@@ -1,0 +1,31 @@
+[package]
+name = "hc_core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+hc_common = { path = "../hc_common" }
+hc_error = { path = "../hc_error" }
+hc_report_builder = { path = "../hc_report_builder" }
+hc_score = { path = "../hc_score" }
+hc_session = { path = "../hc_session" }
+hc_shell = { path = "../hc_shell" }
+hc_version = { path = "../hc_version" }
+
+[dev_dependencies]
+duct = "0.13.5"
+tempfile = "3.2.0"
+hc_common = { path = "../hc_common" }
+criterion = "0.3"
+
+[[bench]]
+name = "basic"
+harness = false
+path = "../../benches/basic.rs"
+
+[[test]]
+name = "can_run"
+path = "../../tests/can_run.rs"
+

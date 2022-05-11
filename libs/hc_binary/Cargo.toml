@@ -1,0 +1,14 @@
+[package]
+name = "hc_binary"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+content_inspector = "0.2.4"
+hc_common = { path = "../hc_common" }
+hc_config = { path = "../hc_config" }
+hc_error = { path = "../hc_error" }
+hc_filesystem = { path = "../hc_filesystem" }
+walkdir = "2"

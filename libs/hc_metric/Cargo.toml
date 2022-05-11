@@ -1,0 +1,24 @@
+[package]
+name = "hc_metric"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+hc_binary = { path = "../hc_binary" }
+hc_common = { path = "../hc_common" }
+hc_config = { path = "../hc_config" }
+hc_data = { path = "../hc_data" }
+hc_error = { path = "../hc_error" }
+hc_filesystem = { path = "../hc_filesystem" }
+hc_git = { path = "../hc_git" }
+hc_linguist = { path = "../hc_linguist" }
+hc_math = { path = "../hc_math" }
+hc_shell = { path = "../hc_shell" }
+maplit = "1.0.2"
+unicode-normalization = "0.1.19"
+unicode-segmentation = "1.9.0"
+
+[dev-dependencies]
+hc_common = { path = "../hc_common" }

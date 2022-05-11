@@ -1,0 +1,8 @@
+# Hard tabs are better than spaces for code accessibility. For example.
+# someone who needs to use a large font size may prefer to set tab width
+# to a smaller number to avoid too much rightward drift in the display
+# of the code. Using tabs for indenting and spaces for alignment will
+# make it easier for people to access and contribute to the Hipcheck
+# source code.
+hard_tabs = true
+

@@ -1,0 +1,14 @@
+[package]
+name = "hc_analysis"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+hc_error = { path = "../hc_error" }
+hc_git = { path = "../hc_git" }
+hc_metric = { path = "../hc_metric" }
+hc_common = { path = "../hc_common" }
+hc_config = { path = "../hc_config" }
+hc_report = { path = "../hc_report" }

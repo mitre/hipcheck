@@ -1,0 +1,92 @@
+###############################################################################
+# Binary.toml
+#
+# This configuration file defines known binary file formats (executables and
+# precompiled objects) and their file extensions in order to identify non-
+# source files included in repositories.
+#
+# -----------------------------------------------------------------------------
+# References:
+# 
+# https://en.wikipedia.org/wiki/List_of_file_formats#Object_code,_executable_files,_shared_and_dynamically_linked_libraries
+#
+# -----------------------------------------------------------------------------
+#
+# name       - Name of the format in question.
+# type       - executable, object, combination, or nil
+# extensions - An Array of associated extensions (the first is considered the
+#              primary extension; the others should be listed alphanumerically)
+# notes      - Optional, short text description of format. Useful if uncommon.
+#
+###############################################################################
+
+[[formats]]
+name = "8BF"
+type = "executable"
+extensions = [ "8bf", "8ba", "8bc", "8be", "8bi", "8bp", "8bs", "8by", "8li", "8ly" ]
+notes = "Image editor plugins"
+
+[[formats]]
+name = "Objective C static library"
+type = "object"
+extensions = [ "a" ]
+
+[[formats]]
+name = "Android Application Package"
+type = "executable"
+extensions = [ "apk", "apkm", "apks", "xapk" ]
+
+[[formats]]
+name = "macOS Appplication Bundle"
+type = "executable"
+extensions = [ "app" ]
+
+[[formats]]
+name = "Java class file"
+type = "object"
+extensions = [ "class" ]
+
+[[formats]]
+name = "COM file"
+type = "executable"
+extensions = [ "com" ]
+notes = "DOS command file"
+
+[[formats]]
+name = "Dynamic-link library"
+type = "object"
+extension = [ "dll" ]
+notes = "Microsoft shared library"
+
+[[formats]]
+name = "Executable and Linkable Format"
+type = "combination"
+extensions = [ "elf", "axf", "bin", "o", "prx", "puff", "ko", "mod", "so" ]
+notes = "Unix ELF"
+
+[[formats]]
+name = "Microsoft Executable"
+type = "executable"
+extensions = [ "exe", "acm", "ax", "cpl", "drv", "efi", "mui", "ocx", "scr", "sys", "tsp" ]
+
+[[formats]]
+name = "iOS App Store Package"
+type = "executable"
+extensions = [ "ipa" ]
+
+[[formats]]
+name = "Java Archive"
+type = "combination"
+extensions = [ "jar", "ear", "war" ]
+
+[[formats]]
+name = "XPInstall"
+type = "executable"
+extensions = [ "xpi" ]
+notes = "Mozilla Cross-Platform Install"
+
+[[formats]]
+name = "Mach-O"
+type = "object"
+extensions = [ "dylib", "bundle" ]
+notes = "Mach object file format, macOS/iOS"

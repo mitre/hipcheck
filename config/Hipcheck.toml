@@ -1,0 +1,456 @@
+###############################################################################
+# Hipcheck.toml
+#
+# This is the config file for Hipcheck's analyses. Generally, the idea is that
+# configurations should be the same between analyses of any repositories whose
+# results you want to compare.
+#
+# Many of these configurations have a default value, and do not need to be
+# included in a configuration file unless you want to override that default.
+#
+###############################################################################
+
+#==============================================================================
+# Risk
+# 
+# Configuration related to the overall risk tolerance across all analyses.
+#==============================================================================
+
+[risk]
+
+# The overall threshold for risk tolerance. Anything above this threshold will
+# be considered a failure. So at 0.5, if 50% of the analyses fail, that's
+# considered a pass, but if more than 50% fail, that's an overall failure.
+#
+# Default: 0.5
+threshold = 0.5
+
+
+#==============================================================================
+# Analysis
+#
+# Configuration for each individual form of analysis.
+#==============================================================================
+
+[analysis]
+
+#------------------------------------------------------------------------------
+# Practices
+#
+# Configuration for analysis of a project's practices.
+#------------------------------------------------------------------------------
+
+[analysis.practices]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+#------------------------------------------------------------------------------
+# Activity
+#
+# Configuration for activity analysis.
+#------------------------------------------------------------------------------
+
+[analysis.practices.activity]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for the number of weeks since a project's last commit, over
+# which a repository will be marked as failing this analysis.
+#
+# Default: 71
+week_count_threshold = 71
+
+#------------------------------------------------------------------------------
+# Binary Files
+#
+# Configuration for binary file presence analysis.
+#------------------------------------------------------------------------------
+
+[analysis.practices.binary]
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of the weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for the number of binary files present in the repository,
+# over which a repository will be marked as failing this analysis.
+# 
+# Default: 0
+binary_file_threshold = 0
+
+#------------------------------------------------------------------------------
+# Fuzz
+#
+# Configuration for analysis of whether a project receives regular fuzz
+# testing.
+#------------------------------------------------------------------------------
+
+[analysis.practices.fuzz]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+#------------------------------------------------------------------------------
+# Identity
+#
+# Configuration for identity analysis.
+#------------------------------------------------------------------------------
+
+[analysis.practices.identity]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for the percentage of commits which may have matching commiter
+# and submitter, over which the repository will be marked as failing this
+# analysis.
+#
+# Default: 0.2
+percent_threshold = 0.2
+
+#------------------------------------------------------------------------------
+# Review
+#
+# Configuration for review analysis.
+#------------------------------------------------------------------------------
+
+[analysis.practices.review]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for the percentage of pull requests which were merged without
+# receiving review, over which the repository will be marked as failing this
+# analysis.
+#
+# Default: 0.05
+percent_threshold = 0.05
+
+#------------------------------------------------------------------------------
+# Attacks
+#
+# Configuration for analysis of potential attacks against a project.
+#------------------------------------------------------------------------------
+
+[analysis.attacks]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+#------------------------------------------------------------------------------
+# Typo
+#
+# Configuration for typo analysis.
+#------------------------------------------------------------------------------
+
+[analysis.attacks.typo]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for the number of possible typos permitted, over which a
+# repository will be marked as failing this analysis.
+#
+# Default: 0
+count_threshold = 0
+
+#------------------------------------------------------------------------------
+# Commit
+#
+# Configuration for commit analysis.
+#------------------------------------------------------------------------------
+
+[analysis.attacks.commit]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+#------------------------------------------------------------------------------
+# Affiliation
+#
+# Configuration for affiliation analysis.
+#------------------------------------------------------------------------------
+
+[analysis.attacks.commit.affiliation]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for number of affiliated committers or submitters to permit.
+# Any count greater than this threshold will cause the repository to be
+# marked as failing.
+#
+# Default: 0
+count_threshold = 0
+
+#------------------------------------------------------------------------------
+# Entropy
+#
+# Configuration for entropy analysis.
+#------------------------------------------------------------------------------
+
+[analysis.attacks.commit.entropy]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for the entropy value (Z-score) over which commits will be
+# marked as having high entropy.
+#
+# Default: 10.0
+value_threshold = 10.0
+
+# The threshold for the percentage of commits which may have high entropy,
+# over which the repository will be marked as failing this analysis.
+#
+# Default: 0.0
+percent_threshold = 0.0
+
+#------------------------------------------------------------------------------
+# Churn
+#
+# Configuration for churn analysis.
+#------------------------------------------------------------------------------
+
+[analysis.attacks.commit.churn]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for the churn value (Z-score) over which commits will be
+# marked as having high churn.
+#
+# Default: 3.0
+value_threshold = 3.0
+
+# The threshold for the percentage of commits which may have high entropy,
+# over which the repository will be marked as failing this analysis.
+#
+# Default: 0.02
+percent_threshold = 0.02
+
+#------------------------------------------------------------------------------
+# Contributor Trust Metric
+#
+# Configuration for contributor trust analysis.
+#------------------------------------------------------------------------------
+
+[analysis.attacks.commit.contributor_trust]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for the trust value (Z-score) over which contributors will be
+# marked as having high trust.
+#
+# Default: 3
+value_threshold = 3
+
+# This is the month range in which the committer needs to have the above value_threshold
+# committer must have commits counts more or equal to X (value_threshold) commits 
+# since Y (trust_month_count_threshold) months ago
+# 
+# Default: 3
+trust_month_count_threshold = 3
+
+# The threshold for the percentage of commits which may have low trust,
+# over which the repository will be marked as failing this analysis.
+#
+# Default: 0.30
+percent_threshold = 0.30
+
+#------------------------------------------------------------------------------
+# Commit Trust Metric
+#
+# Configuration for commit trust analysis.
+#------------------------------------------------------------------------------
+
+[analysis.attacks.commit.commit_trust]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+#------------------------------------------------------------------------------
+# Pull request affiliation
+#
+# Configuration for single pull request affiliation analysis.
+#------------------------------------------------------------------------------
+
+[analysis.attacks.commit.pr_affiliation]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for number of affiliated committers or submitters to permit.
+# Any count greater than this threshold will cause the repository to be
+# marked as failing.
+#
+# Default: 0
+count_threshold = 0
+
+# The path to the "orgs file" is the same as the one for the affiliation
+# analysis, so it does not need to be configured twice.
+
+#------------------------------------------------------------------------------
+# Pull request module contributors
+#
+# Configuration for single pull request module contributors analysis.
+#------------------------------------------------------------------------------
+
+[analysis.attacks.commit.pr_module_contributors]
+
+# Whether the analysis is turned on.
+#
+# Default: true
+active = true
+
+# The "weight" applied to the analysis, controlling how much it influences
+# the overall risk score. The degree of influence of a single weight is that
+# weight divided by the sum of weights for all active analyses.
+#
+# Default: 1
+weight = 1
+
+# The threshold for the percentage of contributors are contributing to at least one new module,
+# over which the repository will be marked as failing this analysis.
+#
+# Default: 0.30
+percent_threshold = 0.30
+
+
+

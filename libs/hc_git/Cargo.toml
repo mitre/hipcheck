@@ -1,0 +1,18 @@
+[package]
+name = "hc_git"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+hc_common = { path = "../hc_common" }
+hc_error = { path = "../hc_error" }
+hc_git_command = { path = "../hc_git_command" }
+hc_command_util = { path = "../hc_command_util" }
+hc_source = { path = "../hc_source" }
+hc_version = { path = "../hc_version" }
+nom = "6.1.2"
+
+[dev-dependencies]
+dirs = "4.0.0"

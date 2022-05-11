@@ -1,0 +1,13 @@
+[package]
+name = "hc_modules"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+dirs = "4.0.0"
+hc_error = { path = "../hc_error" }
+hc_common = { path = "../hc_common" }
+hc_command_util = { path = "../hc_command_util" }
+hc_pathbuf = { path = "../hc_pathbuf" }

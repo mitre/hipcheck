@@ -1,0 +1,11 @@
+[package]
+name = "hc_spdx"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+hc_common = { path = "../hc_common" }
+hc_error = { path = "../hc_error" }
+spdx-rs = "0.5.0"

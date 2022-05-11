@@ -1,0 +1,19 @@
+[package]
+name = "xtask"
+description = "Hipcheck development task runner."
+version = "0.1.0"
+license = "Apache-2.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+hc_filesystem = { path = "../libs/hc_filesystem" }
+hc_error = { path = "../libs/hc_error" }
+hc_pathbuf = { path = "../libs/hc_pathbuf" }
+clap = { version = "3.0.5", default-features = false, features = ["std"] }
+glob = "0.3.0"
+serde = { version = "1.0.133", features = ["derive"] }
+toml = "0.5.8"
+which = "4.2.2"
+duct = "0.13.5"
+open = "2.0.2"

@@ -1,0 +1,16 @@
+[package]
+name = "hc_npm"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+hc_common = { path = "../hc_common" }
+hc_error = { path = "../hc_error" }
+hc_filesystem = { path = "../hc_filesystem" }
+hc_pathbuf = { path = "../hc_pathbuf" }
+hc_command_util = { path = "../hc_command_util" }
+
+[dev-dependencies]
+dirs = "4.0.0"

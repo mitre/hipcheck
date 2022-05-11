@@ -1,0 +1,16 @@
+[package]
+name = "hc_report_builder"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+hc_analysis = { path = "../hc_analysis" }
+hc_common = { path = "../hc_common" }
+hc_config = { path = "../hc_config" }
+hc_error = { path = "../hc_error" }
+hc_report = { path = "../hc_report" }
+hc_score = { path = "../hc_score" }
+hc_session = { path = "../hc_session" }
+hc_source = { path = "../hc_source" }

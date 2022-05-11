@@ -1,0 +1,23 @@
+[package]
+name = "hipcheck"
+version = "3.1.0"
+edition = "2021"
+license = "Apache-2.0"
+include = ["src/**/*", "LICENSE.md", "README.md"]
+publish = false
+
+[[bin]]
+name = "hc"
+path = "src/main.rs"
+
+[dependencies]
+
+# Internal dependencies.
+hc_common = { path = "../libs/hc_common" }
+hc_core = { path = "../libs/hc_core" }
+hc_error = { path = "../libs/hc_error" }
+hc_session = { path = "../libs/hc_session" }
+
+# External dependencies.
+clap = { version = "2.33.3", default-features = false}
+env_logger = { version = "0.9.0", default-features = false, features = ["atty", "humantime"] }
