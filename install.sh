@@ -88,7 +88,7 @@ fi
 #
 # On Linux it tries to follow the XDG directory spec. On MacOS or Windows
 # it defaults based on OS convention.
-hc_uri="https://github.com/mitre/hipcheck/archive/refs/heads/main.zip"
+hc_uri="https://github.com/mitre/hipcheck/archive/refs/heads/main.tar.gz"
 if [ "$os_name" = "linux" ]; then
     if [ -n "$XDG_BIN_HOME" ]; then
         hc_bin_default="$XDG_BIN_HOME/hipcheck"
