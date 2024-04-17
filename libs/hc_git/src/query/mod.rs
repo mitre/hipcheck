@@ -27,7 +27,7 @@ pub trait GitProvider: SourceQuery + VersionQuery {
 
 	/// Return the date of the most recent commit
 	#[salsa::invoke(impls::last_commit_date)]
-	fn last_commit_date(&self) -> Result<Date<FixedOffset>>;
+	fn last_commit_date(&self) -> Result<DateTime<FixedOffset>>;
 
 	/// Returns all diffs extracted from the repository
 	#[salsa::invoke(impls::diffs)]

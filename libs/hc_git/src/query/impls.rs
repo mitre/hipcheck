@@ -23,7 +23,7 @@ pub(crate) fn raw_commits_from_date(
 	get_commits_from_date(db.local().as_ref(), date.as_str()).map(Rc::new)
 }
 
-pub(crate) fn last_commit_date(db: &dyn GitProvider) -> Result<Date<FixedOffset>> {
+pub(crate) fn last_commit_date(db: &dyn GitProvider) -> Result<DateTime<FixedOffset>> {
 	let commits = db.raw_commits().context("failed to get raw commits")?;
 
 	let first = commits.first().ok_or_else(|| Error::msg("no commits"))?;
@@ -31,7 +31,7 @@ pub(crate) fn last_commit_date(db: &dyn GitProvider) -> Result<Date<FixedOffset>
 	first
 		.written_on
 		.as_ref()
-		.map(|date| date.date())
+		.map(|dt| dt.clone())
 		.map_err(|e| Error::msg(e.clone()))
 }
 
