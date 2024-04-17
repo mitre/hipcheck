@@ -15,4 +15,4 @@ hc_version = { path = "../hc_version" }
 nom = "6.1.2"
 
 [dev-dependencies]
-dirs = "4.0.0"
+dirs = "5.0.1"
