@@ -888,7 +888,7 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "hc_error",
- "toml 0.8.12",
+ "toml",
 ]
 
 [[package]]
@@ -1003,7 +1003,7 @@ dependencies = [
  "http",
  "reqwest",
  "serde_derive",
- "toml 0.5.11",
+ "toml",
  "ureq 2.9.6",
  "xml-rs",
 ]
@@ -2519,15 +2519,6 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.5.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f7f0dd8d50a853a531c426359045b1998f04219d88799810762cd4ad314234"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "toml"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9dd1545e8208b4a5af1aa9bbd0b4cf7e9ea08fabc5d0a5c67fcaafa17433aa3"
@@ -3087,7 +3078,7 @@ dependencies = [
  "hc_pathbuf",
  "open",
  "serde",
- "toml 0.8.12",
+ "toml",
  "which",
 ]
 

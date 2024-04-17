@@ -11,7 +11,7 @@ hc_error = { path = "../hc_error" }
 hc_serde = { path = "../hc_serde" }
 clap = { version = "2.33.3", default-features = false}
 glob = "0.3.0"
-toml = "0.5.9"
+toml = "0.8.12"
 reqwest = "0.11.4"
 serde_derive = "1.0.137"
 curl = "0.4.38"
