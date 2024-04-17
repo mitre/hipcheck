@@ -5,7 +5,6 @@ use hc_common::log;
 use hc_config::RiskConfigQuery;
 use hc_error::{hc_error, Error, Result};
 pub use hc_report::*;
-use hc_report::{Concern, ReportParams, VersionQuery};
 use hc_score::ScoringResults;
 use hc_session::Session;
 use hc_source::SourceQuery;
