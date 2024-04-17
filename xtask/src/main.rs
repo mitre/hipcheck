@@ -68,9 +68,7 @@ fn dispatch(matches: ArgMatches) -> Result<()> {
 		Some(("validate", _)) => task::validate::run(),
 		Some(("install", _)) => task::install::run(),
 		Some(("ci", _)) => task::ci::run(),
-		Some(("bench", _)) => {
-			task::bench::build()
-		}
+		Some(("bench", _)) => task::bench::build(),
 		Some(("doc", doc)) => {
 			// PANIC: Should be safe to unwrap, because there is a default value
 			let open = OpenDoc::from_str(doc.value_of("open").unwrap()).unwrap_or(OpenDoc::No);
