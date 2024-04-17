@@ -888,7 +888,7 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "hc_error",
- "toml 0.5.11",
+ "toml 0.8.12",
 ]
 
 [[package]]
