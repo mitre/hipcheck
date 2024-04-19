@@ -32,4 +32,4 @@ hc_version = { path = "../hc_version" }
 
 [dev_dependencies]
 hc_test_util = { path = "../hc_test_util" }
-tempdir = "0.3.7"
+tempfile = "3.10.1"
