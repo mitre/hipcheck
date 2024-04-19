@@ -2,7 +2,7 @@
 
 use crate::authenticated_agent::AuthenticatedAgent;
 use hc_common::serde_json::Value;
-use hc_error::{Error, Result};
+use hc_error::{hc_error, Error, Result};
 use std::rc::Rc;
 
 const GH_API_V4_SEARCH: &str = "https://api.github.com/search/code";
@@ -32,12 +32,7 @@ pub fn search_code_request(agent: &AuthenticatedAgent<'_>, repo: Rc<String>) -> 
 	let query = format!("{}?q={}", GH_API_V4_SEARCH.to_owned(), sub_query);
 
 	// Make the get request.
-	let json_value = match get_request(agent, query) {
-		Ok(json_value) => Ok(json_value),
-		_ => Err(Error::msg("unable to query fuzzing info")),
-	};
-
-	let json = json_value.unwrap();
+	let json = get_request(agent, query).map_err(|_| hc_error!("unable to query fuzzing info"))?;
 
 	match &json["total_count"].to_string().parse::<u64>() {
 		Ok(count) => Ok(count > &0),
