@@ -14,7 +14,7 @@ use hc_error::{self, Context as _, Error, Result};
 use std::path::Path;
 
 pub fn get_git_version() -> Result<String> {
-	let raw_output = GitCommand::new_repo(&["--version"])?
+	let raw_output = GitCommand::new_repo(["--version"])?
 		.output()
 		.context("git version command failed")?;
 	log::debug!("get_git_version [raw_output='{}']", raw_output);
@@ -24,7 +24,7 @@ pub fn get_git_version() -> Result<String> {
 pub fn get_commits(repo: &Path) -> Result<Vec<RawCommit>> {
 	let raw_output = GitCommand::for_repo(
 		repo,
-		&[
+		[
 			"--no-pager",
 			"log",
 			"--no-merges",
@@ -43,7 +43,7 @@ pub fn get_commits_from_date(repo: &Path, date: &str) -> Result<Vec<RawCommit>> 
 	let msg = format!("git log from date {} command failed", &date);
 	let raw_output = GitCommand::for_repo(
 		repo,
-		&[
+		[
 			"--no-pager",
 			"log",
 			"--no-merges",
@@ -72,7 +72,7 @@ pub fn get_last_commit(repo: &Path) -> Result<RawCommit> {
 pub fn get_diffs(repo: &Path) -> Result<Vec<Diff>> {
 	let output = GitCommand::for_repo(
 		repo,
-		&[
+		[
 			"--no-pager",
 			"log",
 			"--no-merges",
@@ -92,7 +92,7 @@ pub fn get_commits_for_file(repo_path: &Path, file: &str) -> Result<String> {
 
 	let output = GitCommand::for_repo(
 		repo_path,
-		&["log", "--follow", "--pretty=tformat:%H%n", "--", file],
+		["log", "--follow", "--pretty=tformat:%H%n", "--", file],
 	)?
 	.output()
 	.context("git log hash command failed")?;

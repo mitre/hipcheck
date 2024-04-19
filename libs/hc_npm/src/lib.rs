@@ -26,7 +26,7 @@ pub struct PackageFile {
 /// Assumes that it exists at the toplevel of the repository.
 pub fn get_package_file(repo: &Path) -> Result<PackageFile> {
 	let package_file = pathbuf!(repo, "package.json");
-	file::read_json(&package_file)
+	file::read_json(package_file)
 }
 
 // For working with dependencies, I think the flow would look like this:
@@ -60,7 +60,7 @@ pub fn get_dependencies(repo: &Path, version: String) -> Result<Vec<String>> {
 /// preinstall scripts.
 fn get_package_lock_file(package_dir: &Path, version: String) -> Result<PackageLockFile> {
 	let package_lock_file = get_package_lock_file_name(package_dir, version)?;
-	file::read_json(&package_lock_file)
+	file::read_json(package_lock_file)
 }
 
 fn get_package_lock_file_name(package_dir: &Path, version: String) -> Result<PathBuf> {
@@ -80,7 +80,7 @@ fn get_package_lock_file_name(package_dir: &Path, version: String) -> Result<Pat
 }
 
 pub fn get_npm_version() -> Result<String> {
-	NpmCommand::version(&["--version"])?.output()
+	NpmCommand::version(["--version"])?.output()
 }
 
 fn generate_package_lock_file(package_dir: &Path, version: String) -> Result<()> {
@@ -89,7 +89,7 @@ fn generate_package_lock_file(package_dir: &Path, version: String) -> Result<()>
 	NpmCommand::for_package(
 		package_dir,
 		version,
-		&[
+		[
 			// Override any `.npmrc` configuration which would otherwise turn off
 			// lockfile production. We need the lockfile to proceed.
 			"--package-lock=true",

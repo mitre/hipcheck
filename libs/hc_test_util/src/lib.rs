@@ -32,9 +32,11 @@ where
 		}
 	}
 
-	match panic::catch_unwind(|| {
+	let scrutinee = panic::catch_unwind(|| {
 		closure();
-	}) {
+	});
+
+	match scrutinee {
 		Ok(_) => {
 			for (k, v) in old_kvs {
 				reset_env(k, v);

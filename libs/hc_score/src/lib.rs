@@ -530,7 +530,7 @@ pub fn add_tree_node(
 	let score_node = score_tree.tree.add_node(ScoreTreeNode {
 		label: phase.to_string(),
 		score: score_increment as f64,
-		weight: weight as f64,
+		weight,
 	});
 	Ok((score_node, score_tree))
 }

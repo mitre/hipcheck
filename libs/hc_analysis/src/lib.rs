@@ -156,18 +156,13 @@ impl Default for AnalysisReport {
 	}
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub enum AnalysisOutcome {
+	#[default]
 	Skipped,
 	Error(Error),
 	Pass(String),
 	Fail(String),
-}
-
-impl Default for AnalysisOutcome {
-	fn default() -> AnalysisOutcome {
-		AnalysisOutcome::Skipped
-	}
 }
 
 impl Display for AnalysisOutcome {

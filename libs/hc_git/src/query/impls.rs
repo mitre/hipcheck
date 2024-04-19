@@ -31,7 +31,7 @@ pub(crate) fn last_commit_date(db: &dyn GitProvider) -> Result<DateTime<FixedOff
 	first
 		.written_on
 		.as_ref()
-		.map(|dt| dt.clone())
+		.map(|dt| *dt)
 		.map_err(|e| Error::msg(e.clone()))
 }
 
@@ -448,7 +448,7 @@ pub(crate) fn signer_for_key(db: &dyn GitProvider, signer_key: Rc<String>) -> Re
 pub(crate) fn get_short_hash(db: &dyn GitProvider, long_hash: Rc<String>) -> Result<String> {
 	let repo = db.local();
 	let repo_path = repo.as_path();
-	let output = GitCommand::for_repo(repo_path, &["rev-parse", "--short", long_hash.as_ref()])?
+	let output = GitCommand::for_repo(repo_path, ["rev-parse", "--short", long_hash.as_ref()])?
 		.output()
 		.context("git rev-parse command failed")?;
 

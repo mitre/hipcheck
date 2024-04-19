@@ -42,17 +42,10 @@ pub fn commit_trust_metric(db: &dyn MetricProvider) -> Result<Rc<CommitTrustOutp
 				count.count
 			);
 
-			if (email == &commit_view.committer.email || email == &commit_view.author.email)
-				&& count.count >= value_threshold
-			{
-				*trust_map
-					.entry(commit_view.commit.hash.to_string())
-					.or_insert(true) = true;
-			} else {
-				*trust_map
-					.entry(commit_view.commit.hash.to_string())
-					.or_insert(true) = false;
-			}
+			*trust_map
+				.entry(commit_view.commit.hash.to_string())
+				.or_insert(true) = (email == &commit_view.committer.email || email == &commit_view.author.email)
+				&& count.count >= value_threshold;
 		}
 	}
 
