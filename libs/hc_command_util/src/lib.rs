@@ -56,7 +56,7 @@ impl DependentProgram {
 		}
 	}
 
-	pub fn min_version<'s, 'v>(&'s self) -> Option<&'v Version> {
+	pub fn min_version<'v>(&self) -> Option<&'v Version> {
 		MIN_VERSIONS.get(self)
 	}
 

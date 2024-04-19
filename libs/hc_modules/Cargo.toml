@@ -6,7 +6,7 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-dirs = "4.0.0"
+dirs = "5.0.1"
 hc_error = { path = "../hc_error" }
 hc_common = { path = "../hc_common" }
 hc_command_util = { path = "../hc_command_util" }

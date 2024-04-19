@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use std::rc::Rc;
-
+use crate::authenticated_agent::AuthenticatedAgent;
 use hc_common::serde_json::Value;
-use hc_error::{Error, Result};
-use ureq;
-use ureq::Agent;
+use hc_error::{hc_error, Error, Result};
+use std::rc::Rc;
 
 const GH_API_V4_SEARCH: &str = "https://api.github.com/search/code";
 
 /// Make a request to the GitHub Code Search API.
-pub fn search_code_request(agent: &Agent, repo: Rc<String>) -> Result<bool> {
+pub fn search_code_request(agent: &AuthenticatedAgent<'_>, repo: Rc<String>) -> Result<bool> {
 	// Example query will look like this:
 	//     https://api.github.com/search/code?q=github.com%20assimp%20assimp+in:file+filename:project.yaml+repo:google/oss-fuzz
 	//
@@ -34,12 +32,7 @@ pub fn search_code_request(agent: &Agent, repo: Rc<String>) -> Result<bool> {
 	let query = format!("{}?q={}", GH_API_V4_SEARCH.to_owned(), sub_query);
 
 	// Make the get request.
-	let json_value = match get_request(agent, query) {
-		Ok(json_value) => Ok(json_value),
-		_ => Err(Error::msg("unable to query fuzzing info")),
-	};
-
-	let json = json_value.unwrap();
+	let json = get_request(agent, query).map_err(|_| hc_error!("unable to query fuzzing info"))?;
 
 	match &json["total_count"].to_string().parse::<u64>() {
 		Ok(count) => Ok(count > &0),
@@ -48,7 +41,7 @@ pub fn search_code_request(agent: &Agent, repo: Rc<String>) -> Result<bool> {
 }
 
 /// Get call using agent
-fn get_request(agent: &Agent, query: String) -> Result<Value> {
-	let response = agent.get(&query).call().into_json()?;
+fn get_request(agent: &AuthenticatedAgent<'_>, query: String) -> Result<Value> {
+	let response = agent.get(&query).call()?.into_json()?;
 	Ok(response)
 }

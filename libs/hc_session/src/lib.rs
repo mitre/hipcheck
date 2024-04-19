@@ -492,7 +492,7 @@ pub enum CheckType {
 mod tests {
 	use super::*;
 	use hc_test_util::with_env_vars;
-	use tempdir::TempDir;
+	use tempfile::TempDir;
 
 	const TEMPDIR_PREFIX: &str = "hc_test";
 
@@ -509,7 +509,7 @@ mod tests {
 
 	#[test]
 	fn resolve_home_with_home_env_var() {
-		let tempdir = TempDir::new(TEMPDIR_PREFIX).unwrap();
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
 
 		with_env_vars(
@@ -545,7 +545,7 @@ mod tests {
 
 	#[test]
 	fn resolve_home_with_home_flag() {
-		let tempdir = TempDir::new(TEMPDIR_PREFIX).unwrap();
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
 
 		with_env_vars(
@@ -578,10 +578,10 @@ mod tests {
 
 	#[test]
 	fn resolve_home_with_xdg_cache_preferred() {
-		let tempdir1 = TempDir::new(TEMPDIR_PREFIX).unwrap();
+		let tempdir1 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 		let tempdir1_path = tempdir1.path().to_string_lossy().into_owned();
 
-		let tempdir2 = TempDir::new(TEMPDIR_PREFIX).unwrap();
+		let tempdir2 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 		let tempdir2_path = tempdir2.path().to_string_lossy().into_owned();
 
 		with_env_vars(
@@ -617,7 +617,7 @@ mod tests {
 
 	#[test]
 	fn resolve_home_with_hc_home_preferred() {
-		let tempdir = TempDir::new(TEMPDIR_PREFIX).unwrap();
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
 
 		with_env_vars(
@@ -639,7 +639,7 @@ mod tests {
 
 	#[test]
 	fn resolve_data_with_data_env_var() {
-		let tempdir = TempDir::new(TEMPDIR_PREFIX).unwrap();
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
 
 		with_env_vars(
@@ -678,7 +678,7 @@ mod tests {
 
 	#[test]
 	fn resolve_data_with_data_flag() {
-		let tempdir = TempDir::new(TEMPDIR_PREFIX).unwrap();
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
 
 		with_env_vars(
@@ -711,10 +711,10 @@ mod tests {
 
 	#[test]
 	fn resolve_data_with_xdg_cache_preferred() {
-		let tempdir1 = TempDir::new(TEMPDIR_PREFIX).unwrap();
+		let tempdir1 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 		let tempdir1_path = tempdir1.path().to_string_lossy().into_owned();
 
-		let tempdir2 = TempDir::new(TEMPDIR_PREFIX).unwrap();
+		let tempdir2 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 		let tempdir2_path = tempdir2.path().to_string_lossy().into_owned();
 
 		with_env_vars(
@@ -754,7 +754,7 @@ mod tests {
 
 	#[test]
 	fn resolve_data_with_hc_data_preferred() {
-		let tempdir = TempDir::new(TEMPDIR_PREFIX).unwrap();
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
 
 		with_env_vars(

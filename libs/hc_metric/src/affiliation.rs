@@ -402,7 +402,7 @@ impl<'de> Visitor<'de> for ReferenceVisitor {
 		let parts: Vec<&str> = s.split(':').collect();
 
 		if parts.len() != 2 {
-			return Err(SerdeError::custom(&"invalid reference"));
+			return Err(SerdeError::custom("invalid reference"));
 		}
 
 		let kind = parts[0].try_into().map_err(SerdeError::custom)?;

@@ -6,7 +6,7 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-dirs = "4.0.0"
+dirs = "5.0.1"
 dotenv = "0.15.0"
 hc_analysis = { path = "../hc_analysis" }
 hc_binary = { path = "../hc_binary" }
@@ -32,4 +32,4 @@ hc_version = { path = "../hc_version" }
 
 [dev_dependencies]
 hc_test_util = { path = "../hc_test_util" }
-tempdir = "0.3.7"
+tempfile = "3.10.1"

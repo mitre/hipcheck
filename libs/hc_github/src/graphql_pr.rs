@@ -4,7 +4,7 @@ use self::review::{
 	ResponseData, ReviewRepositoryPullRequest as RawPull,
 	ReviewRepositoryPullRequestCommitsNodes as RawPullCommit, Variables,
 };
-use crate::data::*;
+use crate::{authenticated_agent::AuthenticatedAgent, data::*};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
 use hc_common::{
 	chrono::DateTime,
@@ -13,7 +13,6 @@ use hc_common::{
 use hc_error::{hc_error, Context, Error, Result};
 use hc_git::{Contributor, RawCommit};
 use std::convert::TryFrom;
-use ureq::Agent;
 
 /// The URL of the GitHub GraphQL API.
 const GH_API_V4: &str = "https://api.github.com/graphql";
@@ -29,7 +28,7 @@ pub struct Review;
 
 /// Query the GitHub GraphQL API for review performed on the given PR.
 pub fn get_all_pr_reviews(
-	agent: &Agent,
+	agent: &AuthenticatedAgent<'_>,
 	owner: &str,
 	repo: &str,
 	number: &i64,
@@ -97,7 +96,7 @@ type Cursor = Option<String>;
 
 /// Query the GitHub GraphQL API for reviews performed on PRs for a repo.
 fn get_all_commits(
-	agent: &Agent,
+	agent: &AuthenticatedAgent<'_>,
 	variables: Variables,
 	commits: &mut Vec<RawCommit>,
 ) -> Result<Cursor> {
@@ -116,7 +115,7 @@ fn get_all_commits(
 	Ok(cursor)
 }
 
-fn get_review(agent: &Agent, variables: Variables) -> Result<GitHubPullRequest> {
+fn get_review(agent: &AuthenticatedAgent<'_>, variables: Variables) -> Result<GitHubPullRequest> {
 	// Setup the query.
 	let query = Review::build_query(variables);
 
@@ -129,8 +128,11 @@ fn get_review(agent: &Agent, variables: Variables) -> Result<GitHubPullRequest> 
 }
 
 /// Make a request to the GitHub API.
-fn make_request(agent: &Agent, query: QueryBody<Variables>) -> Result<Response<ResponseData>> {
-	let response = agent.post(GH_API_V4).send_json(to_json_value(query)?);
+fn make_request(
+	agent: &AuthenticatedAgent<'_>,
+	query: QueryBody<Variables>,
+) -> Result<Response<ResponseData>> {
+	let response = agent.post(GH_API_V4).send_json(to_json_value(query)?)?;
 	if response.status() == 200 {
 		return Ok(from_json_value(response.into_json()?)?);
 	}

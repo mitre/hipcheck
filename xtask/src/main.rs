@@ -6,24 +6,33 @@ mod workspace;
 
 use crate::exit::{EXIT_FAILURE, EXIT_SUCCESS};
 use crate::task::doc::OpenDoc;
-use clap::{Arg, ArgMatches, Command};
+use clap::{crate_version, Arg, ArgAction, ArgMatches, Command};
 use hc_error::{Error, Result};
 use std::process::exit;
-use std::str::FromStr;
 
 fn main() {
 	let matches = Command::new("xtask")
 		.about("Hipcheck development task runner.")
-		.version(get_version().as_ref())
-		.arg(Arg::new("help").short('h').long("help"))
-		.arg(Arg::new("version").short('V').long("version"))
+		.version(crate_version!())
+		.arg(
+			Arg::new("help")
+				.short('h')
+				.long("help")
+				.action(ArgAction::SetTrue),
+		)
+		.arg(
+			Arg::new("version")
+				.short('V')
+				.long("version")
+				.action(ArgAction::SetTrue),
+		)
 		.subcommand(Command::new("ci"))
 		.subcommand(
 			Command::new("doc").arg(
 				Arg::new("open")
 					.value_name("open")
 					.index(1)
-					.default_value(""),
+					.action(ArgAction::SetTrue),
 			),
 		)
 		.subcommand(
@@ -38,11 +47,11 @@ fn main() {
 		.subcommand(Command::new("validate"))
 		.get_matches();
 
-	if matches.is_present("help") {
+	if matches.get_flag("help") {
 		print_help();
 	}
 
-	if matches.is_present("version") {
+	if matches.get_flag("version") {
 		print_version();
 	}
 
@@ -71,7 +80,7 @@ fn dispatch(matches: ArgMatches) -> Result<()> {
 		Some(("bench", _)) => task::bench::build(),
 		Some(("doc", doc)) => {
 			// PANIC: Should be safe to unwrap, because there is a default value
-			let open = OpenDoc::from_str(doc.value_of("open").unwrap()).unwrap_or(OpenDoc::No);
+			let open = OpenDoc::from(doc.get_flag("open"));
 			task::doc::run(open)
 		}
 		Some((_, _)) | None => print_help(),
@@ -110,15 +119,7 @@ TASKS:
 }
 
 fn print_version() -> ! {
-	let version_text = get_version();
+	let version_text = crate_version!();
 	println!("{}", version_text);
 	exit(EXIT_SUCCESS);
-}
-
-fn get_version() -> String {
-	let raw_version = env!("CARGO_PKG_VERSION", "can't find xtask version");
-
-	let version_text = format!("{} {}", env!("CARGO_PKG_NAME"), raw_version);
-
-	version_text
 }

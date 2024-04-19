@@ -3,11 +3,10 @@
 use std::convert::TryInto;
 
 use self::reviews::{ResponseData, ReviewsRepositoryPullRequestsNodes as RawPull, Variables};
-use crate::data::*;
+use crate::{authenticated_agent::AuthenticatedAgent, data::*};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
 use hc_common::serde_json::{from_value as from_json_value, to_value as to_json_value};
 use hc_error::{hc_error, Error, Result};
-use ureq::Agent;
 
 /// The URL of the GitHub GraphQL API.
 const GH_API_V4: &str = "https://api.github.com/graphql";
@@ -22,7 +21,11 @@ const GH_API_V4: &str = "https://api.github.com/graphql";
 pub struct Reviews;
 
 /// Query the GitHub GraphQL API for reviews performed on PRs for a repo.
-pub fn get_all_reviews(agent: &Agent, owner: &str, repo: &str) -> Result<Vec<GitHubPullRequest>> {
+pub fn get_all_reviews(
+	agent: &AuthenticatedAgent<'_>,
+	owner: &str,
+	repo: &str,
+) -> Result<Vec<GitHubPullRequest>> {
 	let vars = Vars::new(owner, repo);
 
 	let mut data = Vec::new();
@@ -64,7 +67,7 @@ type Cursor = Option<String>;
 
 /// Query the GitHub GraphQL API for reviews performed on PRs for a repo.
 fn get_reviews(
-	agent: &Agent,
+	agent: &AuthenticatedAgent<'_>,
 	variables: Variables,
 	data: &mut Vec<GitHubPullRequest>,
 ) -> Result<Cursor> {
@@ -84,8 +87,11 @@ fn get_reviews(
 }
 
 /// Make a request to the GitHub API.
-fn make_request(agent: &Agent, query: QueryBody<Variables>) -> Result<Response<ResponseData>> {
-	let response = agent.post(GH_API_V4).send_json(to_json_value(query)?);
+fn make_request(
+	agent: &AuthenticatedAgent<'_>,
+	query: QueryBody<Variables>,
+) -> Result<Response<ResponseData>> {
+	let response = agent.post(GH_API_V4).send_json(to_json_value(query)?)?;
 	if response.status() == 200 {
 		return Ok(from_json_value(response.into_json()?)?);
 	}

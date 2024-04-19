@@ -15,10 +15,10 @@ hc_shell = { path = "../hc_shell" }
 hc_version = { path = "../hc_version" }
 
 [dev_dependencies]
-duct = "0.13.5"
-tempfile = "3.2.0"
+duct = "0.13.7"
+tempfile = "3.10.1"
 hc_common = { path = "../hc_common" }
-criterion = "0.3"
+criterion = "0.5.1"
 
 [[bench]]
 name = "basic"

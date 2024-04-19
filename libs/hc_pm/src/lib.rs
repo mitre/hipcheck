@@ -262,7 +262,7 @@ impl<'s> Eq for ScoredCandidateUrl<'s> {}
 
 impl<'s> PartialOrd for ScoredCandidateUrl<'s> {
 	fn partial_cmp(&self, other: &ScoredCandidateUrl<'s>) -> Option<Ordering> {
-		self.score.partial_cmp(&other.score)
+		Some(self.cmp(other))
 	}
 }
 
