@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
+mod authenticated_agent;
 pub mod code_search;
 mod data;
 mod graphql;
 mod graphql_pr;
+mod hidden;
 
-use std::{io, rc::Rc};
-
+use crate::authenticated_agent::AuthenticatedAgent;
 use crate::code_search::search_code_request;
 use crate::data::*;
 use crate::graphql::get_all_reviews;
@@ -14,19 +15,21 @@ use crate::graphql_pr::get_all_pr_reviews;
 use hc_common::log;
 use hc_error::{Context as _, Result};
 use hc_git::parse::github_diff;
-use ureq::Agent;
+use std::rc::Rc;
 
 pub struct GitHub<'a> {
 	owner: &'a str,
 	repo: &'a str,
-	agent: Agent,
+	agent: AuthenticatedAgent<'a>,
 }
 
 impl<'a> GitHub<'a> {
 	pub fn new(owner: &'a str, repo: &'a str, token: &'a str) -> GitHub<'a> {
-		let agent = Agent::new().auth_kind("token", token).build();
-
-		GitHub { owner, repo, agent }
+		GitHub {
+			owner,
+			repo,
+			agent: AuthenticatedAgent::new(token),
+		}
 	}
 
 	pub fn fuzz_check(&self, repo_uri: Rc<String>) -> Result<bool> {
@@ -42,7 +45,7 @@ pub struct GitHubPr<'a> {
 	owner: &'a str,
 	repo: &'a str,
 	pull_request: &'a u64,
-	agent: Agent,
+	agent: AuthenticatedAgent<'a>,
 }
 
 impl<'a> GitHubPr<'a> {
@@ -52,13 +55,11 @@ impl<'a> GitHubPr<'a> {
 		pull_request: &'a u64,
 		token: &'a str,
 	) -> GitHubPr<'a> {
-		let agent = Agent::new().auth_kind("token", token).build();
-
 		GitHubPr {
 			owner,
 			repo,
 			pull_request,
-			agent,
+			agent: AuthenticatedAgent::new(token),
 		}
 	}
 
@@ -79,12 +80,12 @@ impl<'a> GitHubPr<'a> {
 		Ok(review)
 	}
 
-	fn get_diffs_for_single_pr(&self) -> io::Result<String> {
+	fn get_diffs_for_single_pr(&self) -> Result<String> {
 		let url = &format!(
 			"https://patch-diff.githubusercontent.com/raw/{}/{}/pull/{}.diff",
 			self.owner, self.repo, self.pull_request
 		);
 		log::trace!("diff url is  {:#?}", url);
-		self.agent.get(url).call().into_string()
+		Ok(self.agent.get(url).call()?.into_string()?)
 	}
 }

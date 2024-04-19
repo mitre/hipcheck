@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use std::rc::Rc;
-
+use crate::authenticated_agent::AuthenticatedAgent;
 use hc_common::serde_json::Value;
 use hc_error::{Error, Result};
-use ureq;
-use ureq::Agent;
+use std::rc::Rc;
 
 const GH_API_V4_SEARCH: &str = "https://api.github.com/search/code";
 
 /// Make a request to the GitHub Code Search API.
-pub fn search_code_request(agent: &Agent, repo: Rc<String>) -> Result<bool> {
+pub fn search_code_request(agent: &AuthenticatedAgent<'_>, repo: Rc<String>) -> Result<bool> {
 	// Example query will look like this:
 	//     https://api.github.com/search/code?q=github.com%20assimp%20assimp+in:file+filename:project.yaml+repo:google/oss-fuzz
 	//
@@ -48,7 +46,7 @@ pub fn search_code_request(agent: &Agent, repo: Rc<String>) -> Result<bool> {
 }
 
 /// Get call using agent
-fn get_request(agent: &Agent, query: String) -> Result<Value> {
-	let response = agent.get(&query).call().into_json()?;
+fn get_request(agent: &AuthenticatedAgent<'_>, query: String) -> Result<Value> {
+	let response = agent.get(&query).call()?.into_json()?;
 	Ok(response)
 }
