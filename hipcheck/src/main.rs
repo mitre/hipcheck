@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 use env_logger::{Builder, Env};
 use hc_common::{schemars::schema_for, serde_json, CheckKind};
 use hc_core::{
@@ -126,6 +126,7 @@ impl Args {
 			.about("Automatically assess and score git repositories for risk.")
 			.version(get_version())
 			.disable_help_flag(true)
+			.disable_version_flag(true)
 			.subcommand(
 				Command::new("help")
 					.subcommand(Command::new("check"))
@@ -135,13 +136,15 @@ impl Args {
 				Arg::new("extra_help")
 					.short('h')
 					.long("help")
-					.help("print help text"),
+					.help("print help text")
+					.action(ArgAction::SetTrue),
 			)
 			.arg(
 				Arg::new("version")
 					.short('V')
 					.long("version")
 					.help("print version information")
+					.action(ArgAction::SetTrue)
 					.global(true),
 			)
 			.subcommand(
@@ -152,6 +155,7 @@ impl Args {
 							.short('h')
 							.long("help")
 							.help("print help text")
+							.action(ArgAction::SetTrue)
 							.global(true),
 					)
 					.subcommand(Command::new(MAVEN))
@@ -165,18 +169,21 @@ impl Args {
 				Arg::new("print home")
 					.long("print-home")
 					.help("print the home directory for Hipcheck")
+					.action(ArgAction::SetTrue)
 					.global(true),
 			)
 			.arg(
 				Arg::new("print config")
 					.long("print-config")
 					.help("print the config file path for Hipcheck")
+					.action(ArgAction::SetTrue)
 					.global(true),
 			)
 			.arg(
 				Arg::new("print data")
 					.long("print-data")
 					.help("print the data folder path for Hipcheck")
+					.action(ArgAction::SetTrue)
 					.global(true),
 			)
 			.arg(
@@ -184,6 +191,7 @@ impl Args {
 					.short('q')
 					.long("quiet")
 					.help("silence progress reporting")
+					.action(ArgAction::SetTrue)
 					.global(true),
 			)
 			.arg(
@@ -225,6 +233,7 @@ impl Args {
 					.short('j')
 					.long("json")
 					.help("output results in JSON format")
+					.action(ArgAction::SetTrue)
 					.global(true),
 			)
 			.subcommand(
