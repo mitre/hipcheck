@@ -11,5 +11,5 @@ hc_error = { path = "../hc_error" }
 hc_git = { path = "../hc_git" }
 # Alias supports graphql_client derive macros
 serde = { path = "../hc_serde", package = "hc_serde" }
-graphql_client = "0.10.0"
+graphql_client = "0.14.0"
 ureq = { version = "1.5.1", default-features = false, features = ["json", "native-tls"] }
