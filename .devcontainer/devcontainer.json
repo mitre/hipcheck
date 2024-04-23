@@ -1,0 +1,14 @@
+{
+  "name": "hipcheck-dev-container",
+  "image": "mcr.microsoft.com/devcontainers/universal:2-linux",
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {
+      "profile": "default"
+    },
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
+  "postCreateCommand": {
+    "module-deps": "npm install -g module-deps@6.2 --no-audit --no-fund",
+    "openssl": "sudo apt-get install libssl-dev"
+  }
+}
