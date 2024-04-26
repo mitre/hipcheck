@@ -11,14 +11,14 @@ use std::process::Command;
 
 fn main() {
 	let repo_dir = env!("CARGO_MANIFEST_DIR", "can't find Cargo manifest directory");
-	let head = get_head_commit(&repo_dir).unwrap_or_default();
+	let head = get_head_commit(repo_dir).unwrap_or_default();
 
 	println!("cargo:rustc-env=HC_HEAD_COMMIT={}", head)
 }
 
 fn get_head_commit<P: AsRef<Path>>(path: P) -> Result<String> {
 	fn inner(path: &Path) -> Result<String> {
-		let output = GitCommand::for_repo(path, &["rev-parse", "--short", "HEAD"])?
+		let output = GitCommand::for_repo(path, ["rev-parse", "--short", "HEAD"])?
 			.output()
 			.context("can't get HEAD commit hash")?;
 

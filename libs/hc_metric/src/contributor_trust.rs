@@ -63,11 +63,7 @@ pub fn contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contributo
 			});
 
 		entry.count += 1;
-		if entry.count >= value_threshold {
-			entry.repo_trusted = true;
-		} else {
-			entry.repo_trusted = false;
-		}
+		entry.repo_trusted = entry.count >= value_threshold;
 	}
 
 	for (email, count) in trust_map.clone() {
@@ -128,11 +124,7 @@ pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contrib
 			});
 
 		author_entry.count += 1;
-		if author_entry.count >= value_threshold {
-			author_entry.repo_trusted = true;
-		} else {
-			author_entry.repo_trusted = false;
-		}
+		author_entry.repo_trusted = author_entry.count >= value_threshold;
 
 		if committer_email != author_email {
 			//if committer email is different, count the committer too
@@ -146,11 +138,7 @@ pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contrib
 
 			committer_entry.count += 1;
 
-			if committer_entry.count >= value_threshold {
-				committer_entry.repo_trusted = true;
-			} else {
-				committer_entry.repo_trusted = false;
-			}
+			committer_entry.repo_trusted = committer_entry.count >= value_threshold;
 		}
 	}
 
@@ -179,11 +167,7 @@ pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contrib
 				repo_trusted: false,
 				pr_trusted: false,
 			});
-		if author_entry.count >= value_threshold {
-			author_entry.pr_trusted = true;
-		} else {
-			author_entry.pr_trusted = false;
-		}
+		author_entry.pr_trusted = author_entry.count >= value_threshold;
 
 		pr_trust_map.insert(author_email.to_string(), author_entry.clone());
 
@@ -197,11 +181,7 @@ pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contrib
 					repo_trusted: false,
 					pr_trusted: false,
 				});
-			if committer_entry.count >= value_threshold {
-				committer_entry.pr_trusted = true;
-			} else {
-				committer_entry.pr_trusted = false;
-			}
+			committer_entry.pr_trusted = committer_entry.count >= value_threshold;
 			pr_trust_map.insert(committer_email.to_string(), committer_entry.clone());
 		}
 	}

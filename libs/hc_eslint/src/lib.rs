@@ -12,7 +12,7 @@ pub mod command;
 pub mod data;
 
 pub fn get_eslint_version() -> Result<String> {
-	ESLintCommand::internal(&[OsStr::new("--version")])?.output()
+	ESLintCommand::internal([OsStr::new("--version")])?.output()
 }
 
 pub fn parse_eslint_version(version: &str) -> Result<Version> {
@@ -27,7 +27,7 @@ pub fn parse_eslint_version(version: &str) -> Result<Version> {
 #[rustfmt::skip]
 pub fn get_eslint_reports(path: &Path, version: String) -> Result<ESLintReports> {
 	// https://eslint.org/docs/user-guide/command-line-interface
-	let output = ESLintCommand::generic(&[
+	let output = ESLintCommand::generic([
 		OsStr::new("--format"), OsStr::new("json"),
 		OsStr::new("--no-eslintrc"),
 		OsStr::new("--rule"), OsStr::new(r#"{"no-eval": "error"}"#),

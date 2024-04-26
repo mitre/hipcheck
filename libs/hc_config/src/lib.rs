@@ -20,8 +20,8 @@ use std::path::Path;
 impl Config {
 	/// Load configuration from the given directory.
 	pub fn load_from(config_path: &Path) -> Result<Config> {
-		file::exists(&config_path)?;
-		let config = file::read_toml(&config_path).context("can't parse config file")?;
+		file::exists(config_path)?;
+		let config = file::read_toml(config_path).context("can't parse config file")?;
 
 		Ok(config)
 	}

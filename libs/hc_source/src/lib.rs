@@ -632,7 +632,7 @@ fn clone_or_update_remote(phase: &mut Phase, url: &Url, dest: &Path) -> Result<(
 }
 
 fn get_symbolic_ref(dest: &Path) -> Result<String> {
-	let output = GitCommand::for_repo(dest, &["symbolic-ref", "-q", "HEAD"])?
+	let output = GitCommand::for_repo(dest, ["symbolic-ref", "-q", "HEAD"])?
 		.output()
 		.context("Git failed to get symbolic ref for HEAD")?;
 
@@ -642,7 +642,7 @@ fn get_symbolic_ref(dest: &Path) -> Result<String> {
 fn get_upstream_for_ref(dest: &Path, symbolic_ref: &str) -> Result<String> {
 	let output = GitCommand::for_repo(
 		dest,
-		&["for-each-ref", "--format=%(upstream:short)", symbolic_ref],
+		["for-each-ref", "--format=%(upstream:short)", symbolic_ref],
 	)?
 	.output()
 	.context("Git failed to get name of upstream for HEAD")?;
@@ -651,13 +651,13 @@ fn get_upstream_for_ref(dest: &Path, symbolic_ref: &str) -> Result<String> {
 }
 
 fn get_url_for_remote(dest: &Path, remote: &str) -> Result<String> {
-	let output = GitCommand::for_repo(dest, &["remote", "get-url", remote])?.output()?;
+	let output = GitCommand::for_repo(dest, ["remote", "get-url", remote])?.output()?;
 
 	Ok(output.trim().to_owned())
 }
 
 fn update_remote(dest: &Path) -> Result<()> {
-	let _output = GitCommand::for_repo(dest, &["pull"])?.output()?;
+	let _output = GitCommand::for_repo(dest, ["pull"])?.output()?;
 
 	Ok(())
 }
@@ -673,7 +673,7 @@ fn clone_remote(url: &Url, dest: &Path) -> Result<()> {
 		.to_str()
 		.ok_or_else(|| hc_error!("destination isn't UTF-8 encoded '{}'", dest.display()))?;
 
-	let _output = GitCommand::new_repo(&[
+	let _output = GitCommand::new_repo([
 		"clone",
 		"-q",
 		"--single-branch",
@@ -687,7 +687,7 @@ fn clone_remote(url: &Url, dest: &Path) -> Result<()> {
 }
 
 pub(crate) fn get_head_commit(path: &Path) -> Result<String> {
-	let output = GitCommand::for_repo(path, &["rev-parse", "--short", "HEAD"])?.output()?;
+	let output = GitCommand::for_repo(path, ["rev-parse", "--short", "HEAD"])?.output()?;
 
 	Ok(output.trim().to_owned())
 }

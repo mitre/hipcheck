@@ -7,4 +7,4 @@ publish = false
 
 [dependencies]
 hc_common = { path = "../hc_common" }
-toml = "0.5.9"
+toml = "0.8.12"

@@ -26,7 +26,7 @@ pub(crate) fn raw_commits_from_date(
 	get_commits_from_date(db.local().as_ref(), date.as_str()).map(Rc::new)
 }
 
-pub(crate) fn last_commit_date(db: &dyn GitProvider) -> Result<Date<FixedOffset>> {
+pub(crate) fn last_commit_date(db: &dyn GitProvider) -> Result<DateTime<FixedOffset>> {
 	let commits = db.raw_commits().context("failed to get raw commits")?;
 
 	let first = commits.first().ok_or_else(|| Error::msg("no commits"))?;
@@ -34,7 +34,7 @@ pub(crate) fn last_commit_date(db: &dyn GitProvider) -> Result<Date<FixedOffset>
 	first
 		.written_on
 		.as_ref()
-		.map(|date| date.date())
+		.map(|dt| *dt)
 		.map_err(|e| Error::msg(e.clone()))
 }
 
@@ -451,7 +451,7 @@ pub(crate) fn signer_for_key(db: &dyn GitProvider, signer_key: Rc<String>) -> Re
 pub(crate) fn get_short_hash(db: &dyn GitProvider, long_hash: Rc<String>) -> Result<String> {
 	let repo = db.local();
 	let repo_path = repo.as_path();
-	let output = GitCommand::for_repo(repo_path, &["rev-parse", "--short", long_hash.as_ref()])?
+	let output = GitCommand::for_repo(repo_path, ["rev-parse", "--short", long_hash.as_ref()])?
 		.output()
 		.context("git rev-parse command failed")?;
 

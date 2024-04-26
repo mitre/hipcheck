@@ -240,7 +240,7 @@ fn validate_crate(krate: &Crate) -> CrateFindingsSet {
 
 /// Check if the 'Cargo.toml' file has an authors field.
 fn crate_has_authors(krate: &Crate) -> bool {
-	matches!(krate.manifest.package.authors, Some(_))
+	krate.manifest.package.authors.is_some()
 }
 
 /// Check if the crate has a 'LICENSE.md' file.
@@ -358,7 +358,7 @@ fn source_missing_license_comment(source_path: &Path) -> bool {
 		Some(Ok(line)) => str::trim(&line) != "// SPDX-License-Identifier: Apache-2.0",
 		// Treat any inability to read a line or the lack of lines as an indicator that the
 		// license comment is missing.
-		_ => return true,
+		_ => true,
 	}
 }
 
@@ -458,13 +458,13 @@ impl CrateKind {
 			.file_name()
 			.ok_or_else(|| hc_error!("invalid path for crate kind"))?
 			.to_string_lossy()
-			.to_owned();
+			.into_owned();
 
 		match kind.as_ref() {
 			"hipcheck" => Ok(CrateKind::Tool),
 			"xtask" => Ok(CrateKind::Task),
 			_ if path.parent().map(|p| p.ends_with("libs")).unwrap_or(false) => Ok(CrateKind::Lib),
-			_ => return Err(hc_error!("unknown crate kind '{}'", kind)),
+			_ => Err(hc_error!("unknown crate kind '{}'", kind)),
 		}
 	}
 }

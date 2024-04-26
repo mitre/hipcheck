@@ -13,7 +13,6 @@ use std::io;
 use std::mem::drop;
 use std::path::PathBuf;
 use std::process::exit;
-use std::str::FromStr;
 
 /// Execute the CI task.
 pub fn run(should_open: OpenDoc) -> Result<()> {
@@ -69,13 +68,12 @@ impl OpenDoc {
 	}
 }
 
-impl FromStr for OpenDoc {
-	type Err = Error;
-
-	fn from_str(s: &str) -> Result<OpenDoc> {
-		match s {
-			"open" => Ok(OpenDoc::Yes),
-			_ => Ok(OpenDoc::No),
+impl From<bool> for OpenDoc {
+	fn from(cond: bool) -> Self {
+		if cond {
+			OpenDoc::Yes
+		} else {
+			OpenDoc::No
 		}
 	}
 }

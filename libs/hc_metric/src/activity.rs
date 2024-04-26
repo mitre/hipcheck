@@ -12,8 +12,8 @@ use std::{rc::Rc, result::Result as StdResult};
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct ActivityOutput {
-	pub today: Date<FixedOffset>,
-	pub last_commit_date: Date<FixedOffset>,
+	pub today: DateTime<FixedOffset>,
+	pub last_commit_date: DateTime<FixedOffset>,
 	pub time_since_last_commit: Duration,
 }
 
@@ -22,9 +22,9 @@ impl Serialize for ActivityOutput {
 	where
 		S: Serializer,
 	{
-		let midnight = NaiveTime::from_hms(0, 0, 0);
-		let today = self.today.and_time(midnight).unwrap();
-		let last_commit_date = self.last_commit_date.and_time(midnight).unwrap();
+		let midnight = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+		let today = self.today.with_time(midnight).unwrap();
+		let last_commit_date = self.last_commit_date.with_time(midnight).unwrap();
 		let time_since_last_commit = self.time_since_last_commit.to_string();
 
 		let mut state = serializer.serialize_struct("Output", 3)?;
@@ -41,7 +41,7 @@ pub(crate) fn activity_metric(db: &dyn MetricProvider) -> Result<Rc<ActivityOutp
 	log::debug!("running activity metric");
 
 	// Get today's date.
-	let today = utc_to_fixed_offset(Utc::today());
+	let today = utc_to_fixed_offset(Utc::now());
 
 	// Get the date of the most recent commit.
 	let last_commit_date = db
@@ -60,7 +60,7 @@ pub(crate) fn activity_metric(db: &dyn MetricProvider) -> Result<Rc<ActivityOutp
 	}))
 }
 
-fn utc_to_fixed_offset(date: Date<Utc>) -> Date<FixedOffset> {
+fn utc_to_fixed_offset(date: DateTime<Utc>) -> DateTime<FixedOffset> {
 	let offset = date.timezone().fix();
-	Date::from_utc(date.naive_utc(), offset)
+	DateTime::from_naive_utc_and_offset(date.naive_utc(), offset)
 }

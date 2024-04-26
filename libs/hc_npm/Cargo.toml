@@ -12,4 +12,4 @@ hc_pathbuf = { path = "../hc_pathbuf" }
 hc_command_util = { path = "../hc_command_util" }
 
 [dev-dependencies]
-dirs = "4.0.0"
+dirs = "5.0.1"

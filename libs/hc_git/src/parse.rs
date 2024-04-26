@@ -186,7 +186,7 @@ fn diff(input: &str) -> IResult<&str, Diff> {
 		let mut additions = Some(0);
 		let mut deletions = Some(0);
 
-		let file_diffs = Iterator::zip(stats.into_iter(), patches.into_iter())
+		let file_diffs = Iterator::zip(stats.into_iter(), patches)
 			.map(|(stat, patch)| {
 				log::trace!(
 					"stat is {:#?} added and {:#?} deleted",
@@ -290,7 +290,7 @@ fn chunk_line(input: &str) -> IResult<&str, &str> {
 }
 
 fn chunk_body(input: &str) -> IResult<&str, String> {
-	fold_many0(chunk_line, String::new(), |mut patch, line| {
+	fold_many0(chunk_line, String::new, |mut patch, line| {
 		patch.push_str(line);
 		patch
 	})(input)
@@ -305,7 +305,7 @@ fn chunk(input: &str) -> IResult<&str, String> {
 }
 
 fn chunks(input: &str) -> IResult<&str, String> {
-	fold_many0(chunk, String::new(), |mut patch, line| {
+	fold_many0(chunk, String::new, |mut patch, line| {
 		patch.push_str(&line);
 		patch
 	})(input)
@@ -346,7 +346,7 @@ fn chunk_line_with_context(input: &str) -> IResult<&str, &str> {
 }
 
 fn chunk_body_with_context(input: &str) -> IResult<&str, String> {
-	fold_many0(chunk_line_with_context, String::new(), |mut patch, line| {
+	fold_many0(chunk_line_with_context, String::new, |mut patch, line| {
 		if line.starts_with('+') || line.starts_with('-') {
 			// Omit the first character.
 			patch.push_str(&line[1..]);
@@ -361,7 +361,7 @@ fn chunk_with_context(input: &str) -> IResult<&str, String> {
 }
 
 fn chunks_with_context(input: &str) -> IResult<&str, String> {
-	fold_many0(chunk_with_context, String::new(), |mut patch, line| {
+	fold_many0(chunk_with_context, String::new, |mut patch, line| {
 		patch.push_str(&line);
 		patch
 	})(input)

@@ -93,7 +93,7 @@ impl ModuleDepsCommand {
 		let path = module_deps_path.display().to_string();
 		log_args(&path, args, DependentProgram::ModuleDeps);
 
-		let mut command = Command::new(&module_deps_path);
+		let mut command = Command::new(module_deps_path);
 		command.args(args);
 
 		// Set the path if necessary

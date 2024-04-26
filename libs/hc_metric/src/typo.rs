@@ -196,10 +196,7 @@ fn get_bitsquatting_typos(results: &mut Vec<Typo>, name: &str) {
 
 					// If the corrupted byte is within the proper ASCII range, then
 					// produce a new string including the corrupted byte.
-					if (c == b'-')
-						|| (c == b'_') || (b'0'..=b'9').contains(&c)
-						|| (b'a'..=b'z').contains(&c)
-					{
+					if (c == b'-') || (c == b'_') || c.is_ascii_digit() || c.is_ascii_lowercase() {
 						let mut corrupted = name.to_owned();
 
 						// We have already ensured the new byte is a valid ASCII byte, so this
