@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_common::{log, semver::Version};
-use hc_error::{hc_error, Context as _, Result};
+use hc_common::context::Context as _;
+use hc_common::{error::Result, hc_error, log, semver::Version};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;

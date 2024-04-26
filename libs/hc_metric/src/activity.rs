@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::MetricProvider;
+use hc_common::context::Context as _;
 use hc_common::{
 	chrono::{prelude::*, Duration},
+	error::Result,
 	log,
 	serde::{ser::SerializeStruct, Serialize, Serializer},
 };
-use hc_error::{Context as _, Result};
 use std::{rc::Rc, result::Result as StdResult};
 
 #[derive(Debug, Eq, PartialEq)]

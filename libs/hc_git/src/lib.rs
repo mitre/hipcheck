@@ -9,8 +9,11 @@ pub use hc_git_command::*;
 pub use query::*;
 
 use crate::parse::*;
-use hc_common::log;
-use hc_error::{self, Context as _, Error, Result};
+use hc_common::context::Context as _;
+use hc_common::{
+	error::{Error, Result},
+	log,
+};
 use std::path::Path;
 
 pub fn get_git_version() -> Result<String> {

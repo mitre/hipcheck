@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 hc_common = { path = "../hc_common" }
-hc_error = { path = "../hc_error" }
 hc_git_command = { path = "../hc_git_command" }
 hc_hash = { path = "../hc_hash" }
 hc_pathbuf = { path = "../hc_pathbuf" }

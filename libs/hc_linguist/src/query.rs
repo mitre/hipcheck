@@ -3,9 +3,11 @@
 //! A query group for source file language detection queries.
 
 use crate::SourceFileDetector;
-use hc_common::salsa;
+use hc_common::{
+	context::{Context, Result},
+	salsa,
+};
 use hc_config::LanguagesConfigQuery;
-use hc_error::{Context as _, Result};
 use std::rc::Rc;
 
 /// Queries related to source file language detection

@@ -9,9 +9,7 @@ build = "src/build.rs"
 [dependencies]
 hc_common = { path = "../hc_common" }
 hc_command_util = { path = "../hc_command_util" }
-hc_error = { path = "../hc_error" }
 
 [build-dependencies]
 hc_common = { path = "../hc_common" }
 hc_command_util = { path = "../hc_command_util" }
-hc_error = { path = "../hc_error" }

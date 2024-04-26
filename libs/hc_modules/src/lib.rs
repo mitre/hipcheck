@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use hc_command_util::{log_args, DependentProgram};
+use hc_common::context::Context as _;
 use hc_common::{
+	error::{Error, Result},
+	hc_error,
 	serde::{self, Deserialize},
 	serde_json,
 };
-use hc_error::{hc_error, Context as _, Error, Result};
 use hc_pathbuf::pathbuf;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;

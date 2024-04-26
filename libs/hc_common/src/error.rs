@@ -10,12 +10,7 @@
 //! which error out aren't retried, as it always compares as equal to
 //! any other error.
 
-mod context;
-#[cfg(test)]
-mod tests;
-
-pub use context::Context;
-use hc_common::log;
+use log;
 use std::borrow::Cow;
 use std::error::Error as StdError;
 use std::fmt::{self, Debug, Display};
@@ -248,16 +243,4 @@ impl<'e> Iterator for Chain<'e> {
 			None => None,
 		}
 	}
-}
-
-/// A limited analogue of the `anyhow!` macro for `Error`.  Only
-/// intended for input suitable for the `Error::msg` function.
-#[macro_export]
-macro_rules! hc_error {
-    ($msg:literal $(,)?) => {
-        $crate::Error::msg($msg)
-    };
-    ($fmt:expr, $($arg:tt)*) => {
-        $crate::Error::msg(format!($fmt, $($arg)*))
-    };
 }

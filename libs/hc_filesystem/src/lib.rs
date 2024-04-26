@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use hc_common::context::Context as _;
 use hc_common::{
+	error::Result,
+	hc_error,
 	serde::{de::DeserializeOwned, Serialize},
 	serde_json,
 };
-use hc_error::{Context as _, Result};
 use std::fs::{self, File};
 use std::ops::Not;
 use std::path::Path;
@@ -110,7 +112,7 @@ pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
 pub fn exists<P: AsRef<Path>>(path: P) -> Result<()> {
 	fn inner(path: &Path) -> Result<()> {
 		if path.exists().not() {
-			Err(hc_error::hc_error!(
+			Err(hc_error!(
 				"'{}' not found at current directory",
 				path.display()
 			))

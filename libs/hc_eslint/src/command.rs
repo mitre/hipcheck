@@ -5,8 +5,8 @@ use std::process::Command;
 
 use hc_command_util;
 use hc_command_util::{log_args, DependentProgram};
-use hc_common::{log, which};
-use hc_error::{hc_error, Context as _, Result};
+use hc_common::context::Context as _;
+use hc_common::{error::Result, hc_error, log, which};
 
 #[derive(Debug)]
 pub struct ESLintCommand {

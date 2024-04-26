@@ -30,7 +30,7 @@
  * These methods take a `&mut Output`, a [`Report`] or [`PrReport`], and a [`Format`].
  *
  * At any point, errors may also be printed using [`Shell::error`], which takes an
- * [`&Error`][hc_error::Error] and a [`Format`].
+ * [`&Error`][hc_common::error:Error] and a [`Format`].
  *
  * ## Why the shell interface?
  *
@@ -85,8 +85,7 @@
 #![deny(missing_docs)]
 
 use atty::is as is_atty;
-use hc_common::{log, serde_json};
-use hc_error::{hc_error, Error, Result};
+use hc_common::{hc_error, log, serde_json, Error, Result};
 use hc_report::{Format, PrReport, RecommendationKind, Report};
 use std::cell::Cell;
 use std::fmt::{self, Debug, Formatter};
@@ -1518,8 +1517,7 @@ enum TtyWidth {
 #[cfg(unix)]
 mod imp {
 	use super::TtyWidth;
-	use hc_common::log;
-	use hc_error::Result;
+	use hc_common::{log, Result};
 	use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 	use std::mem::zeroed;
 	use termcolor::WriteColor;
@@ -1557,8 +1555,7 @@ mod imp {
 #[cfg(windows)]
 mod imp {
 	use super::TtyWidth;
-	use hc_common::log;
-	use hc_error::Result;
+	use hc_common::{log, Result};
 	use std::mem::zeroed;
 	use std::{cmp, ptr};
 	use termcolor::WriteColor;

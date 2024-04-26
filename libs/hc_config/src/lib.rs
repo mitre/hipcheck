@@ -7,10 +7,10 @@ mod query;
 pub use query::*;
 
 use hc_common::{
+	context::{Context, Result},
 	serde::{self, Deserialize, Serialize},
 	F64,
 };
-use hc_error::{Context as _, Result};
 use hc_filesystem as file;
 use smart_default::SmartDefault;
 use std::default::Default;

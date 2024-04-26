@@ -3,11 +3,11 @@
 use crate::MetricProvider;
 use hc_binary::detect_binary_files;
 use hc_common::{
+	error::Result,
 	log,
 	serde::{self, Serialize},
 	TryFilter,
 };
-use hc_error::Result;
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
@@ -28,7 +28,7 @@ pub fn binary_metric(db: &dyn MetricProvider) -> Result<Rc<BinaryOutput>> {
 	let binary_files = detect_binary_files(&pathbuf_rc)?
 		.into_iter()
 		.try_filter(|f| db.is_likely_binary_file(Rc::clone(f)))
-		.collect::<hc_error::Result<_>>()?;
+		.collect::<hc_common::error::Result<_>>()?;
 
 	log::info!("completed binary metric");
 

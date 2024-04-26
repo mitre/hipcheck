@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_error::{hc_error, Result};
+use hc_common::{hc_error, Result};
 use std::path::{Path, PathBuf};
 
 pub fn root() -> Result<PathBuf> {

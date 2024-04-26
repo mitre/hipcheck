@@ -3,7 +3,7 @@
 //! A duplicate of the `anyhow::Context` extension trait intended to
 //! make error propagation less verbose.
 
-use crate::{Error, Introspect};
+use crate::error::{Error, Introspect};
 use std::error::Error as StdError;
 
 /// Functions for adding context to an error result

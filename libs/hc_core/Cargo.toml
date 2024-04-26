@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 hc_common = { path = "../hc_common" }
-hc_error = { path = "../hc_error" }
 hc_report_builder = { path = "../hc_report_builder" }
 hc_score = { path = "../hc_score" }
 hc_session = { path = "../hc_session" }

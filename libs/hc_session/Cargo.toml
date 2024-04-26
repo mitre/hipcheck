@@ -14,7 +14,6 @@ hc_command_util = { path = "../hc_command_util" }
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
 hc_data = { path = "../hc_data" }
-hc_error = { path = "../hc_error" }
 hc_eslint = { path = "../hc_eslint" }
 hc_filesystem = { path = "../hc_filesystem" }
 hc_git = { path = "../hc_git" }

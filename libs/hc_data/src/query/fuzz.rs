@@ -4,9 +4,8 @@
 
 use super::github::GitHubProvider;
 use crate::{get_fuzz_check, Fuzz};
-use hc_common::{log, salsa};
+use hc_common::{log, salsa, Error, Result};
 use hc_config::ConfigSource;
-use hc_error::{Error, Result};
 
 /// A query that provides a fuzz check
 #[salsa::query_group(FuzzProviderStorage)]

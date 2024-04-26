@@ -9,6 +9,5 @@ publish = false
 hc_analysis = { path = "../hc_analysis" }
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
-hc_error = { path = "../hc_error" }
 hc_shell = { path = "../hc_shell" }
 petgraph = { version = "0.6.0" }

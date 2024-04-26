@@ -12,11 +12,11 @@ pub use query::*;
 use std::collections::HashSet;
 
 use hc_common::{
-	log,
+	context::{Context, Result},
+	error::Error,
+	hc_error, log,
 	serde::{self, Serialize},
 };
-
-use hc_error::{hc_error, Context as _, Error, Result};
 use hc_git::{get_commits_for_file, Commit, CommitContributor, Contributor, Diff};
 use hc_github::*;
 use hc_modules::RawModule;

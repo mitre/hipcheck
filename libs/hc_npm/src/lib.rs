@@ -2,11 +2,11 @@
 
 use hc_command_util::{log_args, DependentProgram};
 use hc_common::{
-	log,
+	context::{Context, Result},
+	hc_error, log,
 	serde::{self, Deserialize},
 	which,
 };
-use hc_error::{hc_error, Context as _, Result};
 use hc_filesystem as file;
 use hc_pathbuf::pathbuf;
 use std::convert::AsRef;

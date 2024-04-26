@@ -3,11 +3,10 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
-use hc_common::{semver::Version, serde_json};
-use hc_error::{Context as _, Result};
-
 use command::ESLintCommand;
 use data::ESLintReports;
+use hc_common::context::Context as _;
+use hc_common::{error::Result, semver::Version, serde_json};
 
 pub mod command;
 pub mod data;

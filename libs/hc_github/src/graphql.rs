@@ -5,8 +5,11 @@ use std::convert::TryInto;
 use self::reviews::{ResponseData, ReviewsRepositoryPullRequestsNodes as RawPull, Variables};
 use crate::data::*;
 use graphql_client::{GraphQLQuery, QueryBody, Response};
-use hc_common::serde_json::{from_value as from_json_value, to_value as to_json_value};
-use hc_error::{hc_error, Error, Result};
+use hc_common::{
+	hc_error,
+	serde_json::{from_value as from_json_value, to_value as to_json_value},
+	Error, Result,
+};
 use ureq::Agent;
 
 /// The URL of the GitHub GraphQL API.

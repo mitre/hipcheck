@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use hc_analysis::AnalysisReport;
-use hc_common::log;
+use hc_common::{hc_error, log, Error, Result};
 use hc_config::RiskConfigQuery;
-use hc_error::{hc_error, Error, Result};
 pub use hc_report::*;
 use hc_report::{Concern, ReportParams, VersionQuery};
 use hc_score::ScoringResults;

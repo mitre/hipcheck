@@ -5,7 +5,10 @@
 use crate::exit::EXIT_SUCCESS;
 use crate::task::ci::Printer;
 use duct::cmd;
-use hc_error::{hc_error, Error, Result};
+use hc_common::{
+	error::{Error, Result},
+	hc_error,
+};
 use std::io;
 use std::mem::drop;
 use std::process::exit;

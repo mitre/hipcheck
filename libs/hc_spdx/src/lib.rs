@@ -2,8 +2,8 @@
 
 //! Utilities for extracting repository info from SPDX documents.
 
-use hc_common::{serde_json, url::Url};
-use hc_error::{hc_error, Context, Result};
+use hc_common::context::Context as _;
+use hc_common::{error::Result, hc_error, serde_json, url::Url};
 use spdx_rs::models::SPDX;
 use std::ffi::{OsStr, OsString};
 

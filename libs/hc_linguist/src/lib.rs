@@ -4,11 +4,12 @@ mod query;
 
 pub use query::*;
 
+use hc_common::context::Context as _;
 use hc_common::{
+	error::Result,
 	log,
 	serde::{self, de::Visitor, Deserialize, Deserializer},
 };
-use hc_error::{Context as _, Result};
 use hc_filesystem::read_toml;
 use std::convert::AsRef;
 use std::fmt::{self, Formatter};

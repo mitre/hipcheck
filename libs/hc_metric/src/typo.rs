@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::MetricProvider;
+use hc_common::context::Context as _;
 use hc_common::{
+	error::Result,
 	log,
 	serde::{self, Deserialize, Serialize},
 };
 use hc_data::{Dependencies, Lang};
-use hc_error::{Context as _, Result};
 use hc_filesystem as file;
 use maplit::hashmap;
 use std::cmp::Ordering;
@@ -39,7 +40,9 @@ pub fn typo_metric(db: &dyn MetricProvider) -> Result<Rc<TypoOutput>> {
 
 	let typo_output = match dependencies.language {
 		Lang::JavaScript => typos_for_javascript(&typo_file, dependencies),
-		Lang::Unknown => Err(hc_error::Error::msg("failed to identify a known language")),
+		Lang::Unknown => Err(hc_common::error::Error::msg(
+			"failed to identify a known language",
+		)),
 	}?;
 
 	log::info!("completed typo metric");

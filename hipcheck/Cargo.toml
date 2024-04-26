@@ -15,7 +15,6 @@ path = "src/main.rs"
 # Internal dependencies.
 hc_common = { path = "../libs/hc_common" }
 hc_core = { path = "../libs/hc_core" }
-hc_error = { path = "../libs/hc_error" }
 hc_session = { path = "../libs/hc_session" }
 
 # External dependencies.

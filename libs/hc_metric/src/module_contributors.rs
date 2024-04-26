@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::MetricProvider;
+use hc_common::context::Context as _;
 use hc_common::{
+	error::Result,
 	log,
 	serde::{self, Serialize},
 };
 use hc_data::Module;
-use hc_error::{Context as _, Result};
 use hc_git::Contributor;
 use std::{collections::HashMap, rc::Rc};
 
