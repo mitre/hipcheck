@@ -4,7 +4,7 @@
 
 use crate::npm::{get_package_file, PackageFile};
 use crate::Dependencies;
-use hc_common::{salsa, error::Result};
+use hc_common::{error::Result, salsa};
 use hc_source::SourceQuery;
 use hc_version::VersionQuery;
 use std::rc::Rc;

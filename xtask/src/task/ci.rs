@@ -4,7 +4,10 @@
 
 use crate::exit::EXIT_SUCCESS;
 use duct::cmd;
-use hc_common::{hc_error, error::{Error, Result}};
+use hc_common::{
+	error::{Error, Result},
+	hc_error,
+};
 use std::io::{self, Stderr, Stdout, Write as _};
 use std::mem::drop;
 use std::ops::Not as _;

@@ -85,7 +85,10 @@
 #![deny(missing_docs)]
 
 use atty::is as is_atty;
-use hc_common::{hc_error, log, serde_json, error::{Error, Result}};
+use hc_common::{
+	error::{Error, Result},
+	hc_error, log, serde_json,
+};
 use hc_report::{Format, PrReport, RecommendationKind, Report};
 use std::cell::Cell;
 use std::fmt::{self, Debug, Formatter};
@@ -1517,7 +1520,7 @@ enum TtyWidth {
 #[cfg(unix)]
 mod imp {
 	use super::TtyWidth;
-	use hc_common::{log, Result};
+	use hc_common::{error::Result, log};
 	use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 	use std::mem::zeroed;
 	use termcolor::WriteColor;
@@ -1555,7 +1558,7 @@ mod imp {
 #[cfg(windows)]
 mod imp {
 	use super::TtyWidth;
-	use hc_common::{log, error::Result};
+	use hc_common::{error::Result, log};
 	use std::mem::zeroed;
 	use std::{cmp, ptr};
 	use termcolor::WriteColor;

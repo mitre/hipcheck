@@ -2,7 +2,10 @@
 
 use std::rc::Rc;
 
-use hc_common::{serde_json::Value, error::{Error, Result}};
+use hc_common::{
+	error::{Error, Result},
+	serde_json::Value,
+};
 use ureq;
 use ureq::Agent;
 

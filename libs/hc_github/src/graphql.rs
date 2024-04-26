@@ -6,9 +6,9 @@ use self::reviews::{ResponseData, ReviewsRepositoryPullRequestsNodes as RawPull,
 use crate::data::*;
 use graphql_client::{GraphQLQuery, QueryBody, Response};
 use hc_common::{
+	error::{Error, Result},
 	hc_error,
 	serde_json::{from_value as from_json_value, to_value as to_json_value},
-	error::{Error, Result},
 };
 use ureq::Agent;
 

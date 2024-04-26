@@ -15,10 +15,10 @@ pub use query::*;
 
 use hc_common::{
 	chrono::prelude::*,
+	error::{Error, Result},
 	hc_error, log,
 	schemars::{self, JsonSchema},
 	serde::{self, Serialize, Serializer},
-	error::{Error, Result},
 };
 use paste::paste;
 use std::default::Default;

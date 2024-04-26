@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use hc_analysis::{AnalysisOutcome, AnalysisProvider, AnalysisReport};
-use hc_common::{hc_error, salsa, error::Result};
+use hc_common::{error::Result, hc_error, salsa};
 use hc_shell::Phase;
 use std::default::Default;
 use std::rc::Rc;
@@ -529,7 +529,7 @@ pub fn add_tree_node(
 	let score_node = score_tree.tree.add_node(ScoreTreeNode {
 		label: phase.to_string(),
 		score: score_increment as f64,
-		weight: weight as f64,
+		weight,
 	});
 	Ok((score_node, score_tree))
 }

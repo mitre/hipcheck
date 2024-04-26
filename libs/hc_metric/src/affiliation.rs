@@ -2,13 +2,14 @@
 
 use crate::MetricProvider;
 use hc_common::{
+	context::Context as _,
+	error::{Error, Result},
 	hc_error, log,
 	serde::{
 		self,
 		de::{Error as SerdeError, Visitor},
 		Deserialize, Deserializer, Serialize,
 	},
-	context::Context as _, error::{Error, Result},
 };
 use hc_data::git::{Commit, CommitContributorView};
 use hc_filesystem as file;

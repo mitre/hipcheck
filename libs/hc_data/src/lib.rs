@@ -13,8 +13,8 @@ use std::collections::HashSet;
 
 use hc_common::{
 	context::Context,
-	error::Result,
 	error::Error,
+	error::Result,
 	hc_error, log,
 	serde::{self, Serialize},
 };

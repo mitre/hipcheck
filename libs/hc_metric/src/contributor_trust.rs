@@ -119,7 +119,7 @@ pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contrib
 		let author_email = &commit_view.author.email;
 		let committer_email = &commit_view.committer.email;
 
-		let mut author_entry = full_repo_trust_map
+		let author_entry = full_repo_trust_map
 			.entry(author_email.to_string())
 			.or_insert(ContributorTrustResult {
 				count: 0,
@@ -136,7 +136,7 @@ pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contrib
 
 		if committer_email != author_email {
 			//if committer email is different, count the committer too
-			let mut committer_entry = full_repo_trust_map
+			let committer_entry = full_repo_trust_map
 				.entry(committer_email.to_string())
 				.or_insert(ContributorTrustResult {
 					count: 0,

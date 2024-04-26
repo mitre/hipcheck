@@ -25,7 +25,7 @@ use contributor_trust::ContributorTrustOutput;
 use entropy::EntropyOutput;
 use fuzz::FuzzOutput;
 use hc_binary::BinaryFile;
-use hc_common::{salsa, error::Result};
+use hc_common::{error::Result, salsa};
 use hc_config::{AttacksConfigQuery, CommitConfigQuery};
 use hc_data::{DependenciesProvider, FuzzProvider, ModuleProvider, PullRequestReviewProvider};
 use hc_git::GitProvider;

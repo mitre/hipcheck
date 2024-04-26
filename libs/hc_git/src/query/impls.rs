@@ -8,7 +8,11 @@ use crate::{
 	CommitContributorView, CommitDiff, CommitSigner, CommitSignerView, Contributor,
 	ContributorView, Diff, GitCommand, RawCommit, SignerKeyView, SignerNameView, SignerView,
 };
-use hc_common::{chrono::prelude::*, context::Context, error::{Error, Result}};
+use hc_common::{
+	chrono::prelude::*,
+	context::Context,
+	error::{Error, Result},
+};
 use std::rc::Rc;
 
 pub(crate) fn raw_commits(db: &dyn GitProvider) -> Result<Rc<Vec<RawCommit>>> {
