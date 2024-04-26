@@ -2,7 +2,8 @@
 
 use hc_command_util::{log_args, DependentProgram};
 use hc_common::{
-	context::{Context, Result},
+	context::Context,
+	error::Result,
 	hc_error, log,
 	serde::{self, Deserialize},
 	which,

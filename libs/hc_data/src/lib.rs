@@ -12,7 +12,8 @@ pub use query::*;
 use std::collections::HashSet;
 
 use hc_common::{
-	context::{Context, Result},
+	context::Context,
+	error::Result,
 	error::Error,
 	hc_error, log,
 	serde::{self, Serialize},

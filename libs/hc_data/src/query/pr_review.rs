@@ -7,7 +7,7 @@ use crate::{
 	get_pull_request_reviews_from_github, get_single_pull_request_review_from_github, PullRequest,
 	SinglePullRequest,
 };
-use hc_common::{salsa, Context, Error, Result};
+use hc_common::{salsa, context::Context, error::{Error, Result}};
 use hc_config::ConfigSource;
 use hc_git::{Commit, CommitContributorView, CommitDiff, Contributor, ContributorView};
 use std::rc::Rc;

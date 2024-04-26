@@ -18,7 +18,7 @@ use hc_common::{
 	hc_error, log,
 	schemars::{self, JsonSchema},
 	serde::{self, Serialize, Serializer},
-	Error, Result,
+	error::{Error, Result},
 };
 use paste::paste;
 use std::default::Default;

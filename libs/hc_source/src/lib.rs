@@ -5,7 +5,7 @@ mod query;
 pub use query::*;
 
 use hc_common::log::{self, debug};
-use hc_common::{hc_error, url::Url, Context, Error, Result};
+use hc_common::{hc_error, url::Url, context::Context, error::{Error, Result}};
 use hc_git_command::GitCommand;
 use hc_pathbuf::pathbuf;
 use hc_shell::Phase;

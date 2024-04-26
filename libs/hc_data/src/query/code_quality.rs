@@ -5,7 +5,7 @@
 use std::rc::Rc;
 
 use crate::code_quality::{get_eslint_report, CodeQualityReport};
-use hc_common::{error::Error, salsa};
+use hc_common::{error::Result, salsa};
 use hc_source::SourceQuery;
 use hc_version::VersionQuery;
 

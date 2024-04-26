@@ -5,7 +5,8 @@ mod query;
 pub use query::*;
 
 use hc_common::{
-	context::{Context, Result},
+	context::Context,
+	error::Result,
 	log,
 	semver::Version,
 };

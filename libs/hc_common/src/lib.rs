@@ -75,6 +75,6 @@ macro_rules! hc_error {
         $crate::error::Error::msg($msg)
     };
     ($fmt:expr, $($arg:tt)*) => {
-        $crate::::error::Error::msg(format!($fmt, $($arg)*))
+        $crate::error::Error::msg(format!($fmt, $($arg)*))
     };
 }

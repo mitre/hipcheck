@@ -6,7 +6,7 @@ use std::{path::PathBuf, rc::Rc};
 
 use crate::{associate_modules_and_commits, Module, ModuleGraph};
 
-use hc_common::{salsa, Error, Result};
+use hc_common::{salsa, error::{Error, Result}};
 use hc_git::{Commit, GitProvider};
 use hc_pathbuf::pathbuf;
 

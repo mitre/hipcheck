@@ -8,7 +8,7 @@ use hc_common::context::Context as _;
 use hc_common::{
 	chrono::prelude::*,
 	error::{Error, Result},
-	hc_error, salsa, Error, HIPCHECK_TOML_FILE,
+	hc_error, salsa, HIPCHECK_TOML_FILE,
 };
 use hc_config::{
 	AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource, ConfigSourceStorage,

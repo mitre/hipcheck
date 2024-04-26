@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_common::{chrono::Duration, salsa, Error, Result, F64};
+use hc_common::{chrono::Duration, salsa, error::{Error, Result}, F64};
 use hc_config::{AttacksConfigQuery, CommitConfigQuery, FuzzConfigQuery, PracticesConfigQuery};
 use hc_git::GitProvider;
 use hc_metric::{affiliation::AffiliatedType, MetricProvider};

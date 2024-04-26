@@ -2,7 +2,7 @@
 
 //! Query group for data pertaining to a remote GitHub source.
 
-use hc_common::{salsa, Error, Result};
+use hc_common::{salsa, error::{Error, Result}};
 use hc_source::{Remote, SourceQuery};
 use std::rc::Rc;
 

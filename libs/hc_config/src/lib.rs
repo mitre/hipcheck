@@ -7,7 +7,8 @@ mod query;
 pub use query::*;
 
 use hc_common::{
-	context::{Context, Result},
+	context::Context,
+	error::Result,
 	serde::{self, Deserialize, Serialize},
 	F64,
 };

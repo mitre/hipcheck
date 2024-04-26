@@ -85,7 +85,7 @@
 #![deny(missing_docs)]
 
 use atty::is as is_atty;
-use hc_common::{hc_error, log, serde_json, Error, Result};
+use hc_common::{hc_error, log, serde_json, error::{Error, Result}};
 use hc_report::{Format, PrReport, RecommendationKind, Report};
 use std::cell::Cell;
 use std::fmt::{self, Debug, Formatter};
@@ -1555,7 +1555,7 @@ mod imp {
 #[cfg(windows)]
 mod imp {
 	use super::TtyWidth;
-	use hc_common::{log, Result};
+	use hc_common::{log, error::Result};
 	use std::mem::zeroed;
 	use std::{cmp, ptr};
 	use termcolor::WriteColor;

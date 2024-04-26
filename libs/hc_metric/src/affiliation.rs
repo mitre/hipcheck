@@ -8,7 +8,7 @@ use hc_common::{
 		de::{Error as SerdeError, Visitor},
 		Deserialize, Deserializer, Serialize,
 	},
-	Context as _, Error, Result,
+	context::Context as _, error::{Error, Result},
 };
 use hc_data::git::{Commit, CommitContributorView};
 use hc_filesystem as file;

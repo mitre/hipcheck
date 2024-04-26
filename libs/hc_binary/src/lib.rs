@@ -6,7 +6,7 @@ pub use query::*;
 
 use content_inspector::{inspect, ContentType};
 use hc_common::{
-	common::Context,
+	context::Context,
 	error::Result,
 	hc_error,
 	serde::{self, de::Visitor, Deserialize, Deserializer},

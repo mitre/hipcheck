@@ -3,7 +3,7 @@
 use clap::{App, AppSettings, Arg, SubCommand};
 use env_logger::{Builder, Env};
 use hc_common::{
-	common::Context, error::Result, hc_error, schemars::schema_for, serde_json, CheckKind,
+	context::Context, error::Result, hc_error, schemars::schema_for, serde_json, CheckKind,
 };
 use hc_core::{
 	print_error, resolve_config, resolve_data, resolve_home, run, version, AnyReport, ColorChoice,

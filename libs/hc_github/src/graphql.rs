@@ -8,7 +8,7 @@ use graphql_client::{GraphQLQuery, QueryBody, Response};
 use hc_common::{
 	hc_error,
 	serde_json::{from_value as from_json_value, to_value as to_json_value},
-	Error, Result,
+	error::{Error, Result},
 };
 use ureq::Agent;
 

@@ -4,7 +4,7 @@
 
 use super::github::GitHubProvider;
 use crate::{get_fuzz_check, Fuzz};
-use hc_common::{log, salsa, Error, Result};
+use hc_common::{log, salsa, error::{Error, Result}};
 use hc_config::ConfigSource;
 
 /// A query that provides a fuzz check

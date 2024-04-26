@@ -4,7 +4,8 @@
 
 use crate::SourceFileDetector;
 use hc_common::{
-	context::{Context, Result},
+	context::Context,
+	error::Result,
 	salsa,
 };
 use hc_config::LanguagesConfigQuery;

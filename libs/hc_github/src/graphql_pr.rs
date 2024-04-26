@@ -10,7 +10,7 @@ use hc_common::{
 	chrono::DateTime,
 	hc_error,
 	serde_json::{from_value as from_json_value, to_value as to_json_value},
-	Context, Error, Result,
+	context::Context, error::{Error, Result},
 };
 use hc_git::{Contributor, RawCommit};
 use std::convert::TryFrom;
