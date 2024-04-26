@@ -3,10 +3,10 @@
 use dotenv::var;
 use hc_analysis::AnalysisProviderStorage;
 use hc_binary::BinaryFileStorage;
-use hc_command_util::DependentProgram;
 use hc_common::context::Context as _;
 use hc_common::{
 	chrono::prelude::*,
+	command_util::DependentProgram,
 	error::{Error, Result},
 	hc_error, salsa, HIPCHECK_TOML_FILE,
 };

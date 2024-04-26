@@ -8,5 +8,4 @@ publish = false
 [dependencies]
 dirs = "5.0.1"
 hc_common = { path = "../hc_common" }
-hc_command_util = { path = "../hc_command_util" }
 hc_pathbuf = { path = "../hc_pathbuf" }

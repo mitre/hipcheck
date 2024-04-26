@@ -8,7 +8,6 @@ publish = false
 [dependencies]
 hc_common = { path = "../hc_common" }
 hc_git_command = { path = "../hc_git_command" }
-hc_command_util = { path = "../hc_command_util" }
 hc_source = { path = "../hc_source" }
 hc_version = { path = "../hc_version" }
 nom = "7.1.3"

@@ -3,10 +3,12 @@
 use std::ffi::OsStr;
 use std::process::Command;
 
-use hc_command_util;
-use hc_command_util::{log_args, DependentProgram};
 use hc_common::context::Context as _;
-use hc_common::{error::Result, hc_error, log, which};
+use hc_common::{
+	command_util::{log_args, DependentProgram},
+	error::Result,
+	hc_error, log, which,
+};
 
 #[derive(Debug)]
 pub struct ESLintCommand {

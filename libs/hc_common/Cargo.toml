@@ -10,7 +10,9 @@ chrono = { version = "0.4.19", features = ["serde"] }
 hc_serde = { path = "../hc_serde" }
 lazy_static = "1.4.0"
 log = "0.4.16"
+once_cell = "1.10.0"
 ordered-float = { version = "4.2.0", features = ["serde"] }
+regex = "1.5.5"
 salsa = "0.16.1"
 schemars = { version  = "0.8.8", default-features = false, features = ["derive", "preserve_order", "chrono" ] }
 semver = "1.0.9"

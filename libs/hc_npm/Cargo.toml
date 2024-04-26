@@ -9,7 +9,6 @@ publish = false
 hc_common = { path = "../hc_common" }
 hc_filesystem = { path = "../hc_filesystem" }
 hc_pathbuf = { path = "../hc_pathbuf" }
-hc_command_util = { path = "../hc_command_util" }
 
 [dev-dependencies]
 dirs = "5.0.1"

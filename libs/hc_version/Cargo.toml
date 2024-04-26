@@ -8,8 +8,6 @@ build = "src/build.rs"
 
 [dependencies]
 hc_common = { path = "../hc_common" }
-hc_command_util = { path = "../hc_command_util" }
 
 [build-dependencies]
 hc_common = { path = "../hc_common" }
-hc_command_util = { path = "../hc_command_util" }

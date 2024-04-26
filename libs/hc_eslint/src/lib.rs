@@ -45,7 +45,7 @@ pub fn get_eslint_reports(path: &Path, version: String) -> Result<ESLintReports>
 mod test {
 	use super::*;
 
-	use hc_command_util::DependentProgram;
+	use hc_common::command_util::DependentProgram;
 	use std::fs::File;
 	use std::io::Write;
 

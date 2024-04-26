@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_command_util::{log_args, DependentProgram};
 use hc_common::{
+	command_util::{log_args, DependentProgram},
 	context::Context,
 	error::Result,
 	hc_error, log,
