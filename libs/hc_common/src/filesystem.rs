@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_common::context::Context as _;
-use hc_common::{
+use crate::context::Context as _;
+use crate::{
 	error::Result,
 	hc_error,
 	serde::{de::DeserializeOwned, Serialize},

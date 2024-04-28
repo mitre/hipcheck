@@ -625,17 +625,7 @@ dependencies = [
  "content_inspector",
  "hc_common",
  "hc_config",
- "hc_filesystem",
  "walkdir",
-]
-
-[[package]]
-name = "hc_command_util"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "once_cell",
- "regex",
 ]
 
 [[package]]
@@ -646,7 +636,9 @@ dependencies = [
  "hc_serde",
  "lazy_static",
  "log",
+ "once_cell",
  "ordered-float",
+ "regex",
  "salsa",
  "schemars",
  "semver",
@@ -660,7 +652,6 @@ name = "hc_config"
 version = "0.1.0"
 dependencies = [
  "hc_common",
- "hc_filesystem",
  "hc_pathbuf",
  "smart-default",
 ]
@@ -701,17 +692,8 @@ dependencies = [
 name = "hc_eslint"
 version = "0.1.0"
 dependencies = [
- "hc_command_util",
  "hc_common",
  "tempfile",
-]
-
-[[package]]
-name = "hc_filesystem"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "toml",
 ]
 
 [[package]]
@@ -719,7 +701,6 @@ name = "hc_git"
 version = "0.1.0"
 dependencies = [
  "dirs",
- "hc_command_util",
  "hc_common",
  "hc_git_command",
  "hc_source",
@@ -731,7 +712,6 @@ dependencies = [
 name = "hc_git_command"
 version = "0.1.0"
 dependencies = [
- "hc_command_util",
  "hc_common",
 ]
 
@@ -756,7 +736,6 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "hc_config",
- "hc_filesystem",
 ]
 
 [[package]]
@@ -771,7 +750,6 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_filesystem",
  "hc_git",
  "hc_linguist",
  "hc_math",
@@ -786,7 +764,6 @@ name = "hc_modules"
 version = "0.1.0"
 dependencies = [
  "dirs",
- "hc_command_util",
  "hc_common",
  "hc_pathbuf",
 ]
@@ -796,9 +773,7 @@ name = "hc_npm"
 version = "0.1.0"
 dependencies = [
  "dirs",
- "hc_command_util",
  "hc_common",
- "hc_filesystem",
  "hc_pathbuf",
 ]
 
@@ -868,12 +843,10 @@ dependencies = [
  "dotenv",
  "hc_analysis",
  "hc_binary",
- "hc_command_util",
  "hc_common",
  "hc_config",
  "hc_data",
  "hc_eslint",
- "hc_filesystem",
  "hc_git",
  "hc_linguist",
  "hc_metric",
@@ -933,7 +906,6 @@ dependencies = [
 name = "hc_version"
 version = "0.1.0"
 dependencies = [
- "hc_command_util",
  "hc_common",
 ]
 
@@ -2420,7 +2392,6 @@ dependencies = [
  "duct",
  "glob",
  "hc_common",
- "hc_filesystem",
  "hc_pathbuf",
  "open",
  "serde",

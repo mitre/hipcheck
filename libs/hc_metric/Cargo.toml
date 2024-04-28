@@ -10,7 +10,6 @@ hc_binary = { path = "../hc_binary" }
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
 hc_data = { path = "../hc_data" }
-hc_filesystem = { path = "../hc_filesystem" }
 hc_git = { path = "../hc_git" }
 hc_linguist = { path = "../hc_linguist" }
 hc_math = { path = "../hc_math" }

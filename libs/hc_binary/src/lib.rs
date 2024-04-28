@@ -8,10 +8,10 @@ use content_inspector::{inspect, ContentType};
 use hc_common::{
 	context::Context,
 	error::Result,
+	filesystem::read_toml,
 	hc_error,
 	serde::{self, de::Visitor, Deserialize, Deserializer},
 };
-use hc_filesystem::read_toml;
 use std::fmt::{self, Formatter};
 use std::fs::File;
 use std::io::prelude::Read;

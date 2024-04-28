@@ -7,6 +7,5 @@ publish = false
 
 [dependencies]
 hc_common = { path = "../hc_common" }
-hc_filesystem = { path = "../hc_filesystem" }
 hc_pathbuf = { path = "../hc_pathbuf" }
 smart-default = "0.7.1"

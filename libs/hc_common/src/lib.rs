@@ -6,6 +6,7 @@
 pub mod command_util;
 pub mod context;
 pub mod error;
+pub mod filesystem;
 #[cfg(test)]
 mod tests;
 mod try_any;

@@ -9,5 +9,4 @@ publish = false
 content_inspector = "0.2.4"
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
-hc_filesystem = { path = "../hc_filesystem" }
 walkdir = "2"

@@ -7,10 +7,10 @@ pub use query::*;
 use hc_common::context::Context as _;
 use hc_common::{
 	error::Result,
+	filesystem::read_toml,
 	log,
 	serde::{self, de::Visitor, Deserialize, Deserializer},
 };
-use hc_filesystem::read_toml;
 use std::convert::AsRef;
 use std::fmt::{self, Formatter};
 use std::path::Path;

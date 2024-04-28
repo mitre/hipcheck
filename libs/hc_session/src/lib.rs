@@ -8,6 +8,7 @@ use hc_common::{
 	chrono::prelude::*,
 	command_util::DependentProgram,
 	error::{Error, Result},
+	filesystem::create_dir_all,
 	hc_error, salsa, HIPCHECK_TOML_FILE,
 };
 use hc_config::{
@@ -20,7 +21,6 @@ use hc_data::{
 	CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
 	GitHubProviderStorage, ModuleProviderStorage, PullRequestReviewProviderStorage,
 };
-use hc_filesystem::create_dir_all;
 use hc_git::get_git_version;
 use hc_git::GitProviderStorage;
 use hc_linguist::LinguistStorage;

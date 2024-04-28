@@ -4,11 +4,10 @@ use crate::MetricProvider;
 use hc_common::context::Context as _;
 use hc_common::{
 	error::Result,
-	log,
+	filesystem as file, log,
 	serde::{self, Deserialize, Serialize},
 };
 use hc_data::{Dependencies, Lang};
-use hc_filesystem as file;
 use maplit::hashmap;
 use std::cmp::Ordering;
 use std::collections::HashMap;

@@ -4,11 +4,10 @@ use hc_common::{
 	command_util::{log_args, DependentProgram},
 	context::Context,
 	error::Result,
-	hc_error, log,
+	filesystem as file, hc_error, log,
 	serde::{self, Deserialize},
 	which,
 };
-use hc_filesystem as file;
 use hc_pathbuf::pathbuf;
 use std::convert::AsRef;
 use std::ffi::OsStr;

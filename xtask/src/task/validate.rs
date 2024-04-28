@@ -5,8 +5,7 @@
 use crate::exit::{EXIT_FAILURE, EXIT_SUCCESS};
 use crate::workspace;
 use glob::glob;
-use hc_common::{error::Result, hc_error};
-use hc_filesystem::read_toml;
+use hc_common::{error::Result, filesystem::read_toml, hc_error};
 use hc_pathbuf::pathbuf;
 use serde::Deserialize;
 use std::fmt::{self, Debug, Display, Formatter};

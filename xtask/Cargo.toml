@@ -7,7 +7,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
-hc_filesystem = { path = "../libs/hc_filesystem" }
 hc_common = { path = "../libs/hc_common" }
 hc_pathbuf = { path = "../libs/hc_pathbuf" }
 clap = { version = "4.5.4", default-features = false, features = ["cargo", "std"] }
