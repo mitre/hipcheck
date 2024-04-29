@@ -1,0 +1,23 @@
+name: Conventional Commits
+
+on:
+  push:
+      branches: [main]
+  pull_request:
+      branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  RUSTFLAGS: -Dwarnings
+  CARGO_TERM_COLOR: always
+
+jobs:
+  conventional-commits:
+      name: Check Format
+      runs-on: ubuntu-latest
+      timeout-minutes: 5
+      steps:
+        - uses: actions/checkout@v4
+        - uses: webiny/action-conventional-commits@v1.3.0
