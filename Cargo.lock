@@ -675,11 +675,11 @@ dependencies = [
 name = "hc_data"
 version = "0.1.0"
 dependencies = [
+ "dirs",
  "graphql_client",
  "hc_common",
  "hc_config",
  "hc_git",
- "hc_modules",
  "hc_npm",
  "hc_serde",
  "hc_source",
@@ -738,14 +738,6 @@ dependencies = [
  "maplit",
  "unicode-normalization",
  "unicode-segmentation",
-]
-
-[[package]]
-name = "hc_modules"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "hc_common",
 ]
 
 [[package]]

@@ -143,7 +143,7 @@ impl ModuleDepsCommand {
 // 		for _ in 0..4 {
 // 			path.pop();
 // 		}
-// 		path.push("libs/hc_modules/src/testpkg");
+// 		path.push("libs/hc_data/src/modules/testpkg");
 
 // 		Ok(path)
 // 	}

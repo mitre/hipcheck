@@ -6,6 +6,7 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
+dirs = "5.0.1"
 graphql_client = "0.14.0"
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
@@ -13,7 +14,6 @@ hc_git = { path = "../hc_git" }
 hc_npm = { path = "../hc_npm" }
 hc_source = { path = "../hc_source" }
 hc_version = { path = "../hc_version" }
-hc_modules = { path = "../hc_modules" }
 petgraph = { version = "0.6.0", features = ["serde-1"] }
 serde = { path = "../hc_serde", package = "hc_serde" }
 ureq = { version = "2.9.7", default-features = false, features = ["json", "native-tls"] }
