@@ -2,9 +2,9 @@ name: Conventional Commits
 
 on:
   push:
-      branches: [main]
+    branches: [main]
   pull_request:
-      branches: [main]
+    branches: [main]
 
 permissions:
   contents: read
@@ -15,9 +15,9 @@ env:
 
 jobs:
   conventional-commits:
-      name: Check Format
-      runs-on: ubuntu-latest
-      timeout-minutes: 5
-      steps:
-        - uses: actions/checkout@v4
-        - uses: webiny/action-conventional-commits@v1.3.0
+    name: Check Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: webiny/action-conventional-commits@v1.3.0
