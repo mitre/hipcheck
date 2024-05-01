@@ -6,10 +6,10 @@ use hc_common::{
 	hc_error, log,
 };
 use hc_config::RiskConfigQuery;
+use hc_data::source::SourceQuery;
 pub use hc_report::*;
 use hc_score::ScoringResults;
 use hc_session::Session;
-use hc_source::SourceQuery;
 use std::default::Default;
 use std::result::Result as StdResult;
 

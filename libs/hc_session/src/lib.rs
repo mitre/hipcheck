@@ -18,20 +18,20 @@ use hc_config::{
 };
 use hc_data::ModuleProvider;
 use hc_data::{
-	npm::get_npm_version, CodeQualityProviderStorage, DependenciesProviderStorage,
-	FuzzProviderStorage, GitHubProviderStorage, ModuleProviderStorage,
-	PullRequestReviewProviderStorage,
+	git::get_git_version,
+	git::GitProviderStorage,
+	npm::get_npm_version,
+	source::{
+		Source, SourceChangeRequest, SourceKind, SourceQuery, SourceQueryStorage, SourceRepo,
+	},
+	CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
+	GitHubProviderStorage, ModuleProviderStorage, PullRequestReviewProviderStorage,
 };
-use hc_git::get_git_version;
-use hc_git::GitProviderStorage;
 use hc_linguist::LinguistStorage;
 use hc_metric::MetricProviderStorage;
 use hc_report::{Format, ReportParams, ReportParamsStorage};
 use hc_score::ScoringProviderStorage;
 use hc_shell::{Phase, Shell};
-use hc_source::{
-	Source, SourceChangeRequest, SourceKind, SourceQuery, SourceQueryStorage, SourceRepo,
-};
 use hc_version::{get_version, VersionQuery, VersionQueryStorage};
 use std::ffi::{OsStr, OsString};
 use std::fmt;

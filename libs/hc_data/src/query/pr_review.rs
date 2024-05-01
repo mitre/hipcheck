@@ -4,8 +4,9 @@
 
 use super::github::GitHubProvider;
 use crate::{
-	get_pull_request_reviews_from_github, get_single_pull_request_review_from_github, PullRequest,
-	SinglePullRequest,
+	get_pull_request_reviews_from_github, get_single_pull_request_review_from_github,
+	git::{Commit, CommitContributorView, CommitDiff, Contributor, ContributorView},
+	PullRequest, SinglePullRequest,
 };
 use hc_common::{
 	context::Context,
@@ -13,7 +14,6 @@ use hc_common::{
 	salsa,
 };
 use hc_config::ConfigSource;
-use hc_git::{Commit, CommitContributorView, CommitDiff, Contributor, ContributorView};
 use std::rc::Rc;
 
 /// A query that provides GitHub pull request reviews

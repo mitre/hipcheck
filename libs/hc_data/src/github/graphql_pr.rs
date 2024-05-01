@@ -4,7 +4,10 @@ use self::review::{
 	ResponseData, ReviewRepositoryPullRequest as RawPull,
 	ReviewRepositoryPullRequestCommitsNodes as RawPullCommit, Variables,
 };
-use crate::github::{authenticated_agent::AuthenticatedAgent, data::*};
+use crate::{
+	git::{Contributor, RawCommit},
+	github::{authenticated_agent::AuthenticatedAgent, data::*},
+};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
 use hc_common::{
 	chrono::DateTime,
@@ -13,7 +16,6 @@ use hc_common::{
 	hc_error,
 	serde_json::{from_value as from_json_value, to_value as to_json_value},
 };
-use hc_git::{Contributor, RawCommit};
 use std::convert::TryFrom;
 
 /// The URL of the GitHub GraphQL API.

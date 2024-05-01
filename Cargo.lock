@@ -613,7 +613,7 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "hc_config",
- "hc_git",
+ "hc_data",
  "hc_metric",
  "hc_report",
 ]
@@ -679,24 +679,14 @@ dependencies = [
  "graphql_client",
  "hc_common",
  "hc_config",
- "hc_git",
- "hc_serde",
- "hc_source",
- "hc_version",
- "petgraph",
- "ureq",
-]
-
-[[package]]
-name = "hc_git"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "hc_common",
  "hc_git_command",
- "hc_source",
+ "hc_hash",
+ "hc_serde",
+ "hc_shell",
  "hc_version",
  "nom",
+ "petgraph",
+ "ureq",
 ]
 
 [[package]]
@@ -730,7 +720,6 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_git",
  "hc_linguist",
  "hc_math",
  "hc_shell",
@@ -769,10 +758,10 @@ dependencies = [
  "hc_analysis",
  "hc_common",
  "hc_config",
+ "hc_data",
  "hc_report",
  "hc_score",
  "hc_session",
- "hc_source",
 ]
 
 [[package]]
@@ -804,14 +793,12 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_git",
  "hc_linguist",
  "hc_metric",
  "hc_pm",
  "hc_report",
  "hc_score",
  "hc_shell",
- "hc_source",
  "hc_spdx",
  "hc_version",
  "tempfile",
@@ -828,16 +815,6 @@ dependencies = [
  "libc",
  "termcolor",
  "winapi",
-]
-
-[[package]]
-name = "hc_source"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "hc_git_command",
- "hc_hash",
- "hc_shell",
 ]
 
 [[package]]

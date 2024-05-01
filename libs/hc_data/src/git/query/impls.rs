@@ -3,7 +3,7 @@
 //! Derived query implementations for the `GitProvider` query group.
 
 use super::GitProvider;
-use crate::{
+use crate::git::{
 	get_commits, get_commits_from_date, get_diffs, Commit, CommitContributor,
 	CommitContributorView, CommitDiff, CommitSigner, CommitSignerView, Contributor,
 	ContributorView, Diff, GitCommand, RawCommit, SignerKeyView, SignerNameView, SignerView,

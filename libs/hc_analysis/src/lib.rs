@@ -6,7 +6,7 @@ use hc_common::{
 	salsa, F64,
 };
 use hc_config::{AttacksConfigQuery, CommitConfigQuery, FuzzConfigQuery, PracticesConfigQuery};
-use hc_git::GitProvider;
+use hc_data::git::GitProvider;
 use hc_metric::{affiliation::AffiliatedType, MetricProvider};
 use hc_report::{Concern, PrConcern};
 use std::collections::{HashMap, HashSet};

@@ -4,13 +4,16 @@
 
 use std::{path::PathBuf, rc::Rc};
 
-use crate::{associate_modules_and_commits, Module, ModuleGraph};
+use crate::{
+	associate_modules_and_commits,
+	git::{Commit, GitProvider},
+	Module, ModuleGraph,
+};
 
 use hc_common::{
 	error::{Error, Result},
 	pathbuf, salsa,
 };
-use hc_git::{Commit, GitProvider};
 
 /// A module and an associated commit
 pub type ModuleCommitMap = Rc<Vec<(Rc<Module>, Rc<Commit>)>>;
