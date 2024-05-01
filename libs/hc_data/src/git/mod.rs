@@ -5,10 +5,10 @@ pub mod parse;
 mod query;
 
 pub use data::*;
-pub use hc_git_command::*;
 use parse::*;
 pub use query::*;
 
+pub use crate::git_command::*;
 use hc_common::context::Context as _;
 use hc_common::{
 	error::{Error, Result},

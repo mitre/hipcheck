@@ -4,6 +4,7 @@ mod query;
 
 pub use query::*;
 
+use crate::git_command::GitCommand;
 use hc_common::log::{self, debug};
 use hc_common::{
 	context::Context,
@@ -11,7 +12,6 @@ use hc_common::{
 	hc_error, pathbuf,
 	url::Url,
 };
-use hc_git_command::GitCommand;
 use hc_shell::Phase;
 use std::ffi::OsStr;
 use std::fmt::{self, Debug, Display, Formatter};
