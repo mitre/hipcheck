@@ -3,6 +3,7 @@
 //! Functions and types for data retrieval.
 
 mod code_quality;
+mod es_lint;
 mod query;
 
 pub use hc_git as git;

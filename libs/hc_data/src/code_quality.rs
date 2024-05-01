@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::es_lint::data::{ESLintMessage, ESLintReports};
+use crate::es_lint::get_eslint_reports;
 use hc_common::{error::Result, hc_error};
-use hc_eslint::data::{ESLintMessage, ESLintReports};
-use hc_eslint::get_eslint_reports;
 
 pub type CodeQualityReport = Vec<FileFindings>;
 

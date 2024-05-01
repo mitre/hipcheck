@@ -677,7 +677,6 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "hc_config",
- "hc_eslint",
  "hc_git",
  "hc_github",
  "hc_modules",
@@ -685,14 +684,6 @@ dependencies = [
  "hc_source",
  "hc_version",
  "petgraph",
-]
-
-[[package]]
-name = "hc_eslint"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "tempfile",
 ]
 
 [[package]]
@@ -839,7 +830,6 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_eslint",
  "hc_git",
  "hc_linguist",
  "hc_metric",
