@@ -613,7 +613,7 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "hc_config",
- "hc_git",
+ "hc_data",
  "hc_metric",
  "hc_report",
 ]
@@ -675,36 +675,19 @@ dependencies = [
 name = "hc_data"
 version = "0.1.0"
 dependencies = [
+ "dirs",
+ "graphql_client",
  "hc_common",
  "hc_config",
- "hc_eslint",
- "hc_git",
- "hc_github",
- "hc_modules",
- "hc_npm",
- "hc_source",
- "hc_version",
- "petgraph",
-]
-
-[[package]]
-name = "hc_eslint"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "tempfile",
-]
-
-[[package]]
-name = "hc_git"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "hc_common",
  "hc_git_command",
- "hc_source",
+ "hc_hash",
+ "hc_serde",
+ "hc_shell",
  "hc_version",
  "nom",
+ "petgraph",
+ "tempfile",
+ "ureq",
 ]
 
 [[package]]
@@ -712,17 +695,6 @@ name = "hc_git_command"
 version = "0.1.0"
 dependencies = [
  "hc_common",
-]
-
-[[package]]
-name = "hc_github"
-version = "0.1.0"
-dependencies = [
- "graphql_client",
- "hc_common",
- "hc_git",
- "hc_serde",
- "ureq",
 ]
 
 [[package]]
@@ -749,29 +721,12 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_git",
  "hc_linguist",
  "hc_math",
  "hc_shell",
  "maplit",
  "unicode-normalization",
  "unicode-segmentation",
-]
-
-[[package]]
-name = "hc_modules"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "hc_common",
-]
-
-[[package]]
-name = "hc_npm"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "hc_common",
 ]
 
 [[package]]
@@ -804,10 +759,10 @@ dependencies = [
  "hc_analysis",
  "hc_common",
  "hc_config",
+ "hc_data",
  "hc_report",
  "hc_score",
  "hc_session",
- "hc_source",
 ]
 
 [[package]]
@@ -839,16 +794,12 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_eslint",
- "hc_git",
  "hc_linguist",
  "hc_metric",
- "hc_npm",
  "hc_pm",
  "hc_report",
  "hc_score",
  "hc_shell",
- "hc_source",
  "hc_spdx",
  "hc_version",
  "tempfile",
@@ -865,16 +816,6 @@ dependencies = [
  "libc",
  "termcolor",
  "winapi",
-]
-
-[[package]]
-name = "hc_source"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "hc_git_command",
- "hc_hash",
- "hc_shell",
 ]
 
 [[package]]

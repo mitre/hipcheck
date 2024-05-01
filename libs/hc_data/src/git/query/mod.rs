@@ -5,11 +5,14 @@
 mod impls;
 
 use crate::{
-	Commit, CommitContributor, CommitContributorView, CommitDiff, CommitSigner, CommitSignerView,
-	Contributor, ContributorView, Diff, RawCommit, SignerKeyView, SignerNameView, SignerView,
+	git::{
+		Commit, CommitContributor, CommitContributorView, CommitDiff, CommitSigner,
+		CommitSignerView, Contributor, ContributorView, Diff, RawCommit, SignerKeyView,
+		SignerNameView, SignerView,
+	},
+	source::SourceQuery,
 };
 use hc_common::{chrono::prelude::*, error::Result, salsa};
-use hc_source::SourceQuery;
 use hc_version::VersionQuery;
 use std::rc::Rc;
 

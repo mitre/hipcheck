@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_git::{Diff, RawCommit};
+use crate::git::{Diff, RawCommit};
 
 use serde::Deserialize;
 #[derive(Debug, Deserialize)]

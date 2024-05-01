@@ -2,11 +2,11 @@
 
 //! Query group for data pertaining to a remote GitHub source.
 
+use crate::source::{Remote, SourceQuery};
 use hc_common::{
 	error::{Error, Result},
 	salsa,
 };
-use hc_source::{Remote, SourceQuery};
 use std::rc::Rc;
 
 /// Queries about a remote GitHub source

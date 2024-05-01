@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authenticated_agent::AuthenticatedAgent;
+use crate::github::authenticated_agent::AuthenticatedAgent;
 use hc_common::{
 	error::{Error, Result},
 	hc_error,

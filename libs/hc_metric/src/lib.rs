@@ -27,8 +27,9 @@ use fuzz::FuzzOutput;
 use hc_binary::BinaryFile;
 use hc_common::{error::Result, salsa};
 use hc_config::{AttacksConfigQuery, CommitConfigQuery};
-use hc_data::{DependenciesProvider, FuzzProvider, ModuleProvider, PullRequestReviewProvider};
-use hc_git::GitProvider;
+use hc_data::{
+	git::GitProvider, DependenciesProvider, FuzzProvider, ModuleProvider, PullRequestReviewProvider,
+};
 use hc_linguist::Linguist;
 use identity::IdentityOutput;
 use module::ModuleOutput;

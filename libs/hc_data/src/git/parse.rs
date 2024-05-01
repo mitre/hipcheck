@@ -2,7 +2,7 @@
 
 #![allow(dead_code)]
 
-use crate::{Contributor, Diff, FileDiff, RawCommit};
+use crate::git::{Contributor, Diff, FileDiff, RawCommit};
 use hc_common::context::Context as _;
 use hc_common::{
 	chrono::{DateTime, FixedOffset},

@@ -7,8 +7,7 @@ use hc_common::{
 	log,
 	serde::{self, Serialize},
 };
-use hc_data::Module;
-use hc_git::Contributor;
+use hc_data::{git::Contributor, Module};
 use std::{collections::HashMap, rc::Rc};
 
 #[derive(Debug, Eq, PartialEq, Serialize)]

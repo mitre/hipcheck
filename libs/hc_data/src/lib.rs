@@ -3,14 +3,19 @@
 //! Functions and types for data retrieval.
 
 mod code_quality;
+mod es_lint;
+pub mod git;
+mod github;
+mod modules;
+pub mod npm;
 mod query;
+pub mod source;
 
-pub use hc_git as git;
-pub use hc_modules as modules;
-pub use hc_npm as npm;
 pub use query::*;
 use std::collections::HashSet;
 
+use git::{get_commits_for_file, Commit, CommitContributor, Contributor, Diff};
+use github::*;
 use hc_common::{
 	context::Context,
 	error::Error,
@@ -18,9 +23,7 @@ use hc_common::{
 	hc_error, log, pathbuf,
 	serde::{self, Serialize},
 };
-use hc_git::{get_commits_for_file, Commit, CommitContributor, Contributor, Diff};
-use hc_github::*;
-use hc_modules::RawModule;
+use modules::RawModule;
 use petgraph::visit::Dfs;
 use petgraph::Graph;
 use std::path::Path;

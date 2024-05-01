@@ -3,9 +3,9 @@
 //! Query group for dependencies information.
 
 use crate::npm::{get_package_file, PackageFile};
+use crate::source::SourceQuery;
 use crate::Dependencies;
 use hc_common::{error::Result, salsa};
-use hc_source::SourceQuery;
 use hc_version::VersionQuery;
 use std::rc::Rc;
 

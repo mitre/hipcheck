@@ -11,10 +11,12 @@ use hc_common::{error::Result, semver::Version, serde_json};
 pub mod command;
 pub mod data;
 
+#[allow(unused)]
 pub fn get_eslint_version() -> Result<String> {
 	ESLintCommand::internal([OsStr::new("--version")])?.output()
 }
 
+#[allow(unused)]
 pub fn parse_eslint_version(version: &str) -> Result<Version> {
 	// semver's parser will not accept the leading 'v' or trailing newline
 	let version = version.strip_prefix('v').unwrap_or(version);

@@ -3,7 +3,7 @@
 use std::convert::TryInto;
 
 use self::reviews::{ResponseData, ReviewsRepositoryPullRequestsNodes as RawPull, Variables};
-use crate::{authenticated_agent::AuthenticatedAgent, data::*};
+use crate::github::{authenticated_agent::AuthenticatedAgent, data::*};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
 use hc_common::{
 	error::{Error, Result},
@@ -17,8 +17,8 @@ const GH_API_V4: &str = "https://api.github.com/graphql";
 /// Defines the query being made against the GitHub API.
 #[derive(GraphQLQuery)]
 #[graphql(
-	schema_path = "src/gh_schema.graphql",
-	query_path = "src/gh_query.graphql",
+	schema_path = "src/github/gh_schema.graphql",
+	query_path = "src/github/gh_query.graphql",
 	response_derives = "Debug"
 )]
 pub struct Reviews;

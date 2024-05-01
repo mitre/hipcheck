@@ -6,9 +6,9 @@ mod query;
 
 pub use data::*;
 pub use hc_git_command::*;
+use parse::*;
 pub use query::*;
 
-use crate::parse::*;
 use hc_common::context::Context as _;
 use hc_common::{
 	error::{Error, Result},
