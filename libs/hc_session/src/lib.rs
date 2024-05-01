@@ -18,14 +18,14 @@ use hc_config::{
 };
 use hc_data::ModuleProvider;
 use hc_data::{
-	CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
-	GitHubProviderStorage, ModuleProviderStorage, PullRequestReviewProviderStorage,
+	npm::get_npm_version, CodeQualityProviderStorage, DependenciesProviderStorage,
+	FuzzProviderStorage, GitHubProviderStorage, ModuleProviderStorage,
+	PullRequestReviewProviderStorage,
 };
 use hc_git::get_git_version;
 use hc_git::GitProviderStorage;
 use hc_linguist::LinguistStorage;
 use hc_metric::MetricProviderStorage;
-use hc_npm::get_npm_version;
 use hc_report::{Format, ReportParams, ReportParamsStorage};
 use hc_score::ScoringProviderStorage;
 use hc_shell::{Phase, Shell};

@@ -680,7 +680,6 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_git",
- "hc_npm",
  "hc_serde",
  "hc_source",
  "hc_version",
@@ -738,14 +737,6 @@ dependencies = [
  "maplit",
  "unicode-normalization",
  "unicode-segmentation",
-]
-
-[[package]]
-name = "hc_npm"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "hc_common",
 ]
 
 [[package]]
@@ -816,7 +807,6 @@ dependencies = [
  "hc_git",
  "hc_linguist",
  "hc_metric",
- "hc_npm",
  "hc_pm",
  "hc_report",
  "hc_score",

@@ -11,7 +11,6 @@ graphql_client = "0.14.0"
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
 hc_git = { path = "../hc_git" }
-hc_npm = { path = "../hc_npm" }
 hc_source = { path = "../hc_source" }
 hc_version = { path = "../hc_version" }
 petgraph = { version = "0.6.0", features = ["serde-1"] }

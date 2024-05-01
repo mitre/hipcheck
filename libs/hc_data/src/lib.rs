@@ -6,10 +6,10 @@ mod code_quality;
 mod es_lint;
 mod github;
 mod modules;
+pub mod npm;
 mod query;
 
 pub use hc_git as git;
-pub use hc_npm as npm;
 pub use query::*;
 use std::collections::HashSet;
 
