@@ -679,7 +679,6 @@ dependencies = [
  "graphql_client",
  "hc_common",
  "hc_config",
- "hc_hash",
  "hc_serde",
  "hc_shell",
  "hc_version",
@@ -688,10 +687,6 @@ dependencies = [
  "tempfile",
  "ureq",
 ]
-
-[[package]]
-name = "hc_hash"
-version = "0.1.0"
 
 [[package]]
 name = "hc_linguist"

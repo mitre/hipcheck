@@ -10,7 +10,6 @@ dirs = "5.0.1"
 graphql_client = "0.14.0"
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
-hc_hash = { path = "../hc_hash" }
 hc_shell = { path = "../hc_shell" }
 hc_version = { path = "../hc_version" }
 nom = "7.1.3"
