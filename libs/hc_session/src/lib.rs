@@ -2,7 +2,6 @@
 
 use dotenv::var;
 use hc_analysis::AnalysisProviderStorage;
-use hc_binary::BinaryFileStorage;
 use hc_common::context::Context as _;
 use hc_common::{
 	chrono::prelude::*,
@@ -27,8 +26,9 @@ use hc_data::{
 	CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
 	GitHubProviderStorage, ModuleProviderStorage, PullRequestReviewProviderStorage,
 };
-use hc_linguist::LinguistStorage;
-use hc_metric::MetricProviderStorage;
+use hc_metric::{
+	binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,
+};
 use hc_report::{Format, ReportParams, ReportParamsStorage};
 use hc_score::ScoringProviderStorage;
 use hc_shell::{Phase, Shell};

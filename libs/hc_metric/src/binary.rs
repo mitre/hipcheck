@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::binary_detector::detect_binary_files;
 use crate::MetricProvider;
-use hc_binary::detect_binary_files;
 use hc_common::{
 	error::Result,
 	log,
