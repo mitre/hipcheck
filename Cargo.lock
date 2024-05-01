@@ -686,6 +686,7 @@ dependencies = [
  "hc_version",
  "nom",
  "petgraph",
+ "tempfile",
  "ureq",
 ]
 

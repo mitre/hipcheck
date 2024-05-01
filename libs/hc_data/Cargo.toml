@@ -21,3 +21,4 @@ ureq = { version = "2.9.7", default-features = false, features = ["json", "nativ
 
 [dev-dependencies]
 dirs = "5.0.1"
+tempfile = "3.2.0"
