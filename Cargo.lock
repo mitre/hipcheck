@@ -675,15 +675,17 @@ dependencies = [
 name = "hc_data"
 version = "0.1.0"
 dependencies = [
+ "graphql_client",
  "hc_common",
  "hc_config",
  "hc_git",
- "hc_github",
  "hc_modules",
  "hc_npm",
+ "hc_serde",
  "hc_source",
  "hc_version",
  "petgraph",
+ "ureq",
 ]
 
 [[package]]
@@ -703,17 +705,6 @@ name = "hc_git_command"
 version = "0.1.0"
 dependencies = [
  "hc_common",
-]
-
-[[package]]
-name = "hc_github"
-version = "0.1.0"
-dependencies = [
- "graphql_client",
- "hc_common",
- "hc_git",
- "hc_serde",
- "ureq",
 ]
 
 [[package]]

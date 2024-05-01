@@ -7,11 +7,11 @@ mod graphql;
 mod graphql_pr;
 mod hidden;
 
-use crate::authenticated_agent::AuthenticatedAgent;
 use crate::code_search::search_code_request;
-use crate::data::*;
-use crate::graphql::get_all_reviews;
-use crate::graphql_pr::get_all_pr_reviews;
+use crate::github::authenticated_agent::AuthenticatedAgent;
+use crate::github::data::*;
+use crate::github::graphql::get_all_reviews;
+use crate::github::graphql_pr::get_all_pr_reviews;
 use hc_common::context::Context as _;
 use hc_common::{error::Result, log};
 use hc_git::parse::github_diff;

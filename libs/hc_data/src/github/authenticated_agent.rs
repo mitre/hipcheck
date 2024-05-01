@@ -1,6 +1,6 @@
 //! Defines an authenticated [`Agent`] type that adds token auth to all requests.
 
-use crate::hidden::Hidden;
+use crate::github::hidden::Hidden;
 use ureq::{Agent, Request};
 
 /// An [`Agent`] which authenticates requests with token auth.

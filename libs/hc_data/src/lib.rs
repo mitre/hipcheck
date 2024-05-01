@@ -4,6 +4,7 @@
 
 mod code_quality;
 mod es_lint;
+mod github;
 mod query;
 
 pub use hc_git as git;
@@ -12,6 +13,7 @@ pub use hc_npm as npm;
 pub use query::*;
 use std::collections::HashSet;
 
+use crate::github::*;
 use hc_common::{
 	context::Context,
 	error::Error,
@@ -20,7 +22,6 @@ use hc_common::{
 	serde::{self, Serialize},
 };
 use hc_git::{get_commits_for_file, Commit, CommitContributor, Contributor, Diff};
-use hc_github::*;
 use hc_modules::RawModule;
 use petgraph::visit::Dfs;
 use petgraph::Graph;
