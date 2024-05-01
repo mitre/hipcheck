@@ -2,9 +2,11 @@
 
 //! A query group for accessing Git repository data.
 
-use crate::source::{Remote, Source};
+use crate::{
+	hash,
+	source::{Remote, Source},
+};
 use hc_common::{pathbuf, salsa};
-use hc_hash::hash;
 use std::path::PathBuf;
 use std::rc::Rc;
 

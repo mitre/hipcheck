@@ -5,7 +5,9 @@
 mod code_quality;
 mod es_lint;
 pub mod git;
+pub mod git_command;
 mod github;
+mod hash;
 mod modules;
 pub mod npm;
 mod query;
