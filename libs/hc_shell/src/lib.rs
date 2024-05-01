@@ -84,7 +84,6 @@
 
 #![deny(missing_docs)]
 
-use atty::is as is_atty;
 use hc_common::{
 	error::{Error, Result},
 	hc_error, log, serde_json,
@@ -92,6 +91,9 @@ use hc_common::{
 use hc_report::{Format, PrReport, RecommendationKind, Report};
 use std::cell::Cell;
 use std::fmt::{self, Debug, Formatter};
+use std::io::stderr;
+use std::io::stdout;
+use std::io::IsTerminal as _;
 use std::io::Write;
 use std::ops::Not as _;
 use std::str::FromStr;
@@ -800,7 +802,7 @@ pub struct Output {
 impl Output {
 	/// Create a new Output wrapping stdout.
 	pub fn stdout(color_choice: ColorChoice) -> Output {
-		let is_atty = is_atty(atty::Stream::Stdout);
+		let is_atty = stdout().is_terminal();
 		let color_choice = color_choice.to_termcolor(is_atty);
 		Output {
 			out: Box::new(StandardStream::stdout(color_choice)),
@@ -810,7 +812,7 @@ impl Output {
 
 	/// Create a new Output wrapping stderr.
 	pub fn stderr(color_choice: ColorChoice) -> Output {
-		let is_atty = is_atty(atty::Stream::Stderr);
+		let is_atty = stderr().is_terminal();
 		let color_choice = color_choice.to_termcolor(is_atty);
 		Output {
 			out: Box::new(StandardStream::stderr(color_choice)),
