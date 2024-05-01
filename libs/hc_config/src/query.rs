@@ -3,8 +3,7 @@
 //! Query groups for accessing Hipcheck configuration data.
 
 use crate::Config;
-use hc_common::{salsa, BINARY_CONFIG_FILE, F64, LANGS_FILE, ORGS_FILE, TYPO_FILE};
-use hc_pathbuf::pathbuf;
+use hc_common::{pathbuf, salsa, BINARY_CONFIG_FILE, F64, LANGS_FILE, ORGS_FILE, TYPO_FILE};
 use std::path::PathBuf;
 use std::rc::Rc;
 

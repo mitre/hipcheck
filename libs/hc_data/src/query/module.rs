@@ -8,10 +8,9 @@ use crate::{associate_modules_and_commits, Module, ModuleGraph};
 
 use hc_common::{
 	error::{Error, Result},
-	salsa,
+	pathbuf, salsa,
 };
 use hc_git::{Commit, GitProvider};
-use hc_pathbuf::pathbuf;
 
 /// A module and an associated commit
 pub type ModuleCommitMap = Rc<Vec<(Rc<Module>, Rc<Commit>)>>;

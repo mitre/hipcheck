@@ -6,9 +6,8 @@ use crate::exit::EXIT_SUCCESS;
 use duct::cmd;
 use hc_common::{
 	error::{Error, Result},
-	hc_error,
+	hc_error, pathbuf,
 };
-use hc_pathbuf::pathbuf;
 use std::io;
 use std::mem::drop;
 use std::path::PathBuf;

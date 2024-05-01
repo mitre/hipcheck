@@ -15,13 +15,12 @@ use hc_common::{
 	context::Context,
 	error::Error,
 	error::Result,
-	hc_error, log,
+	hc_error, log, pathbuf,
 	serde::{self, Serialize},
 };
 use hc_git::{get_commits_for_file, Commit, CommitContributor, Contributor, Diff};
 use hc_github::*;
 use hc_modules::RawModule;
-use hc_pathbuf::pathbuf;
 use petgraph::visit::Dfs;
 use petgraph::Graph;
 use std::path::Path;

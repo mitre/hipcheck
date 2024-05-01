@@ -3,9 +3,8 @@
 //! A query group for accessing Git repository data.
 
 use crate::{Remote, Source};
-use hc_common::salsa;
+use hc_common::{pathbuf, salsa};
 use hc_hash::hash;
-use hc_pathbuf::pathbuf;
 use std::path::PathBuf;
 use std::rc::Rc;
 

@@ -6,7 +6,7 @@ use std::env::{self, VarError};
 use std::panic::{self, RefUnwindSafe, UnwindSafe};
 use std::sync::Mutex;
 
-use hc_common::lazy_static::lazy_static;
+use crate::lazy_static::lazy_static;
 
 lazy_static! {
 	static ref SERIAL_TEST: Mutex<()> = Default::default();

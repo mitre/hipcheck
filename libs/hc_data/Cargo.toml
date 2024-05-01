@@ -12,7 +12,6 @@ hc_eslint = { path = "../hc_eslint" }
 hc_git = { path = "../hc_git" }
 hc_github = { path = "../hc_github" }
 hc_npm = { path = "../hc_npm" }
-hc_pathbuf = { path = "../hc_pathbuf" }
 hc_source = { path = "../hc_source" }
 hc_version = { path = "../hc_version" }
 hc_modules = { path = "../hc_modules" }

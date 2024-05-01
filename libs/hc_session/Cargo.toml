@@ -18,7 +18,6 @@ hc_git = { path = "../hc_git" }
 hc_linguist = { path = "../hc_linguist" }
 hc_metric = { path = "../hc_metric" }
 hc_npm = { path = "../hc_npm" }
-hc_pathbuf = { path = "../hc_pathbuf" }
 hc_pm = { path = "../hc_pm" }
 hc_report = { path = "../hc_report" }
 hc_score = { path = "../hc_score" }
@@ -28,5 +27,4 @@ hc_spdx = { path = "../hc_spdx" }
 hc_version = { path = "../hc_version" }
 
 [dev_dependencies]
-hc_test_util = { path = "../hc_test_util" }
 tempfile = "3.10.1"

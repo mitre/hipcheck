@@ -643,6 +643,7 @@ dependencies = [
  "schemars",
  "semver",
  "serde_json",
+ "toml",
  "url",
  "which",
 ]
@@ -652,7 +653,6 @@ name = "hc_config"
 version = "0.1.0"
 dependencies = [
  "hc_common",
- "hc_pathbuf",
  "smart-default",
 ]
 
@@ -682,7 +682,6 @@ dependencies = [
  "hc_github",
  "hc_modules",
  "hc_npm",
- "hc_pathbuf",
  "hc_source",
  "hc_version",
  "petgraph",
@@ -765,7 +764,6 @@ version = "0.1.0"
 dependencies = [
  "dirs",
  "hc_common",
- "hc_pathbuf",
 ]
 
 [[package]]
@@ -774,12 +772,7 @@ version = "0.1.0"
 dependencies = [
  "dirs",
  "hc_common",
- "hc_pathbuf",
 ]
-
-[[package]]
-name = "hc_pathbuf"
-version = "0.1.0"
 
 [[package]]
 name = "hc_pm"
@@ -851,14 +844,12 @@ dependencies = [
  "hc_linguist",
  "hc_metric",
  "hc_npm",
- "hc_pathbuf",
  "hc_pm",
  "hc_report",
  "hc_score",
  "hc_shell",
  "hc_source",
  "hc_spdx",
- "hc_test_util",
  "hc_version",
  "tempfile",
 ]
@@ -883,7 +874,6 @@ dependencies = [
  "hc_common",
  "hc_git_command",
  "hc_hash",
- "hc_pathbuf",
  "hc_shell",
 ]
 
@@ -893,13 +883,6 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "spdx-rs",
-]
-
-[[package]]
-name = "hc_test_util"
-version = "0.1.0"
-dependencies = [
- "hc_common",
 ]
 
 [[package]]
@@ -2392,7 +2375,6 @@ dependencies = [
  "duct",
  "glob",
  "hc_common",
- "hc_pathbuf",
  "open",
  "serde",
  "toml",

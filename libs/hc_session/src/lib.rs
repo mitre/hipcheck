@@ -9,7 +9,7 @@ use hc_common::{
 	command_util::DependentProgram,
 	error::{Error, Result},
 	filesystem::create_dir_all,
-	hc_error, salsa, HIPCHECK_TOML_FILE,
+	hc_error, pathbuf, salsa, HIPCHECK_TOML_FILE,
 };
 use hc_config::{
 	AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource, ConfigSourceStorage,
@@ -26,7 +26,6 @@ use hc_git::GitProviderStorage;
 use hc_linguist::LinguistStorage;
 use hc_metric::MetricProviderStorage;
 use hc_npm::get_npm_version;
-use hc_pathbuf::pathbuf;
 use hc_report::{Format, ReportParams, ReportParamsStorage};
 use hc_score::ScoringProviderStorage;
 use hc_shell::{Phase, Shell};
@@ -495,7 +494,7 @@ pub enum CheckType {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use hc_test_util::with_env_vars;
+	use hc_common::with_env_vars;
 	use tempfile::TempDir;
 
 	const TEMPDIR_PREFIX: &str = "hc_test";

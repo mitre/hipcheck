@@ -7,6 +7,8 @@ pub mod command_util;
 pub mod context;
 pub mod error;
 pub mod filesystem;
+pub mod pathbuf;
+pub mod test_util;
 #[cfg(test)]
 mod tests;
 mod try_any;
@@ -67,16 +69,4 @@ impl CheckKind {
 			CheckKind::Spdx => "spdx",
 		}
 	}
-}
-
-/// A limited analogue of the `anyhow!` macro for `Error`.  Only
-/// intended for input suitable for the `Error::msg` function.
-#[macro_export]
-macro_rules! hc_error {
-    ($msg:literal $(,)?) => {
-        $crate::error::Error::msg($msg)
-    };
-    ($fmt:expr, $($arg:tt)*) => {
-        $crate::error::Error::msg(format!($fmt, $($arg)*))
-    };
 }
