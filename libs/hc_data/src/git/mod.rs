@@ -106,7 +106,7 @@ pub fn get_commits_for_file(repo_path: &Path, file: &str) -> Result<String> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use hc_command_util::DependentProgram;
+	use hc_common::command_util::DependentProgram;
 
 	#[test]
 	#[ignore = "can't guarantee availability of Git"]

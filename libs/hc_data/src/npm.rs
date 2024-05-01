@@ -255,8 +255,7 @@ impl NpmCommand {
 #[cfg(test)]
 mod test {
 	use super::*;
-
-	use hc_command_util::DependentProgram;
+	use hc_common::command_util::DependentProgram;
 
 	#[test]
 	#[ignore = "can't guarantee availability of NPM"]

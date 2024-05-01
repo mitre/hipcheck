@@ -494,7 +494,11 @@ pub enum CheckType {
 #[cfg(test)]
 mod tests {
 	use super::*;
+<<<<<<< HEAD
 	use hc_common::with_env_vars;
+=======
+	use hc_common::test_util::with_env_vars;
+>>>>>>> main
 	use tempfile::TempDir;
 
 	const TEMPDIR_PREFIX: &str = "hc_test";

@@ -613,7 +613,11 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "hc_config",
+<<<<<<< HEAD
  "hc_data",
+=======
+ "hc_git",
+>>>>>>> main
  "hc_metric",
  "hc_report",
 ]
@@ -679,6 +683,33 @@ dependencies = [
  "graphql_client",
  "hc_common",
  "hc_config",
+<<<<<<< HEAD
+=======
+ "hc_eslint",
+ "hc_git",
+ "hc_github",
+ "hc_modules",
+ "hc_npm",
+ "hc_source",
+ "hc_version",
+ "petgraph",
+]
+
+[[package]]
+name = "hc_eslint"
+version = "0.1.0"
+dependencies = [
+ "hc_common",
+ "tempfile",
+]
+
+[[package]]
+name = "hc_git"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "hc_common",
+>>>>>>> main
  "hc_git_command",
  "hc_hash",
  "hc_serde",
@@ -694,6 +725,20 @@ name = "hc_git_command"
 version = "0.1.0"
 dependencies = [
  "hc_common",
+<<<<<<< HEAD
+=======
+]
+
+[[package]]
+name = "hc_github"
+version = "0.1.0"
+dependencies = [
+ "graphql_client",
+ "hc_common",
+ "hc_git",
+ "hc_serde",
+ "ureq",
+>>>>>>> main
 ]
 
 [[package]]
@@ -720,6 +765,10 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_data",
+<<<<<<< HEAD
+=======
+ "hc_git",
+>>>>>>> main
  "hc_linguist",
  "hc_math",
  "hc_shell",
@@ -729,6 +778,25 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
+=======
+name = "hc_modules"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "hc_common",
+]
+
+[[package]]
+name = "hc_npm"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "hc_common",
+]
+
+[[package]]
+>>>>>>> main
 name = "hc_pm"
 version = "0.1.0"
 dependencies = [
@@ -758,7 +826,10 @@ dependencies = [
  "hc_analysis",
  "hc_common",
  "hc_config",
+<<<<<<< HEAD
  "hc_data",
+=======
+>>>>>>> main
  "hc_report",
  "hc_score",
  "hc_session",
@@ -793,8 +864,16 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_data",
+<<<<<<< HEAD
  "hc_linguist",
  "hc_metric",
+=======
+ "hc_eslint",
+ "hc_git",
+ "hc_linguist",
+ "hc_metric",
+ "hc_npm",
+>>>>>>> main
  "hc_pm",
  "hc_report",
  "hc_score",
@@ -818,6 +897,19 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
+=======
+name = "hc_source"
+version = "0.1.0"
+dependencies = [
+ "hc_common",
+ "hc_git_command",
+ "hc_hash",
+ "hc_shell",
+]
+
+[[package]]
+>>>>>>> main
 name = "hc_spdx"
 version = "0.1.0"
 dependencies = [
