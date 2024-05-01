@@ -15,11 +15,11 @@ pub use query::*;
 
 use hc_common::{
 	chrono::prelude::*,
-	log,
+	error::{Error, Result},
+	hc_error, log,
 	schemars::{self, JsonSchema},
 	serde::{self, Serialize, Serializer},
 };
-use hc_error::{hc_error, Error, Result};
 use paste::paste;
 use std::default::Default;
 use std::fmt::{self, Display, Formatter};

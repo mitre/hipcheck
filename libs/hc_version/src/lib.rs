@@ -4,8 +4,7 @@ mod query;
 
 pub use query::*;
 
-use hc_common::{log, semver::Version};
-use hc_error::{Context as _, Result};
+use hc_common::{context::Context, error::Result, log, semver::Version};
 use std::ops::Not as _;
 
 pub fn get_version(raw_version: &str) -> Result<String> {

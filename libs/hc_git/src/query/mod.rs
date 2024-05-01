@@ -8,8 +8,7 @@ use crate::{
 	Commit, CommitContributor, CommitContributorView, CommitDiff, CommitSigner, CommitSignerView,
 	Contributor, ContributorView, Diff, RawCommit, SignerKeyView, SignerNameView, SignerView,
 };
-use hc_common::{chrono::prelude::*, salsa};
-use hc_error::Result;
+use hc_common::{chrono::prelude::*, error::Result, salsa};
 use hc_source::SourceQuery;
 use hc_version::VersionQuery;
 use std::rc::Rc;

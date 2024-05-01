@@ -2,7 +2,8 @@
 
 //! Tests to ensure `Error` produces output correctly.
 
-use crate::{hc_error, Error};
+use crate::error::Error;
+use crate::hc_error;
 use std::io::{self, ErrorKind};
 
 // Message source root error with no context

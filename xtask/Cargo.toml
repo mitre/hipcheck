@@ -7,9 +7,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-hc_filesystem = { path = "../libs/hc_filesystem" }
-hc_error = { path = "../libs/hc_error" }
-hc_pathbuf = { path = "../libs/hc_pathbuf" }
+hc_common = { path = "../libs/hc_common" }
 clap = { version = "4.5.4", default-features = false, features = ["cargo", "std"] }
 glob = "0.3.0"
 serde = { version = "1.0.133", features = ["derive"] }

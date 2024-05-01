@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use hc_error::{hc_error, Result};
+use hc_common::{error::Result, hc_error};
 use hc_eslint::data::{ESLintMessage, ESLintReports};
 use hc_eslint::get_eslint_reports;
 

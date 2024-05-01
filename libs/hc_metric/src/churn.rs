@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::MetricProvider;
+use hc_common::context::Context as _;
 use hc_common::{
-	log,
+	error::Result,
+	hc_error, log,
 	serde::{self, Serialize},
 	TryAny, TryFilter, F64,
 };
 use hc_data::git::Commit;
-use hc_error::{hc_error, Context as _, Result};
 use hc_math::{mean, std_dev};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -38,7 +39,7 @@ pub fn churn_metric(db: &dyn MetricProvider) -> Result<Rc<ChurnOutput>> {
 				.iter()
 				.try_any(|fd| db.is_likely_source_file(Rc::clone(&fd.file_name)))
 		})
-		.collect::<hc_error::Result<Vec<_>>>()?;
+		.collect::<hc_common::error::Result<Vec<_>>>()?;
 
 	let mut commit_churns = Vec::new();
 	let mut total_files_changed: i64 = 0;
@@ -50,7 +51,7 @@ pub fn churn_metric(db: &dyn MetricProvider) -> Result<Rc<ChurnOutput>> {
 			.file_diffs
 			.iter()
 			.try_filter(|file_diff| db.is_likely_source_file(Rc::clone(&file_diff.file_name)))
-			.collect::<hc_error::Result<Vec<_>>>()?;
+			.collect::<hc_common::error::Result<Vec<_>>>()?;
 
 		// Update files changed.
 		let files_changed = source_files.len() as i64;
@@ -130,10 +131,10 @@ pub fn churn_metric(db: &dyn MetricProvider) -> Result<Rc<ChurnOutput>> {
 		.map(|c| c.churn.into_inner())
 		.collect();
 
-	let mean =
-		mean(&churns).ok_or_else(|| hc_error::Error::msg("failed to get mean churn value"))?;
+	let mean = mean(&churns)
+		.ok_or_else(|| hc_common::error::Error::msg("failed to get mean churn value"))?;
 	let std_dev = std_dev(mean, &churns)
-		.ok_or_else(|| hc_error::Error::msg("failed to get churn standard deviation"))?;
+		.ok_or_else(|| hc_common::error::Error::msg("failed to get churn standard deviation"))?;
 
 	log::trace!("mean of churn scores [mean='{}']", mean);
 	log::trace!("standard deviation of churn scores [stddev='{}']", std_dev);

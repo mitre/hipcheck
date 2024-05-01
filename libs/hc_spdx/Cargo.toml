@@ -7,5 +7,4 @@ publish = false
 
 [dependencies]
 hc_common = { path = "../hc_common" }
-hc_error = { path = "../hc_error" }
 spdx-rs = "0.5.0"

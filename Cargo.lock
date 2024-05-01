@@ -613,7 +613,6 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "hc_config",
- "hc_error",
  "hc_git",
  "hc_metric",
  "hc_report",
@@ -626,19 +625,7 @@ dependencies = [
  "content_inspector",
  "hc_common",
  "hc_config",
- "hc_error",
- "hc_filesystem",
  "walkdir",
-]
-
-[[package]]
-name = "hc_command_util"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "hc_error",
- "once_cell",
- "regex",
 ]
 
 [[package]]
@@ -649,11 +636,14 @@ dependencies = [
  "hc_serde",
  "lazy_static",
  "log",
+ "once_cell",
  "ordered-float",
+ "regex",
  "salsa",
  "schemars",
  "semver",
  "serde_json",
+ "toml",
  "url",
  "which",
 ]
@@ -663,9 +653,6 @@ name = "hc_config"
 version = "0.1.0"
 dependencies = [
  "hc_common",
- "hc_error",
- "hc_filesystem",
- "hc_pathbuf",
  "smart-default",
 ]
 
@@ -676,7 +663,6 @@ dependencies = [
  "criterion",
  "duct",
  "hc_common",
- "hc_error",
  "hc_report_builder",
  "hc_score",
  "hc_session",
@@ -691,42 +677,22 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "hc_config",
- "hc_error",
  "hc_eslint",
  "hc_git",
  "hc_github",
  "hc_modules",
  "hc_npm",
- "hc_pathbuf",
  "hc_source",
  "hc_version",
  "petgraph",
 ]
 
 [[package]]
-name = "hc_error"
-version = "0.1.0"
-dependencies = [
- "hc_common",
-]
-
-[[package]]
 name = "hc_eslint"
 version = "0.1.0"
 dependencies = [
- "hc_command_util",
  "hc_common",
- "hc_error",
  "tempfile",
-]
-
-[[package]]
-name = "hc_filesystem"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "hc_error",
- "toml",
 ]
 
 [[package]]
@@ -734,9 +700,7 @@ name = "hc_git"
 version = "0.1.0"
 dependencies = [
  "dirs",
- "hc_command_util",
  "hc_common",
- "hc_error",
  "hc_git_command",
  "hc_source",
  "hc_version",
@@ -747,9 +711,7 @@ dependencies = [
 name = "hc_git_command"
 version = "0.1.0"
 dependencies = [
- "hc_command_util",
  "hc_common",
- "hc_error",
 ]
 
 [[package]]
@@ -758,7 +720,6 @@ version = "0.1.0"
 dependencies = [
  "graphql_client",
  "hc_common",
- "hc_error",
  "hc_git",
  "hc_serde",
  "ureq",
@@ -774,8 +735,6 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "hc_config",
- "hc_error",
- "hc_filesystem",
 ]
 
 [[package]]
@@ -790,8 +749,6 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_error",
- "hc_filesystem",
  "hc_git",
  "hc_linguist",
  "hc_math",
@@ -806,10 +763,7 @@ name = "hc_modules"
 version = "0.1.0"
 dependencies = [
  "dirs",
- "hc_command_util",
  "hc_common",
- "hc_error",
- "hc_pathbuf",
 ]
 
 [[package]]
@@ -817,16 +771,8 @@ name = "hc_npm"
 version = "0.1.0"
 dependencies = [
  "dirs",
- "hc_command_util",
  "hc_common",
- "hc_error",
- "hc_filesystem",
- "hc_pathbuf",
 ]
-
-[[package]]
-name = "hc_pathbuf"
-version = "0.1.0"
 
 [[package]]
 name = "hc_pm"
@@ -835,7 +781,6 @@ dependencies = [
  "curl",
  "glob",
  "hc_common",
- "hc_error",
  "hc_serde",
  "serde_derive",
  "toml",
@@ -848,7 +793,6 @@ name = "hc_report"
 version = "0.1.0"
 dependencies = [
  "hc_common",
- "hc_error",
  "hc_version",
  "paste",
 ]
@@ -860,7 +804,6 @@ dependencies = [
  "hc_analysis",
  "hc_common",
  "hc_config",
- "hc_error",
  "hc_report",
  "hc_score",
  "hc_session",
@@ -874,7 +817,6 @@ dependencies = [
  "hc_analysis",
  "hc_common",
  "hc_config",
- "hc_error",
  "hc_shell",
  "petgraph",
 ]
@@ -894,25 +836,20 @@ dependencies = [
  "dotenv",
  "hc_analysis",
  "hc_binary",
- "hc_command_util",
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_error",
  "hc_eslint",
- "hc_filesystem",
  "hc_git",
  "hc_linguist",
  "hc_metric",
  "hc_npm",
- "hc_pathbuf",
  "hc_pm",
  "hc_report",
  "hc_score",
  "hc_shell",
  "hc_source",
  "hc_spdx",
- "hc_test_util",
  "hc_version",
  "tempfile",
 ]
@@ -924,7 +861,6 @@ dependencies = [
  "atty",
  "duct",
  "hc_common",
- "hc_error",
  "hc_report",
  "libc",
  "termcolor",
@@ -936,10 +872,8 @@ name = "hc_source"
 version = "0.1.0"
 dependencies = [
  "hc_common",
- "hc_error",
  "hc_git_command",
  "hc_hash",
- "hc_pathbuf",
  "hc_shell",
 ]
 
@@ -948,24 +882,14 @@ name = "hc_spdx"
 version = "0.1.0"
 dependencies = [
  "hc_common",
- "hc_error",
  "spdx-rs",
-]
-
-[[package]]
-name = "hc_test_util"
-version = "0.1.0"
-dependencies = [
- "hc_common",
 ]
 
 [[package]]
 name = "hc_version"
 version = "0.1.0"
 dependencies = [
- "hc_command_util",
  "hc_common",
- "hc_error",
 ]
 
 [[package]]
@@ -1006,7 +930,6 @@ dependencies = [
  "env_logger",
  "hc_common",
  "hc_core",
- "hc_error",
  "hc_session",
 ]
 
@@ -2451,9 +2374,7 @@ dependencies = [
  "clap",
  "duct",
  "glob",
- "hc_error",
- "hc_filesystem",
- "hc_pathbuf",
+ "hc_common",
  "open",
  "serde",
  "toml",

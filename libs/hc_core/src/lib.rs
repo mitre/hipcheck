@@ -5,7 +5,10 @@ pub use hc_session::{resolve_config, resolve_data, resolve_home, Check, CheckTyp
 pub use hc_shell::{ColorChoice, Output, Shell, Verbosity};
 pub use hc_version as version;
 
-use hc_error::{Context as _, Error, Result};
+use hc_common::{
+	context::Context as _,
+	error::{Error, Result},
+};
 use hc_report_builder::{build_pr_report, build_report};
 use hc_score::{score_pr_results, score_results};
 use hc_session::Session;

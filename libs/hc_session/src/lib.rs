@@ -3,8 +3,14 @@
 use dotenv::var;
 use hc_analysis::AnalysisProviderStorage;
 use hc_binary::BinaryFileStorage;
-use hc_command_util::DependentProgram;
-use hc_common::{chrono::prelude::*, salsa, HIPCHECK_TOML_FILE};
+use hc_common::context::Context as _;
+use hc_common::{
+	chrono::prelude::*,
+	command_util::DependentProgram,
+	error::{Error, Result},
+	filesystem::create_dir_all,
+	hc_error, pathbuf, salsa, HIPCHECK_TOML_FILE,
+};
 use hc_config::{
 	AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource, ConfigSourceStorage,
 	FuzzConfigQueryStorage, LanguagesConfigQueryStorage, PracticesConfigQueryStorage,
@@ -15,14 +21,11 @@ use hc_data::{
 	CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
 	GitHubProviderStorage, ModuleProviderStorage, PullRequestReviewProviderStorage,
 };
-use hc_error::{hc_error, Context as _, Error, Result};
-use hc_filesystem::create_dir_all;
 use hc_git::get_git_version;
 use hc_git::GitProviderStorage;
 use hc_linguist::LinguistStorage;
 use hc_metric::MetricProviderStorage;
 use hc_npm::get_npm_version;
-use hc_pathbuf::pathbuf;
 use hc_report::{Format, ReportParams, ReportParamsStorage};
 use hc_score::ScoringProviderStorage;
 use hc_shell::{Phase, Shell};
@@ -491,7 +494,7 @@ pub enum CheckType {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use hc_test_util::with_env_vars;
+	use hc_common::test_util::with_env_vars;
 	use tempfile::TempDir;
 
 	const TEMPDIR_PREFIX: &str = "hc_test";

@@ -9,7 +9,6 @@ publish = false
 atty = "0.2.14"
 duct = "0.13.5"
 hc_common = { path = "../hc_common" }
-hc_error = { path = "../hc_error" }
 hc_report = { path = "../hc_report" }
 libc = "0.2.125"
 termcolor = "1.1.3"

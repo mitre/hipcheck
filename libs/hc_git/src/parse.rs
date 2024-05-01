@@ -3,11 +3,12 @@
 #![allow(dead_code)]
 
 use crate::{Contributor, Diff, FileDiff, RawCommit};
+use hc_common::context::Context as _;
 use hc_common::{
 	chrono::{DateTime, FixedOffset},
+	error::{Error, Result},
 	log,
 };
-use hc_error::{Context as _, Error, Result};
 use nom::{
 	branch::alt,
 	character::complete::{char as character, digit1, not_line_ending, one_of, space1},

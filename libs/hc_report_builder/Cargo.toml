@@ -9,7 +9,6 @@ publish = false
 hc_analysis = { path = "../hc_analysis" }
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
-hc_error = { path = "../hc_error" }
 hc_report = { path = "../hc_report" }
 hc_score = { path = "../hc_score" }
 hc_session = { path = "../hc_session" }

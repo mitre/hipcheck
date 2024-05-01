@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_command_util::log_git_args;
-use hc_common::which;
-use hc_error::{hc_error, Context as _, Result};
+use hc_common::{command_util::log_git_args, context::Context, error::Result, hc_error, which};
 use std::convert::AsRef;
 use std::ffi::OsStr;
 use std::iter::IntoIterator;

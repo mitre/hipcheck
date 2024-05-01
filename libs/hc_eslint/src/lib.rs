@@ -3,11 +3,10 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
-use hc_common::{semver::Version, serde_json};
-use hc_error::{Context as _, Result};
-
 use command::ESLintCommand;
 use data::ESLintReports;
+use hc_common::context::Context as _;
+use hc_common::{error::Result, semver::Version, serde_json};
 
 pub mod command;
 pub mod data;
@@ -46,7 +45,7 @@ pub fn get_eslint_reports(path: &Path, version: String) -> Result<ESLintReports>
 mod test {
 	use super::*;
 
-	use hc_command_util::DependentProgram;
+	use hc_common::command_util::DependentProgram;
 	use std::fs::File;
 	use std::io::Write;
 

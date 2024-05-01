@@ -2,7 +2,9 @@
 
 use crate::MetricProvider;
 use hc_common::{
-	log,
+	context::Context as _,
+	error::{Error, Result},
+	filesystem as file, hc_error, log,
 	serde::{
 		self,
 		de::{Error as SerdeError, Visitor},
@@ -10,8 +12,6 @@ use hc_common::{
 	},
 };
 use hc_data::git::{Commit, CommitContributorView};
-use hc_error::{hc_error, Context as _, Error, Result};
-use hc_filesystem as file;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};

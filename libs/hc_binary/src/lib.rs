@@ -5,9 +5,13 @@ mod query;
 pub use query::*;
 
 use content_inspector::{inspect, ContentType};
-use hc_common::serde::{self, de::Visitor, Deserialize, Deserializer};
-use hc_error::{hc_error, Context as _, Result};
-use hc_filesystem::read_toml;
+use hc_common::{
+	context::Context,
+	error::Result,
+	filesystem::read_toml,
+	hc_error,
+	serde::{self, de::Visitor, Deserialize, Deserializer},
+};
 use std::fmt::{self, Formatter};
 use std::fs::File;
 use std::io::prelude::Read;
@@ -24,8 +28,10 @@ pub struct BinaryFileDetector {
 
 impl BinaryFileDetector {
 	/// Constructs a new `BinaryFileDetector` from the `Binary.toml` file.
-	pub fn load<P: AsRef<Path>>(binary_config_file: P) -> hc_error::Result<BinaryFileDetector> {
-		fn inner(binary_config_file: &Path) -> hc_error::Result<BinaryFileDetector> {
+	pub fn load<P: AsRef<Path>>(
+		binary_config_file: P,
+	) -> hc_common::error::Result<BinaryFileDetector> {
+		fn inner(binary_config_file: &Path) -> hc_common::error::Result<BinaryFileDetector> {
 			let extensions_file: ExtensionsFile = read_toml(binary_config_file)
 				.context("failed to read binary type defintions from Binary config file")?;
 

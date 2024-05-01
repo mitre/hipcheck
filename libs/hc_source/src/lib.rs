@@ -5,10 +5,13 @@ mod query;
 pub use query::*;
 
 use hc_common::log::{self, debug};
-use hc_common::url::Url;
-use hc_error::{hc_error, Context as _, Error, Result};
+use hc_common::{
+	context::Context,
+	error::{Error, Result},
+	hc_error, pathbuf,
+	url::Url,
+};
 use hc_git_command::GitCommand;
-use hc_pathbuf::pathbuf;
 use hc_shell::Phase;
 use std::ffi::OsStr;
 use std::fmt::{self, Debug, Display, Formatter};

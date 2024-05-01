@@ -7,7 +7,7 @@ mod workspace;
 use crate::exit::{EXIT_FAILURE, EXIT_SUCCESS};
 use crate::task::doc::OpenDoc;
 use clap::{crate_version, Arg, ArgAction, ArgMatches, Command};
-use hc_error::{Error, Result};
+use hc_common::error::{Error, Result};
 use std::process::exit;
 
 fn main() {

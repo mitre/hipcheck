@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::authenticated_agent::AuthenticatedAgent;
-use hc_common::serde_json::Value;
-use hc_error::{hc_error, Error, Result};
+use hc_common::{
+	error::{Error, Result},
+	hc_error,
+	serde_json::Value,
+};
 use std::rc::Rc;
 
 const GH_API_V4_SEARCH: &str = "https://api.github.com/search/code";

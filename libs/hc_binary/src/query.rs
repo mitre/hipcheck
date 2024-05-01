@@ -3,9 +3,9 @@
 //! A query group for binary file detection queries.
 
 use crate::BinaryFileDetector;
-use hc_common::salsa;
+use hc_common::context::Context as _;
+use hc_common::{error::Result, salsa};
 use hc_config::PracticesConfigQuery;
-use hc_error::{Context as _, Result};
 use std::rc::Rc;
 
 /// Queries related to binary file detection

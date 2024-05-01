@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(dead_code)]
+use hc_common::context::Context as _;
 use hc_common::{
+	error::{Error, Result},
+	hc_error,
 	serde_json::{self, Value},
 	url::{Host, Url},
 	CheckKind, EXIT_FAILURE,
 };
-
-use hc_error::{hc_error, Context as _, Error, Result};
 use std::cmp::max;
 use std::cmp::Ordering;
 use std::process::exit;

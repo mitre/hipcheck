@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! # use hc_pathbuf::pathbuf;
+//! # use hc_common::pathbuf;
 //! # use std::path::Path;
 //! #
 //! fn do_something(dir: &Path) {
@@ -27,7 +27,7 @@
 /// `pathbuf!` allows [`PathBuf`][std_path_pathbuf]s to be defined with the same syntax as array expressions, like so:
 ///
 /// ```
-/// # use hc_pathbuf::pathbuf;
+/// # use hc_common::pathbuf;
 /// # use std::path::Path;
 /// #
 /// fn do_something(dir: &Path) {

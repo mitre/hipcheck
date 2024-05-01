@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_command_util::{log_args, DependentProgram};
 use hc_common::{
-	log,
+	command_util::{log_args, DependentProgram},
+	context::Context,
+	error::Result,
+	filesystem as file, hc_error, log, pathbuf,
 	serde::{self, Deserialize},
 	which,
 };
-use hc_error::{hc_error, Context as _, Result};
-use hc_filesystem as file;
-use hc_pathbuf::pathbuf;
 use std::convert::AsRef;
 use std::ffi::OsStr;
 use std::iter::IntoIterator;
@@ -256,8 +255,7 @@ impl NpmCommand {
 #[cfg(test)]
 mod test {
 	use super::*;
-
-	use hc_command_util::DependentProgram;
+	use hc_common::command_util::DependentProgram;
 
 	#[test]
 	#[ignore = "can't guarantee availability of NPM"]

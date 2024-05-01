@@ -8,9 +8,11 @@ use crate::{authenticated_agent::AuthenticatedAgent, data::*};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
 use hc_common::{
 	chrono::DateTime,
+	context::Context,
+	error::{Error, Result},
+	hc_error,
 	serde_json::{from_value as from_json_value, to_value as to_json_value},
 };
-use hc_error::{hc_error, Context, Error, Result};
 use hc_git::{Contributor, RawCommit};
 use std::convert::TryFrom;
 

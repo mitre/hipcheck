@@ -3,6 +3,14 @@
 //! Provides common access to third-party crates and other
 //! functionality used widely throughout Hipcheck.
 
+pub mod command_util;
+pub mod context;
+pub mod error;
+pub mod filesystem;
+pub mod pathbuf;
+pub mod test_util;
+#[cfg(test)]
+mod tests;
 mod try_any;
 mod try_filter;
 

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::MetricProvider;
+use hc_common::context::Context as _;
 use hc_common::{
-	log,
+	error::Result,
+	hc_error, log,
 	serde::{self, Serialize},
 	TryAny, TryFilter, F64,
 };
 use hc_data::git::{Commit, CommitDiff, Diff};
-use hc_error::{hc_error, Context as _, Result};
 use hc_math::{mean, std_dev};
 use std::collections::HashMap;
 use std::iter::Iterator;
@@ -138,7 +139,7 @@ struct GraphemeFreqView<'gra> {
 fn is_likely_source_file(
 	commit_diff: &CommitDiff,
 	db: &dyn MetricProvider,
-) -> hc_error::Result<bool> {
+) -> hc_common::error::Result<bool> {
 	commit_diff
 		.diff
 		.file_diffs
@@ -211,10 +212,10 @@ fn z_scores(mut commit_entropies: Vec<CommitEntropy>) -> Result<Vec<CommitEntrop
 		.map(|c| c.entropy.into_inner())
 		.collect();
 
-	let mean =
-		mean(&entropies).ok_or_else(|| hc_error::Error::msg("failed to get mean entropy"))?;
+	let mean = mean(&entropies)
+		.ok_or_else(|| hc_common::error::Error::msg("failed to get mean entropy"))?;
 	let std_dev = std_dev(mean, &entropies)
-		.ok_or_else(|| hc_error::Error::msg("failed to get entropy standard deviation"))?;
+		.ok_or_else(|| hc_common::error::Error::msg("failed to get entropy standard deviation"))?;
 
 	if std_dev == 0.0 {
 		return Err(hc_error!("not enough commits to calculate entropy"));
