@@ -6,16 +6,15 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-hc_binary = { path = "../hc_binary" }
+content_inspector = "0.2.4"
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
 hc_data = { path = "../hc_data" }
-hc_linguist = { path = "../hc_linguist" }
-hc_math = { path = "../hc_math" }
 hc_shell = { path = "../hc_shell" }
 maplit = "1.0.2"
 unicode-normalization = "0.1.19"
 unicode-segmentation = "1.9.0"
+walkdir = "2"
 
 [dev-dependencies]
 hc_common = { path = "../hc_common" }

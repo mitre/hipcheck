@@ -9,11 +9,9 @@ publish = false
 dirs = "5.0.1"
 dotenv = "0.15.0"
 hc_analysis = { path = "../hc_analysis" }
-hc_binary = { path = "../hc_binary" }
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
 hc_data = { path = "../hc_data" }
-hc_linguist = { path = "../hc_linguist" }
 hc_metric = { path = "../hc_metric" }
 hc_pm = { path = "../hc_pm" }
 hc_report = { path = "../hc_report" }

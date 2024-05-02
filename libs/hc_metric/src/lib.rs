@@ -3,12 +3,15 @@
 pub mod activity;
 pub mod affiliation;
 pub mod binary;
+pub mod binary_detector;
 pub mod churn;
 pub mod commit_trust;
 pub mod contributor_trust;
 pub mod entropy;
 pub mod fuzz;
 pub mod identity;
+pub mod linguist;
+mod math;
 pub mod module;
 pub mod module_contributors;
 pub mod review;
@@ -19,19 +22,19 @@ use std::rc::Rc;
 use activity::ActivityOutput;
 use affiliation::AffiliationOutput;
 use binary::BinaryOutput;
+use binary_detector::BinaryFile;
 use churn::ChurnOutput;
 use commit_trust::CommitTrustOutput;
 use contributor_trust::ContributorTrustOutput;
 use entropy::EntropyOutput;
 use fuzz::FuzzOutput;
-use hc_binary::BinaryFile;
 use hc_common::{error::Result, salsa};
 use hc_config::{AttacksConfigQuery, CommitConfigQuery};
 use hc_data::{
 	git::GitProvider, DependenciesProvider, FuzzProvider, ModuleProvider, PullRequestReviewProvider,
 };
-use hc_linguist::Linguist;
 use identity::IdentityOutput;
+use linguist::Linguist;
 use module::ModuleOutput;
 use module_contributors::ModuleContributorsOutput;
 use review::ReviewOutput;

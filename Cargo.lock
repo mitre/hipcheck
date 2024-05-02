@@ -608,16 +608,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc_binary"
-version = "0.1.0"
-dependencies = [
- "content_inspector",
- "hc_common",
- "hc_config",
- "walkdir",
-]
-
-[[package]]
 name = "hc_common"
 version = "0.1.0"
 dependencies = [
@@ -678,31 +668,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc_linguist"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "hc_config",
-]
-
-[[package]]
-name = "hc_math"
-version = "0.1.0"
-
-[[package]]
 name = "hc_metric"
 version = "0.1.0"
 dependencies = [
- "hc_binary",
+ "content_inspector",
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_linguist",
- "hc_math",
  "hc_shell",
  "maplit",
  "unicode-normalization",
  "unicode-segmentation",
+ "walkdir",
 ]
 
 [[package]]
@@ -766,11 +743,9 @@ dependencies = [
  "dirs",
  "dotenv",
  "hc_analysis",
- "hc_binary",
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_linguist",
  "hc_metric",
  "hc_pm",
  "hc_report",

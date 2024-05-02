@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::math::{mean, std_dev};
 use crate::MetricProvider;
 use hc_common::context::Context as _;
 use hc_common::{
@@ -9,7 +10,6 @@ use hc_common::{
 	TryAny, TryFilter, F64,
 };
 use hc_data::git::{Commit, CommitDiff, Diff};
-use hc_math::{mean, std_dev};
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::ops::Not as _;
