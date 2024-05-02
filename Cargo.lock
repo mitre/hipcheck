@@ -683,20 +683,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc_pm"
-version = "0.1.0"
-dependencies = [
- "curl",
- "glob",
- "hc_common",
- "hc_serde",
- "serde_derive",
- "toml",
- "ureq",
- "xml-rs",
-]
-
-[[package]]
 name = "hc_report"
 version = "0.1.0"
 dependencies = [
@@ -740,20 +726,26 @@ dependencies = [
 name = "hc_session"
 version = "0.1.0"
 dependencies = [
+ "curl",
  "dirs",
  "dotenv",
+ "glob",
  "hc_analysis",
  "hc_common",
  "hc_config",
  "hc_data",
  "hc_metric",
- "hc_pm",
  "hc_report",
  "hc_score",
+ "hc_serde",
  "hc_shell",
  "hc_spdx",
  "hc_version",
+ "serde_derive",
  "tempfile",
+ "toml",
+ "ureq",
+ "xml-rs",
 ]
 
 [[package]]
