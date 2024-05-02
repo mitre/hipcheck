@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+mod pm;
+
 use dotenv::var;
 use hc_analysis::AnalysisProviderStorage;
 use hc_common::context::Context as _;
@@ -450,7 +452,7 @@ fn resolve_source(
 
 			let command = &source_type.to_owned().parent_command_value;
 
-			let package_git_repo_url = hc_pm::detect_and_extract(package, command.to_owned())
+			let package_git_repo_url = pm::detect_and_extract(package, command.to_owned())
 				.context("Could not get git repo URL for package")?;
 
 			SourceRepo::resolve_repo(phase, home, OsStr::new(package_git_repo_url.as_str())).map(

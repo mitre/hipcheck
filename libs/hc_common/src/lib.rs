@@ -46,7 +46,7 @@ pub const EXIT_FAILURE: i32 = 1;
 /// Indicates the program succeeded.
 pub const EXIT_SUCCESS: i32 = 0;
 
-//used in hc_pm and main.rs, global variables for hc check CheckKindHere node-ipc@9.2.1
+//used in hc_session::pm and main.rs, global variables for hc check CheckKindHere node-ipc@9.2.1
 pub enum CheckKind {
 	Repo,
 	Request,
