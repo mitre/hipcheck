@@ -28,3 +28,6 @@ unicode-segmentation = "1.9.0"
 ureq = { version = "2.9.7", features = ["json"] }
 walkdir = "2"
 xml-rs = "0.8"
+
+[dev_dependencies]
+tempfile = "3.10.1"

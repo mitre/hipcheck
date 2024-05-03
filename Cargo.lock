@@ -616,6 +616,7 @@ dependencies = [
  "petgraph",
  "serde_derive",
  "spdx-rs",
+ "tempfile",
  "toml",
  "unicode-normalization",
  "unicode-segmentation",
