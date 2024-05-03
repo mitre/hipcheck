@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pub use hc_report_builder::{AnyReport, Format, PrReport, Report};
-pub use hc_session::{resolve_config, resolve_data, resolve_home, Check, CheckType};
+pub use hc_analysis::{
+	report_builder::{AnyReport, Format, PrReport, Report},
+	session::{resolve_config, resolve_data, resolve_home, Check, CheckType},
+};
 pub use hc_shell::{ColorChoice, Output, Shell, Verbosity};
 pub use hc_version as version;
 
+use hc_analysis::{
+	report_builder::{build_pr_report, build_report},
+	score::{score_pr_results, score_results},
+	session::Session,
+};
 use hc_common::{
 	context::Context as _,
 	error::{Error, Result},
 };
-use hc_report_builder::{build_pr_report, build_report};
-use hc_score::{score_pr_results, score_results};
-use hc_session::Session;
 use std::path::PathBuf;
 
 /// Run Hipcheck.

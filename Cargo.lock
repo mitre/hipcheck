@@ -600,11 +600,29 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 name = "hc_analysis"
 version = "0.1.0"
 dependencies = [
+ "content_inspector",
+ "curl",
+ "dirs",
+ "dotenv",
+ "glob",
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_metric",
  "hc_report",
+ "hc_serde",
+ "hc_shell",
+ "hc_version",
+ "maplit",
+ "petgraph",
+ "serde_derive",
+ "spdx-rs",
+ "tempfile",
+ "toml",
+ "unicode-normalization",
+ "unicode-segmentation",
+ "ureq",
+ "walkdir",
+ "xml-rs",
 ]
 
 [[package]]
@@ -641,10 +659,8 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "duct",
+ "hc_analysis",
  "hc_common",
- "hc_report_builder",
- "hc_score",
- "hc_session",
  "hc_shell",
  "hc_version",
  "tempfile",
@@ -668,21 +684,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc_metric"
-version = "0.1.0"
-dependencies = [
- "content_inspector",
- "hc_common",
- "hc_config",
- "hc_data",
- "hc_shell",
- "maplit",
- "unicode-normalization",
- "unicode-segmentation",
- "walkdir",
-]
-
-[[package]]
 name = "hc_report"
 version = "0.1.0"
 dependencies = [
@@ -692,60 +693,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc_report_builder"
-version = "0.1.0"
-dependencies = [
- "hc_analysis",
- "hc_common",
- "hc_config",
- "hc_data",
- "hc_report",
- "hc_score",
- "hc_session",
-]
-
-[[package]]
-name = "hc_score"
-version = "0.1.0"
-dependencies = [
- "hc_analysis",
- "hc_common",
- "hc_config",
- "hc_shell",
- "petgraph",
-]
-
-[[package]]
 name = "hc_serde"
 version = "0.1.0"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "hc_session"
-version = "0.1.0"
-dependencies = [
- "curl",
- "dirs",
- "dotenv",
- "glob",
- "hc_analysis",
- "hc_common",
- "hc_config",
- "hc_data",
- "hc_metric",
- "hc_report",
- "hc_score",
- "hc_serde",
- "hc_shell",
- "hc_spdx",
- "hc_version",
- "serde_derive",
- "tempfile",
- "toml",
- "ureq",
- "xml-rs",
 ]
 
 [[package]]
@@ -758,14 +709,6 @@ dependencies = [
  "libc",
  "termcolor",
  "winapi",
-]
-
-[[package]]
-name = "hc_spdx"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "spdx-rs",
 ]
 
 [[package]]
@@ -802,9 +745,9 @@ version = "3.1.0"
 dependencies = [
  "clap",
  "env_logger",
+ "hc_analysis",
  "hc_common",
  "hc_core",
- "hc_session",
 ]
 
 [[package]]

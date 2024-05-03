@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_analysis::{AnalysisOutcome, AnalysisProvider, AnalysisReport};
+use crate::{
+	analysis::{AnalysisOutcome, AnalysisReport},
+	AnalysisProvider,
+};
 use hc_common::{error::Result, hc_error, salsa};
 use hc_shell::Phase;
 use std::default::Default;

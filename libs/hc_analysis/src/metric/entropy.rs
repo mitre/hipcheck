@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::math::{mean, std_dev};
+use crate::metric::math::{mean, std_dev};
 use crate::MetricProvider;
 use hc_common::context::Context as _;
 use hc_common::{

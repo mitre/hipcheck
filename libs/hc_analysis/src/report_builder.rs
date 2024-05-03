@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_analysis::AnalysisReport;
+use crate::{analysis::AnalysisReport, score::ScoringResults, session::Session};
 use hc_common::{
 	error::{Error, Result},
 	hc_error, log,
@@ -8,8 +8,6 @@ use hc_common::{
 use hc_config::RiskConfigQuery;
 use hc_data::source::SourceQuery;
 pub use hc_report::*;
-use hc_score::ScoringResults;
-use hc_session::Session;
 use std::default::Default;
 use std::result::Result as StdResult;
 
@@ -42,7 +40,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::ACTIVITY_PHASE
+						crate::score::ACTIVITY_PHASE
 					))
 				}
 			}
@@ -74,7 +72,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::AFFILIATION_PHASE
+						crate::score::AFFILIATION_PHASE
 					))
 				}
 			}
@@ -106,7 +104,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::BINARY_PHASE
+						crate::score::BINARY_PHASE
 					))
 				}
 			}
@@ -137,7 +135,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::CHURN_PHASE
+						crate::score::CHURN_PHASE
 					))
 				}
 			}
@@ -168,7 +166,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::ENTROPY_PHASE
+						crate::score::ENTROPY_PHASE
 					))
 				}
 			}
@@ -199,7 +197,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::IDENTITY_PHASE
+						crate::score::IDENTITY_PHASE
 					))
 				}
 			}
@@ -227,7 +225,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::FUZZ_PHASE
+						crate::score::FUZZ_PHASE
 					))
 				}
 			}
@@ -258,7 +256,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::REVIEW_PHASE
+						crate::score::REVIEW_PHASE
 					))
 				}
 			}
@@ -289,7 +287,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::TYPO_PHASE
+						crate::score::TYPO_PHASE
 					))
 				}
 			}
@@ -484,7 +482,7 @@ pub fn build_pr_report(session: &Session, scoring: &ScoringResults) -> Result<Pr
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::PR_AFFILIATION_PHASE
+						crate::score::PR_AFFILIATION_PHASE
 					))
 				}
 			}
@@ -518,7 +516,7 @@ pub fn build_pr_report(session: &Session, scoring: &ScoringResults) -> Result<Pr
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::PR_CONTRIBUTOR_TRUST_PHASE
+						crate::score::PR_CONTRIBUTOR_TRUST_PHASE
 					))
 				}
 			}
@@ -552,7 +550,7 @@ pub fn build_pr_report(session: &Session, scoring: &ScoringResults) -> Result<Pr
 				_ => {
 					return Err(hc_error!(
 						"phase name does not match {} analysis",
-						hc_score::PR_MODULE_CONTRIBUTORS_PHASE
+						crate::score::PR_MODULE_CONTRIBUTORS_PHASE
 					))
 				}
 			}
