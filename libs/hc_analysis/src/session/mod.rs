@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod pm;
+mod spdx;
 
-use dotenv::var;
-use hc_analysis::{
+use crate::{
 	metric::{
 		binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,
 	},
 	score::ScoringProviderStorage,
 	AnalysisProviderStorage,
 };
+use dotenv::var;
 use hc_common::context::Context as _;
 use hc_common::{
 	chrono::prelude::*,
@@ -469,7 +470,7 @@ fn resolve_source(
 			})
 		}
 		CheckType::SpdxDocument => {
-			let download_url = hc_spdx::extract_download_url(source)?;
+			let download_url = spdx::extract_download_url(source)?;
 			SourceRepo::resolve_repo(phase, home, &download_url).map(|repo| Source {
 				kind: SourceKind::Repo(repo),
 			})

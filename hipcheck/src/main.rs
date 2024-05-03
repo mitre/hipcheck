@@ -2,6 +2,7 @@
 
 use clap::{Arg, ArgAction, Command};
 use env_logger::{Builder, Env};
+use hc_analysis::session::{Check, CheckType};
 use hc_common::{
 	context::Context, error::Result, hc_error, schemars::schema_for, serde_json, CheckKind,
 };
@@ -9,7 +10,6 @@ use hc_core::{
 	print_error, resolve_config, resolve_data, resolve_home, run, version, AnyReport, ColorChoice,
 	Format, Outcome, Output, PrReport, Report, Verbosity,
 };
-use hc_session::{Check, CheckType};
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::process::exit;

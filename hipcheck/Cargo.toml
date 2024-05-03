@@ -13,9 +13,9 @@ path = "src/main.rs"
 [dependencies]
 
 # Internal dependencies.
+hc_analysis = { path = "../libs/hc_analysis" }
 hc_common = { path = "../libs/hc_common" }
 hc_core = { path = "../libs/hc_core" }
-hc_session = { path = "../libs/hc_session" }
 
 # External dependencies.
 clap = { version = "4.5.4", default-features = false, features = ["string", "std"]}
