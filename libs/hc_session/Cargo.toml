@@ -14,7 +14,6 @@ hc_analysis = { path = "../hc_analysis" }
 hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
 hc_data = { path = "../hc_data" }
-hc_metric = { path = "../hc_metric" }
 hc_report = { path = "../hc_report" }
 hc_score = { path = "../hc_score" }
 hc_serde = { path = "../hc_serde" }

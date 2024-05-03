@@ -600,11 +600,16 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 name = "hc_analysis"
 version = "0.1.0"
 dependencies = [
+ "content_inspector",
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_metric",
  "hc_report",
+ "hc_shell",
+ "maplit",
+ "unicode-normalization",
+ "unicode-segmentation",
+ "walkdir",
 ]
 
 [[package]]
@@ -668,21 +673,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc_metric"
-version = "0.1.0"
-dependencies = [
- "content_inspector",
- "hc_common",
- "hc_config",
- "hc_data",
- "hc_shell",
- "maplit",
- "unicode-normalization",
- "unicode-segmentation",
- "walkdir",
-]
-
-[[package]]
 name = "hc_report"
 version = "0.1.0"
 dependencies = [
@@ -734,7 +724,6 @@ dependencies = [
  "hc_common",
  "hc_config",
  "hc_data",
- "hc_metric",
  "hc_report",
  "hc_score",
  "hc_serde",

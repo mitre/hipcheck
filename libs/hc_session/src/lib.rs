@@ -3,7 +3,12 @@
 mod pm;
 
 use dotenv::var;
-use hc_analysis::AnalysisProviderStorage;
+use hc_analysis::{
+	metric::{
+		binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,
+	},
+	AnalysisProviderStorage,
+};
 use hc_common::context::Context as _;
 use hc_common::{
 	chrono::prelude::*,
@@ -27,9 +32,6 @@ use hc_data::{
 	},
 	CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
 	GitHubProviderStorage, ModuleProviderStorage, PullRequestReviewProviderStorage,
-};
-use hc_metric::{
-	binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,
 };
 use hc_report::{Format, ReportParams, ReportParamsStorage};
 use hc_score::ScoringProviderStorage;
