@@ -607,6 +607,7 @@ dependencies = [
  "hc_report",
  "hc_shell",
  "maplit",
+ "petgraph",
  "unicode-normalization",
  "unicode-segmentation",
  "walkdir",
@@ -646,9 +647,9 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "duct",
+ "hc_analysis",
  "hc_common",
  "hc_report_builder",
- "hc_score",
  "hc_session",
  "hc_shell",
  "hc_version",
@@ -690,19 +691,7 @@ dependencies = [
  "hc_config",
  "hc_data",
  "hc_report",
- "hc_score",
  "hc_session",
-]
-
-[[package]]
-name = "hc_score"
-version = "0.1.0"
-dependencies = [
- "hc_analysis",
- "hc_common",
- "hc_config",
- "hc_shell",
- "petgraph",
 ]
 
 [[package]]
@@ -725,7 +714,6 @@ dependencies = [
  "hc_config",
  "hc_data",
  "hc_report",
- "hc_score",
  "hc_serde",
  "hc_shell",
  "hc_spdx",

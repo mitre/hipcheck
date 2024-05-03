@@ -11,5 +11,4 @@ hc_common = { path = "../hc_common" }
 hc_config = { path = "../hc_config" }
 hc_data = { path = "../hc_data" }
 hc_report = { path = "../hc_report" }
-hc_score = { path = "../hc_score" }
 hc_session = { path = "../hc_session" }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_analysis::{
+use crate::{
 	analysis::{AnalysisOutcome, AnalysisReport},
 	AnalysisProvider,
 };

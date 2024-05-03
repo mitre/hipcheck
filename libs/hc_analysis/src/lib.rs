@@ -2,6 +2,8 @@
 
 pub mod analysis;
 pub mod metric;
+pub mod score;
 
 pub use analysis::{AnalysisProvider, AnalysisProviderStorage};
 pub use metric::{MetricProvider, MetricProviderStorage};
+pub use score::{ScoringProvider, ScoringProviderStorage};

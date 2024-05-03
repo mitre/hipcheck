@@ -13,6 +13,7 @@ hc_config = { path = "../hc_config" }
 hc_report = { path = "../hc_report" }
 hc_shell = { path = "../hc_shell" }
 maplit = "1.0.2"
+petgraph = { version = "0.6.0" }
 unicode-normalization = "0.1.19"
 unicode-segmentation = "1.9.0"
 walkdir = "2"

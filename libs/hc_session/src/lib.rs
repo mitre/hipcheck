@@ -7,6 +7,7 @@ use hc_analysis::{
 	metric::{
 		binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,
 	},
+	score::ScoringProviderStorage,
 	AnalysisProviderStorage,
 };
 use hc_common::context::Context as _;
@@ -34,7 +35,6 @@ use hc_data::{
 	GitHubProviderStorage, ModuleProviderStorage, PullRequestReviewProviderStorage,
 };
 use hc_report::{Format, ReportParams, ReportParamsStorage};
-use hc_score::ScoringProviderStorage;
 use hc_shell::{Phase, Shell};
 use hc_version::{get_version, VersionQuery, VersionQueryStorage};
 use std::ffi::{OsStr, OsString};
