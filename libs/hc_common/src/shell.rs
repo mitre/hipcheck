@@ -30,7 +30,7 @@
  * These methods take a `&mut Output`, a [`Report`] or [`PrReport`], and a [`Format`].
  *
  * At any point, errors may also be printed using [`Shell::error`], which takes an
- * [`&Error`][hc_common::error:Error] and a [`Format`].
+ * [`&Error`][crate::error:Error] and a [`Format`].
  *
  * ## Why the shell interface?
  *
@@ -84,7 +84,7 @@
 
 #![deny(missing_docs)]
 
-use hc_common::{
+use crate::{
 	error::{Error, Result},
 	hc_error, log,
 	report::{Format, PrReport, RecommendationKind, Report},
@@ -1523,7 +1523,7 @@ enum TtyWidth {
 #[cfg(unix)]
 mod imp {
 	use super::TtyWidth;
-	use hc_common::{error::Result, log};
+	use crate::{error::Result, log};
 	use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 	use std::mem::zeroed;
 	use termcolor::WriteColor;
@@ -1561,7 +1561,7 @@ mod imp {
 #[cfg(windows)]
 mod imp {
 	use super::TtyWidth;
-	use hc_common::{error::Result, log};
+	use crate::{error::Result, log};
 	use std::mem::zeroed;
 	use std::{cmp, ptr};
 	use termcolor::WriteColor;

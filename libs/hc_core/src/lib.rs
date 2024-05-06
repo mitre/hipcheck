@@ -4,8 +4,10 @@ pub use hc_analysis::{
 	report_builder::{AnyReport, Format, PrReport, Report},
 	session::{resolve_config, resolve_data, resolve_home, Check, CheckType},
 };
-pub use hc_common::version;
-pub use hc_shell::{ColorChoice, Output, Shell, Verbosity};
+pub use hc_common::{
+	shell::{ColorChoice, Output, Shell, Verbosity},
+	version,
+};
 
 use hc_analysis::{
 	report_builder::{build_pr_report, build_report},

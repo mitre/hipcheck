@@ -9,7 +9,6 @@ publish = false
 dirs = "5.0.1"
 graphql_client = "0.14.0"
 hc_common = { path = "../hc_common" }
-hc_shell = { path = "../hc_shell" }
 nom = "7.1.3"
 petgraph = { version = "0.6.0", features = ["serde-1"] }
 serde = { version = "1.0.200", features = ["derive", "rc"] }

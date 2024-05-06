@@ -613,7 +613,6 @@ dependencies = [
  "glob",
  "hc_common",
  "hc_data",
- "hc_shell",
  "maplit",
  "petgraph",
  "serde",
@@ -634,7 +633,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "duct",
  "lazy_static",
+ "libc",
  "log",
  "once_cell",
  "ordered-float",
@@ -646,9 +647,11 @@ dependencies = [
  "serde",
  "serde_json",
  "smart-default",
+ "termcolor",
  "toml",
  "url",
  "which",
+ "winapi",
 ]
 
 [[package]]
@@ -659,7 +662,6 @@ dependencies = [
  "duct",
  "hc_analysis",
  "hc_common",
- "hc_shell",
  "tempfile",
 ]
 
@@ -670,23 +672,11 @@ dependencies = [
  "dirs",
  "graphql_client",
  "hc_common",
- "hc_shell",
  "nom",
  "petgraph",
  "serde",
  "tempfile",
  "ureq",
-]
-
-[[package]]
-name = "hc_shell"
-version = "0.1.0"
-dependencies = [
- "duct",
- "hc_common",
- "libc",
- "termcolor",
- "winapi",
 ]
 
 [[package]]

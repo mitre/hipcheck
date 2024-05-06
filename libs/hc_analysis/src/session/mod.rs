@@ -25,10 +25,10 @@ use hc_common::{
 	hc_error, pathbuf,
 	report::{Format, ReportParams, ReportParamsStorage},
 	salsa,
+	shell::{Phase, Shell},
 	version::{get_version, VersionQuery, VersionQueryStorage},
 	HIPCHECK_TOML_FILE,
 };
-use hc_data::ModuleProvider;
 use hc_data::{
 	git::get_git_version,
 	git::GitProviderStorage,
@@ -37,9 +37,8 @@ use hc_data::{
 		Source, SourceChangeRequest, SourceKind, SourceQuery, SourceQueryStorage, SourceRepo,
 	},
 	CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
-	GitHubProviderStorage, ModuleProviderStorage, PullRequestReviewProviderStorage,
+	GitHubProviderStorage, ModuleProvider, ModuleProviderStorage, PullRequestReviewProviderStorage,
 };
-use hc_shell::{Phase, Shell};
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::path::{Path, PathBuf};

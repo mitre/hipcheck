@@ -4,8 +4,7 @@ use crate::{
 	analysis::{AnalysisOutcome, AnalysisReport},
 	AnalysisProvider,
 };
-use hc_common::{error::Result, hc_error, salsa};
-use hc_shell::Phase;
+use hc_common::{error::Result, hc_error, salsa, shell::Phase};
 use std::default::Default;
 use std::rc::Rc;
 

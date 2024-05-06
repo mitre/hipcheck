@@ -10,6 +10,7 @@ pub mod error;
 pub mod filesystem;
 pub mod pathbuf;
 pub mod report;
+pub mod shell;
 pub mod test_util;
 #[cfg(test)]
 mod tests;

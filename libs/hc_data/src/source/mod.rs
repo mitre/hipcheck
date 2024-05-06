@@ -10,9 +10,9 @@ use hc_common::{
 	context::Context,
 	error::{Error, Result},
 	hc_error, pathbuf,
+	shell::Phase,
 	url::Url,
 };
-use hc_shell::Phase;
 use std::ffi::OsStr;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::fs;
