@@ -13,7 +13,6 @@ use serde::de::Visitor;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
-use serde::{self};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -25,20 +24,17 @@ use std::rc::Rc;
 use std::result::Result as StdResult;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct AffiliationOutput {
 	pub affiliations: Vec<Affiliation>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct Affiliation {
 	pub commit: Rc<Commit>,
 	pub affiliated_type: AffiliatedType,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize, Clone, Copy)]
-#[serde(crate = "self::serde")]
 pub enum AffiliatedType {
 	Author,
 	Committer,
@@ -208,7 +204,6 @@ impl<'haystack> Matcher<'haystack> {
 /// An overall organization metric specification, with a strategy for how the
 /// metric will be performed, and a list of organizations.
 #[derive(Deserialize)]
-#[serde(crate = "self::serde")]
 struct OrgSpec {
 	strategy: Strategy,
 	orgs: Vec<Org>,
@@ -263,7 +258,6 @@ impl OrgSpec {
 /// An organization metric strategy. It either implicitly includes _all_
 /// organizations in the Orgs struct, or has a more detailed custom specification.
 #[derive(Deserialize)]
-#[serde(crate = "self::serde")]
 enum Strategy {
 	All(Mode),
 	Specified(Spec),
@@ -273,7 +267,6 @@ enum Strategy {
 /// commits which are independent of the listed orgs, or all commits which are
 /// affiliated with the listed orgs.
 #[derive(Deserialize, Clone, Copy)]
-#[serde(crate = "self::serde")]
 enum Mode {
 	Independent,
 	Affiliated,
@@ -287,7 +280,6 @@ enum Mode {
 /// specifiers may be combined (for example, analyzing all commits from some
 /// country, plus commits from an organization not from that country).
 #[derive(Deserialize)]
-#[serde(crate = "self::serde")]
 struct Spec {
 	mode: Mode,
 	list: Vec<Reference>,
@@ -339,7 +331,6 @@ fn get_by_name<'spec>(name: &str, list: &'spec [Org]) -> Result<Vec<&'spec Org>>
 /// A single organization, with a name, a list of hosts (which form the basis
 /// for the hosts used in the analyzer), and an affiliated country.
 #[derive(Clone, Deserialize, Debug)]
-#[serde(crate = "self::serde")]
 struct Org {
 	name: String,
 	hosts: Vec<String>,
@@ -415,7 +406,6 @@ impl<'de> Visitor<'de> for ReferenceVisitor {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(crate = "self::serde")]
 struct RawOrgSpec {
 	strategy: Option<String>,
 	strategy_spec: Option<RawSpec>,
@@ -423,7 +413,6 @@ struct RawOrgSpec {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(crate = "self::serde")]
 struct RawSpec {
 	mode: String,
 	list: Vec<Reference>,

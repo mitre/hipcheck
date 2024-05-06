@@ -10,10 +10,9 @@ use crate::filesystem::read_toml;
 use serde::de::Visitor;
 use serde::Deserialize;
 use serde::Deserializer;
-use serde::{self};
 use std::convert::AsRef;
+use std::fmt;
 use std::fmt::Formatter;
-use std::fmt::{self};
 use std::path::Path;
 use std::result::Result as StdResult;
 
@@ -66,13 +65,11 @@ impl SourceFileDetector {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(crate = "self::serde")]
 struct LanguageFile {
 	languages: Vec<LanguageExtensions>,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(crate = "self::serde")]
 struct LanguageExtensions {
 	#[serde(default = "missing_lang_type")]
 	r#type: LanguageType,

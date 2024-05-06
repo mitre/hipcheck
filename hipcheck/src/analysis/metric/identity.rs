@@ -5,17 +5,14 @@ use crate::context::Context as _;
 use crate::data::git::Commit;
 use crate::error::Result;
 use serde::Serialize;
-use serde::{self};
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct IdentityOutput {
 	pub matches: Vec<Match>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct Match {
 	pub commit: Rc<Commit>,
 	pub identities_match: bool,

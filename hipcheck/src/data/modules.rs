@@ -8,7 +8,6 @@ use crate::error::Result;
 use crate::hc_error;
 use crate::pathbuf;
 use serde::Deserialize;
-use serde::{self};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::convert::AsRef;
@@ -56,7 +55,6 @@ fn detect_npm_package_root(pkg_file: &Path) -> Result<PathBuf> {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(crate = "self::serde")]
 pub struct RawModule {
 	pub file: String,
 	pub entry: bool,

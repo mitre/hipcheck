@@ -4,8 +4,8 @@
 
 use crate::error::Error;
 use crate::hc_error;
+use std::io;
 use std::io::ErrorKind;
-use std::io::{self};
 
 // Message source root error with no context
 #[test]

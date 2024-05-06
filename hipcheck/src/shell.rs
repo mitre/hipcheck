@@ -92,9 +92,9 @@ use crate::report::PrReport;
 use crate::report::RecommendationKind;
 use crate::report::Report;
 use std::cell::Cell;
+use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Formatter;
-use std::fmt::{self};
 use std::io::stderr;
 use std::io::stdout;
 use std::io::IsTerminal as _;
@@ -103,13 +103,13 @@ use std::ops::Not as _;
 use std::str::FromStr;
 use std::time::Duration;
 use std::time::Instant;
+use termcolor;
 use termcolor::Color;
 use termcolor::Color::*;
 use termcolor::ColorSpec;
 use termcolor::NoColor;
 use termcolor::StandardStream;
 use termcolor::WriteColor;
-use termcolor::{self};
 
 /// The interface used throughout Hipcheck to print things out to the user.
 pub struct Shell {

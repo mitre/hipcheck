@@ -4,15 +4,13 @@ use chrono::DateTime;
 use chrono::FixedOffset;
 use serde::Deserialize;
 use serde::Serialize;
-use serde::{self};
+use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fmt::{self};
 use std::rc::Rc;
 
 /// Commits as they come directly out of `git log`.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct RawCommit {
 	pub hash: String,
 
@@ -28,7 +26,6 @@ pub struct RawCommit {
 
 /// Commits as understood in Hipcheck's data model.
 #[derive(Debug, Serialize, Clone, PartialEq, Eq, Hash)]
-#[serde(crate = "self::serde")]
 pub struct Commit {
 	pub hash: String,
 
@@ -45,7 +42,6 @@ impl Display for Commit {
 
 /// Authors or committers of a commit.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Hash, PartialOrd, Ord)]
-#[serde(crate = "self::serde")]
 pub struct Contributor {
 	pub name: String,
 	pub email: String,
@@ -59,7 +55,6 @@ impl Display for Contributor {
 
 /// "Joim struct" for commits and contributors.
 #[derive(Debug, PartialEq, Eq, Serialize, Clone)]
-#[serde(crate = "self::serde")]
 pub struct CommitContributor {
 	// Index of commit cache
 	pub commit_id: usize,
@@ -70,7 +65,6 @@ pub struct CommitContributor {
 
 /// "Join struct" for commits and signature data.
 #[derive(Debug, PartialEq, Eq, Serialize, Clone)]
-#[serde(crate = "self::serde")]
 pub struct CommitSigner {
 	// Index of commit cache
 	pub commit_id: usize,
@@ -82,7 +76,6 @@ pub struct CommitSigner {
 
 /// Temporary data structure for looking up the contributors of a commit
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct CommitContributorView {
 	pub commit: Rc<Commit>,
 	pub author: Rc<Contributor>,
@@ -91,7 +84,6 @@ pub struct CommitContributorView {
 
 /// Temporary data structure for looking up the commits associated with a contributor
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct ContributorView {
 	pub contributor: Rc<Contributor>,
 	pub commits: Vec<Rc<Commit>>,
@@ -99,7 +91,6 @@ pub struct ContributorView {
 
 /// Temporary data structure for looking up the signer of a commit
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct CommitSignerView {
 	pub commit: Rc<Commit>,
 	pub signer_name: Option<Rc<String>>,
@@ -108,7 +99,6 @@ pub struct CommitSignerView {
 
 /// Temporary data structure for looking up the commits associated with a signer name
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct SignerNameView {
 	pub signer_name: Rc<String>,
 	pub commits: Vec<Rc<Commit>>,
@@ -116,7 +106,6 @@ pub struct SignerNameView {
 
 /// Temporary data structure for looking up the commits associated with a signer key
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct SignerKeyView {
 	pub signer_key: Rc<String>,
 	pub commits: Vec<Rc<Commit>>,
@@ -124,7 +113,6 @@ pub struct SignerKeyView {
 
 /// Temporary data structure for looking up the keys associated with a signer name
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct SignerView {
 	pub signer_name: Rc<String>,
 	pub signer_keys: Vec<Rc<String>>,
@@ -132,7 +120,6 @@ pub struct SignerView {
 
 /// View into commits and diffs joined together.
 #[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct CommitDiff {
 	pub commit: Rc<Commit>,
 	pub diff: Rc<Diff>,
@@ -160,7 +147,6 @@ impl Display for CommitDiff {
 
 /// A set of changes in a commit.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct Diff {
 	pub additions: Option<i64>,
 	pub deletions: Option<i64>,
@@ -169,7 +155,6 @@ pub struct Diff {
 
 /// A set of changes to a specific file in a commit.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct FileDiff {
 	pub file_name: Rc<String>,
 	pub additions: Option<i64>,

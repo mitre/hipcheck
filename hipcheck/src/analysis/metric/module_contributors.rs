@@ -6,18 +6,15 @@ use crate::data::git::Contributor;
 use crate::data::Module;
 use crate::error::Result;
 use serde::Serialize;
-use serde::{self};
 use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct ModuleContributorsOutput {
 	pub contributors_map: Rc<HashMap<Rc<Contributor>, Vec<ContributedModule>>>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct ContributedModule {
 	pub module: Rc<Module>,
 	pub new_contributor: bool,

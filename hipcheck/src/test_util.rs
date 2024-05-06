@@ -2,11 +2,11 @@
 
 //! Utilities for unit testing.
 
+use std::env;
 use std::env::VarError;
-use std::env::{self};
+use std::panic;
 use std::panic::RefUnwindSafe;
 use std::panic::UnwindSafe;
-use std::panic::{self};
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;

@@ -16,9 +16,9 @@ use chrono::Duration;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::default::Default;
+use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fmt::{self};
 use std::ops::Not;
 use std::rc::Rc;
 

@@ -5,17 +5,14 @@ use crate::context::Context as _;
 use crate::data::PullRequest;
 use crate::error::Result;
 use serde::Serialize;
-use serde::{self};
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct ReviewOutput {
 	pub pull_reviews: Vec<PullReview>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct PullReview {
 	pub pull_request: Rc<PullRequest>,
 	pub has_review: bool,

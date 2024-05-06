@@ -13,9 +13,8 @@ use content_inspector::ContentType;
 use serde::de::Visitor;
 use serde::Deserialize;
 use serde::Deserializer;
-use serde::{self};
+use std::fmt;
 use std::fmt::Formatter;
-use std::fmt::{self};
 use std::fs::File;
 use std::io::prelude::Read;
 use std::io::BufReader;
@@ -66,13 +65,11 @@ impl BinaryFileDetector {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(crate = "self::serde")]
 struct ExtensionsFile {
 	formats: Vec<BinaryExtensions>,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(crate = "self::serde")]
 struct BinaryExtensions {
 	#[serde(default = "missing_bin_type")]
 	r#type: BinaryType,

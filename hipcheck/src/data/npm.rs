@@ -8,7 +8,6 @@ use crate::filesystem as file;
 use crate::hc_error;
 use crate::pathbuf;
 use serde::Deserialize;
-use serde::{self};
 use std::collections::HashMap;
 use std::convert::AsRef;
 use std::ffi::OsStr;
@@ -21,7 +20,6 @@ use std::process::Command;
 use std::process::Stdio;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(crate = "self::serde")]
 pub struct PackageFile {
 	pub main: String,
 }
@@ -116,7 +114,6 @@ fn generate_package_lock_file(package_dir: &Path, version: String) -> Result<()>
 }
 
 #[derive(Deserialize)]
-#[serde(crate = "self::serde")]
 struct PackageLockFile {
 	dependencies: Option<HashMap<String, Box<Dependency>>>,
 }
@@ -151,7 +148,6 @@ fn resolve_deps(name: &str, detail: &Dependency) -> Vec<String> {
 }
 
 #[derive(Deserialize)]
-#[serde(crate = "self::serde")]
 struct Dependency {
 	dependencies: Option<HashMap<String, Box<Dependency>>>,
 }

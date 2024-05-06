@@ -5,11 +5,9 @@ use crate::analysis::MetricProvider;
 use crate::error::Result;
 use crate::TryFilter;
 use serde::Serialize;
-use serde::{self};
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct BinaryOutput {
 	pub binary_files: Vec<Rc<String>>,
 }

@@ -11,18 +11,15 @@ use crate::TryAny;
 use crate::TryFilter;
 use crate::F64;
 use serde::Serialize;
-use serde::{self};
 use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct ChurnOutput {
 	pub commit_churn_freqs: Vec<CommitChurnFreq>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct CommitChurnFreq {
 	pub commit: Rc<Commit>,
 	pub churn: F64,

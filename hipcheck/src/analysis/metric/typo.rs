@@ -9,24 +9,21 @@ use crate::filesystem as file;
 use maplit::hashmap;
 use serde::Deserialize;
 use serde::Serialize;
-use serde::{self};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::AsRef;
+use std::fmt;
 use std::fmt::Display;
-use std::fmt::{self};
 use std::path::Path;
 use std::rc::Rc;
 use std::str;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct TypoOutput {
 	pub typos: Vec<TypoDep>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct TypoDep {
 	pub dependency: Rc<String>,
 	pub typo: Typo,
@@ -74,13 +71,11 @@ fn typos_for_javascript(
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(crate = "self::serde")]
 struct TypoFile {
 	languages: Languages,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(crate = "self::serde")]
 struct Languages {
 	javascript: Vec<String>,
 }
@@ -402,7 +397,6 @@ fn get_homoglyph_typos(results: &mut Vec<Typo>, name: &str, homoglyphs: &[Homogl
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct Typo {
 	kind: TypoKind,
 	typo: String,
@@ -532,7 +526,6 @@ impl PartialEq<Typo> for &Typo {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
-#[serde(crate = "self::serde")]
 enum TypoKind {
 	Addition,
 	Bitsquatting,

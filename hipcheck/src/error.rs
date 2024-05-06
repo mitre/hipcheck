@@ -12,9 +12,9 @@
 
 use std::borrow::Cow;
 use std::error::Error as StdError;
+use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Display;
-use std::fmt::{self};
 use std::rc::Rc;
 
 pub type Result<T> = std::result::Result<T, Error>;

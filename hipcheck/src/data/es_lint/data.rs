@@ -5,16 +5,15 @@
 ///
 /// This parser has been tested with the output from ESLint v7.31.0
 use serde::Deserialize;
-/// ESLint's JSON output is demonstrated here:
-/// https://eslint.org/docs/user-guide/formatters/#json
-///
-/// This parser has been tested with the output from ESLint v7.31.0
-use serde::{self};
+
+// ESLint's JSON output is demonstrated here:
+// https://eslint.org/docs/user-guide/formatters/#json
+//
+// This parser has been tested with the output from ESLint v7.31.0
 
 pub type ESLintReports = Vec<ESLintReport>;
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(crate = "self::serde")]
 pub struct ESLintReport {
 	#[serde(rename = "filePath")]
 	pub file_path: String,
@@ -31,7 +30,6 @@ pub struct ESLintReport {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(crate = "self::serde")]
 pub struct ESLintMessage {
 	#[serde(rename = "ruleId")]
 	pub rule_id: String,

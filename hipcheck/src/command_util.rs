@@ -10,9 +10,9 @@ use std::collections::HashMap;
 use std::convert::AsRef;
 use std::env;
 use std::ffi::OsStr;
+use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fmt::{self};
 use std::iter::IntoIterator;
 
 use DependentProgram::*;

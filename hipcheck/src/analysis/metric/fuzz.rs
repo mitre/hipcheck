@@ -5,11 +5,9 @@ use crate::context::Context as _;
 use crate::data::Fuzz;
 use crate::error::Result;
 use serde::Serialize;
-use serde::{self};
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct FuzzOutput {
 	pub fuzz_result: Fuzz,
 }

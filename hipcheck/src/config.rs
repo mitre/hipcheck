@@ -13,7 +13,6 @@ use crate::ORGS_FILE;
 use crate::TYPO_FILE;
 use serde::Deserialize;
 use serde::Serialize;
-use serde::{self};
 use smart_default::SmartDefault;
 use std::default::Default;
 use std::path::Path;
@@ -32,7 +31,6 @@ impl Config {
 
 /// Represents the configuration of Hipcheck's analyses.
 #[derive(Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct Config {
 	/// The configuration of overall project risk tolerance.
 	#[serde(default)]
@@ -49,7 +47,6 @@ pub struct Config {
 
 /// Represents configuration of the overall risk threshold of an assessment.
 #[derive(Debug, Serialize, Deserialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct RiskConfig {
 	/// The risk tolerance threshold, a value between 0 and 1.
 	#[default(_code = "F64::new(0.5).unwrap()")]
@@ -59,7 +56,6 @@ pub struct RiskConfig {
 
 /// Defines configuration for all of Hipcheck's analyses.
 #[derive(Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct AnalysisConfig {
 	/// Defines configuration for practices analysis.
 	#[serde(default)]
@@ -72,7 +68,6 @@ pub struct AnalysisConfig {
 
 /// Configuration of analyses on a repo's development practices.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct PracticesConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -105,7 +100,6 @@ pub struct PracticesConfig {
 
 /// Configuration of analyses on potential attacks against a repo.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct AttacksConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -126,7 +120,6 @@ pub struct AttacksConfig {
 
 /// Configuration of analyses on individual commits.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct CommitConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -167,7 +160,6 @@ pub struct CommitConfig {
 
 /// Defines configuration for activity analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct ActivityConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -184,7 +176,6 @@ pub struct ActivityConfig {
 
 /// Defines configuration for affiliation analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct AffiliationConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -205,7 +196,6 @@ pub struct AffiliationConfig {
 
 /// Defines configuration for binary file analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct BinaryConfig {
 	/// Binary file extension configuration file.
 	#[default = "Binary.toml"]
@@ -226,7 +216,6 @@ pub struct BinaryConfig {
 
 /// Defines configuration for churn analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct ChurnConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -248,7 +237,6 @@ pub struct ChurnConfig {
 
 /// Defines configuration for commit trust analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct CommitTrustConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -261,7 +249,6 @@ pub struct CommitTrustConfig {
 
 /// Defines configuration for contributor trust analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct ContributorTrustConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -287,7 +274,6 @@ pub struct ContributorTrustConfig {
 
 /// Defines configuration for entropy analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct EntropyConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -309,7 +295,6 @@ pub struct EntropyConfig {
 
 /// Defines configuration for identity analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct IdentityConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -328,7 +313,6 @@ pub struct IdentityConfig {
 
 /// Defines configuration for review analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct ReviewConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -347,7 +331,6 @@ pub struct ReviewConfig {
 
 /// Defines configuration for typo analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct TypoConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -369,7 +352,6 @@ pub struct TypoConfig {
 
 /// Defines configuration for pull request affiliation analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct PrAffiliationConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -386,7 +368,6 @@ pub struct PrAffiliationConfig {
 
 /// Defines configuration for pull request module committers analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct PrModuleContributorsConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -404,7 +385,6 @@ pub struct PrModuleContributorsConfig {
 
 /// Defines the configuration of language-specific info.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct LanguagesConfig {
 	/// The file to pull language information from.
 	#[default = "Langs.toml"]
@@ -413,7 +393,6 @@ pub struct LanguagesConfig {
 
 /// Defines configuration for fuzz analysis.
 #[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default, crate = "self::serde")]
 pub struct FuzzConfig {
 	/// Whether the analysis is active.
 	#[default = true]
@@ -426,12 +405,12 @@ pub struct FuzzConfig {
 
 /// Inner module for deserialization helpers.
 mod de {
-	use super::serde::de::Deserializer;
-	use super::serde::de::Visitor;
-	use super::serde::de::{self};
 	use super::F64;
+	use serde::de;
+	use serde::de::Deserializer;
+	use serde::de::Visitor;
+	use std::fmt;
 	use std::fmt::Formatter;
-	use std::fmt::{self};
 
 	/// Deserialize a float, ensuring it's between 0.0 and 1.0 inclusive.
 	pub(super) fn percent<'de, D>(deserializer: D) -> Result<F64, D::Error>

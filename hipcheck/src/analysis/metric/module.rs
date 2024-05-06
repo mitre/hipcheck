@@ -5,11 +5,9 @@ use crate::context::Context as _;
 use crate::data::ModuleGraph;
 use crate::error::Result;
 use serde::Serialize;
-use serde::{self};
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct ModuleOutput {
 	pub module_graph: Rc<ModuleGraph>,
 	pub is_modular: bool,

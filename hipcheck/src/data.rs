@@ -31,7 +31,6 @@ use modules::RawModule;
 use petgraph::visit::Dfs;
 use petgraph::Graph;
 use serde::Serialize;
-use serde::{self};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -75,7 +74,6 @@ impl Lang {
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct Fuzz {
 	pub exists: bool,
 }
@@ -95,14 +93,12 @@ pub fn get_fuzz_check(token: &str, repo_uri: Rc<String>) -> Result<Fuzz> {
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct PullRequest {
 	pub id: u64,
 	pub reviews: u64,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(crate = "self::serde")]
 pub struct SinglePullRequest {
 	pub id: u64,
 	pub reviews: u64,
@@ -218,20 +214,17 @@ pub fn get_single_pull_request_review_from_github(
 
 #[allow(unused)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize)]
-#[serde(crate = "self::serde")]
 pub enum Relationship {
 	Child,
 	Import,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct Module {
 	pub file: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct ModuleGraph {
 	pub connections: Graph<Module, Relationship>,
 }

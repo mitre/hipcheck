@@ -13,7 +13,6 @@ use crate::TryAny;
 use crate::TryFilter;
 use crate::F64;
 use serde::Serialize;
-use serde::{self};
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::ops::Not as _;
@@ -81,7 +80,6 @@ pub fn entropy_metric(db: &dyn MetricProvider) -> Result<Rc<EntropyOutput>> {
 /// The final output for entropy metric, containing an entropy score for
 /// every commit.
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct EntropyOutput {
 	/// The set of commit entropies.
 	pub commit_entropies: Vec<CommitEntropy>,
@@ -96,7 +94,6 @@ impl EntropyOutput {
 
 /// The entropy of a single commit.
 #[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(crate = "self::serde")]
 pub struct CommitEntropy {
 	/// The commit
 	pub commit: Rc<Commit>,
