@@ -9,7 +9,6 @@ publish = false
 hc_analysis = { path = "../hc_analysis" }
 hc_common = { path = "../hc_common" }
 hc_shell = { path = "../hc_shell" }
-hc_version = { path = "../hc_version" }
 
 [dev_dependencies]
 duct = "0.13.7"
@@ -25,4 +24,3 @@ path = "../../benches/basic.rs"
 [[test]]
 name = "can_run"
 path = "../../tests/can_run.rs"
-

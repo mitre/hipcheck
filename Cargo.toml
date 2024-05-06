@@ -6,12 +6,7 @@ cargo-features = ["resolver"]
 resolver = "2"
 
 # All the actual crates are in `libs/` or `hipcheck/`
-members = [
-    "hipcheck",
-    "libs/*",
-    "xtask",
-]
+members = ["hipcheck", "libs/*", "xtask"]
 
 # Make sure Hipcheck is run with `cargo run`.
 default-members = ["hipcheck"]
-

@@ -6,8 +6,7 @@ use std::rc::Rc;
 
 use crate::code_quality::{get_eslint_report, CodeQualityReport};
 use crate::source::SourceQuery;
-use hc_common::{error::Result, salsa};
-use hc_version::VersionQuery;
+use hc_common::{error::Result, salsa, version::VersionQuery};
 
 /// Queries about code quality
 #[salsa::query_group(CodeQualityProviderStorage)]

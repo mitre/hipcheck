@@ -17,7 +17,9 @@ use hc_common::{
 	command_util::DependentProgram,
 	error::{Error, Result},
 	filesystem::create_dir_all,
-	hc_error, pathbuf, salsa, HIPCHECK_TOML_FILE,
+	hc_error, pathbuf, salsa,
+	version::{get_version, VersionQuery, VersionQueryStorage},
+	HIPCHECK_TOML_FILE,
 };
 use hc_config::{
 	AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource, ConfigSourceStorage,
@@ -37,7 +39,6 @@ use hc_data::{
 };
 use hc_report::{Format, ReportParams, ReportParamsStorage};
 use hc_shell::{Phase, Shell};
-use hc_version::{get_version, VersionQuery, VersionQueryStorage};
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::path::{Path, PathBuf};

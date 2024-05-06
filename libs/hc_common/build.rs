@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_common::{command_util::log_git_args, context::Context, error::Result, hc_error, which};
+use anyhow::{anyhow, Context as _, Result};
 use std::convert::AsRef;
 use std::ffi::OsStr;
 use std::iter::IntoIterator;
 use std::ops::Not as _;
 use std::path::Path;
 use std::process::Command;
+use which::which;
 
 fn main() {
 	let repo_dir = env!("CARGO_MANIFEST_DIR", "can't find Cargo manifest directory");
@@ -38,11 +39,8 @@ impl GitCommand {
 		S: AsRef<OsStr>,
 	{
 		// Init the command.
-		let git_path = which::which("git").context("can't find git command")?;
-		let repo = repo_path.display().to_string();
-		let path = git_path.display().to_string();
-		log_git_args(&repo, args, &path);
-		let mut command = Command::new(&git_path);
+		let git_path = which("git").context("can't find git command")?;
+		let mut command = Command::new(git_path);
 		command.args(args);
 
 		// Set the path if necessary
@@ -67,12 +65,12 @@ impl GitCommand {
 		}
 
 		match String::from_utf8(output.stderr) {
-			Ok(msg) if msg.is_empty().not() => Err(hc_error!(
+			Ok(msg) if msg.is_empty().not() => Err(anyhow!(
 				"git failed with message '{}' [status: {}]",
 				msg.trim(),
 				output.status
 			)),
-			_ => Err(hc_error!("git failed [status: {}]", output.status)),
+			_ => Err(anyhow!("git failed [status: {}]", output.status)),
 		}
 	}
 }

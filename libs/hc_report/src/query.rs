@@ -2,7 +2,7 @@
 
 //! Query groups for how Hipcheck reports and dumps session results.
 
-pub use hc_version::VersionQuery;
+pub use hc_common::version::VersionQuery;
 
 use crate::Format;
 use hc_common::{chrono::prelude::*, salsa};

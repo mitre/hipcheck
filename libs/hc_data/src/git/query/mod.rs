@@ -12,8 +12,7 @@ use crate::{
 	},
 	source::SourceQuery,
 };
-use hc_common::{chrono::prelude::*, error::Result, salsa};
-use hc_version::VersionQuery;
+use hc_common::{chrono::prelude::*, error::Result, salsa, version::VersionQuery};
 use std::rc::Rc;
 
 /// Queries about Git objects

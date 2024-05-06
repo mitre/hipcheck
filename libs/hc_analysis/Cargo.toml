@@ -17,7 +17,6 @@ hc_data = { path = "../hc_data" }
 hc_report = { path = "../hc_report" }
 hc_serde = { path = "../hc_serde" }
 hc_shell = { path = "../hc_shell" }
-hc_version = { path = "../hc_version" }
 maplit = "1.0.2"
 petgraph = { version = "0.6.0" }
 serde_derive = "1.0.137"

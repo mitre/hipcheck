@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-mod query;
-
-pub use query::*;
-
-use hc_common::{context::Context, error::Result, log, semver::Version};
+use crate::{context::Context, error::Result, log, salsa, semver::Version};
 use std::ops::Not as _;
+use std::rc::Rc;
 
+/// Query the environment to identify the proper version string.
 pub fn get_version(raw_version: &str) -> Result<String> {
-	// Queries the environment to identify the proper version string.
-	//
 	// Basic algorithm:
 	//     1. Check the version number in `Cargo.toml`.
 	//     2. If it's an "alpha" release, then in addition to printing
@@ -30,4 +26,24 @@ pub fn get_version(raw_version: &str) -> Result<String> {
 	}
 
 	Ok(raw_version.to_string())
+}
+
+/// Queries for current versions of Hipcheck and tool dependencies
+#[salsa::query_group(VersionQueryStorage)]
+pub trait VersionQuery: salsa::Database {
+	/// Returns the current Hipcheck version
+	#[salsa::input]
+	fn hc_version(&self) -> Rc<String>;
+
+	/// Returns the version of npm currently running on user's machine
+	#[salsa::input]
+	fn npm_version(&self) -> Rc<String>;
+
+	/// Returns the version of eslint currently running on user's machine
+	#[salsa::input]
+	fn eslint_version(&self) -> Rc<String>;
+
+	/// Returns the version of git currently running on user's machine
+	#[salsa::input]
+	fn git_version(&self) -> Rc<String>;
 }

@@ -87,6 +87,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.83"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25bdb32cbbdce2b519a9cd7df3a678443100e265d5e25ca763b7572a5104f5f3"
+
+[[package]]
 name = "ascii"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -611,7 +617,6 @@ dependencies = [
  "hc_report",
  "hc_serde",
  "hc_shell",
- "hc_version",
  "maplit",
  "petgraph",
  "serde_derive",
@@ -629,6 +634,7 @@ dependencies = [
 name = "hc_common"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "hc_serde",
  "lazy_static",
@@ -662,7 +668,6 @@ dependencies = [
  "hc_analysis",
  "hc_common",
  "hc_shell",
- "hc_version",
  "tempfile",
 ]
 
@@ -676,7 +681,6 @@ dependencies = [
  "hc_config",
  "hc_serde",
  "hc_shell",
- "hc_version",
  "nom",
  "petgraph",
  "tempfile",
@@ -688,7 +692,6 @@ name = "hc_report"
 version = "0.1.0"
 dependencies = [
  "hc_common",
- "hc_version",
  "paste",
 ]
 
@@ -709,13 +712,6 @@ dependencies = [
  "libc",
  "termcolor",
  "winapi",
-]
-
-[[package]]
-name = "hc_version"
-version = "0.1.0"
-dependencies = [
- "hc_common",
 ]
 
 [[package]]

@@ -13,6 +13,7 @@ pub mod test_util;
 mod tests;
 mod try_any;
 mod try_filter;
+pub mod version;
 
 pub use try_any::TryAny;
 pub use try_filter::{FallibleFilter, TryFilter};
