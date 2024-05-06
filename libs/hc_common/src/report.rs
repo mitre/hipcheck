@@ -9,15 +9,12 @@
 // The report serves double-duty, because it's both the thing used to print user-friendly
 // results on the CLI, and the type that's serialized out to JSON for machine-friendly output.
 
-mod query;
-
-pub use query::*;
-
-use hc_common::{
+use crate::{
 	chrono::prelude::*,
 	error::{Error, Result},
-	hc_error, log,
+	hc_error, log, salsa,
 	schemars::{self, JsonSchema},
+	version::VersionQuery,
 };
 use paste::paste;
 use serde::{Serialize, Serializer};
@@ -1328,4 +1325,16 @@ impl Serialize for Timestamp {
 		// and use minimal space.
 		serializer.serialize_str(&self.0.to_rfc3339())
 	}
+}
+
+/// Queries for how Hipcheck reports session results
+#[salsa::query_group(ReportParamsStorage)]
+pub trait ReportParams: VersionQuery {
+	/// Returns the time the current Hipcheck session started
+	#[salsa::input]
+	fn started_at(&self) -> DateTime<FixedOffset>;
+
+	/// Returns the format of the final report
+	#[salsa::input]
+	fn format(&self) -> Format;
 }

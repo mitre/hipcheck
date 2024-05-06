@@ -86,9 +86,10 @@
 
 use hc_common::{
 	error::{Error, Result},
-	hc_error, log, serde_json,
+	hc_error, log,
+	report::{Format, PrReport, RecommendationKind, Report},
+	serde_json,
 };
-use hc_report::{Format, PrReport, RecommendationKind, Report};
 use std::cell::Cell;
 use std::fmt::{self, Debug, Formatter};
 use std::io::stderr;

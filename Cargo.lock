@@ -613,7 +613,6 @@ dependencies = [
  "glob",
  "hc_common",
  "hc_data",
- "hc_report",
  "hc_shell",
  "maplit",
  "petgraph",
@@ -639,6 +638,7 @@ dependencies = [
  "log",
  "once_cell",
  "ordered-float",
+ "paste",
  "regex",
  "salsa",
  "schemars",
@@ -679,21 +679,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc_report"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "paste",
- "serde",
-]
-
-[[package]]
 name = "hc_shell"
 version = "0.1.0"
 dependencies = [
  "duct",
  "hc_common",
- "hc_report",
  "libc",
  "termcolor",
  "winapi",

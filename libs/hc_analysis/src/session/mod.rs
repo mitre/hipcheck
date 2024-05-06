@@ -22,7 +22,9 @@ use hc_common::{
 	},
 	error::{Error, Result},
 	filesystem::create_dir_all,
-	hc_error, pathbuf, salsa,
+	hc_error, pathbuf,
+	report::{Format, ReportParams, ReportParamsStorage},
+	salsa,
 	version::{get_version, VersionQuery, VersionQueryStorage},
 	HIPCHECK_TOML_FILE,
 };
@@ -37,7 +39,6 @@ use hc_data::{
 	CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
 	GitHubProviderStorage, ModuleProviderStorage, PullRequestReviewProviderStorage,
 };
-use hc_report::{Format, ReportParams, ReportParamsStorage};
 use hc_shell::{Phase, Shell};
 use std::ffi::{OsStr, OsString};
 use std::fmt;

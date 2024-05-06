@@ -5,10 +5,10 @@ use hc_common::{
 	chrono::Duration,
 	config::{AttacksConfigQuery, CommitConfigQuery, FuzzConfigQuery, PracticesConfigQuery},
 	error::{Error, Result},
+	report::{Concern, PrConcern},
 	salsa, F64,
 };
 use hc_data::git::GitProvider;
-use hc_report::{Concern, PrConcern};
 use std::collections::{HashMap, HashSet};
 use std::default::Default;
 use std::fmt::{self, Display, Formatter};

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{analysis::AnalysisReport, score::ScoringResults, session::Session};
+pub use hc_common::report::*;
 use hc_common::{
 	config::RiskConfigQuery,
 	error::{Error, Result},
 	hc_error, log,
+	version::VersionQuery,
 };
 use hc_data::source::SourceQuery;
-pub use hc_report::*;
 use std::default::Default;
 use std::result::Result as StdResult;
 
