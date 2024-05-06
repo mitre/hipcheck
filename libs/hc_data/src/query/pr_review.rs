@@ -9,11 +9,11 @@ use crate::{
 	PullRequest, SinglePullRequest,
 };
 use hc_common::{
+	config::ConfigSource,
 	context::Context,
 	error::{Error, Result},
 	salsa,
 };
-use hc_config::ConfigSource;
 use std::rc::Rc;
 
 /// A query that provides GitHub pull request reviews

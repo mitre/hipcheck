@@ -15,16 +15,16 @@ use hc_common::context::Context as _;
 use hc_common::{
 	chrono::prelude::*,
 	command_util::DependentProgram,
+	config::{
+		AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource,
+		ConfigSourceStorage, FuzzConfigQueryStorage, LanguagesConfigQueryStorage,
+		PracticesConfigQueryStorage, RiskConfigQueryStorage,
+	},
 	error::{Error, Result},
 	filesystem::create_dir_all,
 	hc_error, pathbuf, salsa,
 	version::{get_version, VersionQuery, VersionQueryStorage},
 	HIPCHECK_TOML_FILE,
-};
-use hc_config::{
-	AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource, ConfigSourceStorage,
-	FuzzConfigQueryStorage, LanguagesConfigQueryStorage, PracticesConfigQueryStorage,
-	RiskConfigQueryStorage,
 };
 use hc_data::ModuleProvider;
 use hc_data::{

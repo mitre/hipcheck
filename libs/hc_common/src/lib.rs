@@ -4,6 +4,7 @@
 //! functionality used widely throughout Hipcheck.
 
 pub mod command_util;
+pub mod config;
 pub mod context;
 pub mod error;
 pub mod filesystem;

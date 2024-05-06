@@ -3,10 +3,10 @@
 use crate::metric::{affiliation::AffiliatedType, MetricProvider};
 use hc_common::{
 	chrono::Duration,
+	config::{AttacksConfigQuery, CommitConfigQuery, FuzzConfigQuery, PracticesConfigQuery},
 	error::{Error, Result},
 	salsa, F64,
 };
-use hc_config::{AttacksConfigQuery, CommitConfigQuery, FuzzConfigQuery, PracticesConfigQuery};
 use hc_data::git::GitProvider;
 use hc_report::{Concern, PrConcern};
 use std::collections::{HashMap, HashSet};

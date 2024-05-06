@@ -5,10 +5,10 @@
 use super::github::GitHubProvider;
 use crate::{get_fuzz_check, Fuzz};
 use hc_common::{
+	config::ConfigSource,
 	error::{Error, Result},
 	log, salsa,
 };
-use hc_config::ConfigSource;
 
 /// A query that provides a fuzz check
 #[salsa::query_group(FuzzProviderStorage)]

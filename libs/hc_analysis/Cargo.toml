@@ -12,7 +12,6 @@ dotenv = "0.15.0"
 curl = "0.4.38"
 glob = "0.3.0"
 hc_common = { path = "../hc_common" }
-hc_config = { path = "../hc_config" }
 hc_data = { path = "../hc_data" }
 hc_report = { path = "../hc_report" }
 hc_serde = { path = "../hc_serde" }

@@ -612,7 +612,6 @@ dependencies = [
  "dotenv",
  "glob",
  "hc_common",
- "hc_config",
  "hc_data",
  "hc_report",
  "hc_serde",
@@ -646,17 +645,10 @@ dependencies = [
  "schemars",
  "semver",
  "serde_json",
+ "smart-default",
  "toml",
  "url",
  "which",
-]
-
-[[package]]
-name = "hc_config"
-version = "0.1.0"
-dependencies = [
- "hc_common",
- "smart-default",
 ]
 
 [[package]]
@@ -678,7 +670,6 @@ dependencies = [
  "dirs",
  "graphql_client",
  "hc_common",
- "hc_config",
  "hc_serde",
  "hc_shell",
  "nom",

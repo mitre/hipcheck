@@ -2,10 +2,10 @@
 
 use crate::{analysis::AnalysisReport, score::ScoringResults, session::Session};
 use hc_common::{
+	config::RiskConfigQuery,
 	error::{Error, Result},
 	hc_error, log,
 };
-use hc_config::RiskConfigQuery;
 use hc_data::source::SourceQuery;
 pub use hc_report::*;
 use std::default::Default;

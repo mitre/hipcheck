@@ -28,8 +28,11 @@ use commit_trust::CommitTrustOutput;
 use contributor_trust::ContributorTrustOutput;
 use entropy::EntropyOutput;
 use fuzz::FuzzOutput;
-use hc_common::{error::Result, salsa};
-use hc_config::{AttacksConfigQuery, CommitConfigQuery};
+use hc_common::{
+	config::{AttacksConfigQuery, CommitConfigQuery},
+	error::Result,
+	salsa,
+};
 use hc_data::{
 	git::GitProvider, DependenciesProvider, FuzzProvider, ModuleProvider, PullRequestReviewProvider,
 };
