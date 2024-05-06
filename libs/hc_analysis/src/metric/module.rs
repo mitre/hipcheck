@@ -2,12 +2,9 @@
 
 use crate::MetricProvider;
 use hc_common::context::Context as _;
-use hc_common::{
-	error::Result,
-	log,
-	serde::{self, Serialize},
-};
+use hc_common::{error::Result, log};
 use hc_data::ModuleGraph;
+use serde::{self, Serialize};
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]

@@ -16,11 +16,7 @@ mod try_any;
 mod try_filter;
 pub mod version;
 
-pub use try_any::TryAny;
-pub use try_filter::{FallibleFilter, TryFilter};
-
 pub use chrono;
-pub use hc_serde::serde;
 pub use lazy_static;
 pub use log;
 pub use ordered_float;
@@ -28,6 +24,8 @@ pub use salsa;
 pub use schemars;
 pub use semver;
 pub use serde_json;
+pub use try_any::TryAny;
+pub use try_filter::{FallibleFilter, TryFilter};
 pub use url;
 pub use which;
 

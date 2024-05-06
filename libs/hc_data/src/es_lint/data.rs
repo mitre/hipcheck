@@ -4,7 +4,7 @@
 /// https://eslint.org/docs/user-guide/formatters/#json
 ///
 /// This parser has been tested with the output from ESLint v7.31.0
-use hc_common::serde::{self, Deserialize};
+use serde::{self, Deserialize};
 
 pub type ESLintReports = Vec<ESLintReport>;
 

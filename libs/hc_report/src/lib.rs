@@ -18,9 +18,9 @@ use hc_common::{
 	error::{Error, Result},
 	hc_error, log,
 	schemars::{self, JsonSchema},
-	serde::{self, Serialize, Serializer},
 };
 use paste::paste;
+use serde::{Serialize, Serializer};
 use std::default::Default;
 use std::fmt::{self, Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -57,7 +57,6 @@ pub enum AnyReport {
 
 /// The report output to the user.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct Report {
 	/// The name of the repository being analyzed.
@@ -129,7 +128,7 @@ impl Report {
 
 /// An analysis which passed.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(transparent, crate = "self::serde")]
+#[serde(transparent)]
 #[schemars(crate = "self::schemars")]
 pub struct PassingAnalysis(
 	/// The analysis which passed.
@@ -144,7 +143,6 @@ impl PassingAnalysis {
 
 /// An analysis which failed, including potential specific concerns.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct FailingAnalysis {
 	/// The analysis.
@@ -224,7 +222,6 @@ fn no_concerns(concerns: &[Concern]) -> bool {
 
 /// An analysis that did _not_ succeed.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct ErroredAnalysis {
 	analysis: AnalysisIdent,
@@ -262,7 +259,6 @@ fn try_add_msg(msgs: &mut Vec<String>, error_report: &Option<Box<ErrorReport>>) 
 
 /// The name of the analyses.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub enum AnalysisIdent {
 	Activity,
@@ -298,7 +294,6 @@ impl Display for AnalysisIdent {
 
 /// A simple, serializable version of `Error`.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct ErrorReport {
 	msg: String,
@@ -353,7 +348,7 @@ impl From<&(dyn std::error::Error + 'static)> for ErrorReport {
 
 /// An analysis, with score and threshold.
 #[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
-#[serde(tag = "analysis", crate = "self::serde")]
+#[serde(tag = "analysis")]
 #[schemars(crate = "self::schemars")]
 pub enum Analysis {
 	/// Activity analysis.
@@ -661,7 +656,7 @@ impl Analysis {
 /// only used where additional detail / evidence should be provided beyond the
 /// top-level information.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(untagged, crate = "self::serde")]
+#[serde(untagged)]
 #[schemars(crate = "self::schemars")]
 pub enum Concern {
 	/// Commits with affiliated contributor(s)
@@ -794,7 +789,6 @@ impl Eq for Concern {}
 
 /// The pull request report output to the user.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct PrReport {
 	/// The URI of the pull request being analyzed.
@@ -866,7 +860,7 @@ impl PrReport {
 
 /// An analysis which passed.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(transparent, crate = "self::serde")]
+#[serde(transparent)]
 #[schemars(crate = "self::schemars")]
 pub struct PrPassingAnalysis(
 	/// The analysis which passed.
@@ -881,7 +875,6 @@ impl PrPassingAnalysis {
 
 /// An analysis which failed, including potential specific concerns.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct PrFailingAnalysis {
 	/// The analysis.
@@ -945,7 +938,6 @@ fn pr_no_concerns(concerns: &[PrConcern]) -> bool {
 
 /// An analysis that did _not_ succeed.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct PrErroredAnalysis {
 	analysis: PrAnalysisIdent,
@@ -983,7 +975,6 @@ fn pr_try_add_msg(msgs: &mut Vec<String>, error_report: &Option<Box<ErrorReport>
 
 /// The name of the analyses.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub enum PrAnalysisIdent {
 	PrAffiliation,
@@ -1007,7 +998,7 @@ impl Display for PrAnalysisIdent {
 
 /// An analysis, with score and threshold.
 #[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
-#[serde(tag = "analysis", crate = "self::serde")]
+#[serde(tag = "analysis")]
 #[schemars(crate = "self::schemars")]
 pub enum PrAnalysis {
 	/// Pull request affiliation analysis.
@@ -1154,7 +1145,7 @@ impl PrAnalysis {
 /// only used where additional detail / evidence should be provided beyond the
 /// top-level information.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(untagged, crate = "self::serde")]
+#[serde(untagged)]
 #[schemars(crate = "self::schemars")]
 pub enum PrConcern {
 	/// Commits with affiliated contributor(s)
@@ -1225,7 +1216,6 @@ impl<'opt, T, E> From<&'opt Option<StdResult<T, E>>> for AnalysisResult<&'opt T,
 
 /// Value and threshold for counting-based analyses.
 #[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct Count {
 	value: u64,
@@ -1234,7 +1224,6 @@ pub struct Count {
 
 /// Value for binary-based analyses.
 #[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct Exists {
 	value: bool,
@@ -1242,7 +1231,6 @@ pub struct Exists {
 
 /// Value and threshold for percentage-based analyses.
 #[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct Percent {
 	value: f64,
@@ -1252,7 +1240,6 @@ pub struct Percent {
 /// A final recommendation of whether to use or investigate a piece of software,
 /// including the risk threshold associated with that decision.
 #[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub struct Recommendation {
 	pub kind: RecommendationKind,
@@ -1282,7 +1269,6 @@ impl Recommendation {
 
 /// The kind of recommendation being made.
 #[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
-#[serde(crate = "self::serde")]
 #[schemars(crate = "self::schemars")]
 pub enum RecommendationKind {
 	Pass,
@@ -1301,13 +1287,13 @@ impl RecommendationKind {
 
 /// The overall final risk score for a repo.
 #[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
-#[serde(transparent, crate = "self::serde")]
+#[serde(transparent)]
 #[schemars(crate = "self::schemars")]
 pub struct RiskScore(pub f64);
 
 /// The risk threshold configured for the Hipcheck session.
 #[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
-#[serde(transparent, crate = "self::serde")]
+#[serde(transparent)]
 #[schemars(crate = "self::schemars")]
 pub struct RiskThreshold(pub f64);
 

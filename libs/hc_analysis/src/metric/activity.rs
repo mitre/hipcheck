@@ -6,8 +6,8 @@ use hc_common::{
 	chrono::{prelude::*, Duration},
 	error::Result,
 	log,
-	serde::{ser::SerializeStruct, Serialize, Serializer},
 };
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 use std::{rc::Rc, result::Result as StdResult};
 
 #[derive(Debug, Eq, PartialEq)]

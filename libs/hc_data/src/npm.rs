@@ -4,10 +4,9 @@ use hc_common::{
 	command_util::{log_args, DependentProgram},
 	context::Context,
 	error::Result,
-	filesystem as file, hc_error, log, pathbuf,
-	serde::{self, Deserialize},
-	which,
+	filesystem as file, hc_error, log, pathbuf, which,
 };
+use serde::{self, Deserialize};
 use std::convert::AsRef;
 use std::ffi::OsStr;
 use std::iter::IntoIterator;

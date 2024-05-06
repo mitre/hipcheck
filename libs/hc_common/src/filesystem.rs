@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::context::Context as _;
-use crate::{
-	error::Result,
-	hc_error,
-	serde::{de::DeserializeOwned, Serialize},
-	serde_json,
-};
+use crate::{error::Result, hc_error, serde_json};
+use serde::{de::DeserializeOwned, Serialize};
 use std::fs::{self, File};
 use std::ops::Not;
 use std::path::Path;

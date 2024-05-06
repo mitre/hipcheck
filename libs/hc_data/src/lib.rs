@@ -18,16 +18,11 @@ use std::collections::HashSet;
 
 use git::{get_commits_for_file, Commit, CommitContributor, Contributor, Diff};
 use github::*;
-use hc_common::{
-	context::Context,
-	error::Error,
-	error::Result,
-	hc_error, log, pathbuf,
-	serde::{self, Serialize},
-};
+use hc_common::{context::Context, error::Error, error::Result, hc_error, log, pathbuf};
 use modules::RawModule;
 use petgraph::visit::Dfs;
 use petgraph::Graph;
+use serde::{self, Serialize};
 use std::path::Path;
 use std::rc::Rc;
 

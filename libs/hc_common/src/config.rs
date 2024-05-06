@@ -3,12 +3,10 @@
 //! Defines the configuration file format.
 
 use crate::{
-	context::Context,
-	error::Result,
-	filesystem as file, pathbuf, salsa,
-	serde::{self, Deserialize, Serialize},
-	BINARY_CONFIG_FILE, F64, LANGS_FILE, ORGS_FILE, TYPO_FILE,
+	context::Context, error::Result, filesystem as file, pathbuf, salsa, BINARY_CONFIG_FILE, F64,
+	LANGS_FILE, ORGS_FILE, TYPO_FILE,
 };
+use serde::{self, Deserialize, Serialize};
 use smart_default::SmartDefault;
 use std::default::Default;
 use std::path::Path;

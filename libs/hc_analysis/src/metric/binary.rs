@@ -2,12 +2,8 @@
 
 use crate::metric::binary_detector::detect_binary_files;
 use crate::MetricProvider;
-use hc_common::{
-	error::Result,
-	log,
-	serde::{self, Serialize},
-	TryFilter,
-};
+use hc_common::{error::Result, log, TryFilter};
+use serde::{self, Serialize};
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]

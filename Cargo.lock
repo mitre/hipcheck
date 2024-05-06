@@ -614,10 +614,10 @@ dependencies = [
  "hc_common",
  "hc_data",
  "hc_report",
- "hc_serde",
  "hc_shell",
  "maplit",
  "petgraph",
+ "serde",
  "serde_derive",
  "spdx-rs",
  "tempfile",
@@ -635,7 +635,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
- "hc_serde",
  "lazy_static",
  "log",
  "once_cell",
@@ -644,6 +643,7 @@ dependencies = [
  "salsa",
  "schemars",
  "semver",
+ "serde",
  "serde_json",
  "smart-default",
  "toml",
@@ -670,10 +670,10 @@ dependencies = [
  "dirs",
  "graphql_client",
  "hc_common",
- "hc_serde",
  "hc_shell",
  "nom",
  "petgraph",
+ "serde",
  "tempfile",
  "ureq",
 ]
@@ -684,12 +684,6 @@ version = "0.1.0"
 dependencies = [
  "hc_common",
  "paste",
-]
-
-[[package]]
-name = "hc_serde"
-version = "0.1.0"
-dependencies = [
  "serde",
 ]
 
@@ -1471,18 +1465,18 @@ checksum = "92d43fe69e652f3df9bdc2b85b2854a0825b86e4fb76bc44d945137d053639ca"
 
 [[package]]
 name = "serde"
-version = "1.0.198"
+version = "1.0.200"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9846a40c979031340571da2545a4e5b7c4163bdae79b301d5f86d03979451fcc"
+checksum = "ddc6f9cc94d67c0e21aaf7eda3a010fd3af78ebf6e096aa6e2e13c79749cce4f"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.198"
+version = "1.0.200"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e88edab869b01783ba905e7d0153f9fc1a6505a96e4ad3018011eedb838566d9"
+checksum = "856f046b9400cee3c8c94ed572ecdb752444c24528c035cd35882aad6f492bcb"
 dependencies = [
  "proc-macro2",
  "quote",

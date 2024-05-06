@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_common::{
-	chrono::{DateTime, FixedOffset},
-	serde::{self, Deserialize, Serialize},
-};
+use hc_common::chrono::{DateTime, FixedOffset};
+use serde::{self, Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
 use std::rc::Rc;
 

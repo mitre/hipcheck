@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::git::{Diff, RawCommit};
-
 use serde::Deserialize;
+
 #[derive(Debug, Deserialize)]
 pub struct GitHubFullPullRequest {
 	pub pull_request: GitHubPullRequest,

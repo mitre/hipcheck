@@ -7,4 +7,5 @@ publish = false
 
 [dependencies]
 hc_common = { path = "../hc_common" }
+serde = { version = "1.0.200", features = ["derive", "rc"] }
 paste = "1.0.7"
