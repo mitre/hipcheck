@@ -6,6 +6,18 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
+
+content_inspector = "0.2.4"
+dotenv = "0.15.0"
+curl = "0.4.38"
+glob = "0.3.0"
+maplit = "1.0.2"
+serde_derive = "1.0.137"
+spdx-rs = "0.5.0"
+unicode-normalization = "0.1.19"
+unicode-segmentation = "1.9.0"
+walkdir = "2"
+xml-rs = "0.8"
 chrono = { version = "0.4.19", features = ["serde"] }
 lazy_static = "1.4.0"
 log = "0.4.16"
@@ -48,4 +60,16 @@ which = { version = "6.0.1", default-features = false }
 
 [dev-dependencies]
 dirs = "5.0.1"
-tempfile = "3.2.0"
+tempfile = "3.10.1"
+duct = "0.13.7"
+criterion = "0.5.1"
+
+
+[[bench]]
+name = "basic"
+harness = false
+path = "../../benches/basic.rs"
+
+[[test]]
+name = "can_run"
+path = "../../tests/can_run.rs"

@@ -2,13 +2,14 @@
 
 use clap::{Arg, ArgAction, Command};
 use env_logger::{Builder, Env};
-use hc_analysis::session::{Check, CheckType};
 use hc_common::{
-	context::Context, error::Result, hc_error, schemars::schema_for, serde_json, CheckKind,
-};
-use hc_core::{
-	print_error, resolve_config, resolve_data, resolve_home, run, version, AnyReport, ColorChoice,
-	Format, Outcome, Output, PrReport, Report, Verbosity,
+	analysis::session::{Check, CheckType},
+	context::Context,
+	error::Result,
+	hc_error, print_error, resolve_config, resolve_data, resolve_home, run,
+	schemars::schema_for,
+	serde_json, version, AnyReport, CheckKind, ColorChoice, Format, Outcome, Output, PrReport,
+	Report, Verbosity,
 };
 use std::ffi::OsString;
 use std::path::PathBuf;

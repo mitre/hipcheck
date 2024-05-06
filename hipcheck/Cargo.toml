@@ -13,10 +13,11 @@ path = "src/main.rs"
 [dependencies]
 
 # Internal dependencies.
-hc_analysis = { path = "../libs/hc_analysis" }
 hc_common = { path = "../libs/hc_common" }
-hc_core = { path = "../libs/hc_core" }
 
 # External dependencies.
-clap = { version = "4.5.4", default-features = false, features = ["string", "std"]}
+clap = { version = "4.5.4", default-features = false, features = [
+    "string",
+    "std",
+] }
 env_logger = { version = "0.11.3" }
