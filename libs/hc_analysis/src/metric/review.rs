@@ -2,8 +2,7 @@
 
 use crate::MetricProvider;
 use hc_common::context::Context as _;
-use hc_common::{error::Result, log};
-use hc_data::PullRequest;
+use hc_common::{data::PullRequest, error::Result, log};
 use serde::{self, Serialize};
 use std::rc::Rc;
 

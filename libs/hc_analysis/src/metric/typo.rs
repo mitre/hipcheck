@@ -2,8 +2,11 @@
 
 use crate::MetricProvider;
 use hc_common::context::Context as _;
-use hc_common::{error::Result, filesystem as file, log};
-use hc_data::{Dependencies, Lang};
+use hc_common::{
+	data::{Dependencies, Lang},
+	error::Result,
+	filesystem as file, log,
+};
 use maplit::hashmap;
 use serde::{self, Deserialize, Serialize};
 use std::cmp::Ordering;

@@ -4,11 +4,11 @@ use crate::metric::{affiliation::AffiliatedType, MetricProvider};
 use hc_common::{
 	chrono::Duration,
 	config::{AttacksConfigQuery, CommitConfigQuery, FuzzConfigQuery, PracticesConfigQuery},
+	data::git::GitProvider,
 	error::{Error, Result},
 	report::{Concern, PrConcern},
 	salsa, F64,
 };
-use hc_data::git::GitProvider;
 use std::collections::{HashMap, HashSet};
 use std::default::Default;
 use std::fmt::{self, Display, Formatter};

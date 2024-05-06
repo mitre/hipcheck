@@ -2,8 +2,11 @@
 
 use crate::MetricProvider;
 use hc_common::context::Context as _;
-use hc_common::{error::Result, log};
-use hc_data::{git::Contributor, Module};
+use hc_common::{
+	data::{git::Contributor, Module},
+	error::Result,
+	log,
+};
 use serde::{self, Serialize};
 use std::{collections::HashMap, rc::Rc};
 

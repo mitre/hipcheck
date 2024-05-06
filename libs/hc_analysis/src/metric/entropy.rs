@@ -3,8 +3,11 @@
 use crate::metric::math::{mean, std_dev};
 use crate::MetricProvider;
 use hc_common::context::Context as _;
-use hc_common::{error::Result, hc_error, log, TryAny, TryFilter, F64};
-use hc_data::git::{Commit, CommitDiff, Diff};
+use hc_common::{
+	data::git::{Commit, CommitDiff, Diff},
+	error::Result,
+	hc_error, log, TryAny, TryFilter, F64,
+};
 use serde::{self, Serialize};
 use std::collections::HashMap;
 use std::iter::Iterator;

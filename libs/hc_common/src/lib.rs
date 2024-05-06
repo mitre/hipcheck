@@ -6,6 +6,7 @@
 pub mod command_util;
 pub mod config;
 pub mod context;
+pub mod data;
 pub mod error;
 pub mod filesystem;
 pub mod pathbuf;

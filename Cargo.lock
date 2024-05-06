@@ -612,7 +612,6 @@ dependencies = [
  "dotenv",
  "glob",
  "hc_common",
- "hc_data",
  "maplit",
  "petgraph",
  "serde",
@@ -633,13 +632,17 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "dirs",
  "duct",
+ "graphql_client",
  "lazy_static",
  "libc",
  "log",
+ "nom",
  "once_cell",
  "ordered-float",
  "paste",
+ "petgraph",
  "regex",
  "salsa",
  "schemars",
@@ -647,8 +650,10 @@ dependencies = [
  "serde",
  "serde_json",
  "smart-default",
+ "tempfile",
  "termcolor",
  "toml",
+ "ureq",
  "url",
  "which",
  "winapi",
@@ -663,20 +668,6 @@ dependencies = [
  "hc_analysis",
  "hc_common",
  "tempfile",
-]
-
-[[package]]
-name = "hc_data"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "graphql_client",
- "hc_common",
- "nom",
- "petgraph",
- "serde",
- "tempfile",
- "ureq",
 ]
 
 [[package]]

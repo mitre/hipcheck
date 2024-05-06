@@ -20,6 +20,17 @@ use hc_common::{
 		ConfigSourceStorage, FuzzConfigQueryStorage, LanguagesConfigQueryStorage,
 		PracticesConfigQueryStorage, RiskConfigQueryStorage,
 	},
+	data::{
+		git::get_git_version,
+		git::GitProviderStorage,
+		npm::get_npm_version,
+		source::{
+			Source, SourceChangeRequest, SourceKind, SourceQuery, SourceQueryStorage, SourceRepo,
+		},
+		CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
+		GitHubProviderStorage, ModuleProvider, ModuleProviderStorage,
+		PullRequestReviewProviderStorage,
+	},
 	error::{Error, Result},
 	filesystem::create_dir_all,
 	hc_error, pathbuf,
@@ -28,16 +39,6 @@ use hc_common::{
 	shell::{Phase, Shell},
 	version::{get_version, VersionQuery, VersionQueryStorage},
 	HIPCHECK_TOML_FILE,
-};
-use hc_data::{
-	git::get_git_version,
-	git::GitProviderStorage,
-	npm::get_npm_version,
-	source::{
-		Source, SourceChangeRequest, SourceKind, SourceQuery, SourceQueryStorage, SourceRepo,
-	},
-	CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
-	GitHubProviderStorage, ModuleProvider, ModuleProviderStorage, PullRequestReviewProviderStorage,
 };
 use std::ffi::{OsStr, OsString};
 use std::fmt;

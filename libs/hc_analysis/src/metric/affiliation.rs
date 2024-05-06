@@ -3,10 +3,10 @@
 use crate::MetricProvider;
 use hc_common::{
 	context::Context as _,
+	data::git::{Commit, CommitContributorView},
 	error::{Error, Result},
 	filesystem as file, hc_error, log,
 };
-use hc_data::git::{Commit, CommitContributorView};
 use serde::{
 	self,
 	de::{Error as SerdeError, Visitor},

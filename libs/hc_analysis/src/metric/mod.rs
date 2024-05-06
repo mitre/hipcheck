@@ -30,11 +30,12 @@ use entropy::EntropyOutput;
 use fuzz::FuzzOutput;
 use hc_common::{
 	config::{AttacksConfigQuery, CommitConfigQuery},
+	data::{
+		git::GitProvider, DependenciesProvider, FuzzProvider, ModuleProvider,
+		PullRequestReviewProvider,
+	},
 	error::Result,
 	salsa,
-};
-use hc_data::{
-	git::GitProvider, DependenciesProvider, FuzzProvider, ModuleProvider, PullRequestReviewProvider,
 };
 use identity::IdentityOutput;
 use linguist::Linguist;

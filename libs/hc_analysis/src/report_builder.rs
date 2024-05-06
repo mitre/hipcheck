@@ -4,11 +4,11 @@ use crate::{analysis::AnalysisReport, score::ScoringResults, session::Session};
 pub use hc_common::report::*;
 use hc_common::{
 	config::RiskConfigQuery,
+	data::source::SourceQuery,
 	error::{Error, Result},
 	hc_error, log,
 	version::VersionQuery,
 };
-use hc_data::source::SourceQuery;
 use std::default::Default;
 use std::result::Result as StdResult;
 

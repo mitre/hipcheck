@@ -29,6 +29,14 @@ which = { version = "6.0.1", default-features = false }
 libc = "0.2.154"
 termcolor = "1.1.3"
 duct = "0.13.5"
+dirs = "5.0.1"
+graphql_client = "0.14.0"
+nom = "7.1.3"
+petgraph = { version = "0.6.0", features = ["serde-1"] }
+ureq = { version = "2.9.7", default-features = false, features = [
+    "json",
+    "native-tls",
+] }
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"
@@ -37,3 +45,7 @@ features = ["handleapi", "processenv", "winbase", "wincon", "winnt"]
 [build-dependencies]
 anyhow = "1.0.83"
 which = { version = "6.0.1", default-features = false }
+
+[dev-dependencies]
+dirs = "5.0.1"
+tempfile = "3.2.0"
