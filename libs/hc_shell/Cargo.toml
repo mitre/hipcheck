@@ -9,7 +9,7 @@ publish = false
 duct = "0.13.5"
 hc_common = { path = "../hc_common" }
 hc_report = { path = "../hc_report" }
-libc = "0.2.125"
+libc = "0.2.154"
 termcolor = "1.1.3"
 
 [target.'cfg(windows)'.dependencies.winapi]
