@@ -73,13 +73,3 @@ dirs = "5.0.1"
 tempfile = "3.10.1"
 duct = "0.13.7"
 criterion = "0.5.1"
-
-
-[[bench]]
-name = "basic"
-harness = false
-path = "../benches/basic.rs"
-
-[[test]]
-name = "can_run"
-path = "../tests/can_run.rs"
