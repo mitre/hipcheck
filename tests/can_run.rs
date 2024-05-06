@@ -1,4 +1,5 @@
-use hc_common::{error::Result, CheckKind};
+use hc_common::error::Result;
+use hc_common::CheckKind;
 use hc_core::*;
 use std::ffi::OsString;
 use tempfile::tempdir;

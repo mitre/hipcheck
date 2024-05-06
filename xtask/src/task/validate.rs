@@ -2,20 +2,29 @@
 
 //! Validate the configuration of all Hipcheck crates.
 
-use crate::exit::{EXIT_FAILURE, EXIT_SUCCESS};
+use crate::exit::EXIT_FAILURE;
+use crate::exit::EXIT_SUCCESS;
 use crate::workspace;
+use anyhow::anyhow as hc_error;
+use anyhow::Context as _;
+use anyhow::Result;
 use glob::glob;
-use hc_common::{error::Result, filesystem::read_toml, hc_error, pathbuf};
+use pathbuf::pathbuf;
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::collections::BTreeSet;
+use std::fmt::Debug;
+use std::fmt::Display;
+use std::fmt::Formatter;
+use std::fmt::{self};
+use std::fs::File;
+use std::fs::{self};
+use std::io::BufRead;
+use std::io::BufReader;
 use std::ops::Not as _;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::exit;
-use std::{
-	collections::BTreeSet,
-	fs::File,
-	io::{BufRead, BufReader},
-};
 
 /// Print list of validation failures for crates in the workspace.
 pub fn run() -> Result<()> {
@@ -531,4 +540,22 @@ fn resolve_configs(dir: &Path) -> Result<Vec<PathBuf>> {
 	}
 
 	Ok(configs)
+}
+
+/// Read file to a struct that can be deserialized from TOML format.
+fn read_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P) -> Result<T> {
+	let path = path.as_ref();
+	let contents = read_string(path)?;
+	toml::de::from_str(&contents)
+		.with_context(|| format!("failed to read as TOML '{}'", path.display()))
+}
+
+/// Read a file to a string.
+fn read_string<P: AsRef<Path>>(path: P) -> Result<String> {
+	fn inner(path: &Path) -> Result<String> {
+		fs::read_to_string(path)
+			.with_context(|| format!("failed to read as UTF-8 string '{}'", path.display()))
+	}
+
+	inner(path.as_ref())
 }

@@ -1,21 +1,57 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use clap::{Arg, ArgAction, Command};
-use env_logger::{Builder, Env};
-use hc_common::{
-	analysis::session::{Check, CheckType},
-	context::Context,
-	error::Result,
-	hc_error, print_error, resolve_config, resolve_data, resolve_home, run,
-	schemars::schema_for,
-	serde_json, version, AnyReport, CheckKind, ColorChoice, Format, Outcome, Output, PrReport,
-	Report, Verbosity,
-};
+mod analysis;
+mod command_util;
+mod config;
+mod context;
+mod data;
+mod error;
+mod filesystem;
+mod pathbuf;
+mod report;
+mod shell;
+mod test_util;
+#[cfg(test)]
+mod tests;
+mod try_any;
+mod try_filter;
+mod version;
+
+use crate::analysis::report_builder::build_pr_report;
+use crate::analysis::report_builder::build_report;
+use crate::analysis::report_builder::AnyReport;
+use crate::analysis::report_builder::Format;
+use crate::analysis::report_builder::PrReport;
+use crate::analysis::report_builder::Report;
+use crate::analysis::score::score_pr_results;
+use crate::analysis::score::score_results;
+use crate::analysis::session::resolve_config;
+use crate::analysis::session::resolve_data;
+use crate::analysis::session::resolve_home;
+use crate::analysis::session::Check;
+use crate::analysis::session::CheckType;
+use crate::analysis::session::Session;
+use crate::context::Context as _;
+use crate::error::Error;
+use crate::error::Result;
+use crate::shell::ColorChoice;
+use crate::shell::Output;
+use crate::shell::Shell;
+use crate::shell::Verbosity;
+use clap::Arg;
+use clap::ArgAction;
+use clap::Command;
+use env_logger::Builder;
+use env_logger::Env;
+use schemars::schema_for;
+use std::env;
 use std::ffi::OsString;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
-use std::{env, path::Path};
+use try_any::TryAny;
+use try_filter::TryFilter;
 
 /// Entry point for Hipcheck.
 ///
@@ -726,4 +762,234 @@ fn print_missing() -> ! {
 	println!("This feature is not implemented yet.");
 	let exit_code = Outcome::Ok.exit_code();
 	exit(exit_code)
+}
+
+/// An `f64` that is never `NaN`.
+type F64 = ordered_float::NotNan<f64>;
+
+// Global variables for toml files per issue 157 config updates
+const LANGS_FILE: &str = "Langs.toml";
+const BINARY_CONFIG_FILE: &str = "Binary.toml";
+const TYPO_FILE: &str = "Typos.toml";
+const ORGS_FILE: &str = "Orgs.toml";
+const HIPCHECK_TOML_FILE: &str = "Hipcheck.toml";
+
+// Constants for exiting with error codes.
+/// Indicates the program failed.
+const EXIT_FAILURE: i32 = 1;
+
+#[allow(unused)]
+/// Indicates the program succeeded.
+const EXIT_SUCCESS: i32 = 0;
+
+//used in hc_session::pm and main.rs, global variables for hc check CheckKindHere node-ipc@9.2.1
+enum CheckKind {
+	Repo,
+	Request,
+	Patch,
+	Maven,
+	Npm,
+	Pypi,
+	Spdx,
+}
+
+impl CheckKind {
+	const fn name(&self) -> &'static str {
+		match self {
+			CheckKind::Repo => "repo",
+			CheckKind::Request => "request",
+			CheckKind::Patch => "patch",
+			CheckKind::Maven => "maven",
+			CheckKind::Npm => "npm",
+			CheckKind::Pypi => "pypi",
+			CheckKind::Spdx => "spdx",
+		}
+	}
+}
+
+/// Run Hipcheck.
+///
+/// Parses arguments, sets up shell output, and then runs the main logic.
+#[allow(clippy::too_many_arguments)]
+fn run(
+	output: Output,
+	error_output: Output,
+	verbosity: Verbosity,
+	check: Check,
+	config_path: Option<PathBuf>,
+	data_path: Option<PathBuf>,
+	home_dir: Option<PathBuf>,
+	format: Format,
+	raw_version: &str,
+) -> (Shell, Result<AnyReport>) {
+	// Setup wrapper for shell output.
+	let shell = Shell::new(output, error_output, verbosity);
+
+	// Run and print / report errors.
+	run_with_shell(
+		shell,
+		check,
+		config_path,
+		data_path,
+		home_dir,
+		format,
+		raw_version,
+	)
+}
+
+// This is for testing purposes.
+/// Now that we're fully-initialized, run Hipcheck's analyses.
+#[allow(clippy::too_many_arguments)]
+#[doc(hidden)]
+fn run_with_shell(
+	shell: Shell,
+	check: Check,
+	config_path: Option<PathBuf>,
+	data_path: Option<PathBuf>,
+	home_dir: Option<PathBuf>,
+	format: Format,
+	raw_version: &str,
+) -> (Shell, Result<AnyReport>) {
+	// Initialize the session.
+	let session = match Session::new(
+		shell,
+		&check,
+		&check.check_value,
+		config_path,
+		data_path,
+		home_dir,
+		format,
+		raw_version,
+	) {
+		Ok(session) => session,
+		Err((shell, err)) => return (shell, Err(err)),
+	};
+
+	match check.check_type {
+		CheckType::RepoSource | CheckType::SpdxDocument => {
+			// Run analyses against a repo and score the results (score calls analyses that call metrics).
+			let mut phase = match session.shell.phase("analyzing and scoring results") {
+				Ok(phase) => phase,
+				Err(err) => return (session.end(), Err(err)),
+			};
+
+			let scoring = match score_results(&mut phase, &session) {
+				Ok(scoring) => scoring,
+				_ => {
+					return (
+						session.end(),
+						Err(Error::msg("Trouble scoring and analyzing results")),
+					)
+				}
+			};
+
+			match phase.finish() {
+				Ok(()) => {}
+				Err(err) => return (session.end(), Err(err)),
+			};
+
+			// Build the final report.
+			let report =
+				match build_report(&session, &scoring).context("failed to build final report") {
+					Ok(report) => report,
+					Err(err) => return (session.end(), Err(err)),
+				};
+
+			(session.end(), Ok(AnyReport::Report(report)))
+		}
+		CheckType::PackageVersion => {
+			// Run analyses against a repo and score the results (score calls analyses that call metrics).
+			let mut phase = match session.shell.phase("analyzing and scoring results") {
+				Ok(phase) => phase,
+				Err(err) => return (session.end(), Err(err)),
+			};
+
+			let scoring = match score_results(&mut phase, &session) {
+				Ok(scoring) => scoring,
+				_ => {
+					return (
+						session.end(),
+						Err(Error::msg("Trouble scoring and analyzing results")),
+					)
+				}
+			};
+
+			match phase.finish() {
+				Ok(()) => {}
+				Err(err) => return (session.end(), Err(err)),
+			};
+
+			// Build the final report.
+			let report =
+				match build_report(&session, &scoring).context("failed to build final report") {
+					Ok(report) => report,
+					Err(err) => return (session.end(), Err(err)),
+				};
+
+			(session.end(), Ok(AnyReport::Report(report)))
+		}
+		CheckType::PrUri => {
+			// Run analyses against a pull request and score the results (score calls analyses that call metrics).
+			let mut phase = match session.shell.phase("scoring and analyzing results") {
+				Ok(phase) => phase,
+				Err(err) => return (session.end(), Err(err)),
+			};
+
+			let score = match score_pr_results(&mut phase, &session) {
+				Ok(score) => score,
+				_ => {
+					return (
+						session.end(),
+						Err(Error::msg("Trouble scoring and analyzing results")),
+					)
+				}
+			};
+
+			match phase.finish() {
+				Ok(()) => {}
+				Err(err) => return (session.end(), Err(err)),
+			};
+
+			// Build the final report.
+			let pr_report =
+				match build_pr_report(&session, &score).context("failed to build final report") {
+					Ok(pr_report) => pr_report,
+					Err(err) => return (session.end(), Err(err)),
+				};
+
+			(session.end(), Ok(AnyReport::PrReport(pr_report)))
+		}
+		_ => (
+			session.end(),
+			Err(Error::msg(
+				"Hipcheck attempted to analyze an unsupported type",
+			)),
+		),
+	}
+}
+
+/// Print errors which occur before the `Shell` type can be setup.
+fn print_error(err: &Error) {
+	let mut chain = err.chain();
+
+	// PANIC: First error is guaranteed to be present.
+	eprintln!("error: {}", chain.next().unwrap());
+
+	for err in chain {
+		eprintln!("       {}", err);
+	}
+}
+
+enum Outcome {
+	Ok,
+	Err,
+}
+
+impl Outcome {
+	fn exit_code(&self) -> i32 {
+		match self {
+			Outcome::Ok => 0,
+			Outcome::Err => 1,
+		}
+	}
 }

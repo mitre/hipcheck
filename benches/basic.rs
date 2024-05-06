@@ -1,4 +1,7 @@
-use criterion::{criterion_group, criterion_main, Criterion, PlottingBackend};
+use criterion::criterion_group;
+use criterion::criterion_main;
+use criterion::Criterion;
+use criterion::PlottingBackend;
 use hc_common::CheckKind;
 use hc_core::*;
 use std::time::Duration;

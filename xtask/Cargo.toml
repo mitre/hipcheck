@@ -7,8 +7,12 @@ edition = "2021"
 publish = false
 
 [dependencies]
-hc_common = { path = "../libs/hc_common" }
-clap = { version = "4.5.4", default-features = false, features = ["cargo", "std"] }
+clap = { version = "4.5.4", default-features = false, features = [
+    "cargo",
+    "std",
+] }
+anyhow = "1.0.83"
+pathbuf = "1.0.0"
 glob = "0.3.0"
 serde = { version = "1.0.133", features = ["derive"] }
 toml = "0.8.12"

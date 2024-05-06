@@ -4,11 +4,10 @@
 
 use crate::exit::EXIT_SUCCESS;
 use crate::task::ci::Printer;
+use anyhow::anyhow as hc_error;
+use anyhow::Error;
+use anyhow::Result;
 use duct::cmd;
-use hc_common::{
-	error::{Error, Result},
-	hc_error,
-};
 use std::io;
 use std::mem::drop;
 use std::process::exit;

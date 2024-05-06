@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use hc_common::{error::Result, hc_error};
-use std::path::{Path, PathBuf};
+use anyhow::anyhow as hc_error;
+use anyhow::Result;
+use std::path::Path;
+use std::path::PathBuf;
 
 pub fn root() -> Result<PathBuf> {
 	Path::new(&env!("CARGO_MANIFEST_DIR"))

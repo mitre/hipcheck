@@ -3,12 +3,14 @@
 //! A task to simulate a CI run locally.
 
 use crate::exit::EXIT_SUCCESS;
+use anyhow::anyhow as hc_error;
+use anyhow::Error;
+use anyhow::Result;
 use duct::cmd;
-use hc_common::{
-	error::{Error, Result},
-	hc_error,
-};
-use std::io::{self, Stderr, Stdout, Write as _};
+use std::io::Stderr;
+use std::io::Stdout;
+use std::io::Write as _;
+use std::io::{self};
 use std::mem::drop;
 use std::ops::Not as _;
 use std::process::exit;
@@ -201,7 +203,7 @@ fn run_fmt(printer: &mut Printer) -> Result<()> {
 		.run()
 		.map(drop)
 		.map_err(reason(
-			"call to cargo fmt failed. To automatically fix cargo fmt issues most likely due to white space or tab issues, run 
+			"call to cargo fmt failed. To automatically fix cargo fmt issues most likely due to white space or tab issues, run
 		cargo fmt --all",
 		))
 }
