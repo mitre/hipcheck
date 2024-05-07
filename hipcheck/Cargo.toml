@@ -3,6 +3,7 @@ name = "hipcheck"
 version = "3.1.0"
 edition = "2021"
 license = "Apache-2.0"
+repository = "https://github.com/mitre/hipcheck"
 include = ["src/**/*", "LICENSE.md", "README.md"]
 publish = false
 
@@ -74,3 +75,8 @@ dirs = "5.0.1"
 tempfile = "3.10.1"
 duct = "0.13.7"
 criterion = "0.5.1"
+
+[package.metadata.dist]
+
+# Make sure that `cargo-dist` can find this binary.
+dist = true
