@@ -103,7 +103,6 @@ use std::ops::Not as _;
 use std::str::FromStr;
 use std::time::Duration;
 use std::time::Instant;
-use termcolor;
 use termcolor::Color;
 use termcolor::Color::*;
 use termcolor::ColorSpec;
