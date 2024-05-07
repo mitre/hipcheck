@@ -20,7 +20,6 @@ lazy_static! {
 /// before unwinding the panic.
 ///
 /// Credit: Fabian Braun at https://stackoverflow.com/a/67433684
-#[allow(unused)]
 pub fn with_env_vars<F>(kvs: Vec<(&str, Option<&str>)>, closure: F)
 where
 	F: Fn() + UnwindSafe + RefUnwindSafe,

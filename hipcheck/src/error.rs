@@ -76,26 +76,6 @@ impl Error {
 		}
 	}
 
-	#[allow(unused)]
-	/// Get the next error in the chain.
-	pub fn source(&self) -> Option<&(dyn StdError + 'static)> {
-		self.head.source()
-	}
-
-	#[allow(unused)]
-	/// Get the root error of the chain.
-	pub fn root_cause(&self) -> Error {
-		let mut current = &self.head;
-
-		while let Some(next) = &current.next {
-			current = next;
-		}
-
-		Error {
-			head: Rc::clone(current),
-		}
-	}
-
 	/// Get an iterator over the errors in a chain.
 	pub fn chain(&self) -> Chain {
 		Chain::new(self)

@@ -1036,8 +1036,6 @@ macro_rules! pr_count_constructor {
 	};
 }
 
-// Unused for now
-#[allow(unused_macros)]
 macro_rules! pr_percent_constructor {
 	( $name:tt ) => {
 		pr_constructor!($name(f64), Percent);

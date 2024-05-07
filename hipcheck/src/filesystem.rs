@@ -4,7 +4,6 @@ use crate::context::Context as _;
 use crate::error::Result;
 use crate::hc_error;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::fs;
 use std::fs::File;
 use std::ops::Not;
@@ -53,27 +52,6 @@ pub fn write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()>
 	}
 
 	inner(path.as_ref(), contents.as_ref())
-}
-
-/// Write JSON to a file.
-#[allow(unused)]
-pub fn write_json<P: AsRef<Path>, T: ?Sized + Serialize>(path: P, value: &T) -> Result<()> {
-	// The non-generic inner function (NGIF) trick is useless here, since T would still be generic,
-	// so instead we do this conversion up-front to avoid borrowing issues with the `with_context`
-	// closure taking ownership of `path`.
-	let path = path.as_ref();
-	let mut file = create(path)?;
-	serde_json::to_writer_pretty(&mut file, value)
-		.with_context(|| format!("failed to write JSON '{}'", path.display()))
-}
-
-/// Create a new file.
-pub fn create<P: AsRef<Path>>(path: P) -> Result<File> {
-	fn inner(path: &Path) -> Result<File> {
-		File::create(path).with_context(|| format!("failed to create file '{}'", path.display()))
-	}
-
-	inner(path.as_ref())
 }
 
 /// Open an existing file.

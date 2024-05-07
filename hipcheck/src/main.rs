@@ -10,6 +10,7 @@ mod filesystem;
 mod pathbuf;
 mod report;
 mod shell;
+#[cfg(test)]
 mod test_util;
 #[cfg(test)]
 mod tests;
@@ -777,10 +778,6 @@ const HIPCHECK_TOML_FILE: &str = "Hipcheck.toml";
 // Constants for exiting with error codes.
 /// Indicates the program failed.
 const EXIT_FAILURE: i32 = 1;
-
-#[allow(unused)]
-/// Indicates the program succeeded.
-const EXIT_SUCCESS: i32 = 0;
 
 //used in hc_session::pm and main.rs, global variables for hc check CheckKindHere node-ipc@9.2.1
 enum CheckKind {
