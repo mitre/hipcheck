@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Defines an authenticated [`Agent`] type that adds token auth to all requests.
 
 use std::sync::Arc;
