@@ -37,8 +37,8 @@ fn main() {
 		.subcommand(
 			Command::new("doc").arg(
 				Arg::new("open")
-					.value_name("open")
-					.index(1)
+					.short('o')
+					.long("open")
 					.action(ArgAction::SetTrue),
 			),
 		)
