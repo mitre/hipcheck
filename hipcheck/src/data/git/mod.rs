@@ -10,7 +10,6 @@ pub use query::*;
 
 use crate::context::Context as _;
 pub use crate::data::git_command::*;
-use crate::error::Error;
 use crate::error::Result;
 use std::path::Path;
 
@@ -58,17 +57,6 @@ pub fn get_commits_from_date(repo: &Path, date: &str) -> Result<Vec<RawCommit>> 
 	.context(msg)?;
 
 	git_log(&raw_output)
-}
-
-#[allow(unused)]
-pub fn get_last_commit(repo: &Path) -> Result<RawCommit> {
-	let mut raw_commits = get_commits(repo)?;
-
-	if raw_commits.is_empty() {
-		Err(Error::msg("no commits"))
-	} else {
-		Ok(raw_commits.remove(0))
-	}
 }
 
 pub fn get_diffs(repo: &Path) -> Result<Vec<Diff>> {

@@ -98,7 +98,6 @@ use std::fmt::Formatter;
 use std::io::stderr;
 use std::io::stdout;
 use std::io::IsTerminal as _;
-use std::io::Write;
 use std::ops::Not as _;
 use std::str::FromStr;
 use std::time::Duration;
@@ -106,7 +105,6 @@ use std::time::Instant;
 use termcolor::Color;
 use termcolor::Color::*;
 use termcolor::ColorSpec;
-use termcolor::NoColor;
 use termcolor::StandardStream;
 use termcolor::WriteColor;
 
@@ -163,10 +161,6 @@ impl Shell {
 		/// Print the prelude header for Hipcheck's run.
 		pub fn prelude(source: &str)
 
-		#[allow(unused)]
-		/// Print a warning to the user.
-		pub fn warn(message: &str)
-
 		/// Print an error.
 		pub fn error(error: &Error, format: Format)
 
@@ -183,10 +177,6 @@ impl Shell {
 
 		/// Print the in-progress line for a phase.
 		fn status(msg: &str)
-
-		#[allow(unused)]
-		/// Print a warning during a phase.
-		fn warn_in_phase(msg: &str)
 
 		/// Update the in-progress line for a phase.
 		fn update_status(msg: &str)
@@ -434,15 +424,6 @@ impl ShellInner {
 	/// Print the prelude header for Hipcheck's run.
 	fn prelude(&mut self, source: &str) -> Result<()> {
 		Ok(pm!(@update self, m!(#prelude source)))
-	}
-
-	/// Print a warning to the user.
-	fn warn(&mut self, msg: &str) -> Result<()> {
-		Ok(pm!(self, m!(#warning msg)))
-	}
-
-	fn warn_in_phase(&mut self, msg: &str) -> Result<()> {
-		Ok(pm!(self, m!(#phase_warning msg)))
 	}
 
 	/// Print an error.
@@ -777,12 +758,6 @@ impl<'sec, 'desc> Phase<'sec, 'desc> {
 		})
 	}
 
-	#[allow(unused)]
-	/// Warn the user.
-	pub fn warn(&mut self, msg: &str) -> Result<()> {
-		self.shell.warn_in_phase(msg)
-	}
-
 	/// Update the phase status with a progress indicator.
 	pub fn update(&mut self, progress: &str) -> Result<()> {
 		self.shell
@@ -829,15 +804,6 @@ impl Output {
 		Output {
 			out: Box::new(StandardStream::stderr(color_choice)),
 			is_atty,
-		}
-	}
-
-	#[allow(unused)]
-	/// Create a new Output wrapping an arbitrary Write.
-	pub fn from_writer(write: impl Write + 'static) -> Output {
-		Output {
-			out: Box::new(NoColor::new(write)),
-			is_atty: false,
 		}
 	}
 }
@@ -996,20 +962,6 @@ pub enum Verbosity {
 	Silent,
 }
 
-impl Verbosity {
-	#[allow(unused)]
-	/// Check if verbosity is quiet.
-	pub fn is_quiet(&self) -> bool {
-		matches!(self, Verbosity::Quiet)
-	}
-
-	#[allow(unused)]
-	/// Check if verbosity is normal.
-	pub fn is_normal(&self) -> bool {
-		matches!(self, Verbosity::Normal)
-	}
-}
-
 impl From<bool> for Verbosity {
 	fn from(b: bool) -> Verbosity {
 		if b {
@@ -1087,17 +1039,6 @@ fn print(stream: &mut dyn WriteColor, msg: Message) -> Result<()> {
 			Print::print(&timestamp, stream)?;
 			Print::print(&title, stream)?;
 			print_str(msg, stream)
-		}
-		Message::PhaseWarning { title, msg } => {
-			Print::print(&title, stream)?;
-			print_str(msg, stream)?;
-			// Ensure the next phase message doesn't overwrite the warning.
-			print_newline(stream)
-		}
-		Message::Warning { title, msg } => {
-			Print::print(&title, stream)?;
-			print_str(msg, stream)
-			// No newline for regular warnings.
 		}
 		Message::ErrorJson { error } => print_error_json(error, stream),
 		Message::Error { title, error } => {
@@ -1248,10 +1189,6 @@ enum Message<'a, 'b> {
 		title: Title<'a>,
 		msg: &'a str,
 	},
-	/// A warning to the user during a phase.
-	PhaseWarning { title: Title<'a>, msg: &'a str },
-	/// A warning to the user.
-	Warning { title: Title<'a>, msg: &'a str },
 	/// An error occured and can't be recovered from, and we're print it as JSON.
 	ErrorJson { error: &'b Error },
 	/// An error occured and can't be recovered from.
@@ -1311,8 +1248,6 @@ enum Title<'a> {
 	Errored,
 	/// "In Progress"
 	InProgress,
-	/// "Warning"
-	Warning,
 	/// "Done"
 	Done,
 	/// "Done" (with a timestamp attached)
@@ -1342,7 +1277,6 @@ impl<'a> Print for Title<'a> {
 			Done | TimestampedDone => "Done",
 			Pass => "PASS",
 			Investigate => "INVESTIGATE",
-			Warning => "Warning",
 			Error => "Error",
 			Empty => "",
 		};
@@ -1356,7 +1290,7 @@ impl<'a> Print for Title<'a> {
 		match self {
 			// Full width
 			Analyzing | Analyzed | Section(..) | Passed | Failed | Errored | InProgress | Done
-			| Pass | Investigate | Warning | Error | Empty => MAX_TITLE_WIDTH,
+			| Pass | Investigate | Error | Empty => MAX_TITLE_WIDTH,
 			// Leave room for the timestamp.
 			TimestampedDone => DONE_WIDTH,
 		}
@@ -1371,7 +1305,7 @@ impl<'a> Print for Title<'a> {
 			InProgress => Some(Magenta),
 			Passed | Pass => Some(Green),
 			Failed | Investigate => Some(Red),
-			Warning | Errored => Some(Yellow),
+			Errored => Some(Yellow),
 			Error => Some(Red),
 			Empty => None,
 		}

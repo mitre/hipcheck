@@ -212,11 +212,9 @@ pub fn get_single_pull_request_review_from_github(
 
 // Module structs/enums
 
-#[allow(unused)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize)]
 pub enum Relationship {
 	Child,
-	Import,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize)]

@@ -10,8 +10,6 @@ mod github;
 mod module;
 mod pr_review;
 
-#[allow(unused)]
-pub use code_quality::CodeQualityProvider;
 pub use code_quality::CodeQualityProviderStorage;
 pub use dependencies::DependenciesProvider;
 pub use dependencies::DependenciesProviderStorage;

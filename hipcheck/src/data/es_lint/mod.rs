@@ -7,23 +7,9 @@ use crate::context::Context as _;
 use crate::error::Result;
 use command::ESLintCommand;
 use data::ESLintReports;
-use semver::Version;
 
 pub mod command;
 pub mod data;
-
-#[allow(unused)]
-pub fn get_eslint_version() -> Result<String> {
-	ESLintCommand::internal([OsStr::new("--version")])?.output()
-}
-
-#[allow(unused)]
-pub fn parse_eslint_version(version: &str) -> Result<Version> {
-	// semver's parser will not accept the leading 'v' or trailing newline
-	let version = version.strip_prefix('v').unwrap_or(version);
-	let version = version.trim_end();
-	Ok(Version::parse(version)?)
-}
 
 // rustfmt insists on splitting the args into separate lines,
 // reducing readability
@@ -51,15 +37,7 @@ mod test {
 	use crate::command_util::DependentProgram;
 	use std::fs::File;
 	use std::io::Write;
-
 	use tempfile::tempdir;
-
-	#[test]
-	#[ignore = "can't guarantee availability of ESLint"]
-	fn parse_version() {
-		let version = get_eslint_version().unwrap();
-		DependentProgram::EsLint.check_version(&version).unwrap();
-	}
 
 	#[test]
 	#[ignore = "can't guarantee availability of ESLint"]
