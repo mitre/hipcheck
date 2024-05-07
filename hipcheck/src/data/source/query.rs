@@ -5,7 +5,7 @@
 use crate::data::source::Remote;
 use crate::data::source::Source;
 use crate::hash;
-use crate::pathbuf;
+use pathbuf::pathbuf;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -80,14 +80,14 @@ fn storage_path(db: &dyn SourceQuery) -> Rc<PathBuf> {
 				repo,
 				pull_request,
 				..
-			} => pathbuf!["remote", "github", owner, repo, pull_request.to_string()],
+			} => pathbuf!["remote", "github", owner, repo, &pull_request.to_string()],
 			// This is an unknown remote source.
-			Unknown(url) => pathbuf!["remote", "unknown", hash!(url).to_string()],
+			Unknown(url) => pathbuf!["remote", "unknown", &hash!(url).to_string()],
 		},
 		// This is a local source.
 		None => match db.local().file_name() {
 			Some(file_name) => pathbuf!["local", file_name],
-			None => pathbuf!["local", "unknown", hash!(db.local()).to_string()],
+			None => pathbuf!["local", "unknown", &hash!(db.local()).to_string()],
 		},
 	};
 

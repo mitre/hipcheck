@@ -623,6 +623,7 @@ dependencies = [
  "once_cell",
  "ordered-float",
  "paste",
+ "pathbuf",
  "petgraph",
  "regex",
  "salsa",

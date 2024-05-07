@@ -5,12 +5,12 @@
 use crate::context::Context;
 use crate::error::Result;
 use crate::filesystem as file;
-use crate::pathbuf;
 use crate::BINARY_CONFIG_FILE;
 use crate::F64;
 use crate::LANGS_FILE;
 use crate::ORGS_FILE;
 use crate::TYPO_FILE;
+use pathbuf::pathbuf;
 use serde::Deserialize;
 use serde::Serialize;
 use smart_default::SmartDefault;

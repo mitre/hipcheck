@@ -7,7 +7,6 @@ mod context;
 mod data;
 mod error;
 mod filesystem;
-mod pathbuf;
 mod report;
 mod shell;
 #[cfg(test)]
