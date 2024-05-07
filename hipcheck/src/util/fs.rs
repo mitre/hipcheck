@@ -5,7 +5,6 @@ use crate::error::Result;
 use crate::hc_error;
 use serde::de::DeserializeOwned;
 use std::fs;
-use std::fs::File;
 use std::ops::Not;
 use std::path::Path;
 
@@ -44,43 +43,11 @@ pub fn read_json<P: AsRef<Path>, T: DeserializeOwned>(path: P) -> Result<T> {
 		.with_context(|| format!("failed to read as JSON '{}'", path.display()))
 }
 
-/// Write to a file.
-#[allow(dead_code)]
-pub fn write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
-	fn inner(path: &Path, contents: &[u8]) -> Result<()> {
-		fs::write(path, contents).with_context(|| format!("failed to write '{}'", path.display()))
-	}
-
-	inner(path.as_ref(), contents.as_ref())
-}
-
-/// Open an existing file.
-#[allow(dead_code)]
-pub fn open<P: AsRef<Path>>(path: P) -> Result<File> {
-	fn inner(path: &Path) -> Result<File> {
-		File::open(path).with_context(|| format!("failed to open file '{}'", path.display()))
-	}
-
-	inner(path.as_ref())
-}
-
 /// Create a directory and missing parents.
-#[allow(dead_code)]
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
 	fn inner(path: &Path) -> Result<()> {
 		fs::create_dir_all(path)
 			.with_context(|| format!("failed to create directory '{}'", path.display()))
-	}
-
-	inner(path.as_ref())
-}
-
-/// Remove a directory and any children.
-#[allow(dead_code)]
-pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
-	fn inner(path: &Path) -> Result<()> {
-		fs::remove_dir_all(path)
-			.with_context(|| format!("failed to remove directory '{}'", path.display()))
 	}
 
 	inner(path.as_ref())

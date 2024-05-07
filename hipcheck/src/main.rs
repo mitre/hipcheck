@@ -6,15 +6,13 @@ mod config;
 mod context;
 mod data;
 mod error;
-mod filesystem;
 mod report;
 mod shell;
 #[cfg(test)]
 mod test_util;
 #[cfg(test)]
 mod tests;
-mod try_any;
-mod try_filter;
+mod util;
 mod version;
 
 use crate::analysis::report_builder::build_pr_report;
@@ -38,6 +36,8 @@ use crate::shell::ColorChoice;
 use crate::shell::Output;
 use crate::shell::Shell;
 use crate::shell::Verbosity;
+use crate::util::iter::TryAny;
+use crate::util::iter::TryFilter;
 use clap::Arg;
 use clap::ArgAction;
 use clap::Command;
@@ -50,8 +50,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
-use try_any::TryAny;
-use try_filter::TryFilter;
 
 /// Entry point for Hipcheck.
 ///

@@ -6,7 +6,7 @@ pub use query::*;
 
 use crate::context::Context as _;
 use crate::error::Result;
-use crate::filesystem::read_toml;
+use crate::util::fs::read_toml;
 use serde::de::Visitor;
 use serde::Deserialize;
 use serde::Deserializer;
