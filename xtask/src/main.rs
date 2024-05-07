@@ -4,10 +4,16 @@ mod exit;
 mod task;
 mod workspace;
 
-use crate::exit::{EXIT_FAILURE, EXIT_SUCCESS};
+use crate::exit::EXIT_FAILURE;
+use crate::exit::EXIT_SUCCESS;
 use crate::task::doc::OpenDoc;
-use clap::{crate_version, Arg, ArgAction, ArgMatches, Command};
-use hc_common::error::{Error, Result};
+use anyhow::Error;
+use anyhow::Result;
+use clap::crate_version;
+use clap::Arg;
+use clap::ArgAction;
+use clap::ArgMatches;
+use clap::Command;
 use std::process::exit;
 
 fn main() {

@@ -3,11 +3,11 @@
 //! A task to simulate a CI run locally.
 
 use crate::exit::EXIT_SUCCESS;
+use anyhow::anyhow as hc_error;
+use anyhow::Error;
+use anyhow::Result;
 use duct::cmd;
-use hc_common::{
-	error::{Error, Result},
-	hc_error, pathbuf,
-};
+use pathbuf::pathbuf;
 use std::io;
 use std::mem::drop;
 use std::path::PathBuf;

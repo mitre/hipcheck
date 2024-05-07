@@ -1,17 +1,9 @@
-# Necessary for 'cargo outdated'
-cargo-features = ["resolver"]
-
 [workspace]
 # Use the newer, better feature resolver.
 resolver = "2"
 
 # All the actual crates are in `libs/` or `hipcheck/`
-members = [
-    "hipcheck",
-    "libs/*",
-    "xtask",
-]
+members = ["hipcheck", "xtask"]
 
 # Make sure Hipcheck is run with `cargo run`.
 default-members = ["hipcheck"]
-
