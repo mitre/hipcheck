@@ -6,7 +6,7 @@ use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
-use crate::pathbuf;
+use pathbuf::pathbuf;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -21,7 +21,7 @@ use std::process::Command;
 
 pub fn generate_module_model(repo_dir: &Path, module_deps: &Path) -> Result<Vec<RawModule>> {
 	let root = detect_npm_package_root(&pathbuf![repo_dir, "package.json"])?;
-	if !pathbuf![&repo_dir, &root].exists() {
+	if !pathbuf![repo_dir, &root].exists() {
 		return Err(Error::msg(
 			"Unable to identify module structure of repository code",
 		));

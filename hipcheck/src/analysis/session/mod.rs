@@ -39,7 +39,6 @@ use crate::error::Error;
 use crate::error::Result;
 use crate::filesystem::create_dir_all;
 use crate::hc_error;
-use crate::pathbuf;
 use crate::report::Format;
 use crate::report::ReportParams;
 use crate::report::ReportParamsStorage;
@@ -51,6 +50,7 @@ use crate::version::VersionQueryStorage;
 use crate::HIPCHECK_TOML_FILE;
 use chrono::prelude::*;
 use dotenv::var;
+use pathbuf::pathbuf;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fmt;
@@ -372,7 +372,7 @@ pub fn resolve_config(config_flag: Option<&Path>) -> Result<PathBuf> {
 	//    (See https://docs.rs/dirs/3.0.2/dirs/fn.cache_dir.html)
 
 	if let Some(config_path) = config_flag {
-		let full_config_path = pathbuf![&config_path, HIPCHECK_TOML_FILE];
+		let full_config_path = pathbuf![config_path, HIPCHECK_TOML_FILE];
 		if full_config_path.exists() {
 			return Ok(full_config_path);
 		}
@@ -673,7 +673,7 @@ mod tests {
 			],
 			|| {
 				let data_dir = None;
-				let data_path = pathbuf![dirs::data_dir().unwrap(), "hipcheck"];
+				let data_path = pathbuf![&dirs::data_dir().unwrap(), "hipcheck"];
 				create_dir_all(data_path.as_path()).unwrap();
 				let result = resolve_data(data_dir).unwrap();
 				let path = result.to_str().unwrap();
@@ -748,7 +748,7 @@ mod tests {
 				("HC_DATA", None),
 			],
 			|| {
-				let data_path = pathbuf![dirs::data_dir().unwrap(), "hipcheck"];
+				let data_path = pathbuf![&dirs::data_dir().unwrap(), "hipcheck"];
 				create_dir_all(data_path.as_path()).unwrap();
 				let result = resolve_data(None).unwrap();
 				let path = result.to_str().unwrap();

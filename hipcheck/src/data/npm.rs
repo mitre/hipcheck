@@ -6,7 +6,7 @@ use crate::context::Context;
 use crate::error::Result;
 use crate::filesystem as file;
 use crate::hc_error;
-use crate::pathbuf;
+use pathbuf::pathbuf;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::convert::AsRef;

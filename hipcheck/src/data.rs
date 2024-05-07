@@ -2,25 +2,24 @@
 
 //! Functions and types for data retrieval.
 
-mod code_quality;
-mod es_lint;
 pub mod git;
 pub mod git_command;
+pub mod npm;
+pub mod source;
+
+mod code_quality;
+mod es_lint;
 mod github;
 mod hash;
 mod modules;
-pub mod npm;
 mod query;
-pub mod source;
 
 pub use query::*;
-use std::collections::HashSet;
 
 use crate::context::Context;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
-use crate::pathbuf;
 use git::get_commits_for_file;
 use git::Commit;
 use git::CommitContributor;
@@ -28,9 +27,11 @@ use git::Contributor;
 use git::Diff;
 use github::*;
 use modules::RawModule;
+use pathbuf::pathbuf;
 use petgraph::visit::Dfs;
 use petgraph::Graph;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::path::Path;
 use std::rc::Rc;
 
