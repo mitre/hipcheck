@@ -4,7 +4,7 @@
 
 use crate::context::Context;
 use crate::error::Result;
-use crate::filesystem as file;
+use crate::util::fs as file;
 use crate::BINARY_CONFIG_FILE;
 use crate::F64;
 use crate::LANGS_FILE;

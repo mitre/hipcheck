@@ -5,7 +5,7 @@ use crate::context::Context as _;
 use crate::data::Dependencies;
 use crate::data::Lang;
 use crate::error::Result;
-use crate::filesystem as file;
+use crate::util::fs as file;
 use maplit::hashmap;
 use serde::Deserialize;
 use serde::Serialize;

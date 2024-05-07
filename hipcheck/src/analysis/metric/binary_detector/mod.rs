@@ -6,8 +6,8 @@ pub use query::*;
 
 use crate::context::Context;
 use crate::error::Result;
-use crate::filesystem::read_toml;
 use crate::hc_error;
+use crate::util::fs::read_toml;
 use content_inspector::inspect;
 use content_inspector::ContentType;
 use serde::de::Visitor;
