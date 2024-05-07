@@ -1,87 +1,107 @@
-let process = require('process');
-let Stream = require('stream');
-let mdeps = require('module-deps');
+// SPDX-License-Identifier: Apache-2.0
+
+/**
+ * `module-deps.js`
+ *
+ * This file is a helper script that Hipcheck uses to enable us to leverage
+ * the "module-deps" NPM package when trying to do module-level analyses of
+ * NPM packages.
+ *
+ * The `module-deps` package isn't really built to be used as a CLI, so this
+ * helper script lets us do that to make consuming the data it produces
+ * from Rust easier.
+ *
+ * This script also ensures `module-deps` doesn't error out when it encounters
+ * imports of packages provided by Node.js.
+ *
+ * Portions of this script are vendored in from different NPM packages. The
+ * appropriate license notices are included with them below.
+ */
+
+let process = require("process");
+let Stream = require("stream");
+let mdeps = require("module-deps");
 
 const getBuiltins = function () {
-	// Making this function memoized ensures the set of builtins is
-	// only generated once, and can then be reused on each call to builtins()
-	// in the main function below.
-	let cached = null;
+  // Making this function memoized ensures the set of builtins is
+  // only generated once, and can then be reused on each call to builtins()
+  // in the main function below.
+  let cached = null;
 
-	return () => {
-		if (cached !== null) {
-			return cached;
-		}
+  return () => {
+    if (cached !== null) {
+      return cached;
+    }
 
-		// This is the list of built-in packages provided by Node.js.
-		const pkgs = [
-			'assert',
-			'async_hooks',
-			'buffer',
-			'child_process',
-			'cluster',
-			'console',
-			'constants',
-			'crypto',
-			'dgram',
-			'dns',
-			'domain',
-			'events',
-			'fs',
-			'http',
-			'http2',
-			'https',
-			'inspector',
-			'module',
-			'net',
-			'os',
-			'path',
-			'perf_hooks',
-			'process',
-			'punycode',
-			'querystring',
-			'readline',
-			'repl',
-			'stream',
-			'string_decoder',
-			'sys',
-			'timers',
-			'tls',
-			'trace_events',
-			'tty',
-			'url',
-			'util',
-			'v8',
-			'vm',
-			'wasi',
-			'worker_threads',
-			'zlib'
-		];
+    // This is the list of built-in packages provided by Node.js.
+    const pkgs = [
+      "assert",
+      "async_hooks",
+      "buffer",
+      "child_process",
+      "cluster",
+      "console",
+      "constants",
+      "crypto",
+      "dgram",
+      "dns",
+      "domain",
+      "events",
+      "fs",
+      "http",
+      "http2",
+      "https",
+      "inspector",
+      "module",
+      "net",
+      "os",
+      "path",
+      "perf_hooks",
+      "process",
+      "punycode",
+      "querystring",
+      "readline",
+      "repl",
+      "stream",
+      "string_decoder",
+      "sys",
+      "timers",
+      "tls",
+      "trace_events",
+      "tty",
+      "url",
+      "util",
+      "v8",
+      "vm",
+      "wasi",
+      "worker_threads",
+      "zlib",
+    ];
 
-		let builtins = new Set();
+    let builtins = new Set();
 
-		for (const pkg of pkgs) {
-			builtins.add(pkg);
-		}
+    for (const pkg of pkgs) {
+      builtins.add(pkg);
+    }
 
-		cached = builtins;
+    cached = builtins;
 
-		return builtins;
-	}
+    return builtins;
+  };
 };
 
 const processArgs = function () {
-	let args = process.argv.slice(2);
+  let args = process.argv.slice(2);
 
-	if (args.length < 1) {
-		process.stderr.write("error: missing entrypoint name");
-		process.exit(1);
-	} else if (args.length > 1) {
-		process.stderr.write("error: only one entrypoint accepted");
-		process.exit(1);
-	}
+  if (args.length < 1) {
+    process.stderr.write("error: missing entrypoint name");
+    process.exit(1);
+  } else if (args.length > 1) {
+    process.stderr.write("error: only one entrypoint accepted");
+    process.exit(1);
+  }
 
-	return args;
+  return args;
 };
 
 /*
@@ -114,13 +134,13 @@ const stringify = function (op, sep, cl, indent) {
   indent = indent || 0;
 
   if (op === false) {
-    op = '';
-    sep = '\n';
-    cl = '';
+    op = "";
+    sep = "\n";
+    cl = "";
   } else if (op == null) {
-    op = '[\n';
-    sep = '\n,\n';
-    cl = '\n]\n';
+    op = "[\n";
+    sep = "\n,\n";
+    cl = "\n]\n";
   }
 
   var stream;
@@ -133,24 +153,24 @@ const stringify = function (op, sep, cl, indent) {
     try {
       var json = JSON.stringify(data, null, indent);
     } catch (err) {
-      return stream.emit('error', err);
+      return stream.emit("error", err);
     }
 
     if (first) {
-        first = false;
-        stream.queue(op + json);
+      first = false;
+      stream.queue(op + json);
     } else {
-        stream.queue(sep + json);
+      stream.queue(sep + json);
     }
   };
 
   var end = function (_data) {
     if (!anyData) {
-      stream.queue(op)
+      stream.queue(op);
     }
 
-    stream.queue(cl)
-    stream.queue(null)
+    stream.queue(cl);
+    stream.queue(null);
   };
 
   stream = through(write, end);
@@ -184,8 +204,16 @@ const stringify = function (op, sep, cl, indent) {
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 const through = function (write, end, opts) {
-  write = write || function (data) { this.queue(data) };
-  end = end || function () { this.queue(null) };
+  write =
+    write ||
+    function (data) {
+      this.queue(data);
+    };
+  end =
+    end ||
+    function () {
+      this.queue(null);
+    };
 
   var ended = false;
   var destroyed = false;
@@ -207,20 +235,20 @@ const through = function (write, end, opts) {
       var data = buffer.shift();
 
       if (null === data) {
-        return stream.emit('end');
+        return stream.emit("end");
       } else {
-        stream.emit('data', data);
+        stream.emit("data", data);
       }
     }
   }
 
   stream.queue = stream.push = function (data) {
     if (_ended) {
-        return stream;
+      return stream;
     }
 
     if (data === null) {
-        _ended = true;
+      _ended = true;
     }
 
     buffer.push(data);
@@ -228,7 +256,7 @@ const through = function (write, end, opts) {
     return stream;
   };
 
-  stream.on('end', function () {
+  stream.on("end", function () {
     stream.readable = false;
 
     if (!stream.writable && stream.autoDestroy)
@@ -248,13 +276,13 @@ const through = function (write, end, opts) {
 
   stream.end = function (data) {
     if (ended) {
-        return;
+      return;
     }
 
-    ended = true
+    ended = true;
 
     if (arguments.length) {
-        stream.write(data)
+      stream.write(data);
     }
 
     _end();
@@ -263,20 +291,20 @@ const through = function (write, end, opts) {
 
   stream.destroy = function () {
     if (destroyed) {
-        return;
+      return;
     }
 
     destroyed = true;
     ended = true;
     buffer.length = 0;
     stream.writable = stream.readable = false;
-    stream.emit('close');
+    stream.emit("close");
     return stream;
   };
 
   stream.pause = function () {
     if (stream.paused) {
-        return;
+      return;
     }
 
     stream.paused = true;
@@ -286,13 +314,13 @@ const through = function (write, end, opts) {
   stream.resume = function () {
     if (stream.paused) {
       stream.paused = false;
-      stream.emit('resume');
+      stream.emit("resume");
     }
 
-    drain()
+    drain();
 
     if (!stream.paused) {
-      stream.emit('drain');
+      stream.emit("drain");
     }
 
     return stream;
@@ -302,19 +330,18 @@ const through = function (write, end, opts) {
 };
 
 const main = function () {
-	let args = processArgs();
+  let args = processArgs();
 
-	// Get a memoized function that returns the builtins.
-	let builtins = getBuiltins();
+  // Get a memoized function that returns the builtins.
+  let builtins = getBuiltins();
 
-	const filterBuiltins = function (name) {
-		return !builtins().has(name);
-	};
+  const filterBuiltins = function (name) {
+    return !builtins().has(name);
+  };
 
-	let md = mdeps({ filter: filterBuiltins });
-	md.pipe(stringify()).pipe(process.stdout);
-	md.end({ file: args[0] });
+  let md = mdeps({ filter: filterBuiltins });
+  md.pipe(stringify()).pipe(process.stdout);
+  md.end({ file: args[0] });
 };
 
 main();
-
