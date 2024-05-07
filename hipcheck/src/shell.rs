@@ -1579,7 +1579,6 @@ mod imp {
 mod imp {
 	use super::TtyWidth;
 	use crate::error::Result;
-	use crate::log;
 	use std::cmp;
 	use std::mem::zeroed;
 	use std::ptr;
