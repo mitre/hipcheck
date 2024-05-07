@@ -1,12 +1,6 @@
 [alias]
-xtask = "run --package xtask --bin xtask --quiet --"
+xtask = "run --package xtask --bin xtask --"
 
 [build]
 target-dir = ".target"
 incremental = true
-
-[profile.dev]
-# Disabling debug info speeds up builds a bunch,
-# and we don't rely on it for debugging that much.
-debug = 0
-

@@ -20,6 +20,7 @@ fn main() {
 	let matches = Command::new("xtask")
 		.about("Hipcheck development task runner.")
 		.version(crate_version!())
+		.disable_version_flag(true)
 		.arg(
 			Arg::new("help")
 				.short('h')
