@@ -1,6 +1,3 @@
-# Necessary for 'cargo outdated'
-cargo-features = ["resolver"]
-
 [workspace]
 # Use the newer, better feature resolver.
 resolver = "2"

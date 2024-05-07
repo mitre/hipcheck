@@ -79,7 +79,7 @@ pub struct Fuzz {
 }
 
 pub fn get_fuzz_check(token: &str, repo_uri: Rc<String>) -> Result<Fuzz> {
-	let github = GitHub::new("google", "oss-fuzz", token);
+	let github = GitHub::new("google", "oss-fuzz", token)?;
 
 	let github_result = github
 		.fuzz_check(repo_uri)
@@ -113,7 +113,7 @@ pub fn get_pull_request_reviews_from_github(
 	repo: &str,
 	token: &str,
 ) -> Result<Vec<PullRequest>> {
-	let github = GitHub::new(owner, repo, token);
+	let github = GitHub::new(owner, repo, token)?;
 
 	let results = github
 		.get_reviews_for_pr()
@@ -134,7 +134,7 @@ pub fn get_single_pull_request_review_from_github(
 	pull_request: &u64,
 	token: &str,
 ) -> Result<SinglePullRequest> {
-	let github_pr = GitHubPr::new(owner, repo, pull_request, token);
+	let github_pr = GitHubPr::new(owner, repo, pull_request, token)?;
 
 	let github_result = github_pr
 		.get_review_for_single_pr()

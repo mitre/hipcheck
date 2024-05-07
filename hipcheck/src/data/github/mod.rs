@@ -24,12 +24,12 @@ pub struct GitHub<'a> {
 }
 
 impl<'a> GitHub<'a> {
-	pub fn new(owner: &'a str, repo: &'a str, token: &'a str) -> GitHub<'a> {
-		GitHub {
+	pub fn new(owner: &'a str, repo: &'a str, token: &'a str) -> Result<GitHub<'a>> {
+		Ok(GitHub {
 			owner,
 			repo,
-			agent: AuthenticatedAgent::new(token),
-		}
+			agent: AuthenticatedAgent::new(token)?,
+		})
 	}
 
 	pub fn fuzz_check(&self, repo_uri: Rc<String>) -> Result<bool> {
@@ -54,13 +54,13 @@ impl<'a> GitHubPr<'a> {
 		repo: &'a str,
 		pull_request: &'a u64,
 		token: &'a str,
-	) -> GitHubPr<'a> {
-		GitHubPr {
+	) -> Result<GitHubPr<'a>> {
+		Ok(GitHubPr {
 			owner,
 			repo,
 			pull_request,
-			agent: AuthenticatedAgent::new(token),
-		}
+			agent: AuthenticatedAgent::new(token)?,
+		})
 	}
 
 	pub fn get_review_for_single_pr(&self) -> Result<GitHubFullPullRequest> {

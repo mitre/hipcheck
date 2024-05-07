@@ -618,6 +618,7 @@ dependencies = [
  "libc",
  "log",
  "maplit",
+ "native-tls",
  "nom",
  "once_cell",
  "ordered-float",
