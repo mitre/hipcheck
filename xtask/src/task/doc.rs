@@ -43,7 +43,7 @@ fn run_cargo_doc(should_open: OpenDoc) -> Result<()> {
 			out_dir.pop();
 
 			// Add the rest of the path to the Hipcheck index file.
-			pathbuf![&out_dir, ".target", "doc", "hipcheck", "index.html"]
+			pathbuf![&out_dir, ".target", "doc", "hc", "index.html"]
 		};
 
 		open::that(path)?;
