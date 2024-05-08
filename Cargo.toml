@@ -1,14 +1,33 @@
+#============================================================================
+# Workspace Configuration
+#----------------------------------------------------------------------------
+
 [workspace]
+
 # Use the newer, better feature resolver.
+#
+# In the future we'll be able to remove this, but for now without it Cargo
+# will default to the old resolver.
 resolver = "2"
 
-# All the actual crates are in `libs/` or `hipcheck/`
+# Members of the workspace, just Hipcheck and our custom task runner.
 members = ["hipcheck", "xtask"]
 
 # Make sure Hipcheck is run with `cargo run`.
+#
+# This means to use `xtask` with `cargo run` you need to specify the package.
+# See `.cargo/config.toml` for how this is done.
 default-members = ["hipcheck"]
 
-# Config for 'cargo dist'
+
+#============================================================================
+# `cargo-dist` Configuration
+#
+# We use `cargo-dist` to automate building and publishing prebuilt binaries
+# for Hipcheck releases. It runs in CI on GitHub Actions and is triggered
+# by pushing new release tags with `cargo-release`.
+#----------------------------------------------------------------------------
+
 [workspace.metadata.dist]
 
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
@@ -38,5 +57,177 @@ install-updater = true
 # The profile that 'cargo dist' will build with
 [profile.dist]
 
+# For now this is just the release profile, but with "thin" Link-Time
+# Optimization enabled. This performs _some_ LTO and tries to hit the
+# right trade-off between the runtime performance improvements of more
+# LTO and the compile time cost of doing LTO.
 inherits = "release"
 lto = "thin"
+
+
+#============================================================================
+# `cargo-release` Configuration
+#
+# We use `cargo-release` to automate the release process, including creating
+# a release commit, tagging it, and publishing to Crates.io.
+#----------------------------------------------------------------------------
+
+[workspace.metadata.release]
+
+# Commit message to use when doing a release.
+#
+# This is in a Conventional Commits format to play nicely with `git-cliff`.
+pre-release-commit-message = "chore: Release {{crate_name}}-v{{version}}"
+
+# Whether to use a single commit when releasing versions of multiple
+# crates in a workspace.
+consolidate-commits = false
+
+
+#============================================================================
+# `git-cliff` Configuration
+#
+# We use `git-cliff` to help with generating a `CHANGELOG.md` when we
+# publish new versions of Hipcheck.
+#----------------------------------------------------------------------------
+
+[workspace.metadata.git-cliff.changelog]
+
+body = """
+# Hipcheck Changelog
+
+All notable changes to this project will be documented in this file. This
+project adheres to [Semantic Versioning].
+
+{% if version -%}
+    ## [{{ version | split(pat="-") | last | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+    ## [Unreleased]
+{%- endif %}
+{%- for group, commits in commits | group_by(attribute="group") %}
+
+    ### {{ group | upper_first }}
+    {% for commit in commits %}
+        * \
+            {{ commit.message | split(pat="\n") | first | trim | trim_end_matches(pat=".") }} \
+            {% if commit.github.username %}\
+                by [@{{ commit.github.username }}]({{ self::remote_user(name=commit.github.username) }}) \
+            {%- endif -%} \
+            {% if commit.github.pr_number %}\
+            in [#{{ commit.github.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.github.pr_number }})
+        {%- endif %}
+    {%- endfor %}
+{%- endfor %}
+{% if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
+  ### New Contributors
+{%- endif %}
+{% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
+  * \
+    [@{{ contributor.username }}]({{ self::remote_user(name=contributor.username) }}) \
+    made their first contribution \
+    {%- if contributor.pr_number %} \
+      in [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}) \
+    {%- endif %}
+{%- endfor %}
+
+{% if version %}
+    {% if previous.version %}
+      **Full Changelog**: <{{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}>
+    {% endif %}
+{% endif %}
+
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+
+{%- macro remote_user(name) -%}
+  https://github.com/{{ name | trim_end_matches(pat="[bot]") }}
+{%- endmacro -%}
+"""
+
+# Remove leading and trailing whitespace from the template.
+#
+# This lets the template use indentation without having that reflected in
+# the output.
+trim = true
+
+footer = """
+{% for release in releases -%}
+    {% if release.version -%}
+        {% if release.previous -%}
+            {% if release.previous.version -%}
+                [{{ release.version | split(pat="-") | last | trim_start_matches(pat="v") }}]: \
+                    https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
+                        /compare/{{ release.previous.version }}..{{ release.version }}
+            {% endif -%}
+        {% endif -%}
+    {% else -%}
+        {% if release.previous.version -%}
+            [Unreleased]: https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
+                /compare/{{ release.previous.version }}..HEAD
+        {% else -%}
+            {% set first_commit = "4372390" %}
+            [Unreleased]: https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
+                /compare/{{ first_commit }}..HEAD
+        {% endif -%}
+    {% endif -%}
+{% endfor -%}
+
+[Semantic Versioning]: https://semver.org/spec/v2.0.0.html
+
+<!-- generated by git-cliff -->
+"""
+
+[workspace.metadata.git-cliff.git]
+
+# How to preprocess commit messages before injecting them into the template
+# context when making the `CHANGELOG.md`.
+commit_preprocessors = [
+    # remove issue numbers from commits
+    { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "" },
+]
+
+# How to parse and group commit messages.
+commit_parsers = [
+    { message = "^.*: add", group = "Added" },
+    { message = "^.*: support", group = "Added" },
+    { message = "^.*: remove", group = "Removed" },
+    { message = "^.*: delete", group = "Removed" },
+    { message = "^test", group = "Fixed" },
+    { message = "^fix", group = "Fixed" },
+    { message = "^.*: fix", group = "Fixed" },
+    { message = "^.*", group = "Changed" },
+]
+
+# Parse the commits based on https://www.conventionalcommits.org
+conventional_commits = true
+
+# Filter out the commits that are not conventional
+filter_unconventional = true
+
+# Process each line of a commit as an individual commit
+split_commits = false
+
+# Protect breaking changes from being skipped due to matching a skipping
+# commit_parser
+protect_breaking_commits = false
+
+# Filter out the commits that are not matched by commit parsers
+filter_commits = true
+
+# Regex for matching git tags
+tag_pattern = "v[0-9].*"
+
+# Configures GitHub integration, which lets `git-cliff` augments the
+# generated `CHANGELOG.md` with additional GitHub info.
+#
+# See: https://git-cliff.org/docs/integration/github
+[workspace.metadata.git-cliff.remote.github]
+
+# The GitHub owner and repo name.
+owner = "mitre"
+repo = "hipcheck"
+
+# This integration ALSO requires a GitHub token, which we expect to be
+# set with the `GITHUB_TOKEN` environment variable. This token needs
+# read permission for the repository, but nothing more.
