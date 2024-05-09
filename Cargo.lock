@@ -600,7 +600,7 @@ checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
 
 [[package]]
 name = "hipcheck"
-version = "3.1.0"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "chrono",
