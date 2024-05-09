@@ -1,11 +1,12 @@
 [package]
 name = "hipcheck"
 description = "Automatically assess and score software repositories for supply chain risk"
+readme = "../README.md"
 version = "3.2.0"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/mitre/hipcheck"
-include = ["src/**/*", "LICENSE.md", "README.md"]
+include = ["src/**/*", "../LICENSE.md", "../README.md"]
 
 [[bin]]
 name = "hc"
