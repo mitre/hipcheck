@@ -106,12 +106,15 @@ consolidate-commits = false
 
 [workspace.metadata.git-cliff.changelog]
 
-body = """
+header = """
 # Hipcheck Changelog
 
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+"""
+
+body = """
 {% if version -%}
     ## [{{ version | split(pat="-") | last | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else -%}
@@ -145,9 +148,31 @@ project adheres to [Semantic Versioning].
 
 {% if version %}
     {% if previous.version %}
-    **Full Changelog**: <{{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}>
+    __Full Changelog__: <{{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}>
     {% endif %}
 {% endif %}
+
+{% if version -%}
+    {% if previous.version -%}
+        [{{ version | split(pat="-") | last | trim_start_matches(pat="v") }}]: \
+            https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
+                /compare/{{ previous.version }}..{{ version }}
+    {% else -%}
+        {% set first_commit = "4372390" %}
+        [{{ version | split(pat="-") | last | trim_start_matches(pat="v") }}]: \
+            https://github.com/{{ remote.github.owner }}/{{remote.github.repo}}\
+                /compare/{{ first_commit }}..HEAD
+    {% endif -%}
+{% else -%}
+    {% if previous.version -%}
+        [Unreleased]: https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
+            /compare/{{ previous.version }}..HEAD
+    {% else -%}
+        {% set first_commit = "4372390" %}
+        [Unreleased]: https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
+            /compare/{{ first_commit }}..HEAD
+    {% endif -%}
+{% endif -%}
 
 {%- macro remote_url() -%}
   https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
@@ -159,31 +184,6 @@ project adheres to [Semantic Versioning].
 """
 
 footer = """
-{% for release in releases -%}
-    {% if release.version -%}
-        {% if release.previous -%}
-            {% if release.previous.version -%}
-                [{{ release.version | split(pat="-") | last | trim_start_matches(pat="v") }}]: \
-                    https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
-                        /compare/{{ release.previous.version }}..{{ release.version }}
-            {% endif -%}
-        {% else -%}
-            {% set first_commit = "4372390" %}
-            [{{ release.version }}]: https://github.com/{{ remote.github.owner }}/{{remote.github.repo}}\
-                /compare/{{ first_commit }}..HEAD
-        {% endif -%}
-    {% else -%}
-        {% if release.previous.version -%}
-            [Unreleased]: https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
-                /compare/{{ release.previous.version }}..HEAD
-        {% else -%}
-            {% set first_commit = "4372390" %}
-            [Unreleased]: https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
-                /compare/{{ first_commit }}..HEAD
-        {% endif -%}
-    {% endif -%}
-{% endfor -%}
-
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 """
 
@@ -232,6 +232,9 @@ filter_commits = true
 
 # Regex for matching git tags
 tag_pattern = "v[0-9].*"
+
+[workspace.metadata.git-cliff.bump]
+features_always_bump_minor = false
 
 # Configures GitHub integration, which lets `git-cliff` augments the
 # generated `CHANGELOG.md` with additional GitHub info.

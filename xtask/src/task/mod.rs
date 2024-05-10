@@ -2,5 +2,6 @@
 
 //! Commands supported by 'xtask'
 
+pub mod changelog;
+pub mod check;
 pub mod ci;
-pub mod validate;

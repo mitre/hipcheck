@@ -5,14 +5,13 @@
 use anyhow::anyhow;
 use anyhow::Error;
 use anyhow::Result;
-use duct::cmd;
-use std::io;
 use std::mem::drop;
 use std::ops::Not as _;
-use std::process::ExitCode;
+use xshell::cmd;
+use xshell::Shell;
 
 /// Helper type for tasks.
-type Task = (&'static str, fn() -> Result<()>);
+type Task = (&'static str, fn(&Shell) -> Result<()>);
 
 macro_rules! task {
 	($fn:ident) => {
@@ -21,7 +20,9 @@ macro_rules! task {
 }
 
 /// Execute the CI task.
-pub fn run() -> ExitCode {
+pub fn run() -> Result<()> {
+	let sh = Shell::new()?;
+
 	let tasks: &[Task] = &[
 		task!(check_using_stable),
 		task!(check_stable_is_current),
@@ -37,18 +38,18 @@ pub fn run() -> ExitCode {
 	];
 
 	for (name, task) in tasks {
-		if let Err(e) = task() {
+		if let Err(e) = task(&sh) {
 			log::error!("task: {}, error: {}", name, e);
 		}
 	}
 
-	ExitCode::SUCCESS
+	Ok(())
 }
 
 /// Check if the active toolchain is stable.
-fn check_using_stable() -> Result<()> {
+fn check_using_stable(sh: &Shell) -> Result<()> {
 	// Get the active toolchain.
-	let active_toolchain = cmd!("rustup", "show")
+	let active_toolchain = cmd!(sh, "rustup show")
 		.read()
 		.map_err(reason("call to rustup failed. Make sure rust is installed and path to home-dir-here/.cargo/bin is on your path."))?;
 
@@ -68,9 +69,9 @@ fn check_using_stable() -> Result<()> {
 }
 
 /// Check if the stable toolchain is up to date.
-fn check_stable_is_current() -> Result<()> {
+fn check_stable_is_current(sh: &Shell) -> Result<()> {
 	// Check the versions of the toolchains installed by rustup.
-	let results = cmd!("rustup", "check")
+	let results = cmd!(sh, "rustup check")
 		.read()
 		.map_err(reason("call to rustup failed. Make sure rust is installed and path to home-dir-here/.cargo/bin is on your path."))?;
 
@@ -90,9 +91,9 @@ fn check_stable_is_current() -> Result<()> {
 }
 
 /// Check if the target toolchain matches the CI toolchain.
-fn check_target_matches_ci() -> Result<()> {
+fn check_target_matches_ci(sh: &Shell) -> Result<()> {
 	// Get the toolchain info from rustup.
-	let results = cmd!("rustup", "show")
+	let results = cmd!(sh, "rustup show")
 		.read()
 		.map_err(reason("call to rustup failed. Make sure rust is installed and path to home-dir-here/.cargo/bin is on your path."))?;
 
@@ -119,61 +120,53 @@ fn check_target_matches_ci() -> Result<()> {
 }
 
 /// Print versions of the tools we use.
-fn print_versions() -> Result<()> {
+fn print_versions(sh: &Shell) -> Result<()> {
 	// Print versions of tools.
-	print_rustc_version()?;
-	print_cargo_version()?;
-	print_fmt_version()?;
-	print_clippy_version()?;
-	print_xtask_version()?;
+	print_rustc_version(sh)?;
+	print_cargo_version(sh)?;
+	print_fmt_version(sh)?;
+	print_clippy_version(sh)?;
+	print_xtask_version(sh)?;
 
 	Ok(())
 }
 
 /// Print the version of `rustc`.
-fn print_rustc_version() -> Result<()> {
-	cmd!("rustc", "--version")
+fn print_rustc_version(sh: &Shell) -> Result<()> {
+	cmd!(sh, "rustc --version")
 		.run()
 		.map(drop)
 		.map_err(reason("call to rustc failed. Make sure rust is installed and path to home-dir-here/.cargo/bin is on your path."))
 }
 
 /// Print the version of `cargo`.
-fn print_cargo_version() -> Result<()> {
-	cmd!("cargo", "--version")
+fn print_cargo_version(sh: &Shell) -> Result<()> {
+	cmd!(sh, "cargo --version")
 		.run()
 		.map(drop)
 		.map_err(reason("call to cargo failed. Make sure rust is installed and path to home-dir-here/.cargo/bin is on your path."))
 }
 
 /// Print the version of `cargo fmt`.
-fn print_fmt_version() -> Result<()> {
-	cmd!("cargo", "fmt", "--version")
+fn print_fmt_version(sh: &Shell) -> Result<()> {
+	cmd!(sh, "cargo fmt --version")
 		.run()
 		.map(drop)
 		.map_err(reason("call to cargo fmt failed. Make sure rust is installed and path to home-dir-here/.cargo/bin is on your path."))
 }
 
 /// Print the version of `cargo clippy`.
-fn print_clippy_version() -> Result<()> {
-	cmd!("cargo", "clippy", "--version")
+fn print_clippy_version(sh: &Shell) -> Result<()> {
+	cmd!(sh, "cargo clippy --version")
 		.run()
 		.map(drop)
 		.map_err(reason("call to cargo clippy failed. Make sure rust is installed and path to home-dir-here/.cargo/bin is on your path."))
 }
 
 /// Print the version of `cargo xtask`.
-fn print_xtask_version() -> Result<()> {
-	cmd!(
-		"cargo",
-		"run",
-		"--package",
-		"xtask",
-		"--bin",
-		"xtask",
-		"--quiet",
-		"--",
-		"--version"
+fn print_xtask_version(sh: &Shell) -> Result<()> {
+	cmd!(sh,
+		"cargo run --package xtask --bin xtask --quiet -- --version"
 	)
 	.run()
 	.map(drop)
@@ -181,8 +174,8 @@ fn print_xtask_version() -> Result<()> {
 }
 
 /// Run `cargo fmt`.
-fn run_fmt() -> Result<()> {
-	cmd!("cargo", "fmt", "--all", "--", "--color=always", "--check")
+fn run_fmt(sh: &Shell) -> Result<()> {
+	cmd!(sh, "cargo fmt --all -- --color=always --check")
 		.run()
 		.map(drop)
 		.map_err(reason(
@@ -192,31 +185,31 @@ fn run_fmt() -> Result<()> {
 }
 
 /// Run `cargo check`.
-fn run_check() -> Result<()> {
-	cmd!("cargo", "check", "--workspace", "--benches", "--tests")
+fn run_check(sh: &Shell) -> Result<()> {
+	cmd!(sh, "cargo check --workspace --benches --tests")
 		.run()
 		.map(drop)
 		.map_err(reason("call to cargo failed"))
 }
 
 /// Run `cargo build`.
-fn run_build() -> Result<()> {
-	cmd!("cargo", "build", "--bins", "--benches")
+fn run_build(sh: &Shell) -> Result<()> {
+	cmd!(sh, "cargo build --bins --benches")
 		.run()
 		.map(drop)
 		.map_err(reason("call to cargo failed"))
 }
 
 /// Run `cargo test`.
-fn run_test() -> Result<()> {
+fn run_test(sh: &Shell) -> Result<()> {
 	// Opportunistically use 'cargo-nextest' if present.
 	if which::which("cargo-nextest").is_ok() {
-		cmd!("cargo", "nextest", "run", "--workspace")
+		cmd!(sh, "cargo nextest run --workspace")
 			.run()
 			.map(drop)
 			.map_err(reason("call to cargo-nextest failed"))
 	} else {
-		cmd!("cargo", "test", "--workspace")
+		cmd!(sh, "cargo test --workspace")
 			.run()
 			.map(drop)
 			.map_err(reason("call to cargo failed"))
@@ -224,33 +217,18 @@ fn run_test() -> Result<()> {
 }
 
 /// Run `cargo clippy`.
-fn run_clippy() -> Result<()> {
-	cmd!(
-		"cargo",
-		"clippy",
-		"--workspace",
-		"--all-targets",
-		"--",
-		"-D",
-		"warnings"
-	)
-	.run()
-	.map(drop)
-	.map_err(reason("call to cargo clippy failed"))
+fn run_clippy(sh: &Shell) -> Result<()> {
+	cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings")
+		.run()
+		.map(drop)
+		.map_err(reason("call to cargo clippy failed"))
 }
 
 /// Run `cargo xtask validate`.
-fn run_xtask_validate() -> Result<()> {
+fn run_xtask_validate(sh: &Shell) -> Result<()> {
 	cmd!(
-		"cargo",
-		"run",
-		"--package",
-		"xtask",
-		"--bin",
-		"xtask",
-		"--quiet",
-		"--",
-		"validate"
+		sh,
+		"cargo run --package xtask --bin xtask --quiet -- validate"
 	)
 	.run()
 	.map(drop)
@@ -258,7 +236,7 @@ fn run_xtask_validate() -> Result<()> {
 }
 
 /// Tell the user we're done.
-fn done() -> Result<()> {
+fn done(_sh: &Shell) -> Result<()> {
 	log::info!(
 		"task: {}, message: All checks passed! You can expect to pass CI now.",
 		"Done"
@@ -267,6 +245,6 @@ fn done() -> Result<()> {
 }
 
 /// Replace an existing error with a new message.
-fn reason(msg: &'static str) -> impl FnOnce(io::Error) -> Error {
+fn reason(msg: &'static str) -> impl FnOnce(xshell::Error) -> Error {
 	move |_| anyhow!("{}", msg)
 }
