@@ -2,59 +2,51 @@
 
 //! A task to simulate a CI run locally.
 
-use crate::exit::EXIT_SUCCESS;
-use anyhow::anyhow as hc_error;
+use anyhow::anyhow;
 use anyhow::Error;
 use anyhow::Result;
 use duct::cmd;
 use std::io;
-use std::io::Stderr;
-use std::io::Stdout;
-use std::io::Write as _;
 use std::mem::drop;
 use std::ops::Not as _;
-use std::process::exit;
+use std::process::ExitCode;
 
-/// Execute the CI task.
-pub fn run() -> Result<()> {
-	let mut printer = Printer::new();
+/// Helper type for tasks.
+type Task = (&'static str, fn() -> Result<()>);
 
-	let actions = &[
-		check_using_stable,
-		check_stable_is_current,
-		check_target_matches_ci,
-		print_versions,
-		run_fmt,
-		run_check,
-		run_build,
-		run_test,
-		run_clippy,
-		run_xtask_validate,
-		done,
-	];
-
-	for action in actions {
-		action(&mut printer)?;
-	}
-
-	exit(EXIT_SUCCESS);
+macro_rules! task {
+	($fn:ident) => {
+		(stringify!($fn), $fn)
+	};
 }
 
-/// Convenience macro to writeln! with a flush.
-macro_rules! writelnf {
-    ($dst:expr $(,)?) => {{
-        write!($dst, "\n")?;
-		$dst.flush()
-	}};
-    ($dst:expr, $($arg:tt)*) => {{
-        $dst.write_fmt(format_args!($($arg)*))?;
-		write!($dst, "\n")?;
-		$dst.flush()
-	}};
+/// Execute the CI task.
+pub fn run() -> ExitCode {
+	let tasks: &[Task] = &[
+		task!(check_using_stable),
+		task!(check_stable_is_current),
+		task!(check_target_matches_ci),
+		task!(print_versions),
+		task!(run_fmt),
+		task!(run_check),
+		task!(run_build),
+		task!(run_test),
+		task!(run_clippy),
+		task!(run_xtask_validate),
+		task!(done),
+	];
+
+	for (name, task) in tasks {
+		if let Err(e) = task() {
+			log::error!("task: {}, error: {}", name, e);
+		}
+	}
+
+	ExitCode::SUCCESS
 }
 
 /// Check if the active toolchain is stable.
-fn check_using_stable(_printer: &mut Printer) -> Result<()> {
+fn check_using_stable() -> Result<()> {
 	// Get the active toolchain.
 	let active_toolchain = cmd!("rustup", "show")
 		.read()
@@ -67,7 +59,7 @@ fn check_using_stable(_printer: &mut Printer) -> Result<()> {
 
 	// If it isn't, issue an error.
 	if stable_is_default.not() {
-		return Err(hc_error!(
+		return Err(anyhow!(
 			"not using stable toolchain. Run 'rustup default stable'"
 		));
 	}
@@ -76,7 +68,7 @@ fn check_using_stable(_printer: &mut Printer) -> Result<()> {
 }
 
 /// Check if the stable toolchain is up to date.
-fn check_stable_is_current(_printer: &mut Printer) -> Result<()> {
+fn check_stable_is_current() -> Result<()> {
 	// Check the versions of the toolchains installed by rustup.
 	let results = cmd!("rustup", "check")
 		.read()
@@ -89,7 +81,7 @@ fn check_stable_is_current(_printer: &mut Printer) -> Result<()> {
 
 	// If it isn't, issue an error.
 	if stable_is_current.not() {
-		return Err(hc_error!(
+		return Err(anyhow!(
 			"stable toolchain is out of date. Run 'rustup update' to make current."
 		));
 	}
@@ -98,7 +90,7 @@ fn check_stable_is_current(_printer: &mut Printer) -> Result<()> {
 }
 
 /// Check if the target toolchain matches the CI toolchain.
-fn check_target_matches_ci(printer: &mut Printer) -> Result<()> {
+fn check_target_matches_ci() -> Result<()> {
 	// Get the toolchain info from rustup.
 	let results = cmd!("rustup", "show")
 		.read()
@@ -108,7 +100,7 @@ fn check_target_matches_ci(printer: &mut Printer) -> Result<()> {
 	let toolchain = results
 		.lines()
 		.find(|l| l.contains("Default host: "))
-		.ok_or_else(|| hc_error!("missing default host from rustup"))?
+		.ok_or_else(|| anyhow!("missing default host from rustup"))?
 		.replace("Default host: ", "");
 
 	// The toolchain used in CI.
@@ -116,25 +108,18 @@ fn check_target_matches_ci(printer: &mut Printer) -> Result<()> {
 
 	// Warn if they're different.
 	if toolchain != ci_toolchain {
-		writelnf!(
-			printer.err,
-			"warn: CI toolchain is {}, current host is {}.",
+		log::error!(
+			"CI and host toolchains don't match! CI toolchain is {}, current host is {}",
 			ci_toolchain,
 			toolchain
-		)?;
-		writelnf!(
-			printer.err,
-			"      Differences may arise because of platform-specific code. Consider running 'rustup default stable'."
-		)?;
+		);
 	}
 
 	Ok(())
 }
 
 /// Print versions of the tools we use.
-fn print_versions(printer: &mut Printer) -> Result<()> {
-	printer.header("Versions")?;
-
+fn print_versions() -> Result<()> {
 	// Print versions of tools.
 	print_rustc_version()?;
 	print_cargo_version()?;
@@ -196,9 +181,7 @@ fn print_xtask_version() -> Result<()> {
 }
 
 /// Run `cargo fmt`.
-fn run_fmt(printer: &mut Printer) -> Result<()> {
-	printer.header("cargo fmt")?;
-
+fn run_fmt() -> Result<()> {
 	cmd!("cargo", "fmt", "--all", "--", "--color=always", "--check")
 		.run()
 		.map(drop)
@@ -209,9 +192,7 @@ fn run_fmt(printer: &mut Printer) -> Result<()> {
 }
 
 /// Run `cargo check`.
-fn run_check(printer: &mut Printer) -> Result<()> {
-	printer.header("cargo check")?;
-
+fn run_check() -> Result<()> {
 	cmd!("cargo", "check", "--workspace", "--benches", "--tests")
 		.run()
 		.map(drop)
@@ -219,9 +200,7 @@ fn run_check(printer: &mut Printer) -> Result<()> {
 }
 
 /// Run `cargo build`.
-fn run_build(printer: &mut Printer) -> Result<()> {
-	printer.header("cargo build")?;
-
+fn run_build() -> Result<()> {
 	cmd!("cargo", "build", "--bins", "--benches")
 		.run()
 		.map(drop)
@@ -229,19 +208,23 @@ fn run_build(printer: &mut Printer) -> Result<()> {
 }
 
 /// Run `cargo test`.
-fn run_test(printer: &mut Printer) -> Result<()> {
-	printer.header("cargo test")?;
-
-	cmd!("cargo", "test", "--workspace")
-		.run()
-		.map(drop)
-		.map_err(reason("call to cargo failed"))
+fn run_test() -> Result<()> {
+	// Opportunistically use 'cargo-nextest' if present.
+	if which::which("cargo-nextest").is_ok() {
+		cmd!("cargo", "nextest", "run", "--workspace")
+			.run()
+			.map(drop)
+			.map_err(reason("call to cargo-nextest failed"))
+	} else {
+		cmd!("cargo", "test", "--workspace")
+			.run()
+			.map(drop)
+			.map_err(reason("call to cargo failed"))
+	}
 }
 
 /// Run `cargo clippy`.
-fn run_clippy(printer: &mut Printer) -> Result<()> {
-	printer.header("cargo clippy")?;
-
+fn run_clippy() -> Result<()> {
 	cmd!(
 		"cargo",
 		"clippy",
@@ -257,9 +240,7 @@ fn run_clippy(printer: &mut Printer) -> Result<()> {
 }
 
 /// Run `cargo xtask validate`.
-fn run_xtask_validate(printer: &mut Printer) -> Result<()> {
-	printer.header("cargo xtask validate")?;
-
+fn run_xtask_validate() -> Result<()> {
 	cmd!(
 		"cargo",
 		"run",
@@ -277,42 +258,15 @@ fn run_xtask_validate(printer: &mut Printer) -> Result<()> {
 }
 
 /// Tell the user we're done.
-fn done(printer: &mut Printer) -> Result<()> {
-	printer.header("Done")?;
-	println!("All checks passed! You can expect to pass CI now.");
+fn done() -> Result<()> {
+	log::info!(
+		"task: {}, message: All checks passed! You can expect to pass CI now.",
+		"Done"
+	);
 	Ok(())
-}
-
-/// Holds access to stdout and stderr.
-pub struct Printer {
-	/// Handle for stdout.
-	out: Stdout,
-	/// Handle for stderr.
-	err: Stderr,
-}
-
-impl Printer {
-	/// Construct a new `Printer`.
-	pub fn new() -> Printer {
-		Self {
-			out: io::stdout(),
-			err: io::stderr(),
-		}
-	}
-
-	/// Print the header for a section.
-	pub fn header(&mut self, msg: &str) -> Result<()> {
-		let mut out = self.out.lock();
-		writelnf!(out)?;
-		writelnf!(out, "{:=<78}", "=")?;
-		writelnf!(out, "{}", msg)?;
-		writelnf!(out, "{:-<78}", "-")?;
-		writelnf!(out)?;
-		Ok(())
-	}
 }
 
 /// Replace an existing error with a new message.
 fn reason(msg: &'static str) -> impl FnOnce(io::Error) -> Error {
-	move |_| hc_error!("{}", msg)
+	move |_| anyhow!("{}", msg)
 }

@@ -2,10 +2,8 @@
 
 //! Validate the configuration of all Hipcheck crates.
 
-use crate::exit::EXIT_FAILURE;
-use crate::exit::EXIT_SUCCESS;
 use crate::workspace;
-use anyhow::anyhow as hc_error;
+use anyhow::anyhow;
 use anyhow::Context as _;
 use anyhow::Result;
 use glob::glob;
@@ -24,14 +22,27 @@ use std::io::BufReader;
 use std::ops::Not as _;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::exit;
+use std::process::ExitCode;
 
 /// Print list of validation failures for crates in the workspace.
-pub fn run() -> Result<()> {
+pub fn run() -> ExitCode {
+	if let Err(e) = inner() {
+		log::error!("{}", e);
+		return ExitCode::FAILURE;
+	}
+
+	ExitCode::SUCCESS
+}
+
+fn inner() -> Result<()> {
+	log::info!("beginning validation");
+
 	let workspace = Workspace::resolve()?;
 	let findings = Findings::for_workspace(&workspace);
 	findings.report()?;
-	exit(findings.exit_code());
+
+	log::info!("all checks passed!");
+	Ok(())
 }
 
 /// Set of crate findings.
@@ -110,53 +121,50 @@ impl<'work> Findings<'work> {
 		}
 	}
 
-	/// Report the findings to stdout.
+	/// Report the findings.
 	fn report(&self) -> Result<()> {
-		// Print all the findings.
 		for (krate, findings) in &self.crate_findings {
 			let krate_path = krate.path.strip_prefix(&self.workspace.root)?;
-			println!("crate: {} ({})", krate.name, krate_path.display());
-
 			for finding in findings.iter() {
-				println!("\t{:?}: {}", finding, finding);
+				log::error!(
+					"crate: {}, crate_path: {}, name: {:?}, desc: {}",
+					krate.name,
+					krate_path.display(),
+					finding,
+					finding
+				);
 			}
-
-			println!();
 		}
 
 		for (config, findings) in &self.config_findings {
 			let config_path = config.strip_prefix(&self.workspace.root)?;
-			println!("config: {}", config_path.display());
 
 			for finding in findings.iter() {
-				println!("\t{:?}: {}", finding, finding);
+				log::error!(
+					"config_path: {}, name: {:?}, desc: {}",
+					config_path.display(),
+					finding,
+					finding
+				);
 			}
-
-			println!();
 		}
 
 		for (krate, findings) in &self.source_findings {
 			let krate_path = krate.path.strip_prefix(&self.workspace.root)?;
-			println!("crate: {} ({})", krate.name, krate_path.display());
-
 			for (file, finding) in findings.iter() {
 				let source_path = file.strip_prefix(&self.workspace.root)?;
-				println!("\t{}: {:?}: {}", source_path.display(), finding, finding);
+				log::error!(
+					"crate: {}, crate_path: {}, source: {}, name: {:?}, desc: {}",
+					krate.name,
+					krate_path.display(),
+					source_path.display(),
+					finding,
+					finding
+				);
 			}
-
-			println!();
 		}
 
 		Ok(())
-	}
-
-	/// Get an exit code based on whether there were findings.
-	fn exit_code(&self) -> i32 {
-		if self.crate_findings.is_empty() {
-			EXIT_SUCCESS
-		} else {
-			EXIT_FAILURE
-		}
 	}
 }
 
@@ -169,8 +177,6 @@ enum CrateIssues {
 	LicensePresent,
 	/// The license config in the manifest is invalid.
 	LicenseInvalid,
-	/// The crate permits publishing.
-	PermitsPublish,
 	/// Crate is using an edition other than 2021.
 	Not2021Edition,
 }
@@ -183,7 +189,6 @@ impl Display for CrateIssues {
 			HasAuthors => "must not have an authors field in 'Cargo.toml'",
 			LicensePresent => "must not have a 'LICENSE.md' file",
 			LicenseInvalid => "license must be set to `'Apache-2.0'`",
-			PermitsPublish => "publishing must be disabled with 'publish = false' in 'Cargo.toml'",
 			Not2021Edition => "edition must be set to '2021' in 'Cargo.toml'",
 		};
 
@@ -222,22 +227,28 @@ fn validate_crate(krate: &Crate) -> CrateFindingsSet {
 
 	let mut findings = BTreeSet::new();
 
+	log::info!("validating crate '{}' doesn't specify authors", krate.name);
 	if crate_has_authors(krate) {
 		findings.insert(HasAuthors);
 	}
 
+	log::info!(
+		"validating crate '{}' doesn't specify license_file",
+		krate.name
+	);
 	if crate_license_file_present(krate) {
 		findings.insert(LicensePresent);
 	}
 
+	log::info!(
+		"validating crate '{}' specifies the correct license",
+		krate.name
+	);
 	if crate_license_invalid(krate) {
 		findings.insert(LicenseInvalid);
 	}
 
-	if crate_permits_publish(krate) {
-		findings.insert(PermitsPublish);
-	}
-
+	log::info!("validating crate '{}' uses the correct edition", krate.name);
 	if crate_uses_wrong_edition(krate) {
 		findings.insert(Not2021Edition);
 	}
@@ -273,17 +284,13 @@ fn crate_uses_wrong_edition(krate: &Crate) -> bool {
 		.unwrap_or(true)
 }
 
-/// Check if the crate is missing a 'publish = false' field.
-fn crate_permits_publish(krate: &Crate) -> bool {
-	matches!(krate.manifest.package.publish, Some(false)).not()
-}
-
 /// Perform validation of a configuration file, producing findings.
 fn validate_config(config: &Path) -> ConfigFindingsSet {
 	use ConfigIssues::*;
 
 	let mut findings = BTreeSet::new();
 
+	log::info!("validating config file '{}' syntax", config.display());
 	if let Err(msg) = config_syntax_invalid(config) {
 		findings.insert(InvalidSyntax(msg));
 	}
@@ -334,13 +341,16 @@ fn validate_sources(krate: &Crate) -> SourceFindingsSet {
 	for path_result in globber {
 		match path_result {
 			Ok(path) => {
+				log::info!(
+					"validating source file '{}' includes an SPDX license comment",
+					path.display()
+				);
 				if source_missing_license_comment(&path) {
 					findings.push((path, SourceIssues::MissingLicenseComment));
 				}
 			}
 			Err(e) => {
-				// Warn and continue onward.
-				eprintln!(
+				log::warn!(
 					"warn: failed to check glob against path: {}",
 					e.path().display()
 				);
@@ -410,8 +420,6 @@ pub struct Crate {
 	name: String,
 	/// The path to the crate
 	path: PathBuf,
-	/// What kind of crate we're talking about. Named with '_' to solve clippy error.
-	_kind: CrateKind,
 	/// Data from the crate manifest ('Cargo.toml')
 	manifest: CrateManifest,
 	/// The path to the license file, which may or may not be present.
@@ -423,12 +431,9 @@ impl Crate {
 	fn at_path(path: PathBuf) -> Result<Crate> {
 		let name = path
 			.file_name()
-			.ok_or_else(|| hc_error!("missing crate name"))?
+			.ok_or_else(|| anyhow!("missing crate name"))?
 			.to_string_lossy()
 			.into_owned();
-
-		//Named with _ to solve clippy error
-		let _kind = CrateKind::at_path(&path)?;
 
 		let manifest = {
 			let manifest_path = pathbuf![&path, "Cargo.toml"];
@@ -440,39 +445,9 @@ impl Crate {
 		Ok(Crate {
 			name,
 			path,
-			_kind,
 			manifest,
 			license_path,
 		})
-	}
-}
-
-/// The three kinds of crate we have.
-#[derive(Debug)]
-enum CrateKind {
-	/// An internal library.
-	Lib,
-	/// An external tool.
-	Tool,
-	/// An internal dev tool.
-	Task,
-}
-
-impl CrateKind {
-	/// Identify the kind of crate based on the path.
-	fn at_path(path: &Path) -> Result<CrateKind> {
-		let kind = path
-			.file_name()
-			.ok_or_else(|| hc_error!("invalid path for crate kind"))?
-			.to_string_lossy()
-			.into_owned();
-
-		match kind.as_ref() {
-			"hipcheck" => Ok(CrateKind::Tool),
-			"xtask" => Ok(CrateKind::Task),
-			_ if path.parent().map(|p| p.ends_with("libs")).unwrap_or(false) => Ok(CrateKind::Lib),
-			_ => Err(hc_error!("unknown crate kind '{}'", kind)),
-		}
 	}
 }
 
@@ -521,8 +496,6 @@ struct CrateManifest {
 struct CrateManifestPackage {
 	/// The author information.
 	authors: Option<Vec<String>>,
-	/// The publishing setting.
-	publish: Option<bool>,
 	/// The license of the crate.
 	license: Option<String>,
 	/// The edition of Rust that the crate uses.
