@@ -5,6 +5,7 @@ use anyhow::Result;
 use std::path::Path;
 use std::path::PathBuf;
 
+/// Get the root directory of the workspace.
 pub fn root() -> Result<PathBuf> {
 	Path::new(&env!("CARGO_MANIFEST_DIR"))
 		.ancestors()

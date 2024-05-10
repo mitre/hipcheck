@@ -22,19 +22,9 @@ use std::io::BufReader;
 use std::ops::Not as _;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::ExitCode;
 
 /// Print list of validation failures for crates in the workspace.
-pub fn run() -> ExitCode {
-	if let Err(e) = inner() {
-		log::error!("{}", e);
-		return ExitCode::FAILURE;
-	}
-
-	ExitCode::SUCCESS
-}
-
-fn inner() -> Result<()> {
+pub fn run() -> Result<()> {
 	log::info!("beginning validation");
 
 	let workspace = Workspace::resolve()?;
