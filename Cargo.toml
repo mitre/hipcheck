@@ -19,40 +19,53 @@ members = ["hipcheck", "xtask"]
 # See `.cargo/config.toml` for how this is done.
 default-members = ["hipcheck"]
 
-
-#============================================================================
-# `cargo-dist` Configuration
-#
-# We use `cargo-dist` to automate building and publishing prebuilt binaries
-# for Hipcheck releases. It runs in CI on GitHub Actions and is triggered
-# by pushing new release tags with `cargo-release`.
-#----------------------------------------------------------------------------
-
+# Config for 'cargo dist'
 [workspace.metadata.dist]
-
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.13.3"
-
+cargo-dist-version = "0.14.1"
 # CI backends to support
-ci = ["github"]
-
+ci = "github"
 # The installers to generate for each app
 installers = ["shell", "powershell"]
-
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = [
+    #------------------------------------------------------------------------
+    # macOS Targets
+
+    # Arm64 macOS
     "aarch64-apple-darwin",
+    # x64 macOS
     "x86_64-apple-darwin",
+
+    #------------------------------------------------------------------------
+    # Linux Targets
+
+    # x64 Linux (glibc)
     "x86_64-unknown-linux-gnu",
+    # Arm64 Linux (glibc)
+    "aarch64-unknown-linux-gnu",
+    # x64 Linux (musl libc)
     "x86_64-unknown-linux-musl",
+    # Arm64 Linux (musl libc)
+    "aarch64-unknown-linux-musl",
+
+    #------------------------------------------------------------------------
+    # Windows Targets
+
+    # x64 Windows with the MSVC toolchain
     "x86_64-pc-windows-msvc",
 ]
-
 # Publish jobs to run in CI
 pr-run-mode = "plan"
-
 # Whether to install an updater program
 install-updater = true
+
+[workspace.metadata.dist.dependencies.apt]
+# Just grab the latest version of OpenSSL for Ubuntu.
+# This is required for `musl` builds, which want to statically link to
+# OpenSSL. Note that even for `musl` builds `cargo-dist` is using
+# Ubuntu and not Alpine or something else.
+libssl-dev = "*"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]
