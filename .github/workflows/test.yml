@@ -3,8 +3,18 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'config/**'
+      - 'hipcheck/**'
+      - 'scripts/**'
+      - 'xtask/**'
   pull_request:
     branches: [main]
+    paths:
+      - 'config/**'
+      - 'hipcheck/**'
+      - 'scripts/**'
+      - 'xtask/**'
 
 permissions:
   contents: read
