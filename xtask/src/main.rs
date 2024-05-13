@@ -84,6 +84,9 @@ struct NewRfdArgs {
 	/// The ID number to use for the RFD; inferred by default
 	#[arg(short = 'n', long = "number")]
 	number: Option<u16>,
+
+	/// The title to give the RFD
+	title: String,
 }
 
 #[cfg(test)]
