@@ -23,6 +23,7 @@ fn main() -> ExitCode {
 		Commands::Check => task::check::run(),
 		Commands::Ci => task::ci::run(),
 		Commands::Changelog(args) => task::changelog::run(args),
+		Commands::Rfd(args) => task::rfd::run(args),
 	};
 
 	match result {
@@ -47,19 +48,45 @@ struct Args {
 
 #[derive(Debug, clap::Subcommand)]
 enum Commands {
-	/// Run a variety of quality checks.
+	/// Run a variety of quality checks
 	Check,
-	/// Simulate a CI run locally.
+	/// Simulate a CI run locally
 	Ci,
 	/// Generate a draft CHANGELOG
 	Changelog(ChangelogArgs),
+	/// Interact with Hipcheck RFDs
+	Rfd(RfdArgs),
 }
 
 #[derive(Debug, clap::Args)]
-pub struct ChangelogArgs {
+struct ChangelogArgs {
 	/// Whether to bump the version, else new commits are "unreleased"
 	#[clap(short = 'b', long = "bump")]
 	bump: bool,
+}
+
+#[derive(Debug, clap::Args)]
+struct RfdArgs {
+	#[clap(subcommand)]
+	command: RfdCommand,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum RfdCommand {
+	/// List existing RFDs
+	List,
+	/// Create a new RFD
+	New(NewRfdArgs),
+}
+
+#[derive(Debug, clap::Args)]
+struct NewRfdArgs {
+	/// The ID number to use for the RFD; inferred by default
+	#[arg(short = 'n', long = "number")]
+	number: Option<u16>,
+
+	/// The title to give the RFD
+	title: String,
 }
 
 #[cfg(test)]

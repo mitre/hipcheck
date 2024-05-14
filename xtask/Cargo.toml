@@ -18,3 +18,4 @@ serde = { version = "1.0.133", features = ["derive"] }
 toml = "0.8.12"
 xshell = "0.2.6"
 which = "6.0.1"
+convert_case = "0.6.0"
