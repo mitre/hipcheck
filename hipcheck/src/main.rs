@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod analysis;
+mod cli;
 mod command_util;
 mod config;
 mod context;
@@ -29,6 +30,7 @@ use crate::analysis::session::resolve_home;
 use crate::analysis::session::Check;
 use crate::analysis::session::CheckType;
 use crate::analysis::session::Session;
+use crate::cli::Commands;
 use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
@@ -41,6 +43,10 @@ use crate::util::iter::TryFilter;
 use clap::Arg;
 use clap::ArgAction;
 use clap::Command;
+use clap::Parser as _;
+use cli::CheckCommand;
+use cli::HelpArgs;
+use cli::HelpCommand;
 use env_logger::Builder;
 use env_logger::Env;
 use schemars::schema_for;
@@ -81,7 +87,7 @@ fn init_log() {
 
 fn go() -> Outcome {
 	// Get the source specifier and output directory from the user.
-	let args = match Args::from_env().context("argument parsing failed") {
+	let args = match CliArgs::from_env().context("argument parsing failed") {
 		Ok(args) => args,
 		Err(e) => {
 			print_error(&e);
@@ -132,7 +138,7 @@ fn go() -> Outcome {
 }
 
 /// The arguments passed to the program from the CLI.
-struct Args {
+struct CliArgs {
 	/// The path to the configuration file.
 	config_path: Option<PathBuf>,
 
@@ -155,9 +161,11 @@ struct Args {
 	format: Format,
 }
 
-impl Args {
+impl CliArgs {
 	/// Pull arguments from the environment, potentially exiting with a help or version message.
-	fn from_env() -> Result<Args> {
+	fn from_env() -> Result<CliArgs> {
+		let args = cli::Args::parse();
+
 		let matches = Command::new("Hipcheck")
 			.about("Automatically assess and score git repositories for risk.")
 			.version(get_version())
@@ -348,54 +356,89 @@ impl Args {
 			)
 			.get_matches();
 
-		if matches.get_flag("extra_help") {
+		if args.extra_help {
 			print_help();
 		}
 
-		if matches.get_flag("version") {
+		if args.version {
 			print_version();
 		}
 
-		let verbosity = Verbosity::from(matches.get_flag("verbosity"));
+		let verbosity = Verbosity::from(args.verbosity);
 
 		let home_dir = {
-			let path: Option<&String> = matches.get_one("home");
+			let path: Option<&String> = args.home.as_ref();
 			path.map(PathBuf::from)
 		};
 
-		if matches.get_flag("print home") {
+		if args.print_home {
 			print_home(home_dir.as_deref());
 		}
 
 		// PANIC: Optional but has a default value, so unwrap() should never panic.
 		let color_choice = {
-			let color: &String = matches.get_one("color").unwrap();
+			let color: &String = &args.color.unwrap();
 			ColorChoice::from_str(color).unwrap()
 		};
 
 		let config_path = {
-			let config: Option<&String> = matches.get_one("config");
+			let config: Option<&String> = args.config.as_ref();
 			config.map(PathBuf::from)
 		};
 
-		if matches.get_flag("print config") {
+		if args.print_config {
 			print_config(config_path.as_deref());
 		}
 
 		let data_path = {
-			let data: Option<&String> = matches.get_one("data");
+			let data: Option<&String> = args.data.as_ref();
 			data.map(PathBuf::from)
 		};
 
-		if matches.get_flag("print data") {
+		if args.print_data {
 			print_data(data_path.as_deref());
 		}
 
-		let format = Format::use_json(matches.get_flag("json"));
+		let format = Format::use_json(args.json);
 
 		// initialized later when the "check" subcommand is called
 		let check;
 
+		match args.command {
+			Commands::Help(args) => {
+				match args.command {
+					None => print_help(),
+					Some(HelpCommand::Check) => print_check_help(),
+					Some(HelpCommand::Schema) => print_schema_help(),
+				}
+			},
+			Commands::Check(args) => {
+				if sub_args.extra_help {
+					print_check_help();
+				}
+				match args.command {
+					None => print_check_help(),
+					Some(CheckCommand::Maven(args)) => {
+						check = Check {
+							check_type: CheckType::PackageVersion,
+							check_value: OsString::from(args.package),
+							parent_command_value: MAVEN.to_string(),
+						}
+					}
+					Some(CheckCommand::Npm(args)) => {
+						check = Check {
+							check_type: CheckType::PackageVersion,
+							check_value: OsString::from(args.package),
+							parent_command_value: MAVEN.to_string(),
+						}
+					}
+				}
+			},
+			Commands::Schema(sub_args) => {
+
+			},
+		}
+		
 		match matches.subcommand().unwrap() {
 			("help", sub_help) => {
 				match sub_help.subcommand_name() {
@@ -513,7 +556,7 @@ impl Args {
 			_ => print_help(),
 		}
 
-		Ok(Args {
+		Ok(CliArgs {
 			config_path,
 			data_path,
 			home_dir,
