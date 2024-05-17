@@ -90,7 +90,7 @@ $ curl https://raw.githubusercontent.com/mitre/hipcheck/main/install.sh | bash
 This will ask you to export pre-defined values for the `HC_CONFIG` and `HC_DATA`
 environment variables on which Hipcheck relies.
 
-### Build from Source
+#### Build from Source
 
 Get the Hipcheck repository. Then navigate into the root directory of
 the repository and run `cargo install --path hipcheck`.
