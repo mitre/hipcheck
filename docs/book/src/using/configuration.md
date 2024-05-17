@@ -5,7 +5,7 @@
 
 ## Hipcheck Configuration Order of Operations
 
-Order of prescedence generally is based on Command Line Interface Guidelines at https://clig.dev/#configuration
+Order of precedence generally is based on Command Line Interface Guidelines at https://clig.dev/#configuration
 1. commandline flags, e.g. `hc --config config/ check repo https://github.com/facebook/react`
 2. sytem environment variables
 3. a .env file in hipcheck root
@@ -64,7 +64,7 @@ Order of prescedence generally is based on Command Line Interface Guidelines at 
 
 ### HC_LOG, e.g. HC_LOG=debug,salsa=off
 * Configures what should be logged
-* Can be set from command line as env 
+* Can be set from command line as env
 * Can be set with HC_LOG in system env or .env file
 
 ### HC_LOG_STYLE, e.g. HC_LOG_STYLE=always
