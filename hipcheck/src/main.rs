@@ -40,13 +40,10 @@ use crate::shell::Shell;
 use crate::shell::Verbosity;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
-use clap::Arg;
-use clap::ArgAction;
-use clap::Command;
 use clap::Parser as _;
 use cli::CheckCommand;
-use cli::HelpArgs;
 use cli::HelpCommand;
+use cli::SchemaCommand;
 use env_logger::Builder;
 use env_logger::Env;
 use schemars::schema_for;
@@ -166,196 +163,6 @@ impl CliArgs {
 	fn from_env() -> Result<CliArgs> {
 		let args = cli::Args::parse();
 
-		let matches = Command::new("Hipcheck")
-			.about("Automatically assess and score git repositories for risk.")
-			.version(get_version())
-			.disable_help_flag(true)
-			.disable_version_flag(true)
-			.subcommand(
-				Command::new("help")
-					.subcommand(Command::new("check"))
-					.subcommand(Command::new("schema")),
-			)
-			.arg(
-				Arg::new("extra_help")
-					.short('h')
-					.long("help")
-					.help("print help text")
-					.action(ArgAction::SetTrue),
-			)
-			.arg(
-				Arg::new("version")
-					.short('V')
-					.long("version")
-					.help("print version information")
-					.action(ArgAction::SetTrue)
-					.global(true),
-			)
-			.subcommand(
-				Command::new("schema")
-					.disable_help_subcommand(true)
-					.arg(
-						Arg::new("extra_help")
-							.short('h')
-							.long("help")
-							.help("print help text")
-							.action(ArgAction::SetTrue)
-							.global(true),
-					)
-					.subcommand(Command::new(MAVEN))
-					.subcommand(Command::new(NPM))
-					.subcommand(Command::new(PATCH))
-					.subcommand(Command::new(PYPI))
-					.subcommand(Command::new(REPO))
-					.subcommand(Command::new(REQUEST)),
-			)
-			.arg(
-				Arg::new("print home")
-					.long("print-home")
-					.help("print the home directory for Hipcheck")
-					.action(ArgAction::SetTrue)
-					.global(true),
-			)
-			.arg(
-				Arg::new("print config")
-					.long("print-config")
-					.help("print the config file path for Hipcheck")
-					.action(ArgAction::SetTrue)
-					.global(true),
-			)
-			.arg(
-				Arg::new("print data")
-					.long("print-data")
-					.help("print the data folder path for Hipcheck")
-					.action(ArgAction::SetTrue)
-					.global(true),
-			)
-			.arg(
-				Arg::new("verbosity")
-					.short('q')
-					.long("quiet")
-					.help("silence progress reporting")
-					.action(ArgAction::SetTrue)
-					.global(true),
-			)
-			.arg(
-				Arg::new("color")
-					.short('k')
-					.long("color")
-					.value_name("COLOR")
-					.help("set output coloring ('always', 'never', or 'auto')")
-					// Defaults to "auto"
-					.default_value("auto")
-					.global(true),
-			)
-			.arg(
-				Arg::new("config")
-					.short('c')
-					.long("config")
-					.value_name("FILE")
-					.help("path to the configuration file")
-					.global(true),
-			)
-			.arg(
-				Arg::new("data")
-					.short('d')
-					.long("data")
-					.value_name("FILE")
-					.help("path to the data folder")
-					.global(true),
-			)
-			.arg(
-				Arg::new("home")
-					.short('H')
-					.long("home")
-					.value_name("FILE")
-					.help("path to the hipcheck home")
-					.global(true),
-			)
-			.arg(
-				Arg::new("json")
-					.short('j')
-					.long("json")
-					.help("output results in JSON format")
-					.action(ArgAction::SetTrue)
-					.global(true),
-			)
-			.subcommand(
-				Command::new("check")
-					.disable_help_subcommand(true)
-					.arg(
-						Arg::new("extra_help")
-							.short('h')
-							.long("help")
-							.help("print help text")
-							.global(true),
-					)
-					.subcommand(
-						Command::new(REPO).arg(
-							Arg::new("source")
-								.value_name("SOURCE")
-								.help("repository to analyze; can be a local path or a URI")
-								.index(1)
-								.required(true),
-						),
-					)
-					.subcommand(
-						Command::new(REQUEST).arg(
-							Arg::new("PR/MR URI")
-								.value_name("PR/MR URI")
-								.help("URI of pull/merge request to analyze")
-								.index(1)
-								.required(true),
-						),
-					)
-					.subcommand(
-						Command::new(MAVEN).arg(
-							Arg::new("PACKAGE")
-								.value_name("PACKAGE")
-								.help("maven package uri to analyze")
-								.index(1)
-								.required(true),
-						),
-					)
-					.subcommand(
-						Command::new(NPM).arg(
-							Arg::new("PACKAGE")
-								.value_name("PACKAGE")
-								.help("npm package uri or package[@<optional version>] to analyze")
-								.index(1)
-								.required(true),
-						),
-					)
-					.subcommand(
-						Command::new(PATCH).arg(
-							Arg::new("patch file URI")
-								.value_name("PATCH FILE URI")
-								.help("URI of git patch to analyze")
-								.index(1)
-								.required(true),
-						),
-					)
-					.subcommand(
-						Command::new(PYPI).arg(
-							Arg::new("PACKAGE")
-								.value_name("PACKAGE")
-								.help("pypi package uri or package[@<optional version>] to analyze")
-								.index(1)
-								.required(true),
-						),
-					)
-					.subcommand(
-						Command::new("spdx").arg(
-							Arg::new("filepath")
-								.value_name("FILEPATH")
-								.help("SPDX document to analyze")
-								.index(1)
-								.required(true),
-						),
-					),
-			)
-			.get_matches();
-
 		if args.extra_help {
 			print_help();
 		}
@@ -405,155 +212,83 @@ impl CliArgs {
 		let check;
 
 		match args.command {
-			Commands::Help(args) => {
-				match args.command {
-					None => print_help(),
-					Some(HelpCommand::Check) => print_check_help(),
-					Some(HelpCommand::Schema) => print_schema_help(),
-				}
+			Some(Commands::Help(args)) => match args.command {
+				None => print_help(),
+				Some(HelpCommand::Check) => print_check_help(),
+				Some(HelpCommand::Schema) => print_schema_help(),
 			},
-			Commands::Check(args) => {
-				if sub_args.extra_help {
+			Some(Commands::Check(args)) => {
+				if args.extra_help {
 					print_check_help();
 				}
 				match args.command {
-					None => print_check_help(),
 					Some(CheckCommand::Maven(args)) => {
 						check = Check {
 							check_type: CheckType::PackageVersion,
 							check_value: OsString::from(args.package),
 							parent_command_value: MAVEN.to_string(),
 						}
-					}
+					},
 					Some(CheckCommand::Npm(args)) => {
 						check = Check {
 							check_type: CheckType::PackageVersion,
 							check_value: OsString::from(args.package),
-							parent_command_value: MAVEN.to_string(),
+							parent_command_value: NPM.to_string(),
 						}
-					}
-				}
-			},
-			Commands::Schema(sub_args) => {
-
-			},
-		}
-		
-		match matches.subcommand().unwrap() {
-			("help", sub_help) => {
-				match sub_help.subcommand_name() {
-					None => print_help(),
-					Some("schema") => print_schema_help(),
-					Some("check") => print_check_help(),
-					_ => print_help(),
-				};
-			}
-			("schema", sub_schema) => {
-				if sub_schema.get_flag("extra_help") {
-					print_schema_help();
-				}
-				match sub_schema.subcommand_name() {
-					Some(REPO) => print_report_schema(),
-					Some(REQUEST) => print_request_schema(),
-					Some(PATCH) => print_patch_schema(),
-					Some(NPM) => print_npm_schema(),
-					Some(MAVEN) => print_maven_schema(),
-					Some(PYPI) => print_pypi_schema(),
-					_ => print_schema_help(),
-				}
-			}
-			("check", sub_check) => {
-				if sub_check.get_flag("extra_help") {
-					print_check_help();
-				}
-				match sub_check.subcommand().unwrap() {
-					(REPO, repo_source) => {
+					},
+					Some(CheckCommand::Patch(args)) => {
+						check = Check {
+							check_type: CheckType::PatchUri,
+							check_value: OsString::from(args.patch_file_uri),
+							parent_command_value: PATCH.to_string(),
+						}
+					},
+					Some(CheckCommand::Pypi(args)) => {
+						check = Check {
+							check_type: CheckType::PackageVersion,
+							check_value: OsString::from(args.package),
+							parent_command_value: PYPI.to_string(),
+						}
+					},
+					Some(CheckCommand::Repo(args)) => {
 						check = Check {
 							check_type: CheckType::RepoSource,
-							check_value: OsString::from(
-								repo_source
-									.get_one::<String>("source")
-									.ok_or_else(|| hc_error!("missing SOURCE in arguments"))?,
-							),
+							check_value: OsString::from(args.source),
 							parent_command_value: REPO.to_string(),
-						};
-					}
-					(REQUEST, request_uri) => {
+						}
+					},
+					Some(CheckCommand::Request(args)) => {
 						check = Check {
 							check_type: CheckType::PrUri,
-							check_value: OsString::from(
-								request_uri
-									.get_one::<String>("PR/MR URI")
-									.ok_or_else(|| hc_error!("missing PR/MR URI in arguments"))?,
-							),
+							check_value: OsString::from(args.pr_mr_uri),
 							parent_command_value: REQUEST.to_string(),
-						};
-					}
-					(MAVEN, package_version) => {
-						check =
-							Check {
-								check_type: CheckType::PackageVersion,
-								check_value: OsString::from(
-									package_version.get_one::<String>("PACKAGE").ok_or_else(
-										|| hc_error!("missing maven package uri in arguments"),
-									)?,
-								),
-								parent_command_value: MAVEN.to_string(),
-							};
-					}
-					(NPM, package_version) => {
-						check = Check {
-							check_type: CheckType::PackageVersion,
-							check_value: OsString::from(
-								package_version
-									.get_one::<String>("PACKAGE")
-									.ok_or_else(|| {
-										hc_error!("missing npm package uri or <package name>[@<optional version>] in arguments")
-									})?,
-							),
-							parent_command_value: NPM.to_string(),
-						};
-					}
-					(PYPI, package_version) => {
-						check = Check {
-							check_type: CheckType::PackageVersion,
-							check_value: OsString::from(
-								package_version
-									.get_one::<String>("PACKAGE")
-									.ok_or_else(|| {
-										hc_error!("missing pypi package uri or package[@<optional version>] in arguments")
-									})?,
-							),
-							parent_command_value: PYPI.to_string(),
-						};
-					}
-					(PATCH, patch_uri) => {
-						check =
-							Check {
-								check_type: CheckType::PatchUri,
-								check_value: OsString::from(
-									patch_uri.get_one::<String>("patch file URI").ok_or_else(
-										|| hc_error!("missing PATCH FILE URI in arguments"),
-									)?,
-								),
-								parent_command_value: PATCH.to_string(),
-							};
-					}
-					("spdx", filepath) => {
+						}
+					},
+					Some(CheckCommand::Spdx(args)) => {
 						check = Check {
 							check_type: CheckType::SpdxDocument,
-							check_value: OsString::from(
-								filepath
-									.get_one::<String>("filepath")
-									.ok_or_else(|| hc_error!("missing FILEPATH in arguments"))?,
-							),
+							check_value: OsString::from(args.filepath),
 							parent_command_value: SPDX.to_string(),
-						};
-					}
-					_ => print_check_help(),
+						}
+					},
+					None => print_check_help(),
 				}
-			}
-			_ => print_help(),
+			},
+			Some(Commands::Schema(args)) => {
+				if args.extra_help {
+					print_schema_help();
+				}
+				match args.command {
+					Some(SchemaCommand::Maven) => print_maven_schema(),
+					Some(SchemaCommand::Npm) => print_npm_schema(),
+					Some(SchemaCommand::Patch) => print_patch_schema(),
+					Some(SchemaCommand::Pypi) => print_pypi_schema(),
+					Some(SchemaCommand::Repo) => print_report_schema(),
+					Some(SchemaCommand::Request) => print_request_schema(),
+					None => print_schema_help(),
+				}
+			},
+			None => print_help(),
 		}
 
 		Ok(CliArgs {
@@ -689,18 +424,18 @@ fn print_version() -> ! {
 	exit(Outcome::Err.exit_code());
 }
 
-/// Get the current version of Hipcheck as a String.
-fn get_version() -> String {
-	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
+// /// Get the current version of Hipcheck as a String.
+// fn get_version() -> String {
+// 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 
-	let version_text = format!(
-		"{} {}",
-		env!("CARGO_PKG_NAME"),
-		version::get_version(raw_version).unwrap()
-	);
+// 	let version_text = format!(
+// 		"{} {}",
+// 		env!("CARGO_PKG_NAME"),
+// 		version::get_version(raw_version).unwrap()
+// 	);
 
-	version_text
-}
+// 	version_text
+// }
 
 /// Print the JSON schema of the report.
 fn print_report_schema() -> ! {

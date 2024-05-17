@@ -59,7 +59,7 @@ pub struct Args {
 	pub json: bool,
 
 	#[command(subcommand)]
-	pub command: Commands,
+	pub command: Option<Commands>,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -81,7 +81,7 @@ pub struct CheckArgs {
 	pub extra_help: bool,
 
 	#[clap(subcommand)]
-	pub command: CheckCommand,
+	pub command: Option<CheckCommand>,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -172,7 +172,7 @@ pub struct SchemaArgs {
 	pub extra_help: bool,
 
 	#[clap(subcommand)]
-	pub command: SchemaCommand,
+	pub command: Option<SchemaCommand>,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -189,6 +189,4 @@ pub enum SchemaCommand {
 	Repo,
 	/// Print the schema for JSON-format output for running Hipcheck against a pull/merge request
 	Request,
-	/// Print the schema for JSON-format output for running Hipcheck against an SPDX document
-	Spdx,
 }
