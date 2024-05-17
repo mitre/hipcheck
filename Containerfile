@@ -13,11 +13,9 @@ WORKDIR /build
 #
 # 1) Our Cargo configuration.
 # 2) The main Hipcheck crate.
-# 3) Hipcheck's internal libraries.
-# 4) The current Crate manifest and lockfile.
+# 3) The current Crate manifest and lockfile.
 COPY .cargo/ .cargo/
 COPY hipcheck/ hipcheck/
-COPY libs/ libs/
 COPY Cargo.toml Cargo.lock ./
 
 # Prep the system.
