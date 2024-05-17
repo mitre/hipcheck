@@ -66,7 +66,19 @@ $ # Run the following from the root of the Hipcheck repository.
 $ docker build -t hipcheck:3.1.0 -f ./Containerfile
 ```
 
-### Using `install.sh`
+### Local Install
+
+First, install the Rust compiler. We recommend following the official
+[installation instructions][install_rust]. Make sure to add
+`${CARGO_HOME}/bin` to your `PATH`.
+
+You will also need Node installed. We recommend following the official
+[installation_instructions][install_node].
+
+You may either install using an [automated script](#script-based-installation)
+or [manually](#build-from-source).
+
+#### Script-based Installation
 
 You can install the latest release of Hipcheck by downloading and running the
 `install.sh` script from the repository root.
@@ -80,14 +92,7 @@ environment variables on which Hipcheck relies.
 
 ### Build from Source
 
-First, install the Rust compiler. We recommend following the official
-[installation instructions][install_rust]. Make sure to add
-`${CARGO_HOME}/bin` to your `PATH`.
-
-You will also need Node installed. We recommend following the official
-[installation_instructions][install_node].
-
-Next, get the Hipcheck repository. Then navigate into the root directory of
+Get the Hipcheck repository. Then navigate into the root directory of
 the repository and run `cargo install --path hipcheck`.
 
 ```sh
