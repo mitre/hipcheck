@@ -27,19 +27,12 @@ COPY Cargo.toml Cargo.lock ./
 #                 with a non-zero status, or zero.
 # 2) Setup the packages we'll need for our build:
 #    - musl-dev:    Needed to build some C code we rely on.
-#    - openssl-dev: Needed to build some networking code we have.
 # 3) Delete `xtask/` from Cargo.toml so we can build without copying it.
 # 4) Build Hipcheck in release configuration.
-#    NOTE: The RUSTFLAGS are there to make sure musl is linked to dynamically,
-#          because part of Hipcheck uses OpenSSL which links to it dynamically,
-#          and combining a statically-linked and a dynamically-linked instance
-#          of musl causes Hipcheck to segfault.
-#
-#    LINK: https://users.rust-lang.org/t/sigsegv-with-program-linked-against-openssl-in-an-alpine-container/52172/4
 RUN set -eux -o pipefail; \
-    apk add --no-cache musl-dev openssl-dev; \
+    apk add --no-cache musl-dev \
     sed -i "/xtask\/*/d" Cargo.toml; \
-    RUSTFLAGS="-C target-feature=-crt-static" cargo build --release
+    cargo build --release
 
 #============================================================================
 # App Layer
