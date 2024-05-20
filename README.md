@@ -75,7 +75,7 @@ First, install the Rust compiler. We recommend following the official
 You will also need Node installed. We recommend following the official
 [installation_instructions][install_node].
 
-You may either install using an [automated script](#script-based-installation)
+You may install Hipcheck either using an [automated script](#script-based-installation)
 or [manually](#build-from-source).
 
 #### Script-based Installation

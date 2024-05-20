@@ -29,7 +29,7 @@ Analyzes a repository or single pull request with a set of analysis tools. Hipch
 
 A github token must be set in the HC_GITHUB_TOKEN system environment variable for `hc check` to run. Hipcheck only needs permissions for accessing public repository data, so those are the only permissions to assign to your generated token.
 
-There are currently six working secondary subcommands under `check`. Running `hc check` without a subtask runs `hc help check`. The available subcommands are:
+There are currently five working secondary subcommands under `check`. Running `hc check` without a subtask runs `hc help check`. The available subcommands are:
 
 * npm
     * `hc [FLAGS] [OPTIONS] check npm <PACKAGE>` obtains the Git repo for an npm package by uri or <package name>[@<optional version>], analyzes the Git repo for risks, and outputs an overall risk assessment for that npm package Git repo.
@@ -41,8 +41,6 @@ There are currently six working secondary subcommands under `check`. Running `hc
     * `hc [FLAGS] [OPTIONS] check repo <SOURCE>` analyzes an entire repository for risks and outputs an overall risk assessment for that repository.
 * request
     * `hc [FLAGS] [OPTIONS] check request <PR/MR URI>` analyzes a single pull or merge request for risks and outputs an overall risk assessment for that pull/merge request.
-* spdx
-    * `hc [FLAGS] [OPTIONS] check spdx <FILEPATH>` analyzes packages described in an SPDX 2.2 tag-value or JSON document.
 
 ### schema
 
