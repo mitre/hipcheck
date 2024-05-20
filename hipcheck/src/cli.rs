@@ -2,8 +2,6 @@
 
 //! Data structures for Hipcheck's main CLI.
 
-use clap::Parser as _;
-
 /// Automatically assess and score git repositories for risk
 #[derive(Debug, clap::Parser)]
 #[command(about, disable_help_flag=true, disable_version_flag=true, long_about=None)]
