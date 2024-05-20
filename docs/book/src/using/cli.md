@@ -29,7 +29,7 @@ Analyzes a repository or single pull request with a set of analysis tools. Hipch
 
 A github token must be set in the HC_GITHUB_TOKEN system environment variable for `hc check` to run. Hipcheck only needs permissions for accessing public repository data, so those are the only permissions to assign to your generated token.
 
-There are currently two working secondary subcommands under `check`. Running `hc check` without a subtask runs `hc help check`. The available subcommands are:
+There are currently five working secondary subcommands under `check`. Running `hc check` without a subtask runs `hc help check`. The available subcommands are:
 
 * npm
     * `hc [FLAGS] [OPTIONS] check npm <PACKAGE>` obtains the Git repo for an npm package by uri or <package name>[@<optional version>], analyzes the Git repo for risks, and outputs an overall risk assessment for that npm package Git repo.
@@ -41,8 +41,6 @@ There are currently two working secondary subcommands under `check`. Running `hc
     * `hc [FLAGS] [OPTIONS] check repo <SOURCE>` analyzes an entire repository for risks and outputs an overall risk assessment for that repository.
 * request
     * `hc [FLAGS] [OPTIONS] check request <PR/MR URI>` analyzes a single pull or merge request for risks and outputs an overall risk assessment for that pull/merge request.
-* spdx
-    * `hc [FLAGS] [OPTIONS] check spdx <FILEPATH>` analyzes packages described in an SPDX 2.2 tag-value or JSON document.
 
 ### schema
 
@@ -82,6 +80,7 @@ All options may be entered before or after a subcommand.
 
 * -c, --config `<FILE>`
     * Specifies the path to the configuration file.
+    * This value can instead be set persistently with the `HC_CONFIG` environment variable.
     * **Hipcheck will not run `hc check` if it cannot find the configuration file.**
     * The config file is called Hipcheck.toml.
     * On a default Hipcheck installation, this file should be in `hipcheck/config/`.
@@ -89,6 +88,7 @@ All options may be entered before or after a subcommand.
 
 * -d, --data `<FOLDER>`
     * Specifies the path to the folder containing essential Hipcheck data files.
+    * This value can instead be set persistently with the `HC_DATA` environment variable.
     * **Certain Hipcheck analyses will generate an error if they cannot find necessary files in this folder.**
     * The custom Hipcheck `module-deps.js` file needs to be in this folder.
     * A default Hipcheck installation currently does not create this folder and the files in it.
@@ -96,7 +96,9 @@ All options may be entered before or after a subcommand.
 
 * -H, --home `<FOLDER>`
     * Specifies the path to the hipcheck home/root where repos are cached.
-    * If no filepath is specified, Hipcheck defaults to looking in the HC_HOME system environment variable first and then the system cache directory second.
+    * If no filepath is specified, Hipcheck will look in the `HC_HOME` system environment variable first and then the system cache directory second.
+    * `hc --print-home` shows the directory Hipcheck is currently using as its home.
+    * If a Git repo cloning is interrupted or Hipcheck is using too much disk space, clear appropriate subdirectories in the home directory.
 
 ### Output Options
 * -j, --json

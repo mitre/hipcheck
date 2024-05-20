@@ -66,18 +66,39 @@ $ # Run the following from the root of the Hipcheck repository.
 $ docker build -t hipcheck:3.1.0 -f ./Containerfile
 ```
 
-### Build from Source
+### Local Install
 
 First, install the Rust compiler. We recommend following the official
 [installation instructions][install_rust]. Make sure to add
 `${CARGO_HOME}/bin` to your `PATH`.
 
-Next, get the Hipcheck repository and run `cargo xtask install`.
+You will also need Node installed. We recommend following the official
+[installation_instructions][install_node].
+
+You may install Hipcheck either using an [automated script](#script-based-installation)
+or [manually](#build-from-source).
+
+#### Script-based Installation
+
+You can install the latest release of Hipcheck by downloading and running the
+`install.sh` script from the repository root.
+
+```sh
+$ curl https://raw.githubusercontent.com/mitre/hipcheck/main/install.sh | bash
+```
+
+This will ask you to export pre-defined values for the `HC_CONFIG` and `HC_DATA`
+environment variables on which Hipcheck relies.
+
+#### Build from Source
+
+Get the Hipcheck repository. Then navigate into the root directory of
+the repository and run `cargo install --path hipcheck`.
 
 ```sh
 $ git clone https://github.com/mitre/hipcheck
 $ cd hipcheck
-$ cargo xtask install
+$ cargo install --path hipcheck
 ```
 
 ## Usage
@@ -92,16 +113,43 @@ $ docker run --env "HC_GITHUB_TOKEN=<GITHUB_TOKEN>" hipheck:3.1.0 [<HIPCHECK_ARG
 
 ### Direct Usage
 
-You can run Hipcheck with the `hc` binary.
+To run Hipcheck, make sure you export `HC_GITHUB_TOKEN` with a valid token for
+connecting to the GitHub API.
+
+If you installed from `install.sh` and set the appropriate environment
+variables as directed, you can run Hipcheck with the `hc` binary without any
+further configuration.
 
 ```sh
 $ hc check repo https://github.com/expressjs/express
 ```
 
-Make sure to export `HC_GITHUB_TOKEN` with a valid token for connecting to
-the GitHub API.
+If you installed from source, you will need to configure values for `--config`,
+`--data` and `--home`. From the CLI section of the Hipcheck book:
 
-### Configuring
+* -c, --config `<FILE>`
+    * Specifies the path to the configuration file.
+    * This value can instead be set persistently with the `HC_CONFIG` environment variable.
+    * **Hipcheck will not run `hc check` if it cannot find the configuration file.**
+    * The config file is called Hipcheck.toml.
+    * On a default Hipcheck installation, this file should be in `hipcheck/config/`.
+    * If no filepath is specified, Hipcheck defaults to looking in the current active directory.
+
+* -d, --data `<FOLDER>`
+    * Specifies the path to the folder containing essential Hipcheck data files.
+    * This value can instead be set persistently with the `HC_DATA` environment variable.
+    * **Certain Hipcheck analyses will generate an error if they cannot find necessary files in this folder.**
+    * The custom Hipcheck `module-deps.js` file needs to be in this folder.
+    * A default Hipcheck installation currently does not create this folder and the files in it.
+    * If no filepath is specified, Hipcheck defaults to looking in the default platform data directory.
+
+* -H, --home `<FOLDER>`
+    * Specifies the path to the hipcheck home/root where repos are cached.
+    * If no filepath is specified, Hipcheck will look in the `HC_HOME` system environment variable first and then the system cache directory second.
+    * `hc --print-home` shows the directory Hipcheck is currently using as its home.
+    * If a Git repo cloning is interrupted or Hipcheck is using too much disk space, clear appropriate subdirectories in the home directory.
+
+### Run Configuring
 
 Hipcheck requires a set of configuration files, which you can find default
 versions of in this repository, under the `config/` directory. The path to
@@ -131,4 +179,5 @@ Computer Software and Noncommercial Computer Software Documentation Clause DFARS
 
 [react]: https://github.com/facebook/react
 [install_rust]: https://www.rust-lang.org/tools/install
+[install_node]: https://nodejs.org/en/learn/getting-started/how-to-install-nodejs
 
