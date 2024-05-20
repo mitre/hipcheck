@@ -60,13 +60,6 @@ pr-run-mode = "plan"
 # Whether to install an updater program
 install-updater = true
 
-[workspace.metadata.dist.dependencies.apt]
-# Just grab the latest version of OpenSSL for Ubuntu.
-# This is required for `musl` builds, which want to statically link to
-# OpenSSL. Note that even for `musl` builds `cargo-dist` is using
-# Ubuntu and not Alpine or something else.
-libssl-dev = "*"
-
 # The profile that 'cargo dist' will build with
 [profile.dist]
 
