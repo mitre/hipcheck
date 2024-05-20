@@ -40,7 +40,7 @@ pathbuf = "1.0.0"
 petgraph = { version = "0.6.0", features = ["serde-1"] }
 regex = "1.5.5"
 salsa = "0.16.1"
-schemars = { version = "0.8.17", default-features = false, features = [
+schemars = { version = "0.8.20", default-features = false, features = [
     "derive",
     "preserve_order",
     "chrono",
