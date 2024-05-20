@@ -228,52 +228,52 @@ impl CliArgs {
 							check_value: OsString::from(args.package),
 							parent_command_value: MAVEN.to_string(),
 						}
-					},
+					}
 					Some(CheckCommand::Npm(args)) => {
 						check = Check {
 							check_type: CheckType::PackageVersion,
 							check_value: OsString::from(args.package),
 							parent_command_value: NPM.to_string(),
 						}
-					},
+					}
 					Some(CheckCommand::Patch(args)) => {
 						check = Check {
 							check_type: CheckType::PatchUri,
 							check_value: OsString::from(args.patch_file_uri),
 							parent_command_value: PATCH.to_string(),
 						}
-					},
+					}
 					Some(CheckCommand::Pypi(args)) => {
 						check = Check {
 							check_type: CheckType::PackageVersion,
 							check_value: OsString::from(args.package),
 							parent_command_value: PYPI.to_string(),
 						}
-					},
+					}
 					Some(CheckCommand::Repo(args)) => {
 						check = Check {
 							check_type: CheckType::RepoSource,
 							check_value: OsString::from(args.source),
 							parent_command_value: REPO.to_string(),
 						}
-					},
+					}
 					Some(CheckCommand::Request(args)) => {
 						check = Check {
 							check_type: CheckType::PrUri,
 							check_value: OsString::from(args.pr_mr_uri),
 							parent_command_value: REQUEST.to_string(),
 						}
-					},
+					}
 					Some(CheckCommand::Spdx(args)) => {
 						check = Check {
 							check_type: CheckType::SpdxDocument,
 							check_value: OsString::from(args.filepath),
 							parent_command_value: SPDX.to_string(),
 						}
-					},
+					}
 					None => print_check_help(),
 				}
-			},
+			}
 			Some(Commands::Schema(args)) => {
 				if args.extra_help {
 					print_schema_help();
@@ -287,7 +287,7 @@ impl CliArgs {
 					Some(SchemaCommand::Request) => print_request_schema(),
 					None => print_schema_help(),
 				}
-			},
+			}
 			None => print_help(),
 		}
 
@@ -398,7 +398,7 @@ SUBTASKS:
     pypi    <PACKAGE>     analyze a pypi package git repo via package uri or with format <package name>[@<optional version>]
     repo    <SOURCE>      analyze a repository and output an overall risk assessment
     request <PR/MR URI>   analyze pull/merge request for potential risks
-    spdx    <FILEPATH>    analyze packages specified in an SPDX document
+    spdx    <FILEPATH>    analyze packages specified in an SPDX document (not yet implemented)
 
 {}",
 		env!("CARGO_PKG_NAME"),
@@ -423,19 +423,6 @@ fn print_version() -> ! {
 	println!("{}", version_text);
 	exit(Outcome::Err.exit_code());
 }
-
-// /// Get the current version of Hipcheck as a String.
-// fn get_version() -> String {
-// 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
-
-// 	let version_text = format!(
-// 		"{} {}",
-// 		env!("CARGO_PKG_NAME"),
-// 		version::get_version(raw_version).unwrap()
-// 	);
-
-// 	version_text
-// }
 
 /// Print the JSON schema of the report.
 fn print_report_schema() -> ! {
