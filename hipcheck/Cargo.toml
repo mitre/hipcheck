@@ -46,7 +46,7 @@ schemars = { version = "0.8.17", default-features = false, features = [
     "chrono",
 ] }
 semver = "1.0.9"
-serde = { version = "1.0.200", features = ["derive", "rc"] }
+serde = { version = "1.0.202", features = ["derive", "rc"] }
 serde_derive = "1.0.137"
 serde_json = "1.0.80"
 smart-default = "0.7.1"
