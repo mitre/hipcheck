@@ -79,6 +79,12 @@ pub enum Commands {
 	Schema(SchemaArgs),
 }
 
+impl Default for Commands {
+	fn default() -> Commands {
+		Commands::Help(HelpArgs { command: None })
+	}
+}
+
 #[derive(Debug, clap::Args)]
 pub struct CheckArgs {
 	/// print help text
