@@ -15,7 +15,7 @@ log = "0.4.21"
 glob = "0.3.0"
 pathbuf = "1.0.0"
 serde = { version = "1.0.202", features = ["derive"] }
-toml = "0.8.12"
+toml = "0.8.13"
 xshell = "0.2.6"
 which = "6.0.1"
 convert_case = "0.6.0"
