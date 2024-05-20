@@ -11,7 +11,6 @@ use serde_json::Value;
 use std::cmp::max;
 use std::cmp::Ordering;
 use std::process::exit;
-use std::sync::Arc;
 use url::Host;
 use url::Url;
 use xml::reader::EventReader;
@@ -365,7 +364,6 @@ fn extract_repo_for_npm(raw_package: &str) -> Result<Url> {
 
 	// Make an HTTP request to that URL.
 	let response = ureq::AgentBuilder::new()
-	    .tls_connector(Arc::new(native_tls::TlsConnector::new()?))
 	    .build()
 		.get(&registry)
 		.call()
@@ -416,7 +414,6 @@ fn extract_repo_for_pypi(raw_package: &str) -> Result<Url> {
 
 	// Make an HTTP request to that URL.
 	let response = ureq::AgentBuilder::new()
-	    .tls_connector(Arc::new(native_tls::TlsConnector::new()?))
 	    .build()
 		.get(&registry)
 		.call()
@@ -451,7 +448,6 @@ fn extract_repo_for_maven(url: &str) -> Result<Url> {
 	// Make an HTTP request to that URL to get the POM file.
 
 	let response = ureq::AgentBuilder::new()
-		.tls_connector(Arc::new(native_tls::TlsConnector::new()?))
 		.build()
 		.get(url)
 		.call()

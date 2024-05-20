@@ -10,7 +10,7 @@ Hipcheck binary and supporting files into the proper locations. This _works_,
 but isn't ideal for the following reasons:
 
 - It requires the user to have a number of dependencies on their system,
-  including Git, a Rust toolchain, and OpenSSL (which we currently link into).
+  including Git and a Rust toolchain.
 - It builds from scratch, which is slow and tedious and can lead to poor error
   messages.
 - Building from the Git repository means users may get broken builds if

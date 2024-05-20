@@ -2,11 +2,8 @@
 
 //! Defines an authenticated [`Agent`] type that adds token auth to all requests.
 
-use std::sync::Arc;
-
 use crate::data::github::hidden::Hidden;
 use crate::error::Result;
-use native_tls::TlsConnector;
 use ureq::Agent;
 use ureq::AgentBuilder;
 use ureq::Request;
@@ -26,9 +23,7 @@ pub struct AuthenticatedAgent<'token> {
 impl<'token> AuthenticatedAgent<'token> {
 	/// Construct a new authenticated agent.
 	pub fn new(token: &'token str) -> Result<AuthenticatedAgent<'token>> {
-		let agent = AgentBuilder::new()
-			.tls_connector(Arc::new(TlsConnector::new()?))
-			.build();
+		let agent = AgentBuilder::new().build();
 
 		let token = Hidden::new(token);
 

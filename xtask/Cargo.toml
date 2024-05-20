@@ -7,15 +7,15 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = "1.0.83"
+anyhow = "1.0.86"
 clap = { version = "4.5.4", features = ["cargo", "derive"] }
 clap-verbosity-flag = "2.2.0"
 env_logger = "0.11.3"
 log = "0.4.21"
 glob = "0.3.0"
 pathbuf = "1.0.0"
-serde = { version = "1.0.133", features = ["derive"] }
-toml = "0.8.12"
+serde = { version = "1.0.202", features = ["derive"] }
+toml = "0.8.13"
 xshell = "0.2.6"
 which = "6.0.1"
 convert_case = "0.6.0"
