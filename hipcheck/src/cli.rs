@@ -62,6 +62,12 @@ pub struct Args {
 	pub command: Option<Commands>,
 }
 
+// impl Default for Args {
+// 	fn default() -> Self {
+// 		command::None
+// 	}
+// }
+
 #[derive(Debug, clap::Subcommand)]
 pub enum Commands {
 	/// Analyzes a repository or pull/merge request
@@ -72,6 +78,12 @@ pub enum Commands {
 	/// Print the schema for JSON-format output for a specified subtarget
 	#[command(disable_help_subcommand = true)]
 	Schema(SchemaArgs),
+}
+
+impl Default for Commands {
+	fn default() -> Commands {
+		Commands::Help(HelpArgs { command: None })
+	}
 }
 
 #[derive(Debug, clap::Args)]
