@@ -72,6 +72,7 @@ pub enum Commands {
 	#[command(disable_help_subcommand = true)]
 	Check(CheckArgs),
 	/// Print help information, optionally for a given subcommand
+	#[command(disable_help_subcommand = true)]
 	Help(HelpArgs),
 	/// Print the schema for JSON-format output for a specified subtarget
 	#[command(disable_help_subcommand = true)]
@@ -91,18 +92,25 @@ pub struct CheckArgs {
 #[derive(Debug, clap::Subcommand)]
 pub enum CheckCommand {
 	/// Analyze a maven package git repo via package URI
+	#[command(disable_help_subcommand = true)]
 	Maven(CheckMavenArgs),
 	/// Analyze an npm package git repo via package URI or with format <package name>[@<optional version>]
+	#[command(disable_help_subcommand = true)]
 	Npm(CheckNpmArgs),
 	/// Analyze 'git' patches for projects that use a patch-based workflow (not yet implemented)
+	#[command(disable_help_subcommand = true)]
 	Patch(CheckPatchArgs),
 	/// Analyze a PyPI package git repo via package URI or with format <package name>[@<optional version>]
+	#[command(disable_help_subcommand = true)]
 	Pypi(CheckPypiArgs),
 	/// Analyze a repository and output an overall risk assessment
+	#[command(disable_help_subcommand = true)]
 	Repo(CheckRepoArgs),
 	/// Analyze pull/merge request for potential risks
+	#[command(disable_help_subcommand = true)]
 	Request(CheckRequestArgs),
 	/// Analyze packages specified in an SPDX document
+	#[command(disable_help_subcommand = true)]
 	Spdx(CheckSpdxArgs),
 }
 
@@ -164,8 +172,10 @@ pub struct HelpArgs {
 #[derive(Debug, clap::Subcommand)]
 pub enum HelpCommand {
 	/// Print help information for the check subcommand
+	#[command(disable_help_subcommand = true)]
 	Check,
 	/// Print help information for the schema subcommand
+	#[command(disable_help_subcommand = true)]
 	Schema,
 }
 
@@ -182,16 +192,22 @@ pub struct SchemaArgs {
 #[derive(Debug, clap::Subcommand)]
 pub enum SchemaCommand {
 	/// Print the schema for JSON-format output for running Hipcheck against a Maven package
+	#[command(disable_help_subcommand = true)]
 	Maven,
 	/// Print the schema for JSON-format output for running Hipcheck against a NPM package
+	#[command(disable_help_subcommand = true)]
 	Npm,
 	/// Print the schema for JSON-format output for running Hipcheck against a patch
+	#[command(disable_help_subcommand = true)]
 	Patch,
 	/// Print the schema for JSON-format output for running Hipcheck against a PyPI package
+	#[command(disable_help_subcommand = true)]
 	Pypi,
 	/// Print the schema for JSON-format output for running Hipcheck against a repository
+	#[command(disable_help_subcommand = true)]
 	Repo,
 	/// Print the schema for JSON-format output for running Hipcheck against a pull/merge request
+	#[command(disable_help_subcommand = true)]
 	Request,
 }
 
