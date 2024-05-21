@@ -44,6 +44,7 @@ use clap::Parser as _;
 use cli::CheckCommand;
 use cli::HelpCommand;
 use cli::SchemaCommand;
+use dotenv::var;
 use env_logger::Builder;
 use env_logger::Env;
 use schemars::schema_for;
@@ -472,26 +473,44 @@ fn print_readiness(
 	config_path: Option<&Path>,
 	data_path: Option<&Path>,
 ) -> ! {
+	let mut failed = false;
+
 	let hipcheck_home = resolve_home(home_dir);
+	match hipcheck_home {
+		Ok(path_buffer) => println!("Hipcheck home directory: {}", path_buffer.display()),
+		Err(err) => {
+			failed = true;
+			print_error(&err);
+		}
+	}
 
 	let hipcheck_config = resolve_config(config_path);
+	match hipcheck_config {
+		Ok(path_buffer) => println!("Hipcheck config directory: {}", path_buffer.display()),
+		Err(err) => {
+			failed = true;
+			print_error(&err);
+		}
+	}
 
 	let hipcheck_data = resolve_data(data_path);
+	match hipcheck_data {
+		Ok(path_buffer) => println!("Hipcheck data directory: {}", path_buffer.display()),
+		Err(err) => {
+			failed = true;
+			print_error(&err);
+		}
+	}
 
-	let exit_code = match (hipcheck_home, hipcheck_config, hipcheck_data) {
-		(Ok(home_path), Ok(config_path), Ok(data_path)) => {
-			println!(
-				"{}, {}, {}",
-				home_path.display(),
-				config_path.display(),
-				data_path.display()
-			);
-			Outcome::Ok.exit_code()
-		}
-		_ => {
-			//print_error(&err);
-			Outcome::Err.exit_code()
-		}
+	match var("HC_GITHUB_TOKEN") {
+		Ok(_) => println!("HC_GITHUB_TOKEN system environment variable found."),
+		Err(_) => println!("Missing HC_GITHUB_TOKEN system environment variable. Some analyses will not run without this token set."),
+	}
+
+	let exit_code = if failed {
+		Outcome::Err.exit_code()
+	} else {
+		Outcome::Ok.exit_code()
 	};
 
 	exit(exit_code);
@@ -790,6 +809,7 @@ impl Outcome {
 }
 
 #[cfg(test)]
+/// Test CLI
 mod tests {
 	use super::Args;
 	use clap::CommandFactory;
