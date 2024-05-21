@@ -71,6 +71,9 @@ pub enum Commands {
 	/// Analyzes a repository or pull/merge request
 	#[command(disable_help_subcommand = true)]
 	Check(CheckArgs),
+	/// Check if Hipcheck is ready to execute and reports status to user
+	#[command(disable_help_subcommand = true)]
+	Doctor,
 	/// Print help information, optionally for a given subcommand
 	#[command(disable_help_subcommand = true)]
 	Help(HelpArgs),

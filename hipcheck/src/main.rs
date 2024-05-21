@@ -217,6 +217,13 @@ impl CliArgs {
 				Some(HelpCommand::Check) => print_check_help(),
 				Some(HelpCommand::Schema) => print_schema_help(),
 			},
+			Some(Commands::Doctor) => {
+				print_readiness(
+					home_dir.as_deref(),
+					config_path.as_deref(),
+					data_path.as_deref(),
+				);
+			}
 			Some(Commands::Check(args)) => {
 				if args.extra_help {
 					print_check_help();
@@ -460,6 +467,35 @@ fn print_pypi_schema() -> ! {
 	print_missing()
 }
 
+fn print_readiness(
+	home_dir: Option<&Path>,
+	config_path: Option<&Path>,
+	data_path: Option<&Path>,
+) -> ! {
+	let hipcheck_home = resolve_home(home_dir);
+
+	let hipcheck_config = resolve_config(config_path);
+
+	let hipcheck_data = resolve_data(data_path);
+
+	let exit_code = match (hipcheck_home, hipcheck_config, hipcheck_data) {
+		(Ok(home_path), Ok(config_path), Ok(data_path)) => {
+			println!(
+				"{}, {}, {}",
+				home_path.display(),
+				config_path.display(),
+				data_path.display()
+			);
+			Outcome::Ok.exit_code()
+		}
+		_ => {
+			//print_error(&err);
+			Outcome::Err.exit_code()
+		}
+	};
+
+	exit(exit_code);
+}
 /// Print the current home directory for Hipcheck.
 ///
 /// Exits `Ok` if home directory is specified, `Err` otherwise.
