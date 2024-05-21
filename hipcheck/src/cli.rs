@@ -7,7 +7,7 @@
 #[command(about, disable_help_flag=true, disable_version_flag=true, long_about=None)]
 pub struct Args {
 	/// print help text
-	#[arg(short = 'h', long = "help")]
+	#[arg(name="extra-help", short = 'h', long = "help")]
 	pub extra_help: bool,
 
 	/// print version information
