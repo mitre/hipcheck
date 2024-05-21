@@ -194,3 +194,15 @@ pub enum SchemaCommand {
 	/// Print the schema for JSON-format output for running Hipcheck against a pull/merge request
 	Request,
 }
+
+/// Test CLI commands
+#[cfg(test)]
+mod tests {
+	use super::Args;
+	use clap::CommandFactory;
+
+	#[test]
+	fn verify_cli() {
+		Args::command().debug_assert()
+	}
+}
