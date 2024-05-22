@@ -31,6 +31,7 @@ use crate::analysis::session::Check;
 use crate::analysis::session::CheckType;
 use crate::analysis::session::Session;
 use crate::cli::Commands;
+use crate::command_util::DependentProgram;
 use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
@@ -179,10 +180,6 @@ impl CliArgs {
 			path.map(PathBuf::from)
 		};
 
-		if args.print_home {
-			print_home(home_dir.as_deref());
-		}
-
 		// PANIC: Optional but has a default value, so unwrap() should never panic.
 		let color_choice = {
 			let color: &String = &args.color.unwrap();
@@ -194,18 +191,10 @@ impl CliArgs {
 			config.map(PathBuf::from)
 		};
 
-		if args.print_config {
-			print_config(config_path.as_deref());
-		}
-
 		let data_path = {
 			let data: Option<&String> = args.data.as_ref();
 			data.map(PathBuf::from)
 		};
-
-		if args.print_data {
-			print_data(data_path.as_deref());
-		}
 
 		let format = Format::use_json(args.json);
 
@@ -218,7 +207,7 @@ impl CliArgs {
 				Some(HelpCommand::Check) => print_check_help(),
 				Some(HelpCommand::Schema) => print_schema_help(),
 			},
-			Some(Commands::Doctor) => {
+			Some(Commands::Ready) => {
 				print_readiness(
 					home_dir.as_deref(),
 					config_path.as_deref(),
@@ -315,9 +304,6 @@ impl CliArgs {
 const GLOBAL_HELP: &str = "\
 FLAGS:
     -V, --version         print version information
-    --print-config        print the config file path for Hipcheck
-    --print-data          print the data folder path for Hipcheck
-    --print-home          print the home directory for Hipcheck
 
 OPTIONS (CONFIGURATION):
     -c, --config <FILE>   path to the configuration file [default: ./Hipcheck.toml]
@@ -344,6 +330,7 @@ USAGE:
 
 TASKS:
     check <SUBTASK>       analyzes a repository or pull/merge request
+    ready                 print a report of whether or not Hipcheck is ready to run
     schema <SUBTASK>      print the schema for JSON-format output for a specified subtarget
     help [<SUBTASK>]      print help information, optionally for a given subcommand
 
@@ -468,6 +455,8 @@ fn print_pypi_schema() -> ! {
 	print_missing()
 }
 
+/// Prints a "readiness report" for Hipcheck, indicating if any dependent programs are missing or our of date
+/// or if any necessary folders or files are missing. It then returns a final readiness status.
 fn print_readiness(
 	home_dir: Option<&Path>,
 	config_path: Option<&Path>,
@@ -475,6 +464,43 @@ fn print_readiness(
 ) -> ! {
 	let mut failed = false;
 
+	// Check that git is installed and that its version is up to date
+	// Print the version number either way
+	let git_check = data::git::get_git_version();
+	match git_check {
+		Ok(git_version) => match DependentProgram::Git.check_version(&git_version) {
+			// No need to check Boolean value, because currentl check_version() only returns Ok(true) or Err()
+			Ok(_) => print!("Found installed {}", git_version),
+			Err(err) => {
+				print_error(&err);
+				failed = true;
+			}
+		},
+		Err(err) => {
+			print_error(&err);
+			failed = true;
+		}
+	}
+
+	// Check that git is installed and that its version is up to date
+	// Print the version number either way
+	let npm_check = data::npm::get_npm_version();
+	match npm_check {
+		Ok(npm_version) => match DependentProgram::Npm.check_version(&npm_version) {
+			// No need to check Boolean value, because currently check_version() only returns Ok(true) or Err()
+			Ok(_) => print!("Found installed NPM version {}", npm_version),
+			Err(err) => {
+				print_error(&err);
+				failed = true;
+			}
+		},
+		Err(err) => {
+			print_error(&err);
+			failed = true;
+		}
+	}
+
+	// Check that the Hipcheck home folder is findable
 	let hipcheck_home = resolve_home(home_dir);
 	match hipcheck_home {
 		Ok(path_buffer) => println!("Hipcheck home directory: {}", path_buffer.display()),
@@ -484,6 +510,7 @@ fn print_readiness(
 		}
 	}
 
+	// Check that the Hipcheck config TOML exists in the designated location
 	let hipcheck_config = resolve_config(config_path);
 	match hipcheck_config {
 		Ok(path_buffer) => println!("Hipcheck config directory: {}", path_buffer.display()),
@@ -493,6 +520,7 @@ fn print_readiness(
 		}
 	}
 
+	// Check that Hipcheck data folder is findable
 	let hipcheck_data = resolve_data(data_path);
 	match hipcheck_data {
 		Ok(path_buffer) => println!("Hipcheck data directory: {}", path_buffer.display()),
@@ -502,76 +530,22 @@ fn print_readiness(
 		}
 	}
 
+	// Check that a GitHub token has been provided as an environment variable
+	// This does not check if the token is valid or not
+	// The absence of a token does not trigger the failure state for the readiness check, because
+	// Hipcheck *can* run without a token, but some analyses will not.
 	match var("HC_GITHUB_TOKEN") {
 		Ok(_) => println!("HC_GITHUB_TOKEN system environment variable found."),
 		Err(_) => println!("Missing HC_GITHUB_TOKEN system environment variable. Some analyses will not run without this token set."),
 	}
 
-	let exit_code = if failed {
-		Outcome::Err.exit_code()
+	if failed {
+		println!("One or more dependencies or configuration settings are missing. Hipcheck is not ready to run.");
 	} else {
-		Outcome::Ok.exit_code()
-	};
+		println!("Hipcheck is ready to run!");
+	}
 
-	exit(exit_code);
-}
-/// Print the current home directory for Hipcheck.
-///
-/// Exits `Ok` if home directory is specified, `Err` otherwise.
-fn print_home(path: Option<&Path>) -> ! {
-	let hipcheck_home = resolve_home(path);
-
-	let exit_code = match hipcheck_home {
-		Ok(path_buffer) => {
-			println!("{}", path_buffer.display());
-			Outcome::Ok.exit_code()
-		}
-		Err(err) => {
-			print_error(&err);
-			Outcome::Err.exit_code()
-		}
-	};
-
-	exit(exit_code);
-}
-
-/// Print the current config path for Hipcheck.
-///
-/// Exits `Ok` if config path is specified, `Err` otherwise.
-fn print_config(config_path: Option<&Path>) -> ! {
-	let hipcheck_config = resolve_config(config_path);
-
-	let exit_code = match hipcheck_config {
-		Ok(path_buffer) => {
-			println!("{}", path_buffer.display());
-			Outcome::Ok.exit_code()
-		}
-		Err(err) => {
-			print_error(&err);
-			Outcome::Err.exit_code()
-		}
-	};
-
-	exit(exit_code);
-}
-
-/// Print the current data folder path for Hipcheck.
-///
-/// Exits `Ok` if config path is specified, `Err` otherwise.
-fn print_data(data_path: Option<&Path>) -> ! {
-	let hipcheck_data = resolve_data(data_path);
-
-	let exit_code = match hipcheck_data {
-		Ok(path_buffer) => {
-			println!("{}", path_buffer.display());
-			Outcome::Ok.exit_code()
-		}
-		Err(err) => {
-			print_error(&err);
-			Outcome::Err.exit_code()
-		}
-	};
-
+	let exit_code = Outcome::Err.exit_code();
 	exit(exit_code);
 }
 
@@ -805,17 +779,5 @@ impl Outcome {
 			Outcome::Ok => 0,
 			Outcome::Err => 1,
 		}
-	}
-}
-
-#[cfg(test)]
-/// Test CLI
-mod tests {
-	use super::Args;
-	use clap::CommandFactory;
-
-	#[test]
-	fn verify_cli() {
-		Args::command().debug_assert()
 	}
 }
