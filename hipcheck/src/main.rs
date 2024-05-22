@@ -464,6 +464,16 @@ fn print_readiness(
 ) -> ! {
 	let mut failed = false;
 
+	// Print Hipcheck version
+	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
+
+	let version_text = format!(
+		"{} {}",
+		env!("CARGO_PKG_NAME"),
+		version::get_version(raw_version).unwrap()
+	);
+	println!("{}", version_text);
+	
 	// Check that git is installed and that its version is up to date
 	// Print the version number either way
 	let git_check = data::git::get_git_version();
