@@ -523,7 +523,7 @@ fn print_readiness(
 	// Check that the Hipcheck config TOML exists in the designated location
 	let hipcheck_config = resolve_config(config_path);
 	match hipcheck_config {
-		Ok(path_buffer) => println!("Hipcheck config directory: {}", path_buffer.display()),
+		Ok(path_buffer) => println!("Hipcheck config file: {}", path_buffer.display()),
 		Err(err) => {
 			failed = true;
 			print_error(&err);
