@@ -4,17 +4,17 @@ on:
   push:
     branches: [main]
     paths:
-      - 'config/**'
-      - 'hipcheck/**'
-      - 'scripts/**'
-      - 'xtask/**'
+      - "config/**"
+      - "hipcheck/**"
+      - "scripts/**"
+      - "xtask/**"
   pull_request:
     branches: [main]
     paths:
-      - 'config/**'
-      - 'hipcheck/**'
-      - 'scripts/**'
-      - 'xtask/**'
+      - "config/**"
+      - "hipcheck/**"
+      - "scripts/**"
+      - "xtask/**"
 
 permissions:
   contents: read
@@ -34,10 +34,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Dependency Tree
+        run: cargo tree
       - name: Build
         run: cargo build --verbose --workspace
       - name: Test
         run: cargo test --verbose --workspace
       - name: Lint
         run: cargo clippy --verbose --workspace
-
