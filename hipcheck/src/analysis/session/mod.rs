@@ -47,13 +47,13 @@ use crate::util::fs::create_dir_all;
 use crate::version::get_version;
 use crate::version::VersionQuery;
 use crate::version::VersionQueryStorage;
+use crate::CheckKind;
 use crate::HIPCHECK_TOML_FILE;
 use chrono::prelude::*;
 use dotenv::var;
 use pathbuf::pathbuf;
-use std::ffi::OsStr;
-use std::ffi::OsString;
 use std::fmt;
+use std::ops::Not as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -124,7 +124,7 @@ impl Session {
 	pub fn new(
 		shell: Shell,
 		source_type: &Check,
-		source: &OsStr,
+		source: &str,
 		config_path: Option<PathBuf>,
 		data_path: Option<PathBuf>,
 		home_dir: Option<PathBuf>,
@@ -146,7 +146,7 @@ impl Session {
 		 * Printing the prelude.
 		 *-----------------------------------------------------------------*/
 
-		if let Err(err) = session.shell.prelude(source.to_string_lossy().as_ref()) {
+		if let Err(err) = session.shell.prelude(source) {
 			return Err((session.shell, err));
 		};
 
@@ -282,23 +282,23 @@ fn load_config_and_data(
 
 fn load_home(_shell: &mut Shell, home_dir: Option<&Path>) -> Result<PathBuf> {
 	// If no env or dotenv vars set, return error as Hipcheck can not run without config set
-	let home = resolve_home(home_dir)?;
+	let home = resolve_cache(home_dir)?;
 
 	Ok(home)
 }
 
 fn load_source(
 	shell: &mut Shell,
-	source: &OsStr,
+	source: &str,
 	source_type: &Check,
 	home: &Path,
 ) -> Result<Source> {
 	// Resolve the source specifier into an actual source.
-	let phase_desc = match source_type.check_type {
-		CheckType::RepoSource => "resolving git repository source",
-		CheckType::PrUri => "resolving git pull request source",
-		CheckType::PackageVersion => "resolving package source",
-		CheckType::SpdxDocument => "parsing SPDX document",
+	let phase_desc = match source_type.kind.target_kind() {
+		TargetKind::RepoSource => "resolving git repository source",
+		TargetKind::PrUri => "resolving git pull request source",
+		TargetKind::PackageVersion => "resolving package source",
+		TargetKind::SpdxDocument => "parsing SPDX document",
 		_ => return Err(hc_error!("source specified was not a valid source")),
 	};
 
@@ -317,141 +317,50 @@ fn resolve_token() -> Result<String> {
 	}
 }
 
-/// Resolves a home location for Hipcheck to cache data.
-pub fn resolve_home(home_flag: Option<&Path>) -> Result<PathBuf> {
-	// 1. Prefer --home flag if it is set use home_dir parameter
-	// 2. Prefer HC_HOME if it is set in env or .env file.
-	// 3. Otherwise, use cross platform cache directory as a default.
-	//        `$XDG_CACHE_HOME` or `$HOME/.cache` on Linux,
-	//        `$HOME/Library/Caches` on macOS,
-	//        `{FOLDERID_LocalAppData}` on Windows
-	//    (See https://docs.rs/dirs/3.0.2/dirs/fn.cache_dir.html)
+/// Resolves a cache location for Hipcheck to cache data.
+pub fn resolve_cache(cache_flag: Option<&Path>) -> Result<PathBuf> {
+	let path = cache_flag.ok_or_else(|| {
+		hc_error!("can't find cache folder (try setting the `--cache` flag or `HC_CACHE` environment variable)")
+	})?;
 
-	if let Some(home_dir) = home_flag {
-		if home_dir.exists() {
-			return Ok(home_dir.to_owned());
-		}
-
-		return Err(hc_error!(
-			"home directory {} (from --home) does not exist",
-			home_dir.display()
-		));
+	if path.exists().not() {
+		// Try to create the cache directory if it doesn't exist.
+		create_dir_all(path).context(format!(
+			"failed to create cache folder '{}'",
+			path.display()
+		))?;
 	}
 
-	if let Ok(home_dir) = dotenv::var("HC_HOME").map(PathBuf::from) {
-		if home_dir.exists() {
-			return Ok(home_dir);
-		}
-
-		return Err(hc_error!(
-			"home directory {} (from HC_HOME) does not exist",
-			home_dir.display()
-		));
-	}
-
-	if let Some(cache_dir) = dirs::cache_dir() {
-		// We should always be fine to create the cache directory if it doesn't exist already.
-		let home_dir = pathbuf![&cache_dir, "hipcheck"];
-
-		create_dir_all(&home_dir).context("failed to create Hipcheck home directory")?;
-
-		return Ok(home_dir);
-	}
-
-	Err(hc_error!("can't find Hipcheck home (try setting the `HC_HOME` environment variable or `--home <DIR>` flag)"))
+	Ok(path.to_owned())
 }
 
 /// Resolves a config folder location for Hipcheck to to find config files in
+#[allow(clippy::size_of_ref)]
 pub fn resolve_config(config_flag: Option<&Path>) -> Result<PathBuf> {
-	// 1. Prefer --config flag parameter if it exists as path
-	// 2. Prefer HC_CONFIG if it is set in env or .env file.
-	// 3. Otherwise, use cross platform cache directory as a default.
-	//        `$XDG_CONFIG_HOME` or `$HOME/.config` on Linux,
-	//        `$HOME/Library/Application Support` on macOS,
-	//        `{FOLDERID_RoamingAppData}` on Windows
-	//    (See https://docs.rs/dirs/3.0.2/dirs/fn.cache_dir.html)
+	let path = config_flag.ok_or_else(|| {
+		hc_error!("can't find config file (try setting the `--config` flag or `HC_CONFIG` environment variable)")
+	})?;
 
-	if let Some(config_path) = config_flag {
-		let full_config_path = pathbuf![config_path, HIPCHECK_TOML_FILE];
-		if full_config_path.exists() {
-			return Ok(full_config_path);
-		}
+	let path = pathbuf![&path, HIPCHECK_TOML_FILE];
 
-		return Err(hc_error!(
-			"config file {} (from --config) does not exist",
-			full_config_path.display()
-		));
+	if path.exists() {
+		return Ok(path);
 	}
 
-	if let Ok(config_path) = dotenv::var("HC_CONFIG").map(PathBuf::from) {
-		let full_config_path = pathbuf![&config_path, HIPCHECK_TOML_FILE];
-		if full_config_path.exists() {
-			return Ok(full_config_path);
-		}
-
-		return Err(hc_error!(
-			"config file {} (from HC_CONFIG) does not exist",
-			full_config_path.display()
-		));
-	}
-
-	if let Some(config_dir) = dirs::config_dir() {
-		if config_dir.exists() {
-			let config_path = pathbuf![&config_dir, "hipcheck", HIPCHECK_TOML_FILE];
-
-			if config_path.exists() {
-				return Ok(config_path);
-			}
-		}
-	}
-
-	Err(hc_error!("can't find config (try setting the `HC_CONFIG` environment variable or `--config <FILE>` flag)"))
+	Err(hc_error!("config file '{}' does not exist", path.display()))
 }
 
 /// Resolves a data folder location for Hipcheck to to find data files in
 pub fn resolve_data(data_flag: Option<&Path>) -> Result<PathBuf> {
-	// 1. Prefer --data flag parameter if it exists as path
-	// 2. Prefer HC_DATA if it is set in env or .env file.
-	// 3. Otherwise, use cross platform data directory as a default.
-	//        `$XDG_DATA_HOME` or `$HOME/.local/share` on Linux,
-	//        `$HOME`/Library/Application Support` on macOS,
-	//        `{FOLDERID_RoamingAppData}` on Windows
-	//    (See https://docs.rs/dirs/3.0.2/dirs/fn.cache_dir.html)
+	let path = data_flag.ok_or_else(|| {
+		hc_error!("can't find data folder (try setting the `--data` flag or `HC_DATA` environment variable)")
+	})?;
 
-	if let Some(data_path) = data_flag {
-		if data_path.exists() {
-			return Ok(data_path.to_owned());
-		}
-
-		return Err(hc_error!(
-			"data file {} (from --data) does not exist",
-			data_path.display()
-		));
+	if path.exists() {
+		return Ok(path.to_owned());
 	}
 
-	if let Ok(data_path) = dotenv::var("HC_DATA").map(PathBuf::from) {
-		if data_path.exists() {
-			return Ok(data_path);
-		}
-
-		return Err(hc_error!(
-			"data file {} (from HC_DATA) does not exist",
-			data_path.display()
-		));
-	}
-
-	if let Some(data_dir) = dirs::data_dir() {
-		if data_dir.exists() {
-			let data_path = pathbuf![&data_dir, "hipcheck"];
-			if data_path.exists() {
-				return Ok(data_path);
-			}
-		}
-	}
-
-	Err(hc_error!(
-		"can't find data (try setting the `HC_DATA` environment variable or `--data <FILE>` flag)"
-	))
+	Err(hc_error!("data folder '{}' does not exist", path.display()))
 }
 
 /// Resolves the source specifier into an actual source.
@@ -459,32 +368,34 @@ fn resolve_source(
 	source_type: &Check,
 	phase: &mut Phase,
 	home: &Path,
-	source: &OsStr,
+	source: &str,
 ) -> Result<Source> {
-	match source_type.check_type {
-		CheckType::RepoSource => SourceRepo::resolve_repo(phase, home, source).map(|repo| Source {
-			kind: SourceKind::Repo(repo),
-		}),
-		CheckType::PackageVersion => {
-			let package = source.to_str().unwrap();
+	match source_type.kind.target_kind() {
+		TargetKind::RepoSource => {
+			SourceRepo::resolve_repo(phase, home, source).map(|repo| Source {
+				kind: SourceKind::Repo(repo),
+			})
+		}
+		TargetKind::PackageVersion => {
+			let package = source;
 
-			let command = &source_type.to_owned().parent_command_value;
+			let command = &source_type.to_owned().kind;
 
-			let package_git_repo_url = pm::detect_and_extract(package, command.to_owned())
+			let package_git_repo_url = pm::detect_and_extract(package, command.name().to_owned())
 				.context("Could not get git repo URL for package")?;
 
-			SourceRepo::resolve_repo(phase, home, OsStr::new(package_git_repo_url.as_str())).map(
-				|repo| Source {
+			SourceRepo::resolve_repo(phase, home, package_git_repo_url.as_str()).map(|repo| {
+				Source {
 					kind: SourceKind::Repo(repo),
-				},
-			)
+				}
+			})
 		}
-		CheckType::PrUri => {
+		TargetKind::PrUri => {
 			SourceChangeRequest::resolve_change_request(phase, home, source).map(|cr| Source {
 				kind: SourceKind::ChangeRequest(cr),
 			})
 		}
-		CheckType::SpdxDocument => {
+		TargetKind::SpdxDocument => {
 			let download_url = spdx::extract_download_url(source)?;
 			SourceRepo::resolve_repo(phase, home, &download_url).map(|repo| Source {
 				kind: SourceKind::Repo(repo),
@@ -495,22 +406,30 @@ fn resolve_source(
 }
 
 pub struct Check {
-	pub check_type: CheckType,
-	pub check_value: OsString,
-
-	//hc check 'parent_command_value', where parent_command_value request, repo, npm, maven, pypi etc
-	pub parent_command_value: String,
-	//pub check_url: Url, this does not seem to be used anywhere and was causing a ci error, so turning off
+	pub target: String,
+	pub kind: CheckKind,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum CheckType {
+pub enum TargetKind {
 	RepoSource,
 	PrUri,
 	PatchUri,
 	PackageVersion,
 	SpdxDocument,
 }
+
+impl TargetKind {
+	pub fn is_checkable(&self) -> bool {
+		use TargetKind::*;
+
+		match self {
+			RepoSource | PrUri | PackageVersion | SpdxDocument => true,
+			PatchUri => false,
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -543,7 +462,7 @@ mod tests {
 			],
 			|| {
 				let home_dir = None;
-				let result = resolve_home(home_dir).unwrap();
+				let result = resolve_cache(home_dir).unwrap();
 				let path = result.to_str().unwrap();
 
 				if cfg!(target_os = "linux") {
@@ -581,7 +500,7 @@ mod tests {
 				// Passing in config path that does not exist
 				let manual_flag_path = &tempdir_path;
 				let home_flag = pathbuf![manual_flag_path];
-				let result = resolve_home(Some(&home_flag)).unwrap();
+				let result = resolve_cache(Some(&home_flag)).unwrap();
 				let path = result.to_str().unwrap();
 
 				if cfg!(target_os = "linux")
@@ -614,7 +533,7 @@ mod tests {
 				("HC_HOME", None),
 			],
 			|| {
-				let result = resolve_home(None).unwrap();
+				let result = resolve_cache(None).unwrap();
 				let path = result.to_str().unwrap();
 
 				if cfg!(target_os = "linux") {
@@ -650,7 +569,7 @@ mod tests {
 				("HC_HOME", Some(&tempdir_path)),
 			],
 			|| {
-				let result = resolve_home(None).unwrap();
+				let result = resolve_cache(None).unwrap();
 				let path = result.to_str().unwrap();
 				// Skip test if we cannot identify the OS
 				assert_eq!(path, &tempdir_path);

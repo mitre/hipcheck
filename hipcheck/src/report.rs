@@ -30,16 +30,16 @@ use std::rc::Rc;
 use std::result::Result as StdResult;
 
 /// The format to report results in.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, clap::ValueEnum)]
 pub enum Format {
 	/// JSON format.
 	Json,
 	/// Human-readable format.
+	#[default]
 	Human,
 }
 
 impl Format {
-	/// Set if the format is JSON.
 	pub fn use_json(json: bool) -> Format {
 		if json {
 			Format::Json

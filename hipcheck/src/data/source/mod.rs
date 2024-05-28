@@ -12,7 +12,6 @@ use crate::hc_error;
 use crate::shell::Phase;
 use log::debug;
 use pathbuf::pathbuf;
-use std::ffi::OsStr;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -57,11 +56,8 @@ impl SourceRepo {
 	/// make sure future operations are all done relative to the HEAD, and that any
 	/// cached data records what the HEAD was at the time of caching, to enable
 	/// cache invalidation.
-	pub fn resolve_repo(phase: &mut Phase, root: &Path, raw: &OsStr) -> Result<SourceRepo> {
+	pub fn resolve_repo(phase: &mut Phase, root: &Path, raw: &str) -> Result<SourceRepo> {
 		let local = PathBuf::from(raw);
-		let raw = raw
-			.to_str()
-			.ok_or_else(|| Error::msg("source isn't UTF-8 encoded"))?;
 
 		let source = match (local.exists(), local.is_dir()) {
 			// It's a local file, not a dir.
@@ -252,12 +248,9 @@ impl SourceChangeRequest {
 	pub fn resolve_change_request(
 		phase: &mut Phase,
 		root: &Path,
-		raw: &OsStr,
+		raw: &str,
 	) -> Result<SourceChangeRequest> {
 		let local = PathBuf::from(raw);
-		let raw = raw
-			.to_str()
-			.ok_or_else(|| Error::msg("source isn't UTF-8 encoded"))?;
 
 		let source = match (local.exists(), local.is_dir()) {
 			// It's a local file, not a dir.

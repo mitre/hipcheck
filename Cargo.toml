@@ -10,8 +10,8 @@
 # will default to the old resolver.
 resolver = "2"
 
-# Members of the workspace, just Hipcheck and our custom task runner.
-members = ["hipcheck", "xtask"]
+# Members of the workspace.
+members = ["hipcheck", "hipcheck-macros", "xtask"]
 
 # Make sure Hipcheck is run with `cargo run`.
 #
