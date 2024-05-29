@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+
+//! Tasks to list or create RFDs
+
 use crate::NewRfdArgs;
 use crate::RfdArgs;
 use anyhow::anyhow;
