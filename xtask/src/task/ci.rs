@@ -33,7 +33,7 @@ pub fn run() -> Result<()> {
 		task!(run_build),
 		task!(run_test),
 		task!(run_clippy),
-		task!(run_xtask_validate),
+		task!(run_xtask_check),
 		task!(done),
 	];
 
@@ -224,15 +224,12 @@ fn run_clippy(sh: &Shell) -> Result<()> {
 		.map_err(reason("call to cargo clippy failed"))
 }
 
-/// Run `cargo xtask validate`.
-fn run_xtask_validate(sh: &Shell) -> Result<()> {
-	cmd!(
-		sh,
-		"cargo run --package xtask --bin xtask --quiet -- validate"
-	)
-	.run()
-	.map(drop)
-	.map_err(reason("call to cargo xtask failed"))
+/// Run `cargo xtask check`.
+fn run_xtask_check(sh: &Shell) -> Result<()> {
+	cmd!(sh, "cargo run --package xtask --bin xtask --quiet -- check")
+		.run()
+		.map(drop)
+		.map_err(reason("call to cargo xtask failed"))
 }
 
 /// Tell the user we're done.
