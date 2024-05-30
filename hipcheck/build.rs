@@ -80,24 +80,24 @@ impl GitCommand {
 }
 
 fn install_git_cliff_if_not_found() -> Result<()> {
-
-    if which("git-cliff").is_err() {
-        // Install git cliff with `cargo install`
+	if which("git-cliff").is_err() {
+		// Install git cliff with `cargo install`
 		let cargo_path = which("cargo").context("can't find cargo")?;
 		let output = Command::new(cargo_path)
 			.args(vec!["install", "git-cliff"])
 			.output()?;
 
-        if !output.status.success() {
-            return match String::from_utf8(output.stderr) {
-                Ok(msg) if msg.is_empty().not() => Err(anyhow!(
-                    "cargo install failed with message '{}' [status: {}]",
-                    msg.trim(),output.status
-                )),
-                _ => Err(anyhow!("cargo install failed [status: {}]", output.status)),
-            };
-        }
-    }
+		if !output.status.success() {
+			return match String::from_utf8(output.stderr) {
+				Ok(msg) if msg.is_empty().not() => Err(anyhow!(
+					"cargo install failed with message '{}' [status: {}]",
+					msg.trim(),
+					output.status
+				)),
+				_ => Err(anyhow!("cargo install failed [status: {}]", output.status)),
+			};
+		}
+	}
 
-    Ok(())
+	Ok(())
 }
