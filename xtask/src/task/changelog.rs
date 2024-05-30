@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::ChangelogArgs;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::LevelFilter;
 use xshell::cmd;
 use xshell::Shell;
 
 /// Execute the changelog task.
 pub fn run(args: ChangelogArgs) -> Result<()> {
+	which::which("git-cliff").context(
+        "changelog requires `git-cliff` to be installed. Please install it with `cargo install git-cliff`.")?;
+
 	let sh = Shell::new()?;
 
 	// Get the root of the workspace, and make sure the shell is in it.
