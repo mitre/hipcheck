@@ -99,5 +99,5 @@ fn install_git_cliff_if_not_found() -> Result<()> {
         }
     }
 
-	Ok(())
+    Ok(())
 }
