@@ -330,7 +330,7 @@ USAGE:
 
 TASKS:
     check <SUBTASK>       analyzes a repository or pull/merge request
-    ready                 print a report of whether or not Hipcheck is ready to run
+    ready                 print a report of whether or not Hipcheck is ready to run (experimental)
     schema <SUBTASK>      print the schema for JSON-format output for a specified subtarget
     help [<SUBTASK>]      print help information, optionally for a given subcommand
 
@@ -473,7 +473,7 @@ fn print_readiness(
 		version::get_version(raw_version).unwrap()
 	);
 	println!("{}", version_text);
-	
+
 	// Check that git is installed and that its version is up to date
 	// Print the version number either way
 	let git_check = data::git::get_git_version();
