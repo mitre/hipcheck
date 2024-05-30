@@ -9,8 +9,6 @@ use crate::CheckKind;
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
-use std::env::var_os;
-use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 /// Automatated supply chain risk assessment of software packages.
@@ -143,6 +141,7 @@ impl CliConfig {
 	/// - Final defaults, if still unset.
 	pub fn load() -> CliConfig {
 		let mut config = CliConfig::empty();
+		config.update(&CliConfig::backups());
 		config.update(&CliConfig::from_platform());
 		config.update(&CliConfig::from_env());
 		config.update(&CliConfig::from_cli());
@@ -288,35 +287,37 @@ impl CliConfig {
 			..Default::default()
 		}
 	}
+
+	/// Set configuration backups for paths.
+	fn backups() -> CliConfig {
+		CliConfig {
+			path_args: PathArgs {
+				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),
+				data: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "data"]),
+				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
+			},
+			..Default::default()
+		}
+	}
 }
 
 /// Get a Hipcheck configuration environment variable.
 ///
 /// This is generic in the return type, to automatically handle
 /// converting from any type that can be derived from an [`OsString`].
-fn hc_env_var<O: From<OsString>>(name: &'static str) -> Option<O> {
+fn hc_env_var<O: From<String>>(name: &'static str) -> Option<O> {
 	let name = format!("HC_{}", name.to_uppercase());
-	let val = var_os(name)?;
+	let val = dotenv::var(name).ok()?;
 	Some(O::from(val))
 }
 
 /// Get a Hipcheck configuration environment variable and parse it into a [`ValueEnum`] type.
 fn hc_env_var_value_enum<E: ValueEnum>(name: &'static str) -> Option<E> {
-	let ostr: OsString = hc_env_var(name)?;
+	let s: String = hc_env_var(name)?;
 
 	// We don't ignore case; must be fully uppercase.
 	let ignore_case = false;
-
-	match ostr.into_string() {
-		Ok(s) => E::from_str(&s, ignore_case).ok(),
-		Err(_e) => {
-			log::warn!(
-				"environment variable HC_{} is not UTF-8 and will be ignored",
-				name.to_uppercase()
-			);
-			None
-		}
-	}
+	E::from_str(&s, ignore_case).ok()
 }
 
 /// All commands, both subcommands and flag-like commands.

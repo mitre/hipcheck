@@ -433,286 +433,205 @@ impl TargetKind {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::cli::CliConfig;
 	use crate::test_util::with_env_vars;
 	use tempfile::TempDir;
 
-	const TEMPDIR_PREFIX: &str = "hc_test";
+	const TEMPDIR_PREFIX: &str = "hipcheck";
 
 	#[test]
 	fn resolve_token_test() {
-		with_env_vars(vec![("HC_GITHUB_TOKEN", Some("test"))], || {
-			let result = resolve_token().unwrap();
-			println!("result token {}", result);
-			let empty = "".to_string();
-			assert_ne!(result, empty);
-			assert_eq!(result, "test");
+		let vars = vec![("HC_GITHUB_TOKEN", Some("test"))];
+		with_env_vars(vars, || assert_eq!(resolve_token().unwrap(), "test"));
+	}
+
+	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+	#[test]
+	fn resolve_home_with_home_env_var() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HOME", Some(tempdir.path().to_str().unwrap())),
+			("XDG_CACHE_HOME", None),
+			("HC_CACHE", None),
+		];
+
+		with_env_vars(vars, || {
+			let config = CliConfig::load();
+			let path = resolve_cache(config.cache()).unwrap();
+
+			let expected = if cfg!(target_os = "linux") {
+				pathbuf![&tempdir.path(), ".cache", "hipcheck"]
+			} else if cfg!(target_os = "macos") {
+				pathbuf![&tempdir.path(), "Library", "Caches", "hipcheck"]
+			} else {
+				// Windows
+				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Local", "hipcheck"]
+			};
+
+			assert_eq!(path, expected);
+		});
+	}
+
+	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+	#[test]
+	fn resolve_home_with_home_flag() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HC_CACHE", None),
+			("XDG_CACHE_HOME", None),
+			("HC_CACHE", Some(tempdir.path().to_str().unwrap())),
+		];
+
+		with_env_vars(vars, || {
+			let path = resolve_cache(Some(tempdir.path())).unwrap();
+			assert_eq!(path, tempdir.path());
+		});
+	}
+
+	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+	#[test]
+	fn resolve_home_with_xdg_cache_preferred() {
+		let tempdir1 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+		let tempdir2 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HC_CACHE", Some(tempdir1.path().to_str().unwrap())),
+			("XDG_CACHE_HOME", Some(tempdir2.path().to_str().unwrap())),
+			("HC_CACHE", None),
+		];
+
+		with_env_vars(vars, || {
+			let config = CliConfig::load();
+			let path = resolve_cache(config.cache()).unwrap();
+
+			let expected = if cfg!(target_os = "linux") {
+				pathbuf![tempdir2.path(), "hipcheck"]
+			} else if cfg!(target_os = "macos") {
+				pathbuf![tempdir1.path(), "Library", "Caches", "hipcheck"]
+			} else {
+				// Windows
+				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Local", "hipcheck"]
+			};
+
+			assert_eq!(path, expected);
 		});
 	}
 
 	#[test]
-	fn resolve_home_with_home_env_var() {
+	fn resolve_home_with_hc_cache_preferred() {
 		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
 
-		with_env_vars(
-			vec![
-				("HOME", Some(&tempdir_path)),
-				("XDG_CACHE_HOME", None),
-				("HC_HOME", None),
-			],
-			|| {
-				let home_dir = None;
-				let result = resolve_cache(home_dir).unwrap();
-				let path = result.to_str().unwrap();
+		let vars = vec![
+			("HOME", Some("/users/foo")),
+			("XDG_CACHE_HOME", Some("/xdg_cache_home")),
+			("HC_CACHE", Some(tempdir.path().to_str().unwrap())),
+		];
 
-				if cfg!(target_os = "linux") {
-					let expected = pathbuf![&tempdir_path, ".cache", "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else if cfg!(target_os = "macos") {
-					let expected = pathbuf![&tempdir_path, "Library", "Caches", "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else if cfg!(target_os = "windows") {
-					let expected =
-						pathbuf![&dirs::home_dir().unwrap(), "AppData", "Local", "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else {
-					// Skip test if we cannot identify the OS
-					let _path = path;
-				}
-			},
-		);
-
-		tempdir.close().unwrap();
+		with_env_vars(vars, || {
+			let config = CliConfig::load();
+			assert_eq!(&resolve_cache(config.cache()).unwrap(), &tempdir.path())
+		});
 	}
 
-	#[test]
-	fn resolve_home_with_home_flag() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
-
-		with_env_vars(
-			vec![
-				("HOME", None),
-				("XDG_CACHE_HOME", None),
-				("HC_HOME", Some(&tempdir_path)),
-			],
-			|| {
-				// Passing in config path that does not exist
-				let manual_flag_path = &tempdir_path;
-				let home_flag = pathbuf![manual_flag_path];
-				let result = resolve_cache(Some(&home_flag)).unwrap();
-				let path = result.to_str().unwrap();
-
-				if cfg!(target_os = "linux")
-					|| cfg!(target_os = "macos")
-					|| cfg!(target_os = "windows")
-				{
-					assert_eq!(path, manual_flag_path);
-				} else {
-					// Skip test if we cannot identify the OS
-					let _path = path;
-				}
-			},
-		);
-
-		tempdir.close().unwrap();
-	}
-
-	#[test]
-	fn resolve_home_with_xdg_cache_preferred() {
-		let tempdir1 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir1_path = tempdir1.path().to_string_lossy().into_owned();
-
-		let tempdir2 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir2_path = tempdir2.path().to_string_lossy().into_owned();
-
-		with_env_vars(
-			vec![
-				("HOME", Some(&tempdir1_path)),
-				("XDG_CACHE_HOME", Some(&tempdir2_path)),
-				("HC_HOME", None),
-			],
-			|| {
-				let result = resolve_cache(None).unwrap();
-				let path = result.to_str().unwrap();
-
-				if cfg!(target_os = "linux") {
-					let expected = pathbuf![&tempdir2_path, "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else if cfg!(target_os = "macos") {
-					let expected = pathbuf![&tempdir1_path, "Library", "Caches", "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else if cfg!(target_os = "windows") {
-					let expected =
-						pathbuf![&dirs::home_dir().unwrap(), "AppData", "Local", "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else {
-					// Skip test if we cannot identify the OS
-					let _path = path;
-				}
-			},
-		);
-
-		tempdir1.close().unwrap();
-		tempdir2.close().unwrap();
-	}
-
-	#[test]
-	fn resolve_home_with_hc_home_preferred() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
-
-		with_env_vars(
-			vec![
-				("HOME", Some("/users/foo")),
-				("XDG_CACHE_HOME", Some("/xdg_cache_home")),
-				("HC_HOME", Some(&tempdir_path)),
-			],
-			|| {
-				let result = resolve_cache(None).unwrap();
-				let path = result.to_str().unwrap();
-				// Skip test if we cannot identify the OS
-				assert_eq!(path, &tempdir_path);
-			},
-		);
-
-		tempdir.close().unwrap();
-	}
-
+	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 	#[test]
 	fn resolve_data_with_data_env_var() {
 		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
 
-		with_env_vars(
-			vec![
-				("HOME", Some(&tempdir_path)),
-				("XDG_DATA_HOME", None),
-				("HC_DATA", None),
-			],
-			|| {
-				let data_dir = None;
-				let data_path = pathbuf![&dirs::data_dir().unwrap(), "hipcheck"];
-				create_dir_all(data_path.as_path()).unwrap();
-				let result = resolve_data(data_dir).unwrap();
-				let path = result.to_str().unwrap();
+		let vars = vec![
+			("HOME", Some(tempdir.path().to_str().unwrap())),
+			("XDG_DATA_HOME", None),
+			("HC_DATA", Some(tempdir.path().to_str().unwrap())),
+		];
 
-				if cfg!(target_os = "linux") {
-					let expected = pathbuf![&tempdir_path, ".local", "share", "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else if cfg!(target_os = "macos") {
-					let expected =
-						pathbuf![&tempdir_path, "Library", "Application Support", "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else if cfg!(target_os = "windows") {
-					let expected =
-						pathbuf![&dirs::home_dir().unwrap(), "AppData", "Roaming", "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else {
-					// Skip test if we cannot identify the OS
-					let _path = path;
-				}
-			},
-		);
+		with_env_vars(vars, || {
+			let config = CliConfig::load();
+			let path = resolve_data(config.data()).unwrap();
 
-		tempdir.close().unwrap();
+			let expected = if cfg!(target_os = "linux") {
+				pathbuf![tempdir.path(), ".local", "share", "hipcheck"]
+			} else if cfg!(target_os = "macos") {
+				pathbuf![tempdir.path(), "Library", "Application Support", "hipcheck"]
+			} else {
+				// Windows
+				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Roaming", "hipcheck"]
+			};
+
+			assert_eq!(path, expected);
+		});
 	}
 
+	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 	#[test]
 	fn resolve_data_with_data_flag() {
 		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
 
-		with_env_vars(
-			vec![
-				("HOME", None),
-				("XDG_DATA_HOME", None),
-				("HC_DATA", Some(&tempdir_path)),
-			],
-			|| {
-				// Passing in config path that does not exist
-				let manual_flag_path = &tempdir_path;
-				let data_flag = pathbuf![manual_flag_path];
-				let result = resolve_data(Some(&data_flag)).unwrap();
-				let path = result.to_str().unwrap();
+		let vars = vec![
+			("HC_CACHE", None),
+			("XDG_DATA_HOME", None),
+			("HC_DATA", Some(tempdir.path().to_str().unwrap())),
+		];
 
-				if cfg!(target_os = "linux")
-					|| cfg!(target_os = "macos")
-					|| cfg!(target_os = "windows")
-				{
-					assert_eq!(path, manual_flag_path);
-				} else {
-					// Skip test if we cannot identify the OS
-					let _path = path;
-				}
-			},
-		);
-
-		tempdir.close().unwrap();
+		with_env_vars(vars, || {
+			let path = resolve_data(Some(tempdir.path())).unwrap();
+			assert_eq!(path, tempdir.path());
+		});
 	}
 
+	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 	#[test]
 	fn resolve_data_with_xdg_cache_preferred() {
 		let tempdir1 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir1_path = tempdir1.path().to_string_lossy().into_owned();
-
 		let tempdir2 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir2_path = tempdir2.path().to_string_lossy().into_owned();
 
-		with_env_vars(
-			vec![
-				("HOME", Some(&tempdir1_path)),
-				("XDG_DATA_HOME", Some(&tempdir2_path)),
-				("HC_HOME", None),
-				("HC_DATA", None),
-			],
-			|| {
-				let data_path = pathbuf![&dirs::data_dir().unwrap(), "hipcheck"];
-				create_dir_all(data_path.as_path()).unwrap();
-				let result = resolve_data(None).unwrap();
-				let path = result.to_str().unwrap();
+		let vars = vec![
+			("HOME", Some(tempdir1.path().to_str().unwrap())),
+			("XDG_DATA_HOME", Some(tempdir2.path().to_str().unwrap())),
+			("HC_CACHE", None),
+			("HC_DATA", None),
+		];
 
-				if cfg!(target_os = "linux") {
-					let expected = pathbuf![&tempdir2_path, "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else if cfg!(target_os = "macos") {
-					let expected =
-						pathbuf![&tempdir1_path, "Library", "Application Support", "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else if cfg!(target_os = "windows") {
-					let expected =
-						pathbuf![&dirs::home_dir().unwrap(), "AppData", "Roaming", "hipcheck"];
-					assert_eq!(path, expected.to_str().unwrap());
-				} else {
-					// Skip test if we cannot identify the OS
-					let _path = path;
-				}
-			},
-		);
+		with_env_vars(vars, || {
+			// Create the data path
+			let data_path = pathbuf![&dirs::data_dir().unwrap(), "hipcheck"];
+			create_dir_all(data_path.as_path()).unwrap();
 
-		tempdir1.close().unwrap();
-		tempdir2.close().unwrap();
+			let config = CliConfig::load();
+			let path = resolve_data(config.data()).unwrap();
+
+			let expected = if cfg!(target_os = "linux") {
+				pathbuf![tempdir2.path(), "hipcheck"]
+			} else if cfg!(target_os = "macos") {
+				pathbuf![
+					tempdir1.path(),
+					"Library",
+					"Application Support",
+					"hipcheck"
+				]
+			} else {
+				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Roaming", "hipcheck"]
+			};
+
+			assert_eq!(path, expected);
+		});
 	}
 
 	#[test]
 	fn resolve_data_with_hc_data_preferred() {
 		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir_path = tempdir.path().to_string_lossy().into_owned();
 
-		with_env_vars(
-			vec![
-				("HOME", Some("/users/foo")),
-				("XDG_DATA_HOME", Some("/xdg_cache_home")),
-				("HC_DATA", Some(&tempdir_path)),
-			],
-			|| {
-				let result = resolve_data(None).unwrap();
-				let path = result.to_str().unwrap();
-				// This should work on all platforms
-				assert_eq!(path, &tempdir_path);
-			},
-		);
+		let vars = vec![
+			("HC_CACHE", Some("/users/foo")),
+			("XDG_DATA_HOME", Some("/xdg_cache_home")),
+			("HC_DATA", Some(tempdir.path().to_str().unwrap())),
+		];
 
-		tempdir.close().unwrap();
+		with_env_vars(vars, || {
+			let config = CliConfig::load();
+			let path = resolve_data(config.data()).unwrap();
+			assert_eq!(path, tempdir.path());
+		});
 	}
 }
