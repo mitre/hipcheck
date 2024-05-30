@@ -44,14 +44,18 @@ use cli::FullCommands;
 use cli::SchemaArgs;
 use cli::SchemaCommand;
 use command_util::DependentProgram;
+use core::fmt;
 use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
 use schemars::schema_for;
 use std::env;
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::ops::Not as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::result::Result as StdResult;
 
 fn init_logging() {
 	EnvLoggerBuilder::from_env(Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE")).init();
@@ -141,100 +145,220 @@ fn cmd_schema(args: &SchemaArgs) {
 	}
 }
 
+#[derive(Debug)]
+struct ReadyChecks {
+	hipcheck_version_check: StdResult<String, VersionCheckError>,
+	git_version_check: StdResult<String, VersionCheckError>,
+	npm_version_check: StdResult<String, VersionCheckError>,
+	config_path_check: StdResult<PathBuf, PathCheckError>,
+	data_path_check: StdResult<PathBuf, PathCheckError>,
+	cache_path_check: StdResult<PathBuf, PathCheckError>,
+	github_token_check: StdResult<(), EnvVarCheckError>,
+}
+
+impl ReadyChecks {
+	/// Check if Hipcheck is ready to run.
+	///
+	/// We don't check `github_token_check`, because it's allowed to fail.
+	fn is_ready(&self) -> bool {
+		self.hipcheck_version_check.is_ok()
+			&& self.git_version_check.is_ok()
+			&& self.npm_version_check.is_ok()
+			&& self.config_path_check.is_ok()
+			&& self.data_path_check.is_ok()
+			&& self.cache_path_check.is_ok()
+	}
+}
+
+#[derive(Debug)]
+struct VersionCheckError {
+	cmd_name: &'static str,
+	kind: VersionCheckErrorKind,
+}
+
+impl Display for VersionCheckError {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		match &self.kind {
+			VersionCheckErrorKind::CmdNotFound => {
+				write!(f, "command '{}' not found", self.cmd_name)
+			}
+			VersionCheckErrorKind::VersionTooOld { expected, found } => write!(
+				f,
+				"command '{}' version is too old; found {}, must be at least {}",
+				self.cmd_name, found, expected
+			),
+		}
+	}
+}
+
+#[derive(Debug)]
+enum VersionCheckErrorKind {
+	CmdNotFound,
+	VersionTooOld { expected: String, found: String },
+}
+
+#[derive(Debug)]
+enum PathCheckError {
+	PathNotFound,
+}
+
+impl Display for PathCheckError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		match self {
+			PathCheckError::PathNotFound => write!(f, "path not found"),
+		}
+	}
+}
+
+#[derive(Debug)]
+struct EnvVarCheckError {
+	name: &'static str,
+	kind: EnvVarCheckErrorKind,
+}
+
+impl Display for EnvVarCheckError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		match &self.kind {
+			EnvVarCheckErrorKind::VarNotFound => {
+				write!(f, "environment variable '{}' was not found", self.name)
+			}
+		}
+	}
+}
+
+#[derive(Debug)]
+enum EnvVarCheckErrorKind {
+	VarNotFound,
+}
+
+fn check_hipcheck_version() -> StdResult<String, VersionCheckError> {
+	let pkg_name = env!("CARGO_PKG_NAME", "can't find Hipcheck package name");
+
+	let version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
+	let version = version::get_version(version).map_err(|_| VersionCheckError {
+		cmd_name: "hc",
+		kind: VersionCheckErrorKind::CmdNotFound,
+	})?;
+
+	Ok(format!("{} {}", pkg_name, version))
+}
+
+fn check_git_version() -> StdResult<String, VersionCheckError> {
+	let version = data::git::get_git_version().map_err(|_| VersionCheckError {
+		cmd_name: "git",
+		kind: VersionCheckErrorKind::CmdNotFound,
+	})?;
+
+	DependentProgram::Git
+		.check_version(&version)
+		.map(|_| version.trim().to_owned())
+		.map_err(|_| VersionCheckError {
+			cmd_name: "git",
+			kind: VersionCheckErrorKind::VersionTooOld {
+				expected: DependentProgram::Git.min_version().unwrap().to_string(),
+				found: version,
+			},
+		})
+}
+
+fn check_npm_version() -> StdResult<String, VersionCheckError> {
+	let version = data::npm::get_npm_version()
+		.map(|version| version.trim().to_owned())
+		.map_err(|_| VersionCheckError {
+			cmd_name: "npm",
+			kind: VersionCheckErrorKind::CmdNotFound,
+		})?;
+
+	DependentProgram::Npm
+		.check_version(&version)
+		.map(|_| version.clone())
+		.map_err(|_| VersionCheckError {
+			cmd_name: "npm",
+			kind: VersionCheckErrorKind::VersionTooOld {
+				expected: DependentProgram::Npm.min_version().unwrap().to_string(),
+				found: version,
+			},
+		})
+}
+
+fn check_config_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
+	resolve_config(config.config()).map_err(|_| PathCheckError::PathNotFound)
+}
+
+fn check_cache_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
+	resolve_cache(config.cache()).map_err(|_| PathCheckError::PathNotFound)
+}
+
+fn check_data_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
+	resolve_data(config.data()).map_err(|_| PathCheckError::PathNotFound)
+}
+
+/// Check that a GitHub token has been provided as an environment variable
+/// This does not check if the token is valid or not
+/// The absence of a token does not trigger the failure state for the readiness check, because
+/// Hipcheck *can* run without a token, but some analyses will not.
+fn check_github_token() -> StdResult<(), EnvVarCheckError> {
+	let name = "HC_GITHUB_TOKEN";
+
+	std::env::var(name)
+		.map(|_| ())
+		.map_err(|_| EnvVarCheckError {
+			name,
+			kind: EnvVarCheckErrorKind::VarNotFound,
+		})
+}
+
 fn cmd_ready(config: &CliConfig) {
-	let cache_path = config.cache();
-	let config_path = config.config();
-	let data_path = config.data();
+	let ready = ReadyChecks {
+		hipcheck_version_check: check_hipcheck_version(),
+		git_version_check: check_git_version(),
+		npm_version_check: check_npm_version(),
+		config_path_check: check_config_path(config),
+		data_path_check: check_data_path(config),
+		cache_path_check: check_cache_path(config),
+		github_token_check: check_github_token(),
+	};
 
-	let mut failed = false;
-
-	// Print Hipcheck version
-	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
-
-	let version_text = format!(
-		"{} {}",
-		env!("CARGO_PKG_NAME"),
-		version::get_version(raw_version).unwrap()
-	);
-	println!("{}", version_text);
-
-	// Check that git is installed and that its version is up to date
-	// Print the version number either way
-	match data::git::get_git_version() {
-		Ok(git_version) => match DependentProgram::Git.check_version(&git_version) {
-			// No need to check Boolean value, because currentl check_version() only returns Ok(true) or Err()
-			Ok(_) => print!("Found installed {}", git_version),
-			Err(err) => {
-				print_error(&err);
-				failed = true;
-			}
-		},
-		Err(err) => {
-			print_error(&err);
-			failed = true;
-		}
+	match &ready.hipcheck_version_check {
+		Ok(version) => println!("{:<17} {}", "Hipcheck Version:", version),
+		Err(e) => println!("{:<17} {}", "Hipcheck Version:", e),
 	}
 
-	// Check that git is installed and that its version is up to date
-	// Print the version number either way
-	match data::npm::get_npm_version() {
-		Ok(npm_version) => match DependentProgram::Npm.check_version(&npm_version) {
-			// No need to check Boolean value, because currently check_version() only returns Ok(true) or Err()
-			Ok(_) => print!("Found installed NPM version {}", npm_version),
-			Err(err) => {
-				print_error(&err);
-				failed = true;
-			}
-		},
-		Err(err) => {
-			print_error(&err);
-			failed = true;
-		}
+	match &ready.git_version_check {
+		Ok(version) => println!("{:<17} {}", "Git Version:", version),
+		Err(e) => println!("{:<17} {}", "Git Version:", e),
 	}
 
-	// Check that the Hipcheck home folder is findable
-	match resolve_cache(cache_path) {
-		Ok(path_buffer) => println!("Hipcheck home directory: {}", path_buffer.display()),
-		Err(err) => {
-			failed = true;
-			print_error(&err);
-		}
+	match &ready.npm_version_check {
+		Ok(version) => println!("{:<17} {}", "NPM Version:", version),
+		Err(e) => println!("{:<17} {}", "NPM Version:", e),
 	}
 
-	// Check that the Hipcheck config TOML exists in the designated location
-	match resolve_config(config_path) {
-		Ok(path_buffer) => println!("Hipcheck config file: {}", path_buffer.display()),
-		Err(err) => {
-			failed = true;
-			print_error(&err);
-		}
+	match &ready.cache_path_check {
+		Ok(path) => println!("{:<17} {}", "Cache Path:", path.display()),
+		Err(e) => println!("{:<17} {}", "Cache Path:", e),
 	}
 
-	// Check that Hipcheck data folder is findable
-	match resolve_data(data_path) {
-		Ok(path_buffer) => println!("Hipcheck data directory: {}", path_buffer.display()),
-		Err(err) => {
-			failed = true;
-			print_error(&err);
-		}
+	match &ready.config_path_check {
+		Ok(path) => println!("{:<17} {}", "Config Path:", path.display()),
+		Err(e) => println!("{:<17} {}", "Config Path:", e),
 	}
 
-	// Check that a GitHub token has been provided as an environment variable
-	// This does not check if the token is valid or not
-	// The absence of a token does not trigger the failure state for the readiness check, because
-	// Hipcheck *can* run without a token, but some analyses will not.
-	if std::env::var("HC_GITHUB_TOKEN").is_ok() {
-		println!("HC_GITHUB_TOKEN system environment variable found.");
+	match &ready.data_path_check {
+		Ok(path) => println!("{:<17} {}", "Data Path:", path.display()),
+		Err(e) => println!("{:<17} {}", "Data Path:", e),
+	}
+
+	match &ready.github_token_check {
+		Ok(_) => println!("{:<17} {}", "GitHub Token:", "Found!"),
+		Err(e) => println!("{:<17} {}", "GitHub Token:", e),
+	}
+
+	if ready.is_ready() {
+		println!("Hipcheck is ready to run!");
 	} else {
-		println!("Missing HC_GITHUB_TOKEN system environment variable. Some analyses will not run without this token set.");
+		println!("Hipheck is NOT ready to run");
 	}
-
-	if failed {
-		println!("One or more dependencies or configuration settings are missing. Hipcheck is not ready to run.");
-		return;
-	}
-
-	println!("Hipcheck is ready to run!");
 }
 
 /// Print the current home directory for Hipcheck.
