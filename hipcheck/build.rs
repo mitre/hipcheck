@@ -11,11 +11,13 @@ use std::path::Path;
 use std::process::Command;
 use which::which;
 
-fn main() {
+fn main() -> Result<()> {
 	let repo_dir = env!("CARGO_MANIFEST_DIR", "can't find Cargo manifest directory");
 	let head = get_head_commit(repo_dir).unwrap_or_default();
 
-	println!("cargo:rustc-env=HC_HEAD_COMMIT={}", head)
+	println!("cargo:rustc-env=HC_HEAD_COMMIT={}", head);
+
+	install_git_cliff_if_not_found()
 }
 
 fn get_head_commit<P: AsRef<Path>>(path: P) -> Result<String> {
@@ -75,4 +77,28 @@ impl GitCommand {
 			_ => Err(anyhow!("git failed [status: {}]", output.status)),
 		}
 	}
+}
+
+fn install_git_cliff_if_not_found() -> Result<()> {
+
+    if which("git-cliff").is_err() {
+        // Install git cliff with `cargo install`
+		let cargo_path = which("cargo").context("can't find cargo")?;
+		let output = Command::new(cargo_path)
+			.args(vec!["install", "git-cliff"])
+			.output()?;
+
+		if !output.status.success() {
+			return match String::from_utf8(output.stderr) {
+				Ok(msg) if msg.is_empty().not() => Err(anyhow!(
+					"cargo install failed with message '{}' [status: {}]",
+					msg.trim(),
+					output.status
+				)),
+				_ => Err(anyhow!("cargo install failed [status: {}]", output.status)),
+			};
+		}
+	}
+
+	Ok(())
 }
