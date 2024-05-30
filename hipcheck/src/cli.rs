@@ -7,24 +7,12 @@
 #[command(about, disable_help_flag=true, disable_version_flag=true, long_about=None)]
 pub struct Args {
 	/// print help text
-	#[arg(name="extra-help", short = 'h', long = "help")]
+	#[arg(name = "extra-help", short = 'h', long = "help")]
 	pub extra_help: bool,
 
 	/// print version information
 	#[arg(short = 'V', long, global = true)]
 	pub version: bool,
-
-	/// print the home directory for Hipcheck
-	#[arg(long = "print-home", global = true)]
-	pub print_home: bool,
-
-	/// print the config file path for Hipcheck
-	#[arg(long = "print-config", global = true)]
-	pub print_config: bool,
-
-	/// print the data folder path for Hipcheck
-	#[arg(long = "print-data", global = true)]
-	pub print_data: bool,
 
 	/// silences progress reporting
 	#[arg(short = 'q', long = "quiet", global = true)]
@@ -71,12 +59,21 @@ pub enum Commands {
 	/// Analyzes a repository or pull/merge request
 	#[command(disable_help_subcommand = true)]
 	Check(CheckArgs),
+	/// Check if Hipcheck is ready to execute and reports status to user
+	#[command(disable_help_subcommand = true)]
+	Ready,
 	/// Print help information, optionally for a given subcommand
 	#[command(disable_help_subcommand = true)]
 	Help(HelpArgs),
 	/// Print the schema for JSON-format output for a specified subtarget
 	#[command(disable_help_subcommand = true)]
 	Schema(SchemaArgs),
+}
+
+impl Default for Commands {
+	fn default() -> Commands {
+		Commands::Help(HelpArgs { command: None })
+	}
 }
 
 #[derive(Debug, clap::Args)]
