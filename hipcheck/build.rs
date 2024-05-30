@@ -88,17 +88,16 @@ fn install_git_cliff_if_not_found() -> Result<()> {
 			.args(vec!["install", "git-cliff"])
 			.output()?;
 
-		if !output.status.success() {
-			return match String::from_utf8(output.stderr) {
-				Ok(msg) if msg.is_empty().not() => Err(anyhow!(
-					"cargo install failed with message '{}' [status: {}]",
-					msg.trim(),
-					output.status
-				)),
-				_ => Err(anyhow!("cargo install failed [status: {}]", output.status)),
-			};
-		}
-	}
+        if !output.status.success() {
+            return match String::from_utf8(output.stderr) {
+                Ok(msg) if msg.is_empty().not() => Err(anyhow!(
+                    "cargo install failed with message '{}' [status: {}]",
+                    msg.trim(),output.status
+                )),
+                _ => Err(anyhow!("cargo install failed [status: {}]", output.status)),
+            };
+        }
+    }
 
 	Ok(())
 }
