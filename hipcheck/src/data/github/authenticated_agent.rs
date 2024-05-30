@@ -4,9 +4,9 @@
 
 use crate::data::github::hidden::Hidden;
 use crate::error::Result;
-use ureq::Agent;
-use ureq::AgentBuilder;
-use ureq::Request;
+use rustls::{ClientConfig, RootCertStore};
+use std::sync::Arc;
+use ureq::{Agent, AgentBuilder, Request};
 
 /// An [`Agent`] which authenticates requests with token auth.
 ///
@@ -23,7 +23,16 @@ pub struct AuthenticatedAgent<'token> {
 impl<'token> AuthenticatedAgent<'token> {
 	/// Construct a new authenticated agent.
 	pub fn new(token: &'token str) -> Result<AuthenticatedAgent<'token>> {
-		let agent = AgentBuilder::new().build();
+		let mut roots = RootCertStore::empty();
+		for cert in rustls_native_certs::load_native_certs()? {
+			roots.add(cert)?;
+		}
+
+		let tls_config = ClientConfig::builder()
+			.with_root_certificates(roots)
+			.with_no_client_auth();
+
+		let agent = AgentBuilder::new().tls_config(Arc::new(tls_config)).build();
 
 		let token = Hidden::new(token);
 

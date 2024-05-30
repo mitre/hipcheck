@@ -36,6 +36,9 @@ paste = "1.0.7"
 pathbuf = "1.0.0"
 petgraph = { version = "0.6.0", features = ["serde-1"] }
 regex = "1.5.5"
+# Exactly matching the version of rustls used by ureq
+rustls = "0.22.4"
+rustls-native-certs = "0.7.0"
 salsa = "0.16.1"
 schemars = { version = "0.8.21", default-features = false, features = [
     "derive",
