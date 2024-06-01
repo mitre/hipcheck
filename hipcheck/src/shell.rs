@@ -951,20 +951,22 @@ impl PrintMode {
 }
 
 /// How verbose CLI output should be.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, clap::ValueEnum)]
 pub enum Verbosity {
-	/// Don't output anything except results.
+	/// Output results, not progress indicators.
 	Quiet,
-	/// Output the normal amount of things.
+	/// Output results and progress indicators.
+	#[default]
 	Normal,
 	// This one is only used in testing.
-	/// Don't output anything, including results.
+	/// Do not output anything.
+	#[value(hide = true)]
 	Silent,
 }
 
-impl From<bool> for Verbosity {
-	fn from(b: bool) -> Verbosity {
-		if b {
+impl Verbosity {
+	pub fn use_quiet(quiet: bool) -> Verbosity {
+		if quiet {
 			Verbosity::Quiet
 		} else {
 			Verbosity::Normal
@@ -973,13 +975,14 @@ impl From<bool> for Verbosity {
 }
 
 /// Selection of whether the CLI output should use color.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, clap::ValueEnum)]
 pub enum ColorChoice {
 	/// Always use color output
 	Always,
 	/// Never use color output
 	Never,
 	/// Guess whether to use color output
+	#[default]
 	Auto,
 }
 

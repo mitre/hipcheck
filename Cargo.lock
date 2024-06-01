@@ -485,13 +485,13 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
- "clap-verbosity-flag",
  "content_inspector",
  "dirs",
  "dotenv",
  "duct",
  "env_logger",
  "graphql_client",
+ "hipcheck-macros",
  "lazy_static",
  "libc",
  "log",
@@ -524,6 +524,15 @@ dependencies = [
  "which",
  "winapi",
  "xml-rs",
+]
+
+[[package]]
+name = "hipcheck-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.66",
 ]
 
 [[package]]
