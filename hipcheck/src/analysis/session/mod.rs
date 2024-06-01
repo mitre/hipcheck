@@ -43,17 +43,13 @@ use crate::report::ReportParams;
 use crate::report::ReportParamsStorage;
 use crate::shell::Phase;
 use crate::shell::Shell;
-use crate::util::fs::create_dir_all;
 use crate::version::get_version;
 use crate::version::VersionQuery;
 use crate::version::VersionQueryStorage;
 use crate::CheckKind;
-use crate::HIPCHECK_TOML_FILE;
 use chrono::prelude::*;
 use dotenv::var;
-use pathbuf::pathbuf;
 use std::fmt;
-use std::ops::Not as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -189,7 +185,11 @@ impl Session {
 		 *  Resolving the Hipcheck home.
 		 *-----------------------------------------------------------------*/
 
-		let home = match load_home(&mut session.shell, home_dir.as_deref()) {
+		let home = match home_dir
+			.as_deref()
+			.map(ToOwned::to_owned)
+			.ok_or_else(|| hc_error!("can't find cache directory"))
+		{
 			Ok(results) => results,
 			Err(err) => return Err((session.shell, err)),
 		};
@@ -255,8 +255,8 @@ fn load_config_and_data(
 	let phase = shell.phase("loading configuration and data files")?;
 
 	// Resolve the path to the config file.
-	let valid_config_path = resolve_config(config_path)
-		.context("Failed to load configuration. Please make sure the path set by the hc_config env variable exists.")?;
+	let valid_config_path = config_path
+	   .ok_or_else(|| hc_error!("Failed to load configuration. Please make sure the path set by the hc_config env variable exists."))?;
 
 	// Get the directory the config file is in.
 	let config_dir = valid_config_path
@@ -269,8 +269,9 @@ fn load_config_and_data(
 		.context("Failed to load configuration. Please make sure the config files are in the config directory.")?;
 
 	// Get the directory the data file is in.
-	let data_dir = resolve_data(data_path)
-		.context("Failed to load data files. Please make sure the path set by the hc_data env variable exists.")?;
+	let data_dir = data_path
+	   .ok_or_else(|| hc_error!("Failed to load data files. Please make sure the path set by the hc_data env variable exists."))?
+		.to_owned();
 
 	// Resolve the github token file.
 	let hc_github_token = resolve_token()?;
@@ -278,13 +279,6 @@ fn load_config_and_data(
 	phase.finish()?;
 
 	Ok((config, config_dir, data_dir, hc_github_token))
-}
-
-fn load_home(_shell: &mut Shell, home_dir: Option<&Path>) -> Result<PathBuf> {
-	// If no env or dotenv vars set, return error as Hipcheck can not run without config set
-	let home = resolve_cache(home_dir)?;
-
-	Ok(home)
 }
 
 fn load_source(
@@ -315,52 +309,6 @@ fn resolve_token() -> Result<String> {
 		Ok(token) => Ok(token),
 		_ => Ok("".to_string()),
 	}
-}
-
-/// Resolves a cache location for Hipcheck to cache data.
-pub fn resolve_cache(cache_flag: Option<&Path>) -> Result<PathBuf> {
-	let path = cache_flag.ok_or_else(|| {
-		hc_error!("can't find cache folder (try setting the `--cache` flag or `HC_CACHE` environment variable)")
-	})?;
-
-	if path.exists().not() {
-		// Try to create the cache directory if it doesn't exist.
-		create_dir_all(path).context(format!(
-			"failed to create cache folder '{}'",
-			path.display()
-		))?;
-	}
-
-	Ok(path.to_owned())
-}
-
-/// Resolves a config folder location for Hipcheck to to find config files in
-#[allow(clippy::size_of_ref)]
-pub fn resolve_config(config_flag: Option<&Path>) -> Result<PathBuf> {
-	let path = config_flag.ok_or_else(|| {
-		hc_error!("can't find config file (try setting the `--config` flag or `HC_CONFIG` environment variable)")
-	})?;
-
-	let path = pathbuf![&path, HIPCHECK_TOML_FILE];
-
-	if path.exists() {
-		return Ok(path);
-	}
-
-	Err(hc_error!("config file '{}' does not exist", path.display()))
-}
-
-/// Resolves a data folder location for Hipcheck to to find data files in
-pub fn resolve_data(data_flag: Option<&Path>) -> Result<PathBuf> {
-	let path = data_flag.ok_or_else(|| {
-		hc_error!("can't find data folder (try setting the `--data` flag or `HC_DATA` environment variable)")
-	})?;
-
-	if path.exists() {
-		return Ok(path.to_owned());
-	}
-
-	Err(hc_error!("data folder '{}' does not exist", path.display()))
 }
 
 /// Resolves the source specifier into an actual source.
@@ -433,205 +381,11 @@ impl TargetKind {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::cli::CliConfig;
 	use crate::test_util::with_env_vars;
-	use tempfile::TempDir;
-
-	const TEMPDIR_PREFIX: &str = "hipcheck";
 
 	#[test]
 	fn resolve_token_test() {
 		let vars = vec![("HC_GITHUB_TOKEN", Some("test"))];
 		with_env_vars(vars, || assert_eq!(resolve_token().unwrap(), "test"));
-	}
-
-	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-	#[test]
-	fn resolve_home_with_home_env_var() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HOME", Some(tempdir.path().to_str().unwrap())),
-			("XDG_CACHE_HOME", None),
-			("HC_CACHE", None),
-		];
-
-		with_env_vars(vars, || {
-			let config = CliConfig::load();
-			let path = resolve_cache(config.cache()).unwrap();
-
-			let expected = if cfg!(target_os = "linux") {
-				pathbuf![&tempdir.path(), ".cache", "hipcheck"]
-			} else if cfg!(target_os = "macos") {
-				pathbuf![&tempdir.path(), "Library", "Caches", "hipcheck"]
-			} else {
-				// Windows
-				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Local", "hipcheck"]
-			};
-
-			assert_eq!(path, expected);
-		});
-	}
-
-	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-	#[test]
-	fn resolve_home_with_home_flag() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HC_CACHE", None),
-			("XDG_CACHE_HOME", None),
-			("HC_CACHE", Some(tempdir.path().to_str().unwrap())),
-		];
-
-		with_env_vars(vars, || {
-			let path = resolve_cache(Some(tempdir.path())).unwrap();
-			assert_eq!(path, tempdir.path());
-		});
-	}
-
-	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-	#[test]
-	fn resolve_home_with_xdg_cache_preferred() {
-		let tempdir1 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir2 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HC_CACHE", Some(tempdir1.path().to_str().unwrap())),
-			("XDG_CACHE_HOME", Some(tempdir2.path().to_str().unwrap())),
-			("HC_CACHE", None),
-		];
-
-		with_env_vars(vars, || {
-			let config = CliConfig::load();
-			let path = resolve_cache(config.cache()).unwrap();
-
-			let expected = if cfg!(target_os = "linux") {
-				pathbuf![tempdir2.path(), "hipcheck"]
-			} else if cfg!(target_os = "macos") {
-				pathbuf![tempdir1.path(), "Library", "Caches", "hipcheck"]
-			} else {
-				// Windows
-				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Local", "hipcheck"]
-			};
-
-			assert_eq!(path, expected);
-		});
-	}
-
-	#[test]
-	fn resolve_home_with_hc_cache_preferred() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HOME", Some("/users/foo")),
-			("XDG_CACHE_HOME", Some("/xdg_cache_home")),
-			("HC_CACHE", Some(tempdir.path().to_str().unwrap())),
-		];
-
-		with_env_vars(vars, || {
-			let config = CliConfig::load();
-			assert_eq!(&resolve_cache(config.cache()).unwrap(), &tempdir.path())
-		});
-	}
-
-	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-	#[test]
-	fn resolve_data_with_data_env_var() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HOME", Some(tempdir.path().to_str().unwrap())),
-			("XDG_DATA_HOME", None),
-			("HC_DATA", Some(tempdir.path().to_str().unwrap())),
-		];
-
-		with_env_vars(vars, || {
-			let config = CliConfig::load();
-			let path = resolve_data(config.data()).unwrap();
-
-			let expected = if cfg!(target_os = "linux") {
-				pathbuf![tempdir.path(), ".local", "share", "hipcheck"]
-			} else if cfg!(target_os = "macos") {
-				pathbuf![tempdir.path(), "Library", "Application Support", "hipcheck"]
-			} else {
-				// Windows
-				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Roaming", "hipcheck"]
-			};
-
-			assert_eq!(path, expected);
-		});
-	}
-
-	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-	#[test]
-	fn resolve_data_with_data_flag() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HC_CACHE", None),
-			("XDG_DATA_HOME", None),
-			("HC_DATA", Some(tempdir.path().to_str().unwrap())),
-		];
-
-		with_env_vars(vars, || {
-			let path = resolve_data(Some(tempdir.path())).unwrap();
-			assert_eq!(path, tempdir.path());
-		});
-	}
-
-	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-	#[test]
-	fn resolve_data_with_xdg_cache_preferred() {
-		let tempdir1 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-		let tempdir2 = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HOME", Some(tempdir1.path().to_str().unwrap())),
-			("XDG_DATA_HOME", Some(tempdir2.path().to_str().unwrap())),
-			("HC_CACHE", None),
-			("HC_DATA", None),
-		];
-
-		with_env_vars(vars, || {
-			// Create the data path
-			let data_path = pathbuf![&dirs::data_dir().unwrap(), "hipcheck"];
-			create_dir_all(data_path.as_path()).unwrap();
-
-			let config = CliConfig::load();
-			let path = resolve_data(config.data()).unwrap();
-
-			let expected = if cfg!(target_os = "linux") {
-				pathbuf![tempdir2.path(), "hipcheck"]
-			} else if cfg!(target_os = "macos") {
-				pathbuf![
-					tempdir1.path(),
-					"Library",
-					"Application Support",
-					"hipcheck"
-				]
-			} else {
-				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Roaming", "hipcheck"]
-			};
-
-			assert_eq!(path, expected);
-		});
-	}
-
-	#[test]
-	fn resolve_data_with_hc_data_preferred() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HC_CACHE", Some("/users/foo")),
-			("XDG_DATA_HOME", Some("/xdg_cache_home")),
-			("HC_DATA", Some(tempdir.path().to_str().unwrap())),
-		];
-
-		with_env_vars(vars, || {
-			let config = CliConfig::load();
-			let path = resolve_data(config.data()).unwrap();
-			assert_eq!(path, tempdir.path());
-		});
 	}
 }

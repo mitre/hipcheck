@@ -475,18 +475,6 @@ pub enum SchemaCommand {
 	Request,
 }
 
-/// Test CLI commands
-#[cfg(test)]
-mod tests {
-	use super::CliConfig;
-	use clap::CommandFactory;
-
-	#[test]
-	fn verify_cli() {
-		CliConfig::command().debug_assert()
-	}
-}
-
 /// A type that can copy non-`None` values from other instances of itself.
 pub trait Update {
 	/// Update self with the value from other, if present.
@@ -498,5 +486,287 @@ impl<T: Clone> Update for Option<T> {
 		if other.is_some() {
 			self.clone_from(&other);
 		}
+	}
+}
+
+/// Test CLI commands
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::cli::CliConfig;
+	use crate::test_util::with_env_vars;
+	use clap::CommandFactory;
+	use tempfile::TempDir;
+
+	const TEMPDIR_PREFIX: &str = "hipcheck";
+
+	#[test]
+	fn verify_cli() {
+		CliConfig::command().debug_assert()
+	}
+
+	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+	#[test]
+	fn resolve_cache_with_platform() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HOME", Some(tempdir.path().to_str().unwrap())),
+			("XDG_CACHE_HOME", None),
+			("HC_CACHE", None),
+		];
+
+		with_env_vars(vars, || {
+			let config = {
+				let mut temp = CliConfig::empty();
+				temp.update(&CliConfig::from_platform());
+				temp.update(&CliConfig::from_env());
+				temp
+			};
+
+			let expected = if cfg!(target_os = "linux") {
+				pathbuf![&tempdir.path(), ".cache", "hipcheck"]
+			} else if cfg!(target_os = "macos") {
+				pathbuf![&tempdir.path(), "Library", "Caches", "hipcheck"]
+			} else {
+				// Windows
+				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Local", "hipcheck"]
+			};
+
+			assert_eq!(config.cache().unwrap(), expected);
+		});
+	}
+
+	#[test]
+	fn resolve_cache_with_env_var() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HOME", None),
+			("XDG_CACHE_HOME", None),
+			("HC_CACHE", Some(tempdir.path().to_str().unwrap())),
+		];
+
+		with_env_vars(vars, || {
+			let config = {
+				let mut temp = CliConfig::empty();
+				temp.update(&CliConfig::from_platform());
+				temp.update(&CliConfig::from_env());
+				temp
+			};
+
+			assert_eq!(config.cache().unwrap(), tempdir.path());
+		});
+	}
+
+	#[test]
+	fn resolve_cache_with_flag() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HOME", Some(tempdir.path().to_str().unwrap())),
+			("XDG_CACHE_HOME", None),
+			("HC_CACHE", None),
+		];
+
+		with_env_vars(vars, || {
+			let expected = pathbuf![tempdir.path(), "hipcheck"];
+
+			let config = {
+				let mut temp = CliConfig::empty();
+				temp.update(&CliConfig::from_platform());
+				temp.update(&CliConfig::from_env());
+				temp.update(&CliConfig {
+					path_args: PathArgs {
+						cache: Some(expected.clone()),
+						..Default::default()
+					},
+					..Default::default()
+				});
+				temp
+			};
+
+			assert_eq!(config.cache().unwrap(), expected);
+		});
+	}
+
+	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+	#[test]
+	fn resolve_config_with_platform() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HOME", Some(tempdir.path().to_str().unwrap())),
+			("XDG_CONFIG_HOME", None),
+			("HC_CONFIG", None),
+		];
+
+		with_env_vars(vars, || {
+			let config = {
+				let mut temp = CliConfig::empty();
+				temp.update(&CliConfig::from_platform());
+				temp.update(&CliConfig::from_env());
+				temp
+			};
+
+			let expected = if cfg!(target_os = "linux") {
+				pathbuf![&tempdir.path(), ".config", "hipcheck"]
+			} else if cfg!(target_os = "macos") {
+				pathbuf![
+					&tempdir.path(),
+					"Library",
+					"Application Support",
+					"hipcheck"
+				]
+			} else {
+				// Windows
+				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Roaming", "hipcheck"]
+			};
+
+			assert_eq!(config.config().unwrap(), expected);
+		});
+	}
+
+	#[test]
+	fn resolve_config_with_env_var() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HOME", None),
+			("XDG_CONFIG_HOME", None),
+			("HC_CONFIG", Some(tempdir.path().to_str().unwrap())),
+		];
+
+		with_env_vars(vars, || {
+			let config = {
+				let mut temp = CliConfig::empty();
+				temp.update(&CliConfig::from_platform());
+				temp.update(&CliConfig::from_env());
+				temp
+			};
+
+			assert_eq!(config.config().unwrap(), tempdir.path());
+		});
+	}
+
+	#[test]
+	fn resolve_config_with_flag() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HOME", Some(tempdir.path().to_str().unwrap())),
+			("XDG_CONFIG_HOME", None),
+			("HC_CONFIG", None),
+		];
+
+		with_env_vars(vars, || {
+			let expected = pathbuf![tempdir.path(), "hipcheck"];
+
+			let config = {
+				let mut temp = CliConfig::empty();
+				temp.update(&CliConfig::from_platform());
+				temp.update(&CliConfig::from_env());
+				temp.update(&CliConfig {
+					path_args: PathArgs {
+						config: Some(expected.clone()),
+						..Default::default()
+					},
+					..Default::default()
+				});
+				temp
+			};
+
+			assert_eq!(config.config().unwrap(), expected);
+		});
+	}
+
+	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+	#[test]
+	fn resolve_data_with_platform() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HOME", Some(tempdir.path().to_str().unwrap())),
+			("XDG_DATA_HOME", None),
+			("HC_DATA", None),
+		];
+
+		with_env_vars(vars, || {
+			let config = {
+				let mut temp = CliConfig::empty();
+				temp.update(&CliConfig::from_platform());
+				temp.update(&CliConfig::from_env());
+				temp
+			};
+
+			let expected = if cfg!(target_os = "linux") {
+				pathbuf![&tempdir.path(), ".local", "share", "hipcheck"]
+			} else if cfg!(target_os = "macos") {
+				pathbuf![
+					&tempdir.path(),
+					"Library",
+					"Application Support",
+					"hipcheck"
+				]
+			} else {
+				// Windows
+				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Roaming", "hipcheck"]
+			};
+
+			assert_eq!(config.data().unwrap(), expected);
+		});
+	}
+
+	#[test]
+	fn resolve_data_with_env_var() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HOME", None),
+			("XDG_DATA_HOME", None),
+			("HC_DATA", Some(tempdir.path().to_str().unwrap())),
+		];
+
+		with_env_vars(vars, || {
+			let config = {
+				let mut temp = CliConfig::empty();
+				temp.update(&CliConfig::from_platform());
+				temp.update(&CliConfig::from_env());
+				temp
+			};
+
+			assert_eq!(config.data().unwrap(), tempdir.path());
+		});
+	}
+
+	#[test]
+	fn resolve_data_with_flag() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let vars = vec![
+			("HOME", Some(tempdir.path().to_str().unwrap())),
+			("XDG_DATA_HOME", None),
+			("HC_DATA", None),
+		];
+
+		with_env_vars(vars, || {
+			let expected = pathbuf![tempdir.path(), "hipcheck"];
+
+			let config = {
+				let mut temp = CliConfig::empty();
+				temp.update(&CliConfig::from_platform());
+				temp.update(&CliConfig::from_env());
+				temp.update(&CliConfig {
+					path_args: PathArgs {
+						data: Some(expected.clone()),
+						..Default::default()
+					},
+					..Default::default()
+				});
+				temp
+			};
+
+			assert_eq!(config.data().unwrap(), expected);
+		});
 	}
 }

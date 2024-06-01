@@ -24,9 +24,6 @@ use crate::analysis::report_builder::PrReport;
 use crate::analysis::report_builder::Report;
 use crate::analysis::score::score_pr_results;
 use crate::analysis::score::score_results;
-use crate::analysis::session::resolve_cache;
-use crate::analysis::session::resolve_config;
-use crate::analysis::session::resolve_data;
 use crate::analysis::session::Check;
 use crate::analysis::session::Session;
 use crate::analysis::session::TargetKind;
@@ -47,6 +44,7 @@ use command_util::DependentProgram;
 use core::fmt;
 use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
+use pathbuf::pathbuf;
 use schemars::schema_for;
 use std::env;
 use std::fmt::Display;
@@ -56,6 +54,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::result::Result as StdResult;
+use util::fs::create_dir_all;
 
 fn init_logging() {
 	EnvLoggerBuilder::from_env(Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE")).init();
@@ -282,15 +281,36 @@ fn check_npm_version() -> StdResult<String, VersionCheckError> {
 }
 
 fn check_config_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
-	resolve_config(config.config()).map_err(|_| PathCheckError::PathNotFound)
+	let path = config.config().ok_or(PathCheckError::PathNotFound)?;
+
+	let path = pathbuf![path, HIPCHECK_TOML_FILE];
+
+	if path.exists().not() {
+		return Err(PathCheckError::PathNotFound);
+	}
+
+	Ok(path)
 }
 
 fn check_cache_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
-	resolve_cache(config.cache()).map_err(|_| PathCheckError::PathNotFound)
+	let path = config.cache().ok_or(PathCheckError::PathNotFound)?;
+
+	// Try to create the cache directory if it doesn't exist.
+	if path.exists().not() {
+		create_dir_all(path).map_err(|_| PathCheckError::PathNotFound)?;
+	}
+
+	Ok(path.to_owned())
 }
 
 fn check_data_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
-	resolve_data(config.data()).map_err(|_| PathCheckError::PathNotFound)
+	let path = config.data().ok_or(PathCheckError::PathNotFound)?;
+
+	if path.exists().not() {
+		return Err(PathCheckError::PathNotFound);
+	}
+
+	Ok(path.to_owned())
 }
 
 /// Check that a GitHub token has been provided as an environment variable
@@ -365,9 +385,7 @@ fn cmd_ready(config: &CliConfig) {
 ///
 /// Exits `Ok` if home directory is specified, `Err` otherwise.
 fn cmd_print_home(path: Option<&Path>) {
-	let cache = resolve_cache(path);
-
-	match cache {
+	match path.ok_or_else(|| hc_error!("can't find cache directory")) {
 		Ok(path_buffer) => {
 			println!("{}", path_buffer.display());
 		}
@@ -381,8 +399,7 @@ fn cmd_print_home(path: Option<&Path>) {
 ///
 /// Exits `Ok` if config path is specified, `Err` otherwise.
 fn cmd_print_config(config_path: Option<&Path>) {
-	let config = resolve_config(config_path);
-	match config {
+	match config_path.ok_or_else(|| hc_error!("can't find config directory")) {
 		Ok(path_buffer) => {
 			println!("{}", path_buffer.display());
 		}
@@ -396,8 +413,7 @@ fn cmd_print_config(config_path: Option<&Path>) {
 ///
 /// Exits `Ok` if config path is specified, `Err` otherwise.
 fn cmd_print_data(data_path: Option<&Path>) {
-	let hipcheck_data = resolve_data(data_path);
-	match hipcheck_data {
+	match data_path.ok_or_else(|| hc_error!("can't find data directory")) {
 		Ok(path_buffer) => {
 			println!("{}", path_buffer.display());
 		}
