@@ -280,9 +280,9 @@ impl CliConfig {
 	fn from_platform() -> CliConfig {
 		CliConfig {
 			path_args: PathArgs {
-				config: dirs::config_dir().map(|dir| pathbuf![&dir, "hipcheck"]),
-				data: dirs::data_dir().map(|dir| pathbuf![&dir, "hipcheck"]),
-				cache: dirs::cache_dir().map(|dir| pathbuf![&dir, "hipcheck"]),
+				cache: platform_cache(),
+				config: platform_config(),
+				data: platform_data(),
 			},
 			..Default::default()
 		}
@@ -298,6 +298,43 @@ impl CliConfig {
 			},
 			..Default::default()
 		}
+	}
+}
+
+/// Get the platform cache directory.
+///
+/// See: https://docs.rs/dirs/latest/dirs/fn.cache_dir.html
+fn platform_cache() -> Option<PathBuf> {
+	dirs::cache_dir().map(|dir| pathbuf![&dir, "hipcheck"])
+}
+
+/// Get the platform config directory.
+///
+/// See: https://docs.rs/dirs/latest/dirs/fn.config_dir.html
+fn platform_config() -> Option<PathBuf> {
+	let base = dirs::config_dir().map(|dir| pathbuf![&dir, "hipcheck"]);
+
+	// Config and data paths aren't differentiated on MacOS or Windows,
+	// so on those platforms we differentiate them ourselves.
+	if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
+		base.map(|dir| pathbuf![&dir, "config"])
+	} else {
+		base
+	}
+}
+
+/// Get the platform data directory.
+///
+/// See: https://docs.rs/dirs/latest/dirs/fn.data_dir.html
+fn platform_data() -> Option<PathBuf> {
+	let base = dirs::data_dir().map(|dir| pathbuf![&dir, "hipcheck"]);
+
+	// Config and data paths aren't differentiated on MacOS or Windows,
+	// so on those platforms we differentiate them ourselves.
+	if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
+		base.map(|dir| pathbuf![&dir, "data"])
+	} else {
+		base
 	}
 }
 
@@ -524,16 +561,7 @@ mod tests {
 				temp
 			};
 
-			let expected = if cfg!(target_os = "linux") {
-				pathbuf![&tempdir.path(), ".cache", "hipcheck"]
-			} else if cfg!(target_os = "macos") {
-				pathbuf![&tempdir.path(), "Library", "Caches", "hipcheck"]
-			} else {
-				// Windows
-				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Local", "hipcheck"]
-			};
-
-			assert_eq!(config.cache().unwrap(), expected);
+			assert_eq!(config.cache().unwrap(), platform_cache().unwrap());
 		});
 	}
 
@@ -609,21 +637,7 @@ mod tests {
 				temp
 			};
 
-			let expected = if cfg!(target_os = "linux") {
-				pathbuf![&tempdir.path(), ".config", "hipcheck"]
-			} else if cfg!(target_os = "macos") {
-				pathbuf![
-					&tempdir.path(),
-					"Library",
-					"Application Support",
-					"hipcheck"
-				]
-			} else {
-				// Windows
-				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Roaming", "hipcheck"]
-			};
-
-			assert_eq!(config.config().unwrap(), expected);
+			assert_eq!(config.config().unwrap(), platform_config().unwrap());
 		});
 	}
 
@@ -699,21 +713,7 @@ mod tests {
 				temp
 			};
 
-			let expected = if cfg!(target_os = "linux") {
-				pathbuf![&tempdir.path(), ".local", "share", "hipcheck"]
-			} else if cfg!(target_os = "macos") {
-				pathbuf![
-					&tempdir.path(),
-					"Library",
-					"Application Support",
-					"hipcheck"
-				]
-			} else {
-				// Windows
-				pathbuf![&dirs::home_dir().unwrap(), "AppData", "Roaming", "hipcheck"]
-			};
-
-			assert_eq!(config.data().unwrap(), expected);
+			assert_eq!(config.data().unwrap(), platform_data().unwrap());
 		});
 	}
 
