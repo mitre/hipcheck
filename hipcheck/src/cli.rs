@@ -484,7 +484,7 @@ pub trait Update {
 impl<T: Clone> Update for Option<T> {
 	fn update(&mut self, other: &Option<T>) {
 		if other.is_some() {
-			self.clone_from(&other);
+			self.clone_from(other);
 		}
 	}
 }

@@ -370,7 +370,7 @@ fn cmd_ready(config: &CliConfig) {
 	}
 
 	match &ready.github_token_check {
-		Ok(_) => println!("{:<17} {}", "GitHub Token:", "Found!"),
+		Ok(_) => println!("{:<17} Found!", "GitHub Token:"),
 		Err(e) => println!("{:<17} {}", "GitHub Token:", e),
 	}
 

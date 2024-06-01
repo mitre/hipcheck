@@ -265,7 +265,7 @@ fn load_config_and_data(
 		.ok_or_else(|| hc_error!("can't identify directory of config file"))?;
 
 	// Load the configuration file.
-	let config = Config::load_from(&valid_config_path)
+	let config = Config::load_from(valid_config_path)
 		.context("Failed to load configuration. Please make sure the config files are in the config directory.")?;
 
 	// Get the directory the data file is in.
