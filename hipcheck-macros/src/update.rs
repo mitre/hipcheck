@@ -20,19 +20,19 @@ pub fn derive_update(input: DeriveInput) -> Result<TokenStream> {
 	let ident = &input.ident;
 	let fields = extract_field_names(&input)?;
 
-	Ok(TokenStream::from(quote! {
+	Ok(quote! {
 		impl crate::cli::Update for #ident {
 			fn update(&mut self, other: &Self) {
 				#( self.#fields.update(&other.#fields ); )*
 			}
 		}
-	}))
+	})
 }
 
 /// Extract field names from derive input.
 fn extract_field_names(input: &DeriveInput) -> Result<Vec<Ident>> {
 	let strukt = extract_struct(input)?;
-	let fields = extract_named_fields(&strukt)?;
+	let fields = extract_named_fields(strukt)?;
 	let names = extract_field_names_from_fields(&fields[..])?;
 	Ok(names)
 }
@@ -57,8 +57,8 @@ fn extract_struct(input: &DeriveInput) -> Result<&DataStruct> {
 
 	match &input.data {
 		Data::Struct(struct_data) => Ok(struct_data),
-		Data::Enum(_) => return err!(input.span(), "#[derive(Update)] does not support enums"),
-		Data::Union(_) => return err!(input.span(), "#[derive(Update)] does not support unions"),
+		Data::Enum(_) => err!(input.span(), "#[derive(Update)] does not support enums"),
+		Data::Union(_) => err!(input.span(), "#[derive(Update)] does not support unions"),
 	}
 }
 
