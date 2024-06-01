@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 /// Automatated supply chain risk assessment of software packages.
 #[derive(Debug, Default, clap::Parser, hc::Update)]
-#[command(name = "Hipcheck", about, version, long_about=None)]
+#[command(name = "Hipcheck", about, version, long_about=None, arg_required_else_help = true)]
 pub struct CliConfig {
 	#[command(subcommand)]
 	command: Option<Commands>,
