@@ -81,13 +81,7 @@ fn main() -> ExitCode {
 
 /// Run the `check` command.
 fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
-	let check = match &args.command {
-		Some(command) => command.as_check(),
-		None => {
-			print_error(&hc_error!("unknown check type"));
-			return ExitCode::FAILURE;
-		}
-	};
+	let check = args.command.as_check();
 
 	if check.kind.target_kind().is_checkable().not() {
 		print_missing();
@@ -132,15 +126,12 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 /// Run the `schema` command.
 fn cmd_schema(args: &SchemaArgs) {
 	match args.command {
-		Some(SchemaCommand::Maven) => print_maven_schema(),
-		Some(SchemaCommand::Npm) => print_npm_schema(),
-		Some(SchemaCommand::Patch) => print_patch_schema(),
-		Some(SchemaCommand::Pypi) => print_pypi_schema(),
-		Some(SchemaCommand::Repo) => print_report_schema(),
-		Some(SchemaCommand::Request) => print_request_schema(),
-		None => {
-			print_error(&hc_error!("unknown schema type"));
-		}
+		SchemaCommand::Maven => print_maven_schema(),
+		SchemaCommand::Npm => print_npm_schema(),
+		SchemaCommand::Patch => print_patch_schema(),
+		SchemaCommand::Pypi => print_pypi_schema(),
+		SchemaCommand::Repo => print_report_schema(),
+		SchemaCommand::Request => print_request_schema(),
 	}
 }
 
