@@ -108,7 +108,7 @@ $ cargo install --path hipcheck
 You can run Hipcheck in a container like so:
 
 ```sh
-$ docker run --env "HC_GITHUB_TOKEN=<GITHUB_TOKEN>" hipheck:3.1.0 [<HIPCHECK_ARGS>]...
+$ docker run --env "HC_GITHUB_TOKEN=<GITHUB_TOKEN>" hipcheck:3.1.0 [<HIPCHECK_ARGS>]...
 ```
 
 ### Direct Usage
