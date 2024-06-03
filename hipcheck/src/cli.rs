@@ -364,6 +364,7 @@ fn hc_env_var_value_enum<E: ValueEnum>(name: &'static str) -> Option<E> {
 pub enum FullCommands {
 	Check(CheckArgs),
 	Schema(SchemaArgs),
+	Setup,
 	Ready,
 	PrintConfig,
 	PrintData,
@@ -375,6 +376,7 @@ impl From<&Commands> for FullCommands {
 		match command {
 			Commands::Check(args) => FullCommands::Check(args.clone()),
 			Commands::Schema(args) => FullCommands::Schema(args.clone()),
+			Commands::Setup => FullCommands::Setup,
 			Commands::Ready => FullCommands::Ready,
 		}
 	}
@@ -386,6 +388,8 @@ pub enum Commands {
 	Check(CheckArgs),
 	/// Print the JSON schema for output of a specific `check` command.
 	Schema(SchemaArgs),
+	/// Initialize Hipcheck config file and script file locations.
+	Setup,
 	/// Check if Hipcheck is ready to run.
 	Ready,
 }
@@ -562,7 +566,7 @@ pub struct SchemaArgs {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum SchemaCommand {
-	/// Print the JSONN schema for running Hipcheck against a Maven package
+	/// Print the JSON schema for running Hipcheck against a Maven package
 	Maven,
 	/// Print the JSON schema for running Hipcheck against a NPM package
 	Npm,
