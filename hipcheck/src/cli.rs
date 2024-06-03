@@ -390,7 +390,7 @@ pub enum Commands {
 #[derive(Debug, Clone, clap::Args)]
 pub struct CheckArgs {
 	#[clap(subcommand)]
-	pub command: Option<CheckCommand>,
+	pub command: CheckCommand,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
@@ -493,7 +493,7 @@ pub struct CheckSpdxArgs {
 #[derive(Debug, Clone, clap::Args)]
 pub struct SchemaArgs {
 	#[clap(subcommand)]
-	pub command: Option<SchemaCommand>,
+	pub command: SchemaCommand,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
