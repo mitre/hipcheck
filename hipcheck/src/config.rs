@@ -4,6 +4,7 @@
 
 use crate::context::Context;
 use crate::error::Result;
+use crate::hc_error;
 use crate::util::fs as file;
 use crate::BINARY_CONFIG_FILE;
 use crate::F64;
@@ -22,8 +23,15 @@ use std::rc::Rc;
 impl Config {
 	/// Load configuration from the given directory.
 	pub fn load_from(config_path: &Path) -> Result<Config> {
-		file::exists(config_path)?;
-		let config = file::read_toml(config_path).context("can't parse config file")?;
+		if config_path.is_file() {
+			return Err(hc_error!(
+				"Hipcheck config path must be a directory, not a file."
+			));
+		}
+		let mut config_file = PathBuf::from(config_path);
+		config_file.push("Hipcheck.toml");
+		file::exists(&config_file)?;
+		let config = file::read_toml(config_file).context("can't parse config file")?;
 
 		Ok(config)
 	}
