@@ -92,7 +92,7 @@ consolidate-commits = false
 # When cargo release is run, udates the Hipcheck version number in the two 
 # instances in the READMDE where it explicitly appears in docker commands
 pre-release-replacements = [
-  {file="README.md", search="hipcheck:[a-z0-9\\.-]+", replace="hipcheck:{{version}}"},
+  {file="../README.md", search="hipcheck:[a-z0-9\\.-]+", replace="hipcheck:{{version}}"},
 ]
 
 
