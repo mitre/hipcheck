@@ -11,8 +11,6 @@ mod report;
 mod shell;
 #[cfg(test)]
 mod test_util;
-#[cfg(test)]
-mod tests;
 mod util;
 mod version;
 

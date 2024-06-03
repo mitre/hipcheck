@@ -239,3 +239,42 @@ macro_rules! hc_error {
         $crate::error::Error::msg(format!($fmt, $($arg)*))
     };
 }
+
+#[cfg(test)]
+mod tests {
+	//! Tests to ensure `Error` produces output correctly.
+
+	// Literal input to `hc_error`
+	#[test]
+	fn macro_literal() {
+		let error = hc_error!("msg source");
+		let debug = format!("{:?}", error);
+		let expected = "msg source".to_string();
+		assert_eq!(expected, debug);
+	}
+
+	// Format string input to `hc_error`
+	#[test]
+	fn macro_format_string() {
+		let msg = "msg";
+		let source = "source";
+		let error = hc_error!("format {} {}", msg, source);
+		let debug = format!("{:?}", error);
+		let expected = "format msg source".to_string();
+		assert_eq!(expected, debug);
+	}
+
+	// Verify that the `chain` method on `hc_error` works.
+	#[test]
+	fn hc_error_chain() {
+		let error = hc_error!("first error");
+		let error = error.context("second error");
+		let error = error.context("third error");
+
+		let mut iter = error.chain();
+
+		assert_eq!("third error", iter.next().unwrap().to_string());
+		assert_eq!("second error", iter.next().unwrap().to_string());
+		assert_eq!("first error", iter.next().unwrap().to_string());
+	}
+}
