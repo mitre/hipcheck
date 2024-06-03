@@ -69,6 +69,7 @@ fn main() -> ExitCode {
 	match config.subcommand() {
 		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
+		Some(FullCommands::Setup) => return cmd_setup(&config),
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
@@ -142,6 +143,136 @@ fn cmd_schema(args: &SchemaArgs) {
 			print_error(&hc_error!("unknown schema type"));
 		}
 	}
+}
+
+/// Copy individual files in dir instead of entire dir, to avoid users accidentally
+/// overwriting important dirs such as /usr/bin/
+fn copy_dir_contents<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()> {
+	let src: PathBuf = from.as_ref().to_path_buf();
+	if !src.is_dir() {
+		return Err(hc_error!("source path must be a directory"));
+	}
+	let dst: PathBuf = to.as_ref().to_path_buf();
+	if !dst.is_dir() {
+		return Err(hc_error!("target path must be a directory"));
+	}
+
+	for entry in walkdir::WalkDir::new(&src) {
+		let src_f_path = entry?.path().to_path_buf();
+		if src_f_path == src {
+			continue;
+		}
+		let mut dst_f_path = dst.clone();
+		dst_f_path.push(
+			src_f_path
+				.file_name()
+				.ok_or(hc_error!("src dir entry without file name"))?,
+		);
+		// This is ok for now because we only copy files, no dirs
+		std::fs::copy(src_f_path, dst_f_path)?;
+	}
+
+	Ok(())
+}
+
+fn cmd_setup(config: &CliConfig) -> ExitCode {
+	// Make config dir if not exist
+	let Some(tgt_conf_path) = config.config() else {
+		print_error(&hc_error!("target config dir not specified"));
+		return ExitCode::FAILURE;
+	};
+	if !tgt_conf_path.exists() {
+		if !create_dir_all(&tgt_conf_path).is_ok() {
+			print_error(&hc_error!("failed to create missing target config dir"));
+		};
+	}
+	let Ok(abs_conf_path) = tgt_conf_path.canonicalize() else {
+		print_error(&hc_error!("failed to canonicalize HC_CONFIG path"));
+		return ExitCode::FAILURE;
+	};
+
+	// Make data dir if not exist
+	let Some(tgt_data_path) = config.data() else {
+		print_error(&hc_error!("target data dir not specified"));
+		return ExitCode::FAILURE;
+	};
+	if !tgt_data_path.exists() {
+		if !create_dir_all(&tgt_data_path).is_ok() {
+			print_error(&hc_error!("failed to create missing target data dir"));
+		};
+	}
+	let Ok(abs_data_path) = tgt_data_path.canonicalize() else {
+		print_error(&hc_error!("failed to canonicalize HC_DATA path"));
+		return ExitCode::FAILURE;
+	};
+
+	// Copy current `hc` binary to OS-specific bin path if not there already
+	if which::which("hc").is_err() {
+		// Try env var first, then default to OS-specific exec dir
+		let mut tgt_bin_path: PathBuf = if let Ok(bp) = std::env::var("HC_BIN") {
+			PathBuf::from(bp)
+		} else if let Some(bp) = dirs::executable_dir() {
+			bp
+		} else {
+			print_error(&hc_error!("could not find appropriate bin dir for `hc`"));
+			return ExitCode::FAILURE;
+		};
+		if !tgt_bin_path.exists() {
+			if !create_dir_all(&tgt_bin_path).is_ok() {
+				print_error(&hc_error!("failed to create missing HC_BIN dir"));
+			};
+		}
+		tgt_bin_path.push("hc");
+		if let Err(e) = std::fs::copy(std::env::current_exe().unwrap(), &tgt_bin_path) {
+			print_error(&hc_error!(
+				"could not find appropriate bin dir for `hc`: {}",
+				e
+			));
+			return ExitCode::FAILURE;
+		}
+		let Ok(abs_bin_path) = tgt_bin_path.canonicalize() else {
+			print_error(&hc_error!("failed to canonicalize HC_BIN path"));
+			return ExitCode::FAILURE;
+		};
+		if which::which("hc").is_err() {
+			println!(
+				"warning: `hc` copied to '{}', which is not in your system path. Consider adding it",
+				abs_bin_path.parent().unwrap().display(),
+			);
+		}
+	}
+
+	// Copy local config/data dirs to target locations
+	let src_conf_path = PathBuf::from("config");
+	if let Err(e) = copy_dir_contents(&src_conf_path, &abs_conf_path) {
+		print_error(&hc_error!("failed to copy config dir contents: {}", e));
+		return ExitCode::FAILURE;
+	}
+	let src_data_path = PathBuf::from("scripts");
+	if let Err(e) = copy_dir_contents(&src_data_path, &abs_data_path) {
+		print_error(&hc_error!("failed to copy data dir contents: {}", e));
+		return ExitCode::FAILURE;
+	}
+
+	println!("Hipcheck setup completed successfully.");
+
+	// Recommend exportation of HC_CONFIG/HC_DATA env vars if applicable
+	let shell_profile = match std::env::var("SHELL").as_ref().map(String::as_str) {
+		Ok("/bin/zsh") | Ok("/usr/bin/zsh") => ".zshrc",
+		Ok("/bin/bash") | Ok("/usr/bin/bash") => ".bash_profile",
+		_ => ".profile",
+	};
+
+	println!(
+		"Manually add the following to your '$HOME/{}' (or similar) if you haven't already",
+		shell_profile
+	);
+	println!("{}", format!("  export HC_CONFIG={:?}", abs_conf_path));
+	println!("{}", format!("  export HC_DATA={:?}", abs_data_path));
+
+	println!("Run `hc help` to get started");
+
+	ExitCode::SUCCESS
 }
 
 #[derive(Debug)]
