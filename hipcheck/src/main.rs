@@ -181,10 +181,8 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 		print_error(&hc_error!("target config dir not specified"));
 		return ExitCode::FAILURE;
 	};
-	if !tgt_conf_path.exists() {
-		if !create_dir_all(&tgt_conf_path).is_ok() {
-			print_error(&hc_error!("failed to create missing target config dir"));
-		};
+	if !tgt_conf_path.exists() && create_dir_all(tgt_conf_path).is_err() {
+		print_error(&hc_error!("failed to create missing target config dir"));
 	}
 	let Ok(abs_conf_path) = tgt_conf_path.canonicalize() else {
 		print_error(&hc_error!("failed to canonicalize HC_CONFIG path"));
@@ -196,10 +194,8 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 		print_error(&hc_error!("target data dir not specified"));
 		return ExitCode::FAILURE;
 	};
-	if !tgt_data_path.exists() {
-		if !create_dir_all(&tgt_data_path).is_ok() {
-			print_error(&hc_error!("failed to create missing target data dir"));
-		};
+	if !tgt_data_path.exists() && create_dir_all(tgt_data_path).is_err() {
+		print_error(&hc_error!("failed to create missing target data dir"));
 	}
 	let Ok(abs_data_path) = tgt_data_path.canonicalize() else {
 		print_error(&hc_error!("failed to canonicalize HC_DATA path"));
@@ -217,10 +213,8 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 			print_error(&hc_error!("could not find appropriate bin dir for `hc`"));
 			return ExitCode::FAILURE;
 		};
-		if !tgt_bin_path.exists() {
-			if !create_dir_all(&tgt_bin_path).is_ok() {
-				print_error(&hc_error!("failed to create missing HC_BIN dir"));
-			};
+		if !tgt_bin_path.exists() && create_dir_all(&tgt_bin_path).is_err() {
+			print_error(&hc_error!("failed to create missing HC_BIN dir"));
 		}
 		tgt_bin_path.push("hc");
 		if let Err(e) = std::fs::copy(std::env::current_exe().unwrap(), &tgt_bin_path) {
@@ -244,12 +238,12 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 
 	// Copy local config/data dirs to target locations
 	let src_conf_path = PathBuf::from("config");
-	if let Err(e) = copy_dir_contents(&src_conf_path, &abs_conf_path) {
+	if let Err(e) = copy_dir_contents(src_conf_path, &abs_conf_path) {
 		print_error(&hc_error!("failed to copy config dir contents: {}", e));
 		return ExitCode::FAILURE;
 	}
 	let src_data_path = PathBuf::from("scripts");
-	if let Err(e) = copy_dir_contents(&src_data_path, &abs_data_path) {
+	if let Err(e) = copy_dir_contents(src_data_path, &abs_data_path) {
 		print_error(&hc_error!("failed to copy data dir contents: {}", e));
 		return ExitCode::FAILURE;
 	}
@@ -267,8 +261,8 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 		"Manually add the following to your '$HOME/{}' (or similar) if you haven't already",
 		shell_profile
 	);
-	println!("{}", format!("  export HC_CONFIG={:?}", abs_conf_path));
-	println!("{}", format!("  export HC_DATA={:?}", abs_data_path));
+	println!("\texport HC_CONFIG={:?}", abs_conf_path);
+	println!("\texport HC_DATA={:?}", abs_data_path);
 
 	println!("Run `hc help` to get started");
 
