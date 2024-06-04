@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::MetricProvider;
 use crate::context::Context as _;
 use crate::error::Result;
+use crate::metric::MetricProvider;
 use chrono::prelude::*;
 use chrono::Duration;
 use serde::ser::SerializeStruct;

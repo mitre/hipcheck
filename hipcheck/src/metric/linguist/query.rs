@@ -2,10 +2,10 @@
 
 //! A query group for source file language detection queries.
 
-use crate::analysis::metric::linguist::SourceFileDetector;
 use crate::config::LanguagesConfigQuery;
 use crate::context::Context;
 use crate::error::Result;
+use crate::metric::linguist::SourceFileDetector;
 use std::rc::Rc;
 
 /// Queries related to source file language detection

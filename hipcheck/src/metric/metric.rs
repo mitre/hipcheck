@@ -1,22 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod activity;
-pub mod affiliation;
-pub mod binary;
-pub mod binary_detector;
-pub mod churn;
-pub mod commit_trust;
-pub mod contributor_trust;
-pub mod entropy;
-pub mod fuzz;
-pub mod identity;
-pub mod linguist;
-mod math;
-pub mod module;
-pub mod module_contributors;
-pub mod review;
-pub mod typo;
-
 use std::rc::Rc;
 
 use crate::config::AttacksConfigQuery;
@@ -27,21 +10,21 @@ use crate::data::FuzzProvider;
 use crate::data::ModuleProvider;
 use crate::data::PullRequestReviewProvider;
 use crate::error::Result;
-use activity::ActivityOutput;
-use affiliation::AffiliationOutput;
-use binary::BinaryOutput;
-use binary_detector::BinaryFile;
-use churn::ChurnOutput;
-use commit_trust::CommitTrustOutput;
-use contributor_trust::ContributorTrustOutput;
-use entropy::EntropyOutput;
-use fuzz::FuzzOutput;
-use identity::IdentityOutput;
-use linguist::Linguist;
-use module::ModuleOutput;
-use module_contributors::ModuleContributorsOutput;
-use review::ReviewOutput;
-use typo::TypoOutput;
+use crate::metric::activity::{self, ActivityOutput};
+use crate::metric::affiliation::{self, AffiliationOutput};
+use crate::metric::binary::{self, BinaryOutput};
+use crate::metric::binary_detector::BinaryFile;
+use crate::metric::churn::{self, ChurnOutput};
+use crate::metric::commit_trust::{self, CommitTrustOutput};
+use crate::metric::contributor_trust::{self, ContributorTrustOutput};
+use crate::metric::entropy::{self, EntropyOutput};
+use crate::metric::fuzz::{self, FuzzOutput};
+use crate::metric::identity::{self, IdentityOutput};
+use crate::metric::linguist::Linguist;
+use crate::metric::module::{self, ModuleOutput};
+use crate::metric::module_contributors::{self, ModuleContributorsOutput};
+use crate::metric::review::{self, ReviewOutput};
+use crate::metric::typo::{self, TypoOutput};
 
 /// Queries about metrics
 #[salsa::query_group(MetricProviderStorage)]

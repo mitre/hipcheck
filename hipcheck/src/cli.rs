@@ -2,8 +2,8 @@
 
 //! Data structures for Hipcheck's main CLI.
 
-use crate::analysis::session::Check;
 use crate::report::Format;
+use crate::session::session::Check;
 use crate::shell::{ColorChoice, Verbosity};
 use crate::CheckKind;
 use clap::{Parser as _, ValueEnum};

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::MetricProvider;
 use crate::context::Context as _;
 use crate::data::Dependencies;
 use crate::data::Lang;
 use crate::error::Result;
+use crate::metric::MetricProvider;
 use crate::util::fs as file;
 use maplit::hashmap;
 use serde::Deserialize;

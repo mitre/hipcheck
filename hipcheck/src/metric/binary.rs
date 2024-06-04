@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::metric::binary_detector::detect_binary_files;
-use crate::analysis::MetricProvider;
 use crate::error::Result;
+use crate::metric::binary_detector::detect_binary_files;
+use crate::metric::MetricProvider;
 use crate::TryFilter;
 use serde::Serialize;
 use std::rc::Rc;
