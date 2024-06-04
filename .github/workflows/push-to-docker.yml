@@ -3,12 +3,7 @@ name: Push Hipcheck image to Docker Hub on every tagged release
 on:
   push:
     tags:
-      - '**[0-9]+.[0-9]+.[0-9]+*'
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version'
-        required: true
+      - 'hipcheck-v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   docker:
@@ -22,7 +17,7 @@ jobs:
         uses: frabert/replace-string-action@v2
         id: format-tag
         with:
-          pattern: 'v'
+          pattern: 'hipcheck-v'
           string: "${{ github.event.release.tag_name || github.event.inputs.version }}"
           replace-with: ''
           flags: 'g'
@@ -41,4 +36,4 @@ jobs:
           file: Containerfile
           push: true
           platforms: "linux/amd64,linux/arm64"
-          tags: mitre/hipcheck:release-latest,mitre/hipcheck:${{ steps.format-tag.outputs.replaced }}
+          tags: mitre/hipcheck:latest,mitre/hipcheck:${{ steps.format-tag.outputs.replaced }}
