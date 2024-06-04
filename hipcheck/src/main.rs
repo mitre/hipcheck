@@ -204,40 +204,6 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 		return ExitCode::FAILURE;
 	};
 
-	// Copy current `hc` binary to OS-specific bin path if not there already
-	if which::which("hc").is_err() {
-		// Try env var first, then default to OS-specific exec dir
-		let mut tgt_bin_path: PathBuf = if let Ok(bp) = std::env::var("HC_BIN") {
-			PathBuf::from(bp)
-		} else if let Some(bp) = dirs::executable_dir() {
-			bp
-		} else {
-			print_error(&hc_error!("could not find appropriate bin dir for `hc`"));
-			return ExitCode::FAILURE;
-		};
-		if !tgt_bin_path.exists() && create_dir_all(&tgt_bin_path).is_err() {
-			print_error(&hc_error!("failed to create missing HC_BIN dir"));
-		}
-		tgt_bin_path.push("hc");
-		if let Err(e) = std::fs::copy(std::env::current_exe().unwrap(), &tgt_bin_path) {
-			print_error(&hc_error!(
-				"could not find appropriate bin dir for `hc`: {}",
-				e
-			));
-			return ExitCode::FAILURE;
-		}
-		let Ok(abs_bin_path) = tgt_bin_path.canonicalize() else {
-			print_error(&hc_error!("failed to canonicalize HC_BIN path"));
-			return ExitCode::FAILURE;
-		};
-		if which::which("hc").is_err() {
-			println!(
-				"warning: `hc` copied to '{}', which is not in your system path. Consider adding it",
-				abs_bin_path.parent().unwrap().display(),
-			);
-		}
-	}
-
 	// Copy local config/data dirs to target locations
 	let src_conf_path = PathBuf::from("config");
 	if let Err(e) = copy_dir_contents(src_conf_path, &abs_conf_path) {
