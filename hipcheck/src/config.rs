@@ -28,8 +28,7 @@ impl Config {
 				"Hipcheck config path must be a directory, not a file."
 			));
 		}
-		let mut config_file = PathBuf::from(config_path);
-		config_file.push("Hipcheck.toml");
+		let config_file = pathbuf![config_path, "Hipcheck.toml"];
 		file::exists(&config_file)?;
 		let config = file::read_toml(config_file).context("can't parse config file")?;
 
