@@ -10,36 +10,21 @@ use crate::data::FuzzProvider;
 use crate::data::ModuleProvider;
 use crate::data::PullRequestReviewProvider;
 use crate::error::Result;
-
-use crate::metric::activity;
-use crate::metric::affiliation;
-use crate::metric::binary;
-use crate::metric::churn;
-use crate::metric::commit_trust;
-use crate::metric::contributor_trust;
-use crate::metric::entropy;
-use crate::metric::fuzz;
-use crate::metric::identity;
-use crate::metric::module;
-use crate::metric::module_contributors;
-use crate::metric::review;
-use crate::metric::typo;
-
-use crate::metric::activity::ActivityOutput;
-use crate::metric::affiliation::AffiliationOutput;
-use crate::metric::binary::BinaryOutput;
+use crate::metric::activity::{self, ActivityOutput};
+use crate::metric::affiliation::{self, AffiliationOutput};
+use crate::metric::binary::{self, BinaryOutput};
 use crate::metric::binary_detector::BinaryFile;
-use crate::metric::churn::ChurnOutput;
-use crate::metric::commit_trust::CommitTrustOutput;
-use crate::metric::contributor_trust::ContributorTrustOutput;
-use crate::metric::entropy::EntropyOutput;
-use crate::metric::fuzz::FuzzOutput;
-use crate::metric::identity::IdentityOutput;
+use crate::metric::churn::{self, ChurnOutput};
+use crate::metric::commit_trust::{self, CommitTrustOutput};
+use crate::metric::contributor_trust::{self, ContributorTrustOutput};
+use crate::metric::entropy::{self, EntropyOutput};
+use crate::metric::fuzz::{self, FuzzOutput};
+use crate::metric::identity::{self, IdentityOutput};
 use crate::metric::linguist::Linguist;
-use crate::metric::module::ModuleOutput;
-use crate::metric::module_contributors::ModuleContributorsOutput;
-use crate::metric::review::ReviewOutput;
-use crate::metric::typo::TypoOutput;
+use crate::metric::module::{self, ModuleOutput};
+use crate::metric::module_contributors::{self, ModuleContributorsOutput};
+use crate::metric::review::{self, ReviewOutput};
+use crate::metric::typo::{self, TypoOutput};
 
 /// Queries about metrics
 #[salsa::query_group(MetricProviderStorage)]
