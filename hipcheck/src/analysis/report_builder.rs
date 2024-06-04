@@ -3,12 +3,12 @@
 use crate::analysis::analysis::AnalysisReport;
 use crate::analysis::score::ScoringResults;
 use crate::config::RiskConfigQuery;
-use crate::data::source::SourceQuery;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
 pub use crate::report::*;
 use crate::session::session::Session;
+use crate::source::source::SourceQuery;
 use crate::version::VersionQuery;
 use std::default::Default;
 use std::result::Result as StdResult;

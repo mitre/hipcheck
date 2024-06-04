@@ -4,9 +4,9 @@
 
 use crate::data::npm::get_package_file;
 use crate::data::npm::PackageFile;
-use crate::data::source::SourceQuery;
 use crate::data::Dependencies;
 use crate::error::Result;
+use crate::source::source::SourceQuery;
 use crate::version::VersionQuery;
 use std::rc::Rc;
 

@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-mod query;
-
-pub use query::*;
-
 use crate::context::Context;
 use crate::data::git_command::GitCommand;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
 use crate::shell::Phase;
+pub use crate::source::query::*;
 use log::debug;
 use pathbuf::pathbuf;
 use std::fmt;
