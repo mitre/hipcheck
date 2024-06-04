@@ -7,6 +7,7 @@ mod config;
 mod context;
 mod data;
 mod error;
+mod http;
 mod metric;
 mod report;
 mod session;

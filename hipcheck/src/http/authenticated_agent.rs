@@ -2,8 +2,8 @@
 
 //! Defines an authenticated [`Agent`] type that adds token auth to all requests.
 
-use crate::data::github::hidden::Hidden;
 use crate::error::Result;
+use crate::http::hidden::Hidden;
 use rustls::{ClientConfig, RootCertStore};
 use std::sync::Arc;
 use ureq::{Agent, AgentBuilder, Request};
