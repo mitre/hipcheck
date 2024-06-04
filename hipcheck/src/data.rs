@@ -5,7 +5,6 @@
 pub mod git;
 pub mod git_command;
 pub mod npm;
-pub mod source;
 
 mod code_quality;
 mod es_lint;

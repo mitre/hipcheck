@@ -11,6 +11,7 @@ mod metric;
 mod report;
 mod session;
 mod shell;
+mod source;
 #[cfg(test)]
 mod test_util;
 mod util;

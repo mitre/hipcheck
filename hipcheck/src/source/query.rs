@@ -2,9 +2,9 @@
 
 //! A query group for accessing Git repository data.
 
-use crate::data::source::Remote;
-use crate::data::source::Source;
 use crate::hash;
+use crate::source::source::Remote;
+use crate::source::source::Source;
 use pathbuf::pathbuf;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -68,7 +68,7 @@ fn url(db: &dyn SourceQuery) -> Option<Rc<String>> {
 
 // Computes the appropriate path based on the remote or local info
 fn storage_path(db: &dyn SourceQuery) -> Rc<PathBuf> {
-	use crate::data::source::Remote::*;
+	use crate::source::source::Remote::*;
 
 	let path_buf = match db.remote() {
 		Some(remote) => match remote.as_ref() {
