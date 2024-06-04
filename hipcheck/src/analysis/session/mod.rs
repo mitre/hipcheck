@@ -258,12 +258,6 @@ fn load_config_and_data(
 	let valid_config_path = config_path
 	   .ok_or_else(|| hc_error!("Failed to load configuration. Please make sure the path set by the hc_config env variable exists."))?;
 
-	// Get the directory the config file is in.
-	let config_dir = valid_config_path
-		.parent()
-		.map(ToOwned::to_owned)
-		.ok_or_else(|| hc_error!("can't identify directory of config file"))?;
-
 	// Load the configuration file.
 	let config = Config::load_from(valid_config_path)
 		.context("Failed to load configuration. Please make sure the config files are in the config directory.")?;
@@ -278,7 +272,12 @@ fn load_config_and_data(
 
 	phase.finish()?;
 
-	Ok((config, config_dir, data_dir, hc_github_token))
+	Ok((
+		config,
+		valid_config_path.to_path_buf(),
+		data_dir,
+		hc_github_token,
+	))
 }
 
 fn load_source(
