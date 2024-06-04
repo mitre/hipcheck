@@ -79,7 +79,7 @@ fn main() -> ExitCode {
 
 /// Run the `check` command.
 fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
-	let check = args.command.as_check();
+	let check = args.command().as_ref().unwrap().as_check();
 
 	if check.kind.target_kind().is_checkable().not() {
 		print_missing();

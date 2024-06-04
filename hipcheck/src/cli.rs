@@ -387,13 +387,69 @@ pub enum Commands {
 	Ready,
 }
 
+// If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
+// this case, `target` is a required field, but the existence of a subcommand
+// removes that requirement
 #[derive(Debug, Clone, clap::Args)]
+#[command(subcommand_negates_reqs = true)]
+#[command(arg_required_else_help = true)]
 pub struct CheckArgs {
 	#[clap(subcommand)]
-	pub command: CheckCommand,
+	command: Option<CheckCommand>,
+
+	#[arg(short = 't', long = "target")]
+	pub target_type: Option<String>,
+	#[arg(required = true)]
+	pub target: Option<String>,
+	#[arg(trailing_var_arg(true), hide = true)]
+	pub trailing_args: Vec<String>,
 }
 
-#[derive(Debug, Clone, clap::Subcommand)]
+impl CheckArgs {
+	fn subcommand_from_target(&self, target: &str) -> Option<&str> {
+		if target.starts_with("pkg:npm") {
+			Some("npm")
+		} else if target.ends_with(".spdx") {
+			Some("spdx")
+		} else if target.ends_with("pkg::github") {
+			Some("repo")
+		} else if target.starts_with("https://github.com/") {
+			Some("repo")
+		} else {
+			None
+		}
+	}
+
+	fn target_to_check_command(&self) -> Option<CheckCommand> {
+		let Some(target) = self.target.clone() else {
+			return None;
+		};
+		let opt_subcmd_str: Option<String> = match self.target_type.clone() {
+			Some(t) => Some(t),
+			None => self
+				.subcommand_from_target(target.as_str())
+				.map(str::to_owned),
+		};
+		let Some(subcmd_str) = opt_subcmd_str else {
+			return None;
+		};
+		let binding = "check".to_owned();
+		let mut reconst_args: Vec<&String> = vec![&binding, &subcmd_str, &target];
+		reconst_args.extend(self.trailing_args.iter());
+
+		CheckCommand::try_parse_from(reconst_args.into_iter()).ok()
+	}
+
+	pub fn command(&self) -> Option<CheckCommand> {
+		if self.command.is_some() {
+			self.command.clone()
+		} else {
+			self.target_to_check_command()
+		}
+	}
+}
+
+#[derive(Debug, Clone, clap::Parser)]
 pub enum CheckCommand {
 	/// Analyze a maven package git repo via package URI
 	Maven(CheckMavenArgs),
@@ -768,5 +824,68 @@ mod tests {
 
 			assert_eq!(config.data().unwrap(), expected);
 		});
+	}
+
+	#[test]
+	fn hc_check_schema_no_args_gives_help() {
+		let check_args = vec!["hc", "check"];
+		let schema_args = vec!["hc", "schema"];
+
+		let parsed = CliConfig::try_parse_from(check_args.into_iter());
+		assert!(parsed.is_err());
+		assert_eq!(
+			parsed.unwrap_err().kind(),
+			clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+		);
+	}
+
+	#[test]
+	fn test_deprecated_check_repo() {
+		let args = vec![
+			"hc",
+			"check",
+			"repo",
+			"https://github.com/mitre/hipcheck.git",
+		];
+		let parsed = CliConfig::try_parse_from(args.into_iter());
+		assert!(parsed.is_ok());
+		let command = parsed.unwrap().command;
+		let Some(Commands::Check(chck_args)) = command else {
+			assert!(false);
+			return;
+		};
+		assert!(matches!(chck_args.command(), Some(CheckCommand::Repo(..))));
+	}
+
+	#[test]
+	fn test_deductive_check_no_flag() {
+		let args = vec!["hc", "check", "https://github.com/mitre/hipcheck.git"];
+		let parsed = CliConfig::try_parse_from(args.into_iter());
+		assert!(parsed.is_ok());
+		let command = parsed.unwrap().command;
+		let Some(Commands::Check(chck_args)) = command else {
+			assert!(false);
+			return;
+		};
+		assert!(matches!(chck_args.command(), Some(CheckCommand::Repo(..))));
+	}
+
+	#[test]
+	fn test_deductive_check_with_flag() {
+		let args = vec![
+			"hc",
+			"check",
+			"-t",
+			"repo",
+			"https://github.com/mitre/hipcheck.git",
+		];
+		let parsed = CliConfig::try_parse_from(args.into_iter());
+		assert!(parsed.is_ok());
+		let command = parsed.unwrap().command;
+		let Some(Commands::Check(chck_args)) = command else {
+			assert!(false);
+			return;
+		};
+		assert!(matches!(chck_args.command(), Some(CheckCommand::Repo(..))));
 	}
 }
