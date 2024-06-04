@@ -148,31 +148,33 @@ fn cmd_schema(args: &SchemaArgs) {
 /// Copy individual files in dir instead of entire dir, to avoid users accidentally
 /// overwriting important dirs such as /usr/bin/
 fn copy_dir_contents<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()> {
-	let src: PathBuf = from.as_ref().to_path_buf();
-	if !src.is_dir() {
-		return Err(hc_error!("source path must be a directory"));
-	}
-	let dst: PathBuf = to.as_ref().to_path_buf();
-	if !dst.is_dir() {
-		return Err(hc_error!("target path must be a directory"));
-	}
-
-	for entry in walkdir::WalkDir::new(&src) {
-		let src_f_path = entry?.path().to_path_buf();
-		if src_f_path == src {
-			continue;
+	fn inner(from: &Path, to: &Path) -> Result<()> {
+		let src = from.to_path_buf();
+		if !src.is_dir() {
+			return Err(hc_error!("source path must be a directory"));
 		}
-		let mut dst_f_path = dst.clone();
-		dst_f_path.push(
-			src_f_path
-				.file_name()
-				.ok_or(hc_error!("src dir entry without file name"))?,
-		);
-		// This is ok for now because we only copy files, no dirs
-		std::fs::copy(src_f_path, dst_f_path)?;
-	}
+		let dst: PathBuf = to.to_path_buf();
+		if !dst.is_dir() {
+			return Err(hc_error!("target path must be a directory"));
+		}
 
-	Ok(())
+		for entry in walkdir::WalkDir::new(&src) {
+			let src_f_path = entry?.path().to_path_buf();
+			if src_f_path == src {
+				continue;
+			}
+			let mut dst_f_path = dst.clone();
+			dst_f_path.push(
+				src_f_path
+					.file_name()
+					.ok_or(hc_error!("src dir entry without file name"))?,
+			);
+			// This is ok for now because we only copy files, no dirs
+			std::fs::copy(src_f_path, dst_f_path)?;
+		}
+		Ok(())
+	}
+	inner(from.as_ref(), to.as_ref())
 }
 
 fn cmd_setup(config: &CliConfig) -> ExitCode {
