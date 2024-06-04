@@ -4,7 +4,6 @@
 pub mod analysis;
 pub mod report_builder;
 pub mod score;
-pub mod session;
 
 pub use analysis::AnalysisProvider;
 pub use analysis::AnalysisProviderStorage;
