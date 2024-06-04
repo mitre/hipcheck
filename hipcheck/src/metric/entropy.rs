@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::metric::math::mean;
-use crate::analysis::metric::math::std_dev;
-use crate::analysis::MetricProvider;
 use crate::context::Context as _;
 use crate::data::git::Commit;
 use crate::data::git::CommitDiff;
 use crate::data::git::Diff;
 use crate::error::Result;
 use crate::hc_error;
+use crate::metric::math::mean;
+use crate::metric::math::std_dev;
+use crate::metric::MetricProvider;
 use crate::TryAny;
 use crate::TryFilter;
 use crate::F64;

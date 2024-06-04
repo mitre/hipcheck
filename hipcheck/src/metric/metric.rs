@@ -1,22 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod activity;
-pub mod affiliation;
-pub mod binary;
-pub mod binary_detector;
-pub mod churn;
-pub mod commit_trust;
-pub mod contributor_trust;
-pub mod entropy;
-pub mod fuzz;
-pub mod identity;
-pub mod linguist;
-mod math;
-pub mod module;
-pub mod module_contributors;
-pub mod review;
-pub mod typo;
-
 use std::rc::Rc;
 
 use crate::config::AttacksConfigQuery;
@@ -27,21 +10,36 @@ use crate::data::FuzzProvider;
 use crate::data::ModuleProvider;
 use crate::data::PullRequestReviewProvider;
 use crate::error::Result;
-use activity::ActivityOutput;
-use affiliation::AffiliationOutput;
-use binary::BinaryOutput;
-use binary_detector::BinaryFile;
-use churn::ChurnOutput;
-use commit_trust::CommitTrustOutput;
-use contributor_trust::ContributorTrustOutput;
-use entropy::EntropyOutput;
-use fuzz::FuzzOutput;
-use identity::IdentityOutput;
-use linguist::Linguist;
-use module::ModuleOutput;
-use module_contributors::ModuleContributorsOutput;
-use review::ReviewOutput;
-use typo::TypoOutput;
+
+use crate::metric::activity;
+use crate::metric::affiliation;
+use crate::metric::binary;
+use crate::metric::churn;
+use crate::metric::commit_trust;
+use crate::metric::contributor_trust;
+use crate::metric::entropy;
+use crate::metric::fuzz;
+use crate::metric::identity;
+use crate::metric::module;
+use crate::metric::module_contributors;
+use crate::metric::review;
+use crate::metric::typo;
+
+use crate::metric::activity::ActivityOutput;
+use crate::metric::affiliation::AffiliationOutput;
+use crate::metric::binary::BinaryOutput;
+use crate::metric::binary_detector::BinaryFile;
+use crate::metric::churn::ChurnOutput;
+use crate::metric::commit_trust::CommitTrustOutput;
+use crate::metric::contributor_trust::ContributorTrustOutput;
+use crate::metric::entropy::EntropyOutput;
+use crate::metric::fuzz::FuzzOutput;
+use crate::metric::identity::IdentityOutput;
+use crate::metric::linguist::Linguist;
+use crate::metric::module::ModuleOutput;
+use crate::metric::module_contributors::ModuleContributorsOutput;
+use crate::metric::review::ReviewOutput;
+use crate::metric::typo::TypoOutput;
 
 /// Queries about metrics
 #[salsa::query_group(MetricProviderStorage)]

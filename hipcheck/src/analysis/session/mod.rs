@@ -3,9 +3,6 @@
 mod pm;
 mod spdx;
 
-use crate::analysis::metric::binary_detector::BinaryFileStorage;
-use crate::analysis::metric::linguist::LinguistStorage;
-use crate::analysis::metric::MetricProviderStorage;
 use crate::analysis::score::ScoringProviderStorage;
 use crate::analysis::AnalysisProviderStorage;
 use crate::command_util::DependentProgram;
@@ -38,6 +35,9 @@ use crate::data::PullRequestReviewProviderStorage;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
+use crate::metric::binary_detector::BinaryFileStorage;
+use crate::metric::linguist::LinguistStorage;
+use crate::metric::MetricProviderStorage;
 use crate::report::Format;
 use crate::report::ReportParams;
 use crate::report::ReportParamsStorage;

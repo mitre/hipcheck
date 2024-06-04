@@ -7,6 +7,7 @@ mod config;
 mod context;
 mod data;
 mod error;
+mod metric;
 mod report;
 mod shell;
 #[cfg(test)]

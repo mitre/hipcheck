@@ -2,10 +2,10 @@
 
 //! A query group for binary file detection queries.
 
-use crate::analysis::metric::binary_detector::BinaryFileDetector;
 use crate::config::PracticesConfigQuery;
 use crate::context::Context as _;
 use crate::error::Result;
+use crate::metric::binary_detector::BinaryFileDetector;
 use std::rc::Rc;
 
 /// Queries related to binary file detection
