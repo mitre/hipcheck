@@ -9,6 +9,7 @@ mod data;
 mod error;
 mod report;
 mod shell;
+mod target;
 #[cfg(test)]
 mod test_util;
 mod util;
@@ -79,7 +80,13 @@ fn main() -> ExitCode {
 
 /// Run the `check` command.
 fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
-	let check = args.command().as_ref().unwrap().as_check();
+	let check = match args.command() {
+		Ok(chk) => chk.as_check(),
+		Err(e) => {
+			print_error(&e);
+			return ExitCode::FAILURE;
+		}
+	};
 
 	if check.kind.target_kind().is_checkable().not() {
 		print_missing();

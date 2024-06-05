@@ -3,8 +3,11 @@
 //! Data structures for Hipcheck's main CLI.
 
 use crate::analysis::session::Check;
+use crate::error::Error;
+use crate::hc_error;
 use crate::report::Format;
 use crate::shell::{ColorChoice, Verbosity};
+use crate::target::TargetType;
 use crate::CheckKind;
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
@@ -398,7 +401,7 @@ pub struct CheckArgs {
 	command: Option<CheckCommand>,
 
 	#[arg(short = 't', long = "target")]
-	pub target_type: Option<String>,
+	pub target_type: Option<TargetType>,
 	#[arg(required = true)]
 	pub target: Option<String>,
 	#[arg(trailing_var_arg(true), hide = true)]
@@ -406,43 +409,38 @@ pub struct CheckArgs {
 }
 
 impl CheckArgs {
-	fn subcommand_from_target(&self, target: &str) -> Option<&str> {
-		if target.starts_with("pkg:npm") {
-			Some("npm")
-		} else if target.ends_with(".spdx") {
-			Some("spdx")
-		} else if target.ends_with("pkg::github") {
-			Some("repo")
-		} else if target.starts_with("https://github.com/") {
-			Some("repo")
-		} else {
-			None
-		}
-	}
-
-	fn target_to_check_command(&self) -> Option<CheckCommand> {
+	fn target_to_check_command(&self) -> Result<CheckCommand, Error> {
+		// Get target str
 		let Some(target) = self.target.clone() else {
-			return None;
+			return Err(hc_error!(
+				"a target must be provided. The CLI should have caught this"
+			));
 		};
-		let opt_subcmd_str: Option<String> = match self.target_type.clone() {
-			Some(t) => Some(t),
-			None => self
-				.subcommand_from_target(target.as_str())
-				.map(str::to_owned),
+		// If a target type was provided use that, otherwise try to resolve from
+		// the target string
+		let opt_subcmd = self
+			.target_type
+			.clone()
+			.or_else(|| TargetType::try_resolve_from_target(target.as_str()));
+		let Some(subcmd) = opt_subcmd else {
+			return Err(hc_error!(
+				"could not resolve target '{}' to a target type. please specify with the `-t` flag",
+				target
+			));
 		};
-		let Some(subcmd_str) = opt_subcmd_str else {
-			return None;
-		};
+		// We have resolved the subcommand type. Re-construct a string with all args
+		// that we can feed back into clap
 		let binding = "check".to_owned();
+		let subcmd_str = subcmd.as_str();
 		let mut reconst_args: Vec<&String> = vec![&binding, &subcmd_str, &target];
 		reconst_args.extend(self.trailing_args.iter());
 
-		CheckCommand::try_parse_from(reconst_args.into_iter()).ok()
+		CheckCommand::try_parse_from(reconst_args.into_iter()).map_err(|e| hc_error!("{}", e))
 	}
 
-	pub fn command(&self) -> Option<CheckCommand> {
-		if self.command.is_some() {
-			self.command.clone()
+	pub fn command(&self) -> Result<CheckCommand, Error> {
+		if let Some(cmd) = self.command.clone() {
+			Ok(cmd)
 		} else {
 			self.target_to_check_command()
 		}
