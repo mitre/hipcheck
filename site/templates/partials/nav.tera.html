@@ -1,0 +1,74 @@
+
+{% import "macros/icon.tera.html" as ic %}
+
+<nav class="
+        text-sm
+        py-4 px-8
+        ">
+    <ul class="
+            md:flex gap-x-6
+            mx-4
+            ">
+        <li class="block md:flex md:flex-1 items-stretch">
+            <a href="/" class="
+                items-stretch content-center
+                text-black dark:text-zinc-200 hover:text-green-600
+                text-xl
+                font-semibold
+                ">Hipcheck&nbsp;<span class="leading-none font-extrabold text-green-600 text-2xl">✓</span></a>
+
+            {% if config.extra.announce %}
+                <a href="{{ config.extra.announce.url }}"
+                    class="
+                        rounded-3xl
+                        bg-sky-100 dark:bg-sky-900 hover:bg-sky-200 dark:hover:bg-sky-800
+                        text-sky-700 dark:text-sky-200 hover:text-sky-800 dark:hover:text-sky-100
+                        my-1
+                        ml-8
+                        px-3
+                        leading-6
+                        text-xs
+                        ">
+                    <span class="font-semibold">Announcement &middot;</span> {{ config.extra.announce.text }} ↗
+                </a>
+            {% endif %}
+        </li>
+        {% for item in config.extra.nav %}
+            <li class="
+                    items-stretch flex
+                    {% if item.sep %}
+                        border-r border-zinc-200 dark:border-zinc-700 border-solid
+                    {% endif %}
+                    ">
+                {% if not item.sep %}
+                    <a class="
+                        items-stretch
+                        text-black dark:text-zinc-200 hover:text-blue-500
+                        py-1.5
+                        font-normal
+                        {% if item.highlight %}
+                            font-semibold
+                            px-4
+                            bg-blue-600 hover:bg-green-500 hover:from-green-100
+                            text-blue-50 hover:text-green-50
+                            rounded-md
+                        {% else %}
+                            p-0
+                        {% endif %}
+                        " href="{{ item.url }}" {% if item.id %}id="{{ item.id }}"{% endif %}>
+                    {% if item.icon %}
+                        {% set name = item.icon %}
+                        {{ ic::icon(name=name, classes="mt-[-2px] ml-[-4px] mr-1") }}
+                    {% endif %}
+                    {% if not item.icononly %}
+                        {{ item.name }}
+                        {% if item.external %}
+                            ↗
+                            {% endif %}
+                        {% endif %}
+                    </a>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+</nav>

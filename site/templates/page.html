@@ -1,0 +1,16 @@
+
+{% import "macros/icon.tera.html" as ic %}
+
+{% extends "bases/base.tera.html" %}
+
+{% block title %}
+    {% if page.title %}
+        {{ page.title }}
+    {% else %}
+        Hipcheck
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {{ page.content | safe }}
+{% endblock %}

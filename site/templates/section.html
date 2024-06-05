@@ -1,0 +1,22 @@
+
+{% import "macros/icon.tera.html" as ic %}
+{% import "macros/toc.tera.html" as toc %}
+
+{% extends "bases/base.tera.html" %}
+
+{% block title %}
+    {% if section.title %}
+        {{ section.title }}
+    {% else %}
+        Hipcheck
+    {% endif %}
+{% endblock %}
+
+{% block sidebar %}
+    {% set content = section.toc %}
+    {{ toc::toc(content=content) }}
+{% endblock %}
+
+{% block content %}
+    {{ section.content | safe }}
+{% endblock %}

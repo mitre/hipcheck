@@ -1,0 +1,38 @@
+
+{% import "macros/icon.tera.html" as ic %}
+{% import "macros/toc.tera.html" as toc %}
+
+{% extends "bases/base.tera.html" %}
+
+{% block title %}
+    {% if section.title %}
+        {{ section.title }}
+    {% else %}
+        Hipcheck
+    {% endif %}
+{% endblock %}
+
+{% block sidebar %}
+{% endblock %}
+
+{% block content %}
+    {{ section.content | safe }}
+
+    {% for page in section.pages %}
+
+        <article>
+            <header>
+                <h2 class="text-4xl"><a class="no-underline font-extrabold" href="{{ page.permalink }}">{{ page.title }}</a></h2>
+                <p class="">Posted on {{ page.date | date(format="%B %-d, %Y") }}</p>
+
+                {% if page.summary %}
+                    {{ page.summary | safe }}
+                {% endif %}
+
+            </header>
+
+        </article>
+
+    {% endfor %}
+
+{% endblock %}

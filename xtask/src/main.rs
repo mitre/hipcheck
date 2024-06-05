@@ -4,8 +4,8 @@ mod task;
 mod workspace;
 
 use clap::Parser as _;
+use clap_verbosity_flag::InfoLevel;
 use clap_verbosity_flag::Verbosity;
-use clap_verbosity_flag::WarnLevel;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -24,6 +24,9 @@ fn main() -> ExitCode {
 		Commands::Ci => task::ci::run(),
 		Commands::Changelog(args) => task::changelog::run(args),
 		Commands::Rfd(args) => task::rfd::run(args),
+		Commands::Site(args) => match args.command {
+			SiteCommand::Serve => task::site::serve::run(),
+		},
 	};
 
 	match result {
@@ -40,7 +43,7 @@ fn main() -> ExitCode {
 #[clap(about, version, long_about = None, propagate_version = true)]
 struct Args {
 	#[clap(flatten)]
-	verbose: Verbosity<WarnLevel>,
+	verbose: Verbosity<InfoLevel>,
 
 	#[clap(subcommand)]
 	command: Commands,
@@ -56,6 +59,8 @@ enum Commands {
 	Changelog(ChangelogArgs),
 	/// Interact with Hipcheck RFDs
 	Rfd(RfdArgs),
+	/// Work with the Hipcheck website.
+	Site(SiteArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -87,6 +92,18 @@ struct NewRfdArgs {
 
 	/// The title to give the RFD
 	title: String,
+}
+
+#[derive(Debug, clap::Args)]
+struct SiteArgs {
+	#[clap(subcommand)]
+	command: SiteCommand,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum SiteCommand {
+	/// Serve the local development site.
+	Serve,
 }
 
 #[cfg(test)]

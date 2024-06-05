@@ -6,3 +6,4 @@ pub mod changelog;
 pub mod check;
 pub mod ci;
 pub mod rfd;
+pub mod site;

@@ -1,0 +1,68 @@
+# The URL of the side.
+base_url = "https://mitre.github.io/hipcheck"
+
+# Don't use Sass
+compile_sass = false
+
+# Build the search engine.
+build_search_index = true
+
+[markdown]
+
+# Use syntax highlighting.
+highlight_code = true
+
+[extra]
+
+# Define the site navigation.
+nav = [
+    { name = "Documentation", url = "/docs" },
+    { name = "Contribute", url = "/contribute" },
+    { name = "Blog", url = "/blog" },
+    { sep = true },
+    { name = "Get Help", url = "https://github.com/mitre/hipcheck/discussions", icon = "life-buoy", external = true },
+    { name = "Install", url = "/install", highlight = true, icon = "arrow-down" },
+    { sep = true },
+    { url = "https://github.com/mitre/hipcheck", icon = "github", icononly = true },
+    { url = "#", icon = "sun", icononly = true, id = "toggle-darkmode" },
+]
+
+# Define the site footer.
+footer = [
+    [
+        { name = "Documentation", title = true },
+        { name = "Quickstart", url = "/docs/quickstart" },
+        { name = "Complete Guide", url = "/docs/guide" },
+        { name = "Requests for Discussion", url = "/rfds" },
+        { name = "Development Blog", url = "/blog" },
+        { name = "Project", title = true },
+        { name = "Hipcheck Values", url = "/rfds/0002" },
+        { name = "Open Source License", url = "https://github.com/mitre/hipcheck/blob/main/LICENSE", external = true },
+        { name = "Code of Conduct", url = "https://github.com/mitre/hipcheck/blob/main/CODE_OF_CONDUCT.md", external = true },
+    ],
+    [
+        { name = "Install", title = true },
+        { name = "Installer", url = "/install" },
+        { name = "Container Image", url = "https://hub.docker.com/r/mitre/hipcheck", external = true },
+        { name = "Release Notes", url = "https://github.com/mitre/hipcheck/releases", external = true },
+        { name = "Changelog", url = "https://github.com/mitre/hipcheck/blob/main/CHANGELOG.md", external = true },
+        { name = "Packages", title = true },
+        { name = "GitHub", url = "https://github.com/mitre/hipcheck", external = true },
+        { name = "Crates.io", url = "https://crates.io/crates/hipcheck", external = true },
+    ],
+    [
+        { name = "Contribute", title = true },
+        { name = "Discussions", url = "https://github.com/mitre/hipcheck/discussions", external = true },
+        { name = "Issue Tracker", url = "https://github.com/mitre/hipcheck/issues", external = true },
+        { name = "Product Roadmap", url = "https://github.com/orgs/mitre/projects/29/views/2", external = true },
+        { name = "Contributor Guide", url = "https://github.com/mitre/hipcheck/blob/main/CONTRIBUTING.md", external = true },
+        { name = "Security", title = true },
+        { name = "Security Policy", url = "https://github.com/mitre/hipcheck/security", external = true },
+        { name = "Report a Vulnerability", url = "https://github.com/mitre/hipcheck/security/advisories/new", external = true },
+    ],
+]
+
+# Set an announcement for the site navigation bar.
+[extra.announce]
+url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.2.1"
+text = "Introducing Hipcheck 3.2.1"

@@ -1,0 +1,23 @@
+
+{% macro toc_level(content) %}
+    <ol class="">
+        {% for item in content %}
+            <li class="pl-4">
+                <a class="text-blue-500 block py-2 hover:underline" href="{{ item.permalink }}">{{ item.title }}</a>
+
+                {% if item.children %}
+                    {% set children = item.children %}
+                    {{ toc::toc_level(content=children) }}
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ol>
+{% endmacro toc_level %}
+
+{% macro toc(content) %}
+    <div class="mt-16 text-sm dark:text-zinc-300 border border-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg pb-2">
+        <span class="font-semibold block p-4 pb-2">Table of Contents</span>
+
+        {{ toc::toc_level(content=content) }}
+    </div>
+{% endmacro toc %}
