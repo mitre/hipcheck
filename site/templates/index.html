@@ -1,0 +1,19 @@
+
+{% import "macros/icon.tera.html" as ic %}
+
+{% extends "bases/base.tera.html" %}
+
+{% block title %}
+    {% if section.title %}
+        {{ section.title }}
+    {% else %}
+        Hipcheck
+    {% endif %}
+{% endblock %}
+
+{# Turn off breadcrumbs for the index page. #}
+{% block breadcrumbs %}{% endblock %}
+
+{% block content %}
+    {{ section.content | safe }}
+{% endblock %}

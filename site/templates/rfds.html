@@ -1,0 +1,29 @@
+
+{% import "macros/icon.tera.html" as ic %}
+{% import "macros/toc.tera.html" as toc %}
+
+{% extends "bases/base.tera.html" %}
+
+{% block title %}
+    {% if section.title %}
+        {{ section.title }}
+    {% else %}
+        Hipcheck
+    {% endif %}
+{% endblock %}
+
+{% block sidebar %}
+{% endblock %}
+
+{% block content %}
+    {{ section.content | safe }}
+
+    <ol>
+        {% for page in section.pages %}
+
+            <li>
+                <a href="{{ page.permalink }}">{% if page.extra.rfd %}RFD #{{ page.extra.rfd }}: {% endif %}{{ page.title }}</a></li>
+
+        {% endfor %}
+    </ol>
+{% endblock %}

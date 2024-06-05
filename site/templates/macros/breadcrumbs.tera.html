@@ -1,0 +1,21 @@
+{% macro breadcrumbs(current) %}
+    <div class="text-sm text-zinc-500 px-14 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800 rounded-md p-2 mx-[-0.5rem]">
+            <a class="font-normal no-underline hover:underline" href="/">Home</a>
+
+            {% for ancestor in current.ancestors %}
+                {% if loop.first %}
+                    {% continue %}
+                {% endif %}
+
+                <span class="text-zinc-300 px-1">›</span>
+
+                {% set section = get_section(path=ancestor) %}
+
+                <a class="font-normal no-underline hover:underline" href="{{ section.permalink }}">{{ section.title }}</a>
+            {% endfor %}
+
+            <span class="text-zinc-300 px-1">›</span>
+
+            <a class="font-normal no-underline hover:underline" href="{{ current.permalink }}">{{ current.title }}</a>
+    </div>
+{% endmacro breadcrumbs %}

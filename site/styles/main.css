@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.icon {
+    @apply inline-block;
+    @apply w-4;
+    @apply h-4;
+    @apply stroke-0;
+    @apply stroke-current;
+    @apply fill-current;
+}
