@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-mod authenticated_agent;
 pub mod code_search;
 mod data;
 mod graphql;
 mod graphql_pr;
-mod hidden;
 
 use crate::context::Context as _;
 use crate::data::code_search::search_code_request;
 use crate::data::git::parse::github_diff;
-use crate::data::github::authenticated_agent::AuthenticatedAgent;
 use crate::data::github::data::*;
 use crate::data::github::graphql::get_all_reviews;
 use crate::data::github::graphql_pr::get_all_pr_reviews;
 use crate::error::Result;
+use crate::http::authenticated_agent::AuthenticatedAgent;
 use std::rc::Rc;
 
 pub struct GitHub<'a> {

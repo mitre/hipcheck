@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data::github::authenticated_agent::AuthenticatedAgent;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
+use crate::http::authenticated_agent::AuthenticatedAgent;
 use serde_json::Value;
 use std::rc::Rc;
 
