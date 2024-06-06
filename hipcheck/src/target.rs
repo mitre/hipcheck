@@ -17,7 +17,7 @@ impl TargetType {
 	pub fn try_resolve_from_target(tgt: &str) -> Option<TargetType> {
 		use TargetType::*;
 		if let Some(pkg) = tgt.strip_prefix("pkg:") {
-			if let Some((pkg_type, _)) = pkg.split_once("/") {
+			if let Some((pkg_type, _)) = pkg.split_once('/') {
 				// Match on purl package type
 				match pkg_type {
 					"github" => Some(Repo),

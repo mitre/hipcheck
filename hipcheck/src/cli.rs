@@ -438,7 +438,7 @@ impl CheckArgs {
 		let mut reconst_args: Vec<&String> = vec![&binding, &subcmd_str, &target];
 		reconst_args.extend(self.trailing_args.iter());
 
-		CheckCommand::try_parse_from(reconst_args.into_iter()).map_err(|e| hc_error!("{}", e))
+		CheckCommand::try_parse_from(reconst_args).map_err(|e| hc_error!("{}", e))
 	}
 
 	pub fn command(&self) -> Result<CheckCommand, Error> {
