@@ -16,14 +16,23 @@ pub enum TargetType {
 impl TargetType {
 	pub fn try_resolve_from_target(tgt: &str) -> Option<TargetType> {
 		use TargetType::*;
-		if tgt.starts_with("pkg:npm") {
-			Some(Npm)
-		} else if tgt.ends_with(".spdx") {
-			Some(Spdx)
-		} else if tgt.ends_with("pkg::github") {
-			Some(Repo)
+		if let Some(pkg) = tgt.strip_prefix("pkg:") {
+			if let Some((pkg_type, _)) = pkg.split_once("/") {
+				// Match on purl package type
+				match pkg_type {
+					"github" => Some(Repo),
+					"npm" => Some(Npm),
+					"maven" => Some(Maven),
+					"pypi" => Some(Pypi),
+					_ => None,
+				}
+			} else {
+				None
+			}
 		} else if tgt.starts_with("https://github.com/") {
 			Some(Repo)
+		} else if tgt.ends_with(".spdx") {
+			Some(Spdx)
 		} else {
 			None
 		}
