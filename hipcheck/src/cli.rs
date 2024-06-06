@@ -845,6 +845,13 @@ mod tests {
 			parsed.unwrap_err().kind(),
 			clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
 		);
+
+		let parsed = CliConfig::try_parse_from(schema_args.into_iter());
+		assert!(parsed.is_err());
+		assert_eq!(
+			parsed.unwrap_err().kind(),
+			clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+		);
 	}
 
 	fn get_check_cmd_from_cli(args: Vec<&str>) -> Result<CheckCommand, Error> {
