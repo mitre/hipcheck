@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::metric::affiliation::AffiliatedType;
-use crate::analysis::metric::MetricProvider;
 use crate::config::AttacksConfigQuery;
 use crate::config::CommitConfigQuery;
 use crate::config::FuzzConfigQuery;
@@ -9,6 +7,8 @@ use crate::config::PracticesConfigQuery;
 use crate::data::git::GitProvider;
 use crate::error::Error;
 use crate::error::Result;
+use crate::metric::affiliation::AffiliatedType;
+use crate::metric::MetricProvider;
 use crate::report::Concern;
 use crate::report::PrConcern;
 use crate::F64;

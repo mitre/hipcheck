@@ -2,10 +2,10 @@
 
 //! Data structures for Hipcheck's main CLI.
 
-use crate::analysis::session::Check;
 use crate::error::Error;
 use crate::hc_error;
 use crate::report::Format;
+use crate::session::session::Check;
 use crate::shell::{ColorChoice, Verbosity};
 use crate::target::TargetType;
 use crate::CheckKind;

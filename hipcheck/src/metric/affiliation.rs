@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::MetricProvider;
 use crate::context::Context as _;
 use crate::data::git::Commit;
 use crate::data::git::CommitContributorView;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
+use crate::metric::MetricProvider;
 use crate::util::fs as file;
 use serde::de::Error as SerdeError;
 use serde::de::Visitor;

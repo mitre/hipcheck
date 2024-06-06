@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-mod pm;
-mod spdx;
+// mod pm;
+// mod spdx;
 
-use crate::analysis::metric::binary_detector::BinaryFileStorage;
-use crate::analysis::metric::linguist::LinguistStorage;
-use crate::analysis::metric::MetricProviderStorage;
 use crate::analysis::score::ScoringProviderStorage;
 use crate::analysis::AnalysisProviderStorage;
 use crate::command_util::DependentProgram;
@@ -22,12 +19,6 @@ use crate::context::Context as _;
 use crate::data::git::get_git_version;
 use crate::data::git::GitProviderStorage;
 use crate::data::npm::get_npm_version;
-use crate::data::source::Source;
-use crate::data::source::SourceChangeRequest;
-use crate::data::source::SourceKind;
-use crate::data::source::SourceQuery;
-use crate::data::source::SourceQueryStorage;
-use crate::data::source::SourceRepo;
 use crate::data::CodeQualityProviderStorage;
 use crate::data::DependenciesProviderStorage;
 use crate::data::FuzzProviderStorage;
@@ -38,11 +29,22 @@ use crate::data::PullRequestReviewProviderStorage;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
+use crate::metric::binary_detector::BinaryFileStorage;
+use crate::metric::linguist::LinguistStorage;
+use crate::metric::MetricProviderStorage;
 use crate::report::Format;
 use crate::report::ReportParams;
 use crate::report::ReportParamsStorage;
+use crate::session::pm::detect_and_extract;
+use crate::session::spdx::extract_download_url;
 use crate::shell::Phase;
 use crate::shell::Shell;
+use crate::source::source::Source;
+use crate::source::source::SourceChangeRequest;
+use crate::source::source::SourceKind;
+use crate::source::source::SourceQuery;
+use crate::source::source::SourceQueryStorage;
+use crate::source::source::SourceRepo;
 use crate::version::get_version;
 use crate::version::VersionQuery;
 use crate::version::VersionQueryStorage;
@@ -328,7 +330,7 @@ fn resolve_source(
 
 			let command = &source_type.to_owned().kind;
 
-			let package_git_repo_url = pm::detect_and_extract(package, command.name().to_owned())
+			let package_git_repo_url = detect_and_extract(package, command.name().to_owned())
 				.context("Could not get git repo URL for package")?;
 
 			SourceRepo::resolve_repo(phase, home, package_git_repo_url.as_str()).map(|repo| {
@@ -343,7 +345,7 @@ fn resolve_source(
 			})
 		}
 		TargetKind::SpdxDocument => {
-			let download_url = spdx::extract_download_url(source)?;
+			let download_url = extract_download_url(source)?;
 			SourceRepo::resolve_repo(phase, home, &download_url).map(|repo| Source {
 				kind: SourceKind::Repo(repo),
 			})
