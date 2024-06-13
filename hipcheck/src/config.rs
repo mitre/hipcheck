@@ -2,6 +2,7 @@
 
 //! Defines the configuration file format.
 
+use crate::analysis::score::*;
 use crate::context::Context;
 use crate::error::Result;
 use crate::hc_error;
@@ -11,10 +12,13 @@ use crate::F64;
 use crate::LANGS_FILE;
 use crate::ORGS_FILE;
 use crate::TYPO_FILE;
+use indextree::{Arena, NodeId};
+use num_traits::identities::Zero;
 use pathbuf::pathbuf;
 use serde::Deserialize;
 use serde::Serialize;
 use smart_default::SmartDefault;
+use std::cmp::{Eq, PartialEq};
 use std::default::Default;
 use std::path::Path;
 use std::path::PathBuf;
@@ -644,6 +648,94 @@ pub trait CommitConfigQuery: ConfigSource {
 	fn pr_module_contributors_weight(&self) -> u64;
 	/// Returns the pull request module contributors analysis count threshold
 	fn pr_module_contributors_percent_threshold(&self) -> F64;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WeightTreeNode {
+	pub label: String,
+	pub weight: F64,
+}
+impl WeightTreeNode {
+	pub fn new(label: &str, weight: F64) -> Self {
+		WeightTreeNode {
+			label: label.to_owned(),
+			weight,
+		}
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WeightTree {
+	pub tree: Arena<WeightTreeNode>,
+	pub root: NodeId,
+}
+impl WeightTree {
+	pub fn new(root_label: &str) -> Self {
+		let mut tree = Arena::new();
+		let root = tree.new_node(WeightTreeNode::new(root_label, F64::new(1.0).unwrap()));
+		WeightTree { tree, root }
+	}
+	pub fn add_child_u64(&mut self, under: NodeId, label: &str, weight: u64) -> NodeId {
+		let weight = F64::new(weight as f64).unwrap();
+		self.add_child(under, label, weight)
+	}
+	pub fn add_child(&mut self, under: NodeId, label: &str, weight: F64) -> NodeId {
+		let child = self.tree.new_node(WeightTreeNode::new(label, weight));
+		under.append(child, &mut self.tree);
+		child
+	}
+}
+
+#[salsa::query_group(WeightTreeQueryStorage)]
+pub trait WeightTreeProvider:
+	FuzzConfigQuery + PracticesConfigQuery + AttacksConfigQuery + CommitConfigQuery
+{
+	/// Returns the tree of raw analysis weights from the config
+	fn weight_tree(&self) -> Result<Rc<WeightTree>>;
+	/// Returns the tree of normalized weights for analyses from the config
+	fn normalized_weight_tree(&self) -> Result<Rc<WeightTree>>;
+}
+
+pub fn weight_tree(db: &dyn WeightTreeProvider) -> Result<Rc<WeightTree>> {
+	let mut tree = WeightTree::new(RISK_PHASE);
+	if db.practices_active() {
+		let practices_node = tree.add_child_u64(tree.root, PRACTICES_PHASE, db.practices_weight());
+		tree.add_child_u64(practices_node, ACTIVITY_PHASE, db.activity_weight());
+		tree.add_child_u64(practices_node, REVIEW_PHASE, db.review_weight());
+		tree.add_child_u64(practices_node, BINARY_PHASE, db.binary_weight());
+		tree.add_child_u64(practices_node, IDENTITY_PHASE, db.identity_weight());
+		tree.add_child_u64(practices_node, FUZZ_PHASE, db.fuzz_weight());
+	}
+	if db.attacks_active() {
+		let attacks_node = tree.add_child_u64(tree.root, ATTACKS_PHASE, db.attacks_weight());
+		tree.add_child_u64(attacks_node, TYPO_PHASE, db.typo_weight());
+		if db.commit_active() {
+			let commit_node = tree.add_child_u64(attacks_node, COMMITS_PHASE, db.commit_weight());
+			tree.add_child_u64(commit_node, AFFILIATION_PHASE, db.affiliation_weight());
+			tree.add_child_u64(commit_node, CHURN_PHASE, db.churn_weight());
+			tree.add_child_u64(commit_node, ENTROPY_PHASE, db.entropy_weight());
+		}
+	}
+	Ok(Rc::new(tree))
+}
+
+fn normalize_internal(node: NodeId, tree: &mut WeightTree) -> F64 {
+	let children: Vec<NodeId> = node.children(&tree.tree).collect();
+	let weight_sum: F64 = children.iter().map(|n| normalize_internal(*n, tree)).sum();
+	if !weight_sum.is_zero() {
+		for c in children {
+			let child: &mut WeightTreeNode = tree.tree.get_mut(c).unwrap().get_mut();
+			child.weight = child.weight / weight_sum;
+		}
+	}
+	tree.tree.get(node).unwrap().get().weight
+}
+
+pub fn normalized_weight_tree(db: &dyn WeightTreeProvider) -> Result<Rc<WeightTree>> {
+	let tree = db.weight_tree();
+	let mut norm_tree: WeightTree = (*tree?).clone();
+	normalize_internal(norm_tree.root, &mut norm_tree);
+	Ok(Rc::new(norm_tree))
 }
 
 /// Derived query implementations
