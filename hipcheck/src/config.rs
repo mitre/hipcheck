@@ -12,7 +12,7 @@ use crate::F64;
 use crate::LANGS_FILE;
 use crate::ORGS_FILE;
 use crate::TYPO_FILE;
-use indextree::{Arena, NodeId};
+use indextree::{Arena, NodeEdge, NodeId};
 use num_traits::identities::Zero;
 use pathbuf::pathbuf;
 use serde::Deserialize;
@@ -684,6 +684,28 @@ impl WeightTree {
 		under.append(child, &mut self.tree);
 		child
 	}
+}
+// @Temporary
+pub fn visit_leaves(node: NodeId, tree: &Arena<WeightTreeNode>) -> Vec<Vec<F64>> {
+	let mut iter = node.traverse(tree);
+	let mut scope: Vec<F64> = vec![];
+	let mut last_start: NodeId = node;
+	let mut out_scopes: Vec<Vec<F64>> = vec![];
+	while let Some(edge) = iter.next() {
+		match edge {
+			NodeEdge::Start(n) => {
+				last_start = n;
+				scope.push(tree.get(n).unwrap().get().weight);
+			}
+			NodeEdge::End(n) => {
+				if n == last_start {
+					out_scopes.push(scope.clone())
+				}
+				scope.pop();
+			}
+		}
+	}
+	out_scopes
 }
 
 #[salsa::query_group(WeightTreeQueryStorage)]

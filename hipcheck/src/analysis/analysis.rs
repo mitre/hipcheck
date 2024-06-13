@@ -33,7 +33,7 @@ pub trait AnalysisProvider:
 	+ PracticesConfigQuery
 {
 	/// Returns result of activity analysis
-	fn activity_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn activity_analysis(&self) -> Result<Rc<AltAnalysisReport>>;
 
 	/// Returns result of affiliation analysis
 	fn affiliation_analysis(&self) -> Result<Rc<AnalysisReport>>;
@@ -67,6 +67,88 @@ pub trait AnalysisProvider:
 
 	/// Returns result of pull request module contributors analysis
 	fn pr_module_contributors_analysis(&self) -> Result<Rc<AnalysisReport>>;
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ThresholdAnalysis<T: Ord> {
+	pub value: T,
+	pub threshold: T,
+	pub reversed: bool,
+}
+impl<T: Ord> ThresholdAnalysis<T> {
+	pub fn new(value: T, threshold: T, reversed: bool) -> Self {
+		ThresholdAnalysis {
+			value,
+			threshold,
+			reversed,
+		}
+	}
+	pub fn score(&self) -> i64 {
+		if self.reversed {
+			score_by_threshold_reversed(&self.value, &self.threshold)
+		} else {
+			score_by_threshold(&self.value, &self.threshold)
+		}
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ThresholdAnalysisCmp {
+	U64(ThresholdAnalysis<u64>),
+	F64(ThresholdAnalysis<F64>),
+	Bool(ThresholdAnalysis<bool>),
+}
+impl ThresholdAnalysisCmp {
+	pub fn score(&self) -> i64 {
+		use ThresholdAnalysisCmp::*;
+		match self {
+			U64(r) => r.score(),
+			F64(r) => r.score(),
+			Bool(r) => r.score(),
+		}
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct AltAnalysisReport {
+	// @FollowUp - if outcome is Pass/Fail, analysis *must* be Some.
+	//  maybe need better way to intertwine the two.
+	pub analysis: Option<ThresholdAnalysisCmp>,
+	pub outcome: AnalysisOutcome,
+	pub concerns: Vec<Concern>,
+}
+impl AltAnalysisReport {
+	pub fn error(err: Error) -> Self {
+		AltAnalysisReport {
+			analysis: None,
+			outcome: AnalysisOutcome::Error(err),
+			concerns: vec![],
+		}
+	}
+	pub fn skip() -> Self {
+		AltAnalysisReport {
+			analysis: None,
+			outcome: AnalysisOutcome::Skipped,
+			concerns: vec![],
+		}
+	}
+	pub fn new(
+		analysis: ThresholdAnalysisCmp,
+		outcome: AnalysisOutcome,
+		concerns: Vec<Concern>,
+	) -> Self {
+		AltAnalysisReport {
+			analysis: Some(analysis),
+			outcome,
+			concerns,
+		}
+	}
+	pub fn score(&self) -> i64 {
+		match &self.analysis {
+			None => -1,
+			Some(a) => a.score(),
+		}
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -186,50 +268,47 @@ impl Display for AnalysisOutcome {
 	}
 }
 
-pub fn activity_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn activity_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AltAnalysisReport>> {
 	if db.activity_active() {
 		let results = db.activity_metric();
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			})),
+			Err(err) => Ok(Rc::new(AltAnalysisReport::error(err))),
 			Ok(results) => {
 				let value = results.time_since_last_commit.num_weeks();
 				let threshold =
 					Duration::weeks(db.activity_week_count_threshold() as i64).num_weeks();
+				// @FollowUp - if pass/fail determined in here, then returning value/threshold
+				//  has no meaning, particularly because that info is embedded in the `msg`
 				let results_score = score_by_threshold(value, threshold);
 
 				let concerns = Vec::new();
 
-				if results_score == 0 {
+				let outcome = if results_score == 0 {
 					let msg = format!(
 						"{} weeks inactivity <= {} weeks inactivity",
 						value, threshold
 					);
-					Ok(Rc::new(AnalysisReport::Activity {
-						value: value as u64,
-						threshold: threshold as u64,
-						outcome: AnalysisOutcome::Pass(msg),
-						concerns,
-					}))
+					AnalysisOutcome::Pass(msg)
 				} else {
 					let msg = format!(
 						"{} weeks inactivity > {} weeks inactivity",
 						value, threshold
 					);
-					Ok(Rc::new(AnalysisReport::Activity {
-						value: value as u64,
-						threshold: threshold as u64,
-						outcome: AnalysisOutcome::Fail(msg),
-						concerns,
-					}))
-				}
+					AnalysisOutcome::Fail(msg)
+				};
+				Ok(Rc::new(AltAnalysisReport::new(
+					ThresholdAnalysisCmp::U64(ThresholdAnalysis::new(
+						value as u64,
+						threshold as u64,
+						false,
+					)),
+					outcome,
+					concerns,
+				)))
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
-			outcome: AnalysisOutcome::Skipped,
-		}))
+		Ok(Rc::new(AltAnalysisReport::skip()))
 	}
 }
 

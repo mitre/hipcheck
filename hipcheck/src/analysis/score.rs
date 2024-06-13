@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::analysis::analysis::AltAnalysisReport;
 use crate::analysis::analysis::AnalysisOutcome;
 use crate::analysis::analysis::AnalysisReport;
 use crate::analysis::AnalysisProvider;
+use crate::config::{visit_leaves, WeightTreeProvider};
 use crate::error::Result;
 use crate::hc_error;
 use crate::shell::Phase;
+use crate::F64;
+use std::collections::HashMap;
 use std::default::Default;
 use std::rc::Rc;
 
+use indextree::{Arena, NodeEdge, NodeId};
 use petgraph::graph::node_index as n;
 use petgraph::graph::NodeIndex;
 use petgraph::prelude::Graph;
@@ -38,6 +43,8 @@ pub struct ScoringResults {
 	pub results: AnalysisResults,
 	pub score: Score,
 }
+
+pub type OutcomeSet = HashMap<String, Option<Result<Rc<AltAnalysisReport>>>>;
 
 #[derive(Debug, Default)]
 pub struct AnalysisResults {
@@ -75,7 +82,7 @@ pub struct Score {
 }
 
 #[salsa::query_group(ScoringProviderStorage)]
-pub trait ScoringProvider: AnalysisProvider {
+pub trait ScoringProvider: AnalysisProvider + WeightTreeProvider {
 	/// Returns result of phase outcome and scoring
 	fn phase_outcome(&self, phase_name: Rc<String>) -> Result<Rc<ScoreResult>>;
 }
@@ -122,36 +129,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 	phase_name: P,
 ) -> Result<Rc<ScoreResult>> {
 	match phase_name.as_ref().as_str() {
-		ACTIVITY_PHASE => match &db.activity_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Activity {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Rc::new(ScoreResult {
-				count: db.activity_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Activity {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Rc::new(ScoreResult {
-				count: db.activity_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
+		ACTIVITY_PHASE => Err(hc_error!("Activity disabled")),
 		AFFILIATION_PHASE => match &db.affiliation_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
@@ -560,7 +538,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 	*/
 	// Values set with -1.0 are reseved for parent nodes whose score comes always from children nodes with a score set by hc_analysis algorithms
 
+	let weight_tree = db.normalized_weight_tree()?;
 	let mut results = AnalysisResults::default();
+	let mut outcome_set = OutcomeSet::new();
 	let mut score = Score::default();
 	let mut score_tree = ScoreTree { tree: Graph::new() };
 	let root_node = score_tree.tree.add_node(ScoreTreeNode {
@@ -591,31 +571,12 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 		update_phase(phase, ACTIVITY_PHASE)?;
 		// Check if this analysis was skipped or generated an error, then format the results accordingly for reporting.
 		let activity_analysis = db.activity_analysis()?;
-		match activity_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.activity = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.activity = Some(Err(err.clone())),
-			_ => results.activity = Some(Ok(activity_analysis)),
-		}
-
-		let score_result = db
-			.phase_outcome(Rc::new(ACTIVITY_PHASE.to_string()))
-			.unwrap();
-		score.activity = score_result.outcome.clone();
-		match add_node_and_edge_with_score(
-			score_result,
-			score_tree.clone(),
-			ACTIVITY_PHASE,
-			practices_node,
-		) {
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", ACTIVITY_PHASE)),
-		}
+		let activity_report = match &activity_analysis.as_ref().outcome {
+			AnalysisOutcome::Skipped => None,
+			AnalysisOutcome::Error(err) => Some(Err(err.clone())),
+			_ => Some(Ok(activity_analysis.clone())),
+		};
+		outcome_set.insert(ACTIVITY_PHASE.to_string(), activity_report);
 
 		/*===REVIEW PHASE===*/
 		update_phase(phase, REVIEW_PHASE)?;
@@ -845,6 +806,13 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				_ => return Err(hc_error!("failed to complete {} scoring.", ENTROPY_PHASE)),
 			}
 		}
+	}
+
+	println!("OutcomeSet: {:?}", outcome_set);
+	let trips = visit_leaves(weight_tree.root, &weight_tree.tree);
+	for t in trips {
+		let res: F64 = t.iter().product();
+		println!("Trip: {res}, {t:?}");
 	}
 
 	let start_node: NodeIndex<u32> = n(0);
