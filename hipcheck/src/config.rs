@@ -662,6 +662,17 @@ impl WeightTreeNode {
 			weight,
 		}
 	}
+	pub fn augment(&self, scores: &OutcomeSet) -> ScoreTreeNode {
+		let score = match scores.get(&self.label) {
+			Some(Some(Ok(res))) => res.score(),
+			_ => 0,
+		};
+		ScoreTreeNode {
+			label: self.label.clone(),
+			score: score as f64,
+			weight: self.weight.into(),
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

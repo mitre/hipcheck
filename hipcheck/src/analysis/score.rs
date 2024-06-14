@@ -4,7 +4,7 @@ use crate::analysis::analysis::AltAnalysisReport;
 use crate::analysis::analysis::AnalysisOutcome;
 use crate::analysis::analysis::AnalysisReport;
 use crate::analysis::AnalysisProvider;
-use crate::config::{visit_leaves, WeightTreeProvider};
+use crate::config::{visit_leaves, WeightTree, WeightTreeProvider};
 use crate::error::Result;
 use crate::hc_error;
 use crate::shell::Phase;
@@ -103,6 +103,56 @@ impl Default for ScoreResult {
 			score: 0,
 			outcome: AnalysisOutcome::Skipped,
 		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct AltScoreTree {
+	pub tree: Arena<ScoreTreeNode>,
+	pub root: NodeId,
+}
+impl AltScoreTree {
+	pub fn synthesize(weight_tree: &WeightTree, scores: &OutcomeSet) -> Result<Self> {
+		use indextree::NodeEdge::*;
+		let mut tree = Arena::<ScoreTreeNode>::new();
+		let weight_root = weight_tree.root;
+		let score_root = tree.new_node(
+			weight_tree
+				.tree
+				.get(weight_root)
+				.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+				.get()
+				.augment(&scores),
+		);
+
+		let mut scope: Vec<NodeId> = vec![score_root];
+		for edge in weight_root.traverse(&weight_tree.tree) {
+			match edge {
+				Start(n) => {
+					let curr_node = tree.new_node(
+						weight_tree
+							.tree
+							.get(n)
+							.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+							.get()
+							.augment(&scores),
+					);
+					scope
+						.last()
+						.ok_or(hc_error!("Scope stack is empty, invalid sate"))?
+						.append(curr_node, &mut tree);
+					scope.push(curr_node);
+				}
+				End(_) => {
+					scope.pop();
+				}
+			};
+		}
+
+		Ok(AltScoreTree {
+			tree,
+			root: score_root,
+		})
 	}
 }
 
@@ -814,6 +864,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 		let res: F64 = t.iter().product();
 		println!("Trip: {res}, {t:?}");
 	}
+	let alt_score_tree = AltScoreTree::synthesize(&weight_tree, &outcome_set)?;
 
 	let start_node: NodeIndex<u32> = n(0);
 	score.total = score_nodes(start_node, score_tree.tree);
