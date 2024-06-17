@@ -103,7 +103,6 @@ impl Default for ScoreResult {
 
 //stores the score tree using petgraph
 //the tree does not need to know what sections it is scoring
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ScoreTree {
 	pub tree: Graph<ScoreTreeNode, f64>,
@@ -111,6 +110,7 @@ pub struct ScoreTree {
 
 //stores the score tree using petgraph
 //the tree does not need to know what sections it is scoring
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ScoreTreeNode {
 	pub label: String,
