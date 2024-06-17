@@ -6,6 +6,7 @@ use crate::F64;
 /// Represents the enhanced result of a hipcheck analysis. Contains the actual outcome
 /// of the analysis, plus additional meta-information the analysis wants to provide to
 /// HipCheck core, such as raised concerns.
+#[allow(dead_code)]
 pub struct HCAnalysisResult {
 	pub outcome: AnalysisOutcome,
 	pub concerns: Vec<Concern>,

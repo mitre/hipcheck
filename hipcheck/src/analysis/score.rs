@@ -39,6 +39,7 @@ pub struct ScoringResults {
 	pub score: Score,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct AnalysisResults {
 	pub activity: Option<Result<Rc<AnalysisReport>>>,
@@ -56,6 +57,7 @@ pub struct AnalysisResults {
 	pub pr_module_contributors: Option<Result<Rc<AnalysisReport>>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct Score {
 	pub total: f64,
@@ -101,6 +103,7 @@ impl Default for ScoreResult {
 
 //stores the score tree using petgraph
 //the tree does not need to know what sections it is scoring
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ScoreTree {
 	pub tree: Graph<ScoreTreeNode, f64>,

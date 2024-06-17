@@ -13,6 +13,7 @@ use serde::Deserialize;
 
 pub type ESLintReports = Vec<ESLintReport>;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct ESLintReport {
 	#[serde(rename = "filePath")]
@@ -29,6 +30,7 @@ pub struct ESLintReport {
 	pub source: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct ESLintMessage {
 	#[serde(rename = "ruleId")]
