@@ -576,11 +576,11 @@ fn run_with_shell(
 
 			let scoring = match score_results(&mut phase, &session) {
 				Ok(scoring) => scoring,
-				_ => {
+				Err(x) => {
 					return (
 						session.end(),
-						Err(Error::msg("Trouble scoring and analyzing results")),
-					)
+						Err(x), // Error::msg("Trouble scoring and analyzing results")),
+					);
 				}
 			};
 

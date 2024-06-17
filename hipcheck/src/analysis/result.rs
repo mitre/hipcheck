@@ -1,24 +1,27 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::hc_error;
 use crate::report::Concern;
 use crate::Result;
 use crate::F64;
+use std::cmp::Ordering;
+use std::fmt::{self, Display};
 
 /// Represents the enhanced result of a hipcheck analysis. Contains the actual outcome
 /// of the analysis, plus additional meta-information the analysis wants to provide to
 /// HipCheck core, such as raised concerns.
 #[allow(dead_code)]
-pub struct HCAnalysisResult {
-	pub outcome: AnalysisOutcome,
+#[derive(Debug, Eq, PartialEq)]
+pub struct HCAnalysisReport {
+	pub outcome: HCAnalysisOutcome,
 	pub concerns: Vec<Concern>,
 }
-
-#[allow(dead_code)]
-pub type SkippableAnalysisResult = Option<HCAnalysisResult>;
 
 /// Represents the result of a hipcheck analysis. Either the analysis encountered
 /// an error, or it completed and returned a value.
 #[allow(dead_code)]
-pub enum AnalysisOutcome {
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum HCAnalysisOutcome {
 	Error(HCAnalysisError),
 	Completed(HCAnalysisValue),
 }
@@ -26,6 +29,7 @@ pub enum AnalysisOutcome {
 /// Enumeration of potential errors that a HipCheck analysis might return. The Generic
 /// variant enables representing errors that aren't covered by other variants.
 #[allow(dead_code)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HCAnalysisError {
 	Generic(crate::error::Error),
 }
@@ -34,13 +38,14 @@ pub enum HCAnalysisError {
 /// into two sub-enums under this one, we can eschew a recursive enum definition and
 /// ensure composite types only have a depth of one.
 #[allow(dead_code)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HCAnalysisValue {
 	Basic(HCBasicValue),
 	Composite(HCCompositeValue),
 }
 
 /// Basic HipCheck analysis return types
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HCBasicValue {
 	Integer(i64),
 	Unsigned(u64),
@@ -85,40 +90,69 @@ impl From<&str> for HCBasicValue {
 		HCBasicValue::String(value.to_owned())
 	}
 }
+impl Display for HCBasicValue {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use HCBasicValue::*;
+		match self {
+			Unsigned(u) => u.fmt(f),
+			Integer(i) => i.fmt(f),
+			String(s) => s.fmt(f),
+			Float(fp) => fp.fmt(f),
+			Bool(b) => b.fmt(f),
+		}
+	}
+}
 
 /// Composite HipCheck analysis return types
 #[allow(dead_code)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HCCompositeValue {
 	List(Vec<HCBasicValue>),
 	Dict(indexmap::IndexMap<String, HCBasicValue>),
 }
 
 /// The set of possible predicates for deciding if a source passed an analysis.
-#[allow(dead_code)]
-pub enum HCPredicate {
-	Threshold(ThresholdPredicate),
+pub trait HCPredicate: Display + Clone + Eq + PartialEq {
+	fn pass(&self) -> Result<bool>;
 }
 
 /// This predicate determines analysis pass/fail by whether a returned value was
 /// greater than, less than, or equal to a target value.
 #[allow(dead_code)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ThresholdPredicate {
 	pub value: HCBasicValue,
 	pub threshold: HCBasicValue,
-	pub ordering: std::cmp::Ordering,
+	units: String,
+	pub ordering: Ordering,
+}
+impl ThresholdPredicate {
+	pub fn new(
+		value: HCBasicValue,
+		threshold: HCBasicValue,
+		units: Option<String>,
+		ordering: Ordering,
+	) -> Self {
+		ThresholdPredicate {
+			value,
+			threshold,
+			units: units.unwrap_or("".to_owned()),
+			ordering,
+		}
+	}
 }
 
-fn pass_threshold<T: PartialOrd>(a: &T, b: &T, ord: &std::cmp::Ordering) -> Result<bool> {
+fn pass_threshold<T: PartialOrd>(a: &T, b: &T, ord: &Ordering) -> Result<bool> {
 	a.partial_cmp(b)
 		.ok_or(hc_error!("threshold comparison failed for unknown reason"))
 		.map(|x| x == *ord)
 }
 
 #[allow(dead_code)]
-impl ThresholdPredicate {
+impl HCPredicate for ThresholdPredicate {
 	// @FollowUp - would be nice for this match logic to error at compile time if a new
 	//  HCBasicValue type is added, so developer is reminded to add new variant here
-	pub fn pass(&self) -> Result<bool> {
+	fn pass(&self) -> Result<bool> {
 		use HCBasicValue::*;
 		match (&self.value, &self.threshold) {
 			(Integer(a), Integer(b)) => pass_threshold(a, b, &self.ordering),
@@ -132,5 +166,19 @@ impl ThresholdPredicate {
 				b
 			)),
 		}
+	}
+}
+impl Display for ThresholdPredicate {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use Ordering::*;
+		// append units. if none, trim() call below will clean up whitespace
+		let val = format!("{} {}", self.value, &self.units);
+		let thr = format!("{} {}", self.threshold, &self.units);
+		let order_str = match &self.ordering {
+			Less => "<",
+			Equal => "==",
+			Greater => ">",
+		};
+		write!(f, "{} {} {}", val.trim(), order_str, thr.trim())
 	}
 }

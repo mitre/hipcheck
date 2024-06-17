@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::analysis::result::*;
 use crate::config::AttacksConfigQuery;
 use crate::config::CommitConfigQuery;
 use crate::config::FuzzConfigQuery;
@@ -12,7 +13,6 @@ use crate::metric::MetricProvider;
 use crate::report::Concern;
 use crate::report::PrConcern;
 use crate::F64;
-use chrono::Duration;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::default::Default;
@@ -33,7 +33,7 @@ pub trait AnalysisProvider:
 	+ PracticesConfigQuery
 {
 	/// Returns result of activity analysis
-	fn activity_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn activity_analysis(&self) -> Rc<HCAnalysisReport>;
 
 	/// Returns result of affiliation analysis
 	fn affiliation_analysis(&self) -> Result<Rc<AnalysisReport>>;
@@ -71,13 +71,6 @@ pub trait AnalysisProvider:
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum AnalysisReport {
-	/// Activity analysis result.
-	Activity {
-		value: u64,
-		threshold: u64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<Concern>,
-	},
 	/// Affiliation analysis result.
 	Affiliation {
 		value: u64,
@@ -186,50 +179,21 @@ impl Display for AnalysisOutcome {
 	}
 }
 
-pub fn activity_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
-	if db.activity_active() {
-		let results = db.activity_metric();
-		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			})),
-			Ok(results) => {
-				let value = results.time_since_last_commit.num_weeks();
-				let threshold =
-					Duration::weeks(db.activity_week_count_threshold() as i64).num_weeks();
-				let results_score = score_by_threshold(value, threshold);
-
-				let concerns = Vec::new();
-
-				if results_score == 0 {
-					let msg = format!(
-						"{} weeks inactivity <= {} weeks inactivity",
-						value, threshold
-					);
-					Ok(Rc::new(AnalysisReport::Activity {
-						value: value as u64,
-						threshold: threshold as u64,
-						outcome: AnalysisOutcome::Pass(msg),
-						concerns,
-					}))
-				} else {
-					let msg = format!(
-						"{} weeks inactivity > {} weeks inactivity",
-						value, threshold
-					);
-					Ok(Rc::new(AnalysisReport::Activity {
-						value: value as u64,
-						threshold: threshold as u64,
-						outcome: AnalysisOutcome::Fail(msg),
-						concerns,
-					}))
-				}
-			}
+pub fn activity_analysis(db: &dyn AnalysisProvider) -> Rc<HCAnalysisReport> {
+	let results = db.activity_metric();
+	match results {
+		Err(err) => Rc::new(HCAnalysisReport {
+			outcome: HCAnalysisOutcome::Error(HCAnalysisError::Generic(err)),
+			concerns: vec![],
+		}),
+		Ok(results) => {
+			let value = results.time_since_last_commit.num_weeks() as u64;
+			let hc_value = HCBasicValue::from(value);
+			Rc::new(HCAnalysisReport {
+				outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(hc_value)),
+				concerns: vec![],
+			})
 		}
-	} else {
-		Ok(Rc::new(AnalysisReport::None {
-			outcome: AnalysisOutcome::Skipped,
-		}))
 	}
 }
 
