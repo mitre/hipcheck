@@ -7,14 +7,16 @@ use crate::F64;
 /// of the analysis, plus additional meta-information the analysis wants to provide to
 /// HipCheck core, such as raised concerns.
 pub struct HCAnalysisResult {
-	outcome: AnalysisOutcome,
-	concerns: Vec<Concern>,
+	pub outcome: AnalysisOutcome,
+	pub concerns: Vec<Concern>,
 }
 
+#[allow(dead_code)]
 pub type SkippableAnalysisResult = Option<HCAnalysisResult>;
 
 /// Represents the result of a hipcheck analysis. Either the analysis encountered
 /// an error, or it completed and returned a value.
+#[allow(dead_code)]
 pub enum AnalysisOutcome {
 	Error(HCAnalysisError),
 	Completed(HCAnalysisValue),
@@ -22,6 +24,7 @@ pub enum AnalysisOutcome {
 
 /// Enumeration of potential errors that a HipCheck analysis might return. The Generic
 /// variant enables representing errors that aren't covered by other variants.
+#[allow(dead_code)]
 pub enum HCAnalysisError {
 	Generic(crate::error::Error),
 }
@@ -29,6 +32,7 @@ pub enum HCAnalysisError {
 /// A HipCheck analysis may return a basic or composite value. By splitting the types
 /// into two sub-enums under this one, we can eschew a recursive enum definition and
 /// ensure composite types only have a depth of one.
+#[allow(dead_code)]
 pub enum HCAnalysisValue {
 	Basic(HCBasicValue),
 	Composite(HCCompositeValue),
@@ -82,22 +86,25 @@ impl From<&str> for HCBasicValue {
 }
 
 /// Composite HipCheck analysis return types
+#[allow(dead_code)]
 pub enum HCCompositeValue {
 	List(Vec<HCBasicValue>),
 	Dict(indexmap::IndexMap<String, HCBasicValue>),
 }
 
 /// The set of possible predicates for deciding if a source passed an analysis.
+#[allow(dead_code)]
 pub enum HCPredicate {
 	Threshold(ThresholdPredicate),
 }
 
 /// This predicate determines analysis pass/fail by whether a returned value was
 /// greater than, less than, or equal to a target value.
+#[allow(dead_code)]
 pub struct ThresholdPredicate {
-	value: HCBasicValue,
-	threshold: HCBasicValue,
-	ordering: std::cmp::Ordering,
+	pub value: HCBasicValue,
+	pub threshold: HCBasicValue,
+	pub ordering: std::cmp::Ordering,
 }
 
 fn pass_threshold<T: PartialOrd>(a: &T, b: &T, ord: &std::cmp::Ordering) -> Result<bool> {
@@ -106,6 +113,7 @@ fn pass_threshold<T: PartialOrd>(a: &T, b: &T, ord: &std::cmp::Ordering) -> Resu
 		.map(|x| x == *ord)
 }
 
+#[allow(dead_code)]
 impl ThresholdPredicate {
 	// @FollowUp - would be nice for this match logic to error at compile time if a new
 	//  HCBasicValue type is added, so developer is reminded to add new variant here
