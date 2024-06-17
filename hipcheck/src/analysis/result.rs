@@ -6,35 +6,37 @@ use crate::F64;
 /// Represents the enhanced result of a hipcheck analysis. Contains the actual outcome
 /// of the analysis, plus additional meta-information the analysis wants to provide to
 /// HipCheck core, such as raised concerns.
-struct HCAnalysisResult {
+pub struct HCAnalysisResult {
 	outcome: AnalysisOutcome,
 	concerns: Vec<Concern>,
 }
 
+pub type SkippableAnalysisResult = Option<HCAnalysisResult>;
+
 /// Represents the result of a hipcheck analysis. Either the analysis encountered
 /// an error, or it completed and returned a value.
-enum AnalysisOutcome {
+pub enum AnalysisOutcome {
 	Error(HCAnalysisError),
 	Completed(HCAnalysisValue),
 }
 
 /// Enumeration of potential errors that a HipCheck analysis might return. The Generic
 /// variant enables representing errors that aren't covered by other variants.
-enum HCAnalysisError {
+pub enum HCAnalysisError {
 	Generic(crate::error::Error),
 }
 
 /// A HipCheck analysis may return a basic or composite value. By splitting the types
 /// into two sub-enums under this one, we can eschew a recursive enum definition and
 /// ensure composite types only have a depth of one.
-enum HCAnalysisValue {
+pub enum HCAnalysisValue {
 	Basic(HCBasicValue),
 	Composite(HCCompositeValue),
 }
 
 /// Basic HipCheck analysis return types
 #[derive(Debug)]
-enum HCBasicValue {
+pub enum HCBasicValue {
 	Integer(i64),
 	Unsigned(u64),
 	Float(F64),
@@ -80,19 +82,19 @@ impl From<&str> for HCBasicValue {
 }
 
 /// Composite HipCheck analysis return types
-enum HCCompositeValue {
+pub enum HCCompositeValue {
 	List(Vec<HCBasicValue>),
 	Dict(indexmap::IndexMap<String, HCBasicValue>),
 }
 
 /// The set of possible predicates for deciding if a source passed an analysis.
-enum HCPredicate {
+pub enum HCPredicate {
 	Threshold(ThresholdPredicate),
 }
 
 /// This predicate determines analysis pass/fail by whether a returned value was
 /// greater than, less than, or equal to a target value.
-struct ThresholdPredicate {
+pub struct ThresholdPredicate {
 	value: HCBasicValue,
 	threshold: HCBasicValue,
 	ordering: std::cmp::Ordering,
