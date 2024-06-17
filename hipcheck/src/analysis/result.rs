@@ -9,8 +9,7 @@ use std::fmt::{self, Display};
 
 /// Represents the enhanced result of a hipcheck analysis. Contains the actual outcome
 /// of the analysis, plus additional meta-information the analysis wants to provide to
-/// HipCheck core, such as raised concerns.
-#[allow(dead_code)]
+/// Hipcheck core, such as raised concerns.
 #[derive(Debug, Eq, PartialEq)]
 pub struct HCAnalysisReport {
 	pub outcome: HCAnalysisOutcome,
@@ -19,32 +18,29 @@ pub struct HCAnalysisReport {
 
 /// Represents the result of a hipcheck analysis. Either the analysis encountered
 /// an error, or it completed and returned a value.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HCAnalysisOutcome {
 	Error(HCAnalysisError),
 	Completed(HCAnalysisValue),
 }
 
-/// Enumeration of potential errors that a HipCheck analysis might return. The Generic
+/// Enumeration of potential errors that a Hipcheck analysis might return. The Generic
 /// variant enables representing errors that aren't covered by other variants.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HCAnalysisError {
 	Generic(crate::error::Error),
 }
 
-/// A HipCheck analysis may return a basic or composite value. By splitting the types
+/// A Hipcheck analysis may return a basic or composite value. By splitting the types
 /// into two sub-enums under this one, we can eschew a recursive enum definition and
 /// ensure composite types only have a depth of one.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HCAnalysisValue {
 	Basic(HCBasicValue),
 	Composite(HCCompositeValue),
 }
 
-/// Basic HipCheck analysis return types
+/// Basic Hipcheck analysis return types
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HCBasicValue {
 	Integer(i64),
@@ -80,11 +76,6 @@ impl From<bool> for HCBasicValue {
 		HCBasicValue::Bool(value)
 	}
 }
-impl From<String> for HCBasicValue {
-	fn from(value: String) -> Self {
-		HCBasicValue::String(value)
-	}
-}
 impl From<&str> for HCBasicValue {
 	fn from(value: &str) -> Self {
 		HCBasicValue::String(value.to_owned())
@@ -103,8 +94,7 @@ impl Display for HCBasicValue {
 	}
 }
 
-/// Composite HipCheck analysis return types
-#[allow(dead_code)]
+/// Composite Hipcheck analysis return types
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HCCompositeValue {
 	List(Vec<HCBasicValue>),
@@ -118,7 +108,6 @@ pub trait HCPredicate: Display + Clone + Eq + PartialEq {
 
 /// This predicate determines analysis pass/fail by whether a returned value was
 /// greater than, less than, or equal to a target value.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ThresholdPredicate {
 	pub value: HCBasicValue,
@@ -142,24 +131,21 @@ impl ThresholdPredicate {
 	}
 }
 
-fn pass_threshold<T: PartialOrd>(a: &T, b: &T, ord: &Ordering) -> Result<bool> {
-	a.partial_cmp(b)
-		.ok_or(hc_error!("threshold comparison failed for unknown reason"))
-		.map(|x| x == *ord)
+fn pass_threshold<T: Ord>(a: &T, b: &T, ord: &Ordering) -> bool {
+	a.cmp(b) == *ord
 }
 
-#[allow(dead_code)]
 impl HCPredicate for ThresholdPredicate {
 	// @FollowUp - would be nice for this match logic to error at compile time if a new
 	//  HCBasicValue type is added, so developer is reminded to add new variant here
 	fn pass(&self) -> Result<bool> {
 		use HCBasicValue::*;
 		match (&self.value, &self.threshold) {
-			(Integer(a), Integer(b)) => pass_threshold(a, b, &self.ordering),
-			(Unsigned(a), Unsigned(b)) => pass_threshold(a, b, &self.ordering),
-			(Float(a), Float(b)) => pass_threshold(a, b, &self.ordering),
-			(Bool(a), Bool(b)) => pass_threshold(a, b, &self.ordering),
-			(String(a), String(b)) => pass_threshold(a, b, &self.ordering),
+			(Integer(a), Integer(b)) => Ok(pass_threshold(a, b, &self.ordering)),
+			(Unsigned(a), Unsigned(b)) => Ok(pass_threshold(a, b, &self.ordering)),
+			(Float(a), Float(b)) => Ok(pass_threshold(a, b, &self.ordering)),
+			(Bool(a), Bool(b)) => Ok(pass_threshold(a, b, &self.ordering)),
+			(String(a), String(b)) => Ok(pass_threshold(a, b, &self.ordering)),
 			(a, b) => Err(hc_error!(
 				"threshold and value are of different types: {:?}, {:?}",
 				a,
