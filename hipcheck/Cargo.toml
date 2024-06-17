@@ -63,6 +63,7 @@ url = "2.2.2"
 walkdir = "2.5.0"
 which = { version = "6.0.1", default-features = false }
 xml-rs = "0.8.20"
+indexmap = "2.2.6"
 
 # Windows-specific dependencies
 [target.'cfg(windows)'.dependencies]
