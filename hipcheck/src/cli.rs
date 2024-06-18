@@ -2,9 +2,12 @@
 
 //! Data structures for Hipcheck's main CLI.
 
+use crate::error::Error;
+use crate::hc_error;
 use crate::report::Format;
 use crate::session::session::Check;
 use crate::shell::{ColorChoice, Verbosity};
+use crate::target::TargetType;
 use crate::CheckKind;
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
@@ -387,27 +390,88 @@ pub enum Commands {
 	Ready,
 }
 
+// If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
+// this case, `target` is a required field, but the existence of a subcommand
+// removes that requirement
 #[derive(Debug, Clone, clap::Args)]
+#[command(subcommand_negates_reqs = true)]
+#[command(arg_required_else_help = true)]
 pub struct CheckArgs {
 	#[clap(subcommand)]
-	pub command: CheckCommand,
+	command: Option<CheckCommand>,
+
+	#[arg(short = 't', long = "target")]
+	pub target_type: Option<TargetType>,
+	#[arg(
+		required = true,
+		help = "The target package, URL, commit, etc. for Hipcheck to analyze. If ambiguous, the -t flag must be set"
+	)]
+	pub target: Option<String>,
+	#[arg(trailing_var_arg(true), hide = true)]
+	pub trailing_args: Vec<String>,
 }
 
-#[derive(Debug, Clone, clap::Subcommand)]
+impl CheckArgs {
+	fn target_to_check_command(&self) -> Result<CheckCommand, Error> {
+		// Get target str
+		let Some(target) = self.target.clone() else {
+			return Err(hc_error!(
+				"a target must be provided. The CLI should have caught this"
+			));
+		};
+		// If a target type was provided use that, otherwise try to resolve from
+		// the target string
+		let opt_subcmd = self
+			.target_type
+			.clone()
+			.or_else(|| TargetType::try_resolve_from_target(target.as_str()));
+		let Some(subcmd) = opt_subcmd else {
+			return Err(hc_error!(
+				"could not resolve target '{}' to a target type. please specify with the `-t` flag",
+				target
+			));
+		};
+		// We have resolved the subcommand type. Re-construct a string with all args
+		// that we can feed back into clap
+		let binding = "check".to_owned();
+		let subcmd_str = subcmd.as_str();
+		let mut reconst_args: Vec<&String> = vec![&binding, &subcmd_str, &target];
+		reconst_args.extend(self.trailing_args.iter());
+
+		CheckCommand::try_parse_from(reconst_args).map_err(|e| hc_error!("{}", e))
+	}
+
+	pub fn command(&self) -> Result<CheckCommand, Error> {
+		if let Some(cmd) = self.command.clone() {
+			Ok(cmd)
+		} else {
+			self.target_to_check_command()
+		}
+	}
+}
+
+#[derive(Debug, Clone, clap::Parser)]
 pub enum CheckCommand {
 	/// Analyze a maven package git repo via package URI
+	#[command(hide = true)]
 	Maven(CheckMavenArgs),
 	/// Analyze an npm package git repo via package URI or with format <package name>[@<optional version>]
+	#[command(hide = true)]
 	Npm(CheckNpmArgs),
 	/// Analyze 'git' patches for projects that use a patch-based workflow (not yet implemented)
+	#[command(hide = true)]
 	Patch(CheckPatchArgs),
 	/// Analyze a PyPI package git repo via package URI or with format <package name>[@<optional version>]
+	#[command(hide = true)]
 	Pypi(CheckPypiArgs),
 	/// Analyze a repository and output an overall risk assessment
+	#[command(hide = true)]
 	Repo(CheckRepoArgs),
 	/// Analyze pull/merge request for potential risks
+	#[command(hide = true)]
 	Request(CheckRequestArgs),
 	/// Analyze packages specified in an SPDX document
+	#[command(hide = true)]
 	Spdx(CheckSpdxArgs),
 }
 
@@ -768,5 +832,82 @@ mod tests {
 
 			assert_eq!(config.data().unwrap(), expected);
 		});
+	}
+
+	#[test]
+	fn hc_check_schema_no_args_gives_help() {
+		let check_args = vec!["hc", "check"];
+		let schema_args = vec!["hc", "schema"];
+
+		let parsed = CliConfig::try_parse_from(check_args.into_iter());
+		assert!(parsed.is_err());
+		assert_eq!(
+			parsed.unwrap_err().kind(),
+			clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+		);
+
+		let parsed = CliConfig::try_parse_from(schema_args.into_iter());
+		assert!(parsed.is_err());
+		assert_eq!(
+			parsed.unwrap_err().kind(),
+			clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+		);
+	}
+
+	fn get_check_cmd_from_cli(args: Vec<&str>) -> Result<CheckCommand, Error> {
+		let parsed = CliConfig::try_parse_from(args.into_iter());
+		assert!(parsed.is_ok());
+		let command = parsed.unwrap().command;
+		let Some(Commands::Check(chck_args)) = command else {
+			assert!(false);
+			unreachable!();
+		};
+		chck_args.command()
+	}
+
+	#[test]
+	fn test_deprecated_check_repo() {
+		let cmd = get_check_cmd_from_cli(vec![
+			"hc",
+			"check",
+			"repo",
+			"https://github.com/mitre/hipcheck.git",
+		]);
+		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
+	}
+
+	#[test]
+	fn test_deductive_check_no_match() {
+		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "pkg:unsupportedtype/someurl"]);
+		assert!(matches!(cmd, Err(..)));
+	}
+
+	#[test]
+	fn test_deductive_check_github_url() {
+		let cmd =
+			get_check_cmd_from_cli(vec!["hc", "check", "https://github.com/mitre/hipcheck.git"]);
+		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
+	}
+
+	#[test]
+	fn test_deductive_check_maven_pkg() {
+		let cmd = get_check_cmd_from_cli(vec![
+			"hc",
+			"check",
+			"pkg:maven/org.apache.xmlgraphics/batik-anim@1.9.1",
+		]);
+		assert!(matches!(cmd, Ok(CheckCommand::Maven(..))));
+	}
+
+	#[test]
+	fn test_check_with_target_flag() {
+		let cmd = get_check_cmd_from_cli(vec![
+			"hc",
+			"check",
+			"-t",
+			"repo",
+			"https://github.com/mitre/hipcheck.git",
+		]);
+		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
 	}
 }
