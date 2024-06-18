@@ -2,10 +2,13 @@
 
 use crate::analysis::analysis::AnalysisOutcome;
 use crate::analysis::analysis::AnalysisReport;
+use crate::analysis::result::*;
 use crate::analysis::AnalysisProvider;
 use crate::error::Result;
 use crate::hc_error;
+use crate::report::Concern;
 use crate::shell::Phase;
+use std::cmp::Ordering;
 use std::default::Default;
 use std::rc::Rc;
 
@@ -39,9 +42,10 @@ pub struct ScoringResults {
 	pub score: Score,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct AnalysisResults {
-	pub activity: Option<Result<Rc<AnalysisReport>>>,
+	pub activity: Option<(Result<Rc<ThresholdPredicate>>, Vec<Concern>)>,
 	pub affiliation: Option<Result<Rc<AnalysisReport>>>,
 	pub binary: Option<Result<Rc<AnalysisReport>>>,
 	pub churn: Option<Result<Rc<AnalysisReport>>>,
@@ -56,6 +60,7 @@ pub struct AnalysisResults {
 	pub pr_module_contributors: Option<Result<Rc<AnalysisReport>>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct Score {
 	pub total: f64,
@@ -108,6 +113,7 @@ pub struct ScoreTree {
 
 //stores the score tree using petgraph
 //the tree does not need to know what sections it is scoring
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ScoreTreeNode {
 	pub label: String,
@@ -122,36 +128,9 @@ pub fn phase_outcome<P: AsRef<String>>(
 	phase_name: P,
 ) -> Result<Rc<ScoreResult>> {
 	match phase_name.as_ref().as_str() {
-		ACTIVITY_PHASE => match &db.activity_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Activity {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Rc::new(ScoreResult {
-				count: db.activity_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Activity {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Rc::new(ScoreResult {
-				count: db.activity_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
+		ACTIVITY_PHASE => Err(hc_error!(
+			"activity analysis does not use this infrastructure"
+		)),
 		AFFILIATION_PHASE => match &db.affiliation_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
@@ -590,31 +569,61 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 		/*===NEW_PHASE===*/
 		update_phase(phase, ACTIVITY_PHASE)?;
 		// Check if this analysis was skipped or generated an error, then format the results accordingly for reporting.
-		let activity_analysis = db.activity_analysis()?;
-		match activity_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.activity = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.activity = Some(Err(err.clone())),
-			_ => results.activity = Some(Ok(activity_analysis)),
-		}
-
-		let score_result = db
-			.phase_outcome(Rc::new(ACTIVITY_PHASE.to_string()))
-			.unwrap();
-		score.activity = score_result.outcome.clone();
-		match add_node_and_edge_with_score(
-			score_result,
-			score_tree.clone(),
-			ACTIVITY_PHASE,
-			practices_node,
-		) {
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
+		if db.activity_active() {
+			let raw_activity = db.activity_analysis();
+			let activity_res = match &raw_activity.as_ref().outcome {
+				HCAnalysisOutcome::Error(err) => Err(hc_error!("{:?}", err)),
+				HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(av)) => {
+					let raw_threshold: u64 = db.activity_week_count_threshold();
+					let threshold = HCBasicValue::from(raw_threshold);
+					let predicate = ThresholdPredicate::new(
+						av.clone(),
+						threshold,
+						Some("weeks inactivity".to_owned()),
+						Ordering::Less,
+					);
+					Ok(Rc::new(predicate))
+				}
+				HCAnalysisOutcome::Completed(HCAnalysisValue::Composite(_)) => Err(hc_error!(
+					"activity analysis should return a basic u64 type, not {:?}"
+				)),
+			};
+			// Scoring based off of predicate
+			let score_result = Rc::new(match activity_res.as_ref() {
+				Err(e) => ScoreResult {
+					count: db.activity_weight(),
+					score: 1,
+					outcome: AnalysisOutcome::Error(e.clone()),
+				},
+				Ok(pred) => {
+					// Derive score from predicate, true --> 0, false --> 1
+					let passed = pred.pass()?;
+					let msg = pred.to_string();
+					let outcome = if passed {
+						AnalysisOutcome::Pass(msg)
+					} else {
+						AnalysisOutcome::Fail(msg)
+					};
+					ScoreResult {
+						count: db.activity_weight(),
+						score: (!passed) as u64,
+						outcome,
+					}
+				}
+			});
+			results.activity = Some((activity_res, raw_activity.concerns.clone()));
+			score.activity = score_result.outcome.clone();
+			match add_node_and_edge_with_score(
+				score_result,
+				score_tree.clone(),
+				ACTIVITY_PHASE,
+				practices_node,
+			) {
+				Ok(score_tree_inc) => {
+					score_tree = score_tree_inc;
+				}
+				_ => return Err(hc_error!("failed to complete {} scoring.", ACTIVITY_PHASE)),
 			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", ACTIVITY_PHASE)),
 		}
 
 		/*===REVIEW PHASE===*/

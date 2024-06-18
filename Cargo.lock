@@ -492,6 +492,7 @@ dependencies = [
  "env_logger",
  "graphql_client",
  "hipcheck-macros",
+ "indexmap 2.2.6",
  "lazy_static",
  "libc",
  "log",

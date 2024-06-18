@@ -3,6 +3,7 @@
 #[allow(clippy::module_inception)]
 pub mod analysis;
 pub mod report_builder;
+pub mod result;
 pub mod score;
 
 pub use analysis::AnalysisProvider;
