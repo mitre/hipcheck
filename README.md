@@ -1,7 +1,8 @@
 # Hipcheck &#x2713;
 
-[![License: Apache-2.0](https://img.shields.io/github/license/mitre/hipcheck)](https://github.com/mitre/hipcheck/blob/main/LICENSE)
-[![GitHub Release](https://img.shields.io/github/v/release/mitre/hipcheck)](https://github.com/mitre/hipcheck/releases/latest)
+[![Hipcheck Website](https://img.shields.io/badge/Hipcheck%20Website-blue)][website]
+[![License: Apache-2.0](https://img.shields.io/github/license/mitre/hipcheck)][license]
+[![GitHub Release](https://img.shields.io/github/v/release/mitre/hipcheck)][release]
 
 __Go from hundreds of dependencies you can't review, to just a few you can!__
 
@@ -19,9 +20,9 @@ picture of the risk from using a package.
 
 ## Very Quick Explanation
 
-- You'd like to use an open source software package, but you want to assess it.
+- You'd like to use `express` an open source software package, but you want to assess it first.
 - Run `hc check -t npm express`.
-- If Hipcheck says "investigate," use Hipcheck's output to guide you.
+- If Hipcheck says "investigate," use Hipcheck's output to guide a manual review of the package.
 
 ## Values
 
@@ -35,7 +36,7 @@ Read more about Hipcheck's product and project values in [RFD #2][rfd_2].
 
 ## Installation
 
-__If installing locally:__ run the install script from the [latest release][latest_release],
+__If installing locally:__ run the install script from the [latest release][release],
 then run __`hc setup`__.
 
 __If running as a container:__ use a [Hipcheck image from
@@ -56,11 +57,11 @@ the [`LICENSE`](LICENSE) file in this repository.
 > Computer Software and Noncommercial Computer Software Documentation Clause DFARS
 > 252.227-7014 (FEB 2014)][dfars].
 
-[react]: https://github.com/facebook/react
-[install_rust]: https://www.rust-lang.org/tools/install
-[install_node]: https://nodejs.org/en/learn/getting-started/how-to-install-nodejs
-[rfd_2]: https://github.com/mitre/hipcheck/blob/main/docs/rfds/0002-hipchecks-values.md
-[latest_release]: https://github.com/mitre/hipcheck/releases/latest
-[docker]: https://hub.docker.com/r/mitre/hipcheck
-[install_docs]: #
+
 [dfars]: https://www.acquisition.gov/dfars/252.227-7014-rights-other-commercial-computer-software-and-other-commercial-computer-software-documentation.
+[docker]: https://hub.docker.com/r/mitre/hipcheck
+[install]: https://mitre.github.io/hipcheck/install
+[license]: https://github.com/mitre/hipcheck/blob/main/LICENSE
+[release]: https://github.com/mitre/hipcheck/releases/latest
+[rfd_2]: https://mitre.github.io/hipcheck/rfds/0002
+[website]: https://mitre.github.io/hipcheck
