@@ -62,7 +62,8 @@ fn commits_for_module(
 	let commits = db
 		.commits_for_modules()?
 		.iter()
-		.filter_map(|(m, c)| (**m == *module.as_ref()).then(|| Arc::clone(c)))
+		.filter(|(m, _)| **m == *module.as_ref())
+		.map(|(_, c)| Arc::clone(c))
 		.collect();
 
 	Ok(Arc::new(commits))
@@ -75,7 +76,8 @@ fn modules_for_commit(
 	let modules = db
 		.commits_for_modules()?
 		.iter()
-		.filter_map(|(m, c)| (**c == *commit.as_ref()).then(|| Arc::clone(m)))
+		.filter(|(_, c)| **c == *commit.as_ref())
+		.map(|(m, _)| Arc::clone(m))
 		.collect();
 
 	Ok(Arc::new(modules))

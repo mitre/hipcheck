@@ -49,7 +49,7 @@ impl<T> Context<T> for Result<T, Error> {
 
 impl<T, E> Context<T> for Result<T, E>
 where
-	E: StdError + 'static,
+	E: StdError + Send + Sync + 'static,
 {
 	fn context<C>(self, context: C) -> Result<T, Error>
 	where

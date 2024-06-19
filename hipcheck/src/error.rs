@@ -15,7 +15,7 @@ use std::error::Error as StdError;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Display;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -29,7 +29,7 @@ impl<T: Into<Cow<'static, str>>> Introspect for T {}
 /// An error type compatible with Salsa.
 pub struct Error {
 	/// The start of the error linked list.
-	head: Rc<ErrorNode>,
+	head: Arc<ErrorNode>,
 }
 
 impl Error {
@@ -45,11 +45,11 @@ impl Error {
 	/// Create a new `Error` from a source error.
 	pub fn new<M>(error: M) -> Self
 	where
-		M: StdError + 'static,
+		M: StdError + Send + Sync + 'static,
 	{
 		Error {
-			head: Rc::new(ErrorNode {
-				current: Rc::new(error),
+			head: Arc::new(ErrorNode {
+				current: Arc::new(error),
 				next: None,
 			}),
 		}
@@ -69,8 +69,8 @@ impl Error {
 		);
 
 		Error {
-			head: Rc::new(ErrorNode {
-				current: Rc::new(Message(message)),
+			head: Arc::new(ErrorNode {
+				current: Arc::new(Message(message)),
 				next: Some(self.head),
 			}),
 		}
@@ -85,7 +85,7 @@ impl Error {
 /// Allows use of `?` operator on query system entry.
 impl<T> From<T> for Error
 where
-	T: StdError + 'static,
+	T: StdError + Send + Sync + 'static,
 {
 	fn from(std_error: T) -> Error {
 		Error::new(std_error)
@@ -95,7 +95,7 @@ where
 impl Clone for Error {
 	fn clone(&self) -> Error {
 		Error {
-			head: Rc::clone(&self.head),
+			head: Arc::clone(&self.head),
 		}
 	}
 }
@@ -178,10 +178,10 @@ impl StdError for ErrorNode {
 }
 
 /// A reference-counted fat pointer to a standard error type.
-type ErrorObj = Rc<dyn StdError + 'static>;
+type ErrorObj = Arc<dyn StdError + Send + Sync + 'static>;
 
 /// A link in the linked list.
-type ErrorLink = Rc<ErrorNode>;
+type ErrorLink = Arc<ErrorNode>;
 
 /// A string-only error message, which can either be a static string
 /// slice, or an owned string.

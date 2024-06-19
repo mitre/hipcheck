@@ -60,7 +60,7 @@ fn typos_for_javascript(
 		for dependency in &dependencies.deps {
 			for typo in fuzzer.fuzz(dependency) {
 				typos.push(TypoDep {
-					dependency: Arc::clone(&dependency),
+					dependency: Arc::clone(dependency),
 					typo: typo.clone(),
 				})
 			}
