@@ -117,6 +117,12 @@ pub trait HCPredicate: Display + std::fmt::Debug + std::any::Any + 'static {
 	fn as_any(&self) -> &dyn std::any::Any;
 }
 
+pub struct ThresholdSpec {
+	pub threshold: HCBasicValue,
+	pub units: Option<String>,
+	pub ordering: Ordering,
+}
+
 /// This predicate determines analysis pass/fail by whether a returned value was
 /// greater than, less than, or equal to a target value.
 #[derive(Debug, Clone, Eq, PartialEq)]
