@@ -49,6 +49,9 @@ pub struct HCStoredResult {
 	concerns: Vec<Concern>,
 }
 impl HCStoredResult {
+	// Score the analysis by invoking predicate's impl of `pass()`. Errored
+	// analyses treated as failures.
+	// @FollowUp - remove AnalysisOutcome once scoring refactor complete
 	pub fn score(&self) -> (u64, AnalysisOutcome) {
 		match &self.result {
 			Err(e) => (1, AnalysisOutcome::Error(e.clone())),
@@ -625,6 +628,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 		if db.activity_active() {
 			let raw_activity = db.activity_analysis();
 			let raw_threshold: u64 = db.activity_week_count_threshold();
+
+			// Process analysis value into a threshold predicate and add to new & old storage
+			// objects
 			let activity_res = ThresholdPredicate::from_analysis_outcome(
 				&raw_activity.as_ref().outcome,
 				HCBasicValue::from(raw_threshold),
@@ -634,15 +640,14 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			let new_activity_res = activity_res
 				.clone()
 				.map(|r| Box::new(r) as Box<dyn HCPredicate>);
-
 			alt_results.add(
 				ACTIVITY_PHASE,
 				new_activity_res,
 				raw_activity.as_ref().concerns.clone(),
 			);
-			let (act_score, outcome) = alt_results.table.get(ACTIVITY_PHASE).unwrap().score();
 
 			// Scoring based off of predicate
+			let (act_score, outcome) = alt_results.table.get(ACTIVITY_PHASE).unwrap().score();
 			let score_result = Rc::new(ScoreResult {
 				count: db.activity_weight(),
 				score: act_score,
