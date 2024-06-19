@@ -36,7 +36,7 @@ pub trait AnalysisProvider:
 	fn activity_analysis(&self) -> Arc<HCAnalysisReport>;
 
 	/// Returns result of affiliation analysis
-	fn affiliation_analysis(&self) -> Result<Arc<AnalysisReport>>;
+	fn affiliation_analysis(&self) -> Arc<HCAnalysisReport>;
 
 	/// Returns result of binary analysis
 	fn binary_analysis(&self) -> Result<Arc<AnalysisReport>>;
@@ -185,93 +185,69 @@ pub fn activity_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
 		Ok(results) => results,
 	};
 	let value = results.time_since_last_commit.num_weeks() as u64;
-	let hc_value = HCBasicValue::from(value);
 	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(hc_value)),
+		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(value.into())),
 		concerns: vec![],
 	})
 }
 
-pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
-	if db.affiliation_active() {
-		let results = db.affiliation_metric();
+pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
+	let results = match db.affiliation_metric() {
+		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
+		Ok(results) => results,
+	};
 
-		match results {
-			Err(err) => Ok(Arc::new(AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			})),
-			Ok(results) => {
-				let affiliated_iter = results
-					.affiliations
-					.iter()
-					.filter(|a| a.affiliated_type.is_affiliated());
+	let affiliated_iter = results
+		.affiliations
+		.iter()
+		.filter(|a| a.affiliated_type.is_affiliated());
 
-				let value = affiliated_iter.clone().count() as u64;
-				let threshold = db.affiliation_count_threshold();
-				let results_score = score_by_threshold(value, threshold);
+	let value = affiliated_iter.clone().count() as u64;
 
-				let mut contributor_freq_map = HashMap::new();
+	let mut contributor_freq_map = HashMap::new();
 
-				for affiliation in affiliated_iter {
-					let commit_view =
-						db.contributors_for_commit(Arc::clone(&affiliation.commit))?;
+	for affiliation in affiliated_iter {
+		let commit_view = match db.contributors_for_commit(Arc::clone(&affiliation.commit)) {
+			Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
+			Ok(cv) => cv,
+		};
 
-					let contributor = match affiliation.affiliated_type {
-						AffiliatedType::Author => String::from(&commit_view.author.name),
-						AffiliatedType::Committer => String::from(&commit_view.committer.name),
-						AffiliatedType::Neither => String::from("Neither"),
-						AffiliatedType::Both => String::from("Both"),
-					};
+		let contributor = match affiliation.affiliated_type {
+			AffiliatedType::Author => String::from(&commit_view.author.name),
+			AffiliatedType::Committer => String::from(&commit_view.committer.name),
+			AffiliatedType::Neither => String::from("Neither"),
+			AffiliatedType::Both => String::from("Both"),
+		};
 
-					let count_commits_for = |contributor| {
-						db.commits_for_contributor(Arc::clone(contributor))
-							.into_iter()
-							.count() as i64
-					};
+		let count_commits_for = |contributor| {
+			db.commits_for_contributor(Arc::clone(contributor))
+				.into_iter()
+				.count() as i64
+		};
 
-					let author_commits = count_commits_for(&commit_view.author);
-					let committer_commits = count_commits_for(&commit_view.committer);
+		let author_commits = count_commits_for(&commit_view.author);
+		let committer_commits = count_commits_for(&commit_view.committer);
 
-					let commit_count = match affiliation.affiliated_type {
-						AffiliatedType::Neither => 0,
-						AffiliatedType::Both => author_commits + committer_commits,
-						AffiliatedType::Author => author_commits,
-						AffiliatedType::Committer => committer_commits,
-					};
+		let commit_count = match affiliation.affiliated_type {
+			AffiliatedType::Neither => 0,
+			AffiliatedType::Both => author_commits + committer_commits,
+			AffiliatedType::Author => author_commits,
+			AffiliatedType::Committer => committer_commits,
+		};
 
-					// Add string representation of affiliated contributor with count of associated commits
-					contributor_freq_map.insert(contributor, commit_count);
-				}
-
-				let concerns = contributor_freq_map
-					.into_iter()
-					.map(|(contributor, count)| Concern::Affiliation { contributor, count })
-					.collect();
-
-				if results_score == 0 {
-					let msg = format!("{} affiliated <= {} affiliated", value, threshold);
-					Ok(Arc::new(AnalysisReport::Affiliation {
-						value,
-						threshold,
-						outcome: AnalysisOutcome::Pass(msg),
-						concerns,
-					}))
-				} else {
-					let msg = format!("{} affiliated > {} affiliated", value, threshold);
-					Ok(Arc::new(AnalysisReport::Affiliation {
-						value,
-						threshold,
-						outcome: AnalysisOutcome::Fail(msg),
-						concerns,
-					}))
-				}
-			}
-		}
-	} else {
-		Ok(Arc::new(AnalysisReport::None {
-			outcome: AnalysisOutcome::Skipped,
-		}))
+		// Add string representation of affiliated contributor with count of associated commits
+		contributor_freq_map.insert(contributor, commit_count);
 	}
+
+	let concerns = contributor_freq_map
+		.into_iter()
+		.map(|(contributor, count)| Concern::Affiliation { contributor, count })
+		.collect();
+
+	Arc::new(HCAnalysisReport {
+		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(value.into())),
+		concerns,
+	})
 }
 
 pub fn binary_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {

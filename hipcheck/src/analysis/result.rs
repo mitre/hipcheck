@@ -112,8 +112,14 @@ pub enum HCCompositeValue {
 }
 
 /// The set of possible predicates for deciding if a source passed an analysis.
-pub trait HCPredicate: Display + std::fmt::Debug + std::any::Any + 'static {
+pub trait HCPredicate: Display + std::fmt::Debug {
 	fn pass(&self) -> Result<bool>;
+}
+
+pub struct ThresholdSpec {
+	pub threshold: HCBasicValue,
+	pub units: Option<String>,
+	pub ordering: Ordering,
 }
 
 /// This predicate determines analysis pass/fail by whether a returned value was
