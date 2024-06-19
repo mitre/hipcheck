@@ -13,7 +13,7 @@ use crate::data::github::graphql::get_all_reviews;
 use crate::data::github::graphql_pr::get_all_pr_reviews;
 use crate::error::Result;
 use crate::http::authenticated_agent::AuthenticatedAgent;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct GitHub<'a> {
 	owner: &'a str,
@@ -30,7 +30,7 @@ impl<'a> GitHub<'a> {
 		})
 	}
 
-	pub fn fuzz_check(&self, repo_uri: Rc<String>) -> Result<bool> {
+	pub fn fuzz_check(&self, repo_uri: Arc<String>) -> Result<bool> {
 		search_code_request(&self.agent, repo_uri).context("unable to search fuzzing information; please check the HC_GITHUB_TOKEN system environment variable")
 	}
 

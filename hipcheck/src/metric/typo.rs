@@ -15,8 +15,8 @@ use std::convert::AsRef;
 use std::fmt;
 use std::fmt::Display;
 use std::path::Path;
-use std::rc::Rc;
 use std::str;
+use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct TypoOutput {
@@ -25,11 +25,11 @@ pub struct TypoOutput {
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct TypoDep {
-	pub dependency: Rc<String>,
+	pub dependency: Arc<String>,
 	pub typo: Typo,
 }
 
-pub fn typo_metric(db: &dyn MetricProvider) -> Result<Rc<TypoOutput>> {
+pub fn typo_metric(db: &dyn MetricProvider) -> Result<Arc<TypoOutput>> {
 	log::debug!("running typo metric");
 
 	let typo_file = TypoFile::load_from(&db.typo_file()).context("failed to load typo file")?;
@@ -50,8 +50,8 @@ pub fn typo_metric(db: &dyn MetricProvider) -> Result<Rc<TypoOutput>> {
 
 fn typos_for_javascript(
 	typo_file: &TypoFile,
-	dependencies: Rc<Dependencies>,
-) -> Result<Rc<TypoOutput>> {
+	dependencies: Arc<Dependencies>,
+) -> Result<Arc<TypoOutput>> {
 	let mut typos = Vec::new();
 
 	for legit_name in &typo_file.languages.javascript {
@@ -60,14 +60,14 @@ fn typos_for_javascript(
 		for dependency in &dependencies.deps {
 			for typo in fuzzer.fuzz(dependency) {
 				typos.push(TypoDep {
-					dependency: dependency.clone(),
+					dependency: Arc::clone(&dependency),
 					typo: typo.clone(),
 				})
 			}
 		}
 	}
 
-	Ok(Rc::new(TypoOutput { typos }))
+	Ok(Arc::new(TypoOutput { typos }))
 }
 
 #[derive(Debug, Deserialize)]

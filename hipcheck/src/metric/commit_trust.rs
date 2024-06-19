@@ -4,17 +4,17 @@ use crate::context::Context as _;
 use crate::error::Result;
 use crate::metric::MetricProvider;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub const TRUST_PHASE: &str = "commit trust";
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct CommitTrustOutput {
-	pub commit_counts_in_period: Rc<HashMap<String, bool>>,
+	pub commit_counts_in_period: Arc<HashMap<String, bool>>,
 }
 
 //Add metric to check if a commit is trusted based on whether its author and committer are trusted (depends on trust metric)
-pub fn commit_trust_metric(db: &dyn MetricProvider) -> Result<Rc<CommitTrustOutput>> {
+pub fn commit_trust_metric(db: &dyn MetricProvider) -> Result<Arc<CommitTrustOutput>> {
 	log::debug!("running {} metric", TRUST_PHASE);
 
 	let contributor_trust_map = db
@@ -34,7 +34,9 @@ pub fn commit_trust_metric(db: &dyn MetricProvider) -> Result<Rc<CommitTrustOutp
 			"failed to get contributor commit view for {} metric",
 			TRUST_PHASE
 		);
-		let commit_view = db.contributors_for_commit(Rc::clone(commit)).context(msg)?;
+		let commit_view = db
+			.contributors_for_commit(Arc::clone(commit))
+			.context(msg)?;
 
 		for (email, count) in contributor_trust_map.contributor_counts_in_period.as_ref() {
 			log::debug!(
@@ -60,7 +62,7 @@ pub fn commit_trust_metric(db: &dyn MetricProvider) -> Result<Rc<CommitTrustOutp
 
 	log::info!("completed {} metric", TRUST_PHASE);
 
-	Ok(Rc::new(CommitTrustOutput {
-		commit_counts_in_period: Rc::new(trust_map),
+	Ok(Arc::new(CommitTrustOutput {
+		commit_counts_in_period: Arc::new(trust_map),
 	}))
 }

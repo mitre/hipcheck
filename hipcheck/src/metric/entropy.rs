@@ -16,7 +16,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::ops::Not as _;
-use std::rc::Rc;
+use std::sync::Arc;
 use unicode_normalization::UnicodeNormalization;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -39,7 +39,7 @@ use unicode_segmentation::UnicodeSegmentation;
 /// The idea here is that this metric captures the degree of textual randomness, but does _not_
 /// incorporate any positional information. It is solely based on the frequency of graphemes
 /// in the patch text.
-pub fn entropy_metric(db: &dyn MetricProvider) -> Result<Rc<EntropyOutput>> {
+pub fn entropy_metric(db: &dyn MetricProvider) -> Result<Arc<EntropyOutput>> {
 	log::debug!("running entropy metric");
 
 	// Calculate the grapheme frequencies for each commit which contains code.
@@ -70,7 +70,7 @@ pub fn entropy_metric(db: &dyn MetricProvider) -> Result<Rc<EntropyOutput>> {
 	// Convert to Z-scores and return results.
 	let entropy_output = z_scores(commit_entropies)
 		.map(EntropyOutput::new)
-		.map(Rc::new)?;
+		.map(Arc::new)?;
 
 	log::info!("completed entropy metric");
 
@@ -96,7 +96,7 @@ impl EntropyOutput {
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct CommitEntropy {
 	/// The commit
-	pub commit: Rc<Commit>,
+	pub commit: Arc<Commit>,
 	/// The entropy score
 	pub entropy: F64,
 }
@@ -105,7 +105,7 @@ pub struct CommitEntropy {
 #[derive(Debug)]
 struct CommitGraphemeFreq {
 	/// The commit.
-	commit: Rc<Commit>,
+	commit: Arc<Commit>,
 	/// The set of grapheme frequencies.
 	grapheme_freqs: Vec<GraphemeFreq>,
 }
@@ -145,7 +145,7 @@ fn is_likely_source_file(
 		.diff
 		.file_diffs
 		.iter()
-		.try_any(|fd| db.is_likely_source_file(Rc::clone(&fd.file_name)))
+		.try_any(|fd| db.is_likely_source_file(Arc::clone(&fd.file_name)))
 }
 
 /// Calculate grapheme frequencies for each commit.
@@ -153,7 +153,7 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 	let grapheme_freqs = GraphemeFreqCalculator::for_diff(&commit_diff.diff, db)?.calculate();
 
 	Ok(CommitGraphemeFreq {
-		commit: Rc::clone(&commit_diff.commit),
+		commit: Arc::clone(&commit_diff.commit),
 		grapheme_freqs,
 	})
 }
@@ -182,7 +182,7 @@ fn commit_entropy(
 	commit_freq: &CommitGraphemeFreq,
 	baseline: &HashMap<&str, (f64, i64)>,
 ) -> CommitEntropy {
-	let commit = Rc::clone(&commit_freq.commit);
+	let commit = Arc::clone(&commit_freq.commit);
 	let entropy = F64::new(
 		commit_freq
 			.grapheme_freqs
@@ -245,7 +245,7 @@ impl GraphemeFreqCalculator {
 		let mut cgf = GraphemeFreqCalculator::default();
 
 		for file_diff in &diff.file_diffs {
-			if db.is_likely_source_file(Rc::clone(&file_diff.file_name))?
+			if db.is_likely_source_file(Arc::clone(&file_diff.file_name))?
 				&& file_diff.patch.is_empty().not()
 			{
 				for line in file_diff.patch.lines() {

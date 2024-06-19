@@ -54,6 +54,7 @@ fn detect_npm_package_root(pkg_file: &Path) -> Result<PathBuf> {
 	}
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct RawModule {
 	pub file: String,

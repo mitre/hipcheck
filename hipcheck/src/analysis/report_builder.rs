@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::analysis::analysis::AnalysisReport;
+use crate::analysis::result::HCBasicValue;
 use crate::analysis::score::ScoringResults;
 use crate::config::RiskConfigQuery;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
+use crate::report::Concern;
 pub use crate::report::*;
 use crate::session::session::Session;
 use crate::source::source::SourceQuery;
@@ -25,35 +27,22 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	let mut builder = ReportBuilder::for_session(session);
 
 	// Activity analysis.
-	extract_results(
-		&mut builder,
-		&scoring.results.activity,
-		|builder, output| {
-			match output.as_ref() {
-				AnalysisReport::Activity {
-					value,
-					threshold,
-					concerns,
-					..
-				} => {
-					let analysis = Analysis::activity(*value, *threshold);
-					builder.add_analysis(analysis, concerns.clone())?;
-				}
-				_ => {
-					return Err(hc_error!(
-						"phase name does not match {} analysis",
-						crate::analysis::score::ACTIVITY_PHASE
-					))
-				}
-			}
 
-			Ok(())
-		},
-		|builder, error| {
+	match &scoring.results.activity {
+		Some((Ok(pred), concerns)) => {
+			let HCBasicValue::Unsigned(value) = pred.value else {
+				return Err(hc_error!("activity analysis has a non-u64 value"));
+			};
+			let HCBasicValue::Unsigned(thresh) = pred.threshold else {
+				return Err(hc_error!("activity analysis has a non-u64 value"));
+			};
+			builder.add_analysis(Analysis::activity(value, thresh), concerns.clone())?;
+		}
+		Some((Err(error), _concerns)) => {
 			builder.add_errored_analysis(AnalysisIdent::Activity, error);
-			Ok(())
-		},
-	)?;
+		}
+		None => (),
+	};
 
 	// Affiliation analysis.
 

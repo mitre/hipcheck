@@ -95,6 +95,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::io;
 use std::io::stderr;
 use std::io::stdout;
 use std::io::IsTerminal as _;
@@ -804,6 +805,15 @@ impl Output {
 		Output {
 			out: Box::new(StandardStream::stderr(color_choice)),
 			is_atty,
+		}
+	}
+
+	/// Create a new [`Output`] that prints/writes to the void using [io::Sink].
+	#[allow(dead_code)]
+	pub fn sink() -> Output {
+		Output {
+			out: Box::new(io::sink()),
+			is_atty: false,
 		}
 	}
 }

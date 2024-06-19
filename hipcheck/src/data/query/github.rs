@@ -6,7 +6,7 @@ use crate::error::Error;
 use crate::error::Result;
 use crate::source::source::Remote;
 use crate::source::source::SourceQuery;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Queries about a remote GitHub source
 #[salsa::query_group(GitHubProviderStorage)]
@@ -15,13 +15,13 @@ pub trait GitHubProvider: SourceQuery {
 	///
 	/// Prefer using the other queries in this group over using
 	/// the `Remote` directly
-	fn remote_github(&self) -> Result<Rc<Remote>>;
+	fn remote_github(&self) -> Result<Arc<Remote>>;
 
 	/// Returns the repository owner
-	fn owner(&self) -> Result<Rc<String>>;
+	fn owner(&self) -> Result<Arc<String>>;
 
 	/// Returns the repository name
-	fn repo(&self) -> Result<Rc<String>>;
+	fn repo(&self) -> Result<Arc<String>>;
 
 	/// Returns the pull request number if this is a single pull
 	/// request query. Returns an error otherwise.
@@ -31,7 +31,7 @@ pub trait GitHubProvider: SourceQuery {
 /// Derived query implementations.  Return values are wrapped in an
 /// `Rc` to keep cloning cheap.
 
-fn remote_github(db: &dyn GitHubProvider) -> Result<Rc<Remote>> {
+fn remote_github(db: &dyn GitHubProvider) -> Result<Arc<Remote>> {
 	let remote = db
 		.remote()
 		.ok_or_else(|| Error::msg("git source is not remote"))?;
@@ -42,24 +42,24 @@ fn remote_github(db: &dyn GitHubProvider) -> Result<Rc<Remote>> {
 	}
 }
 
-fn owner(db: &dyn GitHubProvider) -> Result<Rc<String>> {
+fn owner(db: &dyn GitHubProvider) -> Result<Arc<String>> {
 	let remote = db.remote_github()?;
 
 	match remote.as_ref() {
-		Remote::GitHub { owner, .. } => Ok(Rc::new(owner.to_string())),
-		Remote::GitHubPr { owner, .. } => Ok(Rc::new(owner.to_string())),
+		Remote::GitHub { owner, .. } => Ok(Arc::new(owner.to_string())),
+		Remote::GitHubPr { owner, .. } => Ok(Arc::new(owner.to_string())),
 		_ => Err(Error::msg(
 			"unsupported remote host (supported: github.com)",
 		)),
 	}
 }
 
-fn repo(db: &dyn GitHubProvider) -> Result<Rc<String>> {
+fn repo(db: &dyn GitHubProvider) -> Result<Arc<String>> {
 	let remote = db.remote_github()?;
 
 	match remote.as_ref() {
-		Remote::GitHub { repo, .. } => Ok(Rc::new(repo.to_string())),
-		Remote::GitHubPr { repo, .. } => Ok(Rc::new(repo.to_string())),
+		Remote::GitHub { repo, .. } => Ok(Arc::new(repo.to_string())),
+		Remote::GitHubPr { repo, .. } => Ok(Arc::new(repo.to_string())),
 		_ => Err(Error::msg(
 			"unsupported remote host (supported: github.com)",
 		)),

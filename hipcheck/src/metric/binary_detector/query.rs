@@ -6,28 +6,28 @@ use crate::config::PracticesConfigQuery;
 use crate::context::Context as _;
 use crate::error::Result;
 use crate::metric::binary_detector::BinaryFileDetector;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Queries related to binary file detection
 #[salsa::query_group(BinaryFileStorage)]
 pub trait BinaryFile: PracticesConfigQuery {
 	/// Returns the binary file detector for the current session
-	fn binary_file_detector(&self) -> Result<Rc<BinaryFileDetector>>;
+	fn binary_file_detector(&self) -> Result<Arc<BinaryFileDetector>>;
 
 	/// Returns likely binary file assessment for `file_name`
-	fn is_likely_binary_file(&self, file_name: Rc<String>) -> Result<bool>;
+	fn is_likely_binary_file(&self, file_name: Arc<String>) -> Result<bool>;
 }
 
 /// Derived query implementations
 
-fn binary_file_detector(db: &dyn BinaryFile) -> Result<Rc<BinaryFileDetector>> {
+fn binary_file_detector(db: &dyn BinaryFile) -> Result<Arc<BinaryFileDetector>> {
 	let detector = BinaryFileDetector::load(db.binary_formats_file().as_ref())
 		.context("failed to build a binary file detector from binary format file")?;
 
-	Ok(Rc::new(detector))
+	Ok(Arc::new(detector))
 }
 
-fn is_likely_binary_file(db: &dyn BinaryFile, file_name: Rc<String>) -> Result<bool> {
+fn is_likely_binary_file(db: &dyn BinaryFile, file_name: Arc<String>) -> Result<bool> {
 	let detector = db
 		.binary_file_detector()
 		.context("failed to get binary file detector")?;

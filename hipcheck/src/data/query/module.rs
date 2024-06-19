@@ -11,41 +11,41 @@ use crate::error::Error;
 use crate::error::Result;
 use pathbuf::pathbuf;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A module and an associated commit
-pub type ModuleCommitMap = Rc<Vec<(Rc<Module>, Rc<Commit>)>>;
+pub type ModuleCommitMap = Arc<Vec<(Arc<Module>, Arc<Commit>)>>;
 
 /// Queries about modules
 #[salsa::query_group(ModuleProviderStorage)]
 pub trait ModuleProvider: GitProvider {
 	/// Returns output of module analysis on the source code.
 	#[salsa::dependencies]
-	fn get_module_graph(&self) -> Result<Rc<ModuleGraph>>;
+	fn get_module_graph(&self) -> Result<Arc<ModuleGraph>>;
 
 	/// Returns an association list of modules and commits
 	fn commits_for_modules(&self) -> Result<ModuleCommitMap>;
 
 	/// Returns the commits associated with a particular module
-	fn commits_for_module(&self, module: Rc<Module>) -> Result<Rc<Vec<Rc<Commit>>>>;
+	fn commits_for_module(&self, module: Arc<Module>) -> Result<Arc<Vec<Arc<Commit>>>>;
 
 	/// Returns the modules associated with a particular commit
-	fn modules_for_commit(&self, commit: Rc<Commit>) -> Result<Rc<Vec<Rc<Module>>>>;
+	fn modules_for_commit(&self, commit: Arc<Commit>) -> Result<Arc<Vec<Arc<Module>>>>;
 
 	/// Returns the directory containing the data files
 	#[salsa::input]
-	fn data_dir(&self) -> Rc<PathBuf>;
+	fn data_dir(&self) -> Arc<PathBuf>;
 
 	/// Returns the location of the module-deps.js file
-	fn module_deps(&self) -> Result<Rc<PathBuf>>;
+	fn module_deps(&self) -> Result<Arc<PathBuf>>;
 }
 
 /// Derived query implementations.  Return values are wrapped in an
 /// `Rc` to keep cloning cheap.
 
-fn get_module_graph(db: &dyn ModuleProvider) -> Result<Rc<ModuleGraph>> {
+fn get_module_graph(db: &dyn ModuleProvider) -> Result<Arc<ModuleGraph>> {
 	let module_deps = db.module_deps()?;
-	ModuleGraph::get_module_graph_from_repo(&db.local(), module_deps.as_ref()).map(Rc::new)
+	ModuleGraph::get_module_graph_from_repo(&db.local(), module_deps.as_ref()).map(Arc::new)
 }
 
 fn commits_for_modules(db: &dyn ModuleProvider) -> Result<ModuleCommitMap> {
@@ -55,31 +55,37 @@ fn commits_for_modules(db: &dyn ModuleProvider) -> Result<ModuleCommitMap> {
 	associate_modules_and_commits(repo_path.as_ref(), modules, commits)
 }
 
-fn commits_for_module(db: &dyn ModuleProvider, module: Rc<Module>) -> Result<Rc<Vec<Rc<Commit>>>> {
+fn commits_for_module(
+	db: &dyn ModuleProvider,
+	module: impl AsRef<Module>,
+) -> Result<Arc<Vec<Arc<Commit>>>> {
 	let commits = db
 		.commits_for_modules()?
 		.iter()
-		.filter_map(|(m, c)| if m == &module { Some(c.clone()) } else { None })
+		.filter_map(|(m, c)| (**m == *module.as_ref()).then(|| Arc::clone(c)))
 		.collect();
 
-	Ok(Rc::new(commits))
+	Ok(Arc::new(commits))
 }
 
-fn modules_for_commit(db: &dyn ModuleProvider, commit: Rc<Commit>) -> Result<Rc<Vec<Rc<Module>>>> {
+fn modules_for_commit(
+	db: &dyn ModuleProvider,
+	commit: impl AsRef<Commit>,
+) -> Result<Arc<Vec<Arc<Module>>>> {
 	let modules = db
 		.commits_for_modules()?
 		.iter()
-		.filter_map(|(m, c)| if c == &commit { Some(m.clone()) } else { None })
+		.filter_map(|(m, c)| (**c == *commit.as_ref()).then(|| Arc::clone(m)))
 		.collect();
 
-	Ok(Rc::new(modules))
+	Ok(Arc::new(modules))
 }
 
-fn module_deps(db: &dyn ModuleProvider) -> Result<Rc<PathBuf>> {
+fn module_deps(db: &dyn ModuleProvider) -> Result<Arc<PathBuf>> {
 	let data_path = db.data_dir();
 	let module_deps_path = pathbuf![data_path.as_ref(), "module-deps.js"];
 	if module_deps_path.exists() {
-		Ok(Rc::new(module_deps_path))
+		Ok(Arc::new(module_deps_path))
 	} else {
 		Err(Error::msg(
 			"module-deps.js missing from Hipcheck data folder",

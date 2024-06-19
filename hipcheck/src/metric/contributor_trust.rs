@@ -4,14 +4,14 @@ use crate::context::Context as _;
 use crate::error::Result;
 use crate::metric::MetricProvider;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub const TRUST_PHASE: &str = "contributor trust";
 pub const PR_TRUST_PHASE: &str = "pull request contributor trust";
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct ContributorTrustOutput {
-	pub contributor_counts_in_period: Rc<HashMap<String, ContributorTrustResult>>,
+	pub contributor_counts_in_period: Arc<HashMap<String, ContributorTrustResult>>,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -23,14 +23,14 @@ pub struct ContributorTrustResult {
 
 //contributor_trust_metric is here mainly for if contributor trust is applied to full repos
 //it is not currently used
-pub fn contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<ContributorTrustOutput>> {
+pub fn contributor_trust_metric(db: &dyn MetricProvider) -> Result<Arc<ContributorTrustOutput>> {
 	log::debug!("running {} metric", TRUST_PHASE);
 
 	let month_range = db.contributor_trust_month_count_threshold().to_string();
 
 	let value_threshold = db.contributor_trust_value_threshold() as u32;
 
-	let commit_from_date = Rc::new(month_range);
+	let commit_from_date = Arc::new(month_range);
 
 	let msg = format!("failed to get commits for {} metric", TRUST_PHASE);
 
@@ -45,7 +45,9 @@ pub fn contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contributo
 			"failed to get contributor commit view for {} metric",
 			TRUST_PHASE
 		);
-		let commit_view = db.contributors_for_commit(Rc::clone(commit)).context(msg)?;
+		let commit_view = db
+			.contributors_for_commit(Arc::clone(commit))
+			.context(msg)?;
 		let commit_name = &commit_view.author.name;
 		let commit_email = &commit_view.author.name;
 		log::debug!(
@@ -78,22 +80,22 @@ pub fn contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contributo
 
 	log::info!("completed {} metric", TRUST_PHASE);
 
-	Ok(Rc::new(ContributorTrustOutput {
-		contributor_counts_in_period: Rc::new(trust_map),
+	Ok(Arc::new(ContributorTrustOutput {
+		contributor_counts_in_period: Arc::new(trust_map),
 	}))
 }
 
 //This metric is for pull requests and is active
 //A pull request contributor is only trusted if it has x commits >= value_threshold on master
 //Does not count merges, merges excluded
-pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<ContributorTrustOutput>> {
+pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Arc<ContributorTrustOutput>> {
 	log::debug!("running {} metric", PR_TRUST_PHASE);
 
 	let month_range = db.contributor_trust_month_count_threshold().to_string();
 
 	let value_threshold = db.contributor_trust_value_threshold() as u32;
 
-	let commit_from_date = Rc::new(month_range);
+	let commit_from_date = Arc::new(month_range);
 
 	let msg = format!("failed to get commits for {} metric", PR_TRUST_PHASE);
 
@@ -111,7 +113,9 @@ pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contrib
 			TRUST_PHASE
 		);
 
-		let commit_view = db.contributors_for_commit(Rc::clone(commit)).context(msg)?;
+		let commit_view = db
+			.contributors_for_commit(Arc::clone(commit))
+			.context(msg)?;
 
 		let author_email = &commit_view.author.email;
 		let committer_email = &commit_view.committer.email;
@@ -155,7 +159,7 @@ pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contrib
 	for pr_commit in pr_commits {
 		//get the pr commits and see if any contributors match the full repo
 		let commit_view = db
-			.get_pr_contributors_for_commit(Rc::clone(pr_commit))
+			.get_pr_contributors_for_commit(Arc::clone(pr_commit))
 			.context("failed to get commits for pr contributor trust metric")?;
 		let author_email = &commit_view.author.email.to_string();
 		let committer_email = &commit_view.committer.email.to_string();
@@ -207,7 +211,7 @@ pub fn pr_contributor_trust_metric(db: &dyn MetricProvider) -> Result<Rc<Contrib
 
 	log::info!("completed {} metric", PR_TRUST_PHASE);
 
-	Ok(Rc::new(ContributorTrustOutput {
-		contributor_counts_in_period: Rc::new(pr_trust_map),
+	Ok(Arc::new(ContributorTrustOutput {
+		contributor_counts_in_period: Arc::new(pr_trust_map),
 	}))
 }

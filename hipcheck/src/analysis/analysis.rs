@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::analysis::result::*;
 use crate::config::AttacksConfigQuery;
 use crate::config::CommitConfigQuery;
 use crate::config::FuzzConfigQuery;
@@ -12,7 +13,6 @@ use crate::metric::MetricProvider;
 use crate::report::Concern;
 use crate::report::PrConcern;
 use crate::F64;
-use chrono::Duration;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::default::Default;
@@ -20,7 +20,7 @@ use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::ops::Not;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Queries about analyses
 #[salsa::query_group(AnalysisProviderStorage)]
@@ -33,51 +33,44 @@ pub trait AnalysisProvider:
 	+ PracticesConfigQuery
 {
 	/// Returns result of activity analysis
-	fn activity_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn activity_analysis(&self) -> Arc<HCAnalysisReport>;
 
 	/// Returns result of affiliation analysis
-	fn affiliation_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn affiliation_analysis(&self) -> Result<Arc<AnalysisReport>>;
 
 	/// Returns result of binary analysis
-	fn binary_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn binary_analysis(&self) -> Result<Arc<AnalysisReport>>;
 
 	/// Returns result of churn analysis
-	fn churn_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn churn_analysis(&self) -> Result<Arc<AnalysisReport>>;
 
 	/// Returns result of entropy analysis
-	fn entropy_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn entropy_analysis(&self) -> Result<Arc<AnalysisReport>>;
 
 	/// Returns result of identity analysis
-	fn identity_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn identity_analysis(&self) -> Result<Arc<AnalysisReport>>;
 
 	/// Returns result of fuzz analysis
-	fn fuzz_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn fuzz_analysis(&self) -> Result<Arc<AnalysisReport>>;
 
 	/// Returns result of review analysis
-	fn review_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn review_analysis(&self) -> Result<Arc<AnalysisReport>>;
 
 	/// Returns result of typo analysis
-	fn typo_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn typo_analysis(&self) -> Result<Arc<AnalysisReport>>;
 
 	/// Returns result of pull request affiliation analysis
-	fn pr_affiliation_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn pr_affiliation_analysis(&self) -> Result<Arc<AnalysisReport>>;
 
 	/// Returns result of pull request contributor trust analysis
-	fn pr_contributor_trust_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn pr_contributor_trust_analysis(&self) -> Result<Arc<AnalysisReport>>;
 
 	/// Returns result of pull request module contributors analysis
-	fn pr_module_contributors_analysis(&self) -> Result<Rc<AnalysisReport>>;
+	fn pr_module_contributors_analysis(&self) -> Result<Arc<AnalysisReport>>;
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum AnalysisReport {
-	/// Activity analysis result.
-	Activity {
-		value: u64,
-		threshold: u64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<Concern>,
-	},
 	/// Affiliation analysis result.
 	Affiliation {
 		value: u64,
@@ -186,59 +179,30 @@ impl Display for AnalysisOutcome {
 	}
 }
 
-pub fn activity_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
-	if db.activity_active() {
-		let results = db.activity_metric();
-		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			})),
-			Ok(results) => {
-				let value = results.time_since_last_commit.num_weeks();
-				let threshold =
-					Duration::weeks(db.activity_week_count_threshold() as i64).num_weeks();
-				let results_score = score_by_threshold(value, threshold);
-
-				let concerns = Vec::new();
-
-				if results_score == 0 {
-					let msg = format!(
-						"{} weeks inactivity <= {} weeks inactivity",
-						value, threshold
-					);
-					Ok(Rc::new(AnalysisReport::Activity {
-						value: value as u64,
-						threshold: threshold as u64,
-						outcome: AnalysisOutcome::Pass(msg),
-						concerns,
-					}))
-				} else {
-					let msg = format!(
-						"{} weeks inactivity > {} weeks inactivity",
-						value, threshold
-					);
-					Ok(Rc::new(AnalysisReport::Activity {
-						value: value as u64,
-						threshold: threshold as u64,
-						outcome: AnalysisOutcome::Fail(msg),
-						concerns,
-					}))
-				}
-			}
+pub fn activity_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
+	let results = db.activity_metric();
+	match results {
+		Err(err) => Arc::new(HCAnalysisReport {
+			outcome: HCAnalysisOutcome::Error(HCAnalysisError::Generic(err)),
+			concerns: vec![],
+		}),
+		Ok(results) => {
+			let value = results.time_since_last_commit.num_weeks() as u64;
+			let hc_value = HCBasicValue::from(value);
+			Arc::new(HCAnalysisReport {
+				outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(hc_value)),
+				concerns: vec![],
+			})
 		}
-	} else {
-		Ok(Rc::new(AnalysisReport::None {
-			outcome: AnalysisOutcome::Skipped,
-		}))
 	}
 }
 
-pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.affiliation_active() {
 		let results = db.affiliation_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -254,7 +218,8 @@ pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisRepo
 				let mut contributor_freq_map = HashMap::new();
 
 				for affiliation in affiliated_iter {
-					let commit_view = db.contributors_for_commit(Rc::clone(&affiliation.commit))?;
+					let commit_view =
+						db.contributors_for_commit(Arc::clone(&affiliation.commit))?;
 
 					let contributor = match affiliation.affiliated_type {
 						AffiliatedType::Author => String::from(&commit_view.author.name),
@@ -264,7 +229,7 @@ pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisRepo
 					};
 
 					let count_commits_for = |contributor| {
-						db.commits_for_contributor(Rc::clone(contributor))
+						db.commits_for_contributor(Arc::clone(contributor))
 							.into_iter()
 							.count() as i64
 					};
@@ -290,7 +255,7 @@ pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisRepo
 
 				if results_score == 0 {
 					let msg = format!("{} affiliated <= {} affiliated", value, threshold);
-					Ok(Rc::new(AnalysisReport::Affiliation {
+					Ok(Arc::new(AnalysisReport::Affiliation {
 						value,
 						threshold,
 						outcome: AnalysisOutcome::Pass(msg),
@@ -298,7 +263,7 @@ pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisRepo
 					}))
 				} else {
 					let msg = format!("{} affiliated > {} affiliated", value, threshold);
-					Ok(Rc::new(AnalysisReport::Affiliation {
+					Ok(Arc::new(AnalysisReport::Affiliation {
 						value,
 						threshold,
 						outcome: AnalysisOutcome::Fail(msg),
@@ -308,18 +273,18 @@ pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisRepo
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}
 }
 
-pub fn binary_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn binary_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.binary_active() {
 		let results = db.binary_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -341,7 +306,7 @@ pub fn binary_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> 
 						"{} binary files found <= {} binary files found",
 						value, threshold
 					);
-					Ok(Rc::new(AnalysisReport::Binary {
+					Ok(Arc::new(AnalysisReport::Binary {
 						value,
 						threshold,
 						outcome: AnalysisOutcome::Pass(msg),
@@ -352,7 +317,7 @@ pub fn binary_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> 
 						"{} binary files found >= {} binary files found",
 						value, threshold
 					);
-					Ok(Rc::new(AnalysisReport::Binary {
+					Ok(Arc::new(AnalysisReport::Binary {
 						value,
 						threshold,
 						outcome: AnalysisOutcome::Fail(msg),
@@ -362,18 +327,18 @@ pub fn binary_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> 
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}
 }
 
-pub fn churn_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn churn_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.churn_active() {
 		let results = db.churn_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -405,7 +370,7 @@ pub fn churn_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
 						percent_threshold * 100.0
 					);
 					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Rc::new(AnalysisReport::Churn {
+					Ok(Arc::new(AnalysisReport::Churn {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -420,7 +385,7 @@ pub fn churn_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
 						percent_threshold * 100.0
 					);
 					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Rc::new(AnalysisReport::Churn {
+					Ok(Arc::new(AnalysisReport::Churn {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -432,18 +397,18 @@ pub fn churn_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}
 }
 
-pub fn entropy_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn entropy_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.entropy_active() {
 		let results = db.entropy_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -462,7 +427,7 @@ pub fn entropy_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>>
 					.iter()
 					.filter(|c| c.entropy.into_inner() > value_threshold)
 					.map(|cf| {
-						db.get_short_hash(Rc::new(cf.commit.hash.clone()))
+						db.get_short_hash(Arc::new(cf.commit.hash.clone()))
 							.map(|commit_hash| Concern::Entropy {
 								commit_hash: commit_hash.trim().to_owned(),
 								score: cf.entropy.into_inner(),
@@ -478,7 +443,7 @@ pub fn entropy_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>>
 						percent_threshold * 100.0
 					);
 					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Rc::new(AnalysisReport::Entropy {
+					Ok(Arc::new(AnalysisReport::Entropy {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -493,7 +458,7 @@ pub fn entropy_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>>
 						percent_threshold * 100.0
 					);
 					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Rc::new(AnalysisReport::Entropy {
+					Ok(Arc::new(AnalysisReport::Entropy {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -505,18 +470,18 @@ pub fn entropy_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>>
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}
 }
 
-pub fn identity_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn identity_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.identity_active() {
 		let results = db.identity_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -538,7 +503,7 @@ pub fn identity_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>
 						percent_threshold * 100.0
 					);
 					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Rc::new(AnalysisReport::Identity {
+					Ok(Arc::new(AnalysisReport::Identity {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -553,7 +518,7 @@ pub fn identity_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>
 						percent_threshold * 100.0
 					);
 					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Rc::new(AnalysisReport::Identity {
+					Ok(Arc::new(AnalysisReport::Identity {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -565,18 +530,18 @@ pub fn identity_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}
 }
 
-pub fn fuzz_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn fuzz_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.fuzz_active() {
 		let results = db.fuzz_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -592,14 +557,14 @@ pub fn fuzz_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
 
 				if results_score == 0 {
 					let msg = format!("Is fuzzed: {} results found", exists);
-					Ok(Rc::new(AnalysisReport::Fuzz {
+					Ok(Arc::new(AnalysisReport::Fuzz {
 						value: exists,
 						outcome: AnalysisOutcome::Pass(msg),
 						concerns,
 					}))
 				} else {
 					let msg = format!("Is not fuzzed: {} no results found", exists);
-					Ok(Rc::new(AnalysisReport::Fuzz {
+					Ok(Arc::new(AnalysisReport::Fuzz {
 						value: exists,
 						outcome: AnalysisOutcome::Fail(msg),
 						concerns,
@@ -608,18 +573,18 @@ pub fn fuzz_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}
 }
 
-pub fn review_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn review_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.review_active() {
 		let results = db.review_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -644,7 +609,7 @@ pub fn review_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> 
 				if results_score == 0 {
 					let msg = format!("{:.2}% pull requests without review <= {:.2}% pull requests without review", percent_flagged * 100.0, percent_threshold * 100.0);
 					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Rc::new(AnalysisReport::Review {
+					Ok(Arc::new(AnalysisReport::Review {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -659,7 +624,7 @@ pub fn review_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> 
 						percent_threshold * 100.0
 					);
 					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Rc::new(AnalysisReport::Review {
+					Ok(Arc::new(AnalysisReport::Review {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -671,18 +636,18 @@ pub fn review_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> 
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}
 }
 
-pub fn typo_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn typo_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.typo_active() {
 		let results = db.typo_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -705,7 +670,7 @@ pub fn typo_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
 						"{} possible typos <= {} possible typos",
 						num_flagged, count_threshold
 					);
-					Ok(Rc::new(AnalysisReport::Typo {
+					Ok(Arc::new(AnalysisReport::Typo {
 						value: num_flagged,
 						threshold: count_threshold,
 						outcome: AnalysisOutcome::Pass(msg),
@@ -716,7 +681,7 @@ pub fn typo_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
 						"{} possible typos > {} possible typos",
 						num_flagged, count_threshold
 					);
-					Ok(Rc::new(AnalysisReport::Typo {
+					Ok(Arc::new(AnalysisReport::Typo {
 						value: num_flagged,
 						threshold: count_threshold,
 						outcome: AnalysisOutcome::Pass(msg),
@@ -726,18 +691,18 @@ pub fn typo_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}
 }
 
-pub fn pr_affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn pr_affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.pr_affiliation_active() {
 		let results = db.pr_affiliation_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -754,7 +719,7 @@ pub fn pr_affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisR
 
 				for affiliation in affiliated_iter {
 					let commit_view =
-						db.get_pr_contributors_for_commit(Rc::clone(&affiliation.commit))?;
+						db.get_pr_contributors_for_commit(Arc::clone(&affiliation.commit))?;
 
 					let contributor = match affiliation.affiliated_type {
 						AffiliatedType::Author => String::from(&commit_view.author.name),
@@ -764,7 +729,7 @@ pub fn pr_affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisR
 					};
 
 					let count_commits_for = |contributor| {
-						db.get_pr_commits_for_contributor(Rc::clone(contributor))
+						db.get_pr_commits_for_contributor(Arc::clone(contributor))
 							.into_iter()
 							.count() as i64
 					};
@@ -790,7 +755,7 @@ pub fn pr_affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisR
 
 				if results_score == 0 {
 					let msg = format!("{} affiliated <= {} affiliated", value, threshold);
-					Ok(Rc::new(AnalysisReport::PrAffiliation {
+					Ok(Arc::new(AnalysisReport::PrAffiliation {
 						value,
 						threshold,
 						outcome: AnalysisOutcome::Pass(msg),
@@ -798,7 +763,7 @@ pub fn pr_affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisR
 					}))
 				} else {
 					let msg = format!("{} affiliated > {} affiliated", value, threshold);
-					Ok(Rc::new(AnalysisReport::PrAffiliation {
+					Ok(Arc::new(AnalysisReport::PrAffiliation {
 						value,
 						threshold,
 						outcome: AnalysisOutcome::Fail(msg),
@@ -808,18 +773,18 @@ pub fn pr_affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisR
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}
 }
 
-pub fn pr_contributor_trust_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn pr_contributor_trust_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.contributor_trust_active() {
 		let results = db.pr_contributor_trust_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -852,7 +817,7 @@ pub fn pr_contributor_trust_analysis(db: &dyn AnalysisProvider) -> Result<Rc<Ana
 						percent_threshold * 100.0
 					);
 					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Rc::new(AnalysisReport::PrContributorTrust {
+					Ok(Arc::new(AnalysisReport::PrContributorTrust {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -867,7 +832,7 @@ pub fn pr_contributor_trust_analysis(db: &dyn AnalysisProvider) -> Result<Rc<Ana
 						percent_threshold * 100.0
 					);
 					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Rc::new(AnalysisReport::PrContributorTrust {
+					Ok(Arc::new(AnalysisReport::PrContributorTrust {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -879,18 +844,18 @@ pub fn pr_contributor_trust_analysis(db: &dyn AnalysisProvider) -> Result<Rc<Ana
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}
 }
 
-pub fn pr_module_contributors_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {
+pub fn pr_module_contributors_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
 	if db.pr_module_contributors_active() {
 		let results = db.pr_module_contributors_metric();
 
 		match results {
-			Err(err) => Ok(Rc::new(AnalysisReport::None {
+			Err(err) => Ok(Arc::new(AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(err),
 			})),
 			Ok(results) => {
@@ -919,7 +884,7 @@ pub fn pr_module_contributors_analysis(db: &dyn AnalysisProvider) -> Result<Rc<A
 						"{:.2}% contributors contributing a module for the first time <= {:.2}% permitted amount",
 						percent_flagged * 100.0,
 						percent_threshold * 100.0);
-					Ok(Rc::new(AnalysisReport::PrModuleContributors {
+					Ok(Arc::new(AnalysisReport::PrModuleContributors {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -932,7 +897,7 @@ pub fn pr_module_contributors_analysis(db: &dyn AnalysisProvider) -> Result<Rc<A
 						"{:.2}% contributors contributing a module for the first time >= {:.2}% permitted amount",
 						percent_flagged * 100.0,
 						percent_threshold * 100.0);
-					Ok(Rc::new(AnalysisReport::PrModuleContributors {
+					Ok(Arc::new(AnalysisReport::PrModuleContributors {
 						value: F64::new(percent_flagged)
 							.expect("Percent flagged should never be NaN"),
 						threshold: F64::new(percent_threshold)
@@ -944,7 +909,7 @@ pub fn pr_module_contributors_analysis(db: &dyn AnalysisProvider) -> Result<Rc<A
 			}
 		}
 	} else {
-		Ok(Rc::new(AnalysisReport::None {
+		Ok(Arc::new(AnalysisReport::None {
 			outcome: AnalysisOutcome::Skipped,
 		}))
 	}

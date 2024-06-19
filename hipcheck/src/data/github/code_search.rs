@@ -5,12 +5,14 @@ use crate::error::Result;
 use crate::hc_error;
 use crate::http::authenticated_agent::AuthenticatedAgent;
 use serde_json::Value;
-use std::rc::Rc;
 
 const GH_API_V4_SEARCH: &str = "https://api.github.com/search/code";
 
 /// Make a request to the GitHub Code Search API.
-pub fn search_code_request(agent: &AuthenticatedAgent<'_>, repo: Rc<String>) -> Result<bool> {
+pub fn search_code_request(
+	agent: &AuthenticatedAgent<'_>,
+	repo: impl AsRef<String>,
+) -> Result<bool> {
 	// Example query will look like this:
 	//     https://api.github.com/search/code?q=github.com%20assimp%20assimp+in:file+filename:project.yaml+repo:google/oss-fuzz
 	//

@@ -7,22 +7,22 @@ use crate::error::Result;
 use crate::metric::MetricProvider;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct ModuleContributorsOutput {
-	pub contributors_map: Rc<HashMap<Rc<Contributor>, Vec<ContributedModule>>>,
+	pub contributors_map: Arc<HashMap<Arc<Contributor>, Vec<ContributedModule>>>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct ContributedModule {
-	pub module: Rc<Module>,
+	pub module: Arc<Module>,
 	pub new_contributor: bool,
 }
 
 pub fn pr_module_contributors_metric(
 	db: &dyn MetricProvider,
-) -> Result<Rc<ModuleContributorsOutput>> {
+) -> Result<Arc<ModuleContributorsOutput>> {
 	log::debug!("running pull request module contributors metric");
 
 	let pull_request = db
@@ -115,7 +115,7 @@ pub fn pr_module_contributors_metric(
 		final_contributors_map.insert(key.to_owned().to_owned(), module_vector);
 	}
 
-	Ok(Rc::new(ModuleContributorsOutput {
-		contributors_map: Rc::new(final_contributors_map),
+	Ok(Arc::new(ModuleContributorsOutput {
+		contributors_map: Arc::new(final_contributors_map),
 	}))
 }

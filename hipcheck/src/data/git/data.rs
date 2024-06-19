@@ -7,7 +7,7 @@ use serde::Serialize;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Commits as they come directly out of `git log`.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -77,52 +77,52 @@ pub struct CommitSigner {
 /// Temporary data structure for looking up the contributors of a commit
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct CommitContributorView {
-	pub commit: Rc<Commit>,
-	pub author: Rc<Contributor>,
-	pub committer: Rc<Contributor>,
+	pub commit: Arc<Commit>,
+	pub author: Arc<Contributor>,
+	pub committer: Arc<Contributor>,
 }
 
 /// Temporary data structure for looking up the commits associated with a contributor
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct ContributorView {
-	pub contributor: Rc<Contributor>,
-	pub commits: Vec<Rc<Commit>>,
+	pub contributor: Arc<Contributor>,
+	pub commits: Vec<Arc<Commit>>,
 }
 
 /// Temporary data structure for looking up the signer of a commit
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct CommitSignerView {
-	pub commit: Rc<Commit>,
-	pub signer_name: Option<Rc<String>>,
-	pub signer_key: Option<Rc<String>>,
+	pub commit: Arc<Commit>,
+	pub signer_name: Option<Arc<String>>,
+	pub signer_key: Option<Arc<String>>,
 }
 
 /// Temporary data structure for looking up the commits associated with a signer name
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct SignerNameView {
-	pub signer_name: Rc<String>,
-	pub commits: Vec<Rc<Commit>>,
+	pub signer_name: Arc<String>,
+	pub commits: Vec<Arc<Commit>>,
 }
 
 /// Temporary data structure for looking up the commits associated with a signer key
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct SignerKeyView {
-	pub signer_key: Rc<String>,
-	pub commits: Vec<Rc<Commit>>,
+	pub signer_key: Arc<String>,
+	pub commits: Vec<Arc<Commit>>,
 }
 
 /// Temporary data structure for looking up the keys associated with a signer name
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct SignerView {
-	pub signer_name: Rc<String>,
-	pub signer_keys: Vec<Rc<String>>,
+	pub signer_name: Arc<String>,
+	pub signer_keys: Vec<Arc<String>>,
 }
 
 /// View into commits and diffs joined together.
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct CommitDiff {
-	pub commit: Rc<Commit>,
-	pub diff: Rc<Diff>,
+	pub commit: Arc<Commit>,
+	pub diff: Arc<Diff>,
 }
 
 impl Display for CommitDiff {
@@ -156,7 +156,7 @@ pub struct Diff {
 /// A set of changes to a specific file in a commit.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FileDiff {
-	pub file_name: Rc<String>,
+	pub file_name: Arc<String>,
 	pub additions: Option<i64>,
 	pub deletions: Option<i64>,
 	pub patch: String,
