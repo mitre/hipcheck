@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[allow(unused)]
 mod analysis;
 mod cli;
 mod command_util;
@@ -13,8 +14,10 @@ mod report;
 mod session;
 mod shell;
 mod source;
+mod target;
 #[cfg(test)]
 mod test_util;
+mod unstable;
 mod util;
 mod version;
 
@@ -55,6 +58,7 @@ use std::ops::Not as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::process::Termination;
 use std::result::Result as StdResult;
 use util::fs::create_dir_all;
 
@@ -71,6 +75,7 @@ fn main() -> ExitCode {
 	match config.subcommand() {
 		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
+		Some(FullCommands::Unstable(args)) => return unstable::main(args, &config).report(),
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
@@ -83,7 +88,13 @@ fn main() -> ExitCode {
 
 /// Run the `check` command.
 fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
-	let check = args.command.as_check();
+	let check = match args.command() {
+		Ok(chk) => chk.as_check(),
+		Err(e) => {
+			print_error(&e);
+			return ExitCode::FAILURE;
+		}
+	};
 
 	if check.kind.target_kind().is_checkable().not() {
 		print_missing();
@@ -576,11 +587,11 @@ fn run_with_shell(
 
 			let scoring = match score_results(&mut phase, &session) {
 				Ok(scoring) => scoring,
-				_ => {
+				Err(x) => {
 					return (
 						session.end(),
-						Err(Error::msg("Trouble scoring and analyzing results")),
-					)
+						Err(x), // Error::msg("Trouble scoring and analyzing results")),
+					);
 				}
 			};
 
