@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::analysis::score::HCStoredResult;
 use crate::hc_error;
 use crate::report::Concern;
 use crate::Result;
 use crate::F64;
 use std::cmp::Ordering;
 use std::fmt::{self, Display};
+use std::rc::Rc;
 
 /// Represents the enhanced result of a hipcheck analysis. Contains the actual outcome
 /// of the analysis, plus additional meta-information the analysis wants to provide to
@@ -110,8 +112,9 @@ pub enum HCCompositeValue {
 }
 
 /// The set of possible predicates for deciding if a source passed an analysis.
-pub trait HCPredicate: Display + std::fmt::Debug {
+pub trait HCPredicate: Display + std::fmt::Debug + std::any::Any + 'static {
 	fn pass(&self) -> Result<bool>;
+	fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// This predicate determines analysis pass/fail by whether a returned value was
@@ -139,18 +142,18 @@ impl ThresholdPredicate {
 	}
 }
 
-fn pass_threshold<T: Ord>(a: &T, b: &T, ord: &Ordering) -> bool {
-	a.cmp(b) == *ord
+fn pass_threshold<T: Ord>(a: &T, b: &T, ord: Ordering) -> bool {
+	a.cmp(b) == ord
 }
 
 impl ThresholdPredicate {
-	pub fn from_analysis_outcome(
-		outcome: &HCAnalysisOutcome,
+	pub fn from_analysis(
+		report: &HCAnalysisReport,
 		threshold: HCBasicValue,
 		units: Option<String>,
 		order: Ordering,
-	) -> Result<Self> {
-		match outcome {
+	) -> HCStoredResult {
+		let result = match &report.outcome {
 			HCAnalysisOutcome::Error(err) => Err(hc_error!("{:?}", err)),
 			HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(av)) => {
 				Ok(ThresholdPredicate::new(av.clone(), threshold, units, order))
@@ -158,6 +161,10 @@ impl ThresholdPredicate {
 			HCAnalysisOutcome::Completed(HCAnalysisValue::Composite(_)) => Err(hc_error!(
 				"activity analysis should return a basic u64 type, not {:?}"
 			)),
+		};
+		HCStoredResult {
+			result: result.map(|r| Rc::new(r) as Rc<dyn HCPredicate>),
+			concerns: report.concerns.clone(),
 		}
 	}
 }
@@ -167,17 +174,20 @@ impl HCPredicate for ThresholdPredicate {
 	fn pass(&self) -> Result<bool> {
 		use HCBasicValue::*;
 		match (&self.value, &self.threshold) {
-			(Integer(a), Integer(b)) => Ok(pass_threshold(a, b, &self.ordering)),
-			(Unsigned(a), Unsigned(b)) => Ok(pass_threshold(a, b, &self.ordering)),
-			(Float(a), Float(b)) => Ok(pass_threshold(a, b, &self.ordering)),
-			(Bool(a), Bool(b)) => Ok(pass_threshold(a, b, &self.ordering)),
-			(String(a), String(b)) => Ok(pass_threshold(a, b, &self.ordering)),
+			(Integer(a), Integer(b)) => Ok(pass_threshold(a, b, self.ordering)),
+			(Unsigned(a), Unsigned(b)) => Ok(pass_threshold(a, b, self.ordering)),
+			(Float(a), Float(b)) => Ok(pass_threshold(a, b, self.ordering)),
+			(Bool(a), Bool(b)) => Ok(pass_threshold(a, b, self.ordering)),
+			(String(a), String(b)) => Ok(pass_threshold(a, b, self.ordering)),
 			(a, b) => Err(hc_error!(
 				"threshold and value are of different types: {:?}, {:?}",
 				a,
 				b
 			)),
 		}
+	}
+	fn as_any(&self) -> &dyn std::any::Any {
+		self
 	}
 }
 impl Display for ThresholdPredicate {

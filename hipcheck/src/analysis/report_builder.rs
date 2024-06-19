@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::analysis::analysis::AnalysisReport;
-use crate::analysis::result::HCBasicValue;
+use crate::analysis::result::{HCBasicValue, ThresholdPredicate};
 use crate::analysis::score::ScoringResults;
 use crate::config::RiskConfigQuery;
 use crate::error::Error;
@@ -28,20 +28,26 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 
 	// Activity analysis.
 
-	match &scoring.results.activity {
-		Some((Ok(pred), concerns)) => {
-			let HCBasicValue::Unsigned(value) = pred.value else {
-				return Err(hc_error!("activity analysis has a non-u64 value"));
-			};
-			let HCBasicValue::Unsigned(thresh) = pred.threshold else {
-				return Err(hc_error!("activity analysis has a non-u64 value"));
-			};
-			builder.add_analysis(Analysis::activity(value, thresh), concerns.clone())?;
+	if let Some(stored) = &scoring.results.activity {
+		match &stored.result {
+			Ok(analysis) => {
+				let Some(pred) = analysis.as_any().downcast_ref::<ThresholdPredicate>() else {
+					return Err(hc_error!(
+						"expected threshold predicate for activity analysis"
+					));
+				};
+				let HCBasicValue::Unsigned(value) = pred.value else {
+					return Err(hc_error!("activity analysis has a non-u64 value"));
+				};
+				let HCBasicValue::Unsigned(thresh) = pred.threshold else {
+					return Err(hc_error!("activity analysis has a non-u64 value"));
+				};
+				builder.add_analysis(Analysis::activity(value, thresh), stored.concerns.clone())?;
+			}
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Activity, &error);
+			}
 		}
-		Some((Err(error), _concerns)) => {
-			builder.add_errored_analysis(AnalysisIdent::Activity, error);
-		}
-		None => (),
 	};
 
 	// Affiliation analysis.

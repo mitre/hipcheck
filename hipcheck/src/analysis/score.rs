@@ -43,10 +43,10 @@ pub struct ScoringResults {
 	pub score: Score,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HCStoredResult {
-	result: Result<Rc<Box<dyn HCPredicate>>>,
-	concerns: Vec<Concern>,
+	pub result: Result<Rc<dyn HCPredicate>>,
+	pub concerns: Vec<Concern>,
 }
 impl HCStoredResult {
 	// Score the analysis by invoking predicate's impl of `pass()`. Errored
@@ -82,7 +82,7 @@ impl AltAnalysisResults {
 	pub fn add(
 		&mut self,
 		key: &str,
-		in_result: Result<Box<dyn HCPredicate>>,
+		result: Result<Rc<dyn HCPredicate>>,
 		concerns: Vec<Concern>,
 	) -> Result<()> {
 		if self.table.contains_key(key) {
@@ -90,7 +90,6 @@ impl AltAnalysisResults {
 				"analysis results table already contains key '{key}'"
 			));
 		}
-		let result = in_result.map(Rc::new);
 		let result_struct = HCStoredResult { result, concerns };
 		self.table.insert(key.to_owned(), result_struct);
 		Ok(())
@@ -100,7 +99,7 @@ impl AltAnalysisResults {
 #[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct AnalysisResults {
-	pub activity: Option<(Result<ThresholdPredicate>, Vec<Concern>)>,
+	pub activity: Option<HCStoredResult>,
 	pub affiliation: Option<Result<Rc<AnalysisReport>>>,
 	pub binary: Option<Result<Rc<AnalysisReport>>>,
 	pub churn: Option<Result<Rc<AnalysisReport>>>,
@@ -631,20 +630,16 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 
 			// Process analysis value into a threshold predicate and add to new & old storage
 			// objects
-			let activity_res = ThresholdPredicate::from_analysis_outcome(
-				&raw_activity.as_ref().outcome,
+			let activity_result = ThresholdPredicate::from_analysis(
+				&raw_activity,
 				HCBasicValue::from(raw_threshold),
 				Some("weeks inactivity".to_owned()),
 				Ordering::Less,
 			);
-			let new_activity_res = activity_res
-				.clone()
-				.map(|r| Box::new(r) as Box<dyn HCPredicate>);
-			alt_results.add(
-				ACTIVITY_PHASE,
-				new_activity_res,
-				raw_activity.as_ref().concerns.clone(),
-			);
+			results.activity = Some(activity_result.clone());
+			alt_results
+				.table
+				.insert(ACTIVITY_PHASE.to_owned(), activity_result);
 
 			// Scoring based off of predicate
 			let (act_score, outcome) = alt_results.table.get(ACTIVITY_PHASE).unwrap().score();
@@ -653,7 +648,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				score: act_score,
 				outcome,
 			});
-			results.activity = Some((activity_res, raw_activity.concerns.clone()));
 			score.activity = score_result.outcome.clone();
 			match add_node_and_edge_with_score(
 				score_result,
