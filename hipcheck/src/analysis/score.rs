@@ -90,7 +90,7 @@ impl AltAnalysisResults {
 				"analysis results table already contains key '{key}'"
 			));
 		}
-		let result = in_result.map(|r| Rc::new(r));
+		let result = in_result.map(Rc::new);
 		let result_struct = HCStoredResult { result, concerns };
 		self.table.insert(key.to_owned(), result_struct);
 		Ok(())
