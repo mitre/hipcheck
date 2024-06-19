@@ -5,7 +5,7 @@ use crate::data::git::Commit;
 use crate::error::Result;
 use crate::metric::MetricProvider;
 use serde::Serialize;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct IdentityOutput {
@@ -14,11 +14,11 @@ pub struct IdentityOutput {
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct Match {
-	pub commit: Rc<Commit>,
+	pub commit: Arc<Commit>,
 	pub identities_match: bool,
 }
 
-pub fn identity_metric(db: &dyn MetricProvider) -> Result<Rc<IdentityOutput>> {
+pub fn identity_metric(db: &dyn MetricProvider) -> Result<Arc<IdentityOutput>> {
 	log::debug!("running identity metric");
 
 	let commits = db.commits().context("failed to get commits")?;
@@ -27,18 +27,18 @@ pub fn identity_metric(db: &dyn MetricProvider) -> Result<Rc<IdentityOutput>> {
 
 	for commit in commits.iter() {
 		let commit_view = db
-			.contributors_for_commit(Rc::clone(commit))
+			.contributors_for_commit(Arc::clone(commit))
 			.context("failed to get commits")?;
 
 		let identities_match = commit_view.author == commit_view.committer;
 
 		matches.push(Match {
-			commit: Rc::clone(commit),
+			commit: Arc::clone(commit),
 			identities_match,
 		});
 	}
 
 	log::info!("completed identity metric");
 
-	Ok(Rc::new(IdentityOutput { matches }))
+	Ok(Arc::new(IdentityOutput { matches }))
 }

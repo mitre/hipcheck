@@ -12,7 +12,7 @@ use crate::TryFilter;
 use crate::F64;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct ChurnOutput {
@@ -21,11 +21,11 @@ pub struct ChurnOutput {
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct CommitChurnFreq {
-	pub commit: Rc<Commit>,
+	pub commit: Arc<Commit>,
 	pub churn: F64,
 }
 
-pub fn churn_metric(db: &dyn MetricProvider) -> Result<Rc<ChurnOutput>> {
+pub fn churn_metric(db: &dyn MetricProvider) -> Result<Arc<ChurnOutput>> {
 	log::debug!("running churn metric");
 
 	let commit_diffs = db.commit_diffs().context("failed to get commit diffs")?;
@@ -36,7 +36,7 @@ pub fn churn_metric(db: &dyn MetricProvider) -> Result<Rc<ChurnOutput>> {
 			cd.diff
 				.file_diffs
 				.iter()
-				.try_any(|fd| db.is_likely_source_file(Rc::clone(&fd.file_name)))
+				.try_any(|fd| db.is_likely_source_file(Arc::clone(&fd.file_name)))
 		})
 		.collect::<crate::error::Result<Vec<_>>>()?;
 
@@ -49,7 +49,7 @@ pub fn churn_metric(db: &dyn MetricProvider) -> Result<Rc<ChurnOutput>> {
 			.diff
 			.file_diffs
 			.iter()
-			.try_filter(|file_diff| db.is_likely_source_file(Rc::clone(&file_diff.file_name)))
+			.try_filter(|file_diff| db.is_likely_source_file(Arc::clone(&file_diff.file_name)))
 			.collect::<crate::error::Result<Vec<_>>>()?;
 
 		// Update files changed.
@@ -69,7 +69,7 @@ pub fn churn_metric(db: &dyn MetricProvider) -> Result<Rc<ChurnOutput>> {
 		total_lines_changed += lines_changed;
 
 		commit_churns.push(CommitChurn {
-			commit: Rc::clone(&commit_diff.commit),
+			commit: Arc::clone(&commit_diff.commit),
 			files_changed,
 			lines_changed,
 		});
@@ -118,7 +118,7 @@ pub fn churn_metric(db: &dyn MetricProvider) -> Result<Rc<ChurnOutput>> {
 						.unwrap();
 
 				CommitChurnFreq {
-					commit: Rc::clone(&commit_churn.commit),
+					commit: Arc::clone(&commit_churn.commit),
 					churn,
 				}
 			})
@@ -148,12 +148,12 @@ pub fn churn_metric(db: &dyn MetricProvider) -> Result<Rc<ChurnOutput>> {
 
 	log::info!("completed churn metric");
 
-	Ok(Rc::new(ChurnOutput { commit_churn_freqs }))
+	Ok(Arc::new(ChurnOutput { commit_churn_freqs }))
 }
 
 #[derive(Debug)]
 pub struct CommitChurn {
-	commit: Rc<Commit>,
+	commit: Arc<Commit>,
 	files_changed: i64,
 	lines_changed: i64,
 }

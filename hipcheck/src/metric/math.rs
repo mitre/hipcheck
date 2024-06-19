@@ -3,6 +3,8 @@
 /// Calculate the arithmetic mean for a set of floats. Returns an option to account
 /// for the possibility of dividing by zero.
 pub fn mean(data: &[f64]) -> Option<f64> {
+	// Do not use rayon's parallel iter/sum here due to the non-associativity of floating point numbers/math.
+	// See: https://en.wikipedia.org/wiki/Associative_property#Nonassociativity_of_floating_point_calculation.
 	let sum = data.iter().sum::<f64>();
 	let count = data.len();
 

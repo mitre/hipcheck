@@ -56,6 +56,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::result::Result as StdResult;
+use std::sync::Arc;
 
 /// Immutable configuration and base data for a run of Hipcheck.
 #[salsa::database(
@@ -178,7 +179,7 @@ impl Session {
 		session.set_config_dir(Rc::new(config_dir));
 
 		// Set data folder location for module analysis
-		session.set_data_dir(Rc::new(data_dir));
+		session.set_data_dir(Arc::new(data_dir));
 
 		// Set github token in salsa
 		session.set_github_api_token(Some(Rc::new(hc_github_token)));
@@ -205,7 +206,7 @@ impl Session {
 			Err(err) => return Err((session.shell, err)),
 		};
 
-		session.set_source(Rc::new(source));
+		session.set_source(Arc::new(source));
 
 		/*===================================================================
 		 *  Resolving the Hipcheck version.

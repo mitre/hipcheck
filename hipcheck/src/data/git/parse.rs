@@ -31,8 +31,8 @@ use nom::sequence::terminated;
 use nom::sequence::tuple;
 use nom::IResult;
 use std::iter::Iterator;
-use std::rc::Rc;
 use std::result::Result as StdResult;
+use std::sync::Arc;
 
 const HEX_CHARS: &str = "0123456789abcdef";
 const GIT_HASH_MIN_LEN: usize = 5;
@@ -209,7 +209,7 @@ fn diff(input: &str) -> IResult<&str, Diff> {
 				deletions = deletions.map(|d| d + stat.lines_deleted);
 
 				FileDiff {
-					file_name: Rc::new(stat.file_name.to_owned()),
+					file_name: Arc::new(stat.file_name.to_owned()),
 					additions: Some(stat.lines_added),
 					deletions: Some(stat.lines_deleted),
 					patch,
@@ -243,7 +243,7 @@ fn gh_diff(input: &str) -> IResult<&str, Diff> {
 		let file_diffs = patches
 			.into_iter()
 			.map(|patch| FileDiff {
-				file_name: Rc::new(patch.file_name),
+				file_name: Arc::new(patch.file_name),
 				additions: None,
 				deletions: None,
 				patch: patch.content,
@@ -831,7 +831,7 @@ index e7a11a9..4894a2e 100644
 			deletions: Some(1),
 			file_diffs: vec![
 				FileDiff {
-					file_name: Rc::new(String::from(".gitignore")),
+					file_name: Arc::new(String::from(".gitignore")),
 					additions: Some(10),
 					deletions: Some(0),
 					patch: String::from(
@@ -849,7 +849,7 @@ Cargo.lock
 					),
 				},
 				FileDiff {
-					file_name: Rc::new(String::from("Cargo.toml")),
+					file_name: Arc::new(String::from("Cargo.toml")),
 					additions: Some(4),
 					deletions: Some(0),
 					patch: String::from(
@@ -861,7 +861,7 @@ serde_json = "1.0.39"
 					),
 				},
 				FileDiff {
-					file_name: Rc::new(String::from("src/main.rs")),
+					file_name: Arc::new(String::from("src/main.rs")),
 					additions: Some(127),
 					deletions: Some(1),
 					patch: String::from(

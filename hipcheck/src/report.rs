@@ -26,8 +26,8 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::iter::Iterator;
 use std::ops::Not as _;
-use std::rc::Rc;
 use std::result::Result as StdResult;
+use std::sync::Arc;
 
 /// The format to report results in.
 #[derive(Debug, Default, Clone, Copy, clap::ValueEnum)]
@@ -60,10 +60,10 @@ pub enum AnyReport {
 #[schemars(crate = "schemars")]
 pub struct Report {
 	/// The name of the repository being analyzed.
-	pub repo_name: Rc<String>,
+	pub repo_name: Arc<String>,
 
 	/// The HEAD commit hash of the repository during analysis.
-	pub repo_head: Rc<String>,
+	pub repo_head: Arc<String>,
 
 	/// The version of Hipcheck used to analyze the repo.
 	pub hipcheck_version: String,
@@ -792,10 +792,10 @@ impl Eq for Concern {}
 #[schemars(crate = "schemars")]
 pub struct PrReport {
 	/// The URI of the pull request being analyzed.
-	pub pr_uri: Rc<String>,
+	pub pr_uri: Arc<String>,
 
 	/// The HEAD commit hash of the repository during analysis.
-	pub repo_head: Rc<String>,
+	pub repo_head: Arc<String>,
 
 	/// The version of Hipcheck used to analyze the repo.
 	pub hipcheck_version: String,
