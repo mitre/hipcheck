@@ -180,21 +180,16 @@ impl Display for AnalysisOutcome {
 }
 
 pub fn activity_analysis(db: &dyn AnalysisProvider) -> Rc<HCAnalysisReport> {
-	let results = db.activity_metric();
-	match results {
-		Err(err) => Rc::new(HCAnalysisReport {
-			outcome: HCAnalysisOutcome::Error(HCAnalysisError::Generic(err)),
-			concerns: vec![],
-		}),
-		Ok(results) => {
-			let value = results.time_since_last_commit.num_weeks() as u64;
-			let hc_value = HCBasicValue::from(value);
-			Rc::new(HCAnalysisReport {
-				outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(hc_value)),
-				concerns: vec![],
-			})
-		}
-	}
+	let results = match db.activity_metric() {
+		Err(err) => return Rc::new(HCAnalysisReport::generic_error(err, vec![])),
+		Ok(results) => results,
+	};
+	let value = results.time_since_last_commit.num_weeks() as u64;
+	let hc_value = HCBasicValue::from(value);
+	Rc::new(HCAnalysisReport {
+		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(hc_value)),
+		concerns: vec![],
+	})
 }
 
 pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Rc<AnalysisReport>> {

@@ -15,6 +15,14 @@ pub struct HCAnalysisReport {
 	pub outcome: HCAnalysisOutcome,
 	pub concerns: Vec<Concern>,
 }
+impl HCAnalysisReport {
+	pub fn generic_error(error: crate::error::Error, concerns: Vec<Concern>) -> Self {
+		HCAnalysisReport {
+			outcome: HCAnalysisOutcome::Error(HCAnalysisError::Generic(error)),
+			concerns,
+		}
+	}
+}
 
 /// Represents the result of a hipcheck analysis. Either the analysis encountered
 /// an error, or it completed and returned a value.
@@ -102,7 +110,7 @@ pub enum HCCompositeValue {
 }
 
 /// The set of possible predicates for deciding if a source passed an analysis.
-pub trait HCPredicate: Display + Clone + Eq + PartialEq {
+pub trait HCPredicate: Display + std::fmt::Debug {
 	fn pass(&self) -> Result<bool>;
 }
 
@@ -135,6 +143,24 @@ fn pass_threshold<T: Ord>(a: &T, b: &T, ord: &Ordering) -> bool {
 	a.cmp(b) == *ord
 }
 
+impl ThresholdPredicate {
+	pub fn from_analysis_outcome(
+		outcome: &HCAnalysisOutcome,
+		threshold: HCBasicValue,
+		units: Option<String>,
+		order: Ordering,
+	) -> Result<Self> {
+		match outcome {
+			HCAnalysisOutcome::Error(err) => Err(hc_error!("{:?}", err)),
+			HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(av)) => {
+				Ok(ThresholdPredicate::new(av.clone(), threshold, units, order))
+			}
+			HCAnalysisOutcome::Completed(HCAnalysisValue::Composite(_)) => Err(hc_error!(
+				"activity analysis should return a basic u64 type, not {:?}"
+			)),
+		}
+	}
+}
 impl HCPredicate for ThresholdPredicate {
 	// @FollowUp - would be nice for this match logic to error at compile time if a new
 	//  HCBasicValue type is added, so developer is reminded to add new variant here

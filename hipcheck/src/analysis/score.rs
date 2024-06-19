@@ -9,6 +9,7 @@ use crate::hc_error;
 use crate::report::Concern;
 use crate::shell::Phase;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::default::Default;
 use std::rc::Rc;
 
@@ -42,10 +43,61 @@ pub struct ScoringResults {
 	pub score: Score,
 }
 
+#[derive(Debug)]
+pub struct HCStoredResult {
+	result: Result<Rc<Box<dyn HCPredicate>>>,
+	concerns: Vec<Concern>,
+}
+impl HCStoredResult {
+	pub fn score(&self) -> (u64, AnalysisOutcome) {
+		match &self.result {
+			Err(e) => (1, AnalysisOutcome::Error(e.clone())),
+			Ok(pred) => {
+				let passed = match pred.pass() {
+					Err(err) => {
+						return (1, AnalysisOutcome::Error(err));
+					}
+					Ok(p) => p,
+				};
+				let msg = pred.to_string();
+				let outcome = if passed {
+					AnalysisOutcome::Pass(msg)
+				} else {
+					AnalysisOutcome::Fail(msg)
+				};
+				let score = (!passed) as u64;
+				(score, outcome)
+			}
+		}
+	}
+}
+#[derive(Debug, Default)]
+pub struct AltAnalysisResults {
+	pub table: HashMap<String, HCStoredResult>,
+}
+impl AltAnalysisResults {
+	pub fn add(
+		&mut self,
+		key: &str,
+		in_result: Result<Box<dyn HCPredicate>>,
+		concerns: Vec<Concern>,
+	) -> Result<()> {
+		if self.table.contains_key(key) {
+			return Err(hc_error!(
+				"analysis results table already contains key '{key}'"
+			));
+		}
+		let result = in_result.map(|r| Rc::new(r));
+		let result_struct = HCStoredResult { result, concerns };
+		self.table.insert(key.to_owned(), result_struct);
+		Ok(())
+	}
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct AnalysisResults {
-	pub activity: Option<(Result<Rc<ThresholdPredicate>>, Vec<Concern>)>,
+	pub activity: Option<(Result<ThresholdPredicate>, Vec<Concern>)>,
 	pub affiliation: Option<Result<Rc<AnalysisReport>>>,
 	pub binary: Option<Result<Rc<AnalysisReport>>>,
 	pub churn: Option<Result<Rc<AnalysisReport>>>,
@@ -540,6 +592,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 	// Values set with -1.0 are reseved for parent nodes whose score comes always from children nodes with a score set by hc_analysis algorithms
 
 	let mut results = AnalysisResults::default();
+	let mut alt_results = AltAnalysisResults::default();
 	let mut score = Score::default();
 	let mut score_tree = ScoreTree { tree: Graph::new() };
 	let root_node = score_tree.tree.add_node(ScoreTreeNode {
@@ -571,45 +624,29 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 		// Check if this analysis was skipped or generated an error, then format the results accordingly for reporting.
 		if db.activity_active() {
 			let raw_activity = db.activity_analysis();
-			let activity_res = match &raw_activity.as_ref().outcome {
-				HCAnalysisOutcome::Error(err) => Err(hc_error!("{:?}", err)),
-				HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(av)) => {
-					let raw_threshold: u64 = db.activity_week_count_threshold();
-					let threshold = HCBasicValue::from(raw_threshold);
-					let predicate = ThresholdPredicate::new(
-						av.clone(),
-						threshold,
-						Some("weeks inactivity".to_owned()),
-						Ordering::Less,
-					);
-					Ok(Rc::new(predicate))
-				}
-				HCAnalysisOutcome::Completed(HCAnalysisValue::Composite(_)) => Err(hc_error!(
-					"activity analysis should return a basic u64 type, not {:?}"
-				)),
-			};
+			let raw_threshold: u64 = db.activity_week_count_threshold();
+			let activity_res = ThresholdPredicate::from_analysis_outcome(
+				&raw_activity.as_ref().outcome,
+				HCBasicValue::from(raw_threshold),
+				Some("weeks inactivity".to_owned()),
+				Ordering::Less,
+			);
+			let new_activity_res = activity_res
+				.clone()
+				.map(|r| Box::new(r) as Box<dyn HCPredicate>);
+
+			alt_results.add(
+				ACTIVITY_PHASE,
+				new_activity_res,
+				raw_activity.as_ref().concerns.clone(),
+			);
+			let (act_score, outcome) = alt_results.table.get(ACTIVITY_PHASE).unwrap().score();
+
 			// Scoring based off of predicate
-			let score_result = Rc::new(match activity_res.as_ref() {
-				Err(e) => ScoreResult {
-					count: db.activity_weight(),
-					score: 1,
-					outcome: AnalysisOutcome::Error(e.clone()),
-				},
-				Ok(pred) => {
-					// Derive score from predicate, true --> 0, false --> 1
-					let passed = pred.pass()?;
-					let msg = pred.to_string();
-					let outcome = if passed {
-						AnalysisOutcome::Pass(msg)
-					} else {
-						AnalysisOutcome::Fail(msg)
-					};
-					ScoreResult {
-						count: db.activity_weight(),
-						score: (!passed) as u64,
-						outcome,
-					}
-				}
+			let score_result = Rc::new(ScoreResult {
+				count: db.activity_weight(),
+				score: act_score,
+				outcome,
 			});
 			results.activity = Some((activity_res, raw_activity.concerns.clone()));
 			score.activity = score_result.outcome.clone();
