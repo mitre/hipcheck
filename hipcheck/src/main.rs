@@ -75,7 +75,7 @@ fn main() -> ExitCode {
 		println!("[TIMINGS]: Timing information will be printed.");
 	}
 
-	// Start tracking the timing for `main` after logging is initiated. 
+	// Start tracking the timing for `main` after logging is initiated.
 	#[cfg(feature = "print-timings")]
 	let _0 = benchmarking::print_scope_time!("main");
 

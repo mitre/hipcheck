@@ -224,11 +224,11 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 
 /// Calculate baseline frequencies for each grapheme across all commits.
 fn baseline_freqs(commit_freqs: &[CommitGraphemeFreq]) -> HashMap<&str, (f64, i64)> {
-	// PERFORMANCE: At the moment this function appears to be faster single-threaded. 
-	// I tried switching out the hashmap with a Dashamp and switching the iterator to rayon, 
+	// PERFORMANCE: At the moment this function appears to be faster single-threaded.
+	// I tried switching out the hashmap with a Dashamp and switching the iterator to rayon,
 	// but the overhead is not worth it (against express we go from 3 milliseconds to 6).
 	// This may be worth revisiting if we prioritize projects with huge numbers of commits, but at the moment
-	// I will leave it be. 
+	// I will leave it be.
 
 	#[cfg(feature = "print-timings")]
 	let _0 = crate::benchmarking::print_scope_time!("baseline_freqs");
