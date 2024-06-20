@@ -5,15 +5,15 @@ use crate::data::ModuleGraph;
 use crate::error::Result;
 use crate::metric::MetricProvider;
 use serde::Serialize;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct ModuleOutput {
-	pub module_graph: Rc<ModuleGraph>,
+	pub module_graph: Arc<ModuleGraph>,
 	pub is_modular: bool,
 }
 
-pub fn module_analysis(db: &dyn MetricProvider) -> Result<Rc<ModuleOutput>> {
+pub fn module_analysis(db: &dyn MetricProvider) -> Result<Arc<ModuleOutput>> {
 	log::debug!("running module analysis");
 
 	let module_graph = db
@@ -29,5 +29,5 @@ pub fn module_analysis(db: &dyn MetricProvider) -> Result<Rc<ModuleOutput>> {
 
 	log::info!("completed module analysis");
 
-	Ok(Rc::new(modules))
+	Ok(Arc::new(modules))
 }

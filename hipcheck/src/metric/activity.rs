@@ -8,8 +8,8 @@ use chrono::Duration;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde::Serializer;
-use std::rc::Rc;
 use std::result::Result as StdResult;
+use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct ActivityOutput {
@@ -38,7 +38,7 @@ impl Serialize for ActivityOutput {
 	}
 }
 
-pub(crate) fn activity_metric(db: &dyn MetricProvider) -> Result<Rc<ActivityOutput>> {
+pub(crate) fn activity_metric(db: &dyn MetricProvider) -> Result<Arc<ActivityOutput>> {
 	log::debug!("running activity metric");
 
 	// Get today's date.
@@ -54,7 +54,7 @@ pub(crate) fn activity_metric(db: &dyn MetricProvider) -> Result<Rc<ActivityOutp
 
 	log::info!("completed activity metric");
 
-	Ok(Rc::new(ActivityOutput {
+	Ok(Arc::new(ActivityOutput {
 		today,
 		last_commit_date,
 		time_since_last_commit,

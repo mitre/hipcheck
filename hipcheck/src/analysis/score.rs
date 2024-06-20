@@ -11,7 +11,7 @@ use crate::shell::Phase;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::default::Default;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use petgraph::graph::node_index as n;
 use petgraph::graph::NodeIndex;
@@ -45,7 +45,7 @@ pub struct ScoringResults {
 
 #[derive(Debug, Clone)]
 pub struct HCStoredResult {
-	pub result: Result<Rc<dyn HCPredicate>>,
+	pub result: Result<Arc<dyn HCPredicate>>,
 	pub concerns: Vec<Concern>,
 }
 impl HCStoredResult {
@@ -82,7 +82,7 @@ impl AltAnalysisResults {
 	pub fn add(
 		&mut self,
 		key: &str,
-		result: Result<Rc<dyn HCPredicate>>,
+		result: Result<Arc<dyn HCPredicate>>,
 		concerns: Vec<Concern>,
 	) -> Result<()> {
 		if self.table.contains_key(key) {
@@ -100,18 +100,18 @@ impl AltAnalysisResults {
 #[derive(Debug, Default)]
 pub struct AnalysisResults {
 	pub activity: Option<HCStoredResult>,
-	pub affiliation: Option<Result<Rc<AnalysisReport>>>,
-	pub binary: Option<Result<Rc<AnalysisReport>>>,
-	pub churn: Option<Result<Rc<AnalysisReport>>>,
-	pub entropy: Option<Result<Rc<AnalysisReport>>>,
-	pub identity: Option<Result<Rc<AnalysisReport>>>,
-	pub fuzz: Option<Result<Rc<AnalysisReport>>>,
-	pub review: Option<Result<Rc<AnalysisReport>>>,
-	pub typo: Option<Result<Rc<AnalysisReport>>>,
-	pub pull_request: Option<Result<Rc<AnalysisReport>>>,
-	pub pr_affiliation: Option<Result<Rc<AnalysisReport>>>,
-	pub pr_contributor_trust: Option<Result<Rc<AnalysisReport>>>,
-	pub pr_module_contributors: Option<Result<Rc<AnalysisReport>>>,
+	pub affiliation: Option<Result<Arc<AnalysisReport>>>,
+	pub binary: Option<Result<Arc<AnalysisReport>>>,
+	pub churn: Option<Result<Arc<AnalysisReport>>>,
+	pub entropy: Option<Result<Arc<AnalysisReport>>>,
+	pub identity: Option<Result<Arc<AnalysisReport>>>,
+	pub fuzz: Option<Result<Arc<AnalysisReport>>>,
+	pub review: Option<Result<Arc<AnalysisReport>>>,
+	pub typo: Option<Result<Arc<AnalysisReport>>>,
+	pub pull_request: Option<Result<Arc<AnalysisReport>>>,
+	pub pr_affiliation: Option<Result<Arc<AnalysisReport>>>,
+	pub pr_contributor_trust: Option<Result<Arc<AnalysisReport>>>,
+	pub pr_module_contributors: Option<Result<Arc<AnalysisReport>>>,
 }
 
 #[allow(dead_code)]
@@ -136,7 +136,7 @@ pub struct Score {
 #[salsa::query_group(ScoringProviderStorage)]
 pub trait ScoringProvider: AnalysisProvider {
 	/// Returns result of phase outcome and scoring
-	fn phase_outcome(&self, phase_name: Rc<String>) -> Result<Rc<ScoreResult>>;
+	fn phase_outcome(&self, phase_name: Arc<String>) -> Result<Arc<ScoreResult>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -180,7 +180,7 @@ pub struct ScoreTreeNode {
 pub fn phase_outcome<P: AsRef<String>>(
 	db: &dyn ScoringProvider,
 	phase_name: P,
-) -> Result<Rc<ScoreResult>> {
+) -> Result<Arc<ScoreResult>> {
 	match phase_name.as_ref().as_str() {
 		ACTIVITY_PHASE => Err(hc_error!(
 			"activity analysis does not use this infrastructure"
@@ -188,10 +188,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 		AFFILIATION_PHASE => match &db.affiliation_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
+			} => Ok(Arc::new(ScoreResult::default())),
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: 0,
 				score: 0,
 				outcome: AnalysisOutcome::Error(msg.clone()),
@@ -199,7 +199,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Affiliation {
 				outcome: AnalysisOutcome::Pass(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.affiliation_weight(),
 				score: 0,
 				outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -207,7 +207,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Affiliation {
 				outcome: AnalysisOutcome::Fail(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.affiliation_weight(),
 				score: 1,
 				outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -218,10 +218,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 		BINARY_PHASE => match &db.binary_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
+			} => Ok(Arc::new(ScoreResult::default())),
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: 0,
 				score: 0,
 				outcome: AnalysisOutcome::Error(msg.clone()),
@@ -229,7 +229,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Binary {
 				outcome: AnalysisOutcome::Pass(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.binary_weight(),
 				score: 0,
 				outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -237,7 +237,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Binary {
 				outcome: AnalysisOutcome::Fail(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.binary_weight(),
 				score: 1,
 				outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -248,10 +248,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 		CHURN_PHASE => match &db.churn_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
+			} => Ok(Arc::new(ScoreResult::default())),
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: 0,
 				score: 0,
 				outcome: AnalysisOutcome::Error(msg.clone()),
@@ -259,7 +259,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Churn {
 				outcome: AnalysisOutcome::Pass(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.churn_weight(),
 				score: 0,
 				outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -267,7 +267,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Churn {
 				outcome: AnalysisOutcome::Fail(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.churn_weight(),
 				score: 1,
 				outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -278,10 +278,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 		ENTROPY_PHASE => match &db.entropy_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
+			} => Ok(Arc::new(ScoreResult::default())),
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: 0,
 				score: 0,
 				outcome: AnalysisOutcome::Error(msg.clone()),
@@ -289,7 +289,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Entropy {
 				outcome: AnalysisOutcome::Pass(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.entropy_weight(),
 				score: 0,
 				outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -297,7 +297,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Entropy {
 				outcome: AnalysisOutcome::Fail(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.entropy_weight(),
 				score: 1,
 				outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -308,10 +308,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 		IDENTITY_PHASE => match &db.identity_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
+			} => Ok(Arc::new(ScoreResult::default())),
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: 0,
 				score: 0,
 				outcome: AnalysisOutcome::Error(msg.clone()),
@@ -319,7 +319,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Identity {
 				outcome: AnalysisOutcome::Pass(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.identity_weight(),
 				score: 0,
 				outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -327,7 +327,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Identity {
 				outcome: AnalysisOutcome::Fail(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.identity_weight(),
 				score: 1,
 				outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -338,10 +338,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 		FUZZ_PHASE => match &db.fuzz_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
+			} => Ok(Arc::new(ScoreResult::default())),
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: 0,
 				score: 0,
 				outcome: AnalysisOutcome::Error(msg.clone()),
@@ -349,7 +349,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Fuzz {
 				outcome: AnalysisOutcome::Pass(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.fuzz_weight(),
 				score: 0,
 				outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -357,7 +357,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Fuzz {
 				outcome: AnalysisOutcome::Fail(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.fuzz_weight(),
 				score: 1,
 				outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -368,10 +368,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 		REVIEW_PHASE => match &db.review_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
+			} => Ok(Arc::new(ScoreResult::default())),
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: 0,
 				score: 0,
 				outcome: AnalysisOutcome::Error(msg.clone()),
@@ -379,7 +379,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Review {
 				outcome: AnalysisOutcome::Pass(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.review_weight(),
 				score: 0,
 				outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -387,7 +387,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Review {
 				outcome: AnalysisOutcome::Fail(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.review_weight(),
 				score: 1,
 				outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -398,10 +398,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 		TYPO_PHASE => match &db.typo_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
+			} => Ok(Arc::new(ScoreResult::default())),
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: 0,
 				score: 0,
 				outcome: AnalysisOutcome::Error(msg.clone()),
@@ -409,7 +409,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Typo {
 				outcome: AnalysisOutcome::Pass(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.typo_weight(),
 				score: 0,
 				outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -417,7 +417,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::Typo {
 				outcome: AnalysisOutcome::Fail(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.typo_weight(),
 				score: 1,
 				outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -428,10 +428,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 		PR_AFFILIATION_PHASE => match &db.pr_affiliation_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
+			} => Ok(Arc::new(ScoreResult::default())),
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: 0,
 				score: 0,
 				outcome: AnalysisOutcome::Error(msg.clone()),
@@ -439,7 +439,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::PrAffiliation {
 				outcome: AnalysisOutcome::Pass(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.pr_affiliation_weight(),
 				score: 0,
 				outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -447,7 +447,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::PrAffiliation {
 				outcome: AnalysisOutcome::Fail(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.pr_affiliation_weight(),
 				score: 1,
 				outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -458,10 +458,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 		PR_CONTRIBUTOR_TRUST_PHASE => match &db.pr_contributor_trust_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Rc::new(ScoreResult::default())),
+			} => Ok(Arc::new(ScoreResult::default())),
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: 0,
 				score: 0,
 				outcome: AnalysisOutcome::Error(msg.clone()),
@@ -469,7 +469,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::PrContributorTrust {
 				outcome: AnalysisOutcome::Pass(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.contributor_trust_weight(),
 				score: 0,
 				outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -477,7 +477,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			AnalysisReport::PrContributorTrust {
 				outcome: AnalysisOutcome::Fail(msg),
 				..
-			} => Ok(Rc::new(ScoreResult {
+			} => Ok(Arc::new(ScoreResult {
 				count: db.contributor_trust_weight(),
 				score: 1,
 				outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -489,10 +489,10 @@ pub fn phase_outcome<P: AsRef<String>>(
 			match &db.pr_module_contributors_analysis().unwrap().as_ref() {
 				AnalysisReport::None {
 					outcome: AnalysisOutcome::Skipped,
-				} => Ok(Rc::new(ScoreResult::default())),
+				} => Ok(Arc::new(ScoreResult::default())),
 				AnalysisReport::None {
 					outcome: AnalysisOutcome::Error(msg),
-				} => Ok(Rc::new(ScoreResult {
+				} => Ok(Arc::new(ScoreResult {
 					count: 0,
 					score: 0,
 					outcome: AnalysisOutcome::Error(msg.clone()),
@@ -500,7 +500,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 				AnalysisReport::PrModuleContributors {
 					outcome: AnalysisOutcome::Pass(msg),
 					..
-				} => Ok(Rc::new(ScoreResult {
+				} => Ok(Arc::new(ScoreResult {
 					count: db.pr_module_contributors_weight(),
 					score: 0,
 					outcome: AnalysisOutcome::Pass(msg.to_string()),
@@ -508,7 +508,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 				AnalysisReport::PrModuleContributors {
 					outcome: AnalysisOutcome::Fail(msg),
 					..
-				} => Ok(Rc::new(ScoreResult {
+				} => Ok(Arc::new(ScoreResult {
 					count: db.pr_module_contributors_weight(),
 					score: 1,
 					outcome: AnalysisOutcome::Fail(msg.to_string()),
@@ -533,13 +533,13 @@ pub fn update_phase(phase: &mut Phase, phase_name: &str) -> Result<()> {
 
 //Scores phase and adds nodes and edges to tree
 pub fn add_node_and_edge_with_score(
-	score_result: Rc<ScoreResult>,
+	score_result: impl AsRef<ScoreResult>,
 	mut score_tree: ScoreTree,
 	phase: &str,
 	parent_node: NodeIndex<u32>,
 ) -> Result<ScoreTree> {
-	let weight = score_result.count as f64;
-	let score_increment = score_result.score as i64;
+	let weight = score_result.as_ref().count as f64;
+	let score_increment = score_result.as_ref().score as i64;
 
 	//adding nodes/edges to the score tree
 	let (child_node, score_tree_updated) =
@@ -643,7 +643,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 
 			// Scoring based off of predicate
 			let (act_score, outcome) = alt_results.table.get(ACTIVITY_PHASE).unwrap().score();
-			let score_result = Rc::new(ScoreResult {
+			let score_result = Arc::new(ScoreResult {
 				count: db.activity_weight(),
 				score: act_score,
 				outcome,
@@ -674,7 +674,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			} => results.review = Some(Err(err.clone())),
 			_ => results.review = Some(Ok(review_analysis)),
 		}
-		let score_result = db.phase_outcome(Rc::new(REVIEW_PHASE.to_string())).unwrap();
+		let score_result = db
+			.phase_outcome(Arc::new(REVIEW_PHASE.to_string()))
+			.unwrap();
 		score.review = score_result.outcome.clone();
 		match add_node_and_edge_with_score(score_result, score_tree, REVIEW_PHASE, practices_node) {
 			Ok(score_tree_inc) => {
@@ -695,7 +697,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			} => results.binary = Some(Err(err.clone())),
 			_ => results.binary = Some(Ok(binary_analysis)),
 		}
-		let score_result = db.phase_outcome(Rc::new(BINARY_PHASE.to_string())).unwrap();
+		let score_result = db
+			.phase_outcome(Arc::new(BINARY_PHASE.to_string()))
+			.unwrap();
 		score.binary = score_result.outcome.clone();
 		match add_node_and_edge_with_score(score_result, score_tree, BINARY_PHASE, practices_node) {
 			Ok(score_tree_inc) => {
@@ -718,7 +722,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 		}
 
 		let score_result = db
-			.phase_outcome(Rc::new(IDENTITY_PHASE.to_string()))
+			.phase_outcome(Arc::new(IDENTITY_PHASE.to_string()))
 			.unwrap();
 		score.identity = score_result.outcome.clone();
 		match add_node_and_edge_with_score(score_result, score_tree, IDENTITY_PHASE, practices_node)
@@ -742,7 +746,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			_ => results.fuzz = Some(Ok(fuzz_analysis)),
 		}
 
-		let score_result = db.phase_outcome(Rc::new(FUZZ_PHASE.to_string())).unwrap();
+		let score_result = db.phase_outcome(Arc::new(FUZZ_PHASE.to_string())).unwrap();
 		score.fuzz = score_result.outcome.clone();
 		match add_node_and_edge_with_score(score_result, score_tree, FUZZ_PHASE, practices_node) {
 			Ok(score_tree_inc) => {
@@ -783,7 +787,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			} => results.typo = Some(Err(err.clone())),
 			_ => results.typo = Some(Ok(typo_analysis)),
 		}
-		let score_result = db.phase_outcome(Rc::new(TYPO_PHASE.to_string())).unwrap();
+		let score_result = db.phase_outcome(Arc::new(TYPO_PHASE.to_string())).unwrap();
 		score.typo = score_result.outcome.clone();
 		match add_node_and_edge_with_score(score_result, score_tree, TYPO_PHASE, attacks_node) {
 			Ok(score_tree_inc) => {
@@ -824,7 +828,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				_ => results.affiliation = Some(Ok(affiliation_analysis)),
 			}
 			let score_result = db
-				.phase_outcome(Rc::new(AFFILIATION_PHASE.to_string()))
+				.phase_outcome(Arc::new(AFFILIATION_PHASE.to_string()))
 				.unwrap();
 			score.affiliation = score_result.outcome.clone();
 			match add_node_and_edge_with_score(
@@ -856,7 +860,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				} => results.churn = Some(Err(err.clone())),
 				_ => results.churn = Some(Ok(churn_analysis)),
 			}
-			let score_result = db.phase_outcome(Rc::new(CHURN_PHASE.to_string())).unwrap();
+			let score_result = db.phase_outcome(Arc::new(CHURN_PHASE.to_string())).unwrap();
 			score.churn = score_result.outcome.clone();
 			match add_node_and_edge_with_score(score_result, score_tree, CHURN_PHASE, commit_node) {
 				Ok(score_tree_inc) => {
@@ -879,7 +883,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			}
 
 			let score_result = db
-				.phase_outcome(Rc::new(ENTROPY_PHASE.to_string()))
+				.phase_outcome(Arc::new(ENTROPY_PHASE.to_string()))
 				.unwrap();
 			score.entropy = score_result.outcome.clone();
 			match add_node_and_edge_with_score(score_result, score_tree, ENTROPY_PHASE, commit_node)
@@ -971,7 +975,7 @@ pub fn score_pr_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<S
 				_ => results.pr_affiliation = Some(Ok(pr_affiliation_analysis)),
 			}
 			let score_result = db
-				.phase_outcome(Rc::new(PR_AFFILIATION_PHASE.to_string()))
+				.phase_outcome(Arc::new(PR_AFFILIATION_PHASE.to_string()))
 				.unwrap();
 			score.pr_affiliation = score_result.outcome.clone();
 			match add_node_and_edge_with_score(
@@ -1004,7 +1008,7 @@ pub fn score_pr_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<S
 				_ => results.pr_contributor_trust = Some(Ok(pr_contributor_trust_analysis)),
 			}
 			let score_result = db
-				.phase_outcome(Rc::new(PR_CONTRIBUTOR_TRUST_PHASE.to_string()))
+				.phase_outcome(Arc::new(PR_CONTRIBUTOR_TRUST_PHASE.to_string()))
 				.unwrap();
 			score.pr_contributor_trust = score_result.outcome.clone();
 			match add_node_and_edge_with_score(
@@ -1037,7 +1041,7 @@ pub fn score_pr_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<S
 				_ => results.pr_module_contributors = Some(Ok(pr_module_contributors_analysis)),
 			}
 			let score_result = db
-				.phase_outcome(Rc::new(PR_MODULE_CONTRIBUTORS_PHASE.to_string()))
+				.phase_outcome(Arc::new(PR_MODULE_CONTRIBUTORS_PHASE.to_string()))
 				.unwrap();
 			score.pr_module_contributors = score_result.outcome.clone();
 			match add_node_and_edge_with_score(

@@ -19,8 +19,8 @@ use std::fs::File;
 use std::io::prelude::Read;
 use std::io::BufReader;
 use std::path::Path;
-use std::rc::Rc;
 use std::result::Result as StdResult;
+use std::sync::Arc;
 use walkdir::DirEntry;
 use walkdir::WalkDir;
 
@@ -159,9 +159,9 @@ fn fetch_entries(dir: &Path) -> Result<Vec<DirEntry>> {
 }
 
 /// Searches `dir` for any binary files and records their paths as Strings.
-pub fn detect_binary_files(dir: &Path) -> Result<Vec<Rc<String>>> {
+pub fn detect_binary_files(dir: &Path) -> Result<Vec<Arc<String>>> {
 	let path_entries = fetch_entries(dir)?;
-	let mut possible_binary: Vec<Rc<String>> = Vec::new();
+	let mut possible_binary: Vec<Arc<String>> = Vec::new();
 
 	// Inspect the first 4K of each file for telltale signs of binary data.
 	// Store a String of each Path that leads to a binary file.
@@ -178,7 +178,7 @@ pub fn detect_binary_files(dir: &Path) -> Result<Vec<Rc<String>>> {
 		let _bytes_read = reader.take(SAMPLE_SIZE).read_to_end(&mut contents)?;
 		if inspect(&contents) == ContentType::BINARY {
 			possible_binary.push(match entry.path().strip_prefix(dir)?.to_str() {
-				Some(p) => Rc::new(String::from(p)),
+				Some(p) => Arc::new(String::from(p)),
 				None => {
 					return Err(hc_error!(
 						"path was not valid unicode: '{}'",

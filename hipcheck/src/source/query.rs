@@ -7,7 +7,7 @@ use crate::source::source::Remote;
 use crate::source::source::Source;
 use pathbuf::pathbuf;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Queries for accessing info about a Git source
 #[salsa::query_group(SourceQueryStorage)]
@@ -15,20 +15,20 @@ pub trait SourceQuery: salsa::Database {
 	/// Returns the input `Source` struct
 	#[salsa::input]
 	#[salsa::query_type(SourceTypeQuery)]
-	fn source(&self) -> Rc<Source>;
+	fn source(&self) -> Arc<Source>;
 
 	/// Returns the local path to the repository
-	fn local(&self) -> Rc<PathBuf>;
+	fn local(&self) -> Arc<PathBuf>;
 	/// Returns remote source information, if any
-	fn remote(&self) -> Option<Rc<Remote>>;
+	fn remote(&self) -> Option<Arc<Remote>>;
 	/// Returns the repository HEAD commit
-	fn head(&self) -> Rc<String>;
+	fn head(&self) -> Arc<String>;
 	/// Returns the repository name
-	fn name(&self) -> Rc<String>;
+	fn name(&self) -> Arc<String>;
 	/// Returns the repository url
-	fn url(&self) -> Option<Rc<String>>;
+	fn url(&self) -> Option<Arc<String>>;
 	/// Returns a filesystem-usable storage path for the source
-	fn storage_path(&self) -> Rc<PathBuf>;
+	fn storage_path(&self) -> Arc<PathBuf>;
 }
 
 /// Derived query implementations
@@ -40,34 +40,34 @@ pub trait SourceQuery: salsa::Database {
 // PANIC: It is safe to unwrap in these functions, because a valid
 // `Source` will always contain a `SourceRepo`, so `get_repo()` will
 // not return an error here.
-fn local(db: &dyn SourceQuery) -> Rc<PathBuf> {
+fn local(db: &dyn SourceQuery) -> Arc<PathBuf> {
 	let source = db.source();
-	Rc::new(source.get_repo().local().to_path_buf())
+	Arc::new(source.get_repo().local().to_path_buf())
 }
 
-fn remote(db: &dyn SourceQuery) -> Option<Rc<Remote>> {
+fn remote(db: &dyn SourceQuery) -> Option<Arc<Remote>> {
 	db.source()
 		.get_remote()
 		.as_ref()
-		.map(|remote| Rc::new(remote.clone()))
+		.map(|remote| Arc::new(remote.clone()))
 }
 
-fn head(db: &dyn SourceQuery) -> Rc<String> {
+fn head(db: &dyn SourceQuery) -> Arc<String> {
 	let source = db.source();
-	Rc::new(source.get_repo().head().to_string())
+	Arc::new(source.get_repo().head().to_string())
 }
 
-fn name(db: &dyn SourceQuery) -> Rc<String> {
+fn name(db: &dyn SourceQuery) -> Arc<String> {
 	let source = db.source();
-	Rc::new(source.get_repo().name().to_string())
+	Arc::new(source.get_repo().name().to_string())
 }
 
-fn url(db: &dyn SourceQuery) -> Option<Rc<String>> {
-	Some(Rc::new(db.remote()?.url().to_string()))
+fn url(db: &dyn SourceQuery) -> Option<Arc<String>> {
+	Some(Arc::new(db.remote()?.url().to_string()))
 }
 
 // Computes the appropriate path based on the remote or local info
-fn storage_path(db: &dyn SourceQuery) -> Rc<PathBuf> {
+fn storage_path(db: &dyn SourceQuery) -> Arc<PathBuf> {
 	use crate::source::source::Remote::*;
 
 	let path_buf = match db.remote() {
@@ -91,5 +91,5 @@ fn storage_path(db: &dyn SourceQuery) -> Rc<PathBuf> {
 		},
 	};
 
-	Rc::new(path_buf)
+	Arc::new(path_buf)
 }

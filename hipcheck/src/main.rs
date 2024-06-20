@@ -17,6 +17,7 @@ mod source;
 mod target;
 #[cfg(test)]
 mod test_util;
+mod unstable;
 mod util;
 mod version;
 
@@ -57,6 +58,7 @@ use std::ops::Not as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::process::Termination;
 use std::result::Result as StdResult;
 use util::fs::create_dir_all;
 
@@ -73,6 +75,7 @@ fn main() -> ExitCode {
 	match config.subcommand() {
 		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
+		Some(FullCommands::Unstable(args)) => return unstable::main(args, &config).report(),
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),

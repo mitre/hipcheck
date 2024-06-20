@@ -20,8 +20,8 @@ use std::convert::TryInto;
 use std::fmt;
 use std::ops::Not as _;
 use std::path::Path;
-use std::rc::Rc;
 use std::result::Result as StdResult;
+use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct AffiliationOutput {
@@ -30,7 +30,7 @@ pub struct AffiliationOutput {
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct Affiliation {
-	pub commit: Rc<Commit>,
+	pub commit: Arc<Commit>,
 	pub affiliated_type: AffiliatedType,
 }
 
@@ -60,7 +60,7 @@ impl AffiliatedType {
 	}
 }
 
-pub(crate) fn affiliation_metric(db: &dyn MetricProvider) -> Result<Rc<AffiliationOutput>> {
+pub(crate) fn affiliation_metric(db: &dyn MetricProvider) -> Result<Arc<AffiliationOutput>> {
 	log::debug!("running affiliation metric");
 
 	// Parse the Orgs file and construct an OrgSpec.
@@ -81,23 +81,23 @@ pub(crate) fn affiliation_metric(db: &dyn MetricProvider) -> Result<Rc<Affiliati
 	for commit in commits.iter() {
 		// Check if a commit matches the affiliation rules.
 		let commit_view = db
-			.contributors_for_commit(Rc::clone(commit))
+			.contributors_for_commit(Arc::clone(commit))
 			.context("failed to get commits")?;
 
 		let affiliated_type = AffiliatedType::is(&affiliator, &commit_view);
 
 		affiliations.push(Affiliation {
-			commit: Rc::clone(commit),
+			commit: Arc::clone(commit),
 			affiliated_type,
 		});
 	}
 
 	log::info!("completed affiliation metric");
 
-	Ok(Rc::new(AffiliationOutput { affiliations }))
+	Ok(Arc::new(AffiliationOutput { affiliations }))
 }
 
-pub(crate) fn pr_affiliation_metric(db: &dyn MetricProvider) -> Result<Rc<AffiliationOutput>> {
+pub(crate) fn pr_affiliation_metric(db: &dyn MetricProvider) -> Result<Arc<AffiliationOutput>> {
 	log::debug!("running pull request affiliation metric");
 
 	// Parse the Orgs file and construct an OrgSpec.
@@ -121,20 +121,20 @@ pub(crate) fn pr_affiliation_metric(db: &dyn MetricProvider) -> Result<Rc<Affili
 	for commit in commits.iter() {
 		// Check if a commit matches the affiliation rules.
 		let commit_view = db
-			.get_pr_contributors_for_commit(Rc::clone(commit))
+			.get_pr_contributors_for_commit(Arc::clone(commit))
 			.context("failed to get commits")?;
 
 		let affiliated_type = AffiliatedType::is(&affiliator, &commit_view);
 
 		affiliations.push(Affiliation {
-			commit: Rc::clone(commit),
+			commit: Arc::clone(commit),
 			affiliated_type,
 		});
 	}
 
 	log::info!("completed pull request affiliation metric");
 
-	Ok(Rc::new(AffiliationOutput { affiliations }))
+	Ok(Arc::new(AffiliationOutput { affiliations }))
 }
 
 /// A type which encapsulates checking whether a given string matches an org in theorgs file,

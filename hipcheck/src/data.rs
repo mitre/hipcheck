@@ -32,12 +32,12 @@ use petgraph::Graph;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dependencies {
 	pub language: Lang,
-	pub deps: Vec<Rc<String>>,
+	pub deps: Vec<Arc<String>>,
 }
 
 impl Dependencies {
@@ -46,7 +46,7 @@ impl Dependencies {
 			language @ Lang::JavaScript => {
 				let deps = npm::get_dependencies(repo, version)?
 					.into_iter()
-					.map(Rc::new)
+					.map(Arc::new)
 					.collect();
 				Ok(Dependencies { language, deps })
 			}
@@ -78,7 +78,7 @@ pub struct Fuzz {
 	pub exists: bool,
 }
 
-pub fn get_fuzz_check(token: &str, repo_uri: Rc<String>) -> Result<Fuzz> {
+pub fn get_fuzz_check(token: &str, repo_uri: Arc<String>) -> Result<Fuzz> {
 	let github = GitHub::new("google", "oss-fuzz", token)?;
 
 	let github_result = github
@@ -102,10 +102,10 @@ pub struct PullRequest {
 pub struct SinglePullRequest {
 	pub id: u64,
 	pub reviews: u64,
-	pub commits: Vec<Rc<Commit>>,
-	pub contributors: Vec<Rc<Contributor>>,
+	pub commits: Vec<Arc<Commit>>,
+	pub contributors: Vec<Arc<Contributor>>,
 	pub commit_contributors: Vec<CommitContributor>,
-	pub diffs: Vec<Rc<Diff>>,
+	pub diffs: Vec<Arc<Diff>>,
 }
 
 pub fn get_pull_request_reviews_from_github(
@@ -146,7 +146,7 @@ pub fn get_single_pull_request_review_from_github(
 		.commits
 		.iter()
 		.map(|raw| {
-			Rc::new(Commit {
+			Arc::new(Commit {
 				hash: raw.hash.to_owned(),
 				written_on: raw.written_on.to_owned(),
 				committed_on: raw.committed_on.to_owned(),
@@ -154,13 +154,13 @@ pub fn get_single_pull_request_review_from_github(
 		})
 		.collect();
 
-	let mut contributors: Vec<Rc<Contributor>> = github_result
+	let mut contributors: Vec<Arc<Contributor>> = github_result
 		.commits
 		.iter()
 		.flat_map(|raw| {
 			[
-				Rc::new(raw.author.to_owned()),
-				Rc::new(raw.committer.to_owned()),
+				Arc::new(raw.author.to_owned()),
+				Arc::new(raw.committer.to_owned()),
 			]
 		})
 		.collect();
@@ -195,7 +195,7 @@ pub fn get_single_pull_request_review_from_github(
 	let diffs = github_result
 		.diffs
 		.iter()
-		.map(|diff| Rc::new(diff.to_owned()))
+		.map(|diff| Arc::new(diff.to_owned()))
 		.collect();
 
 	let result = SinglePullRequest {
@@ -230,11 +230,11 @@ pub struct ModuleGraph {
 // For a given ModuleGraph representation of repository files, associate each module with the file's commit hashes
 pub fn associate_modules_and_commits(
 	repo_path: &Path,
-	module_graph: Rc<ModuleGraph>,
-	commits: Rc<Vec<Rc<Commit>>>,
+	module_graph: Arc<ModuleGraph>,
+	commits: Arc<Vec<Arc<Commit>>>,
 ) -> Result<ModuleCommitMap> {
 	// Vector containing pairings between module and associated commits
-	let mut modules_commits: Vec<(Rc<Module>, Rc<Commit>)> = Vec::new();
+	let mut modules_commits: Vec<(Arc<Module>, Arc<Commit>)> = Vec::new();
 
 	// Graph traversal, depth-first
 	let start = module_graph
@@ -256,7 +256,7 @@ pub fn associate_modules_and_commits(
 			.iter()
 			.filter_map(|commit| {
 				if hashes.contains(&commit.hash.as_ref()) {
-					Some(Rc::clone(commit))
+					Some(Arc::clone(commit))
 				} else {
 					None
 				}
@@ -266,13 +266,13 @@ pub fn associate_modules_and_commits(
 		// Add entry to vec for each commit e.g. <Module, Commit>
 		for commit in commit_vec {
 			modules_commits.push((
-				Rc::new(module_graph.connections[visited].clone()),
-				Rc::clone(&commit),
+				Arc::new(module_graph.connections[visited].clone()),
+				Arc::clone(&commit),
 			));
 		}
 	}
 
-	Ok(Rc::new(modules_commits))
+	Ok(Arc::new(modules_commits))
 }
 
 impl ModuleGraph {

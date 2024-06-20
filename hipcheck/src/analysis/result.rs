@@ -7,7 +7,7 @@ use crate::Result;
 use crate::F64;
 use std::cmp::Ordering;
 use std::fmt::{self, Display};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Represents the enhanced result of a hipcheck analysis. Contains the actual outcome
 /// of the analysis, plus additional meta-information the analysis wants to provide to
@@ -163,7 +163,7 @@ impl ThresholdPredicate {
 			)),
 		};
 		HCStoredResult {
-			result: result.map(|r| Rc::new(r) as Rc<dyn HCPredicate>),
+			result: result.map(|r| Arc::new(r) as Arc<dyn HCPredicate>),
 			concerns: report.concerns.clone(),
 		}
 	}

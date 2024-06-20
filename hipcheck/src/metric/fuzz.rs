@@ -5,14 +5,14 @@ use crate::data::Fuzz;
 use crate::error::Result;
 use crate::metric::MetricProvider;
 use serde::Serialize;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct FuzzOutput {
 	pub fuzz_result: Fuzz,
 }
 
-pub fn fuzz_metric(db: &dyn MetricProvider) -> Result<Rc<FuzzOutput>> {
+pub fn fuzz_metric(db: &dyn MetricProvider) -> Result<Arc<FuzzOutput>> {
 	log::debug!("running fuzz metric");
 
 	let fuzz_result = db
@@ -21,5 +21,5 @@ pub fn fuzz_metric(db: &dyn MetricProvider) -> Result<Rc<FuzzOutput>> {
 
 	log::info!("completed fuzz metric");
 
-	Ok(Rc::new(FuzzOutput { fuzz_result }))
+	Ok(Arc::new(FuzzOutput { fuzz_result }))
 }

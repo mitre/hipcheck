@@ -364,6 +364,7 @@ fn hc_env_var_value_enum<E: ValueEnum>(name: &'static str) -> Option<E> {
 pub enum FullCommands {
 	Check(CheckArgs),
 	Schema(SchemaArgs),
+	Unstable(UnstableArgs),
 	Ready,
 	PrintConfig,
 	PrintData,
@@ -376,6 +377,7 @@ impl From<&Commands> for FullCommands {
 			Commands::Check(args) => FullCommands::Check(args.clone()),
 			Commands::Schema(args) => FullCommands::Schema(args.clone()),
 			Commands::Ready => FullCommands::Ready,
+			Commands::Unstable(args) => FullCommands::Unstable(args.clone()),
 		}
 	}
 }
@@ -388,6 +390,19 @@ pub enum Commands {
 	Schema(SchemaArgs),
 	/// Check if Hipcheck is ready to run.
 	Ready,
+
+	/// Unstable command to aid in benchmarking
+	#[command(hide = true)]
+	Unstable(UnstableArgs),
+}
+
+// If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
+// this case, `target` is a required field, but the existence of a subcommand
+// removes that requirement
+#[derive(Debug, Clone, clap::Args)]
+pub struct UnstableArgs {
+	#[clap(subcommand)]
+	pub benchmark: CheckCommand,
 }
 
 // If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
