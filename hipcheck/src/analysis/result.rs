@@ -114,7 +114,6 @@ pub enum HCCompositeValue {
 /// The set of possible predicates for deciding if a source passed an analysis.
 pub trait HCPredicate: Display + std::fmt::Debug + std::any::Any + 'static {
 	fn pass(&self) -> Result<bool>;
-	fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// This predicate determines analysis pass/fail by whether a returned value was
@@ -163,7 +162,7 @@ impl ThresholdPredicate {
 			)),
 		};
 		HCStoredResult {
-			result: result.map(|r| Arc::new(r) as Arc<dyn HCPredicate>),
+			result: result.map(|r| Arc::new(Predicate::Threshold(r))),
 			concerns: report.concerns.clone(),
 		}
 	}
@@ -186,9 +185,6 @@ impl HCPredicate for ThresholdPredicate {
 			)),
 		}
 	}
-	fn as_any(&self) -> &dyn std::any::Any {
-		self
-	}
 }
 impl Display for ThresholdPredicate {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -202,5 +198,27 @@ impl Display for ThresholdPredicate {
 			Greater => ">",
 		};
 		write!(f, "{} {} {}", val.trim(), order_str, thr.trim())
+	}
+}
+
+#[derive(Debug)]
+pub enum Predicate {
+	Threshold(ThresholdPredicate),
+}
+
+impl Display for Predicate {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use Predicate::*;
+		match self {
+			Threshold(t) => t.fmt(f),
+		}
+	}
+}
+impl HCPredicate for Predicate {
+	fn pass(&self) -> Result<bool> {
+		use Predicate::*;
+		match self {
+			Threshold(t) => t.pass(),
+		}
 	}
 }

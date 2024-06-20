@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::analysis::analysis::AnalysisReport;
-use crate::analysis::result::{HCBasicValue, ThresholdPredicate};
+use crate::analysis::result::{HCBasicValue, Predicate};
 use crate::analysis::score::ScoringResults;
 use crate::config::RiskConfigQuery;
 use crate::error::Error;
@@ -31,11 +31,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	if let Some(stored) = &scoring.results.activity {
 		match &stored.result {
 			Ok(analysis) => {
-				let Some(pred) = analysis.as_any().downcast_ref::<ThresholdPredicate>() else {
-					return Err(hc_error!(
-						"expected threshold predicate for activity analysis"
-					));
-				};
+				let Predicate::Threshold(pred) = analysis.as_ref();
 				let HCBasicValue::Unsigned(value) = pred.value else {
 					return Err(hc_error!("activity analysis has a non-u64 value"));
 				};

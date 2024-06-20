@@ -45,7 +45,7 @@ pub struct ScoringResults {
 
 #[derive(Debug, Clone)]
 pub struct HCStoredResult {
-	pub result: Result<Arc<dyn HCPredicate>>,
+	pub result: Result<Arc<Predicate>>,
 	pub concerns: Vec<Concern>,
 }
 impl HCStoredResult {
@@ -82,7 +82,7 @@ impl AltAnalysisResults {
 	pub fn add(
 		&mut self,
 		key: &str,
-		result: Result<Arc<dyn HCPredicate>>,
+		result: Result<Arc<Predicate>>,
 		concerns: Vec<Concern>,
 	) -> Result<()> {
 		if self.table.contains_key(key) {
