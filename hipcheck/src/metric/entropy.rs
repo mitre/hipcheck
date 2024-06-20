@@ -151,8 +151,8 @@ fn is_likely_source_file(
 
 /// Calculate grapheme frequencies for each commit.
 fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<CommitGraphemeFreq> {
-	#[cfg(feature = "print-timings")]
-	let start = std::time::Instant::now();
+	// #[cfg(feature = "print-timings")]
+	// let _0 = crate::benchmarking::print_scope_time!("grapheme_freqs");
 
 	// Dashmap (fast concurrent hashmap) to store counts for each grapheme.
 	let grapheme_table: DashMap<String, u64> = DashMap::new();
@@ -175,7 +175,7 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 			continue;
 		}
 
-		// Count the number of graphemes in this patch, add it to the tortal,
+		// Count the number of graphemes in this patch, add it to the total,
 		// and track the number of each grapheme.
 		total_graphemes += file_diff
 			.patch
@@ -215,11 +215,6 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 		})
 		.collect();
 
-	#[cfg(feature = "print-timings")] {
-		use std::time::Instant;
-		println!("[TIMINGS]: Calculating grapheme frequencies for commit {} took {:.6} seconds.", commit_diff.commit.hash, (Instant::now() - start).as_secs_f64());
-	}
-
 	// Return the collected list of graphemes and their frequencies for this commit diff.
 	Ok(CommitGraphemeFreq {
 		commit: Arc::clone(&commit_diff.commit),
@@ -229,19 +224,27 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 
 /// Calculate baseline frequencies for each grapheme across all commits.
 fn baseline_freqs(commit_freqs: &[CommitGraphemeFreq]) -> HashMap<&str, (f64, i64)> {
-	let grapheme_freqs = commit_freqs
+	// PERFORMANCE: At the moment this function appears to be faster single-threaded. 
+	// I tried switching out the hashmap with a Dashamp and switching the iterator to rayon, 
+	// but the overhead is not worth it (against express we go from 3 milliseconds to 6).
+	// This may be worth revisiting if we prioritize projects with huge numbers of commits, but at the moment
+	// I will leave it be. 
+
+	#[cfg(feature = "print-timings")]
+	let _0 = crate::benchmarking::print_scope_time!("baseline_freqs");
+
+	let mut baseline: HashMap<&str, (f64, i64)> = HashMap::new();
+
+	commit_freqs
 		.iter()
-		.flat_map(|cf| cf.grapheme_freqs.iter().map(GraphemeFreq::as_view));
-
-	let mut baseline = HashMap::new();
-
-	for grapheme_freq in grapheme_freqs {
-		let entry = baseline.entry(grapheme_freq.grapheme).or_insert((0.0, 0));
-		let cum_avg = entry.0;
-		let n = entry.1;
-		entry.0 = (grapheme_freq.freq + (n as f64) * cum_avg) / ((n + 1) as f64);
-		entry.1 = n + 1;
-	}
+		.flat_map(|cf: &CommitGraphemeFreq| cf.grapheme_freqs.iter().map(GraphemeFreq::as_view))
+		.for_each(|view: GraphemeFreqView| {
+			let entry = baseline.entry(view.grapheme).or_insert((0.0, 0));
+			let cum_avg = entry.0;
+			let n = entry.1;
+			entry.0 = (view.freq + (n as f64) * cum_avg) / ((n + 1) as f64);
+			entry.1 = n + 1;
+		});
 
 	baseline
 }
