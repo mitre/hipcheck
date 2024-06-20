@@ -30,7 +30,7 @@ COPY Cargo.toml Cargo.lock ./
 # 3) Delete `xtask/` from Cargo.toml so we can build without copying it.
 # 4) Build Hipcheck in release configuration.
 RUN set -eux -o pipefail; \
-    apk add --no-cache musl-dev \
+    apk add --no-cache musl-dev; \
     sed -i "/xtask\/*/d" Cargo.toml; \
     cargo build --release
 
