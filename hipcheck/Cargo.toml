@@ -73,10 +73,11 @@ rayon = "1.10.0"
 indexmap = "2.2.6"
 dashmap = { version = "5.5.3", features = ["rayon", "inline"] }
 git2 = "0.19.0"
-indicatif = "0.17.8"
+indicatif = { version = "0.17.8", features = ["rayon"] }
 finl_unicode = { version = "1.2.0", default-features = false, features = [
     "grapheme_clusters",
 ] }
+indicatif-log-bridge = "0.2.2"
 
 # Windows-specific dependencies
 [target.'cfg(windows)'.dependencies]
