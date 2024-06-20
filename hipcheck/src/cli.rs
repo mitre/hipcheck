@@ -396,9 +396,6 @@ pub enum Commands {
 	Unstable(UnstableArgs),
 }
 
-// If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
-// this case, `target` is a required field, but the existence of a subcommand
-// removes that requirement
 #[derive(Debug, Clone, clap::Args)]
 pub struct UnstableArgs {
 	#[clap(subcommand)]

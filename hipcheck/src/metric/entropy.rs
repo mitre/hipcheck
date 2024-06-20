@@ -3,7 +3,6 @@
 use crate::context::Context as _;
 use crate::data::git::Commit;
 use crate::data::git::CommitDiff;
-use crate::data::git::Diff;
 use crate::error::Result;
 use crate::hc_error;
 use crate::metric::math::mean;
@@ -12,13 +11,15 @@ use crate::metric::MetricProvider;
 use crate::TryAny;
 use crate::TryFilter;
 use crate::F64;
+use dashmap::DashMap;
+use finl_unicode::grapheme_clusters::Graphemes;
+use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::ops::Not as _;
 use std::sync::Arc;
 use unicode_normalization::UnicodeNormalization;
-use unicode_segmentation::UnicodeSegmentation;
 
 /// Analyze a source to produce a set of entropy scores for its commits.
 ///
@@ -150,8 +151,68 @@ fn is_likely_source_file(
 
 /// Calculate grapheme frequencies for each commit.
 fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<CommitGraphemeFreq> {
-	let grapheme_freqs = GraphemeFreqCalculator::for_diff(&commit_diff.diff, db)?.calculate();
+	// Dashmap (fast concurrent hashmap) to store counts for each grapheme.
+	let grapheme_table: DashMap<String, u64> = DashMap::new();
 
+	// Use this variable to track the total number of graphemes accross all patches in this commit diff.
+	let mut total_graphemes: usize = 0;
+
+	// Iterate over the file diffs by reference.
+	for file_diff in &commit_diff.diff.file_diffs {
+		// Filter out any that are probably not source files.
+		if db
+			.is_likely_source_file(Arc::clone(&file_diff.file_name))?
+			.not()
+		{
+			continue;
+		}
+
+		// Filter out any that are empty.
+		if file_diff.patch.is_empty() {
+			continue;
+		}
+
+		// Count the number of graphemes in this patch, add it to the tortal,
+		// and track the number of each grapheme.
+		total_graphemes += file_diff
+			.patch
+			// Iterate in parallel over the lines of the patch.
+			.par_lines()
+			// Normalize each line.
+			// See https://en.wikipedia.org/wiki/Unicode_equivalence.
+			.map(|line: &str| line.chars().nfc().collect::<String>())
+			// Count the graphemes in each normalized line.
+			// Also update the graphemes table here.
+			// We'll sum these counts to get the total number of graphemes.
+			.map(|normalized_line: String| {
+				// Create an iterator over the graphemes in the line.
+				Graphemes::new(&normalized_line)
+					// Update the graphemes table.
+					.map(|grapheme: &str| {
+						// Use this if statement to avoid allocating a new string unless needed.
+						if let Some(mut count) = grapheme_table.get_mut(grapheme) {
+							*count += 1;
+						} else {
+							grapheme_table.insert(grapheme.to_owned(), 1);
+						}
+					})
+					// get the grapheme count for this normalized line.
+					.count()
+			})
+			.sum::<usize>();
+	}
+
+	// Transform out table (dashmap) of graphemes and their frequencies into a list to return.
+	let grapheme_freqs = grapheme_table
+		// Iterate in parallel for performance.
+		.into_par_iter()
+		.map(|(grapheme, count)| GraphemeFreq {
+			grapheme,
+			freq: count as f64 / total_graphemes as f64,
+		})
+		.collect();
+
+	// Return the collected list of graphemes and their frequencies for this commit diff.
 	Ok(CommitGraphemeFreq {
 		commit: Arc::clone(&commit_diff.commit),
 		grapheme_freqs,
@@ -227,62 +288,4 @@ fn z_scores(mut commit_entropies: Vec<CommitEntropy>) -> Result<Vec<CommitEntrop
 	}
 
 	Ok(commit_entropies)
-}
-
-/// A helper struct for calculating frequencies of individual graphemes.
-#[derive(Debug, Default)]
-struct GraphemeFreqCalculator {
-	/// The count of each grapheme in the diff.
-	grapheme_counts: HashMap<String, u64>,
-	/// The total number of graphemes in the diff.
-	grapheme_total: u64,
-}
-
-impl GraphemeFreqCalculator {
-	/// Initialize the calculator with data from a specific diff, filtering out
-	/// non-source-file changes.
-	fn for_diff(diff: &Diff, db: &dyn MetricProvider) -> Result<GraphemeFreqCalculator> {
-		let mut cgf = GraphemeFreqCalculator::default();
-
-		for file_diff in &diff.file_diffs {
-			if db.is_likely_source_file(Arc::clone(&file_diff.file_name))?
-				&& file_diff.patch.is_empty().not()
-			{
-				for line in file_diff.patch.lines() {
-					cgf.add_line(line);
-				}
-			}
-		}
-
-		Ok(cgf)
-	}
-
-	/// Used by the constructor to add individual diff line data to the calculator.
-	#[allow(clippy::suspicious_map)]
-	fn add_line(&mut self, line: &str) {
-		let line = line.chars().nfc().collect::<String>();
-
-		self.grapheme_total += line
-			.graphemes(true)
-			.map(|grapheme| {
-				let grapheme = grapheme.to_owned();
-				let entry = self.grapheme_counts.entry(grapheme).or_insert(0);
-				*entry += 1;
-			})
-			.count() as u64;
-	}
-
-	/// Calculate the grapheme frequencies based on the data collected in the calculator.
-	fn calculate(self) -> Vec<GraphemeFreq> {
-		let mut grapheme_freqs = Vec::new();
-
-		for (grapheme, count) in self.grapheme_counts {
-			grapheme_freqs.push(GraphemeFreq {
-				grapheme,
-				freq: count as f64 / self.grapheme_total as f64,
-			});
-		}
-
-		grapheme_freqs
-	}
 }
