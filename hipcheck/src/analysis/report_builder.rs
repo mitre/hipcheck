@@ -45,7 +45,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				builder.add_analysis(Analysis::activity(value, thresh), stored.concerns.clone())?;
 			}
 			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Activity, &error);
+				builder.add_errored_analysis(AnalysisIdent::Activity, error);
 			}
 		}
 	};
