@@ -2,7 +2,7 @@
 # Builder Layer
 
 # Use a slim Rust/Alpine image for build tooling.
-FROM rust:1.57.0-alpine3.14 as builder
+FROM rust:1.57.0-alpine3.14 AS builder
 
 # Set the working directory.
 WORKDIR /build
@@ -38,7 +38,7 @@ RUN set -eux -o pipefail; \
 # App Layer
 
 # Use a slim Alpine image so our final container is small.
-FROM alpine:3.14 as app
+FROM alpine:3.14 AS app
 
 # Set the working directory.
 WORKDIR /app
@@ -77,4 +77,3 @@ ENTRYPOINT ["./hc"]
 
 # By default, print the help text.
 CMD ["help"]
-
