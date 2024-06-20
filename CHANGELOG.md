@@ -3,6 +3,91 @@
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+## [3.3.0] - 2024-06-20
+
+Hipcheck version 3.3.0 is mostly focused on refactors and internal
+improvements, including a substantial refactor of the `hc` Command Line
+Interface to be easier to use and easier for us to enhance in the future.
+We've also continued to mature our tooling and processes around Hipcheck,
+which should hopefully make future advancement easier.
+
+## RFDs
+
+* Add "Hipcheck's Values" RFD by [@alilleybrinker](https://github.com/alilleybrinker) in [#70](https://github.com/mitre/hipcheck/pull/70)
+* Added RFD #3, "Plugin Architecture Vision" by [@alilleybrinker](https://github.com/alilleybrinker) in [#71](https://github.com/mitre/hipcheck/pull/71)
+
+### `hc`
+
+* Change `ureq` Agent to use native system certs by [@mchernicoff](https://github.com/mchernicoff) in [#85](https://github.com/mitre/hipcheck/pull/85)
+* Remove OpenSSL as a Hipcheck dependency by [@mchernicoff](https://github.com/mchernicoff) in [#80](https://github.com/mitre/hipcheck/pull/80)
+* Added new types to form the basis of scoring refactor by [@j-lanson](https://github.com/j-lanson) in [#127](https://github.com/mitre/hipcheck/pull/127)
+* Change hc CLI to use derive instead of builder (WIP) by [@mchernicoff](https://github.com/mchernicoff)
+* Small fixes; still panics with no argument by [@mchernicoff](https://github.com/mchernicoff)
+* Refactor CLI by [@alilleybrinker](https://github.com/alilleybrinker) in [#93](https://github.com/mitre/hipcheck/pull/93)
+* Print help on empty args to `check` and `schema` by [@j-lanson](https://github.com/j-lanson) in [#107](https://github.com/mitre/hipcheck/pull/107)
+* Move error/context to appropriate sub-modules by [@j-lanson](https://github.com/j-lanson) in [#115](https://github.com/mitre/hipcheck/pull/115)
+* Move `metric` and `session` out of `analysis` by [@mchernicoff](https://github.com/mchernicoff) in [#116](https://github.com/mitre/hipcheck/pull/116)
+* Move `source` out of `data` by [@mchernicoff](https://github.com/mchernicoff) in [#117](https://github.com/mitre/hipcheck/pull/117)
+* Creates general `http` module for making requests by [@mchernicoff](https://github.com/mchernicoff) in [#118](https://github.com/mitre/hipcheck/pull/118)
+* Refactor `hc check` CLI by [@j-lanson](https://github.com/j-lanson)
+* Initial work on performance by [@vcfxb](https://github.com/vcfxb) in [#131](https://github.com/mitre/hipcheck/pull/131)
+* Improve performance of grapheme frequency calculation by [@vcfxb](https://github.com/vcfxb) in [#133](https://github.com/mitre/hipcheck/pull/133)
+* Adds hc ready command by [@mchernicoff](https://github.com/mchernicoff) in [#81](https://github.com/mitre/hipcheck/pull/81)
+* Restore `libc` version to 0.2.153 to match latest version on crates.io by [@mchernicoff](https://github.com/mchernicoff)
+* Restore `libc` version to 0.2.153 to match latest version on crates.io by [@mchernicoff](https://github.com/mchernicoff)
+* Make top-level commands for `hc` `Option`s to allow for no command by [@mchernicoff](https://github.com/mchernicoff)
+* Removes unnecessary `use` in `cli.rs` by [@mchernicoff](https://github.com/mchernicoff)
+* Remove unnecessary `Default` implementation for `hc help` by [@mchernicoff](https://github.com/mchernicoff)
+* Adds test for CLI commands by [@mchernicoff](https://github.com/mchernicoff)
+* Disable built-in `help` command for all `hc` commands by [@mchernicoff](https://github.com/mchernicoff)
+* Rename help flag internally to pass tests by [@mchernicoff](https://github.com/mchernicoff)
+* Fix mishandling of `HC_CONFIG` with new CLI by [@j-lanson](https://github.com/j-lanson) in [#114](https://github.com/mitre/hipcheck/pull/114)
+
+### Continuous Integration Workflows
+
+* Filter GitHub workflow to not run tests if changes to a push or pull-request are outside of code folders by [@mchernicoff](https://github.com/mchernicoff) in [#68](https://github.com/mitre/hipcheck/pull/68)
+* Add "Dependency Tree" task to CI by [@alilleybrinker](https://github.com/alilleybrinker) in [#79](https://github.com/mitre/hipcheck/pull/79)
+* Publish tagged HC releases to Dockerhub by [@j-lanson](https://github.com/j-lanson) in [#113](https://github.com/mitre/hipcheck/pull/113)
+* Add ability to manually exec push-to-dockerhub action by [@j-lanson](https://github.com/j-lanson) in [#119](https://github.com/mitre/hipcheck/pull/119)
+
+### `xtask`
+
+`xtask` is our internal development tooling.
+
+* Add license and description `xtask/src/task/rfd.rs` by [@mchernicoff](https://github.com/mchernicoff) in [#90](https://github.com/mitre/hipcheck/pull/90)
+* Add `xtask` changelog sanity check for `git-cliff` by [@j-lanson](https://github.com/j-lanson) in [#92](https://github.com/mitre/hipcheck/pull/92)
+* Change `xtask validate` to `xtask check` when `xtask ci` is called by [@mchernicoff](https://github.com/mchernicoff) in [#89](https://github.com/mitre/hipcheck/pull/89)
+
+### Other Project Tooling
+
+* `cargo release` updates Hipcheck version in README by [@mchernicoff](https://github.com/mchernicoff) in [#111](https://github.com/mitre/hipcheck/pull/111)
+* Make `cargo-dist` releases include `config/` and `scripts/` by [@alilleybrinker](https://github.com/alilleybrinker) in [#135](https://github.com/mitre/hipcheck/pull/135)
+* Removes missing `/libs` folder from Container file by [@mchernicoff](https://github.com/mchernicoff) in [#72](https://github.com/mitre/hipcheck/pull/72)
+
+### Dependency Version Bumps
+
+* Bump anyhow from 1.0.83 to 1.0.86 by [@dependabot[bot]](https://github.com/dependabot) in [#76](https://github.com/mitre/hipcheck/pull/76)
+* Bump clap from 4.5.6 to 4.5.7 by [@dependabot[bot]](https://github.com/dependabot)
+* Bump clap from 4.5.4 to 4.5.6 by [@dependabot[bot]](https://github.com/dependabot) in [#122](https://github.com/mitre/hipcheck/pull/122)
+* Bump libc from 0.2.154 to 0.2.155 by [@dependabot[bot]](https://github.com/dependabot) in [#74](https://github.com/mitre/hipcheck/pull/74)
+* Bump proc-macro2 from 1.0.84 to 1.0.85 by [@dependabot[bot]](https://github.com/dependabot) in [#109](https://github.com/mitre/hipcheck/pull/109)
+* Bump regex from 1.10.4 to 1.10.5 by [@dependabot[bot]](https://github.com/dependabot) in [#121](https://github.com/mitre/hipcheck/pull/121)
+* Bump schemars from 0.8.19 to 0.8.20 by [@dependabot[bot]](https://github.com/dependabot) in [#78](https://github.com/mitre/hipcheck/pull/78)
+* Bump schemars from 0.8.20 to 0.8.21 by [@dependabot[bot]](https://github.com/dependabot) in [#83](https://github.com/mitre/hipcheck/pull/83)
+* Bump serde from 1.0.201 to 1.0.202 by [@dependabot[bot]](https://github.com/dependabot) in [#75](https://github.com/mitre/hipcheck/pull/75)
+* Bump serde from 1.0.202 to 1.0.203 by [@dependabot[bot]](https://github.com/dependabot) in [#82](https://github.com/mitre/hipcheck/pull/82)
+* Bump toml from 0.8.12 to 0.8.13 by [@dependabot[bot]](https://github.com/dependabot) in [#77](https://github.com/mitre/hipcheck/pull/77)
+* Bump toml from 0.8.13 to 0.8.14 by [@dependabot[bot]](https://github.com/dependabot) in [#123](https://github.com/mitre/hipcheck/pull/123)
+* Bump url from 2.5.0 to 2.5.1 by [@dependabot[bot]](https://github.com/dependabot)
+
+### New Contributors
+
+* [@vcfxb](https://github.com/vcfxb) made their first contribution in [#133](https://github.com/mitre/hipcheck/pull/133)
+
+__Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.2.1...hipcheck-v3.3.0>
+
+[3.3.0]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.2.1..hipcheck-v3.3.0
+
 ## [3.2.1] - 2024-05-10
 
 Nothing really new in Hipcheck itself. Publishing this version mostly to work
