@@ -157,18 +157,26 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 
 	// Iterate over the file diffs by reference.
 	let mut res: Vec<usize> = vec![];
-	commit_diff
+	let tgt_diffs: Result<Vec<&FileDiff>> = commit_diff
 		.diff
 		.file_diffs
 		.iter()
-		.filter(|file_diff| {
+		.filter_map(|file_diff| {
 			// Filter out any that are probably not source files, or are empty patches
-			match db.is_likely_source_file(Arc::clone(&file_diff.file_name)) {
-				Ok(true) => file_diff.patch.is_empty().not(),
-				_ => false,
+			let is_source: bool = match db.is_likely_source_file(Arc::clone(&file_diff.file_name)) {
+				Err(e) => {
+					return Some(Err(e));
+				}
+				Ok(s) => s,
+			};
+			if !is_source || file_diff.patch.is_empty() {
+				None
+			} else {
+				Some(Ok(file_diff))
 			}
 		})
-		.collect::<Vec<&FileDiff>>()
+		.collect();
+	tgt_diffs?
 		.par_iter()
 		.map(|file_diff| {
 			// Count the number of graphemes in this patch, add it to the total,
