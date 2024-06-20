@@ -10,6 +10,10 @@ license = "Apache-2.0"
 repository = "https://github.com/mitre/hipcheck"
 include = ["src/**/*", "../LICENSE", "../README.md"]
 
+[features]
+# Print timings feature is used to print timing information throughout hipchecks runtime. 
+print-timings = []
+
 [[bin]]
 name = "hc"
 path = "src/main.rs"

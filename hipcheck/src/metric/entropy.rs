@@ -151,6 +151,9 @@ fn is_likely_source_file(
 
 /// Calculate grapheme frequencies for each commit.
 fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<CommitGraphemeFreq> {
+	#[cfg(feature = "print-timings")]
+	let start = std::time::Instant::now();
+
 	// Dashmap (fast concurrent hashmap) to store counts for each grapheme.
 	let grapheme_table: DashMap<String, u64> = DashMap::new();
 
@@ -211,6 +214,11 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 			freq: count as f64 / total_graphemes as f64,
 		})
 		.collect();
+
+	#[cfg(feature = "print-timings")] {
+		use std::time::Instant;
+		println!("[TIMINGS]: Calculating grapheme frequencies for commit {} took {:.6} seconds.", commit_diff.commit.hash, (Instant::now() - start).as_secs_f64());
+	}
 
 	// Return the collected list of graphemes and their frequencies for this commit diff.
 	Ok(CommitGraphemeFreq {

@@ -17,7 +17,7 @@ mod source;
 mod target;
 #[cfg(test)]
 mod test_util;
-mod unstable;
+// mod unstable;
 mod util;
 mod version;
 
@@ -70,20 +70,34 @@ fn init_logging() {
 fn main() -> ExitCode {
 	init_logging();
 
-	let config = CliConfig::load();
-
-	match config.subcommand() {
-		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
-		Some(FullCommands::Schema(args)) => cmd_schema(&args),
-		Some(FullCommands::Unstable(args)) => return unstable::main(args, &config).report(),
-		Some(FullCommands::Ready) => cmd_ready(&config),
-		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
-		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
-		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
-		None => print_error(&hc_error!("missing subcommand")),
+	if cfg!(feature = "print-timings") {
+		println!("[TIMINGS]: Timing information will be printed.");
 	}
 
-	ExitCode::SUCCESS
+	// If we're printing timings, get the start time. 
+	#[cfg(feature = "print-timings")]
+	let start = std::time::Instant::now();
+
+
+	let config = CliConfig::load();
+
+	let exit_code = match config.subcommand() {
+		Some(FullCommands::Check(args)) => cmd_check(&args, &config),
+		Some(FullCommands::Schema(args)) => cmd_schema(&args).report(),
+		// Some(FullCommands::Unstable(args)) => return unstable::main(args, &config).report(),
+		Some(FullCommands::Unstable(_)) => panic!("Unstable command is currently disabled"),
+		Some(FullCommands::Ready) => cmd_ready(&config).report(),
+		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()).report(),
+		Some(FullCommands::PrintData) => cmd_print_data(config.data()).report(),
+		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()).report(),
+		None => print_error(&hc_error!("missing subcommand")).report(),
+	};
+
+	#[cfg(feature = "print-timings")]
+	println!("\n[TIMINGS]: TOTAL RUNTIME: {:.6} seconds.", (std::time::Instant::now() - start).as_secs_f64());
+
+	// Return the exit code from above. 
+	exit_code
 }
 
 /// Run the `check` command.
