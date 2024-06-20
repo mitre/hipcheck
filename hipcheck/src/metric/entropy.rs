@@ -151,16 +151,19 @@ fn is_likely_source_file(
 
 /// Calculate grapheme frequencies for each commit.
 fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<CommitGraphemeFreq> {
-	// Dashmap (fast concurrent hashmap) to store counts for each grapheme. 
+	// Dashmap (fast concurrent hashmap) to store counts for each grapheme.
 	let grapheme_table: DashMap<String, u64> = DashMap::new();
 
-	// Use this variable to track the total number of graphemes accross all patches in this commit diff. 
+	// Use this variable to track the total number of graphemes accross all patches in this commit diff.
 	let mut total_graphemes: usize = 0;
 
-	// Iterate over the file diffs by reference. 
+	// Iterate over the file diffs by reference.
 	for file_diff in &commit_diff.diff.file_diffs {
-		// Filter out any that are probably not source files.  
-		if db.is_likely_source_file(Arc::clone(&file_diff.file_name))?.not() {
+		// Filter out any that are probably not source files.
+		if db
+			.is_likely_source_file(Arc::clone(&file_diff.file_name))?
+			.not()
+		{
 			continue;
 		}
 
@@ -169,48 +172,47 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 			continue;
 		}
 
-		// Count the number of graphemes in this patch, add it to the tortal, 
-		// and track the number of each grapheme. 
-		total_graphemes += file_diff.patch
+		// Count the number of graphemes in this patch, add it to the tortal,
+		// and track the number of each grapheme.
+		total_graphemes += file_diff
+			.patch
 			// Iterate in parallel over the lines of the patch.
 			.par_lines()
-			// Normalize each line. 
-			// See https://en.wikipedia.org/wiki/Unicode_equivalence. 
+			// Normalize each line.
+			// See https://en.wikipedia.org/wiki/Unicode_equivalence.
 			.map(|line: &str| line.chars().nfc().collect::<String>())
 			// Count the graphemes in each normalized line.
-			// Also update the graphemes table here. 
-			// We'll sum these counts to get the total number of graphemes. 
+			// Also update the graphemes table here.
+			// We'll sum these counts to get the total number of graphemes.
 			.map(|normalized_line: String| {
 				// Create an iterator over the graphemes in the line.
 				Graphemes::new(&normalized_line)
-					// Update the graphemes table. 
+					// Update the graphemes table.
 					.map(|grapheme: &str| {
-						// Use this if statement to avoid allocating a new string unless needed. 
+						// Use this if statement to avoid allocating a new string unless needed.
 						if let Some(mut count) = grapheme_table.get_mut(grapheme) {
 							*count += 1;
 						} else {
 							grapheme_table.insert(grapheme.to_owned(), 1);
 						}
 					})
-					// get the grapheme count for this normalized line. 
+					// get the grapheme count for this normalized line.
 					.count()
 			})
 			.sum::<usize>();
 	}
 
-	// Transform out table (dashmap) of graphemes and their frequencies into a list to return. 
+	// Transform out table (dashmap) of graphemes and their frequencies into a list to return.
 	let grapheme_freqs = grapheme_table
-		// Iterate in parallel for performance. 
+		// Iterate in parallel for performance.
 		.into_par_iter()
-		.map(|(grapheme, count)| {
-			GraphemeFreq {
-				grapheme,
-				freq: count as f64 / total_graphemes as f64,
-			}
+		.map(|(grapheme, count)| GraphemeFreq {
+			grapheme,
+			freq: count as f64 / total_graphemes as f64,
 		})
 		.collect();
 
-	// Return the collected list of graphemes and their frequencies for this commit diff. 
+	// Return the collected list of graphemes and their frequencies for this commit diff.
 	Ok(CommitGraphemeFreq {
 		commit: Arc::clone(&commit_diff.commit),
 		grapheme_freqs,
