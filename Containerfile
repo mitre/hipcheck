@@ -2,7 +2,7 @@
 # Builder Layer
 
 # Use a slim Rust/Alpine image for build tooling.
-FROM rust:1.57.0-alpine3.14 AS builder
+FROM rust:1.79.0-alpine3.20 AS builder
 
 # Set the working directory.
 WORKDIR /build
@@ -10,12 +10,10 @@ WORKDIR /build
 # Copy the files we need.
 #
 # Unfortunately, to preserve folder structure, these need to be separated.
-#
-# 1) Our Cargo configuration.
-# 2) The main Hipcheck crate.
-# 3) The current Crate manifest and lockfile.
 COPY .cargo/ .cargo/
+COPY hipcheck-macros/ hipcheck-macros/
 COPY hipcheck/ hipcheck/
+COPY xtask/ xtask/
 COPY Cargo.toml Cargo.lock ./
 
 # Prep the system.
@@ -27,18 +25,16 @@ COPY Cargo.toml Cargo.lock ./
 #                 with a non-zero status, or zero.
 # 2) Setup the packages we'll need for our build:
 #    - musl-dev:    Needed to build some C code we rely on.
-# 3) Delete `xtask/` from Cargo.toml so we can build without copying it.
-# 4) Build Hipcheck in release configuration.
+# 3) Build Hipcheck in release configuration.
 RUN set -eux -o pipefail; \
     apk add --no-cache musl-dev; \
-    sed -i "/xtask\/*/d" Cargo.toml; \
     cargo build --release
 
 #============================================================================
 # App Layer
 
-# Use a slim Alpine image so our final container is small.
-FROM alpine:3.14 AS app
+# Use an Alpine image so our final container is small.
+FROM alpine:3.20 AS app
 
 # Set the working directory.
 WORKDIR /app
