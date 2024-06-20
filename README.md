@@ -63,7 +63,7 @@ Hipcheck `Containerfile`.
 
 ```sh
 $ # Run the following from the root of the Hipcheck repository.
-$ docker build -t hipcheck:0.2.0 -f ./Containerfile
+$ docker build -t hipcheck:3.3.0 -f ./Containerfile
 ```
 
 ### Local Install
@@ -108,7 +108,7 @@ $ cargo install --path hipcheck
 You can run Hipcheck in a container like so:
 
 ```sh
-$ docker run --env "HC_GITHUB_TOKEN=<GITHUB_TOKEN>" hipcheck:0.2.0 [<HIPCHECK_ARGS>]...
+$ docker run --env "HC_GITHUB_TOKEN=<GITHUB_TOKEN>" hipcheck:3.3.0 [<HIPCHECK_ARGS>]...
 ```
 
 ### Direct Usage
