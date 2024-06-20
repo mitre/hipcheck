@@ -1,6 +1,8 @@
 [package]
 name = "hipcheck-macros"
-version = "0.1.0"
+description = "Helper macros for the `hipcheck` crate."
+repository = "https://github.com/mitre/hipcheck"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
 
