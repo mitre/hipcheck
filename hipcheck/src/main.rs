@@ -9,6 +9,7 @@ mod context;
 mod data;
 mod error;
 mod http;
+mod kdl_config;
 mod metric;
 mod report;
 mod session;

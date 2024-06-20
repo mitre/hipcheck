@@ -6,10 +6,12 @@ use crate::error::Error;
 use crate::hc_error;
 use crate::report::Format;
 use crate::session::session::Check;
-use crate::shell::{ColorChoice, Verbosity};
+use crate::shell::ColorChoice;
+use crate::shell::Verbosity;
 use crate::target::TargetType;
 use crate::CheckKind;
-use clap::{Parser as _, ValueEnum};
+use clap::Parser as _;
+use clap::ValueEnum;
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};
@@ -83,6 +85,15 @@ struct PathArgs {
 		long_help = "Path to the configuration folder. Can also be set with the `HC_CONFIG` environment variable"
 	)]
 	config: Option<PathBuf>,
+
+	/// Path to the KDL configuration file.
+	#[arg(
+		long = "kdl-config",
+		global = true,
+		help_heading = "Path Flags",
+		long_help = "Path to the KDL configuration file. Can also be set with the `HC_KDL_CONFIG` environment variable"
+	)]
+	kdl_config: Option<PathBuf>,
 
 	/// Path to the data folder.
 	#[arg(
@@ -206,6 +217,11 @@ impl CliConfig {
 		self.path_args.config.as_deref()
 	}
 
+	/// Get the path to the KDL configuration file.
+	pub fn kdl_config(&self) -> Option<&Path> {
+		self.path_args.kdl_config.as_deref()
+	}
+
 	/// Get the path to the data directory.
 	pub fn data(&self) -> Option<&Path> {
 		self.path_args.data.as_deref()
@@ -265,6 +281,7 @@ impl CliConfig {
 			},
 			path_args: PathArgs {
 				config: hc_env_var("config"),
+				kdl_config: hc_env_var("kdl_config"),
 				data: hc_env_var("data"),
 				cache: hc_env_var("cache"),
 			},
@@ -284,6 +301,7 @@ impl CliConfig {
 		CliConfig {
 			path_args: PathArgs {
 				cache: platform_cache(),
+				kdl_config: None,
 				config: platform_config(),
 				data: platform_data(),
 			},
@@ -295,9 +313,10 @@ impl CliConfig {
 	fn backups() -> CliConfig {
 		CliConfig {
 			path_args: PathArgs {
-				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),
-				data: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "data"]),
-				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
+				config: dirs::home_dir().map(|dir| pathbuf![&dir, ".hipcheck", "config"]),
+				kdl_config: None,
+				data: dirs::home_dir().map(|dir| pathbuf![&dir, ".hipcheck", "data"]),
+				cache: dirs::home_dir().map(|dir| pathbuf![&dir, ".hipcheck", "cache"]),
 			},
 			..Default::default()
 		}
@@ -390,15 +409,11 @@ pub enum Commands {
 	Schema(SchemaArgs),
 	/// Check if Hipcheck is ready to run.
 	Ready,
-
 	/// Unstable command to aid in benchmarking
 	#[command(hide = true)]
 	Unstable(UnstableArgs),
 }
 
-// If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
-// this case, `target` is a required field, but the existence of a subcommand
-// removes that requirement
 #[derive(Debug, Clone, clap::Args)]
 pub struct UnstableArgs {
 	#[clap(subcommand)]

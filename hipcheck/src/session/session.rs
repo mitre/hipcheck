@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// mod pm;
-// mod spdx;
-
 use crate::analysis::score::ScoringProviderStorage;
 use crate::analysis::AnalysisProviderStorage;
 use crate::command_util::DependentProgram;

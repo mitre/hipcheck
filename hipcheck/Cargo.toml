@@ -66,6 +66,7 @@ xml-rs = "0.8.20"
 tempdir = "0.3.7"
 rayon = "1.10.0"
 indexmap = "2.2.6"
+kdl = "4.6.0"
 
 # Windows-specific dependencies
 [target.'cfg(windows)'.dependencies]
