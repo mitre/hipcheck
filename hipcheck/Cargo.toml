@@ -24,7 +24,7 @@ dirs = "5.0.1"
 duct = "0.13.5"
 env_logger = { version = "0.11.3" }
 graphql_client = "0.14.0"
-hipcheck-macros = { path = "../hipcheck-macros" }
+hipcheck-macros = { path = "../hipcheck-macros", version = "0.2.0" }
 lazy_static = "1.4.0"
 libc = "0.2.155"
 log = "0.4.16"
@@ -66,7 +66,9 @@ tempdir = "0.3.7"
 rayon = "1.10.0"
 indexmap = "2.2.6"
 dashmap = { version = "5.5.3", features = ["rayon", "inline"] }
-finl_unicode = { version = "1.2.0", default-features = false, features = ["grapheme_clusters"] }
+finl_unicode = { version = "1.2.0", default-features = false, features = [
+    "grapheme_clusters",
+] }
 
 # Windows-specific dependencies
 [target.'cfg(windows)'.dependencies]
