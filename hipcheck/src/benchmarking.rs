@@ -28,7 +28,7 @@ impl PrintTime {
 impl Drop for PrintTime {
 	fn drop(&mut self) {
 		println!(
-			"[TIMINGS]: {} returned after {} seconds.",
+			"[TIMINGS]: {} returned after {:.6} seconds.",
 			self.location,
 			(Instant::now() - self.start).as_secs_f64()
 		);
