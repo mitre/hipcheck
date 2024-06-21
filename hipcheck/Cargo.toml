@@ -10,6 +10,12 @@ license = "Apache-2.0"
 repository = "https://github.com/mitre/hipcheck"
 include = ["src/**/*", "../LICENSE", "../README.md"]
 
+[features]
+# Print timings feature is used to print timing information throughout hipchecks runtime. 
+print-timings = ["benchmarking"]
+# Benchmarking enables the benchmarking module, containing special utilities for benchmarking. 
+benchmarking = []
+
 [[bin]]
 name = "hc"
 path = "src/main.rs"
@@ -66,9 +72,12 @@ tempdir = "0.3.7"
 rayon = "1.10.0"
 indexmap = "2.2.6"
 dashmap = { version = "5.5.3", features = ["rayon", "inline"] }
+git2 = "0.19.0"
+indicatif = { version = "0.17.8", features = ["rayon"] }
 finl_unicode = { version = "1.2.0", default-features = false, features = [
     "grapheme_clusters",
 ] }
+indicatif-log-bridge = "0.2.2"
 
 # Windows-specific dependencies
 [target.'cfg(windows)'.dependencies]

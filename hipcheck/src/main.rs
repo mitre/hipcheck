@@ -17,9 +17,11 @@ mod source;
 mod target;
 #[cfg(test)]
 mod test_util;
-mod unstable;
 mod util;
 mod version;
+
+#[cfg(feature = "benchmarking")]
+mod benchmarking;
 
 use crate::analysis::report_builder::build_pr_report;
 use crate::analysis::report_builder::build_report;
@@ -58,7 +60,6 @@ use std::ops::Not as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::process::Termination;
 use std::result::Result as StdResult;
 use util::fs::create_dir_all;
 
@@ -70,19 +71,27 @@ fn init_logging() {
 fn main() -> ExitCode {
 	init_logging();
 
+	if cfg!(feature = "print-timings") {
+		println!("[TIMINGS]: Timing information will be printed.");
+	}
+
+	// Start tracking the timing for `main` after logging is initiated.
+	#[cfg(feature = "print-timings")]
+	let _0 = benchmarking::print_scope_time!("main");
+
 	let config = CliConfig::load();
 
 	match config.subcommand() {
 		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
-		Some(FullCommands::Unstable(args)) => return unstable::main(args, &config).report(),
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
 		None => print_error(&hc_error!("missing subcommand")),
-	}
+	};
 
+	// If we didn't early return, return success.
 	ExitCode::SUCCESS
 }
 

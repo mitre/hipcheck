@@ -34,10 +34,7 @@ pub struct Error {
 
 impl Error {
 	/// Create a new `Error` with a message source.
-	pub fn msg<S>(message: S) -> Self
-	where
-		S: Into<Cow<'static, str>>,
-	{
+	pub fn msg(message: impl Introspect) -> Self {
 		let error = Message(message.into());
 		Error::new(error)
 	}

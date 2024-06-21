@@ -320,6 +320,9 @@ fn resolve_source(
 	home: &Path,
 	source: &str,
 ) -> Result<Source> {
+	#[cfg(feature = "print-timings")]
+	let _0 = crate::benchmarking::print_scope_time!("resolve_source");
+
 	match source_type.kind.target_kind() {
 		TargetKind::RepoSource => {
 			SourceRepo::resolve_repo(phase, home, source).map(|repo| Source {
