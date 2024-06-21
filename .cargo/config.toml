@@ -2,5 +2,4 @@
 xtask = "run --package xtask --bin xtask --quiet --"
 
 [build]
-target-dir = ".target"
 incremental = true
