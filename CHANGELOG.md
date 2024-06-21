@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+
+## [3.3.2] - 2024-06-21
+
+This patch is intended to workaround a bug in `cargo-dist` which caused the
+publication of 3.3.1 to fail to include all the expected artifacts. They're
+working on fixing the bug, but in the short term this is a reasonable
+workaround.
+
+### Changed
+
+* Stop renaming `target` directory by [@alilleybrinker](https://github.com/alilleybrinker)
+
+__Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.3.1...hipcheck-v3.3.2>
+
+[3.3.2]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.3.1..hipcheck-v3.3.2
+
 ## [3.3.1] - 2024-06-21
 
 This patch release includes two general categories of fixes:
