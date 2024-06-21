@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+## [3.3.1] - 2024-06-21
+
+This patch release includes two general categories of fixes:
+
+- Getting `Containerfile` builds on new releases working.
+- Getting `cargo-dist` generation of binaries on new releases working.
+
+### Changed
+
+* Fix broken Docker Hub action by [@alilleybrinker](https://github.com/alilleybrinker)
+* Update Containerfile to be accepted on Docker Hub push by [@alilleybrinker](https://github.com/alilleybrinker)
+* Upgrade `cargo-dist` to 0.16.0 by [@alilleybrinker](https://github.com/alilleybrinker) in [#137](https://github.com/mitre/hipcheck/pull/137)
+
+### Fixed
+
+* Fix broken Containerfile syntax by [@alilleybrinker](https://github.com/alilleybrinker)
+* Get Containerfile working by [@alilleybrinker](https://github.com/alilleybrinker)
+* Reduce prebuild targets to ones that work by [@alilleybrinker](https://github.com/alilleybrinker)
+
+__Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.3.0...hipcheck-v3.3.1>
+
+[3.3.1]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.3.0..hipcheck-v3.3.1
+
 ## [3.3.0] - 2024-06-20
 
 Hipcheck version 3.3.0 is mostly focused on refactors and internal
