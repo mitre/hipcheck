@@ -10,9 +10,11 @@
 
 use std::time::Instant;
 
+/// Structure used to track timing that will print its location and elapsed time when dropped.
+#[derive(Debug)]
 pub struct PrintTime {
-	location: String,
-	start: Instant,
+	pub location: String,
+	pub start: Instant,
 }
 
 impl PrintTime {
@@ -27,11 +29,7 @@ impl PrintTime {
 
 impl Drop for PrintTime {
 	fn drop(&mut self) {
-		println!(
-			"[TIMINGS]: {} returned after {:.6} seconds.",
-			self.location,
-			(Instant::now() - self.start).as_secs_f64()
-		);
+		Shell::print_timing(&self)
 	}
 }
 
@@ -57,3 +55,5 @@ macro_rules! print_scope_time {
 }
 
 pub(crate) use print_scope_time;
+
+use crate::shell::Shell;

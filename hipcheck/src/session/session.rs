@@ -38,7 +38,7 @@ use crate::report::ReportParams;
 use crate::report::ReportParamsStorage;
 use crate::session::pm::detect_and_extract;
 use crate::session::spdx::extract_download_url;
-use crate::shell::Phase;
+use crate::shell::spinner_phase::SpinnerPhase;
 use crate::shell::Shell;
 use crate::source::source::Source;
 use crate::source::source::SourceKind;
@@ -57,6 +57,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::result::Result as StdResult;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Immutable configuration and base data for a run of Hipcheck.
 #[salsa::database(
@@ -85,9 +86,6 @@ use std::sync::Arc;
 	WeightTreeQueryStorage
 )]
 pub struct Session {
-	/// The shell interface, for outputting progress.
-	pub shell: Shell,
-
 	// Query storage.
 	storage: salsa::Storage<Self>,
 }
@@ -98,11 +96,7 @@ impl salsa::Database for Session {}
 // Cannot be derived because `salsa::Storage` does not implement it
 impl fmt::Debug for Session {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(
-			f,
-			"Session {{ shell: {:?}, storage: salsa::Storage<Session> }}",
-			self.shell
-		)
+		write!(f, "Session {{ storage: salsa::Storage<Session> }}")
 	}
 }
 
@@ -122,7 +116,6 @@ impl Session {
 	/// Construct a new `Session` which owns all the data needed in later phases.
 	#[allow(clippy::too_many_arguments)]
 	pub fn new(
-		shell: Shell,
 		source_type: &Check,
 		source: &str,
 		config_path: Option<PathBuf>,
@@ -130,7 +123,7 @@ impl Session {
 		home_dir: Option<PathBuf>,
 		format: Format,
 		raw_version: &str,
-	) -> StdResult<Session, (Shell, Error)> {
+	) -> StdResult<Session, Error> {
 		/*===================================================================
 		 *  Setting up the session.
 		 *-----------------------------------------------------------------*/
@@ -138,7 +131,6 @@ impl Session {
 		// Input query setters are implemented on `Session`, not
 		// `salsa::Storage<Session>`
 		let mut session = Session {
-			shell,
 			storage: Default::default(),
 		};
 
@@ -146,17 +138,15 @@ impl Session {
 		 * Printing the prelude.
 		 *-----------------------------------------------------------------*/
 
-		if let Err(err) = session.shell.prelude(source) {
-			return Err((session.shell, err));
-		};
+		Shell::print_prelude(source);
 
 		/*===================================================================
 		 *  Loading current versions of needed software git, npm, and eslint into salsa.
 		 *-----------------------------------------------------------------*/
 
-		let (git_version, npm_version) = match load_software_versions(&mut session.shell) {
+		let (git_version, npm_version) = match load_software_versions() {
 			Ok(results) => results,
-			Err(err) => return Err((session.shell, err)),
+			Err(err) => return Err(err),
 		};
 
 		session.set_git_version(Rc::new(git_version));
@@ -166,14 +156,11 @@ impl Session {
 		 *  Loading configuration.
 		 *-----------------------------------------------------------------*/
 
-		let (config, config_dir, data_dir, hc_github_token) = match load_config_and_data(
-			&mut session.shell,
-			config_path.as_deref(),
-			data_path.as_deref(),
-		) {
-			Ok(results) => results,
-			Err(err) => return Err((session.shell, err)),
-		};
+		let (config, config_dir, data_dir, hc_github_token) =
+			match load_config_and_data(config_path.as_deref(), data_path.as_deref()) {
+				Ok(results) => results,
+				Err(err) => return Err(err),
+			};
 
 		// Set config input queries for use below
 		session.set_config(Rc::new(config));
@@ -195,16 +182,16 @@ impl Session {
 			.ok_or_else(|| hc_error!("can't find cache directory"))
 		{
 			Ok(results) => results,
-			Err(err) => return Err((session.shell, err)),
+			Err(err) => return Err(err),
 		};
 
 		/*===================================================================
 		 *  Resolving the source.
 		 *-----------------------------------------------------------------*/
 
-		let source = match load_source(&mut session.shell, source, source_type, &home) {
+		let source = match load_source(source, source_type, &home) {
 			Ok(results) => results,
-			Err(err) => return Err((session.shell, err)),
+			Err(err) => return Err(err),
 		};
 
 		session.set_source(Arc::new(source));
@@ -215,7 +202,7 @@ impl Session {
 
 		let version = match get_version(raw_version) {
 			Ok(version) => version,
-			Err(err) => return Err((session.shell, err)),
+			Err(err) => return Err(err),
 		};
 
 		session.set_hc_version(Rc::new(version));
@@ -230,17 +217,9 @@ impl Session {
 
 		Ok(session)
 	}
-
-	/// Consume self and get the `Shell` back out.
-	///
-	/// This is used so any error printing at the end of the session can still go
-	/// through the shell interface.
-	pub fn end(self) -> Shell {
-		self.shell
-	}
 }
 
-fn load_software_versions(_shell: &mut Shell) -> Result<(String, String)> {
+fn load_software_versions() -> Result<(String, String)> {
 	let git_version = get_git_version()?;
 	DependentProgram::Git.check_version(&git_version)?;
 
@@ -251,12 +230,15 @@ fn load_software_versions(_shell: &mut Shell) -> Result<(String, String)> {
 }
 
 fn load_config_and_data(
-	shell: &mut Shell,
 	config_path: Option<&Path>,
 	data_path: Option<&Path>,
 ) -> Result<(Config, PathBuf, PathBuf, String)> {
 	// Start the phase.
-	let phase = shell.phase("loading configuration and data files")?;
+	let phase = SpinnerPhase::start("loading configuration and data files");
+	// Increment the phase into the "running" stage.
+	phase.inc();
+	// Set the spinner phase to tick constantly, 10 times a second.
+	phase.enable_steady_tick(Duration::from_millis(100));
 
 	// Resolve the path to the config file.
 	let valid_config_path = config_path
@@ -274,7 +256,7 @@ fn load_config_and_data(
 	// Resolve the github token file.
 	let hc_github_token = resolve_token()?;
 
-	phase.finish()?;
+	phase.finish_successful();
 
 	Ok((
 		config,
@@ -284,12 +266,7 @@ fn load_config_and_data(
 	))
 }
 
-fn load_source(
-	shell: &mut Shell,
-	source: &str,
-	source_type: &Check,
-	home: &Path,
-) -> Result<Source> {
+fn load_source(source: &str, source_type: &Check, home: &Path) -> Result<Source> {
 	// Resolve the source specifier into an actual source.
 	let phase_desc = match source_type.kind.target_kind() {
 		TargetKind::RepoSource => "resolving git repository source",
@@ -297,9 +274,9 @@ fn load_source(
 		TargetKind::SpdxDocument => "parsing SPDX document",
 	};
 
-	let mut phase = shell.phase(phase_desc)?;
-	let source = resolve_source(source_type, &mut phase, home, source)?;
-	phase.finish()?;
+	let phase = SpinnerPhase::start(phase_desc);
+	let source = resolve_source(source_type, &phase, home, source)?;
+	phase.finish_successful();
 
 	Ok(source)
 }
@@ -315,7 +292,7 @@ fn resolve_token() -> Result<String> {
 /// Resolves the source specifier into an actual source.
 fn resolve_source(
 	source_type: &Check,
-	phase: &mut Phase,
+	phase: &SpinnerPhase,
 	home: &Path,
 	source: &str,
 ) -> Result<Source> {

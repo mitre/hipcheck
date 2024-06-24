@@ -6,7 +6,7 @@ use crate::error::Error;
 use crate::hc_error;
 use crate::report::Format;
 use crate::session::session::Check;
-use crate::shell::{ColorChoice, Verbosity};
+use crate::shell::{color_choice::ColorChoice, verbosity::Verbosity};
 use crate::target::TargetType;
 use crate::CheckKind;
 use clap::{Parser as _, ValueEnum};
@@ -182,6 +182,7 @@ impl CliConfig {
 	}
 
 	/// Get the configured color.
+	#[allow(unused)]
 	pub fn color(&self) -> ColorChoice {
 		self.output_args.color.unwrap_or_default()
 	}
