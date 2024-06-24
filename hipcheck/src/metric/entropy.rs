@@ -178,42 +178,34 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 			}
 		})
 		.collect();
-	tgt_diffs?
-		.par_iter()
-		.map(|file_diff| {
-			// Count the number of graphemes in this patch, add it to the total,
-			// and track the number of each grapheme.
-			file_diff
-				.patch
-				// Iterate in parallel over the lines of the patch.
-				.par_lines()
-				// Normalize each line.
-				// See https://en.wikipedia.org/wiki/Unicode_equivalence.
-				.map(|line: &str| line.chars().nfc().collect::<String>())
-				// Count the graphemes in each normalized line.
-				// Also update the graphemes table here.
-				// We'll sum these counts to get the total number of graphemes.
-				.map(|normalized_line: String| {
-					// Create an iterator over the graphemes in the line.
-					Graphemes::new(&normalized_line)
-						// Update the graphemes table.
-						.map(|grapheme: &str| {
-							// Use this if statement to avoid allocating a new string unless needed.
-							if let Some(mut count) = grapheme_table.get_mut(grapheme) {
-								*count += 1;
-							} else {
-								grapheme_table.insert(grapheme.to_owned(), 1);
-							}
-						})
-						// get the grapheme count for this normalized line.
-						.count()
-				})
-				.sum::<usize>()
-		})
-		.collect_into_vec(&mut res);
-
 	// Use this variable to track the total number of graphemes accross all patches in this commit diff.
-	let total_graphemes: usize = res.into_iter().sum();
+	let total_graphemes: usize = tgt_diffs?
+		// Iterate over each line of each file in parallel
+		.par_iter()
+		.flat_map(|file_diff| file_diff.patch.par_lines())
+		// Normalize each line.
+		// See https://en.wikipedia.org/wiki/Unicode_equivalence.
+		.map(|line: &str| line.chars().nfc().collect::<String>())
+		// Count the graphemes in each normalized line.
+		// Also update the graphemes table here.
+		// We'll sum these counts to get the total number of graphemes.
+		.map(|normalized_line: String| {
+			// Create an iterator over the graphemes in the line.
+			Graphemes::new(&normalized_line)
+				// Update the graphemes table.
+				.map(|grapheme: &str| {
+					// Use this if statement to avoid allocating a new string unless needed.
+					if let Some(mut count) = grapheme_table.get_mut(grapheme) {
+						*count += 1;
+					} else {
+						grapheme_table.insert(grapheme.to_owned(), 1);
+					}
+				})
+				// get the grapheme count for this normalized line.
+				.count()
+		})
+		// Aggregate the grapheme count across all lines of all files
+		.sum();
 
 	// Transform out table (dashmap) of graphemes and their frequencies into a list to return.
 	let grapheme_freqs = grapheme_table
