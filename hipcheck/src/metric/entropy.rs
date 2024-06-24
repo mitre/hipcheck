@@ -158,7 +158,6 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 	let grapheme_table: DashMap<String, u64> = DashMap::new();
 
 	// Use this variable to track the total number of graphemes accross all patches in this commit diff.
-	let mut res: Vec<usize> = vec![];
 	let tgt_diffs: Result<Vec<&FileDiff>> = commit_diff
 		.diff
 		.file_diffs
