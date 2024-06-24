@@ -27,7 +27,7 @@ impl PrintTime {
 
 impl Drop for PrintTime {
 	fn drop(&mut self) {
-		println!(
+		crate::shell::macros::println!(
 			"[TIMINGS]: {} returned after {:.6} seconds.",
 			self.location,
 			(Instant::now() - self.start).as_secs_f64()

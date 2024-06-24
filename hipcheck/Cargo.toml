@@ -76,6 +76,8 @@ finl_unicode = { version = "1.2.0", default-features = false, features = [
     "grapheme_clusters",
 ] }
 indicatif-log-bridge = "0.2.2"
+console = { version = "0.15.8", features = ["windows-console-colors"] }
+term_size = "0.3.2"
 
 # Windows-specific dependencies
 [target.'cfg(windows)'.dependencies]
