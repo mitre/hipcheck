@@ -3,6 +3,7 @@
 use crate::context::Context as _;
 use crate::data::git::Commit;
 use crate::data::git::CommitDiff;
+use crate::data::git::FileDiff;
 use crate::error::Result;
 use crate::hc_error;
 use crate::metric::math::mean;
@@ -17,7 +18,6 @@ use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::iter::Iterator;
-use std::ops::Not as _;
 use std::sync::Arc;
 use unicode_normalization::UnicodeNormalization;
 
@@ -158,52 +158,62 @@ fn grapheme_freqs(commit_diff: &CommitDiff, db: &dyn MetricProvider) -> Result<C
 	let grapheme_table: DashMap<String, u64> = DashMap::new();
 
 	// Use this variable to track the total number of graphemes accross all patches in this commit diff.
-	let mut total_graphemes: usize = 0;
+	let mut res: Vec<usize> = vec![];
+	let tgt_diffs: Result<Vec<&FileDiff>> = commit_diff
+		.diff
+		.file_diffs
+		.iter()
+		.filter_map(|file_diff| {
+			// Filter out any that are probably not source files, or are empty patches
+			let is_source: bool = match db.is_likely_source_file(Arc::clone(&file_diff.file_name)) {
+				Err(e) => {
+					return Some(Err(e));
+				}
+				Ok(s) => s,
+			};
+			if !is_source || file_diff.patch.is_empty() {
+				None
+			} else {
+				Some(Ok(file_diff))
+			}
+		})
+		.collect();
+	tgt_diffs?
+		.par_iter()
+		.map(|file_diff| {
+			// Count the number of graphemes in this patch, add it to the total,
+			// and track the number of each grapheme.
+			file_diff
+				.patch
+				// Iterate in parallel over the lines of the patch.
+				.par_lines()
+				// Normalize each line.
+				// See https://en.wikipedia.org/wiki/Unicode_equivalence.
+				.map(|line: &str| line.chars().nfc().collect::<String>())
+				// Count the graphemes in each normalized line.
+				// Also update the graphemes table here.
+				// We'll sum these counts to get the total number of graphemes.
+				.map(|normalized_line: String| {
+					// Create an iterator over the graphemes in the line.
+					Graphemes::new(&normalized_line)
+						// Update the graphemes table.
+						.map(|grapheme: &str| {
+							// Use this if statement to avoid allocating a new string unless needed.
+							if let Some(mut count) = grapheme_table.get_mut(grapheme) {
+								*count += 1;
+							} else {
+								grapheme_table.insert(grapheme.to_owned(), 1);
+							}
+						})
+						// get the grapheme count for this normalized line.
+						.count()
+				})
+				.sum::<usize>()
+		})
+		.collect_into_vec(&mut res);
 
-	// Iterate over the file diffs by reference.
-	for file_diff in &commit_diff.diff.file_diffs {
-		// Filter out any that are probably not source files.
-		if db
-			.is_likely_source_file(Arc::clone(&file_diff.file_name))?
-			.not()
-		{
-			continue;
-		}
-
-		// Filter out any that are empty.
-		if file_diff.patch.is_empty() {
-			continue;
-		}
-
-		// Count the number of graphemes in this patch, add it to the total,
-		// and track the number of each grapheme.
-		total_graphemes += file_diff
-			.patch
-			// Iterate in parallel over the lines of the patch.
-			.par_lines()
-			// Normalize each line.
-			// See https://en.wikipedia.org/wiki/Unicode_equivalence.
-			.map(|line: &str| line.chars().nfc().collect::<String>())
-			// Count the graphemes in each normalized line.
-			// Also update the graphemes table here.
-			// We'll sum these counts to get the total number of graphemes.
-			.map(|normalized_line: String| {
-				// Create an iterator over the graphemes in the line.
-				Graphemes::new(&normalized_line)
-					// Update the graphemes table.
-					.map(|grapheme: &str| {
-						// Use this if statement to avoid allocating a new string unless needed.
-						if let Some(mut count) = grapheme_table.get_mut(grapheme) {
-							*count += 1;
-						} else {
-							grapheme_table.insert(grapheme.to_owned(), 1);
-						}
-					})
-					// get the grapheme count for this normalized line.
-					.count()
-			})
-			.sum::<usize>();
-	}
+	// Use this variable to track the total number of graphemes accross all patches in this commit diff.
+	let total_graphemes: usize = res.into_iter().sum();
 
 	// Transform out table (dashmap) of graphemes and their frequencies into a list to return.
 	let grapheme_freqs = grapheme_table
