@@ -8,12 +8,9 @@ use std::panic;
 use std::panic::RefUnwindSafe;
 use std::panic::UnwindSafe;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 
-use lazy_static::lazy_static;
-
-lazy_static! {
-	static ref SERIAL_TEST: Mutex<()> = Default::default();
-}
+static SERIAL_TEST: OnceLock<Mutex<()>> = OnceLock::new();
 
 /// Sets environment variables to the given value for the duration of the closure.
 /// Restores the previous values when the closure completes or panics,
@@ -24,7 +21,7 @@ pub fn with_env_vars<F>(kvs: Vec<(&str, Option<&str>)>, closure: F)
 where
 	F: Fn() + UnwindSafe + RefUnwindSafe,
 {
-	let guard = SERIAL_TEST.lock().unwrap();
+	let guard = SERIAL_TEST.get_or_init(Default::default).lock().unwrap();
 	let mut old_kvs: Vec<(&str, Result<String, VarError>)> = Vec::new();
 	for (k, v) in kvs {
 		let old_v = env::var(k);

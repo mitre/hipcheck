@@ -582,7 +582,6 @@ dependencies = [
  "indexmap 2.2.6",
  "indicatif",
  "indicatif-log-bridge",
- "lazy_static",
  "libc",
  "log",
  "maplit",
