@@ -51,6 +51,7 @@ use cli::UpdateArgs;
 use command_util::DependentProgram;
 use config::WeightTreeNode;
 use config::WeightTreeProvider;
+use indicatif_log_bridge::LogWrapper;
 use core::fmt;
 use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
@@ -74,12 +75,19 @@ use std::result::Result as StdResult;
 use util::fs::create_dir_all;
 use which::which;
 
-fn init_logging() {
-	EnvLoggerBuilder::from_env(Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE")).init();
+fn init_logging() -> std::result::Result<(), log::SetLoggerError> {
+	let logger = EnvLoggerBuilder::from_env(Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE"))
+		.build();
+
+	LogWrapper::new(Shell::progress_bars(), logger).try_init()
 }
 
 /// Entry point for Hipcheck.
 fn main() -> ExitCode {
+	// Initialize the global shell with normal verbosity by default. 
+	Shell::init(Verbosity::Normal);
+	// Initialize logging. 
+	// This must be done after shell initialization. 
 	init_logging();
 
 	// Install a process-wide default crypto provider.
@@ -87,7 +95,7 @@ fn main() -> ExitCode {
 		.expect("installed process-wide default crypto provider");
 
 	if cfg!(feature = "print-timings") {
-		println!("[TIMINGS]: Timing information will be printed.");
+		shell::macros::println!("[TIMINGS]: Timing information will be printed.");
 	}
 
 	// Start tracking the timing for `main` after logging is initiated.

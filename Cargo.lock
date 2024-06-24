@@ -759,6 +759,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "console",
  "content_inspector",
  "dashmap",
  "dirs",
@@ -797,6 +798,7 @@ dependencies = [
  "spdx-rs",
  "tar",
  "tempfile",
+ "term_size",
  "termcolor",
  "toml",
  "unicode-normalization",
@@ -1869,6 +1871,16 @@ dependencies = [
  "fastrand",
  "rustix",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "term_size"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e4129646ca0ed8f45d09b929036bafad5377103edd06e50bf574b353d2b08d9"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]

@@ -91,55 +91,288 @@ use crate::report::Format;
 use crate::report::RecommendationKind;
 use crate::report::Report;
 use std::cell::Cell;
+use std::cell::OnceCell;
 use std::fmt;
 use std::fmt::Debug;
+use std::fmt::Display;
 use std::fmt::Formatter;
 use std::io;
 use std::io::stderr;
 use std::io::stdout;
+use std::io::IsTerminal;
 use std::io::IsTerminal as _;
+use std::io::Write;
 use std::ops::Not as _;
 use std::str::FromStr;
+use std::sync::OnceLock;
+use std::sync::RwLock;
 use std::time::Duration;
 use std::time::Instant;
-use termcolor::Color;
-use termcolor::Color::*;
-use termcolor::ColorSpec;
-use termcolor::StandardStream;
+use console::Color;
+use console::Style;
+use console::Term;
+use indicatif::MultiProgress;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
+use indicatif::TermLike;
 use termcolor::WriteColor;
 
-/// The interface used throughout Hipcheck to print things out to the user.
+/// Global static shell instance, stored in a [`OnceLock`] to make it thread safe and lazy. 
+static GLOBAL_SHELL: OnceLock<Shell> = OnceLock::new();
+
+/// Global static storing the style that should be used for spinners. 
+static SPINNER_STYLE: OnceLock<ProgressStyle> = OnceLock::new();
+
+/// Type interface to the global shell used to produce output in the user's terminal. 
+#[derive(Debug)]
 pub struct Shell {
-	/// A cell wrapper of the inner workings of `Shell`, to enable the
-	/// methods on `Shell` to take it by immutable reference.
-	inner: Cell<Option<ShellInner>>,
+	progres_bars: MultiProgress,
+	verbosity: RwLock<Verbosity>,
 }
 
-/// A convenience macro to generate methods on `Shell` which just delegate to the
-/// real implementation on `ShellInner`.
-macro_rules! inner_methods {
-	( $( $(#[$doc:meta])* $v:vis fn $name:ident($( $param:ident: $type:ty ),*) )* ) => {
-		$(
-			inner_methods! { @single
-				$( #[$doc] )*
-				$v fn $name($( $param: $type ),*)
-			}
-		)*
-	};
-
-	( @single $(#[$doc:meta])* $v:vis fn $name:ident($( $param:ident: $type:ty ),*) ) => {
-		$(#[$doc])*
-		$v fn $name(&self, $($param: $type),*) -> Result<()> {
-			let mut inner = self
-				.inner
-				.take()
-				.ok_or_else(|| hc_error!("no writer found"))?;
-			inner.$name($($param),*)?;
-			self.inner.set(Some(inner));
-			Ok(())
+impl Shell {
+	/// Initialize the global shell. Panics if the global shell is already initialized. 
+	pub(super) fn init(verbosity: Verbosity) {
+		if GLOBAL_SHELL.get().is_some() {
+			panic!("Global shell is already initialized");
 		}
-	};
+
+		GLOBAL_SHELL.get_or_init(move || {
+			Shell { 
+				progres_bars: MultiProgress::new(), verbosity: RwLock::new(verbosity)  }
+		});
+	}
+
+	/// Get the global shell if it's initialized or return [None].
+	#[inline]
+	pub fn try_get() -> Option<&'static Self> {
+		GLOBAL_SHELL.get()
+	}
+
+	/// Get a static reference to the global shell. Panics if the global shell has not yet been initialized. 
+	pub fn get() -> &'static Self {
+		Self::try_get().expect("global shell needs to be initialized.")
+	}
+
+	/// Update the verbosity of the global shell.  
+	pub fn set_verbosity(verbosity: Verbosity) {
+		let mut write_guard = Self::get()
+			.verbosity
+			.write()
+			.expect("acquired write guard to global verbosity");
+
+		*write_guard = verbosity;
+	}
+
+	/// Get the current verbosity of the global shell. 
+	/// 
+	/// Be aware that the value may become outdated if another thread calls [Shell::set_verbosity].
+	pub fn get_verbosity() -> Verbosity {
+		Self::get()
+			.verbosity
+			.read()
+			.expect("acquired read guard to global verbosity")
+			.clone()
+	}
+
+	/// Get a clone of the [`MultiProgress`] instance stored using [`Arc::clone`] under the hood. 
+	pub fn progress_bars() -> MultiProgress {
+		Self::get().progres_bars.clone()
+	}
+
+	/// Get the global static spinner style. 
+	pub fn spinner_style() -> &'static ProgressStyle {
+		SPINNER_STYLE.get_or_init(|| {
+			ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg} {elapsed:>.italic}")
+				.expect("valid spinner style")
+		})
+	}
+
+	/// Start a phase with a spinner that will tick until completion. 
+	/// 
+	/// # Panics
+	/// - Panics if the global shell has not been initialized. 
+	pub fn start_spinner_phase() -> Phase {
+		let bar = Self::get()
+			.progres_bars
+			.add(ProgressBar::new_spinner().with_style(Self::spinner_style().clone()));
+		
+		Phase {
+			bar,
+			// started_at: Instant::now(),
+		}
+	}
+
+	// /// Print a message to the standard output if the standard output is a terminal. 
+	// /// Panics if the global shell is not initialized or if there's an issue printing to the standard output. 
+	// fn println_if_terminal(msg: impl AsRef<str>) {
+	// 	Shell::get()
+	// 		.progres_bars
+	// 		.println(msg)
+	// 		.expect("could print to standard output")
+	// }
+
+	/// Suspend and hide all progress bars to write to the standard output or standard error. 
+	/// Do not do heavy coomputation here since the lock on the progress bars is held the whole time and 
+	/// may cause other threads to block waiting on a lock. 
+	/// 
+	/// # Panics
+	/// - Panics if the global shell is not initialized. 
+	fn in_suspend<F, R>(f: F) -> R
+	where F: FnOnce() -> R {
+		Self::get()
+			.progres_bars
+			.suspend(f)
+	}
+
+	// /// Print a message regardless of whether or not the standard output is a terminal. 
+	// /// [Shell::println_if_terminal] may be more desirable in some cases. 
+	// /// 
+	// /// This will temporarily hide the progress bars to print. 
+	// /// 
+	// /// # Panics
+	// /// - Panics if the global logger is not initialized. 
+	// fn println(msg: impl AsRef<str>) {
+	// 	Shell::in_suspend(|| {
+	// 		println!("{}", msg.as_ref());
+	// 	})
+	// }
+
+	// /// Print a message to the standard error. 
+	// /// Temporarily hide the progress bar to print. 
+	// /// 
+	// /// # Panics
+	// /// - Panics if the global logger is not initialized. 
+	// fn eprintln(msg: impl AsRef<str>) {
+	// 	Shell::in_suspend(|| {
+	// 		eprintln!("{}", msg.as_ref());
+	// 	})
+	// }
+
+	fn print_message(mut term: impl TermLike + Write + IsTerminal, msg: Message) -> Result<()> {
+		// Print nothing if the global verbosity is "silent".
+		if Shell::get_verbosity() == Verbosity::Silent {
+			return Ok(());
+		}
+
+		// Supress optional messages when quiet. 
+		if Shell::get_verbosity() == Verbosity::Quiet && msg.may_not_print() {
+			return Ok(());
+		}
+
+		// Check if the terminal supports clearing/is_atty.  
+		let is_atty: bool = term.is_terminal();
+
+		log::debug!("printing message [message='{:?}']", msg);
+
+		match msg {
+			Message::Clear => term.clear_line()?,
+			Message::Newline => writeln!(&mut term)?, 
+			Message::Nothing | Message::ReportNothing => {},
+			
+			Message::Prelude { title, msg } 
+			| Message::Basic { title, msg } => {
+				write!(&mut term, "{:>width$} {msg}", title.style().apply_to(title.text()), width = title.width())?;
+			}
+
+			Message::Error { title, error } => {
+				write!(&mut term, "{:>width$} {msg}", title.style().apply_to(val))
+			}
+
+
+
+
+			_ => unimplemented!(),
+		}
+
+		Write::flush(&mut term)?;
+
+		Ok(())
+	}
+
+
 }
+
+/// A phase in the processing of hipcheck. 
+/// 
+/// Phases will always contain a progress bar or spinner, which is automatically closed when the phase [Drop]s. 
+#[derive(Debug)]
+pub struct Phase {
+	// started_at: Instant,
+	bar: ProgressBar
+}
+
+// Check to see if this is necessary. 
+impl Drop for Phase {
+	fn drop(&mut self) {
+		self.bar.finish()
+	}
+}
+
+
+// /// Print a string to a writer with a space in front of it, then flush the writer. 
+// fn write_str<W: Write>(w: &mut W, s: &str) -> Result<()> {
+// 	log::trace!("writing message part [part='{:?}']", s);
+// 	write!(w, " {}", s)?;
+// 	w.flush()?;
+// 	Ok(())
+// }
+
+// /// Print a newline to a writer. 
+// fn print_newline<W: Write>(w: &mut W) -> Result<()> {
+// 	log::trace!("writing message part [part='\"\\n\"']");
+// 	writeln!(w)?;
+// 	w.flush()?;
+// 	Ok(())
+// }
+
+
+
+// /// Macros that mirror/replace those from the standard library using the global [`Shell`][crate::shell::Shell].
+// pub mod macros {
+// 	macro_rules! println {
+// 		($($arg:tt)*) => {
+// 			$crate::shell::Shell::println(format!($($arg)*));
+// 		};
+// 	}
+
+// 	// public re-export
+// 	pub(crate) use println;
+
+// 	macro_rules! eprintln {
+// 		($($arg:tt)*) => {
+// 			$crate::shell::Shell::eprintln(format!($($arg)*));
+// 		};
+// 	}
+
+// 	pub(crate) use eprintln;
+// }
+
+// /// A convenience macro to generate methods on `Shell` which just delegate to the
+// /// real implementation on `ShellInner`.
+// macro_rules! inner_methods {
+// 	( $( $(#[$doc:meta])* $v:vis fn $name:ident($( $param:ident: $type:ty ),*) )* ) => {
+// 		$(
+// 			inner_methods! { @single
+// 				$( #[$doc] )*
+// 				$v fn $name($( $param: $type ),*)
+// 			}
+// 		)*
+// 	};
+
+// 	( @single $(#[$doc:meta])* $v:vis fn $name:ident($( $param:ident: $type:ty ),*) ) => {
+// 		$(#[$doc])*
+// 		$v fn $name(&self, $($param: $type),*) -> Result<()> {
+// 			let mut inner = self
+// 				.inner
+// 				.take()
+// 				.ok_or_else(|| hc_error!("no writer found"))?;
+// 			inner.$name($($param),*)?;
+// 			self.inner.set(Some(inner));
+// 			Ok(())
+// 		}
+// 	};
+// }
 
 impl Shell {
 	/// Create a new Shell wrapping the output and error streams.
@@ -180,23 +413,6 @@ impl Shell {
 
 		/// Finish or update a phase, possibly with a timestamp.
 		fn finish_status(msg: &str, elapsed: Option<Duration>)
-	}
-}
-
-impl Debug for Shell {
-	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		match self.inner.take() {
-			Some(inner) => {
-				f.debug_struct("Shell").field("inner", &inner).finish()?;
-
-				self.inner.set(Some(inner));
-			}
-			None => {
-				f.debug_struct("Shell").finish()?;
-			}
-		}
-
-		Ok(())
 	}
 }
 
@@ -585,7 +801,7 @@ impl ShellInner {
 }
 
 /// A handle for outputting progress in a single phase of work.
-pub struct Phase<'sec, 'desc> {
+pub struct OldPhase<'sec, 'desc> {
 	/// A pointer to the shell.
 	shell: &'sec Shell,
 	/// The description for the phase.
@@ -594,9 +810,9 @@ pub struct Phase<'sec, 'desc> {
 	started_at: Instant,
 }
 
-impl<'sec, 'desc> Phase<'sec, 'desc> {
+impl<'sec, 'desc> OldPhase<'sec, 'desc> {
 	/// Construct a new phase, outputting the starting description for it.
-	fn new(shell: &'sec Shell, desc: &'desc str) -> Result<Phase<'sec, 'desc>> {
+	fn new(shell: &'sec ShellInner, desc: &'desc str) -> Result<Phase<'sec, 'desc>> {
 		let started_at = Instant::now();
 
 		shell.status(desc)?;
@@ -698,12 +914,12 @@ impl Printer {
 	}
 
 	/// Print to the stream based on configuration without clearing before the next line.
-	fn print(&mut self, stream: &mut dyn WriteColor, msg: Message) -> Result<()> {
+	fn print(&mut self, stream: &mut impl WriteColor, msg: Message) -> Result<()> {
 		self.print_with_clear(stream, Clear::No, msg)
 	}
 
 	/// Print to the stream based on configuration and clear before the next line.
-	fn update(&mut self, stream: &mut dyn WriteColor, msg: Message) -> Result<()> {
+	fn update(&mut self, stream: &mut impl WriteColor, msg: Message) -> Result<()> {
 		self.print_with_clear(stream, Clear::Yes, msg)
 	}
 
@@ -718,7 +934,7 @@ impl Printer {
 	/// This function is why the `Printer` type exists.
 	fn print_with_clear(
 		&mut self,
-		stream: &mut dyn WriteColor,
+		stream: &mut impl WriteColor,
 		clear: Clear,
 		msg: Message,
 	) -> Result<()> {
@@ -879,7 +1095,6 @@ impl ColorChoice {
 
 /// Print a message out to a stream.
 fn print(stream: &mut dyn WriteColor, msg: Message) -> Result<()> {
-	log::debug!("printing message [message='{:?}']", msg);
 
 	stream.reset()?;
 
@@ -1004,10 +1219,11 @@ fn print_report_json(report: Report, stream: &mut dyn WriteColor) -> Result<()> 
 	Ok(())
 }
 
-/// Print a newline to the stream.
-fn print_newline(stream: &mut dyn WriteColor) -> Result<()> {
-	log::trace!("writing message part [part='\"\\n\"']");
-	writeln!(stream)?;
+/// Print (prettily) a JSON value to the stream for pull requests.
+fn print_pr_report_json(pr_report: PrReport, stream: &mut dyn WriteColor) -> Result<()> {
+	stream.reset()?;
+	log::trace!("writing message part [part='{:?}']", pr_report);
+	serde_json::to_writer_pretty(&mut *stream, &pr_report)?;
 	stream.flush()?;
 	Ok(())
 }
@@ -1111,11 +1327,19 @@ enum Title<'a> {
 	Empty,
 }
 
-impl<'a> Print for Title<'a> {
-	fn text(&self) -> String {
+impl<'a> Title<'a> {
+	/// Maximum width of a title
+	///
+	/// Length of " Affiliation Pass" (with space)
+	const MAX_TITLE_WIDTH: usize = 17;
+
+	/// Length of " Done" (with space)
+	const DONE_WIDTH: usize = 5;
+
+	const fn text(&self) -> &str {
 		use Title::*;
 
-		let text = match self {
+		match self {
 			Analyzing => "Analyzing",
 			Analyzed => "Analyzed",
 			Section(s) => s,
@@ -1128,9 +1352,7 @@ impl<'a> Print for Title<'a> {
 			Investigate => "INVESTIGATE",
 			Error => "Error",
 			Empty => "",
-		};
-
-		text.to_string()
+		}
 	}
 
 	fn width(&self) -> usize {
@@ -1139,16 +1361,17 @@ impl<'a> Print for Title<'a> {
 		match self {
 			// Full width
 			Analyzing | Analyzed | Section(..) | Passed | Failed | Errored | InProgress | Done
-			| Pass | Investigate | Error | Empty => MAX_TITLE_WIDTH,
+			| Pass | Investigate | Error | Empty => Title::MAX_TITLE_WIDTH,
 			// Leave room for the timestamp.
-			TimestampedDone => DONE_WIDTH,
+			TimestampedDone => Title::DONE_WIDTH,
 		}
 	}
 
-	fn color(&self) -> Option<Color> {
+	fn style(&self) -> Style {
 		use Title::*;
+		use console::Color::*;
 
-		match self {
+		let color = match self {
 			Analyzed | Section(..) => Some(Blue),
 			Analyzing | Done | TimestampedDone => Some(Cyan),
 			InProgress => Some(Magenta),
@@ -1157,11 +1380,35 @@ impl<'a> Print for Title<'a> {
 			Errored => Some(Yellow),
 			Error => Some(Red),
 			Empty => None,
+		};
+
+		match color {
+			Some(c) => Style::new().fg(c).bold(),
+			None => Style::new()
 		}
 	}
 
-	fn is_bold(&self) -> bool {
-		true
+	// /// Print the text out with all the configuration.
+	// fn print<W: Write + TermLike>(&self, w: &mut dyn WriteColor) -> Result<()> {
+	// 	stream.set_color(
+	// 		ColorSpec::new()
+	// 			.set_bold(self.is_bold())
+	// 			.set_fg(self.color()),
+	// 	)?;
+
+	// 	let to_write = format!("{:>width$}", self.text(), width = self.width());
+	// 	log::trace!("writing message part [part='{:?}']", to_write);
+	// 	write!(stream, "{}", to_write)?;
+	// 	// No need to flush here, as the string at the end of each line
+	// 	// will be accompanied by a `flush` call.
+
+	// 	Ok(())
+	// }
+}
+
+impl<'a> Display for Title<'a> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		unimplemented!()
 	}
 }
 
@@ -1201,39 +1448,42 @@ impl FromStr for Outcome {
 	}
 }
 
-impl Print for Outcome {
-	fn text(&self) -> String {
-		let text = match self {
+impl Outcome {
+	/// Maximum width of an outcome
+	///
+	/// Length of " Pass" / " Fail" / " Skip" (with space)
+	const OUTCOME_WIDTH: usize = 5;
+
+	fn text(&self) -> &'static str {
+		match self {
 			Outcome::Pass => "Pass",
 			Outcome::Fail => "Fail",
 			Outcome::Skip => "Skip",
-		};
-
-		text.to_owned()
 	}
+	}
+
+	fn width(&self) -> usize {
+		OUTCOME_WIDTH
+		}
 
 	fn width(&self) -> usize {
 		OUTCOME_WIDTH
 	}
 
-	fn color(&self) -> Option<Color> {
+	fn style(&self) -> Style {
 		match self {
-			Outcome::Pass => Some(Green),
-			Outcome::Fail => Some(Red),
-			Outcome::Skip => Some(Yellow),
+			Outcome::Pass => Style::new().green().bold(),
+			Outcome::Fail => Style::new().red().bold(),
+			Outcome::Skip => Style::new().yellow().bold(),
 		}
-	}
-
-	fn is_bold(&self) -> bool {
-		true
 	}
 }
 
-/// A timestamp for how long a phase took.
+/// How long a phase took.
 #[derive(Debug)]
-struct Timestamp(Duration);
+struct WallTime(Duration);
 
-impl Print for Timestamp {
+impl WallTime {
 	fn text(&self) -> String {
 		let secs = self.0.as_secs();
 		let millis = self.0.subsec_millis();
@@ -1242,15 +1492,7 @@ impl Print for Timestamp {
 
 	fn width(&self) -> usize {
 		// Leave room for the title.
-		MAX_TITLE_WIDTH - DONE_WIDTH
-	}
-
-	fn color(&self) -> Option<Color> {
-		Some(White)
-	}
-
-	fn is_bold(&self) -> bool {
-		false
+		Title::MAX_TITLE_WIDTH - Title::DONE_WIDTH
 	}
 }
 
@@ -1289,18 +1531,7 @@ trait Print {
 	}
 }
 
-/// Maximum width of a title
-///
-/// Length of " Affiliation Pass" (with space)
-const MAX_TITLE_WIDTH: usize = 17;
 
-/// Maximum width of an outcome
-///
-/// Length of " Pass" / " Fail" / " Skip" (with space)
-const OUTCOME_WIDTH: usize = 5;
-
-/// Length of " Done" (with space)
-const DONE_WIDTH: usize = 5;
 
 // The following code to handle window sizing and line clearing in a cross-platform manner
 // is adapted from the Cargo project (MIT license). https://github.com/rust-lang/cargo
