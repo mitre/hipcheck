@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::analysis::score::HCStoredResult;
 use crate::hc_error;
 use crate::report::Concern;
 use crate::Result;
 use crate::F64;
 use std::cmp::Ordering;
 use std::fmt::{self, Display};
+use std::sync::Arc;
 
 /// Represents the enhanced result of a hipcheck analysis. Contains the actual outcome
 /// of the analysis, plus additional meta-information the analysis wants to provide to
@@ -14,6 +16,14 @@ use std::fmt::{self, Display};
 pub struct HCAnalysisReport {
 	pub outcome: HCAnalysisOutcome,
 	pub concerns: Vec<Concern>,
+}
+impl HCAnalysisReport {
+	pub fn generic_error(error: crate::error::Error, concerns: Vec<Concern>) -> Self {
+		HCAnalysisReport {
+			outcome: HCAnalysisOutcome::Error(HCAnalysisError::Generic(error)),
+			concerns,
+		}
+	}
 }
 
 /// Represents the result of a hipcheck analysis. Either the analysis encountered
@@ -102,7 +112,7 @@ pub enum HCCompositeValue {
 }
 
 /// The set of possible predicates for deciding if a source passed an analysis.
-pub trait HCPredicate: Display + Clone + Eq + PartialEq {
+pub trait HCPredicate: Display + std::fmt::Debug + std::any::Any + 'static {
 	fn pass(&self) -> Result<bool>;
 }
 
@@ -131,21 +141,43 @@ impl ThresholdPredicate {
 	}
 }
 
-fn pass_threshold<T: Ord>(a: &T, b: &T, ord: &Ordering) -> bool {
-	a.cmp(b) == *ord
+fn pass_threshold<T: Ord>(a: &T, b: &T, ord: Ordering) -> bool {
+	a.cmp(b) == ord
 }
 
+impl ThresholdPredicate {
+	pub fn from_analysis(
+		report: &HCAnalysisReport,
+		threshold: HCBasicValue,
+		units: Option<String>,
+		order: Ordering,
+	) -> HCStoredResult {
+		let result = match &report.outcome {
+			HCAnalysisOutcome::Error(err) => Err(hc_error!("{:?}", err)),
+			HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(av)) => {
+				Ok(ThresholdPredicate::new(av.clone(), threshold, units, order))
+			}
+			HCAnalysisOutcome::Completed(HCAnalysisValue::Composite(_)) => Err(hc_error!(
+				"activity analysis should return a basic u64 type, not {:?}"
+			)),
+		};
+		HCStoredResult {
+			result: result.map(|r| Arc::new(Predicate::Threshold(r))),
+			concerns: report.concerns.clone(),
+		}
+	}
+}
 impl HCPredicate for ThresholdPredicate {
 	// @FollowUp - would be nice for this match logic to error at compile time if a new
 	//  HCBasicValue type is added, so developer is reminded to add new variant here
 	fn pass(&self) -> Result<bool> {
 		use HCBasicValue::*;
 		match (&self.value, &self.threshold) {
-			(Integer(a), Integer(b)) => Ok(pass_threshold(a, b, &self.ordering)),
-			(Unsigned(a), Unsigned(b)) => Ok(pass_threshold(a, b, &self.ordering)),
-			(Float(a), Float(b)) => Ok(pass_threshold(a, b, &self.ordering)),
-			(Bool(a), Bool(b)) => Ok(pass_threshold(a, b, &self.ordering)),
-			(String(a), String(b)) => Ok(pass_threshold(a, b, &self.ordering)),
+			(Integer(a), Integer(b)) => Ok(pass_threshold(a, b, self.ordering)),
+			(Unsigned(a), Unsigned(b)) => Ok(pass_threshold(a, b, self.ordering)),
+			(Float(a), Float(b)) => Ok(pass_threshold(a, b, self.ordering)),
+			(Bool(a), Bool(b)) => Ok(pass_threshold(a, b, self.ordering)),
+			(String(a), String(b)) => Ok(pass_threshold(a, b, self.ordering)),
 			(a, b) => Err(hc_error!(
 				"threshold and value are of different types: {:?}, {:?}",
 				a,
@@ -166,5 +198,27 @@ impl Display for ThresholdPredicate {
 			Greater => ">",
 		};
 		write!(f, "{} {} {}", val.trim(), order_str, thr.trim())
+	}
+}
+
+#[derive(Debug)]
+pub enum Predicate {
+	Threshold(ThresholdPredicate),
+}
+
+impl Display for Predicate {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use Predicate::*;
+		match self {
+			Threshold(t) => t.fmt(f),
+		}
+	}
+}
+impl HCPredicate for Predicate {
+	fn pass(&self) -> Result<bool> {
+		use Predicate::*;
+		match self {
+			Threshold(t) => t.pass(),
+		}
 	}
 }

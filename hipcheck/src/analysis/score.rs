@@ -9,6 +9,7 @@ use crate::hc_error;
 use crate::report::Concern;
 use crate::shell::Phase;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::default::Default;
 use std::sync::Arc;
 
@@ -42,10 +43,63 @@ pub struct ScoringResults {
 	pub score: Score,
 }
 
+#[derive(Debug, Clone)]
+pub struct HCStoredResult {
+	pub result: Result<Arc<Predicate>>,
+	pub concerns: Vec<Concern>,
+}
+impl HCStoredResult {
+	// Score the analysis by invoking predicate's impl of `pass()`. Errored
+	// analyses treated as failures.
+	// @FollowUp - remove AnalysisOutcome once scoring refactor complete
+	pub fn score(&self) -> (u64, AnalysisOutcome) {
+		match &self.result {
+			Err(e) => (1, AnalysisOutcome::Error(e.clone())),
+			Ok(pred) => {
+				let passed = match pred.pass() {
+					Err(err) => {
+						return (1, AnalysisOutcome::Error(err));
+					}
+					Ok(p) => p,
+				};
+				let msg = pred.to_string();
+				let outcome = if passed {
+					AnalysisOutcome::Pass(msg)
+				} else {
+					AnalysisOutcome::Fail(msg)
+				};
+				let score = (!passed) as u64;
+				(score, outcome)
+			}
+		}
+	}
+}
+#[derive(Debug, Default)]
+pub struct AltAnalysisResults {
+	pub table: HashMap<String, HCStoredResult>,
+}
+impl AltAnalysisResults {
+	pub fn add(
+		&mut self,
+		key: &str,
+		result: Result<Arc<Predicate>>,
+		concerns: Vec<Concern>,
+	) -> Result<()> {
+		if self.table.contains_key(key) {
+			return Err(hc_error!(
+				"analysis results table already contains key '{key}'"
+			));
+		}
+		let result_struct = HCStoredResult { result, concerns };
+		self.table.insert(key.to_owned(), result_struct);
+		Ok(())
+	}
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct AnalysisResults {
-	pub activity: Option<(Result<Arc<ThresholdPredicate>>, Vec<Concern>)>,
+	pub activity: Option<HCStoredResult>,
 	pub affiliation: Option<Result<Arc<AnalysisReport>>>,
 	pub binary: Option<Result<Arc<AnalysisReport>>>,
 	pub churn: Option<Result<Arc<AnalysisReport>>>,
@@ -540,6 +594,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 	// Values set with -1.0 are reseved for parent nodes whose score comes always from children nodes with a score set by hc_analysis algorithms
 
 	let mut results = AnalysisResults::default();
+	let mut alt_results = AltAnalysisResults::default();
 	let mut score = Score::default();
 	let mut score_tree = ScoreTree { tree: Graph::new() };
 	let root_node = score_tree.tree.add_node(ScoreTreeNode {
@@ -571,47 +626,28 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 		// Check if this analysis was skipped or generated an error, then format the results accordingly for reporting.
 		if db.activity_active() {
 			let raw_activity = db.activity_analysis();
-			let activity_res = match &raw_activity.as_ref().outcome {
-				HCAnalysisOutcome::Error(err) => Err(hc_error!("{:?}", err)),
-				HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(av)) => {
-					let raw_threshold: u64 = db.activity_week_count_threshold();
-					let threshold = HCBasicValue::from(raw_threshold);
-					let predicate = ThresholdPredicate::new(
-						av.clone(),
-						threshold,
-						Some("weeks inactivity".to_owned()),
-						Ordering::Less,
-					);
-					Ok(Arc::new(predicate))
-				}
-				HCAnalysisOutcome::Completed(HCAnalysisValue::Composite(_)) => Err(hc_error!(
-					"activity analysis should return a basic u64 type, not {:?}"
-				)),
-			};
+			let raw_threshold: u64 = db.activity_week_count_threshold();
+
+			// Process analysis value into a threshold predicate and add to new & old storage
+			// objects
+			let activity_result = ThresholdPredicate::from_analysis(
+				&raw_activity,
+				HCBasicValue::from(raw_threshold),
+				Some("weeks inactivity".to_owned()),
+				Ordering::Less,
+			);
+			results.activity = Some(activity_result.clone());
+			alt_results
+				.table
+				.insert(ACTIVITY_PHASE.to_owned(), activity_result);
+
 			// Scoring based off of predicate
-			let score_result = Arc::new(match activity_res.as_ref() {
-				Err(e) => ScoreResult {
-					count: db.activity_weight(),
-					score: 1,
-					outcome: AnalysisOutcome::Error(e.clone()),
-				},
-				Ok(pred) => {
-					// Derive score from predicate, true --> 0, false --> 1
-					let passed = pred.pass()?;
-					let msg = pred.to_string();
-					let outcome = if passed {
-						AnalysisOutcome::Pass(msg)
-					} else {
-						AnalysisOutcome::Fail(msg)
-					};
-					ScoreResult {
-						count: db.activity_weight(),
-						score: (!passed) as u64,
-						outcome,
-					}
-				}
+			let (act_score, outcome) = alt_results.table.get(ACTIVITY_PHASE).unwrap().score();
+			let score_result = Arc::new(ScoreResult {
+				count: db.activity_weight(),
+				score: act_score,
+				outcome,
 			});
-			results.activity = Some((activity_res, raw_activity.concerns.clone()));
 			score.activity = score_result.outcome.clone();
 			match add_node_and_edge_with_score(
 				score_result,
