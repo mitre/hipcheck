@@ -730,7 +730,6 @@ impl KeyboardLayout {
 mod test {
 	use super::NameFuzzer;
 	use super::Typo;
-	use lazy_static::lazy_static;
 
 	macro_rules! test_typos {
         ( from: $name:ident, to: $to:literal, expected: [ $( $expected:ident ),* ] ) => {
@@ -745,9 +744,7 @@ mod test {
         };
     }
 
-	lazy_static! {
-		static ref NAME: &'static str = "hello";
-	}
+	const NAME: &'static str = "hello";
 
 	#[test]
 	fn fuzz_hello_to_hallo() {
