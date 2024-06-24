@@ -759,6 +759,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "console",
  "content_inspector",
  "dashmap",
  "dirs",
@@ -773,7 +774,6 @@ dependencies = [
  "indextree",
  "indicatif",
  "indicatif-log-bridge",
- "libc",
  "log",
  "maplit",
  "nom",
@@ -798,14 +798,13 @@ dependencies = [
  "spdx-rs",
  "tar",
  "tempfile",
- "termcolor",
+ "term_size",
  "toml",
  "unicode-normalization",
  "ureq",
  "url",
  "walkdir",
  "which",
- "winapi",
  "xml-rs",
  "xz2",
  "zip",
@@ -1883,12 +1882,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "termcolor"
-version = "1.4.1"
+name = "term_size"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
+checksum = "1e4129646ca0ed8f45d09b929036bafad5377103edd06e50bf574b353d2b08d9"
 dependencies = [
- "winapi-util",
+ "libc",
+ "winapi",
 ]
 
 [[package]]

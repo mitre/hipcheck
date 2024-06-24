@@ -36,9 +36,8 @@ use crate::session::session::Check;
 use crate::session::session::Session;
 use crate::session::session::TargetKind;
 use crate::setup::{resolve_and_transform_source, SourceType};
-use crate::shell::Output;
+use crate::shell::verbosity::Verbosity;
 use crate::shell::Shell;
-use crate::shell::Verbosity;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
 use cli::CheckArgs;
@@ -56,11 +55,14 @@ use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
 use indextree::Arena;
 use indextree::NodeId;
+use indicatif_log_bridge::LogWrapper;
 use ordered_float::NotNan;
 use pathbuf::pathbuf;
 use rustls::crypto::ring;
 use rustls::crypto::CryptoProvider;
 use schemars::schema_for;
+use shell::color_choice::ColorChoice;
+use shell::spinner_phase::SpinnerPhase;
 use std::env;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -71,23 +73,32 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::ExitCode;
 use std::result::Result as StdResult;
+use std::time::Duration;
 use util::fs::create_dir_all;
 use which::which;
 
-fn init_logging() {
-	EnvLoggerBuilder::from_env(Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE")).init();
+fn init_logging() -> std::result::Result<(), log::SetLoggerError> {
+	let logger =
+		EnvLoggerBuilder::from_env(Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE")).build();
+
+	LogWrapper::new(Shell::progress_bars(), logger).try_init()
 }
 
 /// Entry point for Hipcheck.
 fn main() -> ExitCode {
-	init_logging();
+	// Initialize the global shell with normal verbosity by default.
+	Shell::init(Verbosity::Normal);
+	// Initialize logging.
+	// This must be done after shell initialization.
+	// Panic if this fails.
+	init_logging().unwrap();
 
 	// Install a process-wide default crypto provider.
 	CryptoProvider::install_default(ring::default_provider())
 		.expect("installed process-wide default crypto provider");
 
 	if cfg!(feature = "print-timings") {
-		println!("[TIMINGS]: Timing information will be printed.");
+		Shell::eprintln("[TIMINGS]: Timing information will be printed.");
 	}
 
 	// Start tracking the timing for `main` after logging is initiated.
@@ -95,6 +106,16 @@ fn main() -> ExitCode {
 	let _0 = benchmarking::print_scope_time!("main");
 
 	let config = CliConfig::load();
+
+	// Set the global verbosity.
+	Shell::set_verbosity(config.verbosity());
+
+	// Set whether to use colors.
+	match config.color() {
+		ColorChoice::Always => Shell::set_colors_enabled(true),
+		ColorChoice::Never => Shell::set_colors_enabled(false),
+		ColorChoice::Auto => {}
+	}
 
 	match config.subcommand() {
 		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
@@ -109,12 +130,12 @@ fn main() -> ExitCode {
 			return cmd_print_weights(&config)
 				.map(|_| ExitCode::SUCCESS)
 				.unwrap_or_else(|err| {
-					eprintln!("{}", err);
+					Shell::print_error(&err, Format::Human);
 					ExitCode::FAILURE
 				});
 		}
 
-		None => print_error(&hc_error!("missing subcommand")),
+		None => Shell::print_error(&hc_error!("missing subcommand"), Format::Human),
 	};
 
 	// If we didn't early return, return success.
@@ -126,7 +147,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	let check = match args.command() {
 		Ok(chk) => chk.as_check(),
 		Err(e) => {
-			print_error(&e);
+			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;
 		}
 	};
@@ -137,10 +158,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 
 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 
-	let (shell, report) = run(
-		Output::stdout(config.color()),
-		Output::stderr(config.color()),
-		config.verbosity(),
+	let report = run(
 		check,
 		config.config().map(ToOwned::to_owned),
 		config.data().map(ToOwned::to_owned),
@@ -150,14 +168,14 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	);
 
 	match report {
-		Ok(AnyReport::Report(report)) => {
-			let _ = shell.report(&mut Output::stdout(config.color()), report, config.format());
-			ExitCode::SUCCESS
-		}
+		Ok(AnyReport::Report(report)) => Shell::print_report(report, config.format())
+			.map(|()| ExitCode::SUCCESS)
+			.unwrap_or_else(|err| {
+				Shell::print_error(&err, Format::Human);
+				ExitCode::FAILURE
+			}),
 		Err(e) => {
-			if shell.error(&e, config.format()).is_err() {
-				print_error(&e);
-			}
+			Shell::print_error(&e, config.format());
 			ExitCode::FAILURE
 		}
 	}
@@ -177,14 +195,12 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	// Get the raw hipcheck version.
 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 
+	// Silence the global shell while we're checking the dummy repo to prevent progress bars and
+	// title messages from displaying while calculating the weight tree.
+	let silence_guard = Shell::silence();
+
 	// Create a dummy session to query the salsa database for a weight graph for printing.
-	let session_result = Session::new(
-		// Use a sink output here since we just want to print the tree and not the shell prelude or anything else.
-		Shell::new(
-			Output::sink(),
-			Output::stdout(shell::ColorChoice::Auto),
-			Verbosity::Normal,
-		),
+	let session = Session::new(
 		&Check {
 			target: "dummy".to_owned(),
 			kind: CheckKind::Repo,
@@ -196,10 +212,9 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		config.cache().map(ToOwned::to_owned),
 		config.format(),
 		raw_version,
-	);
+	)?;
 
-	// Unwrap the session, get the weight tree and print it.
-	let session = session_result.map_err(|(_, err)| err)?;
+	// Get the weight tree and print it.
 	let weight_tree = session.normalized_weight_tree()?;
 
 	// Create a special wrapper to override `Debug` so that we can use indextree's \
@@ -258,12 +273,15 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		}
 	}
 
+	// Drop the silence guard to make the shell produce output again.
+	drop(silence_guard);
+
 	let mut print_tree = ConvertTree(Arena::with_capacity(weight_tree.tree.capacity()));
 	let print_root = print_tree.convert_tree(weight_tree.root, &weight_tree.tree);
 
 	// Print the output using indextree's debug pretty printer.
 	let output = print_root.debug_pretty_print(&print_tree.0);
-	println!("{output:?}");
+	shell::macros::println!("{output:?}");
 
 	Ok(())
 }
@@ -304,7 +322,7 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 	// Find or download a Hipcheck bundle source and decompress
 	let source = match resolve_and_transform_source(args) {
 		Err(e) => {
-			print_error(&e);
+			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;
 		}
 		Ok(x) => x,
@@ -317,7 +335,10 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 			pathbuf![p.as_path(), "scripts"],
 		),
 		_ => {
-			print_error(&hc_error!("expected source to be a directory"));
+			Shell::print_error(
+				&hc_error!("expected source to be a directory"),
+				Format::Human,
+			);
 			source.cleanup();
 			return ExitCode::FAILURE;
 		}
@@ -325,37 +346,57 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 
 	// Make config dir if not exist
 	let Some(tgt_conf_path) = config.config() else {
-		print_error(&hc_error!("target config dir not specified"));
+		Shell::print_error(&hc_error!("target config dir not specified"), Format::Human);
 		return ExitCode::FAILURE;
 	};
+
 	if !tgt_conf_path.exists() && create_dir_all(tgt_conf_path).is_err() {
-		print_error(&hc_error!("failed to create missing target config dir"));
+		Shell::print_error(
+			&hc_error!("failed to create missing target config dir"),
+			Format::Human,
+		);
 	}
+
 	let Ok(abs_conf_path) = tgt_conf_path.canonicalize() else {
-		print_error(&hc_error!("failed to canonicalize HC_CONFIG path"));
+		Shell::print_error(
+			&hc_error!("failed to canonicalize HC_CONFIG path"),
+			Format::Human,
+		);
 		return ExitCode::FAILURE;
 	};
 
 	// Make data dir if not exist
 	let Some(tgt_data_path) = config.data() else {
-		print_error(&hc_error!("target data dir not specified"));
+		Shell::print_error(&hc_error!("target data dir not specified"), Format::Human);
 		return ExitCode::FAILURE;
 	};
 	if !tgt_data_path.exists() && create_dir_all(tgt_data_path).is_err() {
-		print_error(&hc_error!("failed to create missing target data dir"));
+		Shell::print_error(
+			&hc_error!("failed to create missing target data dir"),
+			Format::Human,
+		);
 	}
 	let Ok(abs_data_path) = tgt_data_path.canonicalize() else {
-		print_error(&hc_error!("failed to canonicalize HC_DATA path"));
+		Shell::print_error(
+			&hc_error!("failed to canonicalize HC_DATA path"),
+			Format::Human,
+		);
 		return ExitCode::FAILURE;
 	};
 
 	// Copy local config/data dirs to target locations
 	if let Err(e) = copy_dir_contents(src_conf_path, &abs_conf_path) {
-		print_error(&hc_error!("failed to copy config dir contents: {}", e));
+		Shell::print_error(
+			&hc_error!("failed to copy config dir contents: {}", e),
+			Format::Human,
+		);
 		return ExitCode::FAILURE;
 	}
 	if let Err(e) = copy_dir_contents(src_data_path, &abs_data_path) {
-		print_error(&hc_error!("failed to copy data dir contents: {}", e));
+		Shell::print_error(
+			&hc_error!("failed to copy data dir contents: {}", e),
+			Format::Human,
+		);
 		return ExitCode::FAILURE;
 	}
 
@@ -630,7 +671,7 @@ fn cmd_update(args: &UpdateArgs) {
 		command_name = "hipcheck-update";
 	} else {
 		// If neither possible updater command us found, print this error
-		print_error(&hc_error!("Updater tool not found. Did you install Hipcheck with the official release script (which will install the updater tool)? If you installed Hipcheck from source, you must update Hipcheck by installing a new version from source manually."));
+		Shell::print_error(&hc_error!("Updater tool not found. Did you install Hipcheck with the official release script (which will install the updater tool)? If you installed Hipcheck from source, you must update Hipcheck by installing a new version from source manually."), Format::Human);
 		return;
 	}
 
@@ -639,7 +680,7 @@ fn cmd_update(args: &UpdateArgs) {
 	match hc_command.output() {
 		// Panic: Safe to unwrap because if the updater command runs, it will always produce some output to stderr
 		Ok(output) => std::io::stdout().write_all(&output.stderr).unwrap(),
-		Err(..) => print_error(&hc_error!("Updater command failed to run. You may need to re-install Hipcheck with the official release script.")),
+		Err(..) => Shell::print_error(&hc_error!("Updater command failed to run. You may need to re-install Hipcheck with the official release script."), Format::Human),
 	}
 }
 
@@ -672,7 +713,7 @@ fn cmd_print_home(path: Option<&Path>) {
 			println!("{}", path_buffer.display());
 		}
 		Err(err) => {
-			print_error(&err);
+			Shell::print_error(&err, Format::Human);
 		}
 	}
 }
@@ -686,7 +727,7 @@ fn cmd_print_config(config_path: Option<&Path>) {
 			println!("{}", path_buffer.display());
 		}
 		Err(err) => {
-			print_error(&err);
+			Shell::print_error(&err, Format::Human);
 		}
 	}
 }
@@ -700,7 +741,7 @@ fn cmd_print_data(data_path: Option<&Path>) {
 			println!("{}", path_buffer.display());
 		}
 		Err(err) => {
-			print_error(&err);
+			Shell::print_error(&err, Format::Human);
 		}
 	}
 }
@@ -779,52 +820,20 @@ impl CheckKind {
 	}
 }
 
-/// Run Hipcheck.
-///
-/// Parses arguments, sets up shell output, and then runs the main logic.
-#[allow(clippy::too_many_arguments)]
-fn run(
-	output: Output,
-	error_output: Output,
-	verbosity: Verbosity,
-	check: Check,
-	config_path: Option<PathBuf>,
-	data_path: Option<PathBuf>,
-	home_dir: Option<PathBuf>,
-	format: Format,
-	raw_version: &str,
-) -> (Shell, Result<AnyReport>) {
-	// Setup wrapper for shell output.
-	let shell = Shell::new(output, error_output, verbosity);
-
-	// Run and print / report errors.
-	run_with_shell(
-		shell,
-		check,
-		config_path,
-		data_path,
-		home_dir,
-		format,
-		raw_version,
-	)
-}
-
 // This is for testing purposes.
 /// Now that we're fully-initialized, run Hipcheck's analyses.
 #[allow(clippy::too_many_arguments)]
 #[doc(hidden)]
-fn run_with_shell(
-	shell: Shell,
+fn run(
 	check: Check,
 	config_path: Option<PathBuf>,
 	data_path: Option<PathBuf>,
 	home_dir: Option<PathBuf>,
 	format: Format,
 	raw_version: &str,
-) -> (Shell, Result<AnyReport>) {
+) -> Result<AnyReport> {
 	// Initialize the session.
 	let session = match Session::new(
-		shell,
 		&check,
 		&check.target,
 		config_path,
@@ -834,83 +843,41 @@ fn run_with_shell(
 		raw_version,
 	) {
 		Ok(session) => session,
-		Err((shell, err)) => return (shell, Err(err)),
+		Err(err) => return Err(err),
 	};
 
 	match check.kind.target_kind() {
 		TargetKind::RepoSource | TargetKind::SpdxDocument => {
 			// Run analyses against a repo and score the results (score calls analyses that call metrics).
-			let mut phase = match session.shell.phase("analyzing and scoring results") {
-				Ok(phase) => phase,
-				Err(err) => return (session.end(), Err(err)),
-			};
+			let phase = SpinnerPhase::start("analyzing and scoring results");
 
-			let scoring = match score_results(&mut phase, &session) {
-				Ok(scoring) => scoring,
-				Err(x) => {
-					return (
-						session.end(),
-						Err(x), // Error::msg("Trouble scoring and analyzing results")),
-					);
-				}
-			};
+			// Enable steady ticking on the spinner, since we currently don't increment it manually.
+			phase.enable_steady_tick(Duration::from_millis(250));
 
-			match phase.finish() {
-				Ok(()) => {}
-				Err(err) => return (session.end(), Err(err)),
-			};
+			let scoring = score_results(&phase, &session)?;
+			phase.finish_successful();
 
 			// Build the final report.
 			let report =
-				match build_report(&session, &scoring).context("failed to build final report") {
-					Ok(report) => report,
-					Err(err) => return (session.end(), Err(err)),
-				};
+				build_report(&session, &scoring).context("failed to build final report")?;
 
-			(session.end(), Ok(AnyReport::Report(report)))
+			Ok(AnyReport::Report(report))
 		}
+
 		TargetKind::PackageVersion => {
 			// Run analyses against a repo and score the results (score calls analyses that call metrics).
-			let mut phase = match session.shell.phase("analyzing and scoring results") {
-				Ok(phase) => phase,
-				Err(err) => return (session.end(), Err(err)),
-			};
+			let phase = SpinnerPhase::start("analyzing and scoring results");
+			// Enable steady ticking on the spinner, since we currently don't increment it manually.
+			phase.enable_steady_tick(Duration::from_millis(250));
 
-			let scoring = match score_results(&mut phase, &session) {
-				Ok(scoring) => scoring,
-				_ => {
-					return (
-						session.end(),
-						Err(Error::msg("Trouble scoring and analyzing results")),
-					)
-				}
-			};
-
-			match phase.finish() {
-				Ok(()) => {}
-				Err(err) => return (session.end(), Err(err)),
-			};
+			let scoring = score_results(&phase, &session)?;
+			phase.finish_successful();
 
 			// Build the final report.
 			let report =
-				match build_report(&session, &scoring).context("failed to build final report") {
-					Ok(report) => report,
-					Err(err) => return (session.end(), Err(err)),
-				};
+				build_report(&session, &scoring).context("failed to build final report")?;
 
-			(session.end(), Ok(AnyReport::Report(report)))
+			Ok(AnyReport::Report(report))
 		}
-	}
-}
-
-/// Print errors which occur before the `Shell` type can be setup.
-fn print_error(err: &Error) {
-	let mut chain = err.chain();
-
-	// PANIC: First error is guaranteed to be present.
-	eprintln!("error: {}", chain.next().unwrap());
-
-	for err in chain {
-		eprintln!("       {}", err);
 	}
 }

@@ -7,7 +7,7 @@ use crate::config::{visit_leaves, WeightTree, WeightTreeProvider};
 use crate::error::Result;
 use crate::hc_error;
 use crate::report::Concern;
-use crate::shell::Phase;
+use crate::shell::spinner_phase::SpinnerPhase;
 use num_traits::identities::Zero;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -284,16 +284,9 @@ pub fn phase_outcome<P: AsRef<String>>(
 	}
 }
 
-pub fn update_phase(phase: &mut Phase, phase_name: &str) -> Result<()> {
-	match phase.update(phase_name) {
-		Ok(()) => Ok(()),
-		_ => Err(hc_error!("failed to update {} phase.", phase_name)),
-	}
-}
-
 macro_rules! run_and_score_threshold_analysis {
 	($res:ident, $p:ident, $phase:ident, $a:expr, $spec:ident) => {{
-		update_phase($p, $phase)?;
+		$p.update_status($phase);
 		let analysis_result =
 			ThresholdPredicate::from_analysis(&$a, $spec.threshold, $spec.units, $spec.ordering);
 		$res.table.insert($phase.to_owned(), analysis_result);
@@ -302,7 +295,7 @@ macro_rules! run_and_score_threshold_analysis {
 	}};
 }
 
-pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
+pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
 	/*
 	Scoring should be performed by the construction of a "score tree" where scores are the
 	nodes and weights are the edges. The leaves are the analyses themselves, which either

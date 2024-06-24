@@ -5,7 +5,8 @@ use crate::data::git_command::GitCommand;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
-use crate::shell::Phase;
+use crate::shell::spinner_phase::SpinnerPhase;
+// use crate::shell::Phase;
 pub use crate::source::query::*;
 use log::debug;
 use pathbuf::pathbuf;
@@ -53,7 +54,7 @@ impl SourceRepo {
 	/// make sure future operations are all done relative to the HEAD, and that any
 	/// cached data records what the HEAD was at the time of caching, to enable
 	/// cache invalidation.
-	pub fn resolve_repo(phase: &mut Phase, root: &Path, raw: &str) -> Result<SourceRepo> {
+	pub fn resolve_repo(phase: &SpinnerPhase, root: &Path, raw: &str) -> Result<SourceRepo> {
 		let local = PathBuf::from(raw);
 
 		let source = match (local.exists(), local.is_dir()) {
@@ -63,7 +64,7 @@ impl SourceRepo {
 				local.display()
 			)),
 			// It's a local dir.
-			(true, true) => SourceRepo::resolve_local_repo(phase, root, raw, local),
+			(true, true) => SourceRepo::resolve_local_repo(root, raw, local),
 			// It's possibly a remote URL.
 			(false, _) => SourceRepo::resolve_remote_repo(phase, root, raw),
 		};
@@ -95,12 +96,7 @@ impl SourceRepo {
 		&self.raw
 	}
 
-	fn resolve_local_repo(
-		_phase: &mut Phase,
-		root: &Path,
-		raw: &str,
-		src: PathBuf,
-	) -> Result<SourceRepo> {
+	fn resolve_local_repo(root: &Path, raw: &str, src: PathBuf) -> Result<SourceRepo> {
 		let local = clone_local_repo_to_cache(src.as_path(), root)?;
 		let head = get_head_commit(&local).context("can't get head commit for local source")?;
 		let remote = match SourceRepo::try_resolve_remote_for_local(&local) {
@@ -119,7 +115,7 @@ impl SourceRepo {
 		})
 	}
 
-	fn resolve_remote_repo(phase: &mut Phase, root: &Path, raw: &str) -> Result<SourceRepo> {
+	fn resolve_remote_repo(phase: &SpinnerPhase, root: &Path, raw: &str) -> Result<SourceRepo> {
 		let url = Url::parse(raw)?;
 		let host = url
 			.host_str()
@@ -134,7 +130,7 @@ impl SourceRepo {
 	}
 
 	fn resolve_github_remote_repo(
-		phase: &mut Phase,
+		phase: &SpinnerPhase,
 		root: &Path,
 		raw: &str,
 		url: Url,
@@ -156,7 +152,7 @@ impl SourceRepo {
 	}
 
 	fn resolve_unknown_remote_repo(
-		phase: &mut Phase,
+		phase: &SpinnerPhase,
 		root: &Path,
 		raw: &str,
 		url: Url,
@@ -249,7 +245,7 @@ impl SourceChangeRequest {
 	/// As above, but for a single pull request
 	#[allow(dead_code)]
 	pub fn resolve_change_request(
-		phase: &mut Phase,
+		phase: &SpinnerPhase,
 		root: &Path,
 		raw: &str,
 	) -> Result<SourceChangeRequest> {
@@ -262,7 +258,7 @@ impl SourceChangeRequest {
 				local.display()
 			)),
 			// It's a local dir.
-			(true, true) => SourceChangeRequest::resolve_local_change_request(phase, raw, local),
+			(true, true) => SourceChangeRequest::resolve_local_change_request(raw, local),
 			// It's possibly a remote URL.
 			(false, _) => SourceChangeRequest::resolve_remote_change_request(phase, root, raw),
 		};
@@ -299,11 +295,7 @@ impl SourceChangeRequest {
 	}
 
 	#[allow(dead_code)]
-	fn resolve_local_change_request(
-		_phase: &mut Phase,
-		raw: &str,
-		local: PathBuf,
-	) -> Result<SourceChangeRequest> {
+	fn resolve_local_change_request(raw: &str, local: PathBuf) -> Result<SourceChangeRequest> {
 		let head = get_head_commit(&local).context("can't get head commit for local source")?;
 		let (remote, pull_request_id) = SourceChangeRequest::try_resolve_remote_for_local(&local)?;
 
@@ -319,7 +311,7 @@ impl SourceChangeRequest {
 	}
 
 	fn resolve_remote_change_request(
-		phase: &mut Phase,
+		phase: &SpinnerPhase,
 		root: &Path,
 		raw: &str,
 	) -> Result<SourceChangeRequest> {
@@ -340,7 +332,7 @@ impl SourceChangeRequest {
 
 	#[allow(dead_code)]
 	fn resolve_github_remote_change_request(
-		phase: &mut Phase,
+		phase: &SpinnerPhase,
 		root: &Path,
 		raw: &str,
 		url: Url,
@@ -641,12 +633,12 @@ fn clone_local_repo_to_cache(src: &Path, root: &Path) -> Result<PathBuf> {
 	Ok(dest)
 }
 
-fn clone_or_update_remote(phase: &mut Phase, url: &Url, dest: &Path) -> Result<()> {
+fn clone_or_update_remote(phase: &SpinnerPhase, url: &Url, dest: &Path) -> Result<()> {
 	if dest.exists() {
-		phase.update("pulling")?;
+		phase.update_status("pulling");
 		update_remote(dest).context("failed to update remote repository")
 	} else {
-		phase.update("cloning")?;
+		phase.update_status("cloning");
 		clone_remote(url, dest).context("failed to clone remote repository")
 	}
 }
