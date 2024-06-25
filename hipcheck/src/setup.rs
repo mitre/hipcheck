@@ -2,10 +2,8 @@ use crate::cli::SetupArgs;
 use crate::error::Result;
 use crate::hc_error;
 use crate::http::tls::new_agent;
-use pathbuf::pathbuf;
 use regex::Regex;
 use std::fs::File;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use tar::Archive;
@@ -32,6 +30,7 @@ impl SetupSourcePath {
 			};
 		}
 	}
+	// Convert to a SourceType::Dir
 	pub fn try_unpack(self) -> Result<SetupSourcePath> {
 		use SourceType::*;
 		let (new_path, delete) = match self.path.clone() {
@@ -104,16 +103,18 @@ impl TryFrom<&Path> for SourceType {
 		if file_name.ends_with(".zip") {
 			return Ok(Zip(PathBuf::from(value)));
 		}
-		return Err(hc_error!("unknown source type"));
+		Err(hc_error!("unknown source type"))
 	}
 }
 
 pub fn search_dir_for_source(path: &Path) -> Option<SourceType> {
-	for r_entry in walkdir::WalkDir::new(path).max_depth(1) {
-		if let Ok(entry) = r_entry {
-			if let Ok(source) = SourceType::try_from(entry.path()) {
-				return Some(source);
-			}
+	for entry in walkdir::WalkDir::new(path)
+		.max_depth(1)
+		.into_iter()
+		.flatten()
+	{
+		if let Ok(source) = SourceType::try_from(entry.path()) {
+			return Some(source);
 		}
 	}
 	None
@@ -132,20 +133,21 @@ pub fn try_get_source_path_from_path(path: &Path) -> Option<SourceType> {
 	}
 }
 
+// Search for a dir or archive matching the format of our `cargo-dist` release bundle. Search
+// hierarchy is 1) source cmdline arg, 2) current dir 3) platform downloads dir. If nothing
+// found and user did not forbid internet access, we can then pull from github release page.
 pub fn try_resolve_source_path(args: &SetupArgs) -> Result<SetupSourcePath> {
 	let try_dirs: Vec<Option<PathBuf>> = vec![
 		args.source.clone(),
 		std::env::current_dir().ok(),
 		dirs::download_dir(),
 	];
-	for opt_dir in try_dirs {
-		if let Some(try_dir) = opt_dir {
-			if let Some(bp) = try_get_source_path_from_path(try_dir.as_path()) {
-				return Ok(SetupSourcePath {
-					path: bp,
-					delete: false,
-				});
-			}
+	for try_dir in try_dirs.into_iter().flatten() {
+		if let Some(bp) = try_get_source_path_from_path(try_dir.as_path()) {
+			return Ok(SetupSourcePath {
+				path: bp,
+				delete: false,
+			});
 		}
 	}
 	// If allowed by user, download from github

@@ -205,7 +205,10 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 
 	// Derive the config/scripts paths from the source path
 	let (src_conf_path, src_data_path) = match &source.path {
-		SourceType::Dir(p) => (pathbuf![&p, "config"], pathbuf![&p, "scripts"]),
+		SourceType::Dir(p) => (
+			pathbuf![p.as_path(), "config"],
+			pathbuf![p.as_path(), "scripts"],
+		),
 		_ => {
 			print_error(&hc_error!("expected source to be a directory"));
 			source.cleanup();
