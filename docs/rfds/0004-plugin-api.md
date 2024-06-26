@@ -230,7 +230,7 @@ the appropriate locations based on how `hc` itself was called.
 
 ## Expected gRPC Calls for Plugins
 
-
+With all of this now explained, we can start to break down the RPC calls defined between the `hc` binary and each of the running plugins.
 
 ## The `Plugin` Trait
 
