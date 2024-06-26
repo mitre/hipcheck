@@ -295,7 +295,6 @@ fn load_source(
 		TargetKind::PrUri => "resolving git pull request source",
 		TargetKind::PackageVersion => "resolving package source",
 		TargetKind::SpdxDocument => "parsing SPDX document",
-		_ => return Err(hc_error!("source specified was not a valid source")),
 	};
 
 	let mut phase = shell.phase(phase_desc)?;
@@ -354,7 +353,6 @@ fn resolve_source(
 				kind: SourceKind::Repo(repo),
 			})
 		}
-		_ => Err(Error::msg("source specified was not a valid source")),
 	}
 }
 
@@ -367,7 +365,6 @@ pub struct Check {
 pub enum TargetKind {
 	RepoSource,
 	PrUri,
-	PatchUri,
 	PackageVersion,
 	SpdxDocument,
 }
@@ -378,7 +375,6 @@ impl TargetKind {
 
 		match self {
 			RepoSource | PrUri | PackageVersion | SpdxDocument => true,
-			PatchUri => false,
 		}
 	}
 }

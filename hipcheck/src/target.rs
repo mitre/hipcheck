@@ -6,7 +6,6 @@ use serde::Serialize;
 pub enum TargetType {
 	Maven,
 	Npm,
-	Patch,
 	Pypi,
 	Repo,
 	Request,
