@@ -150,7 +150,6 @@ fn cmd_schema(args: &SchemaArgs) {
 	match args.command {
 		SchemaCommand::Maven => print_maven_schema(),
 		SchemaCommand::Npm => print_npm_schema(),
-		SchemaCommand::Patch => print_patch_schema(),
 		SchemaCommand::Pypi => print_pypi_schema(),
 		SchemaCommand::Repo => print_report_schema(),
 		SchemaCommand::Request => print_request_schema(),
@@ -460,11 +459,6 @@ fn print_npm_schema() {
 	print_missing()
 }
 
-/// Print the JSON schema of the patch.
-fn print_patch_schema() {
-	print_missing()
-}
-
 /// Print the JSON schema of the pypi package
 fn print_pypi_schema() {
 	print_missing()
@@ -493,7 +487,6 @@ const EXIT_FAILURE: i32 = 1;
 enum CheckKind {
 	Repo,
 	Request,
-	Patch,
 	Maven,
 	Npm,
 	Pypi,
@@ -506,7 +499,6 @@ impl CheckKind {
 		match self {
 			CheckKind::Repo => "repo",
 			CheckKind::Request => "request",
-			CheckKind::Patch => "patch",
 			CheckKind::Maven => "maven",
 			CheckKind::Npm => "npm",
 			CheckKind::Pypi => "pypi",
@@ -519,7 +511,6 @@ impl CheckKind {
 		match self {
 			CheckKind::Repo => TargetKind::RepoSource,
 			CheckKind::Request => TargetKind::PrUri,
-			CheckKind::Patch => TargetKind::PatchUri,
 			CheckKind::Maven => TargetKind::PackageVersion,
 			CheckKind::Npm => TargetKind::PackageVersion,
 			CheckKind::Pypi => TargetKind::PackageVersion,
@@ -680,12 +671,6 @@ fn run_with_shell(
 
 			(session.end(), Ok(AnyReport::PrReport(pr_report)))
 		}
-		_ => (
-			session.end(),
-			Err(Error::msg(
-				"Hipcheck attempted to analyze an unsupported type",
-			)),
-		),
 	}
 }
 
