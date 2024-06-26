@@ -364,6 +364,7 @@ fn hc_env_var_value_enum<E: ValueEnum>(name: &'static str) -> Option<E> {
 pub enum FullCommands {
 	Check(CheckArgs),
 	Schema(SchemaArgs),
+	Setup(SetupArgs),
 	Ready,
 	PrintConfig,
 	PrintData,
@@ -375,6 +376,7 @@ impl From<&Commands> for FullCommands {
 		match command {
 			Commands::Check(args) => FullCommands::Check(args.clone()),
 			Commands::Schema(args) => FullCommands::Schema(args.clone()),
+			Commands::Setup(args) => FullCommands::Setup(args.clone()),
 			Commands::Ready => FullCommands::Ready,
 		}
 	}
@@ -386,6 +388,8 @@ pub enum Commands {
 	Check(CheckArgs),
 	/// Print the JSON schema for output of a specific `check` command.
 	Schema(SchemaArgs),
+	/// Initialize Hipcheck config file and script file locations.
+	Setup(SetupArgs),
 	/// Check if Hipcheck is ready to run.
 	Ready,
 }
@@ -548,7 +552,7 @@ pub struct SchemaArgs {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum SchemaCommand {
-	/// Print the JSONN schema for running Hipcheck against a Maven package
+	/// Print the JSON schema for running Hipcheck against a Maven package
 	Maven,
 	/// Print the JSON schema for running Hipcheck against a NPM package
 	Npm,
@@ -558,6 +562,16 @@ pub enum SchemaCommand {
 	Repo,
 	/// Print the JSON schema for running Hipcheck against a pull request
 	Request,
+}
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct SetupArgs {
+	/// Setup will not attempt to pull missing files from the Hipcheck remote repository.
+	#[clap(long, short)]
+	pub offline: bool,
+	/// Path to a local Hipcheck release archive or directory from which to copy default
+	/// config and data dirs.
+	pub source: Option<PathBuf>,
 }
 
 /// A type that can copy non-`None` values from other instances of itself.
