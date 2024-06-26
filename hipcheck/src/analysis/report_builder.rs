@@ -48,35 +48,26 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 
 	// Affiliation analysis.
 
-	extract_results(
-		&mut builder,
-		&scoring.results.affiliation,
-		|builder, output| {
-			match output.as_ref() {
-				AnalysisReport::Affiliation {
-					value,
-					threshold,
-					concerns,
-					..
-				} => {
-					let analysis = Analysis::affiliation(*value, *threshold);
-					builder.add_analysis(analysis, concerns.clone())?;
-				}
-				_ => {
-					return Err(hc_error!(
-						"phase name does not match {} analysis",
-						crate::analysis::score::AFFILIATION_PHASE
-					))
-				}
+	if let Some(stored) = &scoring.results.affiliation {
+		match &stored.result {
+			Ok(analysis) => {
+				let Predicate::Threshold(pred) = analysis.as_ref();
+				let HCBasicValue::Unsigned(value) = pred.value else {
+					return Err(hc_error!("affiliation analysis has a non-u64 value"));
+				};
+				let HCBasicValue::Unsigned(thresh) = pred.threshold else {
+					return Err(hc_error!("affiliation analysis has a non-u64 value"));
+				};
+				builder.add_analysis(
+					Analysis::affiliation(value, thresh),
+					stored.concerns.clone(),
+				)?;
 			}
-
-			Ok(())
-		},
-		|builder, error| {
-			builder.add_errored_analysis(AnalysisIdent::Affiliation, error);
-			Ok(())
-		},
-	)?;
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Affiliation, error);
+			}
+		}
+	};
 
 	// Binary Analysis
 

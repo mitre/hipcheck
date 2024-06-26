@@ -100,7 +100,7 @@ impl AltAnalysisResults {
 #[derive(Debug, Default)]
 pub struct AnalysisResults {
 	pub activity: Option<HCStoredResult>,
-	pub affiliation: Option<Result<Arc<AnalysisReport>>>,
+	pub affiliation: Option<HCStoredResult>,
 	pub binary: Option<Result<Arc<AnalysisReport>>>,
 	pub churn: Option<Result<Arc<AnalysisReport>>>,
 	pub entropy: Option<Result<Arc<AnalysisReport>>>,
@@ -185,36 +185,9 @@ pub fn phase_outcome<P: AsRef<String>>(
 		ACTIVITY_PHASE => Err(hc_error!(
 			"activity analysis does not use this infrastructure"
 		)),
-		AFFILIATION_PHASE => match &db.affiliation_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Affiliation {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.affiliation_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Affiliation {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.affiliation_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
+		AFFILIATION_PHASE => Err(hc_error!(
+			"affiliation analysis does not use this infrastructure"
+		)),
 		BINARY_PHASE => match &db.binary_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
@@ -581,6 +554,29 @@ pub fn add_tree_edge(
 	score_tree
 }
 
+macro_rules! run_and_score_threshold_analysis {
+	($res:ident, $p:ident, $tree: ident, $phase:ident, $a:expr, $w:expr, $spec:ident, $node:ident) => {{
+		update_phase($p, $phase)?;
+		let analysis_result =
+			ThresholdPredicate::from_analysis(&$a, $spec.threshold, $spec.units, $spec.ordering);
+		$res.table.insert($phase.to_owned(), analysis_result);
+		let (an_score, outcome) = $res.table.get($phase).unwrap().score();
+		let score_result = Arc::new(ScoreResult {
+			count: $w,
+			score: an_score,
+			outcome,
+		});
+		let output = score_result.outcome.clone();
+		match add_node_and_edge_with_score(score_result, $tree, $phase, $node) {
+			Ok(score_tree_inc) => {
+				$tree = score_tree_inc;
+			}
+			_ => return Err(hc_error!("failed to complete {} scoring.", $phase)),
+		};
+		output
+	}};
+}
+
 pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
 	/*
 	Scoring should be performed by the construction of a "score tree" where scores are the
@@ -816,37 +812,23 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score_tree = add_tree_edge(score_tree_updated, commit_node, attacks_node);
 
 			/*===NEW_PHASE===*/
-			update_phase(phase, AFFILIATION_PHASE)?;
-			let affiliation_analysis = db.affiliation_analysis()?;
-			match affiliation_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.affiliation = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.affiliation = Some(Err(err.clone())),
-				_ => results.affiliation = Some(Ok(affiliation_analysis)),
-			}
-			let score_result = db
-				.phase_outcome(Arc::new(AFFILIATION_PHASE.to_string()))
-				.unwrap();
-			score.affiliation = score_result.outcome.clone();
-			match add_node_and_edge_with_score(
-				score_result,
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.affiliation_count_threshold()),
+				units: Some("affiliated".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.affiliation = run_and_score_threshold_analysis!(
+				alt_results,
+				phase,
 				score_tree,
 				AFFILIATION_PHASE,
-				commit_node,
-			) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => {
-					return Err(hc_error!(
-						"failed to complete {} scoring.",
-						AFFILIATION_PHASE
-					))
-				}
-			}
+				db.affiliation_analysis(),
+				db.affiliation_weight(),
+				spec,
+				commit_node
+			);
+			// This will be removed once results is deprecated in favor of alt_results
+			results.affiliation = Some(alt_results.table.get(AFFILIATION_PHASE).unwrap().clone());
 
 			/*===NEW_PHASE===*/
 			update_phase(phase, CHURN_PHASE)?;
