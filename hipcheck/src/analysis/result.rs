@@ -148,7 +148,13 @@ impl ThresholdPredicate {
 }
 
 fn pass_threshold<T: Ord>(a: &T, b: &T, ord: Ordering) -> bool {
-	a.cmp(b) == ord
+	match ord {
+		// Ordering doesn't have a way to represent <=, but need it
+		// so that val 0 with threshold 0 is a pass. We'll just treat
+		// any Ordering::Less as less-than-or-equal-to
+		Ordering::Less => a.cmp(b).is_le(),
+		ord => a.cmp(b) == ord,
+	}
 }
 
 impl ThresholdPredicate {
@@ -199,7 +205,7 @@ impl Display for ThresholdPredicate {
 		let val = format!("{} {}", self.value, &self.units);
 		let thr = format!("{} {}", self.threshold, &self.units);
 		let order_str = match &self.ordering {
-			Less => "<",
+			Less => "<=",
 			Equal => "==",
 			Greater => ">",
 		};

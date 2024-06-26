@@ -101,13 +101,13 @@ impl AltAnalysisResults {
 pub struct AnalysisResults {
 	pub activity: Option<HCStoredResult>,
 	pub affiliation: Option<HCStoredResult>,
-	pub binary: Option<Result<Arc<AnalysisReport>>>,
-	pub churn: Option<Result<Arc<AnalysisReport>>>,
-	pub entropy: Option<Result<Arc<AnalysisReport>>>,
-	pub identity: Option<Result<Arc<AnalysisReport>>>,
-	pub fuzz: Option<Result<Arc<AnalysisReport>>>,
-	pub review: Option<Result<Arc<AnalysisReport>>>,
-	pub typo: Option<Result<Arc<AnalysisReport>>>,
+	pub binary: Option<HCStoredResult>,
+	pub churn: Option<HCStoredResult>,
+	pub entropy: Option<HCStoredResult>,
+	pub identity: Option<HCStoredResult>,
+	pub fuzz: Option<HCStoredResult>,
+	pub review: Option<HCStoredResult>,
+	pub typo: Option<HCStoredResult>,
 	pub pull_request: Option<Result<Arc<AnalysisReport>>>,
 	pub pr_affiliation: Option<Result<Arc<AnalysisReport>>>,
 	pub pr_contributor_trust: Option<Result<Arc<AnalysisReport>>>,
@@ -188,216 +188,21 @@ pub fn phase_outcome<P: AsRef<String>>(
 		AFFILIATION_PHASE => Err(hc_error!(
 			"affiliation analysis does not use this infrastructure"
 		)),
-		BINARY_PHASE => match &db.binary_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Binary {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.binary_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Binary {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.binary_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		CHURN_PHASE => match &db.churn_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Churn {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.churn_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Churn {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.churn_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		ENTROPY_PHASE => match &db.entropy_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Entropy {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.entropy_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Entropy {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.entropy_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		IDENTITY_PHASE => match &db.identity_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Identity {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.identity_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Identity {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.identity_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		FUZZ_PHASE => match &db.fuzz_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Fuzz {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.fuzz_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Fuzz {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.fuzz_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		REVIEW_PHASE => match &db.review_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Review {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.review_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Review {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.review_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		TYPO_PHASE => match &db.typo_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Typo {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.typo_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Typo {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.typo_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
+		BINARY_PHASE => Err(hc_error!(
+			"binary analysis does not use this infrastructure"
+		)),
+		CHURN_PHASE => Err(hc_error!("churn analysis does not use this infrastructure")),
+		ENTROPY_PHASE => Err(hc_error!(
+			"entropy analysis does not use this infrastructure"
+		)),
+		IDENTITY_PHASE => Err(hc_error!(
+			"identity analysis does not use this infrastructure"
+		)),
+		FUZZ_PHASE => Err(hc_error!("fuzz analysis does not use this infrastructure")),
+		REVIEW_PHASE => Err(hc_error!(
+			"review analysis does not use this infrastructure"
+		)),
+		TYPO_PHASE => Err(hc_error!("typo analysis does not use this infrastructure")),
 		PR_AFFILIATION_PHASE => match &db.pr_affiliation_analysis().unwrap().as_ref() {
 			AnalysisReport::None {
 				outcome: AnalysisOutcome::Skipped,
@@ -618,137 +423,103 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 		score_tree = add_tree_edge(score_tree_updated, practices_node, root_node);
 
 		/*===NEW_PHASE===*/
-		update_phase(phase, ACTIVITY_PHASE)?;
-		// Check if this analysis was skipped or generated an error, then format the results accordingly for reporting.
 		if db.activity_active() {
-			let raw_activity = db.activity_analysis();
-			let raw_threshold: u64 = db.activity_week_count_threshold();
-
-			// Process analysis value into a threshold predicate and add to new & old storage
-			// objects
-			let activity_result = ThresholdPredicate::from_analysis(
-				&raw_activity,
-				HCBasicValue::from(raw_threshold),
-				Some("weeks inactivity".to_owned()),
-				Ordering::Less,
-			);
-			results.activity = Some(activity_result.clone());
-			alt_results
-				.table
-				.insert(ACTIVITY_PHASE.to_owned(), activity_result);
-
-			// Scoring based off of predicate
-			let (act_score, outcome) = alt_results.table.get(ACTIVITY_PHASE).unwrap().score();
-			let score_result = Arc::new(ScoreResult {
-				count: db.activity_weight(),
-				score: act_score,
-				outcome,
-			});
-			score.activity = score_result.outcome.clone();
-			match add_node_and_edge_with_score(
-				score_result,
-				score_tree.clone(),
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.activity_week_count_threshold()),
+				units: Some("weeks inactivity".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.activity = run_and_score_threshold_analysis!(
+				alt_results,
+				phase,
+				score_tree,
 				ACTIVITY_PHASE,
-				practices_node,
-			) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => return Err(hc_error!("failed to complete {} scoring.", ACTIVITY_PHASE)),
-			}
+				db.activity_analysis(),
+				db.activity_weight(),
+				spec,
+				practices_node
+			);
+			results.activity = Some(alt_results.table.get(ACTIVITY_PHASE).unwrap().clone());
 		}
 
 		/*===REVIEW PHASE===*/
-		update_phase(phase, REVIEW_PHASE)?;
-		let review_analysis = db.review_analysis()?;
-		match review_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.review = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.review = Some(Err(err.clone())),
-			_ => results.review = Some(Ok(review_analysis)),
-		}
-		let score_result = db
-			.phase_outcome(Arc::new(REVIEW_PHASE.to_string()))
-			.unwrap();
-		score.review = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, score_tree, REVIEW_PHASE, practices_node) {
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", REVIEW_PHASE)),
+		if db.review_active() {
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.review_percent_threshold()),
+				units: Some("% pull requests without review".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.review = run_and_score_threshold_analysis!(
+				alt_results,
+				phase,
+				score_tree,
+				REVIEW_PHASE,
+				db.review_analysis(),
+				db.review_weight(),
+				spec,
+				practices_node
+			);
+			results.review = Some(alt_results.table.get(REVIEW_PHASE).unwrap().clone());
 		}
 
 		/*===BINARY PHASE===*/
-		update_phase(phase, BINARY_PHASE)?;
-		let binary_analysis = db.binary_analysis()?;
-		match binary_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.binary = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.binary = Some(Err(err.clone())),
-			_ => results.binary = Some(Ok(binary_analysis)),
-		}
-		let score_result = db
-			.phase_outcome(Arc::new(BINARY_PHASE.to_string()))
-			.unwrap();
-		score.binary = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, score_tree, BINARY_PHASE, practices_node) {
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", BINARY_PHASE)),
+		if db.binary_active() {
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.binary_count_threshold()),
+				units: Some("binary files found".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.binary = run_and_score_threshold_analysis!(
+				alt_results,
+				phase,
+				score_tree,
+				BINARY_PHASE,
+				db.binary_analysis(),
+				db.binary_weight(),
+				spec,
+				practices_node
+			);
+			results.binary = Some(alt_results.table.get(BINARY_PHASE).unwrap().clone());
 		}
 
 		/*===IDENTITY PHASE===*/
-		update_phase(phase, IDENTITY_PHASE)?;
-		let identity_analysis = db.identity_analysis()?;
-		match identity_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.identity = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.identity = Some(Err(err.clone())),
-			_ => results.identity = Some(Ok(identity_analysis)),
-		}
-
-		let score_result = db
-			.phase_outcome(Arc::new(IDENTITY_PHASE.to_string()))
-			.unwrap();
-		score.identity = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, score_tree, IDENTITY_PHASE, practices_node)
-		{
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", IDENTITY_PHASE)),
+		if db.identity_active() {
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.identity_percent_threshold()),
+				units: Some("% identity match".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.identity = run_and_score_threshold_analysis!(
+				alt_results,
+				phase,
+				score_tree,
+				IDENTITY_PHASE,
+				db.identity_analysis(),
+				db.identity_weight(),
+				spec,
+				practices_node
+			);
+			results.identity = Some(alt_results.table.get(IDENTITY_PHASE).unwrap().clone());
 		}
 
 		/*===FUZZ PHASE===*/
-		update_phase(phase, FUZZ_PHASE)?;
-		let fuzz_analysis = db.fuzz_analysis()?;
-		match fuzz_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.fuzz = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.fuzz = Some(Err(err.clone())),
-			_ => results.fuzz = Some(Ok(fuzz_analysis)),
-		}
-
-		let score_result = db.phase_outcome(Arc::new(FUZZ_PHASE.to_string())).unwrap();
-		score.fuzz = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, score_tree, FUZZ_PHASE, practices_node) {
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", FUZZ_PHASE)),
+		if db.fuzz_active() {
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(true),
+				units: None,
+				ordering: Ordering::Equal,
+			};
+			score.fuzz = run_and_score_threshold_analysis!(
+				alt_results,
+				phase,
+				score_tree,
+				FUZZ_PHASE,
+				db.fuzz_analysis(),
+				db.fuzz_weight(),
+				spec,
+				practices_node
+			);
+			results.fuzz = Some(alt_results.table.get(FUZZ_PHASE).unwrap().clone());
 		}
 	}
 
@@ -772,24 +543,23 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 		score_tree = add_tree_edge(score_tree_updated, attacks_node, root_node);
 
 		/*===TYPO PHASE===*/
-		update_phase(phase, TYPO_PHASE)?;
-		let typo_analysis = db.typo_analysis()?;
-		match typo_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.typo = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.typo = Some(Err(err.clone())),
-			_ => results.typo = Some(Ok(typo_analysis)),
-		}
-		let score_result = db.phase_outcome(Arc::new(TYPO_PHASE.to_string())).unwrap();
-		score.typo = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, score_tree, TYPO_PHASE, attacks_node) {
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", TYPO_PHASE)),
+		if db.typo_active() {
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.typo_count_threshold()),
+				units: Some("possible typos".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.typo = run_and_score_threshold_analysis!(
+				alt_results,
+				phase,
+				score_tree,
+				TYPO_PHASE,
+				db.typo_analysis(),
+				db.typo_weight(),
+				spec,
+				attacks_node
+			);
+			results.typo = Some(alt_results.table.get(TYPO_PHASE).unwrap().clone());
 		}
 
 		/*High risk commits node addition*/
@@ -812,68 +582,65 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score_tree = add_tree_edge(score_tree_updated, commit_node, attacks_node);
 
 			/*===NEW_PHASE===*/
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.affiliation_count_threshold()),
-				units: Some("affiliated".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.affiliation = run_and_score_threshold_analysis!(
-				alt_results,
-				phase,
-				score_tree,
-				AFFILIATION_PHASE,
-				db.affiliation_analysis(),
-				db.affiliation_weight(),
-				spec,
-				commit_node
-			);
-			// This will be removed once results is deprecated in favor of alt_results
-			results.affiliation = Some(alt_results.table.get(AFFILIATION_PHASE).unwrap().clone());
-
-			/*===NEW_PHASE===*/
-			update_phase(phase, CHURN_PHASE)?;
-			let churn_analysis = db.churn_analysis()?;
-			match churn_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.churn = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.churn = Some(Err(err.clone())),
-				_ => results.churn = Some(Ok(churn_analysis)),
-			}
-			let score_result = db.phase_outcome(Arc::new(CHURN_PHASE.to_string())).unwrap();
-			score.churn = score_result.outcome.clone();
-			match add_node_and_edge_with_score(score_result, score_tree, CHURN_PHASE, commit_node) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => return Err(hc_error!("failed to complete {} scoring.", CHURN_PHASE)),
+			if db.affiliation_active() {
+				let spec = ThresholdSpec {
+					threshold: HCBasicValue::from(db.affiliation_count_threshold()),
+					units: Some("affiliated".to_owned()),
+					ordering: Ordering::Less,
+				};
+				score.affiliation = run_and_score_threshold_analysis!(
+					alt_results,
+					phase,
+					score_tree,
+					AFFILIATION_PHASE,
+					db.affiliation_analysis(),
+					db.affiliation_weight(),
+					spec,
+					commit_node
+				);
+				// This will be removed once results is deprecated in favor of alt_results
+				results.affiliation =
+					Some(alt_results.table.get(AFFILIATION_PHASE).unwrap().clone());
 			}
 
 			/*===NEW_PHASE===*/
-			update_phase(phase, ENTROPY_PHASE)?;
-			let entropy_analysis = db.entropy_analysis()?;
-			match entropy_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.entropy = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.entropy = Some(Err(err.clone())),
-				_ => results.entropy = Some(Ok(entropy_analysis)),
+			if db.churn_active() {
+				let spec = ThresholdSpec {
+					threshold: HCBasicValue::from(db.churn_percent_threshold()),
+					units: Some("% over churn threshold".to_owned()),
+					ordering: Ordering::Less,
+				};
+				score.churn = run_and_score_threshold_analysis!(
+					alt_results,
+					phase,
+					score_tree,
+					CHURN_PHASE,
+					db.churn_analysis(),
+					db.churn_weight(),
+					spec,
+					commit_node
+				);
+				results.churn = Some(alt_results.table.get(CHURN_PHASE).unwrap().clone());
 			}
 
-			let score_result = db
-				.phase_outcome(Arc::new(ENTROPY_PHASE.to_string()))
-				.unwrap();
-			score.entropy = score_result.outcome.clone();
-			match add_node_and_edge_with_score(score_result, score_tree, ENTROPY_PHASE, commit_node)
-			{
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => return Err(hc_error!("failed to complete {} scoring.", ENTROPY_PHASE)),
+			/*===NEW_PHASE===*/
+			if db.entropy_active() {
+				let spec = ThresholdSpec {
+					threshold: HCBasicValue::from(db.entropy_percent_threshold()),
+					units: Some("% over entropy threshold".to_owned()),
+					ordering: Ordering::Less,
+				};
+				score.entropy = run_and_score_threshold_analysis!(
+					alt_results,
+					phase,
+					score_tree,
+					ENTROPY_PHASE,
+					db.entropy_analysis(),
+					db.entropy_weight(),
+					spec,
+					commit_node
+				);
+				results.entropy = Some(alt_results.table.get(ENTROPY_PHASE).unwrap().clone());
 			}
 		}
 	}
