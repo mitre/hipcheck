@@ -659,13 +659,13 @@ where
 	let mut out_vals: Vec<B> = vec![];
 	for edge in node.traverse(tree) {
 		match edge {
-            // Entering a new scope, update the tracker vec
+			// Entering a new scope, update the tracker vec
 			NodeEdge::Start(n) => {
 				last_start = n;
 				scope.push(acc_op(tree.get(n).unwrap().get()));
 			}
 			NodeEdge::End(n) => {
-                // If we just saw Start on the same NodeId, this is a leaf
+				// If we just saw Start on the same NodeId, this is a leaf
 				if n == last_start {
 					let node = tree.get(n).unwrap().get();
 					out_vals.push(chil_op(scope.as_slice(), node));
@@ -710,22 +710,25 @@ pub fn weight_tree(db: &dyn WeightTreeProvider) -> Result<Rc<WeightTree>> {
 	Ok(Rc::new(tree))
 }
 
-fn normalize_internal(node: NodeId, tree: &mut WeightTree) -> F64 {
-	let children: Vec<NodeId> = node.children(&tree.tree).collect();
-	let weight_sum: F64 = children.iter().map(|n| normalize_internal(*n, tree)).sum();
+fn normalize_wt_internal(node: NodeId, tree: &mut Arena<WeightTreeNode>) -> F64 {
+	let children: Vec<NodeId> = node.children(tree).collect();
+	let weight_sum: F64 = children
+		.iter()
+		.map(|n| normalize_wt_internal(*n, tree))
+		.sum();
 	if !weight_sum.is_zero() {
 		for c in children {
-			let child: &mut WeightTreeNode = tree.tree.get_mut(c).unwrap().get_mut();
+			let child = tree.get_mut(c).unwrap().get_mut();
 			child.weight /= weight_sum;
 		}
 	}
-	tree.tree.get(node).unwrap().get().weight
+	tree.get(node).unwrap().get().weight
 }
 
 pub fn normalized_weight_tree(db: &dyn WeightTreeProvider) -> Result<Rc<WeightTree>> {
 	let tree = db.weight_tree();
 	let mut norm_tree: WeightTree = (*tree?).clone();
-	normalize_internal(norm_tree.root, &mut norm_tree);
+	normalize_wt_internal(norm_tree.root, &mut norm_tree.tree);
 	Ok(Rc::new(norm_tree))
 }
 
