@@ -11,7 +11,6 @@ use crate::error::Result;
 use crate::metric::affiliation::AffiliatedType;
 use crate::metric::MetricProvider;
 use crate::report::Concern;
-use crate::report::PrConcern;
 use crate::F64;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -58,15 +57,6 @@ pub trait AnalysisProvider:
 
 	/// Returns result of typo analysis
 	fn typo_analysis(&self) -> Arc<HCAnalysisReport>;
-
-	/// Returns result of pull request affiliation analysis
-	fn pr_affiliation_analysis(&self) -> Result<Arc<AnalysisReport>>;
-
-	/// Returns result of pull request contributor trust analysis
-	fn pr_contributor_trust_analysis(&self) -> Result<Arc<AnalysisReport>>;
-
-	/// Returns result of pull request module contributors analysis
-	fn pr_module_contributors_analysis(&self) -> Result<Arc<AnalysisReport>>;
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -125,27 +115,6 @@ pub enum AnalysisReport {
 		threshold: u64,
 		outcome: AnalysisOutcome,
 		concerns: Vec<Concern>,
-	},
-	/// Pull request affiliation analysis result.
-	PrAffiliation {
-		value: u64,
-		threshold: u64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<PrConcern>,
-	},
-	/// Pull request contributor trust analysis result.
-	PrContributorTrust {
-		value: F64,
-		threshold: F64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<PrConcern>,
-	},
-	/// Pull request module contributor analysis result.
-	PrModuleContributors {
-		value: F64,
-		threshold: F64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<PrConcern>,
 	},
 	/// "Result" for a skipped or errored analysis
 	None { outcome: AnalysisOutcome },
@@ -415,224 +384,6 @@ pub fn typo_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
 		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(num_flagged.into())),
 		concerns,
 	})
-}
-
-pub fn pr_affiliation_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
-	if db.pr_affiliation_active() {
-		let results = db.pr_affiliation_metric();
-
-		match results {
-			Err(err) => Ok(Arc::new(AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			})),
-			Ok(results) => {
-				let affiliated_iter = results
-					.affiliations
-					.iter()
-					.filter(|a| a.affiliated_type.is_affiliated());
-
-				let value = affiliated_iter.clone().count() as u64;
-				let threshold = db.pr_affiliation_count_threshold();
-				let results_score = score_by_threshold(value, threshold);
-
-				let mut contributor_freq_map = HashMap::new();
-
-				for affiliation in affiliated_iter {
-					let commit_view =
-						db.get_pr_contributors_for_commit(Arc::clone(&affiliation.commit))?;
-
-					let contributor = match affiliation.affiliated_type {
-						AffiliatedType::Author => String::from(&commit_view.author.name),
-						AffiliatedType::Committer => String::from(&commit_view.committer.name),
-						AffiliatedType::Neither => String::from("Neither"),
-						AffiliatedType::Both => String::from("Both"),
-					};
-
-					let count_commits_for = |contributor| {
-						db.get_pr_commits_for_contributor(Arc::clone(contributor))
-							.into_iter()
-							.count() as i64
-					};
-
-					let author_commits = count_commits_for(&commit_view.author);
-					let committer_commits = count_commits_for(&commit_view.committer);
-
-					let commit_count = match affiliation.affiliated_type {
-						AffiliatedType::Neither => 0,
-						AffiliatedType::Both => author_commits + committer_commits,
-						AffiliatedType::Author => author_commits,
-						AffiliatedType::Committer => committer_commits,
-					};
-
-					// Add string representation of affiliated contributor with count of associated commits
-					contributor_freq_map.insert(contributor, commit_count);
-				}
-
-				let concerns = contributor_freq_map
-					.into_iter()
-					.map(|(contributor, count)| PrConcern::PrAffiliation { contributor, count })
-					.collect();
-
-				if results_score == 0 {
-					let msg = format!("{} affiliated <= {} affiliated", value, threshold);
-					Ok(Arc::new(AnalysisReport::PrAffiliation {
-						value,
-						threshold,
-						outcome: AnalysisOutcome::Pass(msg),
-						concerns,
-					}))
-				} else {
-					let msg = format!("{} affiliated > {} affiliated", value, threshold);
-					Ok(Arc::new(AnalysisReport::PrAffiliation {
-						value,
-						threshold,
-						outcome: AnalysisOutcome::Fail(msg),
-						concerns,
-					}))
-				}
-			}
-		}
-	} else {
-		Ok(Arc::new(AnalysisReport::None {
-			outcome: AnalysisOutcome::Skipped,
-		}))
-	}
-}
-
-pub fn pr_contributor_trust_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
-	if db.contributor_trust_active() {
-		let results = db.pr_contributor_trust_metric();
-
-		match results {
-			Err(err) => Ok(Arc::new(AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			})),
-			Ok(results) => {
-				let num_flagged = results
-					.contributor_counts_in_period
-					.iter()
-					.filter(|c| c.1.pr_trusted)
-					.count() as u64;
-				let percent_flagged =
-					num_flagged as f64 / results.contributor_counts_in_period.len() as f64;
-				let percent_threshold = *db.contributor_trust_percent_threshold();
-				let results_score = score_by_threshold_reversed(percent_flagged, percent_threshold);
-				//if more trusted than threshold, no strike
-				//if fewer trusted than threshold, get a strike
-				//can not use score_by_threshold because it is the reverse
-
-				let concerns = results
-					.contributor_counts_in_period
-					.iter()
-					.filter(|c| !c.1.pr_trusted)
-					.map(|(contributor, ..)| PrConcern::PrContributorTrust {
-						contributor: contributor.to_string(),
-					})
-					.collect();
-
-				if results_score == 0 {
-					let msg = format!(
-						"{:.2}% contributor trust threshold <= {:.2}% contributor trust threshold",
-						percent_flagged * 100.0,
-						percent_threshold * 100.0
-					);
-					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Arc::new(AnalysisReport::PrContributorTrust {
-						value: F64::new(percent_flagged)
-							.expect("Percent flagged should never be NaN"),
-						threshold: F64::new(percent_threshold)
-							.expect("Percent threshold should never be NaN"),
-						outcome: AnalysisOutcome::Pass(msg),
-						concerns,
-					}))
-				} else {
-					let msg = format!(
-						"{:.2}% contributor trust threshold > {:.2}% contributor trust threshold",
-						percent_flagged * 100.0,
-						percent_threshold * 100.0
-					);
-					// PANIC: percent_flagged and percent_threshold will never be NaN
-					Ok(Arc::new(AnalysisReport::PrContributorTrust {
-						value: F64::new(percent_flagged)
-							.expect("Percent flagged should never be NaN"),
-						threshold: F64::new(percent_threshold)
-							.expect("Percent threshold should never be NaN"),
-						outcome: AnalysisOutcome::Fail(msg),
-						concerns,
-					}))
-				}
-			}
-		}
-	} else {
-		Ok(Arc::new(AnalysisReport::None {
-			outcome: AnalysisOutcome::Skipped,
-		}))
-	}
-}
-
-pub fn pr_module_contributors_analysis(db: &dyn AnalysisProvider) -> Result<Arc<AnalysisReport>> {
-	if db.pr_module_contributors_active() {
-		let results = db.pr_module_contributors_metric();
-
-		match results {
-			Err(err) => Ok(Arc::new(AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			})),
-			Ok(results) => {
-				let contributors_map = &results.contributors_map;
-
-				let total_contributors = contributors_map.keys().len();
-				let mut flagged_contributors: u64 = 0;
-
-				for contributed_modules in contributors_map.values() {
-					for contributed_module in contributed_modules {
-						if contributed_module.new_contributor {
-							flagged_contributors += 1;
-							break;
-						}
-					}
-				}
-
-				let percent_flagged = flagged_contributors as f64 / total_contributors as f64;
-				let percent_threshold = *db.pr_module_contributors_percent_threshold();
-				let results_score = score_by_threshold(percent_flagged, percent_threshold);
-
-				let concerns = Vec::new();
-
-				if results_score == 0 {
-					let msg = format!(
-						"{:.2}% contributors contributing a module for the first time <= {:.2}% permitted amount",
-						percent_flagged * 100.0,
-						percent_threshold * 100.0);
-					Ok(Arc::new(AnalysisReport::PrModuleContributors {
-						value: F64::new(percent_flagged)
-							.expect("Percent flagged should never be NaN"),
-						threshold: F64::new(percent_threshold)
-							.expect("Percent threshold should never be NaN"),
-						outcome: AnalysisOutcome::Pass(msg),
-						concerns,
-					}))
-				} else {
-					let msg = format!(
-						"{:.2}% contributors contributing a module for the first time >= {:.2}% permitted amount",
-						percent_flagged * 100.0,
-						percent_threshold * 100.0);
-					Ok(Arc::new(AnalysisReport::PrModuleContributors {
-						value: F64::new(percent_flagged)
-							.expect("Percent flagged should never be NaN"),
-						threshold: F64::new(percent_threshold)
-							.expect("Percent threshold should never be NaN"),
-						outcome: AnalysisOutcome::Fail(msg),
-						concerns,
-					}))
-				}
-			}
-		}
-	} else {
-		Ok(Arc::new(AnalysisReport::None {
-			outcome: AnalysisOutcome::Skipped,
-		}))
-	}
 }
 
 fn score_by_threshold<T: PartialOrd>(value: T, threshold: T) -> i64 {

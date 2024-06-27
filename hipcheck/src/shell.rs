@@ -23,11 +23,11 @@
  * returns a [`Phase`] handle which can be used to provide update messages with the [`Phase::update`]
  * method, and is closed out with the [`Phase::finish`] method.
  *
- * Finally, the final result is printed using the [`Shell::report`] and [`Shell::pr_report`] methods.
+ * Finally, the final result is printed using the [`Shell::report`] method.
  * These methods don't print using the `Shell`'s `output` and `error_output` streams, but rather
  * accept a caller-provided stream to write to. This allows flexibility in sending the final
  * report to a different destination than log messages.
- * These methods take a `&mut Output`, a [`Report`] or [`PrReport`], and a [`Format`].
+ * These methods take a `&mut Output`, a [`Report`], and a [`Format`].
  *
  * At any point, errors may also be printed using [`Shell::error`], which takes an
  * [`&Error`][crate::error:Error] and a [`Format`].
@@ -88,7 +88,6 @@ use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
 use crate::report::Format;
-use crate::report::PrReport;
 use crate::report::RecommendationKind;
 use crate::report::Report;
 use std::cell::Cell;
@@ -167,9 +166,6 @@ impl Shell {
 
 		/// Print the final repo report in the requested format.
 		pub fn report(output: &mut Output, report: Report, format: Format)
-
-		/// Print the final pull request report in the requested format.
-		pub fn pr_report(output: &mut Output, report: PrReport, format: Format)
 
 
 		/*=======================================================================================
@@ -286,12 +282,6 @@ macro_rules! m {
 
 	(#report_json $report:expr) => {
 		Message::ReportJson { report: $report }
-	};
-
-	(#pr_report_json $pr_report:expr) => {
-		Message::PrReportJson {
-			pr_report: $pr_report,
-		}
 	};
 
 	(#title_passing) => {
@@ -460,147 +450,6 @@ impl ShellInner {
 				// Go through each part and print them individually.
 
 				//      Analyzed '<repo_name>' (<repo_head>)
-				//               using Hipcheck <hipcheck_version>
-				//               at <analyzed_at:pretty_print>
-				//
-				//       Passing
-				//            + no concerning contributors
-				//               0 found, 0 permitted
-				//            + no unusually large commits
-				//               0% of commits are unusually large, 2% permitted
-				//            + commits usually merged by someone other than the author
-				//               0% of commits merged by author, 20% permitted
-				//
-				//       Failing
-				//            - too many unusual-looking commits
-				//               1% of commits look unusual, 0% permitted
-				//               entropy scores over 3.0 are considered unusual
-				//
-				//              356828346723752 "fixing something" (entropy score: 5.4)
-				//              abab563268c3543 "adding a new block" (entropy score: 3.2)
-				//
-				//           - hasn't been updated in 136 weeks
-				//              require updates in the last 71 weeks
-				//
-				//        Errored
-				//           ? review analysis failed to get pull request reviews
-				//              cause: missing GitHub token with permissions for accessing public repository data in config
-				//           ? typo analysis failed to get dependencies
-				//              cause: can't identify a known language in the repository
-				//
-				// Recommendation
-				//           PASS risk rated as 0.4 (acceptable below 0.5)
-
-				/*===============================================================================
-				 * Header
-				 *
-				 * Says what we're analyzing, what version of Hipcheck we're using, and when
-				 * we're doing the analysis.
-				 */
-
-				out!(self, &mut output.out, {
-					m!(#nothing);
-					m!(#title_analyzed &report.analyzed());
-					m!(#more &report.using());
-					m!(#more &report.at_time());
-					m!(#report_nothing);
-				});
-
-				/*===============================================================================
-				 * Passing analyses
-				 *
-				 * Says what analyses passed and why.
-				 */
-
-				if report.has_passing_analyses() {
-					out!(self, &mut output.out, m!(#title_passing));
-
-					for analysis in report.passing_analyses() {
-						out!(self, &mut output.out, {
-							m!(#analysis_passed [encoded_as: self.encoding] &analysis.statement());
-							m!(#analysis_explanation &analysis.explanation());
-							m!(#report_nothing);
-						});
-					}
-				}
-
-				/*===============================================================================
-				 * Failing analyses
-				 *
-				 * Says what analyses failed, why, and what information might be relevant to
-				 * check in detail.
-				 */
-
-				if report.has_failing_analyses() {
-					out!(self, &mut output.out, m!(#title_failing));
-
-					for failing_analysis in report.failing_analyses() {
-						let analysis = failing_analysis.analysis();
-
-						out!(self, &mut output.out, {
-							m!(#analysis_failed [encoded_as: self.encoding] &analysis.statement());
-							m!(#analysis_explanation &analysis.explanation());
-						});
-
-						for concern in failing_analysis.concerns() {
-							out!(self, &mut output.out, m!(#more &concern.description()));
-						}
-
-						out!(self, &mut output.out, m!(#report_nothing));
-					}
-				}
-
-				/*===============================================================================
-				 * Errored analyses
-				 *
-				 * Says what analyses encountered errors and what those errors were.
-				 */
-
-				if report.has_errored_analyses() {
-					out!(self, &mut output.out, m!(#title_errored));
-
-					for errored_analysis in report.errored_analyses() {
-						out!(
-							self,
-							&mut output.out,
-							m!(#analysis_errored &errored_analysis.top_msg())
-						);
-
-						for msg in &errored_analysis.source_msgs() {
-							out!(self, &mut output.out, m!(#more msg));
-						}
-
-						out!(self, &mut output.out, m!(#report_nothing));
-					}
-				}
-
-				/*===============================================================================
-				 * Recommendation
-				 *
-				 * Says what Hipcheck's final recommendation is for the target of analysis.
-				 */
-
-				let recommendation = report.recommendation();
-
-				out!(self, &mut output.out, {
-					m!(#title_recommendation);
-					m!(#recommendation [kind: recommendation.kind] &recommendation.statement());
-					m!(#report_nothing);
-				});
-
-				Ok(())
-			}
-		}
-	}
-
-	/// Print the final pull request report in the requested format.
-	/// Instead of printing to the Shell's own output or error_output,
-	/// this method takes a caller-provided Output to print to.
-	fn pr_report(&mut self, output: &mut Output, report: PrReport, format: Format) -> Result<()> {
-		match format {
-			Format::Json => Ok(out!(self, &mut output.out, m!(#pr_report_json report))),
-			Format::Human => {
-				//      Analyzed '<pr_uri>' (<repo_head>)
 				//               using Hipcheck <hipcheck_version>
 				//               at <analyzed_at:pretty_print>
 				//
@@ -1059,7 +908,6 @@ fn print(stream: &mut dyn WriteColor, msg: Message) -> Result<()> {
 			print_error(error, stream)
 		}
 		Message::ReportJson { report } => print_report_json(report, stream),
-		Message::PrReportJson { pr_report } => print_pr_report_json(pr_report, stream),
 		Message::ReportSection { title } => Print::print(&title, stream),
 		Message::ReportBasic { title, msg } => {
 			Print::print(&title, stream)?;
@@ -1157,15 +1005,6 @@ fn print_report_json(report: Report, stream: &mut dyn WriteColor) -> Result<()> 
 	Ok(())
 }
 
-/// Print (prettily) a JSON value to the stream for pull requests.
-fn print_pr_report_json(pr_report: PrReport, stream: &mut dyn WriteColor) -> Result<()> {
-	stream.reset()?;
-	log::trace!("writing message part [part='{:?}']", pr_report);
-	serde_json::to_writer_pretty(&mut *stream, &pr_report)?;
-	stream.flush()?;
-	Ok(())
-}
-
 /// Print a newline to the stream.
 fn print_newline(stream: &mut dyn WriteColor) -> Result<()> {
 	log::trace!("writing message part [part='\"\\n\"']");
@@ -1208,8 +1047,6 @@ enum Message<'a, 'b> {
 	Error { title: Title<'a>, error: &'b Error },
 	/// A JSON version of a final report for a repo.
 	ReportJson { report: Report },
-	/// A JSON version of a final report for a pull request.
-	PrReportJson { pr_report: PrReport },
 	/// The title of a section, no content.
 	ReportSection { title: Title<'a> },
 	/// A regular message in a report.

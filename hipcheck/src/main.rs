@@ -24,13 +24,10 @@ mod version;
 #[cfg(feature = "benchmarking")]
 mod benchmarking;
 
-use crate::analysis::report_builder::build_pr_report;
 use crate::analysis::report_builder::build_report;
 use crate::analysis::report_builder::AnyReport;
 use crate::analysis::report_builder::Format;
-use crate::analysis::report_builder::PrReport;
 use crate::analysis::report_builder::Report;
-use crate::analysis::score::score_pr_results;
 use crate::analysis::score::score_results;
 use crate::context::Context as _;
 use crate::error::Error;
@@ -132,14 +129,6 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 			let _ = shell.report(&mut Output::stdout(config.color()), report, config.format());
 			ExitCode::SUCCESS
 		}
-		Ok(AnyReport::PrReport(pr_report)) => {
-			let _ = shell.pr_report(
-				&mut Output::stdout(config.color()),
-				pr_report,
-				config.format(),
-			);
-			ExitCode::SUCCESS
-		}
 		Err(e) => {
 			if shell.error(&e, config.format()).is_err() {
 				print_error(&e);
@@ -156,7 +145,6 @@ fn cmd_schema(args: &SchemaArgs) {
 		SchemaCommand::Npm => print_npm_schema(),
 		SchemaCommand::Pypi => print_pypi_schema(),
 		SchemaCommand::Repo => print_report_schema(),
-		SchemaCommand::Request => print_request_schema(),
 	}
 }
 
@@ -560,13 +548,6 @@ fn print_report_schema() {
 	println!("{}", report_text);
 }
 
-/// Print the JSON schema of the pull/merge request.
-fn print_request_schema() {
-	let schema = schema_for!(PrReport);
-	let report_text = serde_json::to_string_pretty(&schema).unwrap();
-	println!("{}", report_text);
-}
-
 /// Print the JSON schema of the maven package
 fn print_maven_schema() {
 	print_missing()
@@ -604,7 +585,6 @@ const EXIT_FAILURE: i32 = 1;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum CheckKind {
 	Repo,
-	Request,
 	Maven,
 	Npm,
 	Pypi,
@@ -616,7 +596,6 @@ impl CheckKind {
 	const fn name(&self) -> &'static str {
 		match self {
 			CheckKind::Repo => "repo",
-			CheckKind::Request => "request",
 			CheckKind::Maven => "maven",
 			CheckKind::Npm => "npm",
 			CheckKind::Pypi => "pypi",
@@ -628,7 +607,6 @@ impl CheckKind {
 	const fn target_kind(&self) -> TargetKind {
 		match self {
 			CheckKind::Repo => TargetKind::RepoSource,
-			CheckKind::Request => TargetKind::PrUri,
 			CheckKind::Maven => TargetKind::PackageVersion,
 			CheckKind::Npm => TargetKind::PackageVersion,
 			CheckKind::Pypi => TargetKind::PackageVersion,
@@ -757,37 +735,6 @@ fn run_with_shell(
 				};
 
 			(session.end(), Ok(AnyReport::Report(report)))
-		}
-		TargetKind::PrUri => {
-			// Run analyses against a pull request and score the results (score calls analyses that call metrics).
-			let mut phase = match session.shell.phase("scoring and analyzing results") {
-				Ok(phase) => phase,
-				Err(err) => return (session.end(), Err(err)),
-			};
-
-			let score = match score_pr_results(&mut phase, &session) {
-				Ok(score) => score,
-				_ => {
-					return (
-						session.end(),
-						Err(Error::msg("Trouble scoring and analyzing results")),
-					)
-				}
-			};
-
-			match phase.finish() {
-				Ok(()) => {}
-				Err(err) => return (session.end(), Err(err)),
-			};
-
-			// Build the final report.
-			let pr_report =
-				match build_pr_report(&session, &score).context("failed to build final report") {
-					Ok(pr_report) => pr_report,
-					Err(err) => return (session.end(), Err(err)),
-				};
-
-			(session.end(), Ok(AnyReport::PrReport(pr_report)))
 		}
 	}
 }

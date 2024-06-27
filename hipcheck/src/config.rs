@@ -161,14 +161,6 @@ pub struct CommitConfig {
 	/// Defines configuration for entropy analysis.
 	#[serde(default)]
 	pub entropy: EntropyConfig,
-
-	/// Defines configuration for pull request affiliation analysis.
-	#[serde(default)]
-	pub pr_affiliation: PrAffiliationConfig,
-
-	/// Defines configuration for pull request module contributors analysis.
-	#[serde(default)]
-	pub pr_module_contributors: PrModuleContributorsConfig,
 }
 
 /// Defines configuration for activity analysis.
@@ -371,41 +363,6 @@ pub struct TypoConfig {
 	/// Path to a "typos file" containing necessary information for typo detection.
 	#[default = "Typos.toml"]
 	pub typo_file: String,
-}
-
-/// Defines configuration for pull request affiliation analysis.
-#[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default)]
-pub struct PrAffiliationConfig {
-	/// Whether the analysis is active.
-	#[default = true]
-	pub active: bool,
-
-	/// How heavily the analysis' results weigh in risk scoring.
-	#[default = 1]
-	pub weight: u64,
-
-	/// A number of affiliations permitted, over which a repo fails the analysis.
-	#[default = 0]
-	pub count_threshold: u64,
-}
-
-/// Defines configuration for pull request module committers analysis.
-#[derive(Debug, Deserialize, Serialize, SmartDefault, PartialEq, Eq)]
-#[serde(default)]
-pub struct PrModuleContributorsConfig {
-	/// Whether the analysis is active.
-	#[default = true]
-	pub active: bool,
-
-	/// How heavily the analysis' results weigh in risk scoring.
-	#[default = 1]
-	pub weight: u64,
-
-	/// Percent of committers working on a module for the first time permitted, over which a repo fails the analysis.
-	#[default(_code = "F64::new(0.30).unwrap()")]
-	#[serde(deserialize_with = "de::percent")]
-	pub percent_threshold: F64,
 }
 
 /// Defines the configuration of language-specific info.
@@ -629,21 +586,6 @@ pub trait CommitConfigQuery: ConfigSource {
 	fn entropy_value_threshold(&self) -> F64;
 	/// Returns the entropy analysis percent threshold
 	fn entropy_percent_threshold(&self) -> F64;
-
-	/// Returns the pull request affiliation analysis active status
-	fn pr_affiliation_active(&self) -> bool;
-	/// Returns the pull request affiliation analysis weight
-	fn pr_affiliation_weight(&self) -> u64;
-	/// Returns the pull request affiliation analysis count threshold
-	fn pr_affiliation_count_threshold(&self) -> u64;
-	// Pull request affiliation resues orgs_file functions from repo affiliation
-
-	/// Returns the pull request module contributors analysis active status
-	fn pr_module_contributors_active(&self) -> bool;
-	/// Returns the pull request module contributors analysis weight
-	fn pr_module_contributors_weight(&self) -> u64;
-	/// Returns the pull request module contributors analysis count threshold
-	fn pr_module_contributors_percent_threshold(&self) -> F64;
 }
 
 /// Derived query implementations
@@ -920,44 +862,4 @@ fn entropy_value_threshold(db: &dyn CommitConfigQuery) -> F64 {
 fn entropy_percent_threshold(db: &dyn CommitConfigQuery) -> F64 {
 	let config = db.config();
 	config.analysis.attacks.commit.entropy.percent_threshold
-}
-
-fn pr_affiliation_active(db: &dyn CommitConfigQuery) -> bool {
-	let config = db.config();
-	config.analysis.attacks.commit.pr_affiliation.active
-}
-
-fn pr_affiliation_weight(db: &dyn CommitConfigQuery) -> u64 {
-	let config = db.config();
-	config.analysis.attacks.commit.pr_affiliation.weight
-}
-
-fn pr_affiliation_count_threshold(db: &dyn CommitConfigQuery) -> u64 {
-	let config = db.config();
-	config
-		.analysis
-		.attacks
-		.commit
-		.pr_affiliation
-		.count_threshold
-}
-
-fn pr_module_contributors_active(db: &dyn CommitConfigQuery) -> bool {
-	let config = db.config();
-	config.analysis.attacks.commit.pr_module_contributors.active
-}
-
-fn pr_module_contributors_weight(db: &dyn CommitConfigQuery) -> u64 {
-	let config = db.config();
-	config.analysis.attacks.commit.pr_module_contributors.weight
-}
-
-fn pr_module_contributors_percent_threshold(db: &dyn CommitConfigQuery) -> F64 {
-	let config = db.config();
-	config
-		.analysis
-		.attacks
-		.commit
-		.pr_module_contributors
-		.percent_threshold
 }

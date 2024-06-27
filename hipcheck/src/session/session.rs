@@ -40,7 +40,6 @@ use crate::session::spdx::extract_download_url;
 use crate::shell::Phase;
 use crate::shell::Shell;
 use crate::source::source::Source;
-use crate::source::source::SourceChangeRequest;
 use crate::source::source::SourceKind;
 use crate::source::source::SourceQuery;
 use crate::source::source::SourceQueryStorage;
@@ -292,7 +291,6 @@ fn load_source(
 	// Resolve the source specifier into an actual source.
 	let phase_desc = match source_type.kind.target_kind() {
 		TargetKind::RepoSource => "resolving git repository source",
-		TargetKind::PrUri => "resolving git pull request source",
 		TargetKind::PackageVersion => "resolving package source",
 		TargetKind::SpdxDocument => "parsing SPDX document",
 	};
@@ -342,11 +340,6 @@ fn resolve_source(
 				}
 			})
 		}
-		TargetKind::PrUri => {
-			SourceChangeRequest::resolve_change_request(phase, home, source).map(|cr| Source {
-				kind: SourceKind::ChangeRequest(cr),
-			})
-		}
 		TargetKind::SpdxDocument => {
 			let download_url = extract_download_url(source)?;
 			SourceRepo::resolve_repo(phase, home, &download_url).map(|repo| Source {
@@ -364,7 +357,6 @@ pub struct Check {
 #[derive(Debug, PartialEq, Eq)]
 pub enum TargetKind {
 	RepoSource,
-	PrUri,
 	PackageVersion,
 	SpdxDocument,
 }
@@ -374,7 +366,7 @@ impl TargetKind {
 		use TargetKind::*;
 
 		match self {
-			RepoSource | PrUri | PackageVersion | SpdxDocument => true,
+			RepoSource | PackageVersion | SpdxDocument => true,
 		}
 	}
 }
