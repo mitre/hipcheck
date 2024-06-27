@@ -389,6 +389,14 @@ pub enum Commands {
 	/// Print the JSON schema for output of a specific `check` command.
 	Schema(SchemaArgs),
 	/// Initialize Hipcheck config file and script file locations.
+	///
+	/// The "destination" directories for configuration and data files
+	/// Hipcheck needs are determined with the following methods, in
+	/// increasing precedence:
+	///
+	/// 1. Platform-specific defaults
+	/// 2. `HC_CONFIG` and `HC_DATA` environment variables
+	/// 3. `--config` and `--data` command line flags
 	Setup(SetupArgs),
 	/// Check if Hipcheck is ready to run.
 	Ready,
@@ -550,11 +558,11 @@ pub enum SchemaCommand {
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct SetupArgs {
-	/// Setup will not attempt to pull missing files from the Hipcheck remote repository.
-	#[clap(long, short)]
+	/// Do not use the network to download setup files.
+	#[clap(short = 'o', long)]
 	pub offline: bool,
-	/// Path to a local Hipcheck release archive or directory from which to copy default
-	/// config and data dirs.
+	/// Path to local Hipcheck release archive or directory.
+	#[clap(short = 's', long)]
 	pub source: Option<PathBuf>,
 }
 
