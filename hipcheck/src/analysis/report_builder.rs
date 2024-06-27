@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::analysis::analysis::AnalysisReport;
-use crate::analysis::result::{HCBasicValue, Predicate};
+use crate::analysis::result::{HCBasicValue, HCPredicate, Predicate};
 use crate::analysis::score::ScoringResults;
 use crate::config::RiskConfigQuery;
 use crate::error::Error;
@@ -27,7 +27,6 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	let mut builder = ReportBuilder::for_session(session);
 
 	// Activity analysis.
-
 	if let Some(stored) = &scoring.results.activity {
 		match &stored.result {
 			Ok(analysis) => {
@@ -47,7 +46,6 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Affiliation analysis.
-
 	if let Some(stored) = &scoring.results.affiliation {
 		match &stored.result {
 			Ok(analysis) => {
@@ -69,220 +67,144 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 		}
 	};
 
-	// Binary Analysis
-
-	extract_results(
-		&mut builder,
-		&scoring.results.binary,
-		|builder, output| {
-			match output.as_ref() {
-				AnalysisReport::Binary {
-					value,
-					threshold,
-					concerns,
-					..
-				} => {
-					let analysis = Analysis::binary(*value, *threshold);
-					builder.add_analysis(analysis, concerns.clone())?;
-				}
-				_ => {
-					return Err(hc_error!(
-						"phase name does not match {} analysis",
-						crate::analysis::score::BINARY_PHASE
-					))
-				}
+	// Binary analysis
+	if let Some(stored) = &scoring.results.binary {
+		match &stored.result {
+			Ok(analysis) => {
+				let Predicate::Threshold(pred) = analysis.as_ref();
+				let HCBasicValue::Unsigned(value) = pred.value else {
+					return Err(hc_error!("binary analysis has a non-u64 value"));
+				};
+				let HCBasicValue::Unsigned(thresh) = pred.threshold else {
+					return Err(hc_error!("binary analysis has a non-u64 value"));
+				};
+				builder.add_analysis(Analysis::binary(value, thresh), stored.concerns.clone())?;
 			}
-
-			Ok(())
-		},
-		|builder, error| {
-			builder.add_errored_analysis(AnalysisIdent::Binary, error);
-			Ok(())
-		},
-	)?;
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Binary, error);
+			}
+		}
+	};
 
 	// Churn analysis.
-	extract_results(
-		&mut builder,
-		&scoring.results.churn,
-		|builder, output| {
-			match output.as_ref() {
-				AnalysisReport::Churn {
-					value,
-					threshold,
-					concerns,
-					..
-				} => {
-					let analysis = Analysis::churn(value.into_inner(), threshold.into_inner());
-					builder.add_analysis(analysis, concerns.clone())?;
-				}
-				_ => {
-					return Err(hc_error!(
-						"phase name does not match {} analysis",
-						crate::analysis::score::CHURN_PHASE
-					))
-				}
+	if let Some(stored) = &scoring.results.churn {
+		match &stored.result {
+			Ok(analysis) => {
+				let Predicate::Threshold(pred) = analysis.as_ref();
+				let HCBasicValue::Float(value) = pred.value else {
+					return Err(hc_error!("churn analysis has a non-f64 value"));
+				};
+				let HCBasicValue::Float(thresh) = pred.threshold else {
+					return Err(hc_error!("churn analysis has a non-f64 value"));
+				};
+				builder.add_analysis(
+					Analysis::churn(value.into(), thresh.into()),
+					stored.concerns.clone(),
+				)?;
 			}
-
-			Ok(())
-		},
-		|builder, error| {
-			builder.add_errored_analysis(AnalysisIdent::Churn, error);
-			Ok(())
-		},
-	)?;
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Churn, error);
+			}
+		}
+	};
 
 	// Entropy analysis.
-	extract_results(
-		&mut builder,
-		&scoring.results.entropy,
-		|builder, output| {
-			match output.as_ref() {
-				AnalysisReport::Entropy {
-					value,
-					threshold,
-					concerns,
-					..
-				} => {
-					let analysis = Analysis::entropy(value.into_inner(), threshold.into_inner());
-					builder.add_analysis(analysis, concerns.clone())?;
-				}
-				_ => {
-					return Err(hc_error!(
-						"phase name does not match {} analysis",
-						crate::analysis::score::ENTROPY_PHASE
-					))
-				}
+	if let Some(stored) = &scoring.results.entropy {
+		match &stored.result {
+			Ok(analysis) => {
+				let Predicate::Threshold(pred) = analysis.as_ref();
+				let HCBasicValue::Float(value) = pred.value else {
+					return Err(hc_error!("entropy analysis has a non-f64 value"));
+				};
+				let HCBasicValue::Float(thresh) = pred.threshold else {
+					return Err(hc_error!("entropy analysis has a non-f64 value"));
+				};
+				builder.add_analysis(
+					Analysis::entropy(value.into(), thresh.into()),
+					stored.concerns.clone(),
+				)?;
 			}
-
-			Ok(())
-		},
-		|builder, error| {
-			builder.add_errored_analysis(AnalysisIdent::Entropy, error);
-			Ok(())
-		},
-	)?;
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Entropy, error);
+			}
+		}
+	};
 
 	// Identity analysis.
-	extract_results(
-		&mut builder,
-		&scoring.results.identity,
-		|builder, output| {
-			match output.as_ref() {
-				AnalysisReport::Identity {
-					value,
-					threshold,
-					concerns,
-					..
-				} => {
-					let analysis = Analysis::identity(value.into_inner(), threshold.into_inner());
-					builder.add_analysis(analysis, concerns.clone())?;
-				}
-				_ => {
-					return Err(hc_error!(
-						"phase name does not match {} analysis",
-						crate::analysis::score::IDENTITY_PHASE
-					))
-				}
+	if let Some(stored) = &scoring.results.identity {
+		match &stored.result {
+			Ok(analysis) => {
+				let Predicate::Threshold(pred) = analysis.as_ref();
+				let HCBasicValue::Float(value) = pred.value else {
+					return Err(hc_error!("identity analysis has a non-f64 value"));
+				};
+				let HCBasicValue::Float(thresh) = pred.threshold else {
+					return Err(hc_error!("identity analysis has a non-f64 value"));
+				};
+				builder.add_analysis(
+					Analysis::identity(value.into(), thresh.into()),
+					stored.concerns.clone(),
+				)?;
 			}
-
-			Ok(())
-		},
-		|builder, error| {
-			builder.add_errored_analysis(AnalysisIdent::Identity, error);
-			Ok(())
-		},
-	)?;
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Identity, error);
+			}
+		}
+	};
 
 	// Fuzz analysis.
-	extract_results(
-		&mut builder,
-		&scoring.results.fuzz,
-		|builder, output| {
-			match output.as_ref() {
-				AnalysisReport::Fuzz {
-					value, concerns, ..
-				} => {
-					let analysis = Analysis::fuzz(*value);
-					builder.add_analysis(analysis, concerns.clone())?;
-				}
-				_ => {
-					return Err(hc_error!(
-						"phase name does not match {} analysis",
-						crate::analysis::score::FUZZ_PHASE
-					))
-				}
+	if let Some(stored) = &scoring.results.fuzz {
+		match &stored.result {
+			Ok(analysis) => {
+				let Predicate::Threshold(pred) = analysis.as_ref();
+				builder.add_analysis(Analysis::fuzz(pred.pass()?), stored.concerns.clone())?;
 			}
-
-			Ok(())
-		},
-		|builder, error| {
-			builder.add_errored_analysis(AnalysisIdent::Fuzz, error);
-			Ok(())
-		},
-	)?;
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Fuzz, error);
+			}
+		}
+	};
 
 	// Review analysis.
-	extract_results(
-		&mut builder,
-		&scoring.results.review,
-		|builder, output| {
-			match output.as_ref() {
-				AnalysisReport::Review {
-					value,
-					threshold,
-					concerns,
-					..
-				} => {
-					let analysis = Analysis::review(value.into_inner(), threshold.into_inner());
-					builder.add_analysis(analysis, concerns.clone())?;
-				}
-				_ => {
-					return Err(hc_error!(
-						"phase name does not match {} analysis",
-						crate::analysis::score::REVIEW_PHASE
-					))
-				}
+	if let Some(stored) = &scoring.results.review {
+		match &stored.result {
+			Ok(analysis) => {
+				let Predicate::Threshold(pred) = analysis.as_ref();
+				let HCBasicValue::Float(value) = pred.value else {
+					return Err(hc_error!("review analysis has a non-f64 value"));
+				};
+				let HCBasicValue::Float(thresh) = pred.threshold else {
+					return Err(hc_error!("review analysis has a non-f64 value"));
+				};
+				builder.add_analysis(
+					Analysis::review(value.into(), thresh.into()),
+					stored.concerns.clone(),
+				)?;
 			}
-
-			Ok(())
-		},
-		|builder, error| {
-			builder.add_errored_analysis(AnalysisIdent::Review, error);
-			Ok(())
-		},
-	)?;
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Review, error);
+			}
+		}
+	};
 
 	// Typo analysis.
-	extract_results(
-		&mut builder,
-		&scoring.results.typo,
-		|builder, output| {
-			match output.as_ref() {
-				AnalysisReport::Typo {
-					value,
-					threshold,
-					concerns,
-					..
-				} => {
-					let analysis = Analysis::typo(*value, *threshold);
-					builder.add_analysis(analysis, concerns.clone())?;
-				}
-				_ => {
-					return Err(hc_error!(
-						"phase name does not match {} analysis",
-						crate::analysis::score::TYPO_PHASE
-					))
-				}
+	if let Some(stored) = &scoring.results.typo {
+		match &stored.result {
+			Ok(analysis) => {
+				let Predicate::Threshold(pred) = analysis.as_ref();
+				let HCBasicValue::Unsigned(value) = pred.value else {
+					return Err(hc_error!("typo analysis has a non-u64 value"));
+				};
+				let HCBasicValue::Unsigned(thresh) = pred.threshold else {
+					return Err(hc_error!("typo analysis has a non-u64 value"));
+				};
+				builder.add_analysis(Analysis::typo(value, thresh), stored.concerns.clone())?;
 			}
-
-			Ok(())
-		},
-		|builder, error| {
-			builder.add_errored_analysis(AnalysisIdent::Typo, error);
-			Ok(())
-		},
-	)?;
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Typo, error);
+			}
+		}
+	};
 
 	builder
 		.set_risk_score(scoring.score.total)
