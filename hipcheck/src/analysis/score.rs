@@ -72,10 +72,10 @@ impl HCStoredResult {
 	}
 }
 #[derive(Debug, Default)]
-pub struct AltAnalysisResults {
+pub struct AnalysisResults {
 	pub table: HashMap<String, HCStoredResult>,
 }
-impl AltAnalysisResults {
+impl AnalysisResults {
 	pub fn add(
 		&mut self,
 		key: &str,
@@ -95,21 +95,6 @@ impl AltAnalysisResults {
 
 #[allow(dead_code)]
 #[derive(Debug, Default)]
-pub struct AnalysisResults {
-	pub activity: Option<HCStoredResult>,
-	pub affiliation: Option<HCStoredResult>,
-	pub binary: Option<HCStoredResult>,
-	pub churn: Option<HCStoredResult>,
-	pub entropy: Option<HCStoredResult>,
-	pub identity: Option<HCStoredResult>,
-	pub fuzz: Option<HCStoredResult>,
-	pub review: Option<HCStoredResult>,
-	pub typo: Option<HCStoredResult>,
-	pub pull_request: Option<Result<Arc<AnalysisReport>>>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Default)]
 pub struct Score {
 	pub total: f64,
 	pub activity: AnalysisOutcome,
@@ -121,7 +106,6 @@ pub struct Score {
 	pub fuzz: AnalysisOutcome,
 	pub review: AnalysisOutcome,
 	pub typo: AnalysisOutcome,
-	pub pull_request: AnalysisOutcome,
 }
 
 #[salsa::query_group(ScoringProviderStorage)]
@@ -194,7 +178,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 			"review analysis does not use this infrastructure"
 		)),
 		TYPO_PHASE => Err(hc_error!("typo analysis does not use this infrastructure")),
-	  _ => Err(hc_error!(
+		_ => Err(hc_error!(
 			"failed to complete {} analysis.",
 			phase_name.as_ref()
 		)),
@@ -294,7 +278,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 	// Values set with -1.0 are reseved for parent nodes whose score comes always from children nodes with a score set by hc_analysis algorithms
 
 	let mut results = AnalysisResults::default();
-	let mut alt_results = AltAnalysisResults::default();
 	let mut score = Score::default();
 	let mut score_tree = ScoreTree { tree: Graph::new() };
 	let root_node = score_tree.tree.add_node(ScoreTreeNode {
@@ -329,7 +312,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				ordering: Ordering::Less,
 			};
 			score.activity = run_and_score_threshold_analysis!(
-				alt_results,
+				results,
 				phase,
 				score_tree,
 				ACTIVITY_PHASE,
@@ -338,7 +321,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				spec,
 				practices_node
 			);
-			results.activity = Some(alt_results.table.get(ACTIVITY_PHASE).unwrap().clone());
 		}
 
 		/*===REVIEW PHASE===*/
@@ -349,7 +331,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				ordering: Ordering::Less,
 			};
 			score.review = run_and_score_threshold_analysis!(
-				alt_results,
+				results,
 				phase,
 				score_tree,
 				REVIEW_PHASE,
@@ -358,7 +340,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				spec,
 				practices_node
 			);
-			results.review = Some(alt_results.table.get(REVIEW_PHASE).unwrap().clone());
 		}
 
 		/*===BINARY PHASE===*/
@@ -369,7 +350,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				ordering: Ordering::Less,
 			};
 			score.binary = run_and_score_threshold_analysis!(
-				alt_results,
+				results,
 				phase,
 				score_tree,
 				BINARY_PHASE,
@@ -378,7 +359,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				spec,
 				practices_node
 			);
-			results.binary = Some(alt_results.table.get(BINARY_PHASE).unwrap().clone());
 		}
 
 		/*===IDENTITY PHASE===*/
@@ -389,7 +369,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				ordering: Ordering::Less,
 			};
 			score.identity = run_and_score_threshold_analysis!(
-				alt_results,
+				results,
 				phase,
 				score_tree,
 				IDENTITY_PHASE,
@@ -398,7 +378,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				spec,
 				practices_node
 			);
-			results.identity = Some(alt_results.table.get(IDENTITY_PHASE).unwrap().clone());
 		}
 
 		/*===FUZZ PHASE===*/
@@ -409,7 +388,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				ordering: Ordering::Equal,
 			};
 			score.fuzz = run_and_score_threshold_analysis!(
-				alt_results,
+				results,
 				phase,
 				score_tree,
 				FUZZ_PHASE,
@@ -418,7 +397,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				spec,
 				practices_node
 			);
-			results.fuzz = Some(alt_results.table.get(FUZZ_PHASE).unwrap().clone());
 		}
 	}
 
@@ -449,7 +427,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				ordering: Ordering::Less,
 			};
 			score.typo = run_and_score_threshold_analysis!(
-				alt_results,
+				results,
 				phase,
 				score_tree,
 				TYPO_PHASE,
@@ -458,7 +436,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				spec,
 				attacks_node
 			);
-			results.typo = Some(alt_results.table.get(TYPO_PHASE).unwrap().clone());
 		}
 
 		/*High risk commits node addition*/
@@ -488,7 +465,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 					ordering: Ordering::Less,
 				};
 				score.affiliation = run_and_score_threshold_analysis!(
-					alt_results,
+					results,
 					phase,
 					score_tree,
 					AFFILIATION_PHASE,
@@ -497,9 +474,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 					spec,
 					commit_node
 				);
-				// This will be removed once results is deprecated in favor of alt_results
-				results.affiliation =
-					Some(alt_results.table.get(AFFILIATION_PHASE).unwrap().clone());
 			}
 
 			/*===NEW_PHASE===*/
@@ -510,7 +484,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 					ordering: Ordering::Less,
 				};
 				score.churn = run_and_score_threshold_analysis!(
-					alt_results,
+					results,
 					phase,
 					score_tree,
 					CHURN_PHASE,
@@ -519,7 +493,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 					spec,
 					commit_node
 				);
-				results.churn = Some(alt_results.table.get(CHURN_PHASE).unwrap().clone());
 			}
 
 			/*===NEW_PHASE===*/
@@ -530,7 +503,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 					ordering: Ordering::Less,
 				};
 				score.entropy = run_and_score_threshold_analysis!(
-					alt_results,
+					results,
 					phase,
 					score_tree,
 					ENTROPY_PHASE,
@@ -539,7 +512,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 					spec,
 					commit_node
 				);
-				results.entropy = Some(alt_results.table.get(ENTROPY_PHASE).unwrap().clone());
 			}
 		}
 	}
