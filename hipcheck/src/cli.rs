@@ -468,9 +468,6 @@ pub enum CheckCommand {
 	/// Analyze a repository and output an overall risk assessment
 	#[command(hide = true)]
 	Repo(CheckRepoArgs),
-	/// Analyze pull/merge request for potential risks
-	#[command(hide = true)]
-	Request(CheckRequestArgs),
 	/// Analyze packages specified in an SPDX document
 	#[command(hide = true)]
 	Spdx(CheckSpdxArgs),
@@ -494,10 +491,6 @@ impl CheckCommand {
 			CheckCommand::Repo(args) => Check {
 				target: args.source.clone(),
 				kind: CheckKind::Repo,
-			},
-			CheckCommand::Request(args) => Check {
-				target: args.pr_mr_uri.clone(),
-				kind: CheckKind::Request,
 			},
 			CheckCommand::Spdx(args) => Check {
 				target: args.path.clone(),
@@ -532,13 +525,6 @@ pub struct CheckRepoArgs {
 }
 
 #[derive(Debug, Clone, clap::Args)]
-pub struct CheckRequestArgs {
-	/// URI of pull/merge request to analyze
-	#[arg(value_name = "PR/MR URI")]
-	pub pr_mr_uri: String,
-}
-
-#[derive(Debug, Clone, clap::Args)]
 pub struct CheckSpdxArgs {
 	/// SPDX document to analyze
 	pub path: String,
@@ -560,8 +546,6 @@ pub enum SchemaCommand {
 	Pypi,
 	/// Print the JSON schema for running Hipcheck against a source repository
 	Repo,
-	/// Print the JSON schema for running Hipcheck against a pull request
-	Request,
 }
 
 #[derive(Debug, Clone, clap::Args)]

@@ -22,7 +22,6 @@ use crate::metric::fuzz::{self, FuzzOutput};
 use crate::metric::identity::{self, IdentityOutput};
 use crate::metric::linguist::Linguist;
 use crate::metric::module::{self, ModuleOutput};
-use crate::metric::module_contributors::{self, ModuleContributorsOutput};
 use crate::metric::review::{self, ReviewOutput};
 use crate::metric::typo::{self, TypoOutput};
 
@@ -86,16 +85,4 @@ pub trait MetricProvider:
 	/// Returns result of typo metric
 	#[salsa::invoke(typo::typo_metric)]
 	fn typo_metric(&self) -> Result<Arc<TypoOutput>>;
-
-	/// Returns result of pull request affiliation metric
-	#[salsa::invoke(affiliation::pr_affiliation_metric)]
-	fn pr_affiliation_metric(&self) -> Result<Arc<AffiliationOutput>>;
-
-	/// Returns result of pull request contributor trust metric
-	#[salsa::invoke(contributor_trust::pr_contributor_trust_metric)]
-	fn pr_contributor_trust_metric(&self) -> Result<Arc<ContributorTrustOutput>>;
-
-	/// Returns result of pull request module contributors metric
-	#[salsa::invoke(module_contributors::pr_module_contributors_metric)]
-	fn pr_module_contributors_metric(&self) -> Result<Arc<ModuleContributorsOutput>>;
 }

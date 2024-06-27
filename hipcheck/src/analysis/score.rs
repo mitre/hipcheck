@@ -33,9 +33,6 @@ pub const ATTACKS_PHASE: &str = "attacks";
 pub const AFFILIATION_PHASE: &str = "affiliation";
 pub const CHURN_PHASE: &str = "churn";
 pub const ENTROPY_PHASE: &str = "entropy";
-pub const PR_AFFILIATION_PHASE: &str = "pull request affiliation";
-pub const PR_CONTRIBUTOR_TRUST_PHASE: &str = "pull request contributor trust";
-pub const PR_MODULE_CONTRIBUTORS_PHASE: &str = "pull request module contributors";
 
 #[derive(Debug, Default)]
 pub struct ScoringResults {
@@ -109,9 +106,6 @@ pub struct AnalysisResults {
 	pub review: Option<Result<Arc<AnalysisReport>>>,
 	pub typo: Option<Result<Arc<AnalysisReport>>>,
 	pub pull_request: Option<Result<Arc<AnalysisReport>>>,
-	pub pr_affiliation: Option<Result<Arc<AnalysisReport>>>,
-	pub pr_contributor_trust: Option<Result<Arc<AnalysisReport>>>,
-	pub pr_module_contributors: Option<Result<Arc<AnalysisReport>>>,
 }
 
 #[allow(dead_code)]
@@ -128,9 +122,6 @@ pub struct Score {
 	pub review: AnalysisOutcome,
 	pub typo: AnalysisOutcome,
 	pub pull_request: AnalysisOutcome,
-	pub pr_affiliation: AnalysisOutcome,
-	pub pr_contributor_trust: AnalysisOutcome,
-	pub pr_module_contributors: AnalysisOutcome,
 }
 
 #[salsa::query_group(ScoringProviderStorage)]
@@ -397,98 +388,6 @@ pub fn phase_outcome<P: AsRef<String>>(
 			})),
 			_ => Err(hc_error!("phase name does not match analysis")),
 		},
-
-		PR_AFFILIATION_PHASE => match &db.pr_affiliation_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::PrAffiliation {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.pr_affiliation_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::PrAffiliation {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.pr_affiliation_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		PR_CONTRIBUTOR_TRUST_PHASE => match &db.pr_contributor_trust_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::PrContributorTrust {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.contributor_trust_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::PrContributorTrust {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.contributor_trust_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		PR_MODULE_CONTRIBUTORS_PHASE => {
-			match &db.pr_module_contributors_analysis().unwrap().as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => Ok(Arc::new(ScoreResult::default())),
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(msg),
-				} => Ok(Arc::new(ScoreResult {
-					count: 0,
-					score: 0,
-					outcome: AnalysisOutcome::Error(msg.clone()),
-				})),
-				AnalysisReport::PrModuleContributors {
-					outcome: AnalysisOutcome::Pass(msg),
-					..
-				} => Ok(Arc::new(ScoreResult {
-					count: db.pr_module_contributors_weight(),
-					score: 0,
-					outcome: AnalysisOutcome::Pass(msg.to_string()),
-				})),
-				AnalysisReport::PrModuleContributors {
-					outcome: AnalysisOutcome::Fail(msg),
-					..
-				} => Ok(Arc::new(ScoreResult {
-					count: db.pr_module_contributors_weight(),
-					score: 1,
-					outcome: AnalysisOutcome::Fail(msg.to_string()),
-				})),
-				_ => Err(hc_error!("phase name does not match analysis")),
-			}
-		}
 
 		_ => Err(hc_error!(
 			"failed to complete {} analysis.",
@@ -874,173 +773,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 					score_tree = score_tree_inc;
 				}
 				_ => return Err(hc_error!("failed to complete {} scoring.", ENTROPY_PHASE)),
-			}
-		}
-	}
-
-	let start_node: NodeIndex<u32> = n(0);
-	score.total = score_nodes(start_node, score_tree.tree);
-
-	Ok(ScoringResults { results, score })
-}
-
-pub fn score_pr_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
-	/*Scoring should be performed by the construction of a "score tree" where scores are the
-	nodes and weights are the edges. The leaves are the analyses themselves, which either
-	pass (a score of 0) or fail (a score of 1). These are then combined with the other
-	children of their parent according to their weights, repeating until the final score is
-	reached.
-	generate the tree
-	traverse and score recursively
-	*/
-
-	let mut results = AnalysisResults::default();
-	let mut score = Score::default();
-	let mut score_tree = ScoreTree { tree: Graph::new() };
-	let root_node = score_tree.tree.add_node(ScoreTreeNode {
-		label: RISK_PHASE.to_string(),
-		score: -1.0,
-		weight: 0.0,
-	});
-
-	/* PRACTICES NODE ADDITION */
-	// Currently there are no practices analyses for a single pull request analysis
-
-	/* ATTACKS NODE ADDITION */
-	if db.attacks_active() {
-		let (attacks_node, score_tree_updated) = match add_tree_node(
-			score_tree.clone(),
-			ATTACKS_PHASE,
-			0,
-			db.attacks_weight() as f64,
-		) {
-			Ok(results) => results,
-			_ => {
-				return Err(hc_error!(
-					"failed to add score tree node for {} scoring.",
-					ATTACKS_PHASE
-				))
-			}
-		};
-
-		score_tree = add_tree_edge(score_tree_updated, attacks_node, root_node);
-
-		/*High risk commits node addition*/
-		if db.commit_active() {
-			let (commit_node, score_tree_updated) = match add_tree_node(
-				score_tree.clone(),
-				COMMITS_PHASE,
-				0,
-				db.commit_weight() as f64,
-			) {
-				Ok(results) => results,
-				_ => {
-					return Err(hc_error!(
-						"failed to add score tree node for {} scoring.",
-						COMMITS_PHASE
-					))
-				}
-			};
-
-			score_tree = add_tree_edge(score_tree_updated, commit_node, attacks_node);
-
-			/*===PR_AFFILIATION_PHASE===*/
-			update_phase(phase, PR_AFFILIATION_PHASE)?;
-			let pr_affiliation_analysis = db.pr_affiliation_analysis()?;
-			match pr_affiliation_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.affiliation = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.pr_affiliation = Some(Err(err.clone())),
-				_ => results.pr_affiliation = Some(Ok(pr_affiliation_analysis)),
-			}
-			let score_result = db
-				.phase_outcome(Arc::new(PR_AFFILIATION_PHASE.to_string()))
-				.unwrap();
-			score.pr_affiliation = score_result.outcome.clone();
-			match add_node_and_edge_with_score(
-				score_result,
-				score_tree,
-				PR_AFFILIATION_PHASE,
-				commit_node,
-			) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => {
-					return Err(hc_error!(
-						"failed to complete {} scoring.",
-						PR_AFFILIATION_PHASE
-					))
-				}
-			}
-
-			/*===PR_CONTRIBUTOR_TRUST_PHASE===*/
-			update_phase(phase, PR_CONTRIBUTOR_TRUST_PHASE)?;
-			let pr_contributor_trust_analysis = db.pr_contributor_trust_analysis()?;
-			match pr_contributor_trust_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.pr_contributor_trust = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.pr_contributor_trust = Some(Err(err.clone())),
-				_ => results.pr_contributor_trust = Some(Ok(pr_contributor_trust_analysis)),
-			}
-			let score_result = db
-				.phase_outcome(Arc::new(PR_CONTRIBUTOR_TRUST_PHASE.to_string()))
-				.unwrap();
-			score.pr_contributor_trust = score_result.outcome.clone();
-			match add_node_and_edge_with_score(
-				score_result,
-				score_tree,
-				PR_CONTRIBUTOR_TRUST_PHASE,
-				commit_node,
-			) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => {
-					return Err(hc_error!(
-						"failed to complete {} scoring.",
-						PR_CONTRIBUTOR_TRUST_PHASE
-					))
-				}
-			}
-
-			/*===PR_MODULE_CONTRIBUTORS_PHASE===*/
-			update_phase(phase, PR_MODULE_CONTRIBUTORS_PHASE)?;
-			let pr_module_contributors_analysis = db.pr_module_contributors_analysis()?;
-			match pr_module_contributors_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.pr_module_contributors = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.pr_module_contributors = Some(Err(err.clone())),
-				_ => results.pr_module_contributors = Some(Ok(pr_module_contributors_analysis)),
-			}
-			let score_result = db
-				.phase_outcome(Arc::new(PR_MODULE_CONTRIBUTORS_PHASE.to_string()))
-				.unwrap();
-			score.pr_module_contributors = score_result.outcome.clone();
-			match add_node_and_edge_with_score(
-				score_result,
-				score_tree,
-				PR_MODULE_CONTRIBUTORS_PHASE,
-				commit_node,
-			) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => {
-					return Err(hc_error!(
-						"failed to complete {} scoring.",
-						PR_MODULE_CONTRIBUTORS_PHASE
-					))
-				}
 			}
 		}
 	}
