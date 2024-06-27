@@ -2,7 +2,7 @@
 
 use crate::analysis::analysis::AnalysisReport;
 use crate::analysis::result::{HCBasicValue, HCPredicate, Predicate};
-use crate::analysis::score::ScoringResults;
+use crate::analysis::score::*;
 use crate::config::RiskConfigQuery;
 use crate::error::Error;
 use crate::error::Result;
@@ -27,7 +27,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	let mut builder = ReportBuilder::for_session(session);
 
 	// Activity analysis.
-	if let Some(stored) = &scoring.results.activity {
+	if let Some(stored) = &scoring.results.table.get(ACTIVITY_PHASE) {
 		match &stored.result {
 			Ok(analysis) => {
 				let Predicate::Threshold(pred) = analysis.as_ref();
@@ -46,7 +46,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Affiliation analysis.
-	if let Some(stored) = &scoring.results.affiliation {
+	if let Some(stored) = &scoring.results.table.get(AFFILIATION_PHASE) {
 		match &stored.result {
 			Ok(analysis) => {
 				let Predicate::Threshold(pred) = analysis.as_ref();
@@ -68,7 +68,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Binary analysis
-	if let Some(stored) = &scoring.results.binary {
+	if let Some(stored) = &scoring.results.table.get(BINARY_PHASE) {
 		match &stored.result {
 			Ok(analysis) => {
 				let Predicate::Threshold(pred) = analysis.as_ref();
@@ -87,7 +87,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Churn analysis.
-	if let Some(stored) = &scoring.results.churn {
+	if let Some(stored) = &scoring.results.table.get(CHURN_PHASE) {
 		match &stored.result {
 			Ok(analysis) => {
 				let Predicate::Threshold(pred) = analysis.as_ref();
@@ -109,7 +109,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Entropy analysis.
-	if let Some(stored) = &scoring.results.entropy {
+	if let Some(stored) = &scoring.results.table.get(ENTROPY_PHASE) {
 		match &stored.result {
 			Ok(analysis) => {
 				let Predicate::Threshold(pred) = analysis.as_ref();
@@ -131,7 +131,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Identity analysis.
-	if let Some(stored) = &scoring.results.identity {
+	if let Some(stored) = &scoring.results.table.get(IDENTITY_PHASE) {
 		match &stored.result {
 			Ok(analysis) => {
 				let Predicate::Threshold(pred) = analysis.as_ref();
@@ -153,7 +153,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Fuzz analysis.
-	if let Some(stored) = &scoring.results.fuzz {
+	if let Some(stored) = &scoring.results.table.get(FUZZ_PHASE) {
 		match &stored.result {
 			Ok(analysis) => {
 				let Predicate::Threshold(pred) = analysis.as_ref();
@@ -166,7 +166,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Review analysis.
-	if let Some(stored) = &scoring.results.review {
+	if let Some(stored) = &scoring.results.table.get(REVIEW_PHASE) {
 		match &stored.result {
 			Ok(analysis) => {
 				let Predicate::Threshold(pred) = analysis.as_ref();
@@ -188,7 +188,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Typo analysis.
-	if let Some(stored) = &scoring.results.typo {
+	if let Some(stored) = &scoring.results.table.get(TYPO_PHASE) {
 		match &stored.result {
 			Ok(analysis) => {
 				let Predicate::Threshold(pred) = analysis.as_ref();
