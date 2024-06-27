@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[allow(unused)]
 mod analysis;
 mod cli;
 mod command_util;
