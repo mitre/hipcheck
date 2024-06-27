@@ -769,12 +769,14 @@ dependencies = [
  "graphql_client",
  "hipcheck-macros",
  "indexmap 2.2.6",
+ "indextree",
  "indicatif",
  "indicatif-log-bridge",
  "libc",
  "log",
  "maplit",
  "nom",
+ "num-traits",
  "once_cell",
  "ordered-float",
  "paste",
@@ -893,6 +895,12 @@ dependencies = [
  "equivalent",
  "hashbrown 0.14.5",
 ]
+
+[[package]]
+name = "indextree"
+version = "4.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a6f7e29c1619ec492f411b021ac9f30649d5f522ca6f287f2467ee48c8dfe10"
 
 [[package]]
 name = "indicatif"

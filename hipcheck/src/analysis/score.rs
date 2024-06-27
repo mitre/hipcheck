@@ -4,15 +4,18 @@ use crate::analysis::analysis::AnalysisOutcome;
 use crate::analysis::analysis::AnalysisReport;
 use crate::analysis::result::*;
 use crate::analysis::AnalysisProvider;
+use crate::config::{visit_leaves, WeightTree, WeightTreeProvider};
 use crate::error::Result;
 use crate::hc_error;
 use crate::report::Concern;
 use crate::shell::Phase;
+use crate::F64;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::default::Default;
 use std::sync::Arc;
 
+use indextree::{Arena, NodeEdge, NodeId};
 use petgraph::graph::node_index as n;
 use petgraph::graph::NodeIndex;
 use petgraph::prelude::Graph;
@@ -109,7 +112,7 @@ pub struct Score {
 }
 
 #[salsa::query_group(ScoringProviderStorage)]
-pub trait ScoringProvider: AnalysisProvider {
+pub trait ScoringProvider: AnalysisProvider + WeightTreeProvider {
 	/// Returns result of phase outcome and scoring
 	fn phase_outcome(&self, phase_name: Arc<String>) -> Result<Arc<ScoreResult>>;
 }
@@ -130,6 +133,71 @@ impl Default for ScoreResult {
 			score: 0,
 			outcome: AnalysisOutcome::Skipped,
 		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct AltScoreTree {
+	pub tree: Arena<ScoreTreeNode>,
+	pub root: NodeId,
+}
+impl AltScoreTree {
+	// Given a weight tree and set of analysis results, produce an AltScoreTree by creating
+	// ScoreTreeNode objects for each analysis that was not skipped, and composing them into
+	// a tree structure matching that of the WeightTree
+	pub fn synthesize(weight_tree: &WeightTree, scores: &AnalysisResults) -> Result<Self> {
+		use indextree::NodeEdge::*;
+		let mut tree = Arena::<ScoreTreeNode>::new();
+		let weight_root = weight_tree.root;
+		let score_root = tree.new_node(
+			weight_tree
+				.tree
+				.get(weight_root)
+				.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+				.get()
+				.augment(scores),
+		);
+
+		let mut scope: Vec<NodeId> = vec![score_root];
+		for edge in weight_root.traverse(&weight_tree.tree) {
+			match edge {
+				Start(n) => {
+					let curr_node = tree.new_node(
+						weight_tree
+							.tree
+							.get(n)
+							.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+							.get()
+							.augment(scores),
+					);
+					scope
+						.last()
+						.ok_or(hc_error!("Scope stack is empty, invalid state"))?
+						.append(curr_node, &mut tree);
+					scope.push(curr_node);
+				}
+				End(_) => {
+					scope.pop();
+				}
+			};
+		}
+
+		Ok(AltScoreTree {
+			tree,
+			root: score_root,
+		})
+	}
+	// As our scope, we track the weight of each node. Once we get to a leaf node, we multiply all
+	// the weights (already normalized) by the score (0/1) then sum each value
+	pub fn score(&self) -> f64 {
+		visit_leaves(
+			self.root,
+			&self.tree,
+			|n| n.weight,
+			|a, n| a.iter().product::<f64>() * n.score,
+		)
+		.into_iter()
+		.sum()
 	}
 }
 
@@ -243,25 +311,13 @@ pub fn add_tree_edge(
 }
 
 macro_rules! run_and_score_threshold_analysis {
-	($res:ident, $p:ident, $tree: ident, $phase:ident, $a:expr, $w:expr, $spec:ident, $node:ident) => {{
+	($res:ident, $p:ident, $phase:ident, $a:expr, $spec:ident) => {{
 		update_phase($p, $phase)?;
 		let analysis_result =
 			ThresholdPredicate::from_analysis(&$a, $spec.threshold, $spec.units, $spec.ordering);
 		$res.table.insert($phase.to_owned(), analysis_result);
 		let (an_score, outcome) = $res.table.get($phase).unwrap().score();
-		let score_result = Arc::new(ScoreResult {
-			count: $w,
-			score: an_score,
-			outcome,
-		});
-		let output = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, $tree, $phase, $node) {
-			Ok(score_tree_inc) => {
-				$tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", $phase)),
-		};
-		output
+		outcome
 	}};
 }
 
@@ -277,33 +333,11 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 	*/
 	// Values set with -1.0 are reseved for parent nodes whose score comes always from children nodes with a score set by hc_analysis algorithms
 
+	let weight_tree = db.normalized_weight_tree()?;
 	let mut results = AnalysisResults::default();
 	let mut score = Score::default();
-	let mut score_tree = ScoreTree { tree: Graph::new() };
-	let root_node = score_tree.tree.add_node(ScoreTreeNode {
-		label: RISK_PHASE.to_string(),
-		score: -1.0,
-		weight: 0.0,
-	});
 	/* PRACTICES NODE ADDITION */
 	if db.practices_active() {
-		let (practices_node, score_tree_updated) = match add_tree_node(
-			score_tree.clone(),
-			PRACTICES_PHASE,
-			0,
-			db.practices_weight() as f64,
-		) {
-			Ok(results) => results,
-			_ => {
-				return Err(hc_error!(
-					"failed to add score tree node for {} scoring.",
-					PRACTICES_PHASE
-				))
-			}
-		};
-
-		score_tree = add_tree_edge(score_tree_updated, practices_node, root_node);
-
 		/*===NEW_PHASE===*/
 		if db.activity_active() {
 			let spec = ThresholdSpec {
@@ -314,12 +348,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.activity = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				ACTIVITY_PHASE,
 				db.activity_analysis(),
-				db.activity_weight(),
-				spec,
-				practices_node
+				spec
 			);
 		}
 
@@ -333,12 +364,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.review = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				REVIEW_PHASE,
 				db.review_analysis(),
-				db.review_weight(),
-				spec,
-				practices_node
+				spec
 			);
 		}
 
@@ -352,12 +380,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.binary = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				BINARY_PHASE,
 				db.binary_analysis(),
-				db.binary_weight(),
-				spec,
-				practices_node
+				spec
 			);
 		}
 
@@ -371,12 +396,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.identity = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				IDENTITY_PHASE,
 				db.identity_analysis(),
-				db.identity_weight(),
-				spec,
-				practices_node
+				spec
 			);
 		}
 
@@ -390,35 +412,15 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.fuzz = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				FUZZ_PHASE,
 				db.fuzz_analysis(),
-				db.fuzz_weight(),
-				spec,
-				practices_node
+				spec
 			);
 		}
 	}
 
 	/* ATTACKS NODE ADDITION */
 	if db.attacks_active() {
-		let (attacks_node, score_tree_updated) = match add_tree_node(
-			score_tree.clone(),
-			ATTACKS_PHASE,
-			0,
-			db.attacks_weight() as f64,
-		) {
-			Ok(results) => results,
-			_ => {
-				return Err(hc_error!(
-					"failed to add score tree node for {} scoring.",
-					ATTACKS_PHASE
-				))
-			}
-		};
-
-		score_tree = add_tree_edge(score_tree_updated, attacks_node, root_node);
-
 		/*===TYPO PHASE===*/
 		if db.typo_active() {
 			let spec = ThresholdSpec {
@@ -429,34 +431,14 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.typo = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				TYPO_PHASE,
 				db.typo_analysis(),
-				db.typo_weight(),
-				spec,
-				attacks_node
+				spec
 			);
 		}
 
 		/*High risk commits node addition*/
 		if db.commit_active() {
-			let (commit_node, score_tree_updated) = match add_tree_node(
-				score_tree.clone(),
-				COMMITS_PHASE,
-				0,
-				db.commit_weight() as f64,
-			) {
-				Ok(results) => results,
-				_ => {
-					return Err(hc_error!(
-						"failed to add score tree node for {} scoring.",
-						COMMITS_PHASE
-					))
-				}
-			};
-
-			score_tree = add_tree_edge(score_tree_updated, commit_node, attacks_node);
-
 			/*===NEW_PHASE===*/
 			if db.affiliation_active() {
 				let spec = ThresholdSpec {
@@ -467,12 +449,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				score.affiliation = run_and_score_threshold_analysis!(
 					results,
 					phase,
-					score_tree,
 					AFFILIATION_PHASE,
 					db.affiliation_analysis(),
-					db.affiliation_weight(),
-					spec,
-					commit_node
+					spec
 				);
 			}
 
@@ -486,12 +465,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				score.churn = run_and_score_threshold_analysis!(
 					results,
 					phase,
-					score_tree,
 					CHURN_PHASE,
 					db.churn_analysis(),
-					db.churn_weight(),
-					spec,
-					commit_node
+					spec
 				);
 			}
 
@@ -505,19 +481,16 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				score.entropy = run_and_score_threshold_analysis!(
 					results,
 					phase,
-					score_tree,
 					ENTROPY_PHASE,
 					db.entropy_analysis(),
-					db.entropy_weight(),
-					spec,
-					commit_node
+					spec
 				);
 			}
 		}
 	}
 
-	let start_node: NodeIndex<u32> = n(0);
-	score.total = score_nodes(start_node, score_tree.tree);
+	let alt_score_tree = AltScoreTree::synthesize(&weight_tree, &results)?;
+	score.total = alt_score_tree.score();
 
 	Ok(ScoringResults { results, score })
 }

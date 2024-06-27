@@ -79,6 +79,8 @@ indicatif-log-bridge = "0.2.2"
 tar = "0.4.41"
 zip = "2.1.3"
 xz2 = "0.1.7"
+indextree = "4.6.1"
+num-traits = "0.2.19"
 
 # Windows-specific dependencies
 [target.'cfg(windows)'.dependencies]

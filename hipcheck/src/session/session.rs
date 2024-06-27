@@ -15,6 +15,7 @@ use crate::config::FuzzConfigQueryStorage;
 use crate::config::LanguagesConfigQueryStorage;
 use crate::config::PracticesConfigQueryStorage;
 use crate::config::RiskConfigQueryStorage;
+use crate::config::WeightTreeQueryStorage;
 use crate::context::Context as _;
 use crate::data::git::get_git_version;
 use crate::data::git::GitProviderStorage;
@@ -80,7 +81,8 @@ use std::sync::Arc;
 	RiskConfigQueryStorage,
 	ScoringProviderStorage,
 	SourceQueryStorage,
-	VersionQueryStorage
+	VersionQueryStorage,
+	WeightTreeQueryStorage
 )]
 pub struct Session {
 	/// The shell interface, for outputting progress.

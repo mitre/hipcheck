@@ -2,6 +2,7 @@
 
 //! Defines the configuration file format.
 
+use crate::analysis::score::*;
 use crate::context::Context;
 use crate::error::Result;
 use crate::hc_error;
@@ -11,6 +12,8 @@ use crate::F64;
 use crate::LANGS_FILE;
 use crate::ORGS_FILE;
 use crate::TYPO_FILE;
+use indextree::{Arena, NodeEdge, NodeId};
+use num_traits::identities::Zero;
 use pathbuf::pathbuf;
 use serde::Deserialize;
 use serde::Serialize;
@@ -586,6 +589,144 @@ pub trait CommitConfigQuery: ConfigSource {
 	fn entropy_value_threshold(&self) -> F64;
 	/// Returns the entropy analysis percent threshold
 	fn entropy_percent_threshold(&self) -> F64;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WeightTreeNode {
+	pub label: String,
+	pub weight: F64,
+}
+impl WeightTreeNode {
+	pub fn new(label: &str, weight: F64) -> Self {
+		WeightTreeNode {
+			label: label.to_owned(),
+			weight,
+		}
+	}
+	pub fn augment(&self, scores: &AnalysisResults) -> ScoreTreeNode {
+		let score = match scores.table.get(&self.label) {
+			Some(res) => res.score().0,
+			_ => 0,
+		};
+		ScoreTreeNode {
+			label: self.label.clone(),
+			score: score as f64,
+			weight: self.weight.into(),
+		}
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WeightTree {
+	pub tree: Arena<WeightTreeNode>,
+	pub root: NodeId,
+}
+impl WeightTree {
+	pub fn new(root_label: &str) -> Self {
+		let mut tree = Arena::new();
+		let root = tree.new_node(WeightTreeNode::new(root_label, F64::new(1.0).unwrap()));
+		WeightTree { tree, root }
+	}
+	pub fn add_child_u64(&mut self, under: NodeId, label: &str, weight: u64) -> NodeId {
+		let weight = F64::new(weight as f64).unwrap();
+		self.add_child(under, label, weight)
+	}
+	pub fn add_child(&mut self, under: NodeId, label: &str, weight: F64) -> NodeId {
+		let child = self.tree.new_node(WeightTreeNode::new(label, weight));
+		under.append(child, &mut self.tree);
+		child
+	}
+}
+
+// Generic function for visiting and performing operations on an indexmap::Arena.
+// A function `acc_op` is applied to each node, and the results this function build up a
+// "scope" which is a vector of `acc_op` output from the root node to the current node.
+// When a leaf node is detected, `chil_op` is called, and the function receives both
+// the current node and a slice-view of the scope vector. The output of calling `chil_op`
+// on each leaf node is aggregated and returned.
+pub fn visit_leaves<T, A: Clone, B, F1, F2>(
+	node: NodeId,
+	tree: &Arena<T>,
+	acc_op: F1,
+	chil_op: F2,
+) -> Vec<B>
+where
+	F1: Fn(&T) -> A,
+	F2: Fn(&[A], &T) -> B,
+{
+	let mut scope: Vec<A> = vec![];
+	let mut last_start: NodeId = node;
+	let mut out_vals: Vec<B> = vec![];
+	for edge in node.traverse(tree) {
+		match edge {
+            // Entering a new scope, update the tracker vec
+			NodeEdge::Start(n) => {
+				last_start = n;
+				scope.push(acc_op(tree.get(n).unwrap().get()));
+			}
+			NodeEdge::End(n) => {
+                // If we just saw Start on the same NodeId, this is a leaf
+				if n == last_start {
+					let node = tree.get(n).unwrap().get();
+					out_vals.push(chil_op(scope.as_slice(), node));
+				}
+				scope.pop();
+			}
+		}
+	}
+	out_vals
+}
+
+#[salsa::query_group(WeightTreeQueryStorage)]
+pub trait WeightTreeProvider:
+	FuzzConfigQuery + PracticesConfigQuery + AttacksConfigQuery + CommitConfigQuery
+{
+	/// Returns the tree of raw analysis weights from the config
+	fn weight_tree(&self) -> Result<Rc<WeightTree>>;
+	/// Returns the tree of normalized weights for analyses from the config
+	fn normalized_weight_tree(&self) -> Result<Rc<WeightTree>>;
+}
+
+pub fn weight_tree(db: &dyn WeightTreeProvider) -> Result<Rc<WeightTree>> {
+	let mut tree = WeightTree::new(RISK_PHASE);
+	if db.practices_active() {
+		let practices_node = tree.add_child_u64(tree.root, PRACTICES_PHASE, db.practices_weight());
+		tree.add_child_u64(practices_node, ACTIVITY_PHASE, db.activity_weight());
+		tree.add_child_u64(practices_node, REVIEW_PHASE, db.review_weight());
+		tree.add_child_u64(practices_node, BINARY_PHASE, db.binary_weight());
+		tree.add_child_u64(practices_node, IDENTITY_PHASE, db.identity_weight());
+		tree.add_child_u64(practices_node, FUZZ_PHASE, db.fuzz_weight());
+	}
+	if db.attacks_active() {
+		let attacks_node = tree.add_child_u64(tree.root, ATTACKS_PHASE, db.attacks_weight());
+		tree.add_child_u64(attacks_node, TYPO_PHASE, db.typo_weight());
+		if db.commit_active() {
+			let commit_node = tree.add_child_u64(attacks_node, COMMITS_PHASE, db.commit_weight());
+			tree.add_child_u64(commit_node, AFFILIATION_PHASE, db.affiliation_weight());
+			tree.add_child_u64(commit_node, CHURN_PHASE, db.churn_weight());
+			tree.add_child_u64(commit_node, ENTROPY_PHASE, db.entropy_weight());
+		}
+	}
+	Ok(Rc::new(tree))
+}
+
+fn normalize_internal(node: NodeId, tree: &mut WeightTree) -> F64 {
+	let children: Vec<NodeId> = node.children(&tree.tree).collect();
+	let weight_sum: F64 = children.iter().map(|n| normalize_internal(*n, tree)).sum();
+	if !weight_sum.is_zero() {
+		for c in children {
+			let child: &mut WeightTreeNode = tree.tree.get_mut(c).unwrap().get_mut();
+			child.weight /= weight_sum;
+		}
+	}
+	tree.tree.get(node).unwrap().get().weight
+}
+
+pub fn normalized_weight_tree(db: &dyn WeightTreeProvider) -> Result<Rc<WeightTree>> {
+	let tree = db.weight_tree();
+	let mut norm_tree: WeightTree = (*tree?).clone();
+	normalize_internal(norm_tree.root, &mut norm_tree);
+	Ok(Rc::new(norm_tree))
 }
 
 /// Derived query implementations
