@@ -390,8 +390,13 @@ pub enum Commands {
 	Schema(SchemaArgs),
 	/// Initialize Hipcheck config file and script file locations.
 	///
-	/// NOTE: The `--data` and `--config` flags specify where to install the
-	/// extra files Hipcheck needs.
+	/// The "destination" directories for configuration and data files
+	/// Hipcheck needs are determined with the following methods, in
+	/// increasing precedence:
+	///
+	/// 1. Platform-specific defaults
+	/// 2. `HC_CONFIG` and `HC_DATA` environment variables
+	/// 3. `--config` and `--data` command line flags
 	Setup(SetupArgs),
 	/// Check if Hipcheck is ready to run.
 	Ready,
