@@ -40,6 +40,14 @@ pub enum HCAnalysisOutcome {
 pub enum HCAnalysisError {
 	Generic(crate::error::Error),
 }
+impl Into<crate::error::Error> for HCAnalysisError {
+	fn into(self) -> crate::error::Error {
+		use HCAnalysisError::*;
+		match self {
+			Generic(e) => e,
+		}
+	}
+}
 
 /// A Hipcheck analysis may return a basic or composite value. By splitting the types
 /// into two sub-enums under this one, we can eschew a recursive enum definition and
@@ -164,10 +172,10 @@ impl ThresholdPredicate {
 		units: Option<String>,
 		order: Ordering,
 	) -> HCStoredResult {
-		let result = match &report.outcome {
-			HCAnalysisOutcome::Error(err) => Err(hc_error!("{:?}", err)),
+		let result = match report.outcome.clone() {
+			HCAnalysisOutcome::Error(err) => Err(err.into()),
 			HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(av)) => {
-				Ok(ThresholdPredicate::new(av.clone(), threshold, units, order))
+				Ok(ThresholdPredicate::new(av, threshold, units, order))
 			}
 			HCAnalysisOutcome::Completed(HCAnalysisValue::Composite(_)) => Err(hc_error!(
 				"activity analysis should return a basic u64 type, not {:?}"
