@@ -40,10 +40,10 @@ pub enum HCAnalysisOutcome {
 pub enum HCAnalysisError {
 	Generic(crate::error::Error),
 }
-impl Into<crate::error::Error> for HCAnalysisError {
-	fn into(self) -> crate::error::Error {
+impl From<HCAnalysisError> for crate::error::Error {
+	fn from(val: HCAnalysisError) -> Self {
 		use HCAnalysisError::*;
-		match self {
+		match val {
 			Generic(e) => e,
 		}
 	}
