@@ -474,7 +474,6 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 					spec,
 					commit_node
 				);
-				// This will be removed once results is deprecated in favor of results
 			}
 
 			/*===NEW_PHASE===*/
