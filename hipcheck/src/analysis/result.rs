@@ -40,6 +40,14 @@ pub enum HCAnalysisOutcome {
 pub enum HCAnalysisError {
 	Generic(crate::error::Error),
 }
+impl From<HCAnalysisError> for crate::error::Error {
+	fn from(val: HCAnalysisError) -> Self {
+		use HCAnalysisError::*;
+		match val {
+			Generic(e) => e,
+		}
+	}
+}
 
 /// A Hipcheck analysis may return a basic or composite value. By splitting the types
 /// into two sub-enums under this one, we can eschew a recursive enum definition and
@@ -112,8 +120,14 @@ pub enum HCCompositeValue {
 }
 
 /// The set of possible predicates for deciding if a source passed an analysis.
-pub trait HCPredicate: Display + std::fmt::Debug + std::any::Any + 'static {
+pub trait HCPredicate: Display + std::fmt::Debug {
 	fn pass(&self) -> Result<bool>;
+}
+
+pub struct ThresholdSpec {
+	pub threshold: HCBasicValue,
+	pub units: Option<String>,
+	pub ordering: Ordering,
 }
 
 /// This predicate determines analysis pass/fail by whether a returned value was
@@ -142,7 +156,13 @@ impl ThresholdPredicate {
 }
 
 fn pass_threshold<T: Ord>(a: &T, b: &T, ord: Ordering) -> bool {
-	a.cmp(b) == ord
+	match ord {
+		// Ordering doesn't have a way to represent <=, but need it
+		// so that val 0 with threshold 0 is a pass. We'll just treat
+		// any Ordering::Less as less-than-or-equal-to
+		Ordering::Less => a.cmp(b).is_le(),
+		ord => a.cmp(b) == ord,
+	}
 }
 
 impl ThresholdPredicate {
@@ -152,10 +172,10 @@ impl ThresholdPredicate {
 		units: Option<String>,
 		order: Ordering,
 	) -> HCStoredResult {
-		let result = match &report.outcome {
-			HCAnalysisOutcome::Error(err) => Err(hc_error!("{:?}", err)),
+		let result = match report.outcome.clone() {
+			HCAnalysisOutcome::Error(err) => Err(err.into()),
 			HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(av)) => {
-				Ok(ThresholdPredicate::new(av.clone(), threshold, units, order))
+				Ok(ThresholdPredicate::new(av, threshold, units, order))
 			}
 			HCAnalysisOutcome::Completed(HCAnalysisValue::Composite(_)) => Err(hc_error!(
 				"activity analysis should return a basic u64 type, not {:?}"
@@ -193,7 +213,7 @@ impl Display for ThresholdPredicate {
 		let val = format!("{} {}", self.value, &self.units);
 		let thr = format!("{} {}", self.threshold, &self.units);
 		let order_str = match &self.ordering {
-			Less => "<",
+			Less => "<=",
 			Equal => "==",
 			Greater => ">",
 		};

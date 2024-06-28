@@ -364,6 +364,7 @@ fn hc_env_var_value_enum<E: ValueEnum>(name: &'static str) -> Option<E> {
 pub enum FullCommands {
 	Check(CheckArgs),
 	Schema(SchemaArgs),
+	Setup(SetupArgs),
 	Ready,
 	PrintConfig,
 	PrintData,
@@ -375,6 +376,7 @@ impl From<&Commands> for FullCommands {
 		match command {
 			Commands::Check(args) => FullCommands::Check(args.clone()),
 			Commands::Schema(args) => FullCommands::Schema(args.clone()),
+			Commands::Setup(args) => FullCommands::Setup(args.clone()),
 			Commands::Ready => FullCommands::Ready,
 		}
 	}
@@ -386,6 +388,16 @@ pub enum Commands {
 	Check(CheckArgs),
 	/// Print the JSON schema for output of a specific `check` command.
 	Schema(SchemaArgs),
+	/// Initialize Hipcheck config file and script file locations.
+	///
+	/// The "destination" directories for configuration and data files
+	/// Hipcheck needs are determined with the following methods, in
+	/// increasing precedence:
+	///
+	/// 1. Platform-specific defaults
+	/// 2. `HC_CONFIG` and `HC_DATA` environment variables
+	/// 3. `--config` and `--data` command line flags
+	Setup(SetupArgs),
 	/// Check if Hipcheck is ready to run.
 	Ready,
 }
@@ -458,18 +470,12 @@ pub enum CheckCommand {
 	/// Analyze an npm package git repo via package URI or with format <package name>[@<optional version>]
 	#[command(hide = true)]
 	Npm(CheckNpmArgs),
-	/// Analyze 'git' patches for projects that use a patch-based workflow (not yet implemented)
-	#[command(hide = true)]
-	Patch(CheckPatchArgs),
 	/// Analyze a PyPI package git repo via package URI or with format <package name>[@<optional version>]
 	#[command(hide = true)]
 	Pypi(CheckPypiArgs),
 	/// Analyze a repository and output an overall risk assessment
 	#[command(hide = true)]
 	Repo(CheckRepoArgs),
-	/// Analyze pull/merge request for potential risks
-	#[command(hide = true)]
-	Request(CheckRequestArgs),
 	/// Analyze packages specified in an SPDX document
 	#[command(hide = true)]
 	Spdx(CheckSpdxArgs),
@@ -486,10 +492,6 @@ impl CheckCommand {
 				target: args.package.clone(),
 				kind: CheckKind::Npm,
 			},
-			CheckCommand::Patch(args) => Check {
-				target: args.patch_file_uri.clone(),
-				kind: CheckKind::Patch,
-			},
 			CheckCommand::Pypi(args) => Check {
 				target: args.package.clone(),
 				kind: CheckKind::Pypi,
@@ -497,10 +499,6 @@ impl CheckCommand {
 			CheckCommand::Repo(args) => Check {
 				target: args.source.clone(),
 				kind: CheckKind::Repo,
-			},
-			CheckCommand::Request(args) => Check {
-				target: args.pr_mr_uri.clone(),
-				kind: CheckKind::Request,
 			},
 			CheckCommand::Spdx(args) => Check {
 				target: args.path.clone(),
@@ -523,13 +521,6 @@ pub struct CheckNpmArgs {
 }
 
 #[derive(Debug, Clone, clap::Args)]
-pub struct CheckPatchArgs {
-	/// Path to Git patch file to analyze
-	#[arg(value_name = "PATCH FILE URI")]
-	pub patch_file_uri: String,
-}
-
-#[derive(Debug, Clone, clap::Args)]
 pub struct CheckPypiArgs {
 	/// PyPI package URI or package[@<optional version>] to analyze"
 	pub package: String,
@@ -539,13 +530,6 @@ pub struct CheckPypiArgs {
 pub struct CheckRepoArgs {
 	/// Repository to analyze; can be a local path or a URI
 	pub source: String,
-}
-
-#[derive(Debug, Clone, clap::Args)]
-pub struct CheckRequestArgs {
-	/// URI of pull/merge request to analyze
-	#[arg(value_name = "PR/MR URI")]
-	pub pr_mr_uri: String,
 }
 
 #[derive(Debug, Clone, clap::Args)]
@@ -562,18 +546,24 @@ pub struct SchemaArgs {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum SchemaCommand {
-	/// Print the JSONN schema for running Hipcheck against a Maven package
+	/// Print the JSON schema for running Hipcheck against a Maven package
 	Maven,
 	/// Print the JSON schema for running Hipcheck against a NPM package
 	Npm,
-	/// Print the JSON schema for running Hipcheck against a Git patchfile
-	Patch,
 	/// Print the JSON schema for running Hipcheck against a PyPI package
 	Pypi,
 	/// Print the JSON schema for running Hipcheck against a source repository
 	Repo,
-	/// Print the JSON schema for running Hipcheck against a pull request
-	Request,
+}
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct SetupArgs {
+	/// Do not use the network to download setup files.
+	#[clap(short = 'o', long)]
+	pub offline: bool,
+	/// Path to local Hipcheck release archive or directory.
+	#[clap(short = 's', long)]
+	pub source: Option<PathBuf>,
 }
 
 /// A type that can copy non-`None` values from other instances of itself.

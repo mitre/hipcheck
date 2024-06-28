@@ -15,6 +15,7 @@ use crate::config::FuzzConfigQueryStorage;
 use crate::config::LanguagesConfigQueryStorage;
 use crate::config::PracticesConfigQueryStorage;
 use crate::config::RiskConfigQueryStorage;
+use crate::config::WeightTreeQueryStorage;
 use crate::context::Context as _;
 use crate::data::git::get_git_version;
 use crate::data::git::GitProviderStorage;
@@ -40,7 +41,6 @@ use crate::session::spdx::extract_download_url;
 use crate::shell::Phase;
 use crate::shell::Shell;
 use crate::source::source::Source;
-use crate::source::source::SourceChangeRequest;
 use crate::source::source::SourceKind;
 use crate::source::source::SourceQuery;
 use crate::source::source::SourceQueryStorage;
@@ -81,7 +81,8 @@ use std::sync::Arc;
 	RiskConfigQueryStorage,
 	ScoringProviderStorage,
 	SourceQueryStorage,
-	VersionQueryStorage
+	VersionQueryStorage,
+	WeightTreeQueryStorage
 )]
 pub struct Session {
 	/// The shell interface, for outputting progress.
@@ -292,10 +293,8 @@ fn load_source(
 	// Resolve the source specifier into an actual source.
 	let phase_desc = match source_type.kind.target_kind() {
 		TargetKind::RepoSource => "resolving git repository source",
-		TargetKind::PrUri => "resolving git pull request source",
 		TargetKind::PackageVersion => "resolving package source",
 		TargetKind::SpdxDocument => "parsing SPDX document",
-		_ => return Err(hc_error!("source specified was not a valid source")),
 	};
 
 	let mut phase = shell.phase(phase_desc)?;
@@ -343,18 +342,12 @@ fn resolve_source(
 				}
 			})
 		}
-		TargetKind::PrUri => {
-			SourceChangeRequest::resolve_change_request(phase, home, source).map(|cr| Source {
-				kind: SourceKind::ChangeRequest(cr),
-			})
-		}
 		TargetKind::SpdxDocument => {
 			let download_url = extract_download_url(source)?;
 			SourceRepo::resolve_repo(phase, home, &download_url).map(|repo| Source {
 				kind: SourceKind::Repo(repo),
 			})
 		}
-		_ => Err(Error::msg("source specified was not a valid source")),
 	}
 }
 
@@ -366,8 +359,6 @@ pub struct Check {
 #[derive(Debug, PartialEq, Eq)]
 pub enum TargetKind {
 	RepoSource,
-	PrUri,
-	PatchUri,
 	PackageVersion,
 	SpdxDocument,
 }
@@ -377,8 +368,7 @@ impl TargetKind {
 		use TargetKind::*;
 
 		match self {
-			RepoSource | PrUri | PackageVersion | SpdxDocument => true,
-			PatchUri => false,
+			RepoSource | PackageVersion | SpdxDocument => true,
 		}
 	}
 }

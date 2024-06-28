@@ -12,6 +12,7 @@ mod http;
 mod metric;
 mod report;
 mod session;
+mod setup;
 mod shell;
 mod source;
 mod target;
@@ -23,13 +24,10 @@ mod version;
 #[cfg(feature = "benchmarking")]
 mod benchmarking;
 
-use crate::analysis::report_builder::build_pr_report;
 use crate::analysis::report_builder::build_report;
 use crate::analysis::report_builder::AnyReport;
 use crate::analysis::report_builder::Format;
-use crate::analysis::report_builder::PrReport;
 use crate::analysis::report_builder::Report;
-use crate::analysis::score::score_pr_results;
 use crate::analysis::score::score_results;
 use crate::context::Context as _;
 use crate::error::Error;
@@ -37,6 +35,8 @@ use crate::error::Result;
 use crate::session::session::Check;
 use crate::session::session::Session;
 use crate::session::session::TargetKind;
+use crate::setup::{resolve_and_transform_source, SourceType};
+use crate::shell::Output;
 use crate::shell::Shell;
 use crate::shell::verbosity::Verbosity;
 use crate::util::iter::TryAny;
@@ -46,6 +46,7 @@ use cli::CliConfig;
 use cli::FullCommands;
 use cli::SchemaArgs;
 use cli::SchemaCommand;
+use cli::SetupArgs;
 use command_util::DependentProgram;
 use indicatif_log_bridge::LogWrapper;
 use core::fmt;
@@ -91,6 +92,7 @@ fn main() -> ExitCode {
 	match config.subcommand() {
 		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
+		Some(FullCommands::Setup(args)) => return cmd_setup(&args, &config),
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
@@ -135,14 +137,6 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 			let _ = shell.report(&mut Output::stdout(config.color()), report, config.format());
 			ExitCode::SUCCESS
 		}
-		Ok(AnyReport::PrReport(pr_report)) => {
-			let _ = shell.pr_report(
-				&mut Output::stdout(config.color()),
-				pr_report,
-				config.format(),
-			);
-			ExitCode::SUCCESS
-		}
 		Err(e) => {
 			if shell.error(&e, config.format()).is_err() {
 				print_error(&e);
@@ -157,11 +151,123 @@ fn cmd_schema(args: &SchemaArgs) {
 	match args.command {
 		SchemaCommand::Maven => print_maven_schema(),
 		SchemaCommand::Npm => print_npm_schema(),
-		SchemaCommand::Patch => print_patch_schema(),
 		SchemaCommand::Pypi => print_pypi_schema(),
 		SchemaCommand::Repo => print_report_schema(),
-		SchemaCommand::Request => print_request_schema(),
 	}
+}
+
+/// Copy individual files in dir instead of entire dir, to avoid users accidentally
+/// overwriting important dirs such as /usr/bin/
+fn copy_dir_contents<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()> {
+	fn inner(from: &Path, to: &Path) -> Result<()> {
+		let src = from.to_path_buf();
+		if !src.is_dir() {
+			return Err(hc_error!("source path must be a directory"));
+		}
+		let dst: PathBuf = to.to_path_buf();
+		if !dst.is_dir() {
+			return Err(hc_error!("target path must be a directory"));
+		}
+
+		for entry in walkdir::WalkDir::new(&src) {
+			let src_f_path = entry?.path().to_path_buf();
+			if src_f_path == src {
+				continue;
+			}
+			let mut dst_f_path = dst.clone();
+			dst_f_path.push(
+				src_f_path
+					.file_name()
+					.ok_or(hc_error!("src dir entry without file name"))?,
+			);
+			// This is ok for now because we only copy files, no dirs
+			std::fs::copy(src_f_path, dst_f_path)?;
+		}
+		Ok(())
+	}
+	inner(from.as_ref(), to.as_ref())
+}
+
+fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
+	// Find or download a Hipcheck bundle source and decompress
+	let source = match resolve_and_transform_source(args) {
+		Err(e) => {
+			print_error(&e);
+			return ExitCode::FAILURE;
+		}
+		Ok(x) => x,
+	};
+
+	// Derive the config/scripts paths from the source path
+	let (src_conf_path, src_data_path) = match &source.path {
+		SourceType::Dir(p) => (
+			pathbuf![p.as_path(), "config"],
+			pathbuf![p.as_path(), "scripts"],
+		),
+		_ => {
+			print_error(&hc_error!("expected source to be a directory"));
+			source.cleanup();
+			return ExitCode::FAILURE;
+		}
+	};
+
+	// Make config dir if not exist
+	let Some(tgt_conf_path) = config.config() else {
+		print_error(&hc_error!("target config dir not specified"));
+		return ExitCode::FAILURE;
+	};
+	if !tgt_conf_path.exists() && create_dir_all(tgt_conf_path).is_err() {
+		print_error(&hc_error!("failed to create missing target config dir"));
+	}
+	let Ok(abs_conf_path) = tgt_conf_path.canonicalize() else {
+		print_error(&hc_error!("failed to canonicalize HC_CONFIG path"));
+		return ExitCode::FAILURE;
+	};
+
+	// Make data dir if not exist
+	let Some(tgt_data_path) = config.data() else {
+		print_error(&hc_error!("target data dir not specified"));
+		return ExitCode::FAILURE;
+	};
+	if !tgt_data_path.exists() && create_dir_all(tgt_data_path).is_err() {
+		print_error(&hc_error!("failed to create missing target data dir"));
+	}
+	let Ok(abs_data_path) = tgt_data_path.canonicalize() else {
+		print_error(&hc_error!("failed to canonicalize HC_DATA path"));
+		return ExitCode::FAILURE;
+	};
+
+	// Copy local config/data dirs to target locations
+	if let Err(e) = copy_dir_contents(src_conf_path, &abs_conf_path) {
+		print_error(&hc_error!("failed to copy config dir contents: {}", e));
+		return ExitCode::FAILURE;
+	}
+	if let Err(e) = copy_dir_contents(src_data_path, &abs_data_path) {
+		print_error(&hc_error!("failed to copy data dir contents: {}", e));
+		return ExitCode::FAILURE;
+	}
+
+	println!("Hipcheck setup completed successfully.");
+
+	// Recommend exportation of HC_CONFIG/HC_DATA env vars if applicable
+	let shell_profile = match std::env::var("SHELL").as_ref().map(String::as_str) {
+		Ok("/bin/zsh") | Ok("/usr/bin/zsh") => ".zshrc",
+		Ok("/bin/bash") | Ok("/usr/bin/bash") => ".bash_profile",
+		_ => ".profile",
+	};
+
+	println!(
+		"Manually add the following to your '$HOME/{}' (or similar) if you haven't already",
+		shell_profile
+	);
+	println!("\texport HC_CONFIG={:?}", abs_conf_path);
+	println!("\texport HC_DATA={:?}", abs_data_path);
+
+	println!("Run `hc help` to get started");
+
+	source.cleanup();
+
+	ExitCode::SUCCESS
 }
 
 #[derive(Debug)]
@@ -450,13 +556,6 @@ fn print_report_schema() {
 	println!("{}", report_text);
 }
 
-/// Print the JSON schema of the pull/merge request.
-fn print_request_schema() {
-	let schema = schema_for!(PrReport);
-	let report_text = serde_json::to_string_pretty(&schema).unwrap();
-	println!("{}", report_text);
-}
-
 /// Print the JSON schema of the maven package
 fn print_maven_schema() {
 	print_missing()
@@ -464,11 +563,6 @@ fn print_maven_schema() {
 
 /// Print the JSON schema of the npm package
 fn print_npm_schema() {
-	print_missing()
-}
-
-/// Print the JSON schema of the patch.
-fn print_patch_schema() {
 	print_missing()
 }
 
@@ -499,8 +593,6 @@ const EXIT_FAILURE: i32 = 1;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum CheckKind {
 	Repo,
-	Request,
-	Patch,
 	Maven,
 	Npm,
 	Pypi,
@@ -512,8 +604,6 @@ impl CheckKind {
 	const fn name(&self) -> &'static str {
 		match self {
 			CheckKind::Repo => "repo",
-			CheckKind::Request => "request",
-			CheckKind::Patch => "patch",
 			CheckKind::Maven => "maven",
 			CheckKind::Npm => "npm",
 			CheckKind::Pypi => "pypi",
@@ -525,8 +615,6 @@ impl CheckKind {
 	const fn target_kind(&self) -> TargetKind {
 		match self {
 			CheckKind::Repo => TargetKind::RepoSource,
-			CheckKind::Request => TargetKind::PrUri,
-			CheckKind::Patch => TargetKind::PatchUri,
 			CheckKind::Maven => TargetKind::PackageVersion,
 			CheckKind::Npm => TargetKind::PackageVersion,
 			CheckKind::Pypi => TargetKind::PackageVersion,
@@ -656,43 +744,6 @@ fn run_with_shell(
 
 			(session.end(), Ok(AnyReport::Report(report)))
 		}
-		TargetKind::PrUri => {
-			// Run analyses against a pull request and score the results (score calls analyses that call metrics).
-			let mut phase = match session.shell.phase("scoring and analyzing results") {
-				Ok(phase) => phase,
-				Err(err) => return (session.end(), Err(err)),
-			};
-
-			let score = match score_pr_results(&mut phase, &session) {
-				Ok(score) => score,
-				_ => {
-					return (
-						session.end(),
-						Err(Error::msg("Trouble scoring and analyzing results")),
-					)
-				}
-			};
-
-			match phase.finish() {
-				Ok(()) => {}
-				Err(err) => return (session.end(), Err(err)),
-			};
-
-			// Build the final report.
-			let pr_report =
-				match build_pr_report(&session, &score).context("failed to build final report") {
-					Ok(pr_report) => pr_report,
-					Err(err) => return (session.end(), Err(err)),
-				};
-
-			(session.end(), Ok(AnyReport::PrReport(pr_report)))
-		}
-		_ => (
-			session.end(),
-			Err(Error::msg(
-				"Hipcheck attempted to analyze an unsupported type",
-			)),
-		),
 	}
 }
 

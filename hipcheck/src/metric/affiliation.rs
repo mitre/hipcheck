@@ -97,46 +97,6 @@ pub(crate) fn affiliation_metric(db: &dyn MetricProvider) -> Result<Arc<Affiliat
 	Ok(Arc::new(AffiliationOutput { affiliations }))
 }
 
-pub(crate) fn pr_affiliation_metric(db: &dyn MetricProvider) -> Result<Arc<AffiliationOutput>> {
-	log::debug!("running pull request affiliation metric");
-
-	// Parse the Orgs file and construct an OrgSpec.
-	let org_spec = OrgSpec::from_file(&db.orgs_file()).context("failed to load org spec")?;
-
-	// Get the commits for the source.
-
-	let pull_request = db
-		.single_pull_request_review()
-		.context("failed to get pull request")?;
-
-	let commits = &pull_request.as_ref().commits;
-
-	// Use the OrgSpec to build an Affiliator.
-	let affiliator = Affiliator::from_spec(&org_spec)
-		.context("failed to build affiliation checker from org spec")?;
-
-	// Construct a big enough Vec for the affiliation info.
-	let mut affiliations = Vec::with_capacity(commits.len());
-
-	for commit in commits.iter() {
-		// Check if a commit matches the affiliation rules.
-		let commit_view = db
-			.get_pr_contributors_for_commit(Arc::clone(commit))
-			.context("failed to get commits")?;
-
-		let affiliated_type = AffiliatedType::is(&affiliator, &commit_view);
-
-		affiliations.push(Affiliation {
-			commit: Arc::clone(commit),
-			affiliated_type,
-		});
-	}
-
-	log::info!("completed pull request affiliation metric");
-
-	Ok(Arc::new(AffiliationOutput { affiliations }))
-}
-
 /// A type which encapsulates checking whether a given string matches an org in theorgs file,
 /// based on the mode in question. If the mode is Independent, then you're looking for
 /// the strings that don't match any of the hosts in the set. If the mode is Affiliated,

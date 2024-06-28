@@ -15,7 +15,6 @@ mod math;
 #[allow(clippy::module_inception)]
 pub mod metric;
 pub mod module;
-pub mod module_contributors;
 pub mod review;
 pub mod typo;
 

@@ -1,22 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::analysis::analysis::AnalysisOutcome;
-use crate::analysis::analysis::AnalysisReport;
 use crate::analysis::result::*;
 use crate::analysis::AnalysisProvider;
+use crate::config::{visit_leaves, WeightTree, WeightTreeProvider};
 use crate::error::Result;
 use crate::hc_error;
 use crate::report::Concern;
-// use crate::shell::Phase;
+use crate::shell::Phase;
+use num_traits::identities::Zero;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::default::Default;
 use std::sync::Arc;
 
-use petgraph::graph::node_index as n;
-use petgraph::graph::NodeIndex;
-use petgraph::prelude::Graph;
-use petgraph::EdgeDirection::Outgoing;
+use indextree::{Arena, NodeId};
 
 pub const RISK_PHASE: &str = "risk";
 
@@ -33,9 +31,6 @@ pub const ATTACKS_PHASE: &str = "attacks";
 pub const AFFILIATION_PHASE: &str = "affiliation";
 pub const CHURN_PHASE: &str = "churn";
 pub const ENTROPY_PHASE: &str = "entropy";
-pub const PR_AFFILIATION_PHASE: &str = "pull request affiliation";
-pub const PR_CONTRIBUTOR_TRUST_PHASE: &str = "pull request contributor trust";
-pub const PR_MODULE_CONTRIBUTORS_PHASE: &str = "pull request module contributors";
 
 #[derive(Debug, Default)]
 pub struct ScoringResults {
@@ -75,10 +70,10 @@ impl HCStoredResult {
 	}
 }
 #[derive(Debug, Default)]
-pub struct AltAnalysisResults {
+pub struct AnalysisResults {
 	pub table: HashMap<String, HCStoredResult>,
 }
-impl AltAnalysisResults {
+impl AnalysisResults {
 	pub fn add(
 		&mut self,
 		key: &str,
@@ -98,24 +93,6 @@ impl AltAnalysisResults {
 
 #[allow(dead_code)]
 #[derive(Debug, Default)]
-pub struct AnalysisResults {
-	pub activity: Option<HCStoredResult>,
-	pub affiliation: Option<Result<Arc<AnalysisReport>>>,
-	pub binary: Option<Result<Arc<AnalysisReport>>>,
-	pub churn: Option<Result<Arc<AnalysisReport>>>,
-	pub entropy: Option<Result<Arc<AnalysisReport>>>,
-	pub identity: Option<Result<Arc<AnalysisReport>>>,
-	pub fuzz: Option<Result<Arc<AnalysisReport>>>,
-	pub review: Option<Result<Arc<AnalysisReport>>>,
-	pub typo: Option<Result<Arc<AnalysisReport>>>,
-	pub pull_request: Option<Result<Arc<AnalysisReport>>>,
-	pub pr_affiliation: Option<Result<Arc<AnalysisReport>>>,
-	pub pr_contributor_trust: Option<Result<Arc<AnalysisReport>>>,
-	pub pr_module_contributors: Option<Result<Arc<AnalysisReport>>>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Default)]
 pub struct Score {
 	pub total: f64,
 	pub activity: AnalysisOutcome,
@@ -127,14 +104,10 @@ pub struct Score {
 	pub fuzz: AnalysisOutcome,
 	pub review: AnalysisOutcome,
 	pub typo: AnalysisOutcome,
-	pub pull_request: AnalysisOutcome,
-	pub pr_affiliation: AnalysisOutcome,
-	pub pr_contributor_trust: AnalysisOutcome,
-	pub pr_module_contributors: AnalysisOutcome,
 }
 
 #[salsa::query_group(ScoringProviderStorage)]
-pub trait ScoringProvider: AnalysisProvider {
+pub trait ScoringProvider: AnalysisProvider + WeightTreeProvider {
 	/// Returns result of phase outcome and scoring
 	fn phase_outcome(&self, phase_name: Arc<String>) -> Result<Arc<ScoreResult>>;
 }
@@ -158,11 +131,107 @@ impl Default for ScoreResult {
 	}
 }
 
-//stores the score tree using petgraph
-//the tree does not need to know what sections it is scoring
+fn normalize_st_internal(node: NodeId, tree: &mut Arena<ScoreTreeNode>) -> f64 {
+	let children: Vec<NodeId> = node.children(tree).collect();
+	let weight_sum: f64 = children
+		.iter()
+		.map(|n| normalize_st_internal(*n, tree))
+		.sum();
+	if !weight_sum.is_zero() {
+		for c in children {
+			let child = tree.get_mut(c).unwrap().get_mut();
+			child.weight /= weight_sum;
+		}
+	}
+	tree.get(node).unwrap().get().weight
+}
+
 #[derive(Debug, Clone)]
-pub struct ScoreTree {
-	pub tree: Graph<ScoreTreeNode, f64>,
+pub struct AltScoreTree {
+	pub tree: Arena<ScoreTreeNode>,
+	pub root: NodeId,
+}
+impl AltScoreTree {
+	pub fn new(root_label: &str) -> Self {
+		let mut tree = Arena::<ScoreTreeNode>::new();
+		let root = tree.new_node(ScoreTreeNode {
+			label: root_label.to_owned(),
+			score: -1.0,
+			weight: 1.0,
+		});
+		AltScoreTree { tree, root }
+	}
+	pub fn add_child(&mut self, under: NodeId, label: &str, score: f64, weight: f64) -> NodeId {
+		let child = self.tree.new_node(ScoreTreeNode {
+			label: label.to_owned(),
+			score,
+			weight,
+		});
+		under.append(child, &mut self.tree);
+		child
+	}
+	pub fn normalize(mut self) -> Self {
+		let _ = normalize_st_internal(self.root, &mut self.tree);
+		self
+	}
+	// Given a weight tree and set of analysis results, produce an AltScoreTree by creating
+	// ScoreTreeNode objects for each analysis that was not skipped, and composing them into
+	// a tree structure matching that of the WeightTree
+	pub fn synthesize(weight_tree: &WeightTree, scores: &AnalysisResults) -> Result<Self> {
+		use indextree::NodeEdge::*;
+		let mut tree = Arena::<ScoreTreeNode>::new();
+		let weight_root = weight_tree.root;
+		let score_root = tree.new_node(
+			weight_tree
+				.tree
+				.get(weight_root)
+				.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+				.get()
+				.augment(scores),
+		);
+
+		let mut scope: Vec<NodeId> = vec![score_root];
+		for edge in weight_root.traverse(&weight_tree.tree) {
+			match edge {
+				Start(n) => {
+					let curr_node = tree.new_node(
+						weight_tree
+							.tree
+							.get(n)
+							.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+							.get()
+							.augment(scores),
+					);
+					scope
+						.last()
+						.ok_or(hc_error!("Scope stack is empty, invalid state"))?
+						.append(curr_node, &mut tree);
+					scope.push(curr_node);
+				}
+				End(_) => {
+					scope.pop();
+				}
+			};
+		}
+
+		Ok(AltScoreTree {
+			tree,
+			root: score_root,
+		})
+	}
+	// As our scope, we track the weight of each node. Once we get to a leaf node, we multiply all
+	// the weights (already normalized) by the score (0/1) then sum each value
+	pub fn score(&self) -> f64 {
+		let raw_score = visit_leaves(
+			self.root,
+			&self.tree,
+			|n| n.weight,
+			|a, n| a.iter().product::<f64>() * n.score,
+		)
+		.into_iter()
+		.sum();
+		decimal_truncate(raw_score)
+	}
 }
 
 //stores the score tree using petgraph
@@ -178,345 +247,31 @@ pub struct ScoreTreeNode {
 // returns score result for each phase based on phase name
 // pass (a score of 0) or fail (a score of 1)
 pub fn phase_outcome<P: AsRef<String>>(
-	db: &dyn ScoringProvider,
+	_db: &dyn ScoringProvider,
 	phase_name: P,
 ) -> Result<Arc<ScoreResult>> {
 	match phase_name.as_ref().as_str() {
 		ACTIVITY_PHASE => Err(hc_error!(
 			"activity analysis does not use this infrastructure"
 		)),
-		AFFILIATION_PHASE => match &db.affiliation_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Affiliation {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.affiliation_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Affiliation {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.affiliation_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		BINARY_PHASE => match &db.binary_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Binary {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.binary_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Binary {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.binary_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		CHURN_PHASE => match &db.churn_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Churn {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.churn_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Churn {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.churn_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		ENTROPY_PHASE => match &db.entropy_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Entropy {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.entropy_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Entropy {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.entropy_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		IDENTITY_PHASE => match &db.identity_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Identity {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.identity_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Identity {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.identity_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		FUZZ_PHASE => match &db.fuzz_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Fuzz {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.fuzz_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Fuzz {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.fuzz_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		REVIEW_PHASE => match &db.review_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Review {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.review_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Review {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.review_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		TYPO_PHASE => match &db.typo_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::Typo {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.typo_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::Typo {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.typo_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		PR_AFFILIATION_PHASE => match &db.pr_affiliation_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::PrAffiliation {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.pr_affiliation_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::PrAffiliation {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.pr_affiliation_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		PR_CONTRIBUTOR_TRUST_PHASE => match &db.pr_contributor_trust_analysis().unwrap().as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => Ok(Arc::new(ScoreResult::default())),
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(msg),
-			} => Ok(Arc::new(ScoreResult {
-				count: 0,
-				score: 0,
-				outcome: AnalysisOutcome::Error(msg.clone()),
-			})),
-			AnalysisReport::PrContributorTrust {
-				outcome: AnalysisOutcome::Pass(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.contributor_trust_weight(),
-				score: 0,
-				outcome: AnalysisOutcome::Pass(msg.to_string()),
-			})),
-			AnalysisReport::PrContributorTrust {
-				outcome: AnalysisOutcome::Fail(msg),
-				..
-			} => Ok(Arc::new(ScoreResult {
-				count: db.contributor_trust_weight(),
-				score: 1,
-				outcome: AnalysisOutcome::Fail(msg.to_string()),
-			})),
-			_ => Err(hc_error!("phase name does not match analysis")),
-		},
-
-		PR_MODULE_CONTRIBUTORS_PHASE => {
-			match &db.pr_module_contributors_analysis().unwrap().as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => Ok(Arc::new(ScoreResult::default())),
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(msg),
-				} => Ok(Arc::new(ScoreResult {
-					count: 0,
-					score: 0,
-					outcome: AnalysisOutcome::Error(msg.clone()),
-				})),
-				AnalysisReport::PrModuleContributors {
-					outcome: AnalysisOutcome::Pass(msg),
-					..
-				} => Ok(Arc::new(ScoreResult {
-					count: db.pr_module_contributors_weight(),
-					score: 0,
-					outcome: AnalysisOutcome::Pass(msg.to_string()),
-				})),
-				AnalysisReport::PrModuleContributors {
-					outcome: AnalysisOutcome::Fail(msg),
-					..
-				} => Ok(Arc::new(ScoreResult {
-					count: db.pr_module_contributors_weight(),
-					score: 1,
-					outcome: AnalysisOutcome::Fail(msg.to_string()),
-				})),
-				_ => Err(hc_error!("phase name does not match analysis")),
-			}
-		}
-
+		AFFILIATION_PHASE => Err(hc_error!(
+			"affiliation analysis does not use this infrastructure"
+		)),
+		BINARY_PHASE => Err(hc_error!(
+			"binary analysis does not use this infrastructure"
+		)),
+		CHURN_PHASE => Err(hc_error!("churn analysis does not use this infrastructure")),
+		ENTROPY_PHASE => Err(hc_error!(
+			"entropy analysis does not use this infrastructure"
+		)),
+		IDENTITY_PHASE => Err(hc_error!(
+			"identity analysis does not use this infrastructure"
+		)),
+		FUZZ_PHASE => Err(hc_error!("fuzz analysis does not use this infrastructure")),
+		REVIEW_PHASE => Err(hc_error!(
+			"review analysis does not use this infrastructure"
+		)),
+		TYPO_PHASE => Err(hc_error!("typo analysis does not use this infrastructure")),
 		_ => Err(hc_error!(
 			"failed to complete {} analysis.",
 			phase_name.as_ref()
@@ -531,54 +286,15 @@ pub fn update_phase(phase: &mut Phase, phase_name: &str) -> Result<()> {
 	}
 }
 
-//Scores phase and adds nodes and edges to tree
-pub fn add_node_and_edge_with_score(
-	score_result: impl AsRef<ScoreResult>,
-	mut score_tree: ScoreTree,
-	phase: &str,
-	parent_node: NodeIndex<u32>,
-) -> Result<ScoreTree> {
-	let weight = score_result.as_ref().count as f64;
-	let score_increment = score_result.as_ref().score as i64;
-
-	//adding nodes/edges to the score tree
-	let (child_node, score_tree_updated) =
-		match add_tree_node(score_tree.clone(), phase, score_increment, weight) {
-			Ok(results) => results,
-			_ => {
-				return Err(hc_error!(
-					"failed to add score tree node for {} scoring.",
-					phase
-				))
-			}
-		};
-
-	score_tree = add_tree_edge(score_tree_updated, child_node, parent_node);
-
-	Ok(score_tree)
-}
-
-pub fn add_tree_node(
-	mut score_tree: ScoreTree,
-	phase: &str,
-	score_increment: i64,
-	weight: f64,
-) -> Result<(NodeIndex, ScoreTree)> {
-	let score_node = score_tree.tree.add_node(ScoreTreeNode {
-		label: phase.to_string(),
-		score: score_increment as f64,
-		weight,
-	});
-	Ok((score_node, score_tree))
-}
-
-pub fn add_tree_edge(
-	mut score_tree: ScoreTree,
-	child_node: NodeIndex,
-	parent_node: NodeIndex,
-) -> ScoreTree {
-	score_tree.tree.add_edge(parent_node, child_node, 0.0);
-	score_tree
+macro_rules! run_and_score_threshold_analysis {
+	($res:ident, $p:ident, $phase:ident, $a:expr, $spec:ident) => {{
+		update_phase($p, $phase)?;
+		let analysis_result =
+			ThresholdPredicate::from_analysis(&$a, $spec.threshold, $spec.units, $spec.ordering);
+		$res.table.insert($phase.to_owned(), analysis_result);
+		let (_an_score, outcome) = $res.table.get($phase).unwrap().score();
+		outcome
+	}};
 }
 
 pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
@@ -593,507 +309,166 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 	*/
 	// Values set with -1.0 are reseved for parent nodes whose score comes always from children nodes with a score set by hc_analysis algorithms
 
+	let weight_tree = db.normalized_weight_tree()?;
 	let mut results = AnalysisResults::default();
-	let mut alt_results = AltAnalysisResults::default();
 	let mut score = Score::default();
-	let mut score_tree = ScoreTree { tree: Graph::new() };
-	let root_node = score_tree.tree.add_node(ScoreTreeNode {
-		label: RISK_PHASE.to_string(),
-		score: -1.0,
-		weight: 0.0,
-	});
 	/* PRACTICES NODE ADDITION */
 	if db.practices_active() {
-		let (practices_node, score_tree_updated) = match add_tree_node(
-			score_tree.clone(),
-			PRACTICES_PHASE,
-			0,
-			db.practices_weight() as f64,
-		) {
-			Ok(results) => results,
-			_ => {
-				return Err(hc_error!(
-					"failed to add score tree node for {} scoring.",
-					PRACTICES_PHASE
-				))
-			}
-		};
-
-		score_tree = add_tree_edge(score_tree_updated, practices_node, root_node);
-
 		/*===NEW_PHASE===*/
-		update_phase(phase, ACTIVITY_PHASE)?;
-		// Check if this analysis was skipped or generated an error, then format the results accordingly for reporting.
 		if db.activity_active() {
-			let raw_activity = db.activity_analysis();
-			let raw_threshold: u64 = db.activity_week_count_threshold();
-
-			// Process analysis value into a threshold predicate and add to new & old storage
-			// objects
-			let activity_result = ThresholdPredicate::from_analysis(
-				&raw_activity,
-				HCBasicValue::from(raw_threshold),
-				Some("weeks inactivity".to_owned()),
-				Ordering::Less,
-			);
-			results.activity = Some(activity_result.clone());
-			alt_results
-				.table
-				.insert(ACTIVITY_PHASE.to_owned(), activity_result);
-
-			// Scoring based off of predicate
-			let (act_score, outcome) = alt_results.table.get(ACTIVITY_PHASE).unwrap().score();
-			let score_result = Arc::new(ScoreResult {
-				count: db.activity_weight(),
-				score: act_score,
-				outcome,
-			});
-			score.activity = score_result.outcome.clone();
-			match add_node_and_edge_with_score(
-				score_result,
-				score_tree.clone(),
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.activity_week_count_threshold()),
+				units: Some("weeks inactivity".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.activity = run_and_score_threshold_analysis!(
+				results,
+				phase,
 				ACTIVITY_PHASE,
-				practices_node,
-			) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => return Err(hc_error!("failed to complete {} scoring.", ACTIVITY_PHASE)),
-			}
+				db.activity_analysis(),
+				spec
+			);
 		}
 
 		/*===REVIEW PHASE===*/
-		update_phase(phase, REVIEW_PHASE)?;
-		let review_analysis = db.review_analysis()?;
-		match review_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.review = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.review = Some(Err(err.clone())),
-			_ => results.review = Some(Ok(review_analysis)),
-		}
-		let score_result = db
-			.phase_outcome(Arc::new(REVIEW_PHASE.to_string()))
-			.unwrap();
-		score.review = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, score_tree, REVIEW_PHASE, practices_node) {
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", REVIEW_PHASE)),
+		if db.review_active() {
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.review_percent_threshold()),
+				units: Some("% pull requests without review".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.review = run_and_score_threshold_analysis!(
+				results,
+				phase,
+				REVIEW_PHASE,
+				db.review_analysis(),
+				spec
+			);
 		}
 
 		/*===BINARY PHASE===*/
-		update_phase(phase, BINARY_PHASE)?;
-		let binary_analysis = db.binary_analysis()?;
-		match binary_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.binary = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.binary = Some(Err(err.clone())),
-			_ => results.binary = Some(Ok(binary_analysis)),
-		}
-		let score_result = db
-			.phase_outcome(Arc::new(BINARY_PHASE.to_string()))
-			.unwrap();
-		score.binary = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, score_tree, BINARY_PHASE, practices_node) {
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", BINARY_PHASE)),
+		if db.binary_active() {
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.binary_count_threshold()),
+				units: Some("binary files found".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.binary = run_and_score_threshold_analysis!(
+				results,
+				phase,
+				BINARY_PHASE,
+				db.binary_analysis(),
+				spec
+			);
 		}
 
 		/*===IDENTITY PHASE===*/
-		update_phase(phase, IDENTITY_PHASE)?;
-		let identity_analysis = db.identity_analysis()?;
-		match identity_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.identity = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.identity = Some(Err(err.clone())),
-			_ => results.identity = Some(Ok(identity_analysis)),
-		}
-
-		let score_result = db
-			.phase_outcome(Arc::new(IDENTITY_PHASE.to_string()))
-			.unwrap();
-		score.identity = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, score_tree, IDENTITY_PHASE, practices_node)
-		{
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", IDENTITY_PHASE)),
+		if db.identity_active() {
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.identity_percent_threshold()),
+				units: Some("% identity match".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.identity = run_and_score_threshold_analysis!(
+				results,
+				phase,
+				IDENTITY_PHASE,
+				db.identity_analysis(),
+				spec
+			);
 		}
 
 		/*===FUZZ PHASE===*/
-		update_phase(phase, FUZZ_PHASE)?;
-		let fuzz_analysis = db.fuzz_analysis()?;
-		match fuzz_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.fuzz = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.fuzz = Some(Err(err.clone())),
-			_ => results.fuzz = Some(Ok(fuzz_analysis)),
-		}
-
-		let score_result = db.phase_outcome(Arc::new(FUZZ_PHASE.to_string())).unwrap();
-		score.fuzz = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, score_tree, FUZZ_PHASE, practices_node) {
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", FUZZ_PHASE)),
+		if db.fuzz_active() {
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(true),
+				units: None,
+				ordering: Ordering::Equal,
+			};
+			score.fuzz = run_and_score_threshold_analysis!(
+				results,
+				phase,
+				FUZZ_PHASE,
+				db.fuzz_analysis(),
+				spec
+			);
 		}
 	}
 
 	/* ATTACKS NODE ADDITION */
 	if db.attacks_active() {
-		let (attacks_node, score_tree_updated) = match add_tree_node(
-			score_tree.clone(),
-			ATTACKS_PHASE,
-			0,
-			db.attacks_weight() as f64,
-		) {
-			Ok(results) => results,
-			_ => {
-				return Err(hc_error!(
-					"failed to add score tree node for {} scoring.",
-					ATTACKS_PHASE
-				))
-			}
-		};
-
-		score_tree = add_tree_edge(score_tree_updated, attacks_node, root_node);
-
 		/*===TYPO PHASE===*/
-		update_phase(phase, TYPO_PHASE)?;
-		let typo_analysis = db.typo_analysis()?;
-		match typo_analysis.as_ref() {
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Skipped,
-			} => results.typo = None,
-			AnalysisReport::None {
-				outcome: AnalysisOutcome::Error(err),
-			} => results.typo = Some(Err(err.clone())),
-			_ => results.typo = Some(Ok(typo_analysis)),
-		}
-		let score_result = db.phase_outcome(Arc::new(TYPO_PHASE.to_string())).unwrap();
-		score.typo = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, score_tree, TYPO_PHASE, attacks_node) {
-			Ok(score_tree_inc) => {
-				score_tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", TYPO_PHASE)),
+		if db.typo_active() {
+			let spec = ThresholdSpec {
+				threshold: HCBasicValue::from(db.typo_count_threshold()),
+				units: Some("possible typos".to_owned()),
+				ordering: Ordering::Less,
+			};
+			score.typo = run_and_score_threshold_analysis!(
+				results,
+				phase,
+				TYPO_PHASE,
+				db.typo_analysis(),
+				spec
+			);
 		}
 
 		/*High risk commits node addition*/
 		if db.commit_active() {
-			let (commit_node, score_tree_updated) = match add_tree_node(
-				score_tree.clone(),
-				COMMITS_PHASE,
-				0,
-				db.commit_weight() as f64,
-			) {
-				Ok(results) => results,
-				_ => {
-					return Err(hc_error!(
-						"failed to add score tree node for {} scoring.",
-						COMMITS_PHASE
-					))
-				}
-			};
-
-			score_tree = add_tree_edge(score_tree_updated, commit_node, attacks_node);
-
 			/*===NEW_PHASE===*/
-			update_phase(phase, AFFILIATION_PHASE)?;
-			let affiliation_analysis = db.affiliation_analysis()?;
-			match affiliation_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.affiliation = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.affiliation = Some(Err(err.clone())),
-				_ => results.affiliation = Some(Ok(affiliation_analysis)),
-			}
-			let score_result = db
-				.phase_outcome(Arc::new(AFFILIATION_PHASE.to_string()))
-				.unwrap();
-			score.affiliation = score_result.outcome.clone();
-			match add_node_and_edge_with_score(
-				score_result,
-				score_tree,
-				AFFILIATION_PHASE,
-				commit_node,
-			) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => {
-					return Err(hc_error!(
-						"failed to complete {} scoring.",
-						AFFILIATION_PHASE
-					))
-				}
+			if db.affiliation_active() {
+				let spec = ThresholdSpec {
+					threshold: HCBasicValue::from(db.affiliation_count_threshold()),
+					units: Some("affiliated".to_owned()),
+					ordering: Ordering::Less,
+				};
+				score.affiliation = run_and_score_threshold_analysis!(
+					results,
+					phase,
+					AFFILIATION_PHASE,
+					db.affiliation_analysis(),
+					spec
+				);
 			}
 
 			/*===NEW_PHASE===*/
-			update_phase(phase, CHURN_PHASE)?;
-			let churn_analysis = db.churn_analysis()?;
-			match churn_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.churn = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.churn = Some(Err(err.clone())),
-				_ => results.churn = Some(Ok(churn_analysis)),
-			}
-			let score_result = db.phase_outcome(Arc::new(CHURN_PHASE.to_string())).unwrap();
-			score.churn = score_result.outcome.clone();
-			match add_node_and_edge_with_score(score_result, score_tree, CHURN_PHASE, commit_node) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => return Err(hc_error!("failed to complete {} scoring.", CHURN_PHASE)),
+			if db.churn_active() {
+				let spec = ThresholdSpec {
+					threshold: HCBasicValue::from(db.churn_percent_threshold()),
+					units: Some("% over churn threshold".to_owned()),
+					ordering: Ordering::Less,
+				};
+				score.churn = run_and_score_threshold_analysis!(
+					results,
+					phase,
+					CHURN_PHASE,
+					db.churn_analysis(),
+					spec
+				);
 			}
 
 			/*===NEW_PHASE===*/
-			update_phase(phase, ENTROPY_PHASE)?;
-			let entropy_analysis = db.entropy_analysis()?;
-			match entropy_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.entropy = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.entropy = Some(Err(err.clone())),
-				_ => results.entropy = Some(Ok(entropy_analysis)),
-			}
-
-			let score_result = db
-				.phase_outcome(Arc::new(ENTROPY_PHASE.to_string()))
-				.unwrap();
-			score.entropy = score_result.outcome.clone();
-			match add_node_and_edge_with_score(score_result, score_tree, ENTROPY_PHASE, commit_node)
-			{
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => return Err(hc_error!("failed to complete {} scoring.", ENTROPY_PHASE)),
+			if db.entropy_active() {
+				let spec = ThresholdSpec {
+					threshold: HCBasicValue::from(db.entropy_percent_threshold()),
+					units: Some("% over entropy threshold".to_owned()),
+					ordering: Ordering::Less,
+				};
+				score.entropy = run_and_score_threshold_analysis!(
+					results,
+					phase,
+					ENTROPY_PHASE,
+					db.entropy_analysis(),
+					spec
+				);
 			}
 		}
 	}
 
-	let start_node: NodeIndex<u32> = n(0);
-	score.total = score_nodes(start_node, score_tree.tree);
+	let alt_score_tree = AltScoreTree::synthesize(&weight_tree, &results)?;
+	score.total = alt_score_tree.score();
 
 	Ok(ScoringResults { results, score })
-}
-
-pub fn score_pr_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
-	/*Scoring should be performed by the construction of a "score tree" where scores are the
-	nodes and weights are the edges. The leaves are the analyses themselves, which either
-	pass (a score of 0) or fail (a score of 1). These are then combined with the other
-	children of their parent according to their weights, repeating until the final score is
-	reached.
-	generate the tree
-	traverse and score recursively
-	*/
-
-	let mut results = AnalysisResults::default();
-	let mut score = Score::default();
-	let mut score_tree = ScoreTree { tree: Graph::new() };
-	let root_node = score_tree.tree.add_node(ScoreTreeNode {
-		label: RISK_PHASE.to_string(),
-		score: -1.0,
-		weight: 0.0,
-	});
-
-	/* PRACTICES NODE ADDITION */
-	// Currently there are no practices analyses for a single pull request analysis
-
-	/* ATTACKS NODE ADDITION */
-	if db.attacks_active() {
-		let (attacks_node, score_tree_updated) = match add_tree_node(
-			score_tree.clone(),
-			ATTACKS_PHASE,
-			0,
-			db.attacks_weight() as f64,
-		) {
-			Ok(results) => results,
-			_ => {
-				return Err(hc_error!(
-					"failed to add score tree node for {} scoring.",
-					ATTACKS_PHASE
-				))
-			}
-		};
-
-		score_tree = add_tree_edge(score_tree_updated, attacks_node, root_node);
-
-		/*High risk commits node addition*/
-		if db.commit_active() {
-			let (commit_node, score_tree_updated) = match add_tree_node(
-				score_tree.clone(),
-				COMMITS_PHASE,
-				0,
-				db.commit_weight() as f64,
-			) {
-				Ok(results) => results,
-				_ => {
-					return Err(hc_error!(
-						"failed to add score tree node for {} scoring.",
-						COMMITS_PHASE
-					))
-				}
-			};
-
-			score_tree = add_tree_edge(score_tree_updated, commit_node, attacks_node);
-
-			/*===PR_AFFILIATION_PHASE===*/
-			update_phase(phase, PR_AFFILIATION_PHASE)?;
-			let pr_affiliation_analysis = db.pr_affiliation_analysis()?;
-			match pr_affiliation_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.affiliation = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.pr_affiliation = Some(Err(err.clone())),
-				_ => results.pr_affiliation = Some(Ok(pr_affiliation_analysis)),
-			}
-			let score_result = db
-				.phase_outcome(Arc::new(PR_AFFILIATION_PHASE.to_string()))
-				.unwrap();
-			score.pr_affiliation = score_result.outcome.clone();
-			match add_node_and_edge_with_score(
-				score_result,
-				score_tree,
-				PR_AFFILIATION_PHASE,
-				commit_node,
-			) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => {
-					return Err(hc_error!(
-						"failed to complete {} scoring.",
-						PR_AFFILIATION_PHASE
-					))
-				}
-			}
-
-			/*===PR_CONTRIBUTOR_TRUST_PHASE===*/
-			update_phase(phase, PR_CONTRIBUTOR_TRUST_PHASE)?;
-			let pr_contributor_trust_analysis = db.pr_contributor_trust_analysis()?;
-			match pr_contributor_trust_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.pr_contributor_trust = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.pr_contributor_trust = Some(Err(err.clone())),
-				_ => results.pr_contributor_trust = Some(Ok(pr_contributor_trust_analysis)),
-			}
-			let score_result = db
-				.phase_outcome(Arc::new(PR_CONTRIBUTOR_TRUST_PHASE.to_string()))
-				.unwrap();
-			score.pr_contributor_trust = score_result.outcome.clone();
-			match add_node_and_edge_with_score(
-				score_result,
-				score_tree,
-				PR_CONTRIBUTOR_TRUST_PHASE,
-				commit_node,
-			) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => {
-					return Err(hc_error!(
-						"failed to complete {} scoring.",
-						PR_CONTRIBUTOR_TRUST_PHASE
-					))
-				}
-			}
-
-			/*===PR_MODULE_CONTRIBUTORS_PHASE===*/
-			update_phase(phase, PR_MODULE_CONTRIBUTORS_PHASE)?;
-			let pr_module_contributors_analysis = db.pr_module_contributors_analysis()?;
-			match pr_module_contributors_analysis.as_ref() {
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Skipped,
-				} => results.pr_module_contributors = None,
-				AnalysisReport::None {
-					outcome: AnalysisOutcome::Error(err),
-				} => results.pr_module_contributors = Some(Err(err.clone())),
-				_ => results.pr_module_contributors = Some(Ok(pr_module_contributors_analysis)),
-			}
-			let score_result = db
-				.phase_outcome(Arc::new(PR_MODULE_CONTRIBUTORS_PHASE.to_string()))
-				.unwrap();
-			score.pr_module_contributors = score_result.outcome.clone();
-			match add_node_and_edge_with_score(
-				score_result,
-				score_tree,
-				PR_MODULE_CONTRIBUTORS_PHASE,
-				commit_node,
-			) {
-				Ok(score_tree_inc) => {
-					score_tree = score_tree_inc;
-				}
-				_ => {
-					return Err(hc_error!(
-						"failed to complete {} scoring.",
-						PR_MODULE_CONTRIBUTORS_PHASE
-					))
-				}
-			}
-		}
-	}
-
-	let start_node: NodeIndex<u32> = n(0);
-	score.total = score_nodes(start_node, score_tree.tree);
-
-	Ok(ScoringResults { results, score })
-}
-
-fn score_nodes(node: NodeIndex, gr: Graph<ScoreTreeNode, f64>) -> f64 {
-	//get all children to get full weight for node/branch level
-	let mut children = gr.neighbors_directed(node, Outgoing).detach();
-
-	let mut child_weight_sums = 0.0;
-	let sums = gr.clone();
-	let mut weights = children.clone();
-	//add child weights together so we can get weight later
-	while let Some(child) = weights.next_node(&sums) {
-		child_weight_sums += sums[child].weight;
-	}
-
-	if child_weight_sums == 0.0 {
-		//if node has no children return the node score
-		return gr[node].score;
-	}
-
-	let mut score = 0.0;
-	while let Some(child) = children.next_node(&gr) {
-		let child_weight = gr[child].weight / child_weight_sums;
-
-		//using recursion to get children node scores, this takes us to last node first in the end
-		score += score_nodes(child, gr.clone()) * child_weight;
-	}
-	decimal_truncate(score)
 }
 
 fn decimal_truncate(score: f64) -> f64 {
@@ -1103,7 +478,6 @@ fn decimal_truncate(score: f64) -> f64 {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use petgraph::Graph;
 
 	//We use -1.0 values for parent nodes basically that get scored through recursion based on child nodes that have a score set and weight
 
@@ -1123,81 +497,22 @@ mod test {
 	#[test]
 	#[ignore = "test of tree scoring"]
 	fn test_graph1() {
-		let mut score_tree = ScoreTree { tree: Graph::new() };
-		let core = score_tree.tree.add_node(ScoreTreeNode {
-			label: "risk".to_string(),
-			score: -1.0,
-			weight: -1.0,
-		});
-		let practices = score_tree.tree.add_node(ScoreTreeNode {
-			label: PRACTICES_PHASE.to_string(),
-			score: -1.0,
-			weight: 10.0,
-		});
-		let review = score_tree.tree.add_node(ScoreTreeNode {
-			label: REVIEW_PHASE.to_string(),
-			score: 1.0,
-			weight: 5.0,
-		});
-		let activity = score_tree.tree.add_node(ScoreTreeNode {
-			label: ACTIVITY_PHASE.to_string(),
-			score: 0.0,
-			weight: 4.0,
-		});
-		let attacks = score_tree.tree.add_node(ScoreTreeNode {
-			label: ATTACKS_PHASE.to_string(),
-			score: -1.0,
-			weight: 20.0,
-		});
-		let commits = score_tree.tree.add_node(ScoreTreeNode {
-			label: COMMITS_PHASE.to_string(),
-			score: -1.0,
-			weight: 5.0,
-		});
-		let trust = score_tree.tree.add_node(ScoreTreeNode {
-			label: "trust".to_string(),
-			score: 1.0,
-			weight: 4.0,
-		});
-		let code_review = score_tree.tree.add_node(ScoreTreeNode {
-			label: "code review".to_string(),
-			score: 0.0,
-			weight: 3.0,
-		});
-		let entropy = score_tree.tree.add_node(ScoreTreeNode {
-			label: ENTROPY_PHASE.to_string(),
-			score: 0.0,
-			weight: 2.0,
-		});
-		let churn = score_tree.tree.add_node(ScoreTreeNode {
-			label: CHURN_PHASE.to_string(),
-			score: 1.0,
-			weight: 10.0,
-		});
-		let typo = score_tree.tree.add_node(ScoreTreeNode {
-			label: TYPO_PHASE.to_string(),
-			score: 1.0,
-			weight: 5.0,
-		});
-		//edge weights are not used
-		score_tree.tree.add_edge(core, practices, 0.0);
-		score_tree.tree.add_edge(core, attacks, 0.0);
-
-		score_tree.tree.add_edge(practices, review, 0.0);
-		score_tree.tree.add_edge(practices, activity, 0.0);
-
-		score_tree.tree.add_edge(attacks, commits, 0.0);
-		score_tree.tree.add_edge(attacks, typo, 0.0);
-
-		score_tree.tree.add_edge(commits, trust, 0.0);
-		score_tree.tree.add_edge(commits, code_review, 0.0);
-		score_tree.tree.add_edge(commits, entropy, 0.0);
-		score_tree.tree.add_edge(commits, churn, 0.0);
-
-		let final_score = score_nodes(core, score_tree.tree);
+		let mut score_tree = AltScoreTree::new("risk");
+		let core = score_tree.root;
+		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 10.0);
+		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 5.0);
+		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 0.0, 4.0);
+		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 20.0);
+		let commits = score_tree.add_child(attacks, COMMITS_PHASE, -1.0, 5.0);
+		let trust = score_tree.add_child(commits, "trust", 1.0, 4.0);
+		let code_review = score_tree.add_child(commits, "code_review", 0.0, 3.0);
+		let entropy = score_tree.add_child(commits, ENTROPY_PHASE, 0.0, 2.0);
+		let churn = score_tree.add_child(commits, CHURN_PHASE, 1.0, 10.0);
+		let typo = score_tree.add_child(attacks, TYPO_PHASE, 1.0, 5.0);
+		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
-		assert_eq!(0.77, final_score);
+		assert_eq!(0.76, final_score);
 	}
 
 	/*
@@ -1212,53 +527,15 @@ mod test {
 	#[test]
 	#[ignore = "test2 of tree scoring"]
 	fn test_graph2() {
-		let mut score_tree = ScoreTree { tree: Graph::new() };
-		let core = score_tree.tree.add_node(ScoreTreeNode {
-			label: "risk".to_string(),
-			score: -1.0,
-			weight: -1.0,
-		});
-		let practices = score_tree.tree.add_node(ScoreTreeNode {
-			label: PRACTICES_PHASE.to_string(),
-			score: -1.0,
-			weight: 10.0,
-		});
-		let review = score_tree.tree.add_node(ScoreTreeNode {
-			label: REVIEW_PHASE.to_string(),
-			score: 1.0,
-			weight: 4.0,
-		});
-		let activity = score_tree.tree.add_node(ScoreTreeNode {
-			label: ACTIVITY_PHASE.to_string(),
-			score: 1.0,
-			weight: 5.0,
-		});
-		let attacks = score_tree.tree.add_node(ScoreTreeNode {
-			label: ATTACKS_PHASE.to_string(),
-			score: -1.0,
-			weight: 15.0,
-		});
-		let code_review = score_tree.tree.add_node(ScoreTreeNode {
-			label: "code review".to_string(),
-			score: 0.0,
-			weight: 6.0,
-		});
-		let entropy = score_tree.tree.add_node(ScoreTreeNode {
-			label: ENTROPY_PHASE.to_string(),
-			score: 0.0,
-			weight: 7.0,
-		});
-		//edge weights are not used
-		score_tree.tree.add_edge(core, practices, 0.0);
-		score_tree.tree.add_edge(core, attacks, 0.0);
-
-		score_tree.tree.add_edge(practices, review, 0.0);
-		score_tree.tree.add_edge(practices, activity, 0.0);
-
-		score_tree.tree.add_edge(attacks, code_review, 0.0);
-		score_tree.tree.add_edge(attacks, entropy, 0.0);
-
-		let final_score = score_nodes(core, score_tree.tree);
+		let mut score_tree = AltScoreTree::new("risk");
+		let core = score_tree.root;
+		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 10.0);
+		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 4.0);
+		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 5.0);
+		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 15.0);
+		let code_review = score_tree.add_child(attacks, "code_review", 0.0, 6.0);
+		let entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 0.0, 7.0);
+		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
 		assert_eq!(0.4, final_score);
@@ -1276,53 +553,15 @@ mod test {
 	#[test]
 	#[ignore = "test3 of tree scoring"]
 	fn test_graph3() {
-		let mut score_tree = ScoreTree { tree: Graph::new() };
-		let core = score_tree.tree.add_node(ScoreTreeNode {
-			label: "risk".to_string(),
-			score: -1.0,
-			weight: -1.0,
-		});
-		let practices = score_tree.tree.add_node(ScoreTreeNode {
-			label: PRACTICES_PHASE.to_string(),
-			score: -1.0,
-			weight: 33.0,
-		});
-		let review = score_tree.tree.add_node(ScoreTreeNode {
-			label: REVIEW_PHASE.to_string(),
-			score: 1.0,
-			weight: 10.0,
-		});
-		let activity = score_tree.tree.add_node(ScoreTreeNode {
-			label: ACTIVITY_PHASE.to_string(),
-			score: 1.0,
-			weight: 5.0,
-		});
-		let attacks = score_tree.tree.add_node(ScoreTreeNode {
-			label: ATTACKS_PHASE.to_string(),
-			score: -1.0,
-			weight: 15.0,
-		});
-		let code_review = score_tree.tree.add_node(ScoreTreeNode {
-			label: "code review".to_string(),
-			score: 1.0,
-			weight: 6.0,
-		});
-		let entropy = score_tree.tree.add_node(ScoreTreeNode {
-			label: ENTROPY_PHASE.to_string(),
-			score: 1.0,
-			weight: 15.0,
-		});
-		//edge weights are not used
-		score_tree.tree.add_edge(core, practices, 0.0);
-		score_tree.tree.add_edge(core, attacks, 0.0);
-
-		score_tree.tree.add_edge(practices, review, 0.0);
-		score_tree.tree.add_edge(practices, activity, 0.0);
-
-		score_tree.tree.add_edge(attacks, code_review, 0.0);
-		score_tree.tree.add_edge(attacks, entropy, 0.0);
-
-		let final_score = score_nodes(core, score_tree.tree);
+		let mut score_tree = AltScoreTree::new("risk");
+		let core = score_tree.root;
+		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 33.0);
+		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 10.0);
+		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 5.0);
+		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 15.0);
+		let code_review = score_tree.add_child(attacks, "code_review", 1.0, 6.0);
+		let entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 1.0, 15.0);
+		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
 		assert_eq!(1.0, final_score);
@@ -1341,53 +580,15 @@ mod test {
 	#[test]
 	#[ignore = "test4 of tree scoring"]
 	fn test_graph4() {
-		let mut score_tree = ScoreTree { tree: Graph::new() };
-		let core = score_tree.tree.add_node(ScoreTreeNode {
-			label: "risk".to_string(),
-			score: -1.0,
-			weight: -1.0,
-		});
-		let practices = score_tree.tree.add_node(ScoreTreeNode {
-			label: PRACTICES_PHASE.to_string(),
-			score: -1.0,
-			weight: 40.0,
-		});
-		let review = score_tree.tree.add_node(ScoreTreeNode {
-			label: REVIEW_PHASE.to_string(),
-			score: 0.0,
-			weight: 12.0,
-		});
-		let activity = score_tree.tree.add_node(ScoreTreeNode {
-			label: ACTIVITY_PHASE.to_string(),
-			score: 1.0,
-			weight: 6.0,
-		});
-		let attacks = score_tree.tree.add_node(ScoreTreeNode {
-			label: ATTACKS_PHASE.to_string(),
-			score: -1.0,
-			weight: 15.0,
-		});
-		let code_review = score_tree.tree.add_node(ScoreTreeNode {
-			label: "code review".to_string(),
-			score: 0.0,
-			weight: 9.0,
-		});
-		let entropy = score_tree.tree.add_node(ScoreTreeNode {
-			label: ENTROPY_PHASE.to_string(),
-			score: 1.0,
-			weight: 13.0,
-		});
-		//edge weights are not used
-		score_tree.tree.add_edge(core, practices, 0.0);
-		score_tree.tree.add_edge(core, attacks, 0.0);
-
-		score_tree.tree.add_edge(practices, review, 0.0);
-		score_tree.tree.add_edge(practices, activity, 0.0);
-
-		score_tree.tree.add_edge(attacks, code_review, 0.0);
-		score_tree.tree.add_edge(attacks, entropy, 0.0);
-
-		let final_score = score_nodes(core, score_tree.tree);
+		let mut score_tree = AltScoreTree::new("risk");
+		let core = score_tree.root;
+		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 40.0);
+		let review = score_tree.add_child(practices, REVIEW_PHASE, 0.0, 12.0);
+		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 6.0);
+		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 15.0);
+		let code_review = score_tree.add_child(attacks, "code_review", 0.0, 9.0);
+		let entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 1.0, 13.0);
+		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
 		assert_eq!(0.40, final_score);
