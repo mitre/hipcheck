@@ -1,22 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::analysis::analysis::AnalysisOutcome;
-use crate::analysis::analysis::AnalysisReport;
 use crate::analysis::result::*;
 use crate::analysis::AnalysisProvider;
+use crate::config::{visit_leaves, WeightTree, WeightTreeProvider};
 use crate::error::Result;
 use crate::hc_error;
 use crate::report::Concern;
 use crate::shell::Phase;
+use num_traits::identities::Zero;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::default::Default;
 use std::sync::Arc;
 
-use petgraph::graph::node_index as n;
-use petgraph::graph::NodeIndex;
-use petgraph::prelude::Graph;
-use petgraph::EdgeDirection::Outgoing;
+use indextree::{Arena, NodeId};
 
 pub const RISK_PHASE: &str = "risk";
 
@@ -109,7 +107,7 @@ pub struct Score {
 }
 
 #[salsa::query_group(ScoringProviderStorage)]
-pub trait ScoringProvider: AnalysisProvider {
+pub trait ScoringProvider: AnalysisProvider + WeightTreeProvider {
 	/// Returns result of phase outcome and scoring
 	fn phase_outcome(&self, phase_name: Arc<String>) -> Result<Arc<ScoreResult>>;
 }
@@ -133,11 +131,107 @@ impl Default for ScoreResult {
 	}
 }
 
-//stores the score tree using petgraph
-//the tree does not need to know what sections it is scoring
+fn normalize_st_internal(node: NodeId, tree: &mut Arena<ScoreTreeNode>) -> f64 {
+	let children: Vec<NodeId> = node.children(tree).collect();
+	let weight_sum: f64 = children
+		.iter()
+		.map(|n| normalize_st_internal(*n, tree))
+		.sum();
+	if !weight_sum.is_zero() {
+		for c in children {
+			let child = tree.get_mut(c).unwrap().get_mut();
+			child.weight /= weight_sum;
+		}
+	}
+	tree.get(node).unwrap().get().weight
+}
+
 #[derive(Debug, Clone)]
-pub struct ScoreTree {
-	pub tree: Graph<ScoreTreeNode, f64>,
+pub struct AltScoreTree {
+	pub tree: Arena<ScoreTreeNode>,
+	pub root: NodeId,
+}
+impl AltScoreTree {
+	pub fn new(root_label: &str) -> Self {
+		let mut tree = Arena::<ScoreTreeNode>::new();
+		let root = tree.new_node(ScoreTreeNode {
+			label: root_label.to_owned(),
+			score: -1.0,
+			weight: 1.0,
+		});
+		AltScoreTree { tree, root }
+	}
+	pub fn add_child(&mut self, under: NodeId, label: &str, score: f64, weight: f64) -> NodeId {
+		let child = self.tree.new_node(ScoreTreeNode {
+			label: label.to_owned(),
+			score,
+			weight,
+		});
+		under.append(child, &mut self.tree);
+		child
+	}
+	pub fn normalize(mut self) -> Self {
+		let _ = normalize_st_internal(self.root, &mut self.tree);
+		self
+	}
+	// Given a weight tree and set of analysis results, produce an AltScoreTree by creating
+	// ScoreTreeNode objects for each analysis that was not skipped, and composing them into
+	// a tree structure matching that of the WeightTree
+	pub fn synthesize(weight_tree: &WeightTree, scores: &AnalysisResults) -> Result<Self> {
+		use indextree::NodeEdge::*;
+		let mut tree = Arena::<ScoreTreeNode>::new();
+		let weight_root = weight_tree.root;
+		let score_root = tree.new_node(
+			weight_tree
+				.tree
+				.get(weight_root)
+				.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+				.get()
+				.augment(scores),
+		);
+
+		let mut scope: Vec<NodeId> = vec![score_root];
+		for edge in weight_root.traverse(&weight_tree.tree) {
+			match edge {
+				Start(n) => {
+					let curr_node = tree.new_node(
+						weight_tree
+							.tree
+							.get(n)
+							.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+							.get()
+							.augment(scores),
+					);
+					scope
+						.last()
+						.ok_or(hc_error!("Scope stack is empty, invalid state"))?
+						.append(curr_node, &mut tree);
+					scope.push(curr_node);
+				}
+				End(_) => {
+					scope.pop();
+				}
+			};
+		}
+
+		Ok(AltScoreTree {
+			tree,
+			root: score_root,
+		})
+	}
+	// As our scope, we track the weight of each node. Once we get to a leaf node, we multiply all
+	// the weights (already normalized) by the score (0/1) then sum each value
+	pub fn score(&self) -> f64 {
+		let raw_score = visit_leaves(
+			self.root,
+			&self.tree,
+			|n| n.weight,
+			|a, n| a.iter().product::<f64>() * n.score,
+		)
+		.into_iter()
+		.sum();
+		decimal_truncate(raw_score)
+	}
 }
 
 //stores the score tree using petgraph
@@ -153,7 +247,7 @@ pub struct ScoreTreeNode {
 // returns score result for each phase based on phase name
 // pass (a score of 0) or fail (a score of 1)
 pub fn phase_outcome<P: AsRef<String>>(
-	db: &dyn ScoringProvider,
+	_db: &dyn ScoringProvider,
 	phase_name: P,
 ) -> Result<Arc<ScoreResult>> {
 	match phase_name.as_ref().as_str() {
@@ -192,76 +286,14 @@ pub fn update_phase(phase: &mut Phase, phase_name: &str) -> Result<()> {
 	}
 }
 
-//Scores phase and adds nodes and edges to tree
-pub fn add_node_and_edge_with_score(
-	score_result: impl AsRef<ScoreResult>,
-	mut score_tree: ScoreTree,
-	phase: &str,
-	parent_node: NodeIndex<u32>,
-) -> Result<ScoreTree> {
-	let weight = score_result.as_ref().count as f64;
-	let score_increment = score_result.as_ref().score as i64;
-
-	//adding nodes/edges to the score tree
-	let (child_node, score_tree_updated) =
-		match add_tree_node(score_tree.clone(), phase, score_increment, weight) {
-			Ok(results) => results,
-			_ => {
-				return Err(hc_error!(
-					"failed to add score tree node for {} scoring.",
-					phase
-				))
-			}
-		};
-
-	score_tree = add_tree_edge(score_tree_updated, child_node, parent_node);
-
-	Ok(score_tree)
-}
-
-pub fn add_tree_node(
-	mut score_tree: ScoreTree,
-	phase: &str,
-	score_increment: i64,
-	weight: f64,
-) -> Result<(NodeIndex, ScoreTree)> {
-	let score_node = score_tree.tree.add_node(ScoreTreeNode {
-		label: phase.to_string(),
-		score: score_increment as f64,
-		weight,
-	});
-	Ok((score_node, score_tree))
-}
-
-pub fn add_tree_edge(
-	mut score_tree: ScoreTree,
-	child_node: NodeIndex,
-	parent_node: NodeIndex,
-) -> ScoreTree {
-	score_tree.tree.add_edge(parent_node, child_node, 0.0);
-	score_tree
-}
-
 macro_rules! run_and_score_threshold_analysis {
-	($res:ident, $p:ident, $tree: ident, $phase:ident, $a:expr, $w:expr, $spec:ident, $node:ident) => {{
+	($res:ident, $p:ident, $phase:ident, $a:expr, $spec:ident) => {{
 		update_phase($p, $phase)?;
 		let analysis_result =
 			ThresholdPredicate::from_analysis(&$a, $spec.threshold, $spec.units, $spec.ordering);
 		$res.table.insert($phase.to_owned(), analysis_result);
-		let (an_score, outcome) = $res.table.get($phase).unwrap().score();
-		let score_result = Arc::new(ScoreResult {
-			count: $w,
-			score: an_score,
-			outcome,
-		});
-		let output = score_result.outcome.clone();
-		match add_node_and_edge_with_score(score_result, $tree, $phase, $node) {
-			Ok(score_tree_inc) => {
-				$tree = score_tree_inc;
-			}
-			_ => return Err(hc_error!("failed to complete {} scoring.", $phase)),
-		};
-		output
+		let (_an_score, outcome) = $res.table.get($phase).unwrap().score();
+		outcome
 	}};
 }
 
@@ -277,33 +309,11 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 	*/
 	// Values set with -1.0 are reseved for parent nodes whose score comes always from children nodes with a score set by hc_analysis algorithms
 
+	let weight_tree = db.normalized_weight_tree()?;
 	let mut results = AnalysisResults::default();
 	let mut score = Score::default();
-	let mut score_tree = ScoreTree { tree: Graph::new() };
-	let root_node = score_tree.tree.add_node(ScoreTreeNode {
-		label: RISK_PHASE.to_string(),
-		score: -1.0,
-		weight: 0.0,
-	});
 	/* PRACTICES NODE ADDITION */
 	if db.practices_active() {
-		let (practices_node, score_tree_updated) = match add_tree_node(
-			score_tree.clone(),
-			PRACTICES_PHASE,
-			0,
-			db.practices_weight() as f64,
-		) {
-			Ok(results) => results,
-			_ => {
-				return Err(hc_error!(
-					"failed to add score tree node for {} scoring.",
-					PRACTICES_PHASE
-				))
-			}
-		};
-
-		score_tree = add_tree_edge(score_tree_updated, practices_node, root_node);
-
 		/*===NEW_PHASE===*/
 		if db.activity_active() {
 			let spec = ThresholdSpec {
@@ -314,12 +324,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.activity = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				ACTIVITY_PHASE,
 				db.activity_analysis(),
-				db.activity_weight(),
-				spec,
-				practices_node
+				spec
 			);
 		}
 
@@ -333,12 +340,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.review = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				REVIEW_PHASE,
 				db.review_analysis(),
-				db.review_weight(),
-				spec,
-				practices_node
+				spec
 			);
 		}
 
@@ -352,12 +356,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.binary = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				BINARY_PHASE,
 				db.binary_analysis(),
-				db.binary_weight(),
-				spec,
-				practices_node
+				spec
 			);
 		}
 
@@ -371,12 +372,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.identity = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				IDENTITY_PHASE,
 				db.identity_analysis(),
-				db.identity_weight(),
-				spec,
-				practices_node
+				spec
 			);
 		}
 
@@ -390,35 +388,15 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.fuzz = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				FUZZ_PHASE,
 				db.fuzz_analysis(),
-				db.fuzz_weight(),
-				spec,
-				practices_node
+				spec
 			);
 		}
 	}
 
 	/* ATTACKS NODE ADDITION */
 	if db.attacks_active() {
-		let (attacks_node, score_tree_updated) = match add_tree_node(
-			score_tree.clone(),
-			ATTACKS_PHASE,
-			0,
-			db.attacks_weight() as f64,
-		) {
-			Ok(results) => results,
-			_ => {
-				return Err(hc_error!(
-					"failed to add score tree node for {} scoring.",
-					ATTACKS_PHASE
-				))
-			}
-		};
-
-		score_tree = add_tree_edge(score_tree_updated, attacks_node, root_node);
-
 		/*===TYPO PHASE===*/
 		if db.typo_active() {
 			let spec = ThresholdSpec {
@@ -429,34 +407,14 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 			score.typo = run_and_score_threshold_analysis!(
 				results,
 				phase,
-				score_tree,
 				TYPO_PHASE,
 				db.typo_analysis(),
-				db.typo_weight(),
-				spec,
-				attacks_node
+				spec
 			);
 		}
 
 		/*High risk commits node addition*/
 		if db.commit_active() {
-			let (commit_node, score_tree_updated) = match add_tree_node(
-				score_tree.clone(),
-				COMMITS_PHASE,
-				0,
-				db.commit_weight() as f64,
-			) {
-				Ok(results) => results,
-				_ => {
-					return Err(hc_error!(
-						"failed to add score tree node for {} scoring.",
-						COMMITS_PHASE
-					))
-				}
-			};
-
-			score_tree = add_tree_edge(score_tree_updated, commit_node, attacks_node);
-
 			/*===NEW_PHASE===*/
 			if db.affiliation_active() {
 				let spec = ThresholdSpec {
@@ -467,12 +425,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				score.affiliation = run_and_score_threshold_analysis!(
 					results,
 					phase,
-					score_tree,
 					AFFILIATION_PHASE,
 					db.affiliation_analysis(),
-					db.affiliation_weight(),
-					spec,
-					commit_node
+					spec
 				);
 			}
 
@@ -486,12 +441,9 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				score.churn = run_and_score_threshold_analysis!(
 					results,
 					phase,
-					score_tree,
 					CHURN_PHASE,
 					db.churn_analysis(),
-					db.churn_weight(),
-					spec,
-					commit_node
+					spec
 				);
 			}
 
@@ -505,48 +457,18 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 				score.entropy = run_and_score_threshold_analysis!(
 					results,
 					phase,
-					score_tree,
 					ENTROPY_PHASE,
 					db.entropy_analysis(),
-					db.entropy_weight(),
-					spec,
-					commit_node
+					spec
 				);
 			}
 		}
 	}
 
-	let start_node: NodeIndex<u32> = n(0);
-	score.total = score_nodes(start_node, score_tree.tree);
+	let alt_score_tree = AltScoreTree::synthesize(&weight_tree, &results)?;
+	score.total = alt_score_tree.score();
 
 	Ok(ScoringResults { results, score })
-}
-
-fn score_nodes(node: NodeIndex, gr: Graph<ScoreTreeNode, f64>) -> f64 {
-	//get all children to get full weight for node/branch level
-	let mut children = gr.neighbors_directed(node, Outgoing).detach();
-
-	let mut child_weight_sums = 0.0;
-	let sums = gr.clone();
-	let mut weights = children.clone();
-	//add child weights together so we can get weight later
-	while let Some(child) = weights.next_node(&sums) {
-		child_weight_sums += sums[child].weight;
-	}
-
-	if child_weight_sums == 0.0 {
-		//if node has no children return the node score
-		return gr[node].score;
-	}
-
-	let mut score = 0.0;
-	while let Some(child) = children.next_node(&gr) {
-		let child_weight = gr[child].weight / child_weight_sums;
-
-		//using recursion to get children node scores, this takes us to last node first in the end
-		score += score_nodes(child, gr.clone()) * child_weight;
-	}
-	decimal_truncate(score)
 }
 
 fn decimal_truncate(score: f64) -> f64 {
@@ -556,7 +478,6 @@ fn decimal_truncate(score: f64) -> f64 {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use petgraph::Graph;
 
 	//We use -1.0 values for parent nodes basically that get scored through recursion based on child nodes that have a score set and weight
 
@@ -576,81 +497,22 @@ mod test {
 	#[test]
 	#[ignore = "test of tree scoring"]
 	fn test_graph1() {
-		let mut score_tree = ScoreTree { tree: Graph::new() };
-		let core = score_tree.tree.add_node(ScoreTreeNode {
-			label: "risk".to_string(),
-			score: -1.0,
-			weight: -1.0,
-		});
-		let practices = score_tree.tree.add_node(ScoreTreeNode {
-			label: PRACTICES_PHASE.to_string(),
-			score: -1.0,
-			weight: 10.0,
-		});
-		let review = score_tree.tree.add_node(ScoreTreeNode {
-			label: REVIEW_PHASE.to_string(),
-			score: 1.0,
-			weight: 5.0,
-		});
-		let activity = score_tree.tree.add_node(ScoreTreeNode {
-			label: ACTIVITY_PHASE.to_string(),
-			score: 0.0,
-			weight: 4.0,
-		});
-		let attacks = score_tree.tree.add_node(ScoreTreeNode {
-			label: ATTACKS_PHASE.to_string(),
-			score: -1.0,
-			weight: 20.0,
-		});
-		let commits = score_tree.tree.add_node(ScoreTreeNode {
-			label: COMMITS_PHASE.to_string(),
-			score: -1.0,
-			weight: 5.0,
-		});
-		let trust = score_tree.tree.add_node(ScoreTreeNode {
-			label: "trust".to_string(),
-			score: 1.0,
-			weight: 4.0,
-		});
-		let code_review = score_tree.tree.add_node(ScoreTreeNode {
-			label: "code review".to_string(),
-			score: 0.0,
-			weight: 3.0,
-		});
-		let entropy = score_tree.tree.add_node(ScoreTreeNode {
-			label: ENTROPY_PHASE.to_string(),
-			score: 0.0,
-			weight: 2.0,
-		});
-		let churn = score_tree.tree.add_node(ScoreTreeNode {
-			label: CHURN_PHASE.to_string(),
-			score: 1.0,
-			weight: 10.0,
-		});
-		let typo = score_tree.tree.add_node(ScoreTreeNode {
-			label: TYPO_PHASE.to_string(),
-			score: 1.0,
-			weight: 5.0,
-		});
-		//edge weights are not used
-		score_tree.tree.add_edge(core, practices, 0.0);
-		score_tree.tree.add_edge(core, attacks, 0.0);
-
-		score_tree.tree.add_edge(practices, review, 0.0);
-		score_tree.tree.add_edge(practices, activity, 0.0);
-
-		score_tree.tree.add_edge(attacks, commits, 0.0);
-		score_tree.tree.add_edge(attacks, typo, 0.0);
-
-		score_tree.tree.add_edge(commits, trust, 0.0);
-		score_tree.tree.add_edge(commits, code_review, 0.0);
-		score_tree.tree.add_edge(commits, entropy, 0.0);
-		score_tree.tree.add_edge(commits, churn, 0.0);
-
-		let final_score = score_nodes(core, score_tree.tree);
+		let mut score_tree = AltScoreTree::new("risk");
+		let core = score_tree.root;
+		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 10.0);
+		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 5.0);
+		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 0.0, 4.0);
+		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 20.0);
+		let commits = score_tree.add_child(attacks, COMMITS_PHASE, -1.0, 5.0);
+		let trust = score_tree.add_child(commits, "trust", 1.0, 4.0);
+		let code_review = score_tree.add_child(commits, "code_review", 0.0, 3.0);
+		let entropy = score_tree.add_child(commits, ENTROPY_PHASE, 0.0, 2.0);
+		let churn = score_tree.add_child(commits, CHURN_PHASE, 1.0, 10.0);
+		let typo = score_tree.add_child(attacks, TYPO_PHASE, 1.0, 5.0);
+		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
-		assert_eq!(0.77, final_score);
+		assert_eq!(0.76, final_score);
 	}
 
 	/*
@@ -665,53 +527,15 @@ mod test {
 	#[test]
 	#[ignore = "test2 of tree scoring"]
 	fn test_graph2() {
-		let mut score_tree = ScoreTree { tree: Graph::new() };
-		let core = score_tree.tree.add_node(ScoreTreeNode {
-			label: "risk".to_string(),
-			score: -1.0,
-			weight: -1.0,
-		});
-		let practices = score_tree.tree.add_node(ScoreTreeNode {
-			label: PRACTICES_PHASE.to_string(),
-			score: -1.0,
-			weight: 10.0,
-		});
-		let review = score_tree.tree.add_node(ScoreTreeNode {
-			label: REVIEW_PHASE.to_string(),
-			score: 1.0,
-			weight: 4.0,
-		});
-		let activity = score_tree.tree.add_node(ScoreTreeNode {
-			label: ACTIVITY_PHASE.to_string(),
-			score: 1.0,
-			weight: 5.0,
-		});
-		let attacks = score_tree.tree.add_node(ScoreTreeNode {
-			label: ATTACKS_PHASE.to_string(),
-			score: -1.0,
-			weight: 15.0,
-		});
-		let code_review = score_tree.tree.add_node(ScoreTreeNode {
-			label: "code review".to_string(),
-			score: 0.0,
-			weight: 6.0,
-		});
-		let entropy = score_tree.tree.add_node(ScoreTreeNode {
-			label: ENTROPY_PHASE.to_string(),
-			score: 0.0,
-			weight: 7.0,
-		});
-		//edge weights are not used
-		score_tree.tree.add_edge(core, practices, 0.0);
-		score_tree.tree.add_edge(core, attacks, 0.0);
-
-		score_tree.tree.add_edge(practices, review, 0.0);
-		score_tree.tree.add_edge(practices, activity, 0.0);
-
-		score_tree.tree.add_edge(attacks, code_review, 0.0);
-		score_tree.tree.add_edge(attacks, entropy, 0.0);
-
-		let final_score = score_nodes(core, score_tree.tree);
+		let mut score_tree = AltScoreTree::new("risk");
+		let core = score_tree.root;
+		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 10.0);
+		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 4.0);
+		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 5.0);
+		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 15.0);
+		let code_review = score_tree.add_child(attacks, "code_review", 0.0, 6.0);
+		let entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 0.0, 7.0);
+		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
 		assert_eq!(0.4, final_score);
@@ -729,53 +553,15 @@ mod test {
 	#[test]
 	#[ignore = "test3 of tree scoring"]
 	fn test_graph3() {
-		let mut score_tree = ScoreTree { tree: Graph::new() };
-		let core = score_tree.tree.add_node(ScoreTreeNode {
-			label: "risk".to_string(),
-			score: -1.0,
-			weight: -1.0,
-		});
-		let practices = score_tree.tree.add_node(ScoreTreeNode {
-			label: PRACTICES_PHASE.to_string(),
-			score: -1.0,
-			weight: 33.0,
-		});
-		let review = score_tree.tree.add_node(ScoreTreeNode {
-			label: REVIEW_PHASE.to_string(),
-			score: 1.0,
-			weight: 10.0,
-		});
-		let activity = score_tree.tree.add_node(ScoreTreeNode {
-			label: ACTIVITY_PHASE.to_string(),
-			score: 1.0,
-			weight: 5.0,
-		});
-		let attacks = score_tree.tree.add_node(ScoreTreeNode {
-			label: ATTACKS_PHASE.to_string(),
-			score: -1.0,
-			weight: 15.0,
-		});
-		let code_review = score_tree.tree.add_node(ScoreTreeNode {
-			label: "code review".to_string(),
-			score: 1.0,
-			weight: 6.0,
-		});
-		let entropy = score_tree.tree.add_node(ScoreTreeNode {
-			label: ENTROPY_PHASE.to_string(),
-			score: 1.0,
-			weight: 15.0,
-		});
-		//edge weights are not used
-		score_tree.tree.add_edge(core, practices, 0.0);
-		score_tree.tree.add_edge(core, attacks, 0.0);
-
-		score_tree.tree.add_edge(practices, review, 0.0);
-		score_tree.tree.add_edge(practices, activity, 0.0);
-
-		score_tree.tree.add_edge(attacks, code_review, 0.0);
-		score_tree.tree.add_edge(attacks, entropy, 0.0);
-
-		let final_score = score_nodes(core, score_tree.tree);
+		let mut score_tree = AltScoreTree::new("risk");
+		let core = score_tree.root;
+		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 33.0);
+		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 10.0);
+		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 5.0);
+		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 15.0);
+		let code_review = score_tree.add_child(attacks, "code_review", 1.0, 6.0);
+		let entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 1.0, 15.0);
+		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
 		assert_eq!(1.0, final_score);
@@ -794,53 +580,15 @@ mod test {
 	#[test]
 	#[ignore = "test4 of tree scoring"]
 	fn test_graph4() {
-		let mut score_tree = ScoreTree { tree: Graph::new() };
-		let core = score_tree.tree.add_node(ScoreTreeNode {
-			label: "risk".to_string(),
-			score: -1.0,
-			weight: -1.0,
-		});
-		let practices = score_tree.tree.add_node(ScoreTreeNode {
-			label: PRACTICES_PHASE.to_string(),
-			score: -1.0,
-			weight: 40.0,
-		});
-		let review = score_tree.tree.add_node(ScoreTreeNode {
-			label: REVIEW_PHASE.to_string(),
-			score: 0.0,
-			weight: 12.0,
-		});
-		let activity = score_tree.tree.add_node(ScoreTreeNode {
-			label: ACTIVITY_PHASE.to_string(),
-			score: 1.0,
-			weight: 6.0,
-		});
-		let attacks = score_tree.tree.add_node(ScoreTreeNode {
-			label: ATTACKS_PHASE.to_string(),
-			score: -1.0,
-			weight: 15.0,
-		});
-		let code_review = score_tree.tree.add_node(ScoreTreeNode {
-			label: "code review".to_string(),
-			score: 0.0,
-			weight: 9.0,
-		});
-		let entropy = score_tree.tree.add_node(ScoreTreeNode {
-			label: ENTROPY_PHASE.to_string(),
-			score: 1.0,
-			weight: 13.0,
-		});
-		//edge weights are not used
-		score_tree.tree.add_edge(core, practices, 0.0);
-		score_tree.tree.add_edge(core, attacks, 0.0);
-
-		score_tree.tree.add_edge(practices, review, 0.0);
-		score_tree.tree.add_edge(practices, activity, 0.0);
-
-		score_tree.tree.add_edge(attacks, code_review, 0.0);
-		score_tree.tree.add_edge(attacks, entropy, 0.0);
-
-		let final_score = score_nodes(core, score_tree.tree);
+		let mut score_tree = AltScoreTree::new("risk");
+		let core = score_tree.root;
+		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 40.0);
+		let review = score_tree.add_child(practices, REVIEW_PHASE, 0.0, 12.0);
+		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 6.0);
+		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 15.0);
+		let code_review = score_tree.add_child(attacks, "code_review", 0.0, 9.0);
+		let entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 1.0, 13.0);
+		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
 		assert_eq!(0.40, final_score);

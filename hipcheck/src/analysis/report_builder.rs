@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::analysis::AnalysisReport;
 use crate::analysis::result::{HCBasicValue, HCPredicate, Predicate};
 use crate::analysis::score::*;
 use crate::config::RiskConfigQuery;
