@@ -84,6 +84,10 @@
 
 #![deny(missing_docs)]
 
+use console::style;
+use console::Emoji;
+use verbosity::Verbosity;
+
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
@@ -91,6 +95,7 @@ use crate::report::Format;
 use crate::report::PrReport;
 use crate::report::RecommendationKind;
 use crate::report::Report;
+use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::OnceCell;
 use std::fmt;
@@ -112,35 +117,50 @@ use std::time::Instant;
 use console::Color;
 use console::Style;
 use console::Term;
+use dashmap::DashMap;
 use indicatif::MultiProgress;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
 use indicatif::TermLike;
-use termcolor::WriteColor;
+
+pub mod verbosity;
+pub mod color_choice;
+pub mod spinner_phase;
+pub mod prelude;
+pub mod progress_phase;
+pub mod iter;
+pub mod par_iter;
 
 /// Global static shell instance, stored in a [`OnceLock`] to make it thread safe and lazy. 
 static GLOBAL_SHELL: OnceLock<Shell> = OnceLock::new();
 
-/// Global static storing the style that should be used for spinners. 
-static SPINNER_STYLE: OnceLock<ProgressStyle> = OnceLock::new();
+/// Global static storing the style that should be used for progress bars. 
+static ITER_PROGRESS_BAR_STYLE: OnceLock<ProgressStyle> = OnceLock::new();
+
+const ROCKET_SHIP: Emoji = Emoji("🚀", "....");
+const HOUR_GLASS: Emoji = Emoji("⏳", ">>>>");
+const GREEN_CHECKBOX: Emoji = Emoji("✅", "DONE ");
+const ERROR_ESCLAMATION: Emoji = Emoji("❗", "!!!!");
 
 /// Type interface to the global shell used to produce output in the user's terminal. 
 #[derive(Debug)]
 pub struct Shell {
-	progres_bars: MultiProgress,
+	/// Multi-progress bar object holding all the different progress bars we're using. 
+	progress_bars: MultiProgress,
+	/// The verbosity of this shell. 
 	verbosity: RwLock<Verbosity>,
 }
 
 impl Shell {
 	/// Initialize the global shell. Panics if the global shell is already initialized. 
-	pub(super) fn init(verbosity: Verbosity) {
+	pub fn init(verbosity: Verbosity) {
 		if GLOBAL_SHELL.get().is_some() {
 			panic!("Global shell is already initialized");
 		}
 
 		GLOBAL_SHELL.get_or_init(move || {
 			Shell { 
-				progres_bars: MultiProgress::new(), verbosity: RwLock::new(verbosity)  }
+				progress_bars: MultiProgress::new(), verbosity: RwLock::new(verbosity)  }
 		});
 	}
 
@@ -176,32 +196,32 @@ impl Shell {
 			.clone()
 	}
 
+	/// Update whether colors are enabled for all of hipcheck.
+	pub fn set_colors_enabled(enable: bool) {
+		console::set_colors_enabled(enable);
+		console::set_colors_enabled_stderr(enable);
+	}
+
 	/// Get a clone of the [`MultiProgress`] instance stored using [`Arc::clone`] under the hood. 
 	pub fn progress_bars() -> MultiProgress {
-		Self::get().progres_bars.clone()
+		Self::get().progress_bars.clone()
 	}
 
-	/// Get the global static spinner style. 
-	pub fn spinner_style() -> &'static ProgressStyle {
-		SPINNER_STYLE.get_or_init(|| {
-			ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg} {elapsed:>.italic}")
-				.expect("valid spinner style")
+	/// Print timing info. Only enabled while hipcheck is being benchmarked. 
+	#[cfg(feature = "benchmarking")]
+	pub fn print_timing(timing: &crate::benchmarking::PrintTime) {		
+		use crate::benchmarking::PrintTime;
+
+		// Destructure timing object. 
+		let PrintTime { location, start } = timing;
+
+		Shell::in_suspend(|| {
+			eprintln!(
+				"[TIMINGS]: {}: {:.6} seconds elapsed.",
+				style(location).bold(),
+				(Instant::now() - *start).as_secs_f64()
+			);
 		})
-	}
-
-	/// Start a phase with a spinner that will tick until completion. 
-	/// 
-	/// # Panics
-	/// - Panics if the global shell has not been initialized. 
-	pub fn start_spinner_phase() -> Phase {
-		let bar = Self::get()
-			.progres_bars
-			.add(ProgressBar::new_spinner().with_style(Self::spinner_style().clone()));
-		
-		Phase {
-			bar,
-			// started_at: Instant::now(),
-		}
 	}
 
 	// /// Print a message to the standard output if the standard output is a terminal. 
@@ -222,7 +242,7 @@ impl Shell {
 	fn in_suspend<F, R>(f: F) -> R
 	where F: FnOnce() -> R {
 		Self::get()
-			.progres_bars
+			.progress_bars
 			.suspend(f)
 	}
 
@@ -239,76 +259,72 @@ impl Shell {
 	// 	})
 	// }
 
-	// /// Print a message to the standard error. 
-	// /// Temporarily hide the progress bar to print. 
-	// /// 
-	// /// # Panics
-	// /// - Panics if the global logger is not initialized. 
-	// fn eprintln(msg: impl AsRef<str>) {
-	// 	Shell::in_suspend(|| {
-	// 		eprintln!("{}", msg.as_ref());
-	// 	})
+	/// Bypass the recommended styling and print a message to the standard error. 
+	/// Temporarily hide the progress bar to print. 
+	/// 
+	/// # Panics
+	/// - Panics if the global logger is not initialized. 
+	pub fn eprintln(msg: impl Display) {
+		Shell::in_suspend(|| {
+			eprintln!("{}", msg);
+		})
+	}
+
+	// fn print_message(mut term: impl TermLike + Write + IsTerminal, msg: Message) -> Result<()> {
+	// 	// Print nothing if the global verbosity is "silent".
+	// 	if Shell::get_verbosity() == Verbosity::Silent {
+	// 		return Ok(());
+	// 	}
+
+	// 	// Supress optional messages when quiet. 
+	// 	if Shell::get_verbosity() == Verbosity::Quiet && msg.may_not_print() {
+	// 		return Ok(());
+	// 	}
+
+	// 	// Check if the terminal supports clearing/is_atty.  
+	// 	let is_atty: bool = term.is_terminal();
+
+	// 	log::debug!("printing message [message='{:?}']", msg);
+
+	// 	match msg {
+	// 		Message::Clear => term.clear_line()?,
+	// 		Message::Newline => writeln!(&mut term)?, 
+	// 		Message::Nothing | Message::ReportNothing => {},
+			
+	// 		Message::Prelude { title, msg } 
+	// 		| Message::Basic { title, msg } => {
+	// 			write!(&mut term, "{:>width$} {msg}", title.style().apply_to(title.text()), width = title.width())?;
+	// 		}
+
+	// 		Message::Error { title, error } => {
+	// 			write!(&mut term, "{title:>width$} {msg}", 
+	// 				title = title.style().apply_to(title.text()), 
+	// 				width = title.width(),
+	// 				msg = error.
+	// 			)?;
+	// 		}
+
+
+
+
+	// 		_ => unimplemented!(),
+	// 	}
+
+	// 	Write::flush(&mut term)?;
+
+	// 	Ok(())
 	// }
 
-	fn print_message(mut term: impl TermLike + Write + IsTerminal, msg: Message) -> Result<()> {
-		// Print nothing if the global verbosity is "silent".
-		if Shell::get_verbosity() == Verbosity::Silent {
-			return Ok(());
-		}
-
-		// Supress optional messages when quiet. 
-		if Shell::get_verbosity() == Verbosity::Quiet && msg.may_not_print() {
-			return Ok(());
-		}
-
-		// Check if the terminal supports clearing/is_atty.  
-		let is_atty: bool = term.is_terminal();
-
-		log::debug!("printing message [message='{:?}']", msg);
-
-		match msg {
-			Message::Clear => term.clear_line()?,
-			Message::Newline => writeln!(&mut term)?, 
-			Message::Nothing | Message::ReportNothing => {},
-			
-			Message::Prelude { title, msg } 
-			| Message::Basic { title, msg } => {
-				write!(&mut term, "{:>width$} {msg}", title.style().apply_to(title.text()), width = title.width())?;
-			}
-
-			Message::Error { title, error } => {
-				write!(&mut term, "{:>width$} {msg}", title.style().apply_to(val))
-			}
-
-
-
-
-			_ => unimplemented!(),
-		}
-
-		Write::flush(&mut term)?;
-
-		Ok(())
-	}
-
 
 }
 
-/// A phase in the processing of hipcheck. 
-/// 
-/// Phases will always contain a progress bar or spinner, which is automatically closed when the phase [Drop]s. 
-#[derive(Debug)]
-pub struct Phase {
-	// started_at: Instant,
-	bar: ProgressBar
-}
 
-// Check to see if this is necessary. 
-impl Drop for Phase {
-	fn drop(&mut self) {
-		self.bar.finish()
-	}
-}
+// // Check to see if this is necessary. 
+// impl Drop for Phase {
+// 	fn drop(&mut self) {
+// 		self.bar.finish()
+// 	}
+// }
 
 
 // /// Print a string to a writer with a space in front of it, then flush the writer. 
@@ -374,7 +390,7 @@ impl Drop for Phase {
 // 		}
 // 	};
 // }
-
+/*
 impl Shell {
 	/// Create a new Shell wrapping the output and error streams.
 	pub fn new(output: Output, error_output: Output, verbosity: Verbosity) -> Shell {
@@ -1176,74 +1192,7 @@ impl PrintMode {
 	}
 }
 
-/// How verbose CLI output should be.
-#[derive(Debug, Default, Copy, Clone, PartialEq, clap::ValueEnum)]
-pub enum Verbosity {
-	/// Output results, not progress indicators.
-	Quiet,
-	/// Output results and progress indicators.
-	#[default]
-	Normal,
-	// This one is only used in testing.
-	/// Do not output anything.
-	#[value(hide = true)]
-	Silent,
-}
 
-impl Verbosity {
-	pub fn use_quiet(quiet: bool) -> Verbosity {
-		if quiet {
-			Verbosity::Quiet
-		} else {
-			Verbosity::Normal
-		}
-	}
-}
-
-/// Selection of whether the CLI output should use color.
-#[derive(Debug, Default, Copy, Clone, PartialEq, clap::ValueEnum)]
-pub enum ColorChoice {
-	/// Always use color output
-	Always,
-	/// Never use color output
-	Never,
-	/// Guess whether to use color output
-	#[default]
-	Auto,
-}
-
-impl FromStr for ColorChoice {
-	type Err = Error;
-
-	fn from_str(s: &str) -> Result<Self> {
-		match s.to_lowercase().as_ref() {
-			"always" => Ok(ColorChoice::Always),
-			"never" => Ok(ColorChoice::Never),
-			"auto" => Ok(ColorChoice::Auto),
-			_ => Err(Error::msg("unknown color option")),
-		}
-	}
-}
-
-impl ColorChoice {
-	/// Convert Color into the `termcolor` crate's equivalent type.
-	fn to_termcolor(self, is_atty: bool) -> termcolor::ColorChoice {
-		use termcolor::ColorChoice as TermColor;
-		use ColorChoice::*;
-
-		match self {
-			Always => TermColor::Always,
-			Never => TermColor::Never,
-			Auto => {
-				if is_atty {
-					TermColor::Auto
-				} else {
-					TermColor::Never
-				}
-			}
-		}
-	}
-}
 
 /// Print a message out to a stream.
 fn print(stream: &mut dyn WriteColor, msg: Message) -> Result<()> {
@@ -1838,3 +1787,5 @@ mod imp {
 		}
 	}
 }
+
+*/

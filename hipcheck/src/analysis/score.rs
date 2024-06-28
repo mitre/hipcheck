@@ -7,7 +7,7 @@ use crate::analysis::AnalysisProvider;
 use crate::error::Result;
 use crate::hc_error;
 use crate::report::Concern;
-use crate::shell::Phase;
+// use crate::shell::Phase;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::default::Default;

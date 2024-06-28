@@ -37,9 +37,8 @@ use crate::error::Result;
 use crate::session::session::Check;
 use crate::session::session::Session;
 use crate::session::session::TargetKind;
-use crate::shell::Output;
 use crate::shell::Shell;
-use crate::shell::Verbosity;
+use crate::shell::verbosity::Verbosity;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
 use cli::CheckArgs;
@@ -80,7 +79,7 @@ fn main() -> ExitCode {
 	init_logging();
 
 	if cfg!(feature = "print-timings") {
-		shell::macros::println!("[TIMINGS]: Timing information will be printed.");
+		Shell::eprintln("[TIMINGS]: Timing information will be printed.");
 	}
 
 	// Start tracking the timing for `main` after logging is initiated.
