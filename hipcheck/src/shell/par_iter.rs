@@ -5,6 +5,30 @@ use std::sync::Arc;
 use rayon::iter::{plumbing::{Consumer, Folder, Producer, ProducerCallback, UnindexedConsumer}, IndexedParallelIterator, ParallelIterator};
 use super::{progress_phase::{ProgressPhase, ProgressPhaseTracker}, spinner_phase::{SpinnerPhase, SpinnerPhaseTracker}};
 
+/// Trait implemented on "phase" types that link the associated (parallel) [Iteratoe]
+trait HasTrackerType<I> {
+    type Tracker;
+
+    /// Attach this phase to an [Iterator], creating a "tracker". 
+    fn attach(self, iter: I) -> Self::Tracker;
+}
+
+impl<I> HasTrackerType<I> for SpinnerPhase {
+    type Tracker = SpinnerPhaseTracker<I>;
+
+    fn attach(self, iter: I) -> Self::Tracker {
+        SpinnerPhaseTracker { phase: self, iter }
+    }
+}
+
+impl<I> HasTrackerType<I> for ProgressPhase {
+    type Tracker = ProgressPhaseTracker<I>;
+
+    fn attach(self, iter: I) -> Self::Tracker {
+        ProgressPhaseTracker { phase: self, iter }
+    }
+}
+
 /// Trait implemented on all parallel iterators that lets the user create a progress spinner in the shell to track them. 
 pub trait ParallelTrackAsPhase: Sized + ParallelIterator {
     /// Add a spinner progress bar to the global shell that tracks this parallel iterator. 
@@ -229,51 +253,17 @@ struct PhaseProducer<Phase, Prod> {
     phase: Phase,
 }
 
-// We have to impl once for each phase type because 
-
-impl<T, P: Producer<Item = T>> Producer for PhaseProducer<SpinnerPhase, P> {
+impl<Phase, T, Prod> Producer for PhaseProducer<Phase, Prod> 
+where 
+    Prod: Producer<Item = T>,
+    Phase: HasTrackerType<Prod::IntoIter, Tracker: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = T>>,
+    Phase: Send + Clone,
+{
     type Item = T;
-    type IntoIter = SpinnerPhaseTracker<P::IntoIter>;
+    type IntoIter = Phase::Tracker;
 
     fn into_iter(self) -> Self::IntoIter {
-        SpinnerPhaseTracker {
-            iter: self.base.into_iter(),
-            phase: self.phase
-        }
-    }
-
-    fn min_len(&self) -> usize {
-        self.base.min_len()
-    }
-
-    fn max_len(&self) -> usize {
-        self.base.max_len()
-    }
-
-    fn split_at(self, index: usize) -> (Self, Self) {
-        let (left, right) = self.base.split_at(index);
-        (
-            PhaseProducer {
-                base: left,
-                phase: self.phase.clone(),
-            },
-            PhaseProducer {
-                base: right,
-                phase: self.phase.clone(),
-            },
-        )
-    }
-}
-
-impl<T, P: Producer<Item = T>> Producer for PhaseProducer<ProgressPhase, P> {
-    type Item = T;
-    type IntoIter = ProgressPhaseTracker<P::IntoIter>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        ProgressPhaseTracker {
-            iter: self.base.into_iter(),
-            phase: self.phase
-        }
+        Phase::attach(self.phase, self.base.into_iter())
     }
 
     fn min_len(&self) -> usize {
