@@ -2,10 +2,9 @@
 //! 
 //! This can be useful for things like while-loops and iterators without a known size. 
 
-use std::{fmt::Display, iter::FusedIterator, sync::{Arc, OnceLock}, time::Duration};
+use std::{fmt::Display, sync::{Arc, OnceLock}, time::Duration};
 use console::{style, Emoji};
 use indicatif::{ProgressBar, ProgressStyle};
-use rayon::iter::{plumbing::{Consumer, Folder, Producer, ProducerCallback, UnindexedConsumer}, IndexedParallelIterator, ParallelIterator};
 use super::{Shell, ERROR_ESCLAMATION, GREEN_CHECKBOX, HOUR_GLASS, ROCKET_SHIP};
 
 /// Global static storing the style that should be used for spinners. 
