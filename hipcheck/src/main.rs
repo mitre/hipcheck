@@ -38,7 +38,7 @@ use crate::session::session::TargetKind;
 use crate::setup::{resolve_and_transform_source, SourceType};
 use crate::shell::Output;
 use crate::shell::Shell;
-use crate::shell::Verbosity;
+use crate::shell::verbosity::Verbosity;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
 use cli::CheckArgs;
@@ -95,7 +95,7 @@ fn main() -> ExitCode {
 		.expect("installed process-wide default crypto provider");
 
 	if cfg!(feature = "print-timings") {
-		shell::macros::println!("[TIMINGS]: Timing information will be printed.");
+		Shell::eprintln("[TIMINGS]: Timing information will be printed.");
 	}
 
 	// Start tracking the timing for `main` after logging is initiated.
