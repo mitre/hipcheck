@@ -44,7 +44,7 @@ jobs:
       # Install the latest version of the Tailwind CLI.
       - name: Install Tailwind CLI
         run: |
-          curl --proto '=https' --tlsv1.2 https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAILWIND_VERSION}/tailwindcss-linux-x64 -sSf -y
+          curl --proto '=https' --tlsv1.2 https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAILWIND_VERSION}/tailwindcss-linux-x64 -sSf
           chmod +x tailwindcss-linux-x64
           mv tailwindcss-linux-x64 tailwindcss
 
