@@ -1,6 +1,9 @@
 {% macro breadcrumbs(current) %}
+
+    {% set root = config.base_url | replace(from="https://mitre.github.io/", to="") %}
+
     <div class="text-sm text-zinc-500 px-14 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800 rounded-md p-2 mx-[-0.5rem]">
-            <a class="font-normal no-underline hover:underline" href="/">Home</a>
+        <a class="font-normal no-underline hover:underline" href="{{ root }}/">Home</a>
 
             {% for ancestor in current.ancestors %}
                 {% if loop.first %}

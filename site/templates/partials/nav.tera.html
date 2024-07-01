@@ -1,6 +1,8 @@
 
 {% import "macros/icon.tera.html" as ic %}
 
+{% set root = config.base_url | replace(from="https://mitre.github.io/", to="") %}
+
 <nav class="
         text-sm
         py-4 px-8
@@ -10,7 +12,7 @@
             mx-4
             ">
         <li class="block md:flex md:flex-1 items-stretch">
-            <a href="/" class="
+	    <a href="{{ root }}/" class="
                 items-stretch content-center
                 text-black dark:text-zinc-200 hover:text-green-600
                 text-xl
@@ -18,7 +20,7 @@
                 ">Hipcheck&nbsp;<span class="leading-none font-extrabold text-green-600 text-2xl">✓</span></a>
 
             {% if config.extra.announce %}
-                <a href="{{ config.extra.announce.url }}"
+	        <a href="{{ root }}{{ config.extra.announce.url }}"
                     class="
                         rounded-3xl
                         bg-sky-100 dark:bg-sky-900 hover:bg-sky-200 dark:hover:bg-sky-800
@@ -55,7 +57,7 @@
                         {% else %}
                             p-0
                         {% endif %}
-                        " href="{{ item.url }}" {% if item.id %}id="{{ item.id }}"{% endif %}>
+			" href="{{ root }}{{ item.url }}" {% if item.id %}id="{{ item.id }}"{% endif %}>
                     {% if item.icon %}
                         {% set name = item.icon %}
                         {{ ic::icon(name=name, classes="mt-[-2px] ml-[-4px] mr-1") }}
