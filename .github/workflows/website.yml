@@ -47,6 +47,8 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSLO https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAILWIND_VERSION}/tailwindcss-linux-x64
           chmod +x tailwindcss-linux-x64
           mv tailwindcss-linux-x64 tailwindcss
+          mkdir -p "${HOME}/.local/bin"
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
       # Setup GitHub Pages
       #
