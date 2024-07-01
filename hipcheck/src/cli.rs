@@ -369,6 +369,7 @@ pub enum FullCommands {
 	PrintConfig,
 	PrintData,
 	PrintCache,
+	Scoring,
 }
 
 impl From<&Commands> for FullCommands {
@@ -378,6 +379,7 @@ impl From<&Commands> for FullCommands {
 			Commands::Schema(args) => FullCommands::Schema(args.clone()),
 			Commands::Setup(args) => FullCommands::Setup(args.clone()),
 			Commands::Ready => FullCommands::Ready,
+			Commands::Scoring => FullCommands::Scoring,
 		}
 	}
 }
@@ -400,6 +402,8 @@ pub enum Commands {
 	Setup(SetupArgs),
 	/// Check if Hipcheck is ready to run.
 	Ready,
+	/// Print the tree used to weight analyses during scoring.
+	Scoring,
 }
 
 // If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In

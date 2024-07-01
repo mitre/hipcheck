@@ -658,7 +658,6 @@ impl Output {
 	}
 
 	/// Create a new [`Output`] that prints/writes to the void using [io::Sink].
-	#[allow(dead_code)]
 	pub fn sink() -> Output {
 		Output {
 			out: Box::new(io::sink()),
