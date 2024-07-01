@@ -61,12 +61,15 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
 
-      # Build the actual site with Zola.
+      # Build the actual site with Zola and Tailwind.
       - name: Build Hipcheck Website
-        run: zola build
+        run: |
+          cd site
+          zola build
+          tailwindcss -i styles/main.css -o public/main.css
 
-      # Upload the output of the Zola build as an Actions artifact so the
-      # deploy step can pick it up and use it.
+      # Upload the output of the build as an Actions artifact so the deploy
+      # step can pick it up and use it.
       - name: Upload Build Output
         uses: actions/upload-pages-artifact@v3
         with:
