@@ -25,7 +25,7 @@ fn main() -> ExitCode {
 		Commands::Changelog(args) => task::changelog::run(args),
 		Commands::Rfd(args) => task::rfd::run(args),
 		Commands::Site(args) => match args.command {
-			SiteCommand::Serve => task::site::serve::run(),
+			SiteCommand::Serve(args) => task::site::serve::run(args),
 		},
 	};
 
@@ -103,7 +103,28 @@ struct SiteArgs {
 #[derive(Debug, clap::Subcommand)]
 enum SiteCommand {
 	/// Serve the local development site.
-	Serve,
+	Serve(SiteServeArgs),
+}
+
+#[derive(Debug, clap::Args)]
+struct SiteServeArgs {
+	/// The environment to run the site for.
+	#[arg(short = 'e', long = "env")]
+	env: Option<SiteEnvironment>,
+}
+
+impl SiteServeArgs {
+	/// Get the selected environment.
+	fn env(&self) -> SiteEnvironment {
+		self.env.unwrap_or_default()
+	}
+}
+
+#[derive(Debug, Default, Clone, Copy, clap::ValueEnum)]
+enum SiteEnvironment {
+	#[default]
+	Dev,
+	Prod,
 }
 
 #[cfg(test)]
