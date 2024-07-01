@@ -48,9 +48,14 @@ use cli::SchemaArgs;
 use cli::SchemaCommand;
 use cli::SetupArgs;
 use command_util::DependentProgram;
+use config::WeightTreeNode;
+use config::WeightTreeProvider;
 use core::fmt;
 use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
+use indextree::Arena;
+use indextree::NodeId;
+use ordered_float::NotNan;
 use pathbuf::pathbuf;
 use schemars::schema_for;
 use std::env;
@@ -89,6 +94,15 @@ fn main() -> ExitCode {
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
+		Some(FullCommands::Scoring) => {
+			return cmd_print_weights(&config)
+				.map(|_| ExitCode::SUCCESS)
+				.unwrap_or_else(|err| {
+					eprintln!("{}", err);
+					ExitCode::FAILURE
+				});
+		}
+
 		None => print_error(&hc_error!("missing subcommand")),
 	};
 
@@ -146,6 +160,101 @@ fn cmd_schema(args: &SchemaArgs) {
 		SchemaCommand::Pypi => print_pypi_schema(),
 		SchemaCommand::Repo => print_report_schema(),
 	}
+}
+
+fn cmd_print_weights(config: &CliConfig) -> Result<()> {
+	// Get the raw hipcheck version.
+	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
+
+	// Create a dummy session to query the salsa database for a weight graph for printing.
+	let session_result = Session::new(
+		// Use a sink output here since we just want to print the tree and not the shell prelude or anything else.
+		Shell::new(
+			Output::sink(),
+			Output::stdout(shell::ColorChoice::Auto),
+			Verbosity::Normal,
+		),
+		&Check {
+			target: "dummy".to_owned(),
+			kind: CheckKind::Repo,
+		},
+		// Use the hipcheck repo as a dummy url until checking is de-coupled from `Session`.
+		"https://github.com/mitre/hipcheck.git",
+		config.config().map(ToOwned::to_owned),
+		config.data().map(ToOwned::to_owned),
+		config.cache().map(ToOwned::to_owned),
+		config.format(),
+		raw_version,
+	);
+
+	// Unwrap the session, get the weight tree and print it.
+	let session = session_result.map_err(|(_, err)| err)?;
+	let weight_tree = session.normalized_weight_tree()?;
+
+	// Create a special wrapper to override `Debug` so that we can use indextree's \
+	// debug pretty print function instead of writing our own.
+	struct PrintNode(String);
+
+	impl std::fmt::Debug for PrintNode {
+		fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+			f.write_str(self.0.as_ref())
+		}
+	}
+
+	// Struct to help us convert the tree to PrintNodes.
+	// This has to be a struct not a closure because we use a recursive function to convert the tree.
+	struct ConvertTree(Arena<PrintNode>);
+
+	impl ConvertTree {
+		fn convert_tree(&mut self, old_root: NodeId, old_arena: &Arena<WeightTreeNode>) -> NodeId {
+			// Get a reference to the old node.
+			let old_node = old_arena
+				.get(old_root)
+				.expect("root is present in old arena");
+
+			// Format the new node depending on whether there are any children.
+			let new_node = if old_root.children(old_arena).count() == 0 {
+				// If no children, include the weight product.
+				let weight_product = old_root
+					.ancestors(old_arena)
+					.map(|ancestor| old_arena.get(ancestor).unwrap().get().weight)
+					.product::<NotNan<f64>>();
+
+				// Format as percentage.
+				PrintNode(format!(
+					"{}: {:.2}%",
+					old_node.get().label,
+					weight_product * 100f64
+				))
+			} else {
+				PrintNode(old_node.get().label.clone())
+			};
+
+			// Add the new node to the new arena.
+			let new_root = self.0.new_node(new_node);
+
+			// Recursively add all children.
+			for child in old_root.children(old_arena) {
+				// Convert the child node and its subnodes.
+				let new_child_id = self.convert_tree(child, old_arena);
+
+				// Attach the child node and its tree as a child of this node.
+				new_root.append(new_child_id, &mut self.0);
+			}
+
+			// Return the new root's ID.
+			new_root
+		}
+	}
+
+	let mut print_tree = ConvertTree(Arena::with_capacity(weight_tree.tree.capacity()));
+	let print_root = print_tree.convert_tree(weight_tree.root, &weight_tree.tree);
+
+	// Print the output using indextree's debug pretty printer.
+	let output = print_root.debug_pretty_print(&print_tree.0);
+	println!("{output:?}");
+
+	Ok(())
 }
 
 /// Copy individual files in dir instead of entire dir, to avoid users accidentally

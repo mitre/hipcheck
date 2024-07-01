@@ -147,11 +147,12 @@ fn normalize_st_internal(node: NodeId, tree: &mut Arena<ScoreTreeNode>) -> f64 {
 }
 
 #[derive(Debug, Clone)]
-pub struct AltScoreTree {
+pub struct ScoreTree {
 	pub tree: Arena<ScoreTreeNode>,
 	pub root: NodeId,
 }
-impl AltScoreTree {
+
+impl ScoreTree {
 	pub fn new(root_label: &str) -> Self {
 		let mut tree = Arena::<ScoreTreeNode>::new();
 		let root = tree.new_node(ScoreTreeNode {
@@ -159,8 +160,9 @@ impl AltScoreTree {
 			score: -1.0,
 			weight: 1.0,
 		});
-		AltScoreTree { tree, root }
+		ScoreTree { tree, root }
 	}
+
 	pub fn add_child(&mut self, under: NodeId, label: &str, score: f64, weight: f64) -> NodeId {
 		let child = self.tree.new_node(ScoreTreeNode {
 			label: label.to_owned(),
@@ -170,10 +172,12 @@ impl AltScoreTree {
 		under.append(child, &mut self.tree);
 		child
 	}
+
 	pub fn normalize(mut self) -> Self {
 		let _ = normalize_st_internal(self.root, &mut self.tree);
 		self
 	}
+
 	// Given a weight tree and set of analysis results, produce an AltScoreTree by creating
 	// ScoreTreeNode objects for each analysis that was not skipped, and composing them into
 	// a tree structure matching that of the WeightTree
@@ -214,11 +218,12 @@ impl AltScoreTree {
 			};
 		}
 
-		Ok(AltScoreTree {
+		Ok(ScoreTree {
 			tree,
 			root: score_root,
 		})
 	}
+
 	// As our scope, we track the weight of each node. Once we get to a leaf node, we multiply all
 	// the weights (already normalized) by the score (0/1) then sum each value
 	pub fn score(&self) -> f64 {
@@ -465,7 +470,7 @@ pub fn score_results(phase: &mut Phase, db: &dyn ScoringProvider) -> Result<Scor
 		}
 	}
 
-	let alt_score_tree = AltScoreTree::synthesize(&weight_tree, &results)?;
+	let alt_score_tree = ScoreTree::synthesize(&weight_tree, &results)?;
 	score.total = alt_score_tree.score();
 
 	Ok(ScoringResults { results, score })
@@ -497,7 +502,7 @@ mod test {
 	#[test]
 	#[ignore = "test of tree scoring"]
 	fn test_graph1() {
-		let mut score_tree = AltScoreTree::new("risk");
+		let mut score_tree = ScoreTree::new("risk");
 		let core = score_tree.root;
 		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 10.0);
 		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 5.0);
@@ -527,7 +532,7 @@ mod test {
 	#[test]
 	#[ignore = "test2 of tree scoring"]
 	fn test_graph2() {
-		let mut score_tree = AltScoreTree::new("risk");
+		let mut score_tree = ScoreTree::new("risk");
 		let core = score_tree.root;
 		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 10.0);
 		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 4.0);
@@ -553,7 +558,7 @@ mod test {
 	#[test]
 	#[ignore = "test3 of tree scoring"]
 	fn test_graph3() {
-		let mut score_tree = AltScoreTree::new("risk");
+		let mut score_tree = ScoreTree::new("risk");
 		let core = score_tree.root;
 		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 33.0);
 		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 10.0);
@@ -580,7 +585,7 @@ mod test {
 	#[test]
 	#[ignore = "test4 of tree scoring"]
 	fn test_graph4() {
-		let mut score_tree = AltScoreTree::new("risk");
+		let mut score_tree = ScoreTree::new("risk");
 		let core = score_tree.root;
 		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 40.0);
 		let review = score_tree.add_child(practices, REVIEW_PHASE, 0.0, 12.0);
