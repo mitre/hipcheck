@@ -48,6 +48,7 @@ jobs:
           chmod +x tailwindcss-linux-x64
           mv tailwindcss-linux-x64 tailwindcss
           mkdir -p "${HOME}/.local/bin"
+          mv tailwindcss "${HOME}/.local/bin/tailwindcss"
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
       # Setup GitHub Pages
