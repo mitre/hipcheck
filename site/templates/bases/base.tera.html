@@ -9,14 +9,14 @@
         <script type="importmap">
           {
             "imports": {
-              "theme": "/js/theme.mjs"
+              "theme": "{{ get_url(path="js/theme.mjs") }}"
             }
           }
         </script>
-        <script rel="modulepreloaded" type="module" src="/js/load-theme.mjs"></script>
+        <script rel="modulepreloaded" type="module" src="{{ get_url(path="js/load-theme.mjs") }}"></script>
 
         <link href="https://rsms.me/inter/inter.css" rel="stylesheet">
-        <link href="/main.css" rel="stylesheet">
+        <link href="{{ get_url(path="main.css") }}" rel="stylesheet">
         <title>{% block title %}Hipcheck{% endblock %}</title>
     </head>
     <body class="bg-white dark:bg-zinc-900">
@@ -50,6 +50,6 @@
             {% include "partials/footer.tera.html" %}
         </div>
 
-        <script rel="modulepreloaded" type="module" src="/js/setup-theme-toggle.mjs"></script>
+        <script rel="modulepreloaded" type="module" src="{{ get_url(path="js/setup-theme-toggle.mjs") }}"></script>
     </body>
 </html>
