@@ -69,7 +69,7 @@ which = { version = "6.0.1", default-features = false }
 xml-rs = "0.8.20"
 rayon = "1.10.0"
 indexmap = "2.2.6"
-dashmap = { version = "5.5.3", features = ["rayon", "inline"] }
+dashmap = { version = "6.0.1", features = ["rayon", "inline"] }
 git2 = "0.19.0"
 indicatif = { version = "0.17.8", features = ["rayon"] }
 finl_unicode = { version = "1.2.0", default-features = false, features = [
