@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::workspace;
+use crate::SiteEnvironment;
+use crate::SiteServeArgs;
 use anyhow::anyhow;
 use anyhow::Context;
 use anyhow::Result;
@@ -25,14 +27,21 @@ macro_rules! cmd {
 }
 
 /// Execute the `site serve` task.
-pub fn run() -> Result<()> {
+pub fn run(args: SiteServeArgs) -> Result<()> {
 	// Check our dependencies.
 	which::which("tailwindcss").context("`site serve` requires `tailwindcss` to be installed")?;
 	which::which("zola").context("`site serve` requires `zola` to be installed")?;
 
+	// When building for a dev environment, specify the base_url explicitly.
+	// Otherwise use the default one from the Zola configuration.
+	let base_url = match args.env() {
+		SiteEnvironment::Dev => Some("--base-url localhost"),
+		SiteEnvironment::Prod => None,
+	};
+
 	// Start the subcommands.
 	let handles = vec![
-		spawn(cmd!("zola serve")),
+		spawn(cmd!("zola serve {base_url...}")),
 		spawn(cmd!(
 			"tailwindcss -i styles/main.css -o public/main.css --watch=always"
 		)),
