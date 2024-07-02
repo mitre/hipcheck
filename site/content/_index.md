@@ -1,7 +1,3 @@
 ---
 title: Hipcheck
 ---
-
-# Homepage
-
-Test

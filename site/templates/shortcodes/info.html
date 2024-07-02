@@ -1,5 +1,5 @@
 
-<div class="bg-zinc-200 dark:bg-zinc-800 rounded-lg p-4">
-    <span class="font-semibold mb-2 block">Info</span>
-    {{ body }}
+<div class="bg-slate-100 my-12 dark:bg-gray-800 border border-dashed border-slate-400 rounded-lg px-6 py-6 pb-0">
+    <span class="font-semibold mb-2 block">Info{% if title %}: {{ title }}{% endif %}</span>
+    {{ body | markdown | safe }}
 </div>
