@@ -137,6 +137,33 @@ release.
 
 ### Using Docker Hub
 
+Hipcheck publishes container images to Docker Hub under the [`mitre/hipcheck`
+namespace](https://hub.docker.com/r/mitre/hipcheck). In general, we maintain a
+`latest` tag which _always_ refers to the most-recently published version, as
+well as tags for each individual version.
 
+You can use these with Docker by default, or with any other container system
+which you have configured to be able to pull container images from Docker Hub.
+
+For example, to run a short-lived container with Docker using the most recent
+Hipcheck image, you might run:
+
+```sh
+$ docker run mitre/hipcheck:latest
+```
 
 ### Using the `Containerfile` Directly
+
+You can also run Hipcheck from the local `Containerfile`, first by building
+the image, and then by running that image. For example, with Docker:
+
+To do this you will need Git to get a local copy of the repository, or to
+download the repository contents from GitHub without the Git history.
+
+```sh
+$ git clone https://github.com/mitre/hipcheck
+$ cd hipcheck
+$ docker build -f Containerfile .
+```
+
+This will build the image, which you can then use normally.
