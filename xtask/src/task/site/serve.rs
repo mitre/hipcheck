@@ -15,12 +15,7 @@ macro_rules! cmd {
 		move || {
 			let sh = Shell::new()?;
 			sh.change_dir(pathbuf![&workspace::root()?, "site"]);
-			xshell::cmd!(sh, $cmd)
-				.quiet()
-				// Really, truly be quiet.
-				.ignore_stdout()
-				.ignore_stderr()
-				.run()?;
+			xshell::cmd!(sh, $cmd).quiet().run()?;
 			Ok::<(), anyhow::Error>(())
 		}
 	};
@@ -35,16 +30,19 @@ pub fn run(args: SiteServeArgs) -> Result<()> {
 	// When building for a dev environment, specify the base_url explicitly.
 	// Otherwise use the default one from the Zola configuration.
 	let base_url = match args.env() {
-		SiteEnvironment::Dev => Some("--base-url localhost"),
-		SiteEnvironment::Prod => None,
+		SiteEnvironment::Dev => &["--base-url", "localhost"][..],
+		SiteEnvironment::Prod => &[],
 	};
 
 	// Start the subcommands.
 	let handles = vec![
-		spawn(cmd!("zola serve {base_url...}")),
-		spawn(cmd!(
-			"tailwindcss -i styles/main.css -o public/main.css --watch=always"
-		)),
+		("zola", spawn(cmd!("zola serve {base_url...}"))),
+		(
+			"tailwind",
+			spawn(cmd!(
+				"tailwindcss -i styles/main.css -o public/main.css --watch=always"
+			)),
+		),
 	];
 
 	// Let the user know the site is up.
@@ -53,10 +51,13 @@ pub fn run(args: SiteServeArgs) -> Result<()> {
 	// Wait for the subcommands and report errors.
 	let mut error = false;
 	for handle in handles {
-		match handle.join() {
+		match handle.1.join() {
 			Ok(Ok(_)) => {}
 			Ok(Err(err)) => {
-				log::error!("{}", err);
+				for err in err.chain() {
+					log::error!("{}: {}", handle.0, err);
+				}
+
 				error = true;
 			}
 			Err(_) => {

@@ -5,7 +5,7 @@ const defaultTheme = require("tailwindcss/defaultTheme");
 module.exports = {
   // Track the template files for the purpose of selecting
   // what CSS is actually used.
-  content: ["./templates/**/*.html"],
+  content: ["./templates/**/*.html", "./public/**/*.html", "./content/**/*.md"],
   theme: {
     extend: {
       fontFamily: {
@@ -14,7 +14,7 @@ module.exports = {
         sans: ['"Inter"', ...defaultTheme.fontFamily.sans],
       },
       backgroundImage: {
-        body: "url('/img/bg.png')",
+        homepage: "url('/images/homepage-bg.png')",
       },
     },
   },

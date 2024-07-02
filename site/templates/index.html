@@ -15,5 +15,86 @@
 {% block breadcrumbs %}{% endblock %}
 
 {% block content %}
-    {{ section.content | safe }}
+    <h2 class="text-6xl relative z-20">
+        Automatically assess
+        <span class="bg-gradient-to-r from-blue-600 via-cyan-600 to-green-600 text-transparent bg-clip-text">software&nbsp;packages</span>
+        for
+        <span class="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 text-transparent bg-clip-text">supply&nbsp;chain&nbsp;risk</span >
+    </h2>
+
+    <p class="relative z-20 max-w-[92.5%]">Hipcheck is a tool for analyzing software packages from hosts like NPM, PyPI, and Maven, and source repositories like GitHub, GitLab, Sourcehut, and more. It assesses the <em>practices</em> a project follows for building their software, and tries to detect active supply chain <em>attacks</em> as well.</p >
+    <p class="relative z-20 max-w-[92.5%]">Use Hipcheck to filter hundreds of dependencies to just a few you can manually review!</p >
+
+    <a class="
+        relative z-20
+        inline-block
+        font-semibold
+        px-4 py-3
+        no-underline
+        bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800
+        border border-gray-300 dark:border-gray-700
+        rounded-lg
+        mr-4 mt-8
+        top-[-1px]
+    " href="/docs">{{ ic::icon(name="book-open", classes="mt-[-2px] ml-[-4px] mr-1") }}  Read the Docs</a>
+
+    <a class="
+        relative z-20
+        inline-block
+        font-semibold
+        px-4 py-3
+        no-underline
+        bg-blue-600 hover:bg-green-500 hover:from-green-100
+        text-blue-50 hover:text-green-50
+        rounded-lg
+    " href="/install">Try Hipcheck! {{ ic::icon(name="arrow-down", classes="mt-[-2px] mr-[-4px] mr-1") }} </a>
+{% endblock %}
+
+{% block sidebar %}
+    <img class="block rounded-md p-4 bg-[#eff1f5] z-10 -mt-2 -ml-[5.333rem] absolute w-[28rem]" src="/images/homepage-bg.png">
+{% endblock %}
+
+{% block extra %}
+    <div class="mt-36 pt-16 border-t border-gray-100 dark:border-gray-700">
+        <h2 class="text-2xl font-bold mb-8 dark:text-gray-200">Simplify using Open Source Software</h2>
+
+        <div class="grid gap-4 grid-cols-3">
+            <div class="border border-gray-100 dark:border-gray-700 rounded-md p-6">
+                <div class="flex items-start">
+                    <div class="mr-4">
+                        {{ ic::icon(name="info", classes="-mt-1 text-blue-500") }}
+                    </div >
+                    <div class="flex-1 dark:text-gray-200">
+                        <h3 class="mb-4 font-semibold">Identify High Risk Dependencies</h3>
+                        <p class="text-sm">Audit a project&rsquo;s development practices, like code review, fuzz testing, and active maintenance, automatically!</p>
+                        <p class="mt-4 text-sm"><a class="font-semibold text-blue-500 hover:text-blue-700" href="/docs/analyses">Learn about Hipcheck&rsquo;s analyses &rarr;</a ></p>
+                    </div>
+                </div>
+            </div>
+            <div class="border border-gray-100 dark:border-gray-700 rounded-md p-6">
+                <div class="flex items-start">
+                    <div class="mr-4">
+                        {{ ic::icon(name="settings", classes="-mt-1 text-blue-500") }}
+                    </div >
+                    <div class="flex-1 dark:text-gray-200">
+                        <h3 class="mb-4 font-semibold">Configure Analyses You Care About</h3>
+                        <p class="text-sm">Keep only the analyses that matter to you, change how they contribute to scoring, and how much risk you&rsquo;re willing to tolerate.</p>
+                        <p class="mt-4 text-sm"><a class="font-semibold text-blue-500 hover:text-blue-700" href="/docs/analyses">Learn about configuring Hipcheck &rarr;</a ></p>
+                    </div>
+                </div>
+            </div>
+            <div class="border border-gray-100 dark:border-gray-700 rounded-md p-6">
+                <div class="flex items-start">
+                    <div class="mr-4">
+                        {{ ic::icon(name="package", classes="-mt-1 text-blue-500") }}
+                    </div >
+                    <div class="flex-1 dark:text-gray-200">
+                        <h3 class="mb-4 font-semibold">Make Dependencies Manageable</h3 >
+                        <p class="text-sm">Many software projects use hundreds of open source dependencies! Filter that list to something manageable with Hipcheck</p>
+                        <p class="mt-4 text-sm"><a class="font-semibold text-blue-500 hover:text-blue-700" href="/docs/analyses">Learn about using Hipcheck &rarr;</a ></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
