@@ -1,8 +1,8 @@
 #============================================================================
 # Builder Layer
 
-# Use a slim Rust/Alpine image for build tooling.
-FROM rust:1.79.0-alpine3.20 AS builder
+# Use a slim Rust/Debian image for build tooling.
+FROM rust:1.79.0-slim-bookworm AS builder
 
 # Set the working directory.
 WORKDIR /build
@@ -24,17 +24,17 @@ COPY Cargo.toml Cargo.lock ./
 #    -o pipefail: Pipelines return the status of the last command to exit
 #                 with a non-zero status, or zero.
 # 2) Setup the packages we'll need for our build:
-#    - musl-dev:    Needed to build some C code we rely on.
+#    - build-essential: includes make, to build openssl
+#    - perl-base: perl is also needed to build openssl
 # 3) Build Hipcheck in release configuration.
-RUN set -eux -o pipefail; \
-    apk add --no-cache musl-dev; \
+RUN set -eux; \
+    apt-get install -y build-essential perl-base; \
     cargo build --release
 
 #============================================================================
 # App Layer
 
-# Use an Alpine image so our final container is small.
-FROM alpine:3.20 AS app
+FROM debian:bookworm-slim AS app
 
 # Set the working directory.
 WORKDIR /app
@@ -44,7 +44,7 @@ WORKDIR /app
 # 1) The Hipcheck binary.
 # 2) The Hipcheck configuration.
 # 3) The Hipcheck scripts.
-COPY --from=builder /build/.target/release/hc ./hc
+COPY --from=builder /build/target/release/hc ./hc
 COPY config/ config/
 COPY scripts/ scripts/
 
@@ -55,8 +55,8 @@ COPY scripts/ scripts/
 #    - npm:         Used by Hipcheck to analyze JavaScript code.
 #    - git:         Used by Hipcheck to collect repository data.
 # 3) Add a user `hc_user` which will be set to run Hipcheck.
-RUN set -eux -o pipefail; \
-    apk add --no-cache npm git; \
+RUN set -eux; \
+    apt-get install -y npm git; \
     npm install -g module-deps@6.2 --no-audit --no-fund; \
     adduser --disabled-password hc_user && chown -R hc_user /app
 
