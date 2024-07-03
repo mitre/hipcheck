@@ -70,7 +70,8 @@ xml-rs = "0.8.20"
 rayon = "1.10.0"
 indexmap = "2.2.6"
 dashmap = { version = "6.0.1", features = ["rayon", "inline"] }
-git2 = "0.19.0"
+# Vendor libgit2 and openssl so that they will be statically included and not cause problems on certain systems that might not have one or the other. 
+git2 = { version = "0.19.0", features = ["vendored-libgit2", "vendored-openssl"]}
 indicatif = { version = "0.17.8", features = ["rayon"] }
 finl_unicode = { version = "1.2.0", default-features = false, features = [
     "grapheme_clusters",
