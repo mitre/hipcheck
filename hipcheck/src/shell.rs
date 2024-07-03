@@ -129,6 +129,8 @@ pub mod prelude;
 pub mod progress_phase;
 pub mod iter;
 pub mod par_iter;
+pub mod term;
+pub mod macros;
 
 /// Global static shell instance, stored in a [`OnceLock`] to make it thread safe and lazy. 
 static GLOBAL_SHELL: OnceLock<Shell> = OnceLock::new();
@@ -170,8 +172,7 @@ impl Shell {
 		}
 
 		GLOBAL_SHELL.get_or_init(move || {
-			Shell { 
-				progress_bars: MultiProgress::new(), verbosity: RwLock::new(verbosity)  }
+			Shell { progress_bars: MultiProgress::new(), verbosity: RwLock::new(verbosity)  }
 		});
 	}
 
@@ -188,6 +189,11 @@ impl Shell {
 
 	/// Update the verbosity of the global shell.  
 	pub fn set_verbosity(verbosity: Verbosity) {
+		// If the verbosity is "silent", hide all progress bars.
+		if verbosity == Verbosity::Silent {
+			Shell::get().progress_bars.
+		}
+
 		let mut write_guard = Self::get()
 			.verbosity
 			.write()
@@ -507,35 +513,6 @@ impl Shell {
 
 
 }
-
-/// Macros that mirror/replace those from the standard library using the global [`Shell`][crate::shell::Shell].
-mod macros {
-	macro_rules! println {
-		($($arg:tt)+) => {
-			$crate::shell::Shell::println(format!($($arg)*));
-		};
-
-		() => {
-			$crate::shell::Shell::println("");
-		}
-	}
-
-	// public re-export
-	pub(super) use println;
-
-	macro_rules! eprintln {
-		($($arg:tt)+) => {
-			$crate::shell::Shell::eprintln(format!($($arg)*));
-		};
-
-		() => {
-			$crate::shell::Shell::eprintln("");
-		}
-	}
-
-	pub(super) use eprintln;
-}
-
 
 /// The "title" of a message; may be accompanied by a timestamp or outcome.
 #[derive(Debug)]

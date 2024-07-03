@@ -49,7 +49,7 @@ impl SpinnerPhase {
         Shell::progress_bars().add(bar.clone());
 
         // Return phase object. 
-        Self { name, bar}
+        Self { name, bar }
     }
 
     /// Get the elapsed time since this bar was created. 

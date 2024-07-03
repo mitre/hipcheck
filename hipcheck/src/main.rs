@@ -88,7 +88,8 @@ fn main() -> ExitCode {
 	Shell::init(Verbosity::Normal);
 	// Initialize logging. 
 	// This must be done after shell initialization. 
-	init_logging();
+	// Panic if this fails. 
+	init_logging().unwrap();
 
 	// Install a process-wide default crypto provider.
 	CryptoProvider::install_default(ring::default_provider())
@@ -183,14 +184,12 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	// Get the raw hipcheck version.
 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 
+	// Set the global verbosity to silent so that we don't print phases/progress while downloading 
+	// the dummy repo.
+	Shell::set_verbosity(Verbosity::Silent);
+
 	// Create a dummy session to query the salsa database for a weight graph for printing.
-	let session_result = Session::new(
-		// Use a sink output here since we just want to print the tree and not the shell prelude or anything else.
-		Shell::new(
-			Output::sink(),
-			Output::stdout(shell::ColorChoice::Auto),
-			Verbosity::Normal,
-		),
+	let session = Session::new(
 		&Check {
 			target: "dummy".to_owned(),
 			kind: CheckKind::Repo,
@@ -202,10 +201,9 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		config.cache().map(ToOwned::to_owned),
 		config.format(),
 		raw_version,
-	);
+	)?;
 
-	// Unwrap the session, get the weight tree and print it.
-	let session = session_result.map_err(|(_, err)| err)?;
+	// Get the weight tree and print it.
 	let weight_tree = session.normalized_weight_tree()?;
 
 	// Create a special wrapper to override `Debug` so that we can use indextree's \
@@ -817,61 +815,25 @@ fn run(
 		TargetKind::RepoSource | TargetKind::SpdxDocument => {
 			// Run analyses against a repo and score the results (score calls analyses that call metrics).
 			let phase = SpinnerPhase::start("analyzing and scoring results");
-
-			let scoring = match score_results(&phase, &session) {
-				Ok(scoring) => scoring,
-				Err(x) => {
-					return (
-						session.end(),
-						Err(x), // Error::msg("Trouble scoring and analyzing results")),
-					);
-				}
-			};
-
-			match phase.finish() {
-				Ok(()) => {}
-				Err(err) => return (session.end(), Err(err)),
-			};
+			let scoring = score_results(&phase, &session)?;
+			phase.finish_successful();
 
 			// Build the final report.
-			let report =
-				match build_report(&session, &scoring).context("failed to build final report") {
-					Ok(report) => report,
-					Err(err) => return (session.end(), Err(err)),
-				};
+			let report = build_report(&session, &scoring).context("failed to build final report")?;
 
-			(session.end(), Ok(AnyReport::Report(report)))
+			Ok(AnyReport::Report(report))
 		}
+
 		TargetKind::PackageVersion => {
 			// Run analyses against a repo and score the results (score calls analyses that call metrics).
-			let mut phase = match session.shell.phase("analyzing and scoring results") {
-				Ok(phase) => phase,
-				Err(err) => return (session.end(), Err(err)),
-			};
-
-			let scoring = match score_results(&mut phase, &session) {
-				Ok(scoring) => scoring,
-				_ => {
-					return (
-						session.end(),
-						Err(Error::msg("Trouble scoring and analyzing results")),
-					)
-				}
-			};
-
-			match phase.finish() {
-				Ok(()) => {}
-				Err(err) => return (session.end(), Err(err)),
-			};
+			let phase = SpinnerPhase::start("analyzing and scoring results");
+			let scoring = score_results(&phase, &session)?;
+			phase.finish_successful();
 
 			// Build the final report.
-			let report =
-				match build_report(&session, &scoring).context("failed to build final report") {
-					Ok(report) => report,
-					Err(err) => return (session.end(), Err(err)),
-				};
+			let report = build_report(&session, &scoring).context("failed to build final report")?;
 
-			(session.end(), Ok(AnyReport::Report(report)))
+			Ok(AnyReport::Report(report))
 		}
 	}
 }
