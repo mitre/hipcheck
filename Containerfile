@@ -29,6 +29,7 @@ COPY Cargo.toml Cargo.lock ./
 # 3) Build Hipcheck in release configuration.
 RUN set -eux; \
     apt-get install -y build-essential perl-base; \
+    apt-get clean; \
     cargo build --release
 
 #============================================================================
@@ -57,6 +58,7 @@ COPY scripts/ scripts/
 # 3) Add a user `hc_user` which will be set to run Hipcheck.
 RUN set -eux; \
     apt-get install -y npm git; \
+    apt-get clean; \
     npm install -g module-deps@6.2 --no-audit --no-fund; \
     adduser --disabled-password hc_user && chown -R hc_user /app
 
