@@ -144,8 +144,11 @@ const ERROR_ESCLAMATION: Emoji = Emoji("❗", "!!!!");
 /// The color used to print the prelude. 
 const PRELUDE_COLOR: Color = Color::Cyan;
 
-/// The default width of the left column when printing errors/reports/etc. 
-const LEFT_COL_DEFAULT_WIDTH: usize = 20;
+// The color used to print "Analyzed" in reports. 
+const ANALYZED_COLOR: Color = Color::Blue;
+
+/// The width of the left column when printing errors/reports/etc. 
+const LEFT_COL_WIDTH: usize = 20;
 
 /// Empty static string used for drawing padding. 
 const EMPTY: &'static str = "";
@@ -280,11 +283,11 @@ impl Shell {
 
 	/// Print "Analysing {source}" with the proper color/styling. 
 	pub fn print_prelude(source: impl AsRef<str>) {
-		macros::println!("{:>LEFT_COL_DEFAULT_WIDTH$} {}", style("Analyzing").fg(PRELUDE_COLOR).bold(), source.as_ref());
+		macros::println!("{:>LEFT_COL_WIDTH$} {}", style("Analyzing").fg(PRELUDE_COLOR).bold(), source.as_ref());
 	}
 
 	/// Print a hipcheck [Error]. Human readable errors will go to the standard error, JSON will go to the standard output.
-	pub fn print_error(err: &Error, format: Format) -> Result<()> {
+	pub fn print_error(err: &Error, format: Format) {
 		match format {
 			Format::Human => {
 				// Print the root error -- the first in the chain should not be none. 
@@ -293,13 +296,11 @@ impl Shell {
 				
 				// Print remaining errors in chain. 
 				for err in chain {
-					macros::eprintln!("{EMPTY:LEFT_COL_DEFAULT_WIDTH$}{}", err);
+					macros::eprintln!("{EMPTY:LEFT_COL_WIDTH$}{}", err);
 				}
 
 				// Print an extra newline at the end to separate error printing from other stuff. 
 				macros::eprintln!();
-
-				Ok(())
 			},
 
 			Format::Json => {
@@ -323,17 +324,187 @@ impl Shell {
 				// Suspend the progress bars to print the JSON. 
 				Shell::in_suspend(|| {
 					let mut stdout = Term::buffered_stdout();
-					serde_json::to_writer_pretty(&mut stdout, &error_json)?;
-					writeln!(&mut stdout)?;
-					stdout.flush()?;
+					
+					serde_json::to_writer_pretty(&mut stdout, &error_json)
+						.expect("Wrote JSON to standard output.");
 
-					Ok(())
-				})
+					writeln!(&mut stdout).expect("wrote newline to standard out");
+					stdout.flush().expect("flushed standard out");
+				});
 			}
 		}	
 	}
 
-	
+	/// Print the final repo report in the requested format to the standard output. 
+	pub fn print_report(report: Report, format: Format) -> Result<()> {
+		match format {
+			// Print JSON report.
+			Format::Json => {
+				// Suspend the shell to print the JSON report. 
+				Shell::in_suspend(|| {
+					let mut stdout = Term::stdout();
+					serde_json::to_writer_pretty(&mut stdout, &report)?;
+					stdout.flush()?;
+					Ok(())
+				})
+			},
+
+			// Human formatted report. 
+			Format::Human => {
+				// Go through each part and print them individually.
+
+				//      Analyzed '<repo_name>' (<repo_head>)
+				//               using Hipcheck <hipcheck_version>
+				//               at <analyzed_at:pretty_print>
+				//
+				//       Passing
+				//            + no concerning contributors
+				//               0 found, 0 permitted
+				//            + no unusually large commits
+				//               0% of commits are unusually large, 2% permitted
+				//            + commits usually merged by someone other than the author
+				//               0% of commits merged by author, 20% permitted
+				//
+				//       Failing
+				//            - too many unusual-looking commits
+				//               1% of commits look unusual, 0% permitted
+				//               entropy scores over 3.0 are considered unusual
+				//
+				//              356828346723752 "fixing something" (entropy score: 5.4)
+				//              abab563268c3543 "adding a new block" (entropy score: 3.2)
+				//
+				//           - hasn't been updated in 136 weeks
+				//              require updates in the last 71 weeks
+				//
+				//        Errored
+				//           ? review analysis failed to get pull request reviews
+				//              cause: missing GitHub token with permissions for accessing public repository data in config
+				//           ? typo analysis failed to get dependencies
+				//              cause: can't identify a known language in the repository
+				//
+				// Recommendation
+				//           PASS risk rated as 0.4 (acceptable below 0.5)
+
+				/*===============================================================================
+				 * Header
+				 *
+				 * Says what we're analyzing, what version of Hipcheck we're using, and when
+				 * we're doing the analysis.
+				 */
+
+				// Start with an empty line.
+				macros::println!();
+				// What repo we analyzed.
+				macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Analyzed, report.analyzed());
+				// With what version of hipcheck. 
+				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.using());
+				// At what time.
+				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.at_time());
+
+				// out!(self, &mut output.out, {
+				// 	m!(#nothing);
+				// 	m!(#title_analyzed &report.analyzed());
+				// 	m!(#more &report.using());
+				// 	m!(#more &report.at_time());
+				// 	m!(#report_nothing);
+				// });
+
+				/*===============================================================================
+				 * Passing analyses
+				 *
+				 * Says what analyses passed and why.
+				 */
+
+				if report.has_passing_analyses() {
+					macros::println!("{:>LEFT_COL_WIDTH$}", Title::Passed);
+
+				}
+
+				unimplemented!();
+
+				/* 
+				if report.has_passing_analyses() {
+					out!(self, &mut output.out, m!(#title_passing));
+
+					for analysis in report.passing_analyses() {
+						out!(self, &mut output.out, {
+							m!(#analysis_passed [encoded_as: self.encoding] &analysis.statement());
+							m!(#analysis_explanation &analysis.explanation());
+							m!(#report_nothing);
+						});
+					}
+				}
+
+				/*===============================================================================
+				 * Failing analyses
+				 *
+				 * Says what analyses failed, why, and what information might be relevant to
+				 * check in detail.
+				 */
+
+				if report.has_failing_analyses() {
+					out!(self, &mut output.out, m!(#title_failing));
+
+					for failing_analysis in report.failing_analyses() {
+						let analysis = failing_analysis.analysis();
+
+						out!(self, &mut output.out, {
+							m!(#analysis_failed [encoded_as: self.encoding] &analysis.statement());
+							m!(#analysis_explanation &analysis.explanation());
+						});
+
+						for concern in failing_analysis.concerns() {
+							out!(self, &mut output.out, m!(#more &concern.description()));
+						}
+
+						out!(self, &mut output.out, m!(#report_nothing));
+					}
+				}
+
+				/*===============================================================================
+				 * Errored analyses
+				 *
+				 * Says what analyses encountered errors and what those errors were.
+				 */
+
+				if report.has_errored_analyses() {
+					out!(self, &mut output.out, m!(#title_errored));
+
+					for errored_analysis in report.errored_analyses() {
+						out!(
+							self,
+							&mut output.out,
+							m!(#analysis_errored &errored_analysis.top_msg())
+						);
+
+						for msg in &errored_analysis.source_msgs() {
+							out!(self, &mut output.out, m!(#more msg));
+						}
+
+						out!(self, &mut output.out, m!(#report_nothing));
+					}
+				}
+
+				/*===============================================================================
+				 * Recommendation
+				 *
+				 * Says what Hipcheck's final recommendation is for the target of analysis.
+				 */
+
+				let recommendation = report.recommendation();
+
+				out!(self, &mut output.out, {
+					m!(#title_recommendation);
+					m!(#recommendation [kind: recommendation.kind] &recommendation.statement());
+					m!(#report_nothing);
+				});
+				*/
+
+				Ok(())
+			}
+		}}
+
+
 
 }
 
@@ -363,6 +534,87 @@ mod macros {
 	}
 
 	pub(super) use eprintln;
+}
+
+
+/// The "title" of a message; may be accompanied by a timestamp or outcome.
+#[derive(Debug)]
+enum Title {
+	/// "Analyzing"
+	Analyzing,
+	/// "Analyzed"
+	Analyzed,
+	// /// The name of the section.
+	// Section(&'a str),
+	/// An analysis passed.
+	Passed,
+	/// An analysis failed.
+	Failed,
+	/// An analysis errored out.
+	Errored,
+	/// "In Progress"
+	InProgress,
+	/// "Done"
+	Done,
+	/// "Done" (with a timestamp attached)
+	TimestampedDone,
+	/// "PASS"
+	Pass,
+	/// "INVESTIGATE"
+	Investigate,
+	/// "Error"
+	Error,
+	/// No title, used when you need the spacing but no text.
+	Empty,
+}
+
+impl Title {
+	const fn text(&self) -> &str {
+		use Title::*;
+
+		match self {
+			Analyzing => "Analyzing",
+			Analyzed => "Analyzed",
+			// Section(s) => s,
+			Passed => "+",
+			Failed => "-",
+			Errored => "?",
+			InProgress => "In Progress",
+			Done | TimestampedDone => "Done",
+			Pass => "PASS",
+			Investigate => "INVESTIGATE",
+			Error => "Error",
+			Empty => "",
+		}
+	}
+
+	fn style(&self) -> Style {
+		use Title::*;
+		use console::Color::*;
+
+		let color = match self {
+			Analyzed /* | Section(..) */ => Some(Blue),
+			Analyzing | Done | TimestampedDone => Some(Cyan),
+			InProgress => Some(Magenta),
+			Passed | Pass => Some(Green),
+			Failed | Investigate => Some(Red),
+			Errored => Some(Yellow),
+			Error => Some(Red),
+			Empty => None,
+		};
+
+		match color {
+			Some(c) => Style::new().fg(c).bold(),
+			None => Style::new()
+		}
+	}
+}
+
+
+impl Display for Title {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.style().apply_to(self.text()))
+	}
 }
 
 // /// Maximum width of a title
@@ -677,149 +929,6 @@ impl ShellInner {
 	fn finish_status(&mut self, msg: &str, elapsed: Option<Duration>) -> Result<()> {
 		Ok(pm!(@update self, m!(#finish [elapsed: elapsed] msg)))
 	}
-
-	/// Print the final repo report in the requested format.
-	/// Instead of printing to the Shell's own output or error_output,
-	/// this method takes a caller-provided Output to print to.
-	fn report(&mut self, output: &mut Output, report: Report, format: Format) -> Result<()> {
-		match format {
-			Format::Json => Ok(out!(self, &mut output.out, m!(#report_json report))),
-			Format::Human => {
-				// Go through each part and print them individually.
-
-				//      Analyzed '<repo_name>' (<repo_head>)
-				//               using Hipcheck <hipcheck_version>
-				//               at <analyzed_at:pretty_print>
-				//
-				//       Passing
-				//            + no concerning contributors
-				//               0 found, 0 permitted
-				//            + no unusually large commits
-				//               0% of commits are unusually large, 2% permitted
-				//            + commits usually merged by someone other than the author
-				//               0% of commits merged by author, 20% permitted
-				//
-				//       Failing
-				//            - too many unusual-looking commits
-				//               1% of commits look unusual, 0% permitted
-				//               entropy scores over 3.0 are considered unusual
-				//
-				//              356828346723752 "fixing something" (entropy score: 5.4)
-				//              abab563268c3543 "adding a new block" (entropy score: 3.2)
-				//
-				//           - hasn't been updated in 136 weeks
-				//              require updates in the last 71 weeks
-				//
-				//        Errored
-				//           ? review analysis failed to get pull request reviews
-				//              cause: missing GitHub token with permissions for accessing public repository data in config
-				//           ? typo analysis failed to get dependencies
-				//              cause: can't identify a known language in the repository
-				//
-				// Recommendation
-				//           PASS risk rated as 0.4 (acceptable below 0.5)
-
-				/*===============================================================================
-				 * Header
-				 *
-				 * Says what we're analyzing, what version of Hipcheck we're using, and when
-				 * we're doing the analysis.
-				 */
-
-				out!(self, &mut output.out, {
-					m!(#nothing);
-					m!(#title_analyzed &report.analyzed());
-					m!(#more &report.using());
-					m!(#more &report.at_time());
-					m!(#report_nothing);
-				});
-
-				/*===============================================================================
-				 * Passing analyses
-				 *
-				 * Says what analyses passed and why.
-				 */
-
-				if report.has_passing_analyses() {
-					out!(self, &mut output.out, m!(#title_passing));
-
-					for analysis in report.passing_analyses() {
-						out!(self, &mut output.out, {
-							m!(#analysis_passed [encoded_as: self.encoding] &analysis.statement());
-							m!(#analysis_explanation &analysis.explanation());
-							m!(#report_nothing);
-						});
-					}
-				}
-
-				/*===============================================================================
-				 * Failing analyses
-				 *
-				 * Says what analyses failed, why, and what information might be relevant to
-				 * check in detail.
-				 */
-
-				if report.has_failing_analyses() {
-					out!(self, &mut output.out, m!(#title_failing));
-
-					for failing_analysis in report.failing_analyses() {
-						let analysis = failing_analysis.analysis();
-
-						out!(self, &mut output.out, {
-							m!(#analysis_failed [encoded_as: self.encoding] &analysis.statement());
-							m!(#analysis_explanation &analysis.explanation());
-						});
-
-						for concern in failing_analysis.concerns() {
-							out!(self, &mut output.out, m!(#more &concern.description()));
-						}
-
-						out!(self, &mut output.out, m!(#report_nothing));
-					}
-				}
-
-				/*===============================================================================
-				 * Errored analyses
-				 *
-				 * Says what analyses encountered errors and what those errors were.
-				 */
-
-				if report.has_errored_analyses() {
-					out!(self, &mut output.out, m!(#title_errored));
-
-					for errored_analysis in report.errored_analyses() {
-						out!(
-							self,
-							&mut output.out,
-							m!(#analysis_errored &errored_analysis.top_msg())
-						);
-
-						for msg in &errored_analysis.source_msgs() {
-							out!(self, &mut output.out, m!(#more msg));
-						}
-
-						out!(self, &mut output.out, m!(#report_nothing));
-					}
-				}
-
-				/*===============================================================================
-				 * Recommendation
-				 *
-				 * Says what Hipcheck's final recommendation is for the target of analysis.
-				 */
-
-				let recommendation = report.recommendation();
-
-				out!(self, &mut output.out, {
-					m!(#title_recommendation);
-					m!(#recommendation [kind: recommendation.kind] &recommendation.statement());
-					m!(#report_nothing);
-				});
-
-				Ok(())
-			}
-		}
-	}
 }
 
 /// A handle for outputting progress in a single phase of work.
@@ -1095,15 +1204,6 @@ fn print_str(msg: &str, stream: &mut dyn WriteColor) -> Result<()> {
 	let to_write = format!(" {}\r", msg);
 	log::trace!("writing message part [part='{:?}']", to_write);
 	write!(stream, "{}", to_write)?;
-	stream.flush()?;
-	Ok(())
-}
-
-/// Print (prettily) a JSON value to the stream for a repo.
-fn print_report_json(report: Report, stream: &mut dyn WriteColor) -> Result<()> {
-	stream.reset()?;
-	log::trace!("writing message part [part='{:?}']", report);
-	serde_json::to_writer_pretty(&mut *stream, &report)?;
 	stream.flush()?;
 	Ok(())
 }

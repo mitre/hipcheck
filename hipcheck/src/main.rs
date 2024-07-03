@@ -36,7 +36,6 @@ use crate::session::session::Check;
 use crate::session::session::Session;
 use crate::session::session::TargetKind;
 use crate::setup::{resolve_and_transform_source, SourceType};
-use crate::shell::Output;
 use crate::shell::Shell;
 use crate::shell::verbosity::Verbosity;
 use crate::util::iter::TryAny;
@@ -52,6 +51,7 @@ use command_util::DependentProgram;
 use config::WeightTreeNode;
 use config::WeightTreeProvider;
 use indicatif_log_bridge::LogWrapper;
+use shell::spinner_phase::SpinnerPhase;
 use core::fmt;
 use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
@@ -117,12 +117,12 @@ fn main() -> ExitCode {
 			return cmd_print_weights(&config)
 				.map(|_| ExitCode::SUCCESS)
 				.unwrap_or_else(|err| {
-					eprintln!("{}", err);
+					Shell::print_error(&err, Format::Human);
 					ExitCode::FAILURE
 				});
 		}
 
-		None => print_error(&hc_error!("missing subcommand")),
+		None => Shell::print_error(&hc_error!("missing subcommand"), Format::Human),
 	};
 
 	// If we didn't early return, return success.
@@ -134,7 +134,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	let check = match args.command() {
 		Ok(chk) => chk.as_check(),
 		Err(e) => {
-			print_error(&e);
+			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;
 		}
 	};
@@ -146,8 +146,6 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 
 	let (shell, report) = run(
-		Output::stdout(config.color()),
-		Output::stderr(config.color()),
 		config.verbosity(),
 		check,
 		config.config().map(ToOwned::to_owned),
@@ -159,13 +157,11 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 
 	match report {
 		Ok(AnyReport::Report(report)) => {
-			let _ = shell.report(&mut Output::stdout(config.color()), report, config.format());
+			Shell::print_report(report, config.format());
 			ExitCode::SUCCESS
 		}
 		Err(e) => {
-			if Shell::print_error(&e, config.format()).is_err() {
-				print_error(&e);
-			}
+			Shell::print_error(&e, config.format());
 			ExitCode::FAILURE
 		}
 	}
@@ -312,7 +308,7 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 	// Find or download a Hipcheck bundle source and decompress
 	let source = match resolve_and_transform_source(args) {
 		Err(e) => {
-			print_error(&e);
+			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;
 		}
 		Ok(x) => x,
@@ -325,7 +321,7 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 			pathbuf![p.as_path(), "scripts"],
 		),
 		_ => {
-			print_error(&hc_error!("expected source to be a directory"));
+			Shell::print_error(&hc_error!("expected source to be a directory"), Format::Human);
 			source.cleanup();
 			return ExitCode::FAILURE;
 		}
@@ -333,37 +329,39 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 
 	// Make config dir if not exist
 	let Some(tgt_conf_path) = config.config() else {
-		print_error(&hc_error!("target config dir not specified"));
+		Shell::print_error(&hc_error!("target config dir not specified"), Format::Human);
 		return ExitCode::FAILURE;
 	};
+	
 	if !tgt_conf_path.exists() && create_dir_all(tgt_conf_path).is_err() {
-		print_error(&hc_error!("failed to create missing target config dir"));
+		Shell::print_error(&hc_error!("failed to create missing target config dir"), Format::Human);
 	}
+
 	let Ok(abs_conf_path) = tgt_conf_path.canonicalize() else {
-		print_error(&hc_error!("failed to canonicalize HC_CONFIG path"));
+		Shell::print_error(&hc_error!("failed to canonicalize HC_CONFIG path"), Format::Human);
 		return ExitCode::FAILURE;
 	};
 
 	// Make data dir if not exist
 	let Some(tgt_data_path) = config.data() else {
-		print_error(&hc_error!("target data dir not specified"));
+		Shell::print_error(&hc_error!("target data dir not specified"), Format::Human);
 		return ExitCode::FAILURE;
 	};
 	if !tgt_data_path.exists() && create_dir_all(tgt_data_path).is_err() {
-		print_error(&hc_error!("failed to create missing target data dir"));
+		Shell::print_error(&hc_error!("failed to create missing target data dir"), Format::Human);
 	}
 	let Ok(abs_data_path) = tgt_data_path.canonicalize() else {
-		print_error(&hc_error!("failed to canonicalize HC_DATA path"));
+		Shell::print_error(&hc_error!("failed to canonicalize HC_DATA path"), Format::Human);
 		return ExitCode::FAILURE;
 	};
 
 	// Copy local config/data dirs to target locations
 	if let Err(e) = copy_dir_contents(src_conf_path, &abs_conf_path) {
-		print_error(&hc_error!("failed to copy config dir contents: {}", e));
+		Shell::print_error(&hc_error!("failed to copy config dir contents: {}", e), Format::Human);
 		return ExitCode::FAILURE;
 	}
 	if let Err(e) = copy_dir_contents(src_data_path, &abs_data_path) {
-		print_error(&hc_error!("failed to copy data dir contents: {}", e));
+		Shell::print_error(&hc_error!("failed to copy data dir contents: {}", e), Format::Human);
 		return ExitCode::FAILURE;
 	}
 
@@ -680,7 +678,7 @@ fn cmd_print_home(path: Option<&Path>) {
 			println!("{}", path_buffer.display());
 		}
 		Err(err) => {
-			print_error(&err);
+			Shell::print_error(&err, Format::Human);
 		}
 	}
 }
@@ -694,7 +692,7 @@ fn cmd_print_config(config_path: Option<&Path>) {
 			println!("{}", path_buffer.display());
 		}
 		Err(err) => {
-			print_error(&err);
+			Shell::print_error(&err, Format::Human);
 		}
 	}
 }
@@ -708,7 +706,7 @@ fn cmd_print_data(data_path: Option<&Path>) {
 			println!("{}", path_buffer.display());
 		}
 		Err(err) => {
-			print_error(&err);
+			Shell::print_error(&err, Format::Human);
 		}
 	}
 }
@@ -787,52 +785,20 @@ impl CheckKind {
 	}
 }
 
-/// Run Hipcheck.
-///
-/// Parses arguments, sets up shell output, and then runs the main logic.
-#[allow(clippy::too_many_arguments)]
-fn run(
-	output: Output,
-	error_output: Output,
-	verbosity: Verbosity,
-	check: Check,
-	config_path: Option<PathBuf>,
-	data_path: Option<PathBuf>,
-	home_dir: Option<PathBuf>,
-	format: Format,
-	raw_version: &str,
-) -> (Shell, Result<AnyReport>) {
-	// Setup wrapper for shell output.
-	let shell = Shell::new(output, error_output, verbosity);
-
-	// Run and print / report errors.
-	run_with_shell(
-		shell,
-		check,
-		config_path,
-		data_path,
-		home_dir,
-		format,
-		raw_version,
-	)
-}
-
 // This is for testing purposes.
 /// Now that we're fully-initialized, run Hipcheck's analyses.
 #[allow(clippy::too_many_arguments)]
 #[doc(hidden)]
-fn run_with_shell(
-	shell: Shell,
+fn run(
 	check: Check,
 	config_path: Option<PathBuf>,
 	data_path: Option<PathBuf>,
 	home_dir: Option<PathBuf>,
 	format: Format,
 	raw_version: &str,
-) -> (Shell, Result<AnyReport>) {
+) -> Result<AnyReport> {
 	// Initialize the session.
 	let session = match Session::new(
-		shell,
 		&check,
 		&check.target,
 		config_path,
@@ -842,18 +808,15 @@ fn run_with_shell(
 		raw_version,
 	) {
 		Ok(session) => session,
-		Err((shell, err)) => return (shell, Err(err)),
+		Err(err) => return Err(err),
 	};
 
 	match check.kind.target_kind() {
 		TargetKind::RepoSource | TargetKind::SpdxDocument => {
 			// Run analyses against a repo and score the results (score calls analyses that call metrics).
-			let mut phase = match session.shell.phase("analyzing and scoring results") {
-				Ok(phase) => phase,
-				Err(err) => return (session.end(), Err(err)),
-			};
+			let phase = SpinnerPhase::start("analyzing and scoring results");
 
-			let scoring = match score_results(&mut phase, &session) {
+			let scoring = match score_results(&phase, &session) {
 				Ok(scoring) => scoring,
 				Err(x) => {
 					return (
@@ -908,17 +871,5 @@ fn run_with_shell(
 
 			(session.end(), Ok(AnyReport::Report(report)))
 		}
-	}
-}
-
-/// Print errors which occur before the `Shell` type can be setup.
-fn print_error(err: &Error) {
-	let mut chain = err.chain();
-
-	// PANIC: First error is guaranteed to be present.
-	eprintln!("error: {}", chain.next().unwrap());
-
-	for err in chain {
-		eprintln!("       {}", err);
 	}
 }

@@ -49,7 +49,7 @@ impl SpinnerPhase {
         Shell::progress_bars().add(bar.clone());
 
         // Return phase object. 
-        Self { name, bar }
+        Self { name, bar}
     }
 
     /// Get the elapsed time since this bar was created. 
@@ -67,6 +67,12 @@ impl SpinnerPhase {
         self.bar.inc(1)
     }
 
+    /// Update the status and redraw this bar with the new status.
+    /// This status may be over-written if the bar changes states into "done" or the status is updated otherwise. 
+    pub fn update_status(&self, status: impl Display) {
+        self.bar.set_message(format!("{} ({status})", self.name));
+    }
+
     /// Set this spinner phase to tick steadily.
     /// 
     /// It is best practice to call [SpinnerPhase::inc] first to update the bar state to "running...".
@@ -77,7 +83,7 @@ impl SpinnerPhase {
         self.bar.enable_steady_tick(interval);
     }
 
-    /// Internal function to finish with a status and an emoji.
+    /// Internal function to finish with a new status and an emoji.
     fn finish_status(&self, status: impl Display, prefix: &Emoji) {
         self.bar.set_message(format!("{} ({status})", self.name));
         self.bar.set_prefix(prefix.to_string());
