@@ -36,7 +36,7 @@
         rounded-lg
         mr-4 mt-8
         top-[-1px]
-    " href="/docs">{{ ic::icon(name="book-open", classes="mt-[-2px] ml-[-4px] mr-1") }}  Read the Docs</a>
+    " href="{{ get_url(path="/docs") }}">{{ ic::icon(name="book-open", classes="mt-[-2px] ml-[-4px] mr-1") }}  Read the Docs</a>
 
     <a class="
         relative z-20
@@ -47,11 +47,11 @@
         bg-blue-600 hover:bg-green-500 hover:from-green-100
         text-blue-50 hover:text-green-50
         rounded-lg
-    " href="/install">Try Hipcheck! {{ ic::icon(name="arrow-down", classes="mt-[-2px] mr-[-4px] mr-1") }} </a>
+    " href="{{ get_url(path="/install") }}">Try Hipcheck! {{ ic::icon(name="arrow-down", classes="mt-[-2px] mr-[-4px] mr-1") }} </a>
 {% endblock %}
 
 {% block sidebar %}
-    <img class="block rounded-md p-4 bg-[#eff1f5] z-10 -mt-2 -ml-[5.333rem] absolute w-[28rem]" src="/images/homepage-bg.png">
+    <img class="block rounded-md p-4 bg-[#eff1f5] z-10 -mt-2 -ml-[5.333rem] absolute w-[28rem]" src="{{ get_url(path="/images/homepage-bg.png") }}">
 {% endblock %}
 
 {% block extra %}
@@ -67,7 +67,7 @@
                     <div class="flex-1 dark:text-gray-200">
                         <h3 class="mb-4 font-semibold">Identify High Risk Dependencies</h3>
                         <p class="text-sm">Audit a project&rsquo;s development practices, like code review, fuzz testing, and active maintenance, automatically!</p>
-                        <p class="mt-4 text-sm"><a class="font-semibold text-blue-500 hover:text-blue-700" href="/docs/analyses">Learn about Hipcheck&rsquo;s analyses &rarr;</a ></p>
+                        <p class="mt-4 text-sm"><a class="font-semibold text-blue-500 hover:text-blue-700" href="{{ get_page(path="docs/guide/analyses.md") }}">Learn about Hipcheck&rsquo;s analyses &rarr;</a ></p>
                     </div>
                 </div>
             </div>
@@ -79,7 +79,7 @@
                     <div class="flex-1 dark:text-gray-200">
                         <h3 class="mb-4 font-semibold">Configure Analyses You Care About</h3>
                         <p class="text-sm">Keep only the analyses that matter to you, change how they contribute to scoring, and how much risk you&rsquo;re willing to tolerate.</p>
-                        <p class="mt-4 text-sm"><a class="font-semibold text-blue-500 hover:text-blue-700" href="/docs/analyses">Learn about configuring Hipcheck &rarr;</a ></p>
+                        <p class="mt-4 text-sm"><a class="font-semibold text-blue-500 hover:text-blue-700" href="{{ get_page(path="docs/guide/configuration.md") }}">Learn about configuring Hipcheck &rarr;</a ></p>
                     </div>
                 </div>
             </div>
@@ -91,7 +91,7 @@
                     <div class="flex-1 dark:text-gray-200">
                         <h3 class="mb-4 font-semibold">Make Dependencies Manageable</h3 >
                         <p class="text-sm">Many software projects use hundreds of open source dependencies! Filter that list to something manageable with Hipcheck</p>
-                        <p class="mt-4 text-sm"><a class="font-semibold text-blue-500 hover:text-blue-700" href="/docs/analyses">Learn about using Hipcheck &rarr;</a ></p>
+                        <p class="mt-4 text-sm"><a class="font-semibold text-blue-500 hover:text-blue-700" href="{{ get_page(path="docs/guide/how-to-use.md") }}">Learn about using Hipcheck &rarr;</a ></p>
                     </div>
                 </div>
             </div>

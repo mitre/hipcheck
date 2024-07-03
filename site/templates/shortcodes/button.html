@@ -1,4 +1,13 @@
 
+{% if link is starting_with("@/") %}
+    {% set prefix = config.base_url ~ "/" %}
+    {% set link = link | replace(from="@/", to=prefix) %}
+{% endif %}
+
+{% if link is ending_with(".md") %}
+    {% set link = link | replace(from=".md", to="/") %}
+{% endif %}
+
 <a
     class="
         p-2 px-4
