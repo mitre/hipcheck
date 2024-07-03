@@ -141,6 +141,15 @@ const HOUR_GLASS: Emoji = Emoji("⏳", ">>>>");
 const GREEN_CHECKBOX: Emoji = Emoji("✅", "DONE ");
 const ERROR_ESCLAMATION: Emoji = Emoji("❗", "!!!!");
 
+/// The color used to print the prelude. 
+const PRELUDE_COLOR: Color = Color::Cyan;
+
+/// The default width of the left column when printing errors/reports/etc. 
+const LEFT_COL_DEFAULT_WIDTH: usize = 20;
+
+/// Empty static string used for drawing padding. 
+const EMPTY: &'static str = "";
+
 /// Type interface to the global shell used to produce output in the user's terminal. 
 #[derive(Debug)]
 pub struct Shell {
@@ -223,14 +232,14 @@ impl Shell {
 		})
 	}
 
-	// /// Print a message to the standard output if the standard output is a terminal. 
-	// /// Panics if the global shell is not initialized or if there's an issue printing to the standard output. 
-	// fn println_if_terminal(msg: impl AsRef<str>) {
-	// 	Shell::get()
-	// 		.progres_bars
-	// 		.println(msg)
-	// 		.expect("could print to standard output")
-	// }
+	/// Print a message to the standard output if the standard output is a terminal. 
+	/// Panics if the global shell is not initialized or if there's an issue printing to the standard output. 
+	fn println_if_terminal(msg: impl AsRef<str>) {
+		Shell::get()
+			.progress_bars
+			.println(msg)
+			.expect("could print to standard output")
+	}
 
 	/// Suspend and hide all progress bars to write to the standard output or standard error. 
 	/// Do not do heavy coomputation here since the lock on the progress bars is held the whole time and 
@@ -245,18 +254,18 @@ impl Shell {
 			.suspend(f)
 	}
 
-	// /// Print a message regardless of whether or not the standard output is a terminal. 
-	// /// [Shell::println_if_terminal] may be more desirable in some cases. 
-	// /// 
-	// /// This will temporarily hide the progress bars to print. 
-	// /// 
-	// /// # Panics
-	// /// - Panics if the global logger is not initialized. 
-	// fn println(msg: impl AsRef<str>) {
-	// 	Shell::in_suspend(|| {
-	// 		println!("{}", msg.as_ref());
-	// 	})
-	// }
+	/// Print a message regardless of whether or not the standard output is a terminal. 
+	/// [Shell::println_if_terminal] may be more desirable in some cases. 
+	/// 
+	/// This will temporarily hide the progress bars to print. 
+	/// 
+	/// # Panics
+	/// - Panics if the global logger is not initialized. 
+	fn println(msg: impl AsRef<str>) {
+		Shell::in_suspend(|| {
+			println!("{}", msg.as_ref());
+		})
+	}
 
 	/// Bypass the recommended styling and print a message to the standard error. 
 	/// Temporarily hide the progress bar to print. 
@@ -269,100 +278,97 @@ impl Shell {
 		})
 	}
 
-	// fn print_message(mut term: impl TermLike + Write + IsTerminal, msg: Message) -> Result<()> {
-	// 	// Print nothing if the global verbosity is "silent".
-	// 	if Shell::get_verbosity() == Verbosity::Silent {
-	// 		return Ok(());
-	// 	}
+	/// Print "Analysing {source}" with the proper color/styling. 
+	pub fn print_prelude(source: impl AsRef<str>) {
+		macros::println!("{:>LEFT_COL_DEFAULT_WIDTH$} {}", style("Analyzing").fg(PRELUDE_COLOR).bold(), source.as_ref());
+	}
 
-	// 	// Supress optional messages when quiet. 
-	// 	if Shell::get_verbosity() == Verbosity::Quiet && msg.may_not_print() {
-	// 		return Ok(());
-	// 	}
+	/// Print a hipcheck [Error]. Human readable errors will go to the standard error, JSON will go to the standard output.
+	pub fn print_error(err: &Error, format: Format) -> Result<()> {
+		match format {
+			Format::Human => {
+				// Print the root error -- the first in the chain should not be none. 
+				let mut chain = err.chain();
+				macros::eprintln!("{}", chain.next().expect("chain is not empty"));
+				
+				// Print remaining errors in chain. 
+				for err in chain {
+					macros::eprintln!("{EMPTY:LEFT_COL_DEFAULT_WIDTH$}{}", err);
+				}
 
-	// 	// Check if the terminal supports clearing/is_atty.  
-	// 	let is_atty: bool = term.is_terminal();
+				// Print an extra newline at the end to separate error printing from other stuff. 
+				macros::eprintln!();
 
-	// 	log::debug!("printing message [message='{:?}']", msg);
+				Ok(())
+			},
 
-	// 	match msg {
-	// 		Message::Clear => term.clear_line()?,
-	// 		Message::Newline => writeln!(&mut term)?, 
-	// 		Message::Nothing | Message::ReportNothing => {},
-			
-	// 		Message::Prelude { title, msg } 
-	// 		| Message::Basic { title, msg } => {
-	// 			write!(&mut term, "{:>width$} {msg}", title.style().apply_to(title.text()), width = title.width())?;
-	// 		}
+			Format::Json => {
+				// Construct a JSON value from an error.
+				let current = err.to_string();
+				let context = err
+					.chain()
+					.skip(1)
+					.map(ToString::to_string)
+					.collect::<Vec<_>>();
 
-	// 		Message::Error { title, error } => {
-	// 			write!(&mut term, "{title:>width$} {msg}", 
-	// 				title = title.style().apply_to(title.text()), 
-	// 				width = title.width(),
-	// 				msg = error.
-	// 			)?;
-	// 		}
+				let error_json = serde_json::json!({
+					"Error": {
+						"message": current,
+						"context": context,
+					}
+				});
 
+				log::trace!("writing message part [part='{:?}']", error_json);
 
+				// Suspend the progress bars to print the JSON. 
+				Shell::in_suspend(|| {
+					let mut stdout = Term::buffered_stdout();
+					serde_json::to_writer_pretty(&mut stdout, &error_json)?;
+					writeln!(&mut stdout)?;
+					stdout.flush()?;
 
+					Ok(())
+				})
+			}
+		}	
+	}
 
-	// 		_ => unimplemented!(),
-	// 	}
-
-	// 	Write::flush(&mut term)?;
-
-	// 	Ok(())
-	// }
-
+	
 
 }
 
+/// Macros that mirror/replace those from the standard library using the global [`Shell`][crate::shell::Shell].
+mod macros {
+	macro_rules! println {
+		($($arg:tt)+) => {
+			$crate::shell::Shell::println(format!($($arg)*));
+		};
 
-// // Check to see if this is necessary. 
-// impl Drop for Phase {
-// 	fn drop(&mut self) {
-// 		self.bar.finish()
-// 	}
-// }
+		() => {
+			$crate::shell::Shell::println("");
+		}
+	}
 
+	// public re-export
+	pub(super) use println;
 
-// /// Print a string to a writer with a space in front of it, then flush the writer. 
-// fn write_str<W: Write>(w: &mut W, s: &str) -> Result<()> {
-// 	log::trace!("writing message part [part='{:?}']", s);
-// 	write!(w, " {}", s)?;
-// 	w.flush()?;
-// 	Ok(())
-// }
+	macro_rules! eprintln {
+		($($arg:tt)+) => {
+			$crate::shell::Shell::eprintln(format!($($arg)*));
+		};
 
-// /// Print a newline to a writer. 
-// fn print_newline<W: Write>(w: &mut W) -> Result<()> {
-// 	log::trace!("writing message part [part='\"\\n\"']");
-// 	writeln!(w)?;
-// 	w.flush()?;
-// 	Ok(())
-// }
+		() => {
+			$crate::shell::Shell::eprintln("");
+		}
+	}
 
+	pub(super) use eprintln;
+}
 
-
-// /// Macros that mirror/replace those from the standard library using the global [`Shell`][crate::shell::Shell].
-// pub mod macros {
-// 	macro_rules! println {
-// 		($($arg:tt)*) => {
-// 			$crate::shell::Shell::println(format!($($arg)*));
-// 		};
-// 	}
-
-// 	// public re-export
-// 	pub(crate) use println;
-
-// 	macro_rules! eprintln {
-// 		($($arg:tt)*) => {
-// 			$crate::shell::Shell::eprintln(format!($($arg)*));
-// 		};
-// 	}
-
-// 	pub(crate) use eprintln;
-// }
+// /// Maximum width of a title
+// ///
+// /// Length of " Affiliation Pass" (with space)
+// const MAX_TITLE_WIDTH: usize = 17;
 
 // /// A convenience macro to generate methods on `Shell` which just delegate to the
 // /// real implementation on `ShellInner`.
@@ -1089,72 +1095,6 @@ fn print_str(msg: &str, stream: &mut dyn WriteColor) -> Result<()> {
 	let to_write = format!(" {}\r", msg);
 	log::trace!("writing message part [part='{:?}']", to_write);
 	write!(stream, "{}", to_write)?;
-	stream.flush()?;
-	Ok(())
-}
-
-/// Print an error to the stream.
-fn print_error(error: &Error, stream: &mut dyn WriteColor) -> Result<()> {
-	log::trace!("printing error");
-
-	stream.reset()?;
-
-	let mut chain = error.chain();
-
-	// PANIC: First error is guaranteed to be present.
-	print_str(&chain.next().unwrap().to_string(), stream)?;
-	print_newline(stream)?;
-
-	for error in chain {
-		log::trace!("printing error in chain [error: {}]", error);
-
-		print_error_source(error, stream)?;
-		print_newline(stream)?;
-	}
-
-	print_newline(stream)?;
-
-	Ok(())
-}
-
-/// Print a source error to the stream.
-fn print_error_source(error: &dyn std::error::Error, stream: &mut dyn WriteColor) -> Result<()> {
-	stream.reset()?;
-
-	let to_write = format!(" {:>width$}{}", "", error, width = MAX_TITLE_WIDTH);
-
-	log::trace!("writing message part [part='{:?}']", to_write);
-	write!(stream, "{}", to_write)?;
-
-	stream.flush()?;
-
-	Ok(())
-}
-
-/// Print an error report as JSON.
-fn print_error_json(error: &Error, stream: &mut dyn WriteColor) -> Result<()> {
-	// Construct a JSON value from an error.
-	fn error_to_json(error: &Error) -> serde_json::Value {
-		let current = error.to_string();
-		let context = error
-			.chain()
-			.skip(1)
-			.map(ToString::to_string)
-			.collect::<Vec<_>>();
-
-		serde_json::json!({
-			"Error": {
-				"message": current,
-				"context": context,
-			}
-		})
-	}
-
-	stream.reset()?;
-	let error_json = error_to_json(error);
-	log::trace!("writing message part [part='{:?}']", error_json);
-	serde_json::to_writer_pretty(&mut *stream, &error_json)?;
-	writeln!(stream)?;
 	stream.flush()?;
 	Ok(())
 }

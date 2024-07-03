@@ -163,7 +163,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 			ExitCode::SUCCESS
 		}
 		Err(e) => {
-			if shell.error(&e, config.format()).is_err() {
+			if Shell::print_error(&e, config.format()).is_err() {
 				print_error(&e);
 			}
 			ExitCode::FAILURE

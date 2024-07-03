@@ -38,7 +38,6 @@ use crate::report::ReportParams;
 use crate::report::ReportParamsStorage;
 use crate::session::pm::detect_and_extract;
 use crate::session::spdx::extract_download_url;
-use crate::shell::Phase;
 use crate::shell::Shell;
 use crate::source::source::Source;
 use crate::source::source::SourceKind;
@@ -85,9 +84,6 @@ use std::sync::Arc;
 	WeightTreeQueryStorage
 )]
 pub struct Session {
-	/// The shell interface, for outputting progress.
-	pub shell: Shell,
-
 	// Query storage.
 	storage: salsa::Storage<Self>,
 }
@@ -100,8 +96,7 @@ impl fmt::Debug for Session {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write!(
 			f,
-			"Session {{ shell: {:?}, storage: salsa::Storage<Session> }}",
-			self.shell
+			"Session {{ storage: salsa::Storage<Session> }}"
 		)
 	}
 }
@@ -122,7 +117,6 @@ impl Session {
 	/// Construct a new `Session` which owns all the data needed in later phases.
 	#[allow(clippy::too_many_arguments)]
 	pub fn new(
-		shell: Shell,
 		source_type: &Check,
 		source: &str,
 		config_path: Option<PathBuf>,
@@ -138,7 +132,6 @@ impl Session {
 		// Input query setters are implemented on `Session`, not
 		// `salsa::Storage<Session>`
 		let mut session = Session {
-			shell,
 			storage: Default::default(),
 		};
 
@@ -146,9 +139,7 @@ impl Session {
 		 * Printing the prelude.
 		 *-----------------------------------------------------------------*/
 
-		if let Err(err) = session.shell.prelude(source) {
-			return Err((session.shell, err));
-		};
+		Shell::print_prelude(source);
 
 		/*===================================================================
 		 *  Loading current versions of needed software git, npm, and eslint into salsa.
