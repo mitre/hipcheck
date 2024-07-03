@@ -47,6 +47,7 @@ use cli::FullCommands;
 use cli::SchemaArgs;
 use cli::SchemaCommand;
 use cli::SetupArgs;
+use cli::UpdateArgs;
 use command_util::DependentProgram;
 use config::WeightTreeNode;
 use config::WeightTreeProvider;
@@ -61,12 +62,15 @@ use schemars::schema_for;
 use std::env;
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::io::Write;
 use std::ops::Not as _;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 use std::process::ExitCode;
 use std::result::Result as StdResult;
 use util::fs::create_dir_all;
+use which::which;
 
 fn init_logging() {
 	EnvLoggerBuilder::from_env(Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE")).init();
@@ -91,6 +95,7 @@ fn main() -> ExitCode {
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
 		Some(FullCommands::Setup(args)) => return cmd_setup(&args, &config),
 		Some(FullCommands::Ready) => cmd_ready(&config),
+		Some(FullCommands::Update(args)) => cmd_update(&args),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
@@ -606,6 +611,50 @@ fn cmd_ready(config: &CliConfig) {
 	} else {
 		println!("Hipheck is NOT ready to run");
 	}
+}
+
+/// Run the Hipcheck self-updater to update to the latest release version.
+/// If the updater is not found, returns an error
+fn cmd_update(args: &UpdateArgs) {
+	let command_name;
+	// Because of a bug in cargo-dist's updater, it is possible for the updater to be installed as "hipcheck-update" instead of "hc-update"
+	if which("hc-update").is_ok() {
+		command_name = "hc-update";
+	} else if which("hipcheck-update").is_ok() {
+		command_name = "hipcheck-update";
+	} else {
+		// If neither possible updater command us found, print this error
+		print_error(&hc_error!("Updater tool not found. Did you install Hipcheck with the official release script (which will install the updater tool)? If you installed Hipcheck from source, you must update Hipcheck by installing a new version from source manually."));
+		return;
+	}
+
+	// Create the updater command, with optional arguments
+	let mut hc_command = updater_command(command_name, args);
+	match hc_command.output() {
+		// Panic: Safe to unwrap because if the updater command runs, it will always produce some output to stderr
+		Ok(output) => std::io::stdout().write_all(&output.stderr).unwrap(),
+		Err(..) => print_error(&hc_error!("Updater command failed to run. You may need to re-install Hipcheck with the official release script.")),
+	}
+}
+
+/// Creates an updater command, including any optional arguments
+fn updater_command(command_name: &str, args: &UpdateArgs) -> Command {
+	let mut command = Command::new(command_name);
+
+	// If both the --tag and --version arguments are passed to the updater, it will exit with an error message instead of updating
+	if let Some(tag) = &args.tag {
+		command.args(["--tag", tag]);
+	}
+
+	if let Some(version) = &args.version {
+		command.args(["--version", version]);
+	}
+
+	if args.prerelease {
+		command.arg("--prerelease");
+	}
+
+	command
 }
 
 /// Print the current home directory for Hipcheck.

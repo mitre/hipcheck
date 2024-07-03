@@ -366,6 +366,7 @@ pub enum FullCommands {
 	Schema(SchemaArgs),
 	Setup(SetupArgs),
 	Ready,
+	Update(UpdateArgs),
 	PrintConfig,
 	PrintData,
 	PrintCache,
@@ -380,6 +381,7 @@ impl From<&Commands> for FullCommands {
 			Commands::Setup(args) => FullCommands::Setup(args.clone()),
 			Commands::Ready => FullCommands::Ready,
 			Commands::Scoring => FullCommands::Scoring,
+			Commands::Update(args) => FullCommands::Update(args.clone()),
 		}
 	}
 }
@@ -404,6 +406,8 @@ pub enum Commands {
 	Ready,
 	/// Print the tree used to weight analyses during scoring.
 	Scoring,
+	/// Run Hipcheck self-updater, if installed
+	Update(UpdateArgs),
 }
 
 // If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
@@ -568,6 +572,19 @@ pub struct SetupArgs {
 	/// Path to local Hipcheck release archive or directory.
 	#[clap(short = 's', long)]
 	pub source: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct UpdateArgs {
+	/// Installs the specified tag instead of the latest version
+	#[clap(long)]
+	pub tag: Option<String>,
+	/// Installs the specified version instead of the latest version
+	#[clap(long)]
+	pub version: Option<String>,
+	/// Allows prereleases when just updating to "latest"
+	#[clap(long)]
+	pub prerelease: bool,
 }
 
 /// A type that can copy non-`None` values from other instances of itself.
