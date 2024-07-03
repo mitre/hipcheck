@@ -104,6 +104,9 @@ fn main() -> ExitCode {
 
 	let config = CliConfig::load();
 
+	// Set the global verbosity.
+	Shell::set_verbosity(config.verbosity());
+
 	match config.subcommand() {
 		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
@@ -145,8 +148,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 
 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 
-	let (shell, report) = run(
-		config.verbosity(),
+	let report = run(
 		check,
 		config.config().map(ToOwned::to_owned),
 		config.data().map(ToOwned::to_owned),

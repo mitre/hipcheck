@@ -286,7 +286,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 
 macro_rules! run_and_score_threshold_analysis {
 	($res:ident, $p:ident, $phase:ident, $a:expr, $spec:ident) => {{
-		update_phase($p, $phase)?;
+		// $phase.update_status($p, $phase)?;
 		let analysis_result =
 			ThresholdPredicate::from_analysis(&$a, $spec.threshold, $spec.units, $spec.ordering);
 		$res.table.insert($phase.to_owned(), analysis_result);
