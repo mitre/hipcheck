@@ -129,7 +129,6 @@ pub mod prelude;
 pub mod progress_phase;
 pub mod iter;
 pub mod par_iter;
-pub mod term;
 pub mod macros;
 
 /// Global static shell instance, stored in a [`OnceLock`] to make it thread safe and lazy. 
@@ -158,8 +157,12 @@ const EMPTY: &'static str = "";
 /// Type interface to the global shell used to produce output in the user's terminal. 
 #[derive(Debug)]
 pub struct Shell {
-	/// Multi-progress bar object holding all the different progress bars we're using. 
-	progress_bars: MultiProgress,
+	/// Multi-progress bar object rendering all the different progress bars we're using. 
+	multi_progress: MultiProgress,
+	// /// List of all the progress bars actively being rendered --
+	// /// we just store this so that we can hide them all if someone wants to. 
+	// /// (when will [indicatif] add a `.set_hidden()`) to [MultiProgress]?
+	// progress_bars: RwLock<Vec<ProgressBar>>,
 	/// The verbosity of this shell. 
 	verbosity: RwLock<Verbosity>,
 }
@@ -172,7 +175,7 @@ impl Shell {
 		}
 
 		GLOBAL_SHELL.get_or_init(move || {
-			Shell { progress_bars: MultiProgress::new(), verbosity: RwLock::new(verbosity)  }
+			Shell { multi_progress: MultiProgress::new(), verbosity: RwLock::new(verbosity)  }
 		});
 	}
 
@@ -189,10 +192,10 @@ impl Shell {
 
 	/// Update the verbosity of the global shell.  
 	pub fn set_verbosity(verbosity: Verbosity) {
-		// If the verbosity is "silent", hide all progress bars.
-		if verbosity == Verbosity::Silent {
-			Shell::get().progress_bars.
-		}
+		// // If the verbosity is "silent", hide all progress bars.
+		// if verbosity == Verbosity::Silent {
+		// 	Shell::get().progress_bars.
+		// }
 
 		let mut write_guard = Self::get()
 			.verbosity
@@ -221,7 +224,7 @@ impl Shell {
 
 	/// Get a clone of the [`MultiProgress`] instance stored using [`Arc::clone`] under the hood. 
 	pub fn progress_bars() -> MultiProgress {
-		Self::get().progress_bars.clone()
+		Self::get().multi_progress.clone()
 	}
 
 	/// Print timing info. Only enabled while hipcheck is being benchmarked. 
@@ -243,9 +246,9 @@ impl Shell {
 
 	/// Print a message to the standard output if the standard output is a terminal. 
 	/// Panics if the global shell is not initialized or if there's an issue printing to the standard output. 
-	fn println_if_terminal(msg: impl AsRef<str>) {
+	pub fn println_if_terminal(msg: impl AsRef<str>) {
 		Shell::get()
-			.progress_bars
+			.multi_progress
 			.println(msg)
 			.expect("could print to standard output")
 	}
@@ -259,7 +262,7 @@ impl Shell {
 	fn in_suspend<F, R>(f: F) -> R
 	where F: FnOnce() -> R {
 		Self::get()
-			.progress_bars
+			.multi_progress
 			.suspend(f)
 	}
 
@@ -270,7 +273,7 @@ impl Shell {
 	/// 
 	/// # Panics
 	/// - Panics if the global logger is not initialized. 
-	fn println(msg: impl AsRef<str>) {
+	pub fn println(msg: impl AsRef<str>) {
 		Shell::in_suspend(|| {
 			println!("{}", msg.as_ref());
 		})
@@ -591,6 +594,7 @@ impl Title {
 impl Display for Title {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		write!(f, "{}", self.style().apply_to(self.text()))
+		// write!(f, "{}", self.text())
 	}
 }
 

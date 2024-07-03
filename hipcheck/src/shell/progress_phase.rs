@@ -55,15 +55,15 @@ impl ProgressPhase {
 		// Create the progress bar. 
 		let bar = ProgressBar::new(len).with_style(get_unit_agnostic_style().clone());
 
+		// Add the progress bar to the shell.
+		Shell::progress_bars().add(bar.clone());
+
 		// Convert the name.
 		let name = name.into();
 
 		// Set the bar's prefix and message. 
 		bar.set_message(format!("{name} (starting...)"));
 		bar.set_prefix(ROCKET_SHIP.to_string());
-
-		// Add the progress bar to the shell.
-		Shell::progress_bars().add(bar.clone());
 
 		// Return.
 		Self { name, bar }

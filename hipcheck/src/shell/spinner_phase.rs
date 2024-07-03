@@ -39,14 +39,14 @@ impl SpinnerPhase {
         let bar = ProgressBar::new_spinner()
             .with_style(spinner_style().clone());
 
+        // Add to the global shell.
+        Shell::progress_bars().add(bar.clone());
+
 		let name = name.into();
 
 		// Set the initial message of the bar. 
 		bar.set_prefix(ROCKET_SHIP.to_string());
 		bar.set_message(format!("{name} (starting...)"));
-
-        // Add to the global shell.
-        Shell::progress_bars().add(bar.clone());
 
         // Return phase object. 
         Self { name, bar }
@@ -71,6 +71,7 @@ impl SpinnerPhase {
     /// This status may be over-written if the bar changes states into "done" or the status is updated otherwise. 
     pub fn update_status(&self, status: impl Display) {
         self.bar.set_message(format!("{} ({status})", self.name));
+        self.bar.set_prefix(HOUR_GLASS.to_string());
     }
 
     /// Set this spinner phase to tick steadily.

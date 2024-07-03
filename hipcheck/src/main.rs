@@ -53,6 +53,7 @@ use config::WeightTreeProvider;
 use indicatif_log_bridge::LogWrapper;
 use shell::spinner_phase::SpinnerPhase;
 use core::fmt;
+use std::time::Duration;
 use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
 use indextree::Arena;
@@ -160,8 +161,12 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 
 	match report {
 		Ok(AnyReport::Report(report)) => {
-			Shell::print_report(report, config.format());
-			ExitCode::SUCCESS
+			Shell::print_report(report, config.format())
+				.map(|()| ExitCode::SUCCESS)
+				.unwrap_or_else(|err| {
+					Shell::print_error(&err, Format::Human);
+					ExitCode::FAILURE
+				})
 		}
 		Err(e) => {
 			Shell::print_error(&e, config.format());
@@ -267,7 +272,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 
 	// Print the output using indextree's debug pretty printer.
 	let output = print_root.debug_pretty_print(&print_tree.0);
-	println!("{output:?}");
+	shell::macros::println!("{output:?}");
 
 	Ok(())
 }
@@ -815,6 +820,10 @@ fn run(
 		TargetKind::RepoSource | TargetKind::SpdxDocument => {
 			// Run analyses against a repo and score the results (score calls analyses that call metrics).
 			let phase = SpinnerPhase::start("analyzing and scoring results");
+			
+			// Enable steady ticking on the spinner, since we currently don't increment it manually. 
+			phase.enable_steady_tick(Duration::from_millis(250));
+
 			let scoring = score_results(&phase, &session)?;
 			phase.finish_successful();
 
@@ -827,6 +836,9 @@ fn run(
 		TargetKind::PackageVersion => {
 			// Run analyses against a repo and score the results (score calls analyses that call metrics).
 			let phase = SpinnerPhase::start("analyzing and scoring results");
+			// Enable steady ticking on the spinner, since we currently don't increment it manually. 
+			phase.enable_steady_tick(Duration::from_millis(250));
+
 			let scoring = score_results(&phase, &session)?;
 			phase.finish_successful();
 
