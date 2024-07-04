@@ -2,6 +2,7 @@
 
 [![License: Apache-2.0](https://img.shields.io/github/license/mitre/hipcheck)][license]
 [![GitHub Release](https://img.shields.io/github/v/release/mitre/hipcheck)][release]
+[![Hipcheck Website](https://img.shields.io/badge/Website-blue)][website]
 
 __Go from hundreds of dependencies you can't review, to just a few you can!__
 
@@ -18,6 +19,8 @@ software packages and source repositories to understand their software supply
 chain risk. It analyzes a project's _software development practices_ and
 detects _active supply chain attacks_ to give you both a long-term and
 immediate picture of the risk from using a package.
+
+For more information, see ["Why Hipcheck?"][why]
 
 ## Very Quick Explanation
 
@@ -36,13 +39,11 @@ hc check -t pypi urllib3@2.2.2
 hc check example-sbom.spdx.json
 ```
 
+For more information, check out the [Quickstart Guide][quickstart].
+
 ## Installation
 
-__If installing locally:__ run the install script from the
-[latest release][release], then run __`hc setup`__.
-
-__If running as a container:__ use a [Hipcheck image from
-Docker Hub][docker].
+See the [Installation Instructions][install].
 
 ## Values
 
@@ -72,9 +73,10 @@ found in the [`LICENSE`](LICENSE) file in this repository.
 > Software Documentation Clause DFARS 252.227-7014 (FEB 2014)][dfars].
 
 [dfars]: https://www.acquisition.gov/dfars/252.227-7014-rights-other-commercial-computer-software-and-other-commercial-computer-software-documentation.
-[docker]: https://hub.docker.com/r/mitre/hipcheck
+[quickstart]: https://mitre.github.io/hipcheck/docs/quickstart/
 [install]: https://mitre.github.io/hipcheck/install
 [license]: https://github.com/mitre/hipcheck/blob/main/LICENSE
 [release]: https://github.com/mitre/hipcheck/releases/latest
 [rfd_2]: https://mitre.github.io/hipcheck/rfds/0002
 [website]: https://mitre.github.io/hipcheck
+[why]: https://mitre.github.io/hipcheck/docs/guide/why/
