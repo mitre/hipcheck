@@ -3,6 +3,84 @@
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+## [3.4.0] - 2024-07-04
+
+Hipcheck 3.4.0 is an existing release featuring 3 new subcommands!
+
+- `hc setup`: When you install the `hc` binary, whether through an install
+  script with a release, with `cargo binstall`, or by building it yourself,
+  you still need to get the configuration and data files Hipcheck requires.
+  This new command gets those files for you, so you can start using Hipcheck
+  quickly and easily!
+- `hc update`: This lets Hipcheck update itself to newer versions! Under the
+  hood, we're using the self-updater built and provided by `cargo-dist`, the
+  tool we use for cutting new releases with prebuilt binaries. The `hc update`
+  command is a wrapper around that updater. This command _does_ require that
+  you use our install script to get the self-updater.
+- `hc scoring`: This tells you how Hipcheck is scoring results based on your
+  current configuration. While you can see the weights for each analysis in
+  your configuration file, it can be tedious to do the math yourself to find
+  out exactly how much each analysis contributes to the overall score. This
+  command does that math for you to make it easier.
+
+Hipcheck also now has an [official website](https://mitre.github.io/hipcheck)!
+Feel free to check it out, and let us know if you encounter any issues with it.
+
+### Added
+
+- __Add new `hc setup` command:__
+  * Add `hc setup` installation command by [@j-lanson](https://github.com/j-lanson)
+  * Slightly modified arguments for `hc setup` by [@alilleybrinker](https://github.com/alilleybrinker) in [#155](https://github.com/mitre/hipcheck/pull/155)
+- __Add new `hc update` command:__
+  * Adds `hc update` command to run the self-updater (if installed) to automatically bring Hipcheck up to date with a released version. Includes optional flags to update to versions other than the latest by [@mchernicoff](https://github.com/mchernicoff) in [#176](https://github.com/mitre/hipcheck/pull/176)
+- __Add new `hc scoring` command:__
+  * Scoring subcommand by [@vcfxb](https://github.com/vcfxb) in [#170](https://github.com/mitre/hipcheck/pull/170)
+
+### Changed
+
+- __Refactor analyses and scoring to prepare for future migration to a plugin system:__
+  * Add weight tree and replace old scoring by [@j-lanson](https://github.com/j-lanson) in [#160](https://github.com/mitre/hipcheck/pull/160)
+  * Replace prior AnalysisResults obj with AltAnalysisResults impl by [@j-lanson](https://github.com/j-lanson) in [#159](https://github.com/mitre/hipcheck/pull/159)
+  * Demonstrate use of hashmap with new result objects for analysis storage by [@j-lanson](https://github.com/j-lanson) in [#130](https://github.com/mitre/hipcheck/pull/130)
+  * refactor affiliation analysis, experiment with macro by [@j-lanson](https://github.com/j-lanson) in [#154](https://github.com/mitre/hipcheck/pull/154)
+  * refactor all remaining repo analyses by [@j-lanson](https://github.com/j-lanson) in [#157](https://github.com/mitre/hipcheck/pull/157)
+- __Improve Hipcheck performance:__
+  * Parallelize grapheme collection across files by [@alilleybrinker](https://github.com/alilleybrinker) in [#146](https://github.com/mitre/hipcheck/pull/146)
+  * Crate features for benchmarking and new `Drop` based benchmarking struct by [@vcfxb](https://github.com/vcfxb) in [#136](https://github.com/mitre/hipcheck/pull/136)
+- __Clean out dependencies we no longer need:__
+  * Remove unused tempdir dependency by [@vcfxb](https://github.com/vcfxb) in [#145](https://github.com/mitre/hipcheck/pull/145)
+  * Remove dependency on lazy static by [@vcfxb](https://github.com/vcfxb) in [#147](https://github.com/mitre/hipcheck/pull/147)
+- __Improve Hipcheck container image:__
+  * Use Debian base image instead of Alpine by [@cstepanian](https://github.com/cstepanian) in [#180](https://github.com/mitre/hipcheck/pull/180)
+  * Clean apt cache after installation by [@cstepanian](https://github.com/cstepanian) in [#181](https://github.com/mitre/hipcheck/pull/181)
+- __Keep dependencies up-to-date:__
+  * Bump lazy_static from 1.4.0 to 1.5.0 by [@dependabot[bot]](https://github.com/dependabot) in [#142](https://github.com/mitre/hipcheck/pull/142)
+  * Bump proc-macro2 from 1.0.85 to 1.0.86 by [@dependabot[bot]](https://github.com/dependabot) in [#141](https://github.com/mitre/hipcheck/pull/141)
+  * Bump syn from 2.0.66 to 2.0.68 by [@dependabot[bot]](https://github.com/dependabot) in [#140](https://github.com/mitre/hipcheck/pull/140)
+  * Bump dashmap from 5.5.3 to 6.0.1 by [@dependabot[bot]](https://github.com/dependabot) in [#164](https://github.com/mitre/hipcheck/pull/164)
+  * Bump log from 0.4.21 to 0.4.22 by [@dependabot[bot]](https://github.com/dependabot) in [#165](https://github.com/mitre/hipcheck/pull/165)
+  * Bump serde_json from 1.0.117 to 1.0.119 by [@dependabot[bot]](https://github.com/dependabot) in [#163](https://github.com/mitre/hipcheck/pull/163)
+  * Bump ordered-float from 4.2.0 to 4.2.1 by [@dependabot[bot]](https://github.com/dependabot) in [#166](https://github.com/mitre/hipcheck/pull/166)
+  * Bump clap from 4.5.7 to 4.5.8 by [@dependabot[bot]](https://github.com/dependabot) in [#162](https://github.com/mitre/hipcheck/pull/162)
+
+### Fixed
+
+- __Fix broken Docker build:__
+  * Vendor libgit2 and openssl so that hipcheck builds in containers more consistently by [@vcfxb](https://github.com/vcfxb) in [#177](https://github.com/mitre/hipcheck/pull/177)
+
+### Removed
+
+- __Remove legacy CLI features that aren't actually implemented or supported:__
+  * Removes patch type as option for hc check or hc schema, as that was unsupported by [@mchernicoff](https://github.com/mchernicoff) in [#153](https://github.com/mitre/hipcheck/pull/153)
+  * Remove pr analysis and scoring infrastructure by [@j-lanson](https://github.com/j-lanson) in [#158](https://github.com/mitre/hipcheck/pull/158)
+
+### New Contributors
+
+* [@cstepanian](https://github.com/cstepanian) made their first contribution in [#181](https://github.com/mitre/hipcheck/pull/181)
+
+__Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.3.2...hipcheck-v3.4.0>
+
+[3.4.0]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.3.2..hipcheck-v3.4.0
 
 ## [3.3.2] - 2024-06-21
 
