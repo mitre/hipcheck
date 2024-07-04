@@ -1,0 +1,10 @@
+accepted = [
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "MPL-2.0",
+    "MIT",
+    "Unicode-DFS-2016",
+    "OpenSSL",
+]
