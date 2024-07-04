@@ -1,24 +1,33 @@
 {% macro breadcrumbs(current) %}
+    {# TODO: Don't hide this on mobile #}
+    <div class="
+            hidden
+            md:block
+            text-sm
+            text-zinc-500 dark:text-zinc-400
+            px-14 p-2
+            mx-[-0.5rem]
+            border-t border-zinc-100 dark:border-zinc-800
+            rounded-md
+            ">
+        <a href="{{ get_url(path="@/_index.md") }}" class="
+                font-normal
+                no-underline hover:underline
+                ">
+            Home
+        </a>
 
-    {% set root = config.base_url | replace(from="https://mitre.github.io/", to="") %}
+        {% for ancestor in current.ancestors %}
+            {% if loop.first %}
+                {% continue %}
+            {% endif %}
 
-    <div class="text-sm text-zinc-500 px-14 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800 rounded-md p-2 mx-[-0.5rem]">
-        <a class="font-normal no-underline hover:underline" href="{{ root }}/">Home</a>
-
-            {% for ancestor in current.ancestors %}
-                {% if loop.first %}
-                    {% continue %}
-                {% endif %}
-
-                <span class="text-zinc-300 px-1">›</span>
-
-                {% set section = get_section(path=ancestor) %}
-
-                <a class="font-normal no-underline hover:underline" href="{{ section.permalink }}">{{ section.title }}</a>
-            {% endfor %}
-
+            {% set section = get_section(path=ancestor) %}
             <span class="text-zinc-300 px-1">›</span>
+            <a href="{{ section.permalink }}" class="font-normal no-underline hover:underline">{{ section.title }}</a>
+        {% endfor %}
 
-            <a class="font-normal no-underline hover:underline" href="{{ current.permalink }}">{{ current.title }}</a>
+        <span class="text-zinc-300 px-1">›</span>
+        <a href="{{ current.permalink }}" class="font-normal no-underline hover:underline">{{ current.title }}</a>
     </div>
 {% endmacro breadcrumbs %}

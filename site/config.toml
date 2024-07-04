@@ -24,7 +24,8 @@ nav = [
     { name = "Install", url = "@/install/_index.md", highlight = true, icon = "arrow-down" },
     { sep = true },
     { url = "https://github.com/mitre/hipcheck", icon = "github", icononly = true },
-    { url = "#", icon = "sun", icononly = true, id = "toggle-darkmode" },
+    # TODO: Uncomment this when dark mode is ready for production.
+    # { url = "#", icon = "sun", icononly = true, id = "toggle-darkmode" },
 ]
 
 # Define the site footer.
@@ -64,5 +65,5 @@ footer = [
 
 # Set an announcement for the site navigation bar.
 [extra.announce]
-url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.2.1"
-text = "Introducing Hipcheck 3.2.1"
+url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.3.2"
+text = "Introducing Hipcheck 3.3.2"

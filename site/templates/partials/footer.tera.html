@@ -2,10 +2,16 @@
 <div class="max-w-6xl mx-auto mt-32">
     <div class="pb-16">
         <div class="flex gap-8 dark:text-zinc-400">
+
             <div class="basis-1/4 text-lg">
-                <a class="hover:text-green-600 font-semibold" href="{{ get_url(path="@/_index.md") }}">Hipcheck <span class="leading-none font-extrabold text-green-600 text-2xl">✓</span></a>
-                <p class="text-sm text-zinc-500 mt-3 leading-6">Automated supply chain risk assessment for software packages.</p>
+                <a href="{{ get_url(path="@/_index.md") }}" class="hover:text-green-600 font-semibold">
+                    Hipcheck <span class="leading-none font-extrabold text-green-600 text-2xl">✓</span>
+                </a>
+                <p class="text-sm text-zinc-500 mt-3 leading-6">
+                    Automated supply chain risk assessment for software packages.
+                </p>
             </div>
+
             {% for list in config.extra.footer %}
                 <div class="basis-1/4 text-sm mt-[-1.75rem]">
                     <ul>
@@ -20,7 +26,7 @@
                                         {% set url = get_url(path=item.url) %}
                                     {% endif %}
 
-                                    <a class="block mb-2 hover:text-blue-500" href="{{ url }}">
+                                    <a href="{{ url }}" class="block mb-2 hover:text-blue-500">
                                         {{ item.name }}
                                         {% if item.external %}
                                             <span class="text-xs text-zinc-500">↗</span>
