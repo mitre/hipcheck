@@ -30,7 +30,7 @@ dirs = "5.0.1"
 duct = "0.13.5"
 env_logger = { version = "0.11.3" }
 graphql_client = "0.14.0"
-hipcheck-macros = { path = "../hipcheck-macros", version = "0.2.0" }
+hipcheck-macros = { path = "../hipcheck-macros", version = "0.3.0" }
 libc = "0.2.155"
 log = "0.4.22"
 maplit = "1.0.2"
