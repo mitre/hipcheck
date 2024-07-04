@@ -1,11 +1,9 @@
 
-{% set root = config.base_url | replace(from="https://mitre.github.io/", to="") %}
-
 <div class="max-w-6xl mx-auto mt-32">
     <div class="pb-16">
         <div class="flex gap-8 dark:text-zinc-400">
             <div class="basis-1/4 text-lg">
-                <a class="hover:text-green-600 font-semibold" href="{{ root }}/">Hipcheck <span class="leading-none font-extrabold text-green-600 text-2xl">✓</span></a>
+                <a class="hover:text-green-600 font-semibold" href="{{ get_url(path="@/_index.md") }}">Hipcheck <span class="leading-none font-extrabold text-green-600 text-2xl">✓</span></a>
                 <p class="text-sm text-zinc-500 mt-3 leading-6">Automated supply chain risk assessment for software packages.</p>
             </div>
             {% for list in config.extra.footer %}
@@ -16,7 +14,13 @@
                                 {% if item.title %}
                                     <span class="font-semibold mb-4 mt-8 block">{{ item.name }}</span>
                                 {% else %}
-                                    <a class="block mb-2 hover:text-blue-500" href="{{ root }}{{ item.url }}">
+                                    {% if item.url is starting_with("http") %}
+                                        {% set url = item.url %}
+                                    {% else %}
+                                        {% set url = get_url(path=item.url) %}
+                                    {% endif %}
+
+                                    <a class="block mb-2 hover:text-blue-500" href="{{ url }}">
                                         {{ item.name }}
                                         {% if item.external %}
                                             <span class="text-xs text-zinc-500">↗</span>
