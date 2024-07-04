@@ -5,7 +5,7 @@ project adheres to [Semantic Versioning].
 
 ## [3.4.0] - 2024-07-04
 
-Hipcheck 3.4.0 is an existing release featuring 3 new subcommands!
+Hipcheck 3.4.0 is an exciting release featuring 3 new subcommands!
 
 - `hc setup`: When you install the `hc` binary, whether through an install
   script with a release, with `cargo binstall`, or by building it yourself,
