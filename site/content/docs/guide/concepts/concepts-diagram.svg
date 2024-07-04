@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="952" height="192" class="svgbob"><style>.svgbob line, .svgbob path, .svgbob circle, .svgbob rect, .svgbob polygon {
+    stroke: black;
+    stroke-width: 2;
+    stroke-opacity: 1;
+    fill-opacity: 1;
+    stroke-linecap: round;
+    stroke-linejoin: miter;
+}
+.svgbob text {
+    white-space: pre;
+    fill: black;
+    font-family: Iosevka Fixed, monospace;
+    font-size: 14px;
+}
+.svgbob rect.backdrop {
+    stroke: none;
+    fill: white;
+}
+.svgbob .broken {
+    stroke-dasharray: 8;
+}
+.svgbob .filled {
+    fill: black;
+}
+.svgbob .bg_filled {
+    fill: white;
+    stroke-width: 1;
+}
+.svgbob .nofill {
+    fill: white;
+}
+.svgbob .end_marked_arrow {
+    marker-end: url(#arrow);
+}
+.svgbob .start_marked_arrow {
+    marker-start: url(#arrow);
+}
+.svgbob .end_marked_diamond {
+    marker-end: url(#diamond);
+}
+.svgbob .start_marked_diamond {
+    marker-start: url(#diamond);
+}
+.svgbob .end_marked_circle {
+    marker-end: url(#circle);
+}
+.svgbob .start_marked_circle {
+    marker-start: url(#circle);
+}
+.svgbob .end_marked_open_circle {
+    marker-end: url(#open_circle);
+}
+.svgbob .start_marked_open_circle {
+    marker-start: url(#open_circle);
+}
+.svgbob .end_marked_big_open_circle {
+    marker-end: url(#big_open_circle);
+}
+.svgbob .start_marked_big_open_circle {
+    marker-start: url(#big_open_circle);
+}<!--separator--></style><defs><marker id="arrow" viewBox="-2 -2 8 8" refX="4" refY="2" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 0,4 4,2 0,0"></polygon></marker><marker id="diamond" viewBox="-2 -2 8 8" refX="4" refY="2" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,2 2,0 4,2 2,4 0,2"></polygon></marker><marker id="circle" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><circle cx="4" cy="4" r="2" class="filled"></circle></marker><marker id="open_circle" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><circle cx="4" cy="4" r="2" class="bg_filled"></circle></marker><marker id="big_open_circle" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><circle cx="4" cy="4" r="3" class="bg_filled"></circle></marker></defs><rect class="backdrop" x="0" y="0" width="952" height="192"></rect><rect x="852" y="72" width="88" height="64" class="solid nofill" rx="0"></rect><text x="874" y="108" >Output</text><text x="362" y="44" >Measures</text><text x="594" y="44" >Score</text><text x="642" y="44" >&amp;</text><text x="658" y="44" >Recommendation</text><polygon points="424,52 432,56 424,60" class="filled"></polygon><text x="178" y="92" >Data</text><polygon points="224,100 232,104 224,108" class="filled"></polygon><polygon points="840,100 848,104 840,108" class="filled"></polygon><text x="538" y="172" >Concerns</text><text x="458" y="60" >Configuration</text><text x="34" y="108" >Data</text><text x="74" y="108" >Sources</text><text x="258" y="108" >Analyses</text><g><line x1="436" y1="24" x2="580" y2="24" class="solid"></line><line x1="436" y1="24" x2="436" y2="88" class="solid"></line><line x1="580" y1="24" x2="580" y2="88" class="solid"></line><line x1="580" y1="56" x2="772" y2="56" class="solid"></line><line x1="772" y1="56" x2="772" y2="152" class="solid"></line><line x1="436" y1="88" x2="580" y2="88" class="solid"></line><line x1="772" y1="104" x2="840" y2="104" class="solid"></line><line x1="356" y1="56" x2="424" y2="56" class="solid"></line><line x1="356" y1="56" x2="356" y2="88" class="solid"></line><line x1="236" y1="72" x2="340" y2="72" class="solid"></line><line x1="236" y1="72" x2="236" y2="136" class="solid"></line><line x1="340" y1="72" x2="340" y2="136" class="solid"></line><line x1="340" y1="88" x2="356" y2="88" class="solid"></line><line x1="340" y1="120" x2="356" y2="120" class="solid"></line><line x1="356" y1="120" x2="356" y2="152" class="solid"></line><line x1="236" y1="136" x2="340" y2="136" class="solid"></line><line x1="356" y1="152" x2="772" y2="152" class="solid"></line></g><g><line x1="12" y1="72" x2="148" y2="72" class="solid"></line><line x1="12" y1="72" x2="12" y2="136" class="solid"></line><line x1="148" y1="72" x2="148" y2="136" class="solid"></line><line x1="148" y1="104" x2="224" y2="104" class="solid"></line><line x1="12" y1="136" x2="148" y2="136" class="solid"></line></g></svg>
