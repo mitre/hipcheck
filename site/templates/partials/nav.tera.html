@@ -3,17 +3,19 @@
 
 <nav class="
         text-sm
-        py-3
-        md:py-4 md:px-8
+        py-4 px-1
+        lg:py-4 lg:px-8
         ">
     <ul class="
-            md:flex gap-x-6
+            flex
+            justify-between lg:justify-start
+            gap-x-6
             mx-4
             ">
         <li class="
                 block
-                md:flex
-                md:flex-1
+                lg:flex
+                lg:flex-1
                 items-stretch
                 ">
             <a href="{{ get_url(path="@/_index.md") }}" class="
@@ -28,7 +30,7 @@
             {% if config.extra.announce %}
                 <a href="{{ config.extra.announce.url }}" class="
                         hidden
-                        md:inline
+                        lg:inline
                         rounded-3xl
                         bg-sky-100 dark:bg-sky-900 hover:bg-sky-200 dark:hover:bg-sky-800
                         text-sky-700 dark:text-sky-200 hover:text-sky-800 dark:hover:text-sky-100
@@ -42,9 +44,21 @@
                 </a>
             {% endif %}
         </li>
+
+        <li class="
+                flex
+                lg:hidden
+                items-stretch
+                ">
+            {% set name = "menu" %}
+            <a href="#footer">{{ ic::icon(name=name, classes="mt-1 mr-2") }}</a>
+        </li>
+
         {% for item in config.extra.nav %}
             <li class="
-                    items-stretch flex
+                    hidden
+                    lg:flex
+                    items-stretch
                     {% if item.sep %}
                         border-r border-zinc-200 dark:border-zinc-700 border-solid
                     {% endif %}
