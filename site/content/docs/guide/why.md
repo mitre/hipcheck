@@ -111,4 +111,4 @@ as shown by the track record of groups like [Fish in a Barrel](https://fishinaba
 a security research team who run fuzzers against open source code written
 in C and C++.
 
-{{ button(link="@/docs/guide/how-to-use.md", text="How to Use Hipcheck") }}
+{{ button(link="@/docs/guide/concepts.md", text="Key Concepts") }}

@@ -2,26 +2,24 @@
 title: Analyses
 ---
 
-Hipcheck includes a variety of analysis forms, which each may work on different
-sources of data, and have different meanings to understand when configuring
-them or interpreting their outputs. This page lists Hipcheck's analyses with
-the names they are given in the configuration file, what their data source
-is, the details of the analysis performed, what its current limitations are,
-and how the results of that analysis are thresholded based on the
-configuration.
+# Analyses
 
-## Hipcheck Modes
+This page lists Hipcheck's analyses with the names they are given in the
+configuration file, what their data source is, the details of the analysis
+performed, what its current limitations are, and how the results of that
+analysis are thresholded based on the configuration:
 
-Currently Hipcheck runs in one of two modes:
+- [Activity](#activity)
+- [Affiliation](#affiliation)
+- [Binary](#binary)
+- [Churn](#churn)
+- [Entropy](#entropy)
+- [Fuzz](#fuzz)
+- [Identity](#identity)
+- [Review](#review)
+- [Typo](#typo)
 
-* `repo` mode analyzes an entire repository.
-* `request` mode analyzes a single pull/merge request, whether merged or not.
-
-The analyses Hipcheck uses depend on which mode Hipcheck is running in.
-
-## `repo` Analyses
-
-### Activity
+## Activity
 
 * Configuration name: `analysis.practices.activity`
 * Data source: Git (committed date of most recent commit to `HEAD` branch)
@@ -34,11 +32,11 @@ repository, it will always be the default branch on the remote host.
 Hipcheck identifies the committed date of the most recent commit, and
 calculates the number of weeks between that commit and the day Hipcheck is
 performing this analysis. It then compares that duration against the
-configured threshold (default configuration: 52 weeks / one year). If the
+configured threshold (default configuration: 71 weeks / one year). If the
 duration in the repository is greater than the configured threshold, then
 the analysis will be marked as a failure.
 
-#### Limitations
+### Limitations
 
 * __Cases where lack of updates is warranted__: Sometimes work on a piece of
   software stops because it is complete, and there is no longer a need to
@@ -50,16 +48,16 @@ the analysis will be marked as a failure.
   may consider changing the configuration to a different duration, or disabling
   the analysis entirely.
 
-### Affiliation
+## Affiliation
 
 * Configuration name: `analysis.attacks.commit.affiliation`
 * Data source: Git (commit author identities)
 
 Affiliation analysis tries to identify when commit authors or committers
-may be affiliated or unaffiliated with some list of countries or organizations.
+may be affiliated or unaffiliated with some list of organizations.
 This determination is based on the email address associated with authors or
 committers on each Git commit, compared against a configured list of web hosts
-associated with organizations or countries of concern.
+associated with organizations of concern.
 
 The construction of the list is based on an "orgs file," whose path is provided
 in the configuration of this form of analysis. This orgs file defines two
@@ -95,10 +93,10 @@ kind = ["country:United States", "org:MITRE"]
 ```
 
 This strategy spec would flag any commits those authors or committers can be
-identified as being affiliated with any Chinese company listed in the file or
-with Google specifically.
+identified as being affiliated with any American company listed in the file or
+with MITRE specifically.
 
-#### Limitations
+### Limitations
 
 * __The orgs file is limited__: The current construction requires the manual
   definition, in the "orgs file," of companies, their associated web hosts, and
@@ -130,7 +128,7 @@ with Google specifically.
   contributions would be made in commits authored or committed by those using
   their corporate emails.
 
-### Binary
+## Binary
 
 * Configuration name: `analysis.practices.binary`
 * Data source: cloned repository (all files in cloned repo filetree)
@@ -149,7 +147,7 @@ the configured thershold amount, the repository fails this analysis.
 The analysis displays the internal filetree location of each suspicious binary file.
 The user can then examine each file to determine if it is malicious or not.
 
-#### Limitations
+### Limitations
 
 * __Not all binary files may be malicious__: The repo may use certain binary
   files (beyond image and audio files) for legitimate purposes. This
@@ -160,7 +158,7 @@ The user can then examine each file to determine if it is malicious or not.
   locations in the repo filetree. The user must search for them manually if
   they wish to learn more about them.
 
-### Churn
+## Churn
 
 * Configuration name: `analysis.attacks.commit.churn`
 * Data source: Git (commit diff lines added / deleted, and patch contents)
@@ -184,7 +182,7 @@ Churn cannot run if a repository contains only one commit (or only one commit
 that affects a source file). Churn analysis will always give an error when run
 against a repo with a single commit.
 
-#### Limitations
+### Limitations
 
 * __Whether churn surfaces malicious contributions is an open question__:
   We have ongoing work to confirm that churn does help identify the presence
@@ -195,7 +193,7 @@ against a repo with a single commit.
   work to assess the statistical qualities of the churn metric and determine
   whether it needs to be changed.
 
-### Entropy
+## Entropy
 
 * Configuration name: `analysis.attacks.commit.entropy`
 * Data source: Git (commit diff lines added / deleted, and patch contents)
@@ -222,7 +220,7 @@ Entropy cannot run if a repository contains only one commit (or only one commit
 that affects a source file). Entropy analysis will always give an error when run
 against a repo with a single commit.
 
-#### Limitations
+### Limitations
 
 * __Whether entropy surfaces malicious contributions is an open question__:
   We have ongoing work to confirm that entropy does help identify the presence
@@ -233,7 +231,7 @@ against a repo with a single commit.
   work to assess the statistical qualities of the entropy metric and determine
   whether it needs to be changed.
 
-### Fuzz
+## Fuzz
 
 * Configuration name: `analysis.practices.fuzz`
 
@@ -241,7 +239,7 @@ Repos being checked by Hipcheck may receive regular fuzz testing. This analysis
 checks if the repo is participating in the OSS Fuzz program. If it is fuzzed,
 this is considered a signal of a repository being lower risk.
 
-#### Limitations
+### Limitations
 
 * __Not all languagues supported__: Robust fuzzing tools do not exist for every
   language. It is possible fuzz testing was not done because no good option for it
@@ -251,7 +249,8 @@ this is considered a signal of a repository being lower risk.
 * __Only OSS Fuzz checked__: At this time, Hipcheck only checks if the repo
   participates in Google's OSS Fuzz. Other fuzz testing programs exist, but a repo
   will not pass this analysis if it uses one of those instead.
-### Identity
+
+## Identity
 
 * Configuration name: `analysis.practices.identity`
 * Data source: Git (commit author and committer identities)
@@ -265,7 +264,7 @@ commit did _not_ receive review, which could be a cause for concern. At the
 larger level, having a large percentage of commits with the same author
 and committer identities may indicate a project that lacks code review.
 
-#### Limitations
+### Limitations
 
 * __Not every project uses a workflow that accords with this analysis__:
   While some Git projects may use a workflow that involves the generation
@@ -274,7 +273,7 @@ and committer identities may indicate a project that lacks code review.
   the author and committer identity are the same, even though the commit
   received review.
 
-### Review
+## Review
 
 * Configuration name: `analysis.practices.review`
 * Data source: remote Git host API (currently supports: GitHub)
@@ -290,7 +289,7 @@ This works with the GitHub API, and requires a token in the configuration.
 Hipcheck only needs permissions for accessing public repository data, so
 those  are the only permissions to assign to your generated token.
 
-#### Limitations
+### Limitations
 
 * __Not every project uses GitHub__: While GitHub is a very popular host
   for Git repositories, it is by no means the _only_ host. This analysis'
@@ -301,7 +300,7 @@ those  are the only permissions to assign to your generated token.
   than the availability of this feature, and so don't have reviews on older
   pull requests.
 
-### Typo
+## Typo
 
 * Configuration name: `analysis.attacks.typo`
 * Data source: dependency definition for repository (currently supports: NPM \[JavaScript\])
@@ -321,7 +320,7 @@ Typo detection is based on the generation of possible typos for known names,
 according to a collection of typo possibilities, including single-character
 deletion, substitution, swapping, and more.
 
-#### Limitations
+### Limitations
 
 * __Only works for some languages__: Right now, this analysis only supports
   JavaScript projects. It requires the implementation of language-specific code
@@ -330,88 +329,4 @@ deletion, substitution, swapping, and more.
   names, which are not currently pulled from any external API or authoritative
   source.
 
-## `request` Analyses
-
-### Pull Request Affiliation
-* Configuration name: `analysis.attacks.commit.pr_affiliation` ("orgs file" is
-  in `analysis.attacks.commit.affiliation`)
-* Data source: Git (pull request commit author identities)
-
-This analysis is identical to the **Affiliation** analysis, but it only looks
-at the commit authors or committers that contributed to the pull/merge request.
-
-See **Affiliation** above for a description of how this analysis works and what
-its limitations are.
-
-### Pull Request Contributor Trust
-
-* Configuration name: `analysis.attacks.commit.contributor_trust`
-* Data source: Git (commit author contribution history)
-
-This analysis checks all of the commits in the pull/merge request to see if any of the
-commit authors are "trusted" or not. The current metric for detemining trust is how
-often the author has contributed to the repository.
-
-The analysis starts by looking at all commits in the repository dating back a
-configuration-specified number of months. It records the author of each commit and
-considers an author to be a trusted contributor if, in that time, it authored a number
-of commits greater than or equal to a threshold specified in the configuration. (i.e.
-a contributor is trusted if it authored M commits in N recent months).
-
-Authors are tracked by their e-mail address, to account for authors with the same name.
-
-Once a contributor trust map is generated this way, the analysis looks at the commits in
-the pull request. Each commit's author is checked against the contributor trust map to
-see if that author is trusted or not. Commits with untrusted authors are flagged. The
-percentage of flagged commits out of the total number of commits is compared to a
-configuration threshold. If too many commits have untrusted authors, the analysis fails.
-
-If the analysis fails, untustred contributors are reported to the user as concerns.
-
-**NB** The analysis currently counts the commits in the pull request when adding up the
-total commits by an author. Remember to account for this when setting the minimum commits
-needed for an author to be considered a trusted contributor.
-
-#### Limitations
-
-* __Simple trust metric__: At present, the only way that Hipcheck determines a
-  contributor's trust is by seeing how many prior commits they have made. More complex
-  measures of contributor trust exist, but these are not yet implemented.
-
-* __Follow up is needed for flagged contributors__: There are genuine reasons why a
-  contributor might not have contributed to many commits (e.g. contributor is new to the
-  project, repository was created recently). Best practice if a pull request fails this
-  analysis would be to follow up on who the flagged contributors are and what their commits
-  do.
-
-* __Contributors tracked by e-mail__ The same contributor may have multiple e-mail addresses,
-and it may be possible to spoof an e-mail address.
-
-### Pull Request Module Contributors
-
-* Configuration name: `analysis.attacks.commit.pr_module_contributors`
-* Data source: Git (commit author and committer identities) and JavaScript modules
-
-This analysis determines what fraction of contributors to a pull/merge request are
-modifying a module for the first time. This is considered to be suspicious behavior.
-
-The analysis examines each commit of the pull request. It identifies the modules
-affected by the commit, the commit author, and the committer. It then digs into the
-repository's history to determine if either contributor is modifying a module for the
-first time. If a contributor modifies at least one new module, they are flagged as
-potentially untrustworthy.
-
-The percentage of flagged contributors out of the total number of contributors is compared
-to a configuration threshold. If too many of the contributors to the pull request are
-modifying new modules, the analysis fails.
-
-#### Limitations
-
-* __Only works on repositories with a Javascript module structure__: If Hipcheck cannot
-  find the module structure of the repository, this analysis will report `Errored`.
-
-* __Follow up is needed for flagged contributors__: There are genuine reasons why a
-  contributor might modify a module for the first time (e.g. contributor is new to
-  the project, new module, repository was created recently). Best practice if a pull
-  request fails this analysis would be to follow up on who the flagged contributors are
-  and what their commits do.
+{{ button(link="@/docs/guide/configuration.md", text="Configuration") }}
