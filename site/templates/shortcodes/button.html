@@ -1,11 +1,7 @@
-
-{% if link is starting_with("@/") %}
-    {% set prefix = config.base_url ~ "/" %}
-    {% set link = link | replace(from="@/", to=prefix) %}
-{% endif %}
-
-{% if link is ending_with(".md") %}
-    {% set link = link | replace(from=".md", to="/") %}
+{% if link is starting_with("http") %}
+    {% set link = link %}
+{% else %}
+    {% set link = get_url(path=link) %}
 {% endif %}
 
 <a

@@ -20,7 +20,7 @@ container, see the [container installation instructions](#using-in-a-container).
 The easiest way to install Hipcheck is to use an install script included with
 each release.
 
-<a class="p-2 px-4 my-6 inline-block bg-blue-500 hover:bg-blue-600 text-white no-underline rounded-lg" href="https://github.com/mitre/hipcheck/releases/latest">Install with the latest install script &rarr;</a>
+{{ button(link="https://github.com/mitre/hipcheck/releases/latest", text="Install with the latest install script") }}
 
 We currently provide prebuilt binaries for the following targets:
 
