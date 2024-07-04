@@ -66,5 +66,5 @@ footer = [
 
 # Set an announcement for the site navigation bar.
 [extra.announce]
-url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.3.2"
-text = "Introducing Hipcheck 3.3.2"
+url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.4.0"
+text = "Introducing Hipcheck 3.4.0"
