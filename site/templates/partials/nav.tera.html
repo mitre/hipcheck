@@ -1,8 +1,6 @@
 
 {% import "macros/icon.tera.html" as ic %}
 
-{% set root = config.base_url | replace(from="https://mitre.github.io/", to="") %}
-
 <nav class="
         text-sm
         py-4 px-8
@@ -12,7 +10,7 @@
             mx-4
             ">
         <li class="block md:flex md:flex-1 items-stretch">
-	    <a href="{{ root }}/" class="
+	    <a href="{{ get_url(path="@/_index.md") }}" class="
                 items-stretch content-center
                 text-black dark:text-zinc-200 hover:text-green-600
                 text-xl
@@ -20,7 +18,7 @@
                 ">Hipcheck&nbsp;<span class="leading-none font-extrabold text-green-600 text-2xl">✓</span></a>
 
             {% if config.extra.announce %}
-	        <a href="{{ root }}{{ config.extra.announce.url }}"
+                <a href="{{ config.extra.announce.url }}"
                     class="
                         rounded-3xl
                         bg-sky-100 dark:bg-sky-900 hover:bg-sky-200 dark:hover:bg-sky-800
@@ -43,6 +41,12 @@
                     {% endif %}
                     ">
                 {% if not item.sep %}
+                    {% if item.url is starting_with("http") %}
+                        {% set url = item.url %}
+                    {% else %}
+                        {% set url = get_url(path=item.url) %}
+                    {% endif %}
+
                     <a class="
                         items-stretch
                         text-black dark:text-zinc-200 hover:text-blue-500
@@ -57,7 +61,7 @@
                         {% else %}
                             p-0
                         {% endif %}
-			" href="{{ root }}{{ item.url }}" {% if item.id %}id="{{ item.id }}"{% endif %}>
+			" href="{{ url }}" {% if item.id %}id="{{ item.id }}"{% endif %}>
                     {% if item.icon %}
                         {% set name = item.icon %}
                         {{ ic::icon(name=name, classes="mt-[-2px] ml-[-4px] mr-1") }}
