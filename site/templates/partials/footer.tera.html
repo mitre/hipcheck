@@ -1,9 +1,9 @@
 
 <div class="max-w-6xl mx-auto mt-32">
-    <div class="pb-16">
-        <div class="flex gap-8 dark:text-zinc-400">
+    <div class="pb-16 px-4 lg:px-0">
+        <div class="lg:flex gap-8 dark:text-zinc-400">
 
-            <div class="basis-1/4 text-lg">
+            <div class="lg:basis-1/4 text-lg my-8 lg:my-0">
                 <a href="{{ get_url(path="@/_index.md") }}" class="hover:text-green-600 font-semibold">
                     Hipcheck <span class="leading-none font-extrabold text-green-600 text-2xl">✓</span>
                 </a>
@@ -13,7 +13,7 @@
             </div>
 
             {% for list in config.extra.footer %}
-                <div class="basis-1/4 text-sm mt-[-1.75rem]">
+                <div class="lg:basis-1/4 text-sm lg:mt-[-1.75rem] my-8 lg:my-0">
                     <ul>
                         {% for item in list %}
                             <li>
