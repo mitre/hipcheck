@@ -15,7 +15,7 @@ it to your heart's content, we recommend the [Complete Guide](/docs/guide).
 First, you'll need to install Hipcheck. We __strongly__ recommend using the
 install script if you're on a platform for which we provide prebuilt binaries.
 
-{{ button(link="/install", text="Install Hipcheck") }}
+{{ button(link="@/install/_index.md", text="Install Hipcheck") }}
 
 ## Your First Hipcheck Run
 
