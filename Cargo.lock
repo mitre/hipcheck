@@ -774,7 +774,6 @@ dependencies = [
  "indextree",
  "indicatif",
  "indicatif-log-bridge",
- "libc",
  "log",
  "maplit",
  "nom",
