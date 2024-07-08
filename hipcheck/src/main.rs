@@ -644,7 +644,7 @@ fn cmd_update(args: &UpdateArgs) {
 		command_name = "hipcheck-update";
 	} else {
 		// If neither possible updater command us found, print this error
-		print_error(&hc_error!("Updater tool not found. Did you install Hipcheck with the official release script (which will install the updater tool)? If you installed Hipcheck from source, you must update Hipcheck by installing a new version from source manually."));
+		Shell::print_error(&hc_error!("Updater tool not found. Did you install Hipcheck with the official release script (which will install the updater tool)? If you installed Hipcheck from source, you must update Hipcheck by installing a new version from source manually."), Format::Human);
 		return;
 	}
 
@@ -653,7 +653,7 @@ fn cmd_update(args: &UpdateArgs) {
 	match hc_command.output() {
 		// Panic: Safe to unwrap because if the updater command runs, it will always produce some output to stderr
 		Ok(output) => std::io::stdout().write_all(&output.stderr).unwrap(),
-		Err(..) => print_error(&hc_error!("Updater command failed to run. You may need to re-install Hipcheck with the official release script.")),
+		Err(..) => Shell::print_error(&hc_error!("Updater command failed to run. You may need to re-install Hipcheck with the official release script."), Format::Human),
 	}
 }
 
