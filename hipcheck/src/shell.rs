@@ -98,6 +98,7 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::OnceCell;
 use std::fmt;
+use std::fmt::Alignment;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -273,9 +274,14 @@ impl Shell {
 	/// 
 	/// # Panics
 	/// - Panics if the global logger is not initialized. 
-	pub fn println(msg: impl AsRef<str>) {
+	pub fn println(msg: impl Display) {
+		// Do not print if verbosity is set to silent. 
+		if Shell::get_verbosity() == Verbosity::Silent {
+			return;
+		}
+
 		Shell::in_suspend(|| {
-			println!("{}", msg.as_ref());
+			println!("{msg}");
 		})
 	}
 
@@ -292,7 +298,7 @@ impl Shell {
 
 	/// Print "Analysing {source}" with the proper color/styling. 
 	pub fn print_prelude(source: impl AsRef<str>) {
-		macros::println!("{:>LEFT_COL_WIDTH$} {}", style("Analyzing").fg(PRELUDE_COLOR).bold(), source.as_ref());
+		macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Analyzing, source.as_ref());
 	}
 
 	/// Print a hipcheck [Error]. Human readable errors will go to the standard error, JSON will go to the standard output.
@@ -409,14 +415,8 @@ impl Shell {
 				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.using());
 				// At what time.
 				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.at_time());
-
-				// out!(self, &mut output.out, {
-				// 	m!(#nothing);
-				// 	m!(#title_analyzed &report.analyzed());
-				// 	m!(#more &report.using());
-				// 	m!(#more &report.at_time());
-				// 	m!(#report_nothing);
-				// });
+				// Space between this and analyses.
+				macros::println!();
 
 				/*===============================================================================
 				 * Passing analyses
@@ -425,22 +425,13 @@ impl Shell {
 				 */
 
 				if report.has_passing_analyses() {
-					macros::println!("{:>LEFT_COL_WIDTH$}", Title::Passed);
-
-				}
-
-				unimplemented!();
-
-				/* 
-				if report.has_passing_analyses() {
-					out!(self, &mut output.out, m!(#title_passing));
+					macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Passing"));
 
 					for analysis in report.passing_analyses() {
-						out!(self, &mut output.out, {
-							m!(#analysis_passed [encoded_as: self.encoding] &analysis.statement());
-							m!(#analysis_explanation &analysis.explanation());
-							m!(#report_nothing);
-						});
+						macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Passed, analysis.statement());
+						macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
+						// Empty line at end to space out analyses. 
+						macros::println!();
 					}
 				}
 
@@ -452,21 +443,20 @@ impl Shell {
 				 */
 
 				if report.has_failing_analyses() {
-					out!(self, &mut output.out, m!(#title_failing));
+					macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Failing"));
 
 					for failing_analysis in report.failing_analyses() {
 						let analysis = failing_analysis.analysis();
 
-						out!(self, &mut output.out, {
-							m!(#analysis_failed [encoded_as: self.encoding] &analysis.statement());
-							m!(#analysis_explanation &analysis.explanation());
-						});
+						macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Failed, analysis.statement());
+						macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
 
 						for concern in failing_analysis.concerns() {
-							out!(self, &mut output.out, m!(#more &concern.description()));
+							macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", concern.description());
 						}
 
-						out!(self, &mut output.out, m!(#report_nothing));
+						// Newline at the end for spacing. 
+						macros::println!();
 					}
 				}
 
@@ -477,20 +467,17 @@ impl Shell {
 				 */
 
 				if report.has_errored_analyses() {
-					out!(self, &mut output.out, m!(#title_errored));
+					macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Errored"));
 
 					for errored_analysis in report.errored_analyses() {
-						out!(
-							self,
-							&mut output.out,
-							m!(#analysis_errored &errored_analysis.top_msg())
-						);
+						macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Errored, errored_analysis.top_msg());
 
 						for msg in &errored_analysis.source_msgs() {
-							out!(self, &mut output.out, m!(#more msg));
+							macros::println!("{EMPTY:LEFT_COL_WIDTH$} {msg}");
 						}
 
-						out!(self, &mut output.out, m!(#report_nothing));
+						// Newline for spacing.
+						macros::println!();
 					}
 				}
 
@@ -502,12 +489,10 @@ impl Shell {
 
 				let recommendation = report.recommendation();
 
-				out!(self, &mut output.out, {
-					m!(#title_recommendation);
-					m!(#recommendation [kind: recommendation.kind] &recommendation.statement());
-					m!(#report_nothing);
-				});
-				*/
+				macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Recommendation"));
+				macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::from(recommendation.kind), recommendation.statement());
+				// Newline for spacing.
+				macros::println!();
 
 				Ok(())
 			}
@@ -524,8 +509,8 @@ enum Title {
 	Analyzing,
 	/// "Analyzed"
 	Analyzed,
-	// /// The name of the section.
-	// Section(&'a str),
+	/// The name of the section.
+	Section(&'static str),
 	/// An analysis passed.
 	Passed,
 	/// An analysis failed.
@@ -555,7 +540,7 @@ impl Title {
 		match self {
 			Analyzing => "Analyzing",
 			Analyzed => "Analyzed",
-			// Section(s) => s,
+			Section(s) => s,
 			Passed => "+",
 			Failed => "-",
 			Errored => "?",
@@ -573,7 +558,7 @@ impl Title {
 		use console::Color::*;
 
 		let color = match self {
-			Analyzed /* | Section(..) */ => Some(Blue),
+			Analyzed | Section(..) => Some(Blue),
 			Analyzing | Done | TimestampedDone => Some(Cyan),
 			InProgress => Some(Magenta),
 			Passed | Pass => Some(Green),
@@ -593,8 +578,40 @@ impl Title {
 
 impl Display for Title {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", self.style().apply_to(self.text()))
-		// write!(f, "{}", self.text())
+		match f.width() {
+			// No width designation -- just write the styled string itself. 
+			None => write!(f, "{}", self.style().apply_to(self.text())),
+			
+			// Width/alignment/padding handled here. 
+			Some(width) => {
+				let styled: String = self.style().apply_to(self.text()).to_string();
+
+				// Convert the alignment passed to the formatter. If there is no alignment, default to 
+				// left align.
+				let align = f.align().map(convert_alignment).unwrap_or(console::Alignment::Left);
+
+				let padded = console::pad_str(&styled, width, align, None);
+				f.write_str(&padded)
+			}
+		}
+	}
+}
+
+/// Convert an [Alignment] from [std::fmt] to [console::Alignment] trivially, using a match arm. 
+const fn convert_alignment(align: Alignment) -> console::Alignment {
+	match align	{
+		Alignment::Left => console::Alignment::Left,
+		Alignment::Right => console::Alignment::Right,
+		Alignment::Center => console::Alignment::Center,
+	}
+}
+
+impl From<RecommendationKind> for Title {
+	fn from(kind: RecommendationKind) -> Title {
+		match kind {
+			RecommendationKind::Pass => Title::Pass,
+			RecommendationKind::Investigate => Title::Investigate,
+		}
 	}
 }
 
@@ -724,7 +741,7 @@ macro_rules! pm {
 		$( pm!($self, $e) );*
 	}
 }
-
+*/
 /// Construct a `Message` with a shorthand format.
 ///
 /// Constructors defined here look like `#name [parameter_name: parameter] thing_to_print`.
@@ -867,7 +884,7 @@ macro_rules! m {
 		}
 	};
 }
-
+/*
 impl ShellInner {
 	/// Create a new `ShellInner` wrapping the output and error streams.
 	fn new(output: Output, error_output: Output, verbosity: Verbosity) -> ShellInner {
@@ -1382,14 +1399,6 @@ impl<'a> Display for Title<'a> {
 	}
 }
 
-impl<'a> From<RecommendationKind> for Title<'a> {
-	fn from(kind: RecommendationKind) -> Title<'a> {
-		match kind {
-			RecommendationKind::Pass => Title::Pass,
-			RecommendationKind::Investigate => Title::Investigate,
-		}
-	}
-}
 
 /// The outcome of an analysis.
 ///

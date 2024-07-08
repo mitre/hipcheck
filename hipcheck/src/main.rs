@@ -267,6 +267,9 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		}
 	}
 
+	// Reset the verbosity to normal to print the tree.  
+	Shell::set_verbosity(Verbosity::Normal);
+
 	let mut print_tree = ConvertTree(Arena::with_capacity(weight_tree.tree.capacity()));
 	let print_root = print_tree.convert_tree(weight_tree.root, &weight_tree.tree);
 
