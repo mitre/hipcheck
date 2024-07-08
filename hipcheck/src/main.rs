@@ -51,6 +51,8 @@ use cli::UpdateArgs;
 use command_util::DependentProgram;
 use config::WeightTreeNode;
 use config::WeightTreeProvider;
+use rustls::crypto::ring;
+use rustls::crypto::CryptoProvider;
 use core::fmt;
 use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
@@ -79,6 +81,10 @@ fn init_logging() {
 /// Entry point for Hipcheck.
 fn main() -> ExitCode {
 	init_logging();
+
+	// Install a process-wide default crypto provider.
+	CryptoProvider::install_default(ring::default_provider())
+		.expect("installed process-wide default crypto provider");
 
 	if cfg!(feature = "print-timings") {
 		println!("[TIMINGS]: Timing information will be printed.");
