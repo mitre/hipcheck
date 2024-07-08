@@ -10,7 +10,7 @@
 
 use std::time::Instant;
 
-/// Structure used to track timing that will print its location and elapsed time when dropped. 
+/// Structure used to track timing that will print its location and elapsed time when dropped.
 #[derive(Debug)]
 pub struct PrintTime {
 	pub location: String,

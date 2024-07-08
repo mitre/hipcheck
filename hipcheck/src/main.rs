@@ -36,8 +36,8 @@ use crate::session::session::Check;
 use crate::session::session::Session;
 use crate::session::session::TargetKind;
 use crate::setup::{resolve_and_transform_source, SourceType};
-use crate::shell::Shell;
 use crate::shell::verbosity::Verbosity;
+use crate::shell::Shell;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
 use cli::CheckArgs;
@@ -50,19 +50,18 @@ use cli::UpdateArgs;
 use command_util::DependentProgram;
 use config::WeightTreeNode;
 use config::WeightTreeProvider;
-use indicatif_log_bridge::LogWrapper;
-use shell::spinner_phase::SpinnerPhase;
 use core::fmt;
-use std::time::Duration;
 use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
 use indextree::Arena;
 use indextree::NodeId;
+use indicatif_log_bridge::LogWrapper;
 use ordered_float::NotNan;
 use pathbuf::pathbuf;
 use rustls::crypto::ring;
 use rustls::crypto::CryptoProvider;
 use schemars::schema_for;
+use shell::spinner_phase::SpinnerPhase;
 use std::env;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -73,23 +72,24 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::ExitCode;
 use std::result::Result as StdResult;
+use std::time::Duration;
 use util::fs::create_dir_all;
 use which::which;
 
 fn init_logging() -> std::result::Result<(), log::SetLoggerError> {
-	let logger = EnvLoggerBuilder::from_env(Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE"))
-		.build();
+	let logger =
+		EnvLoggerBuilder::from_env(Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE")).build();
 
 	LogWrapper::new(Shell::progress_bars(), logger).try_init()
 }
 
 /// Entry point for Hipcheck.
 fn main() -> ExitCode {
-	// Initialize the global shell with normal verbosity by default. 
+	// Initialize the global shell with normal verbosity by default.
 	Shell::init(Verbosity::Normal);
-	// Initialize logging. 
-	// This must be done after shell initialization. 
-	// Panic if this fails. 
+	// Initialize logging.
+	// This must be done after shell initialization.
+	// Panic if this fails.
 	init_logging().unwrap();
 
 	// Install a process-wide default crypto provider.
@@ -160,14 +160,12 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	);
 
 	match report {
-		Ok(AnyReport::Report(report)) => {
-			Shell::print_report(report, config.format())
-				.map(|()| ExitCode::SUCCESS)
-				.unwrap_or_else(|err| {
-					Shell::print_error(&err, Format::Human);
-					ExitCode::FAILURE
-				})
-		}
+		Ok(AnyReport::Report(report)) => Shell::print_report(report, config.format())
+			.map(|()| ExitCode::SUCCESS)
+			.unwrap_or_else(|err| {
+				Shell::print_error(&err, Format::Human);
+				ExitCode::FAILURE
+			}),
 		Err(e) => {
 			Shell::print_error(&e, config.format());
 			ExitCode::FAILURE
@@ -189,7 +187,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	// Get the raw hipcheck version.
 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 
-	// Set the global verbosity to silent so that we don't print phases/progress while downloading 
+	// Set the global verbosity to silent so that we don't print phases/progress while downloading
 	// the dummy repo.
 	Shell::set_verbosity(Verbosity::Silent);
 
@@ -267,7 +265,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		}
 	}
 
-	// Reset the verbosity to normal to print the tree.  
+	// Reset the verbosity to normal to print the tree.
 	Shell::set_verbosity(Verbosity::Normal);
 
 	let mut print_tree = ConvertTree(Arena::with_capacity(weight_tree.tree.capacity()));
@@ -329,7 +327,10 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 			pathbuf![p.as_path(), "scripts"],
 		),
 		_ => {
-			Shell::print_error(&hc_error!("expected source to be a directory"), Format::Human);
+			Shell::print_error(
+				&hc_error!("expected source to be a directory"),
+				Format::Human,
+			);
 			source.cleanup();
 			return ExitCode::FAILURE;
 		}
@@ -340,13 +341,19 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 		Shell::print_error(&hc_error!("target config dir not specified"), Format::Human);
 		return ExitCode::FAILURE;
 	};
-	
+
 	if !tgt_conf_path.exists() && create_dir_all(tgt_conf_path).is_err() {
-		Shell::print_error(&hc_error!("failed to create missing target config dir"), Format::Human);
+		Shell::print_error(
+			&hc_error!("failed to create missing target config dir"),
+			Format::Human,
+		);
 	}
 
 	let Ok(abs_conf_path) = tgt_conf_path.canonicalize() else {
-		Shell::print_error(&hc_error!("failed to canonicalize HC_CONFIG path"), Format::Human);
+		Shell::print_error(
+			&hc_error!("failed to canonicalize HC_CONFIG path"),
+			Format::Human,
+		);
 		return ExitCode::FAILURE;
 	};
 
@@ -356,20 +363,32 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 		return ExitCode::FAILURE;
 	};
 	if !tgt_data_path.exists() && create_dir_all(tgt_data_path).is_err() {
-		Shell::print_error(&hc_error!("failed to create missing target data dir"), Format::Human);
+		Shell::print_error(
+			&hc_error!("failed to create missing target data dir"),
+			Format::Human,
+		);
 	}
 	let Ok(abs_data_path) = tgt_data_path.canonicalize() else {
-		Shell::print_error(&hc_error!("failed to canonicalize HC_DATA path"), Format::Human);
+		Shell::print_error(
+			&hc_error!("failed to canonicalize HC_DATA path"),
+			Format::Human,
+		);
 		return ExitCode::FAILURE;
 	};
 
 	// Copy local config/data dirs to target locations
 	if let Err(e) = copy_dir_contents(src_conf_path, &abs_conf_path) {
-		Shell::print_error(&hc_error!("failed to copy config dir contents: {}", e), Format::Human);
+		Shell::print_error(
+			&hc_error!("failed to copy config dir contents: {}", e),
+			Format::Human,
+		);
 		return ExitCode::FAILURE;
 	}
 	if let Err(e) = copy_dir_contents(src_data_path, &abs_data_path) {
-		Shell::print_error(&hc_error!("failed to copy data dir contents: {}", e), Format::Human);
+		Shell::print_error(
+			&hc_error!("failed to copy data dir contents: {}", e),
+			Format::Human,
+		);
 		return ExitCode::FAILURE;
 	}
 
@@ -823,15 +842,16 @@ fn run(
 		TargetKind::RepoSource | TargetKind::SpdxDocument => {
 			// Run analyses against a repo and score the results (score calls analyses that call metrics).
 			let phase = SpinnerPhase::start("analyzing and scoring results");
-			
-			// Enable steady ticking on the spinner, since we currently don't increment it manually. 
+
+			// Enable steady ticking on the spinner, since we currently don't increment it manually.
 			phase.enable_steady_tick(Duration::from_millis(250));
 
 			let scoring = score_results(&phase, &session)?;
 			phase.finish_successful();
 
 			// Build the final report.
-			let report = build_report(&session, &scoring).context("failed to build final report")?;
+			let report =
+				build_report(&session, &scoring).context("failed to build final report")?;
 
 			Ok(AnyReport::Report(report))
 		}
@@ -839,14 +859,15 @@ fn run(
 		TargetKind::PackageVersion => {
 			// Run analyses against a repo and score the results (score calls analyses that call metrics).
 			let phase = SpinnerPhase::start("analyzing and scoring results");
-			// Enable steady ticking on the spinner, since we currently don't increment it manually. 
+			// Enable steady ticking on the spinner, since we currently don't increment it manually.
 			phase.enable_steady_tick(Duration::from_millis(250));
 
 			let scoring = score_results(&phase, &session)?;
 			phase.finish_successful();
 
 			// Build the final report.
-			let report = build_report(&session, &scoring).context("failed to build final report")?;
+			let report =
+				build_report(&session, &scoring).context("failed to build final report")?;
 
 			Ok(AnyReport::Report(report))
 		}

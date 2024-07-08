@@ -1,4 +1,4 @@
-//! Utilities for managing and controlling the verbosity of hipcheck. 
+//! Utilities for managing and controlling the verbosity of hipcheck.
 
 /// How verbose CLI output should be.
 #[derive(Debug, Default, Copy, Clone, PartialEq, clap::ValueEnum)]
@@ -15,8 +15,10 @@ pub enum Verbosity {
 }
 
 impl Verbosity {
-	/// [Verbosity::Quiet] if `quiet` is true, [Verbosity::Normal] otherwise. 
+	/// [Verbosity::Quiet] if `quiet` is true, [Verbosity::Normal] otherwise.
 	pub fn use_quiet(quiet: bool) -> Verbosity {
-		quiet.then_some(Verbosity::Quiet).unwrap_or(Verbosity::Normal)
+		quiet
+			.then_some(Verbosity::Quiet)
+			.unwrap_or(Verbosity::Normal)
 	}
 }

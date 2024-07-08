@@ -1,7 +1,7 @@
-//! Utilities for handling whether or not to use color while printing output. 
+//! Utilities for handling whether or not to use color while printing output.
 
-use std::str::FromStr;
 use crate::error::{Error, Result};
+use std::str::FromStr;
 
 /// Selection of whether the CLI output should use color.
 #[derive(Debug, Default, Copy, Clone, PartialEq, clap::ValueEnum)]

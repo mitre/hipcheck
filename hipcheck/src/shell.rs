@@ -94,6 +94,14 @@ use crate::hc_error;
 use crate::report::Format;
 use crate::report::RecommendationKind;
 use crate::report::Report;
+use console::Color;
+use console::Style;
+use console::Term;
+use dashmap::DashMap;
+use indicatif::MultiProgress;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
+use indicatif::TermLike;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::OnceCell;
@@ -114,28 +122,20 @@ use std::sync::OnceLock;
 use std::sync::RwLock;
 use std::time::Duration;
 use std::time::Instant;
-use console::Color;
-use console::Style;
-use console::Term;
-use dashmap::DashMap;
-use indicatif::MultiProgress;
-use indicatif::ProgressBar;
-use indicatif::ProgressStyle;
-use indicatif::TermLike;
 
-pub mod verbosity;
 pub mod color_choice;
-pub mod spinner_phase;
+pub mod iter;
+pub mod macros;
+pub mod par_iter;
 pub mod prelude;
 pub mod progress_phase;
-pub mod iter;
-pub mod par_iter;
-pub mod macros;
+pub mod spinner_phase;
+pub mod verbosity;
 
-/// Global static shell instance, stored in a [`OnceLock`] to make it thread safe and lazy. 
+/// Global static shell instance, stored in a [`OnceLock`] to make it thread safe and lazy.
 static GLOBAL_SHELL: OnceLock<Shell> = OnceLock::new();
 
-/// Global static storing the style that should be used for progress bars. 
+/// Global static storing the style that should be used for progress bars.
 static ITER_PROGRESS_BAR_STYLE: OnceLock<ProgressStyle> = OnceLock::new();
 
 const ROCKET_SHIP: Emoji = Emoji("🚀", "....");
@@ -143,40 +143,41 @@ const HOUR_GLASS: Emoji = Emoji("⏳", ">>>>");
 const GREEN_CHECKBOX: Emoji = Emoji("✅", "DONE ");
 const ERROR_ESCLAMATION: Emoji = Emoji("❗", "!!!!");
 
-/// The color used to print the prelude. 
+/// The color used to print the prelude.
 const PRELUDE_COLOR: Color = Color::Cyan;
 
-// The color used to print "Analyzed" in reports. 
+// The color used to print "Analyzed" in reports.
 const ANALYZED_COLOR: Color = Color::Blue;
 
-/// The width of the left column when printing errors/reports/etc. 
+/// The width of the left column when printing errors/reports/etc.
 const LEFT_COL_WIDTH: usize = 20;
 
-/// Empty static string used for drawing padding. 
+/// Empty static string used for drawing padding.
 const EMPTY: &'static str = "";
 
-/// Type interface to the global shell used to produce output in the user's terminal. 
+/// Type interface to the global shell used to produce output in the user's terminal.
 #[derive(Debug)]
 pub struct Shell {
-	/// Multi-progress bar object rendering all the different progress bars we're using. 
+	/// Multi-progress bar object rendering all the different progress bars we're using.
 	multi_progress: MultiProgress,
 	// /// List of all the progress bars actively being rendered --
-	// /// we just store this so that we can hide them all if someone wants to. 
+	// /// we just store this so that we can hide them all if someone wants to.
 	// /// (when will [indicatif] add a `.set_hidden()`) to [MultiProgress]?
 	// progress_bars: RwLock<Vec<ProgressBar>>,
-	/// The verbosity of this shell. 
+	/// The verbosity of this shell.
 	verbosity: RwLock<Verbosity>,
 }
 
 impl Shell {
-	/// Initialize the global shell. Panics if the global shell is already initialized. 
+	/// Initialize the global shell. Panics if the global shell is already initialized.
 	pub fn init(verbosity: Verbosity) {
 		if GLOBAL_SHELL.get().is_some() {
 			panic!("Global shell is already initialized");
 		}
 
-		GLOBAL_SHELL.get_or_init(move || {
-			Shell { multi_progress: MultiProgress::new(), verbosity: RwLock::new(verbosity)  }
+		GLOBAL_SHELL.get_or_init(move || Shell {
+			multi_progress: MultiProgress::new(),
+			verbosity: RwLock::new(verbosity),
 		});
 	}
 
@@ -186,7 +187,7 @@ impl Shell {
 		GLOBAL_SHELL.get()
 	}
 
-	/// Get a static reference to the global shell. Panics if the global shell has not yet been initialized. 
+	/// Get a static reference to the global shell. Panics if the global shell has not yet been initialized.
 	pub fn get() -> &'static Self {
 		Self::try_get().expect("global shell needs to be initialized.")
 	}
@@ -206,8 +207,8 @@ impl Shell {
 		*write_guard = verbosity;
 	}
 
-	/// Get the current verbosity of the global shell. 
-	/// 
+	/// Get the current verbosity of the global shell.
+	///
 	/// Be aware that the value may become outdated if another thread calls [Shell::set_verbosity].
 	pub fn get_verbosity() -> Verbosity {
 		Self::get()
@@ -223,17 +224,17 @@ impl Shell {
 		console::set_colors_enabled_stderr(enable);
 	}
 
-	/// Get a clone of the [`MultiProgress`] instance stored using [`Arc::clone`] under the hood. 
+	/// Get a clone of the [`MultiProgress`] instance stored using [`Arc::clone`] under the hood.
 	pub fn progress_bars() -> MultiProgress {
 		Self::get().multi_progress.clone()
 	}
 
-	/// Print timing info. Only enabled while hipcheck is being benchmarked. 
+	/// Print timing info. Only enabled while hipcheck is being benchmarked.
 	#[cfg(feature = "benchmarking")]
-	pub fn print_timing(timing: &crate::benchmarking::PrintTime) {		
+	pub fn print_timing(timing: &crate::benchmarking::PrintTime) {
 		use crate::benchmarking::PrintTime;
 
-		// Destructure timing object. 
+		// Destructure timing object.
 		let PrintTime { location, start } = timing;
 
 		Shell::in_suspend(|| {
@@ -245,8 +246,8 @@ impl Shell {
 		})
 	}
 
-	/// Print a message to the standard output if the standard output is a terminal. 
-	/// Panics if the global shell is not initialized or if there's an issue printing to the standard output. 
+	/// Print a message to the standard output if the standard output is a terminal.
+	/// Panics if the global shell is not initialized or if there's an issue printing to the standard output.
 	pub fn println_if_terminal(msg: impl AsRef<str>) {
 		Shell::get()
 			.multi_progress
@@ -254,28 +255,28 @@ impl Shell {
 			.expect("could print to standard output")
 	}
 
-	/// Suspend and hide all progress bars to write to the standard output or standard error. 
-	/// Do not do heavy coomputation here since the lock on the progress bars is held the whole time and 
-	/// may cause other threads to block waiting on a lock. 
-	/// 
+	/// Suspend and hide all progress bars to write to the standard output or standard error.
+	/// Do not do heavy coomputation here since the lock on the progress bars is held the whole time and
+	/// may cause other threads to block waiting on a lock.
+	///
 	/// # Panics
-	/// - Panics if the global shell is not initialized. 
+	/// - Panics if the global shell is not initialized.
 	fn in_suspend<F, R>(f: F) -> R
-	where F: FnOnce() -> R {
-		Self::get()
-			.multi_progress
-			.suspend(f)
+	where
+		F: FnOnce() -> R,
+	{
+		Self::get().multi_progress.suspend(f)
 	}
 
-	/// Print a message regardless of whether or not the standard output is a terminal. 
-	/// [Shell::println_if_terminal] may be more desirable in some cases. 
-	/// 
-	/// This will temporarily hide the progress bars to print. 
-	/// 
+	/// Print a message regardless of whether or not the standard output is a terminal.
+	/// [Shell::println_if_terminal] may be more desirable in some cases.
+	///
+	/// This will temporarily hide the progress bars to print.
+	///
 	/// # Panics
-	/// - Panics if the global logger is not initialized. 
+	/// - Panics if the global logger is not initialized.
 	pub fn println(msg: impl Display) {
-		// Do not print if verbosity is set to silent. 
+		// Do not print if verbosity is set to silent.
 		if Shell::get_verbosity() == Verbosity::Silent {
 			return;
 		}
@@ -285,18 +286,18 @@ impl Shell {
 		})
 	}
 
-	/// Bypass the recommended styling and print a message to the standard error. 
-	/// Temporarily hide the progress bar to print. 
-	/// 
+	/// Bypass the recommended styling and print a message to the standard error.
+	/// Temporarily hide the progress bar to print.
+	///
 	/// # Panics
-	/// - Panics if the global logger is not initialized. 
+	/// - Panics if the global logger is not initialized.
 	pub fn eprintln(msg: impl Display) {
 		Shell::in_suspend(|| {
 			eprintln!("{}", msg);
 		})
 	}
 
-	/// Print "Analysing {source}" with the proper color/styling. 
+	/// Print "Analysing {source}" with the proper color/styling.
 	pub fn print_prelude(source: impl AsRef<str>) {
 		macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Analyzing, source.as_ref());
 	}
@@ -305,18 +306,18 @@ impl Shell {
 	pub fn print_error(err: &Error, format: Format) {
 		match format {
 			Format::Human => {
-				// Print the root error -- the first in the chain should not be none. 
+				// Print the root error -- the first in the chain should not be none.
 				let mut chain = err.chain();
 				macros::eprintln!("{}", chain.next().expect("chain is not empty"));
-				
-				// Print remaining errors in chain. 
+
+				// Print remaining errors in chain.
 				for err in chain {
 					macros::eprintln!("{EMPTY:LEFT_COL_WIDTH$}{}", err);
 				}
 
-				// Print an extra newline at the end to separate error printing from other stuff. 
+				// Print an extra newline at the end to separate error printing from other stuff.
 				macros::eprintln!();
-			},
+			}
 
 			Format::Json => {
 				// Construct a JSON value from an error.
@@ -336,10 +337,10 @@ impl Shell {
 
 				log::trace!("writing message part [part='{:?}']", error_json);
 
-				// Suspend the progress bars to print the JSON. 
+				// Suspend the progress bars to print the JSON.
 				Shell::in_suspend(|| {
 					let mut stdout = Term::buffered_stdout();
-					
+
 					serde_json::to_writer_pretty(&mut stdout, &error_json)
 						.expect("Wrote JSON to standard output.");
 
@@ -347,24 +348,24 @@ impl Shell {
 					stdout.flush().expect("flushed standard out");
 				});
 			}
-		}	
+		}
 	}
 
-	/// Print the final repo report in the requested format to the standard output. 
+	/// Print the final repo report in the requested format to the standard output.
 	pub fn print_report(report: Report, format: Format) -> Result<()> {
 		match format {
 			// Print JSON report.
 			Format::Json => {
-				// Suspend the shell to print the JSON report. 
+				// Suspend the shell to print the JSON report.
 				Shell::in_suspend(|| {
 					let mut stdout = Term::stdout();
 					serde_json::to_writer_pretty(&mut stdout, &report)?;
 					stdout.flush()?;
 					Ok(())
 				})
-			},
+			}
 
-			// Human formatted report. 
+			// Human formatted report.
 			Format::Human => {
 				// Go through each part and print them individually.
 
@@ -411,7 +412,7 @@ impl Shell {
 				macros::println!();
 				// What repo we analyzed.
 				macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Analyzed, report.analyzed());
-				// With what version of hipcheck. 
+				// With what version of hipcheck.
 				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.using());
 				// At what time.
 				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.at_time());
@@ -428,9 +429,13 @@ impl Shell {
 					macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Passing"));
 
 					for analysis in report.passing_analyses() {
-						macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Passed, analysis.statement());
+						macros::println!(
+							"{:>LEFT_COL_WIDTH$} {}",
+							Title::Passed,
+							analysis.statement()
+						);
 						macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
-						// Empty line at end to space out analyses. 
+						// Empty line at end to space out analyses.
 						macros::println!();
 					}
 				}
@@ -448,14 +453,18 @@ impl Shell {
 					for failing_analysis in report.failing_analyses() {
 						let analysis = failing_analysis.analysis();
 
-						macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Failed, analysis.statement());
+						macros::println!(
+							"{:>LEFT_COL_WIDTH$} {}",
+							Title::Failed,
+							analysis.statement()
+						);
 						macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
 
 						for concern in failing_analysis.concerns() {
 							macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", concern.description());
 						}
 
-						// Newline at the end for spacing. 
+						// Newline at the end for spacing.
 						macros::println!();
 					}
 				}
@@ -470,7 +479,11 @@ impl Shell {
 					macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Errored"));
 
 					for errored_analysis in report.errored_analyses() {
-						macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Errored, errored_analysis.top_msg());
+						macros::println!(
+							"{:>LEFT_COL_WIDTH$} {}",
+							Title::Errored,
+							errored_analysis.top_msg()
+						);
 
 						for msg in &errored_analysis.source_msgs() {
 							macros::println!("{EMPTY:LEFT_COL_WIDTH$} {msg}");
@@ -490,16 +503,18 @@ impl Shell {
 				let recommendation = report.recommendation();
 
 				macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Recommendation"));
-				macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::from(recommendation.kind), recommendation.statement());
+				macros::println!(
+					"{:>LEFT_COL_WIDTH$} {}",
+					Title::from(recommendation.kind),
+					recommendation.statement()
+				);
 				// Newline for spacing.
 				macros::println!();
 
 				Ok(())
 			}
-		}}
-
-
-
+		}
+	}
 }
 
 /// The "title" of a message; may be accompanied by a timestamp or outcome.
@@ -554,8 +569,8 @@ impl Title {
 	}
 
 	fn style(&self) -> Style {
-		use Title::*;
 		use console::Color::*;
+		use Title::*;
 
 		let color = match self {
 			Analyzed | Section(..) => Some(Blue),
@@ -570,25 +585,27 @@ impl Title {
 
 		match color {
 			Some(c) => Style::new().fg(c).bold(),
-			None => Style::new()
+			None => Style::new(),
 		}
 	}
 }
 
-
 impl Display for Title {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		match f.width() {
-			// No width designation -- just write the styled string itself. 
+			// No width designation -- just write the styled string itself.
 			None => write!(f, "{}", self.style().apply_to(self.text())),
-			
-			// Width/alignment/padding handled here. 
+
+			// Width/alignment/padding handled here.
 			Some(width) => {
 				let styled: String = self.style().apply_to(self.text()).to_string();
 
-				// Convert the alignment passed to the formatter. If there is no alignment, default to 
+				// Convert the alignment passed to the formatter. If there is no alignment, default to
 				// left align.
-				let align = f.align().map(convert_alignment).unwrap_or(console::Alignment::Left);
+				let align = f
+					.align()
+					.map(convert_alignment)
+					.unwrap_or(console::Alignment::Left);
 
 				let padded = console::pad_str(&styled, width, align, None);
 				f.write_str(&padded)
@@ -597,9 +614,9 @@ impl Display for Title {
 	}
 }
 
-/// Convert an [Alignment] from [std::fmt] to [console::Alignment] trivially, using a match arm. 
+/// Convert an [Alignment] from [std::fmt] to [console::Alignment] trivially, using a match arm.
 const fn convert_alignment(align: Alignment) -> console::Alignment {
-	match align	{
+	match align {
 		Alignment::Left => console::Alignment::Left,
 		Alignment::Right => console::Alignment::Right,
 		Alignment::Center => console::Alignment::Center,

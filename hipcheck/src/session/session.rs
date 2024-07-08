@@ -95,10 +95,7 @@ impl salsa::Database for Session {}
 // Cannot be derived because `salsa::Storage` does not implement it
 impl fmt::Debug for Session {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(
-			f,
-			"Session {{ storage: salsa::Storage<Session> }}"
-		)
+		write!(f, "Session {{ storage: salsa::Storage<Session> }}")
 	}
 }
 
@@ -158,13 +155,11 @@ impl Session {
 		 *  Loading configuration.
 		 *-----------------------------------------------------------------*/
 
-		let (config, config_dir, data_dir, hc_github_token) = match load_config_and_data(
-			config_path.as_deref(),
-			data_path.as_deref(),
-		) {
-			Ok(results) => results,
-			Err(err) => return Err(err),
-		};
+		let (config, config_dir, data_dir, hc_github_token) =
+			match load_config_and_data(config_path.as_deref(), data_path.as_deref()) {
+				Ok(results) => results,
+				Err(err) => return Err(err),
+			};
 
 		// Set config input queries for use below
 		session.set_config(Rc::new(config));
@@ -239,7 +234,7 @@ fn load_config_and_data(
 ) -> Result<(Config, PathBuf, PathBuf, String)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("loading configuration and data files");
-	// Increment the phase into the "running" stage. 
+	// Increment the phase into the "running" stage.
 	phase.inc();
 
 	// Resolve the path to the config file.
@@ -268,11 +263,7 @@ fn load_config_and_data(
 	))
 }
 
-fn load_source(
-	source: &str,
-	source_type: &Check,
-	home: &Path,
-) -> Result<Source> {
+fn load_source(source: &str, source_type: &Check, home: &Path) -> Result<Source> {
 	// Resolve the source specifier into an actual source.
 	let phase_desc = match source_type.kind.target_kind() {
 		TargetKind::RepoSource => "resolving git repository source",

@@ -294,10 +294,7 @@ impl SourceChangeRequest {
 	}
 
 	#[allow(dead_code)]
-	fn resolve_local_change_request(
-		raw: &str,
-		local: PathBuf,
-	) -> Result<SourceChangeRequest> {
+	fn resolve_local_change_request(raw: &str, local: PathBuf) -> Result<SourceChangeRequest> {
 		let head = get_head_commit(&local).context("can't get head commit for local source")?;
 		let (remote, pull_request_id) = SourceChangeRequest::try_resolve_remote_for_local(&local)?;
 
