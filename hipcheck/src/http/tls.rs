@@ -3,9 +3,7 @@
 //! Constructs an [`Agent`] with TLS using system certificates that can be used for making HTTP requests.
 
 use crate::error::Result;
-use rustls::{
-	ClientConfig, RootCertStore,
-};
+use rustls::{ClientConfig, RootCertStore};
 use std::sync::Arc;
 use ureq::{Agent, AgentBuilder};
 
