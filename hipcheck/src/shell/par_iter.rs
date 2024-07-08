@@ -338,11 +338,15 @@ where
 
 #[cfg(test)]
 mod test {
+	use crate::shell::{verbosity::Verbosity, Shell};
 	use super::{ParallelTrackAsPhase, SpinnerPhaseTracker};
 	use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 	#[test]
 	fn it_can_wrap_a_parallel_iterator() {
+		// Initialize the global shell.
+		Shell::init(Verbosity::Normal);
+
 		let v = vec![1, 2, 3];
 		fn wrap<'a, T: ParallelIterator<Item = &'a i32>>(it: SpinnerPhaseTracker<T>) {
 			assert_eq!(it.map(|x| x * 2).collect::<Vec<_>>(), vec![2, 4, 6]);
