@@ -1526,22 +1526,4 @@ trait Print {
 		Ok(())
 	}
 }
-
-
-
-// The following code to handle window sizing and line clearing in a cross-platform manner
-// is adapted from the Cargo project (MIT license). https://github.com/rust-lang/cargo
-
-/// Represents the width of the TTY output.
-#[derive(Debug)]
-#[allow(dead_code)]
-enum TtyWidth {
-	/// stdout is not a TTY.
-	NoTty,
-	/// We know the size of the TTY window exactly.
-	Known(usize),
-	/// We have a guess at the size of the TTY window.
-	Guess(usize),
-}
-
 */
