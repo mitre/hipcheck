@@ -805,7 +805,6 @@ dependencies = [
  "url",
  "walkdir",
  "which",
- "winapi",
  "xml-rs",
  "xz2",
  "zip",

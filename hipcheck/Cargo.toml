@@ -96,16 +96,6 @@ features = [
     "ring"
 ]
 
-# Windows-specific dependencies
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = [
-    "handleapi",
-    "processenv",
-    "winbase",
-    "wincon",
-    "winnt",
-] }
-
 [build-dependencies]
 anyhow = "1.0.86"
 which = { version = "6.0.1", default-features = false }
