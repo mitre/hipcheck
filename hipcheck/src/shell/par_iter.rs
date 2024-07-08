@@ -338,8 +338,8 @@ where
 
 #[cfg(test)]
 mod test {
-	use crate::shell::{verbosity::Verbosity, Shell};
 	use super::{ParallelTrackAsPhase, SpinnerPhaseTracker};
+	use crate::shell::{verbosity::Verbosity, Shell};
 	use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 	#[test]
