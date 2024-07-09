@@ -21,7 +21,6 @@ name = "hc"
 path = "src/main.rs"
 
 [dependencies]
-
 content_inspector = "0.2.4"
 dotenv = "0.15.0"
 chrono = { version = "0.4.19", features = ["serde"] }
@@ -67,8 +66,6 @@ xml-rs = "0.8.20"
 rayon = "1.10.0"
 indexmap = "2.2.6"
 dashmap = { version = "6.0.1", features = ["rayon", "inline"] }
-# Vendor libgit2 and openssl so that they will be statically included and not cause problems on certain systems that might not have one or the other. 
-git2 = { version = "0.19.0", features = ["vendored-libgit2", "vendored-openssl"]}
 indicatif = { version = "0.17.8", features = ["rayon"] }
 finl_unicode = { version = "1.2.0", default-features = false, features = [
     "grapheme_clusters",
@@ -81,6 +78,10 @@ indextree = "4.6.1"
 num-traits = "0.2.19"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
 term_size = "0.3.2"
+# openssl-probe = "0.1.5"
+http = "1"
+dialoguer = "0.11.0"
+base64 = "0.22.1"
 
 # Exactly matching the version of rustls used by ureq
 # Get rid of default features since we don't use the AWS backed crypto provider (we use ring).
@@ -93,6 +94,21 @@ features = [
     "std",
     "tls12",
     "ring"
+]
+
+
+# Vendor libgit2 and openssl so that they will be statically included and 
+# not cause problems on certain systems that might not have one or the other. 
+# Use my (venus's) version of `git2` until https://github.com/rust-lang/git2-rs/pull/1066 
+# is merged.
+# This gives us the `libgit2` tracing shim function that I'm trying to get merged upstream.
+[dependencies.git2]
+git = "https://github.com/vcfxb/git2-rs.git"
+default-features = false
+features = [
+    "vendored-libgit2", 
+    "https",
+    "vendored-openssl"
 ]
 
 [build-dependencies]

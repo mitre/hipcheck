@@ -181,7 +181,7 @@ impl Shell {
 	///
 	/// # Panics
 	/// - Panics if the global shell is not initialized.
-	fn in_suspend<F, R>(f: F) -> R
+	pub fn in_suspend<F, R>(f: F) -> R
 	where
 		F: FnOnce() -> R,
 	{
