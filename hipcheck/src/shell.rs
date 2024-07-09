@@ -2,13 +2,12 @@
 
 #![deny(missing_docs)]
 
-use console::Emoji;
-use verbosity::Verbosity;
 use crate::error::Error;
 use crate::error::Result;
 use crate::report::Format;
 use crate::report::RecommendationKind;
 use crate::report::Report;
+use console::Emoji;
 use console::Style;
 use console::Term;
 use indicatif::MultiProgress;
@@ -20,6 +19,7 @@ use std::fmt::Formatter;
 use std::io::Write;
 use std::sync::OnceLock;
 use std::sync::RwLock;
+use verbosity::Verbosity;
 
 #[cfg(feature = "print-timings")]
 use console::style;
@@ -109,7 +109,7 @@ impl Shell {
 			.read()
 			.expect("acquired read guard to global verbosity");
 
-		// Deref-copy and return. 
+		// Deref-copy and return.
 		*guard
 	}
 

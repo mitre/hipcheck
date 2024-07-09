@@ -4,7 +4,7 @@
 
 use crate::shell::Title;
 
-use super::{Shell, HOUR_GLASS, ROCKET_SHIP, LEFT_COL_WIDTH};
+use super::{Shell, HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP};
 use console::style;
 use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
 use std::{
@@ -104,17 +104,29 @@ impl ProgressPhase {
 		self.bar.inc(amount)
 	}
 
-	/// Finishes this bar, leaving a "done" message with a timestamp in the terminal. 
+	/// Finishes this bar, leaving a "done" message with a timestamp in the terminal.
 	#[allow(unused)]
 	pub fn finish_successful(&self) {
-		super::macros::println!("{:>LEFT_COL_WIDTH$} {} ({})", Title::Done, self.name, style(HumanDuration(self.elapsed())).bold());
+		super::macros::println!(
+			"{:>LEFT_COL_WIDTH$} {} ({})",
+			Title::Done,
+			self.name,
+			style(HumanDuration(self.elapsed())).bold()
+		);
+
 		self.bar.finish_and_clear();
 	}
 
-	/// Finishes this bar, leaving a "errored" message in the terminal with a timestamp. 
+	/// Finishes this bar, leaving a "errored" message in the terminal with a timestamp.
 	#[allow(unused)]
 	pub fn finish_error(&self) {
-		super::macros::println!("{:>LEFT_COL_WIDTH$} {} ({})", Title::Errored, self.name, style(HumanDuration(self.elapsed())).bold());
+		super::macros::println!(
+			"{:>LEFT_COL_WIDTH$} {} ({})",
+			Title::Errored,
+			self.name,
+			style(HumanDuration(self.elapsed())).bold()
+		);
+
 		self.bar.finish_and_clear();
 	}
 }

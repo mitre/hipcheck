@@ -4,7 +4,7 @@
 
 use crate::shell::Title;
 
-use super::{Shell, HOUR_GLASS, ROCKET_SHIP, LEFT_COL_WIDTH};
+use super::{Shell, HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP};
 use console::style;
 use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
 use std::{
@@ -91,14 +91,26 @@ impl SpinnerPhase {
 
 	/// Finishes this spinner, leaving it in the terminal with an updated "done" message.
 	pub fn finish_successful(&self) {
-		super::macros::println!("{:>LEFT_COL_WIDTH$} {} ({})", Title::Done, self.name, style(HumanDuration(self.elapsed())).bold());
+		super::macros::println!(
+			"{:>LEFT_COL_WIDTH$} {} ({})",
+			Title::Done,
+			self.name,
+			style(HumanDuration(self.elapsed())).bold()
+		);
+
 		self.bar.finish_and_clear()
 	}
 
 	/// Finish this spinner, leaving it in the terminal with an updated "error" message and a red exclamation.
 	#[allow(unused)]
 	pub fn finish_error(&self) {
-		super::macros::println!("{:>LEFT_COL_WIDTH$} {} ({})", Title::Errored, self.name, style(HumanDuration(self.elapsed())).bold());
+		super::macros::println!(
+			"{:>LEFT_COL_WIDTH$} {} ({})",
+			Title::Errored,
+			self.name,
+			style(HumanDuration(self.elapsed())).bold()
+		);
+
 		self.bar.finish_and_clear()
 	}
 }

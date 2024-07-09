@@ -17,6 +17,10 @@ pub enum Verbosity {
 impl Verbosity {
 	/// [Verbosity::Quiet] if `quiet` is true, [Verbosity::Normal] otherwise.
 	pub fn use_quiet(quiet: bool) -> Verbosity {
-		if quiet { Verbosity::Quiet } else { Verbosity::Normal }
+		if quiet {
+			Verbosity::Quiet
+		} else {
+			Verbosity::Normal
+		}
 	}
 }

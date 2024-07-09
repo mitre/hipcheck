@@ -237,7 +237,7 @@ fn load_config_and_data(
 	let phase = SpinnerPhase::start("loading configuration and data files");
 	// Increment the phase into the "running" stage.
 	phase.inc();
-	// Set the spinner phase to tick constantly, 10 times a second. 
+	// Set the spinner phase to tick constantly, 10 times a second.
 	phase.enable_steady_tick(Duration::from_millis(100));
 
 	// Resolve the path to the config file.
