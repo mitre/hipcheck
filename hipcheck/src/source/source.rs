@@ -6,8 +6,9 @@ use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
 use crate::shell::spinner_phase::SpinnerPhase;
-// use crate::shell::Phase;
+use crate::shell::Shell;
 pub use crate::source::query::*;
+use git2::Repository;
 use log::debug;
 use pathbuf::pathbuf;
 use std::fmt;
@@ -647,6 +648,9 @@ fn get_url_for_remote(dest: &Path, remote: &str) -> Result<String> {
 }
 
 fn update_remote(dest: &Path) -> Result<()> {
+	let repo = Repository::open(dest)?;
+	Shell::in_suspend(|| { dbg!(&repo.remotes().unwrap().into_iter().collect::<Vec<_>>()); });
+
 	let _output = GitCommand::for_repo(dest, ["pull"])?.output()?;
 
 	Ok(())
