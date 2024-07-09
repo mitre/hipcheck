@@ -110,8 +110,8 @@ fn main() -> ExitCode {
 
 	// Enable the `trace-git2` feature for warnings from `git2`. 
 	if cfg!(feature = "trace-git2") {
-		git2::trace_set(git2::TraceLevel::Warn, |level, msg| {
-			shell::macros::eprintln!("[gi2 trace]: {level:?}: {msg}");
+		git2::trace_set(git2::TraceLevel::Debug, |level, msg| {
+			shell::macros::eprintln!("[git2 trace]: {level:?}: {msg}");
 		});
 	}
 
