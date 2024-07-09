@@ -275,6 +275,8 @@ fn load_source(source: &str, source_type: &Check, home: &Path) -> Result<Source>
 	};
 
 	let phase = SpinnerPhase::start(phase_desc);
+	// Set the phase to tick steadily 10 times a second.
+	phase.enable_steady_tick(Duration::from_millis(100));
 	let source = resolve_source(source_type, &phase, home, source)?;
 	phase.finish_successful();
 

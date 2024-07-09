@@ -97,6 +97,24 @@ fn main() -> ExitCode {
 	CryptoProvider::install_default(ring::default_provider())
 		.expect("installed process-wide default crypto provider");
 
+	// // Tell git2 where to find native tls certs using openssl-probe.
+	// openssl_probe::probe()
+	// 	.cert_dir
+	// 	.inspect(|path| {
+	// 		dbg!(&path);
+
+	// 		unsafe {
+	// 			git2::opts::set_ssl_cert_dir(path).expect("successfully set ssl cert dir")
+	// 		}
+	// 	});
+
+	// Enable the `trace-git2` feature for warnings from `git2`. 
+	if cfg!(feature = "trace-git2") {
+		git2::trace_set(git2::TraceLevel::Warn, |level, msg| {
+			shell::macros::eprintln!("[gi2 trace]: {level:?}: {msg}");
+		});
+	}
+
 	if cfg!(feature = "print-timings") {
 		Shell::eprintln("[TIMINGS]: Timing information will be printed.");
 	}

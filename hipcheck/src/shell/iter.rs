@@ -68,7 +68,8 @@ impl<I: Iterator> Iterator for ProgressPhaseTracker<I> {
 		if item.is_some() {
 			self.phase.inc(1);
 		} else if !self.phase.bar.is_finished() {
-			self.phase.finish_successful();
+			// Don't print a "done" message by default.
+			self.phase.finish_successful(false);
 		}
 
 		item
@@ -111,7 +112,8 @@ impl<I: DoubleEndedIterator> DoubleEndedIterator for ProgressPhaseTracker<I> {
 		if item.is_some() {
 			self.phase.inc(1);
 		} else if !self.phase.bar.is_finished() {
-			self.phase.finish_successful();
+			// Don't print a "done" message by default.
+			self.phase.finish_successful(false);
 		}
 
 		item
