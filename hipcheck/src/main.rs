@@ -50,6 +50,7 @@ use cli::UpdateArgs;
 use command_util::DependentProgram;
 use config::WeightTreeNode;
 use config::WeightTreeProvider;
+use shell::color_choice::ColorChoice;
 use core::fmt;
 use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
@@ -108,6 +109,13 @@ fn main() -> ExitCode {
 
 	// Set the global verbosity.
 	Shell::set_verbosity(config.verbosity());
+
+	// Set whether to use colors.
+	match config.color() {
+		ColorChoice::Always => Shell::set_colors_enabled(true),
+		ColorChoice::Never => Shell::set_colors_enabled(false),
+		ColorChoice::Auto => {}
+	}
 
 	match config.subcommand() {
 		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),

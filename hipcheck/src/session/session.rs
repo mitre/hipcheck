@@ -57,6 +57,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::result::Result as StdResult;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Immutable configuration and base data for a run of Hipcheck.
 #[salsa::database(
@@ -236,6 +237,8 @@ fn load_config_and_data(
 	let phase = SpinnerPhase::start("loading configuration and data files");
 	// Increment the phase into the "running" stage.
 	phase.inc();
+	// Set the spinner phase to tick constantly, 10 times a second. 
+	phase.enable_steady_tick(Duration::from_millis(100));
 
 	// Resolve the path to the config file.
 	let valid_config_path = config_path

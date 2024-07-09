@@ -2,9 +2,11 @@
 //!
 //! This can be useful for things like while-loops and iterators without a known size.
 
-use super::{Shell, ERROR_ESCLAMATION, GREEN_CHECKBOX, HOUR_GLASS, ROCKET_SHIP};
-use console::{style, Emoji};
-use indicatif::{ProgressBar, ProgressStyle};
+use crate::shell::Title;
+
+use super::{Shell, HOUR_GLASS, ROCKET_SHIP, LEFT_COL_WIDTH};
+use console::style;
+use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
 use std::{
 	fmt::Display,
 	sync::{Arc, OnceLock},
@@ -87,21 +89,17 @@ impl SpinnerPhase {
 		self.bar.enable_steady_tick(interval);
 	}
 
-	/// Internal function to finish with a new status and an emoji.
-	fn finish_status(&self, status: impl Display, prefix: &Emoji) {
-		self.bar.set_message(format!("{} ({status})", self.name));
-		self.bar.set_prefix(prefix.to_string());
-		self.bar.finish()
-	}
-
-	/// Finishes this spinner, leaving it in the terminal with an updated "done" message and a green check.
+	/// Finishes this spinner, leaving it in the terminal with an updated "done" message.
 	pub fn finish_successful(&self) {
-		self.finish_status(style("done").green(), &GREEN_CHECKBOX);
+		super::macros::println!("{:>LEFT_COL_WIDTH$} {} ({})", Title::Done, self.name, style(HumanDuration(self.elapsed())).bold());
+		self.bar.finish_and_clear()
 	}
 
 	/// Finish this spinner, leaving it in the terminal with an updated "error" message and a red exclamation.
+	#[allow(unused)]
 	pub fn finish_error(&self) {
-		self.finish_status(style("error").red().bold(), &ERROR_ESCLAMATION);
+		super::macros::println!("{:>LEFT_COL_WIDTH$} {} ({})", Title::Errored, self.name, style(HumanDuration(self.elapsed())).bold());
+		self.bar.finish_and_clear()
 	}
 }
 

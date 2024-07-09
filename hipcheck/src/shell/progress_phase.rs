@@ -2,11 +2,12 @@
 //!
 //! This can be useful for things like like file download, where the number of bytes is known.
 
-use super::{Shell, ERROR_ESCLAMATION, GREEN_CHECKBOX, HOUR_GLASS, ROCKET_SHIP};
-use console::{style, Emoji};
-use indicatif::{ProgressBar, ProgressStyle};
+use crate::shell::Title;
+
+use super::{Shell, HOUR_GLASS, ROCKET_SHIP, LEFT_COL_WIDTH};
+use console::style;
+use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
 use std::{
-	fmt::Display,
 	sync::{Arc, OnceLock},
 	time::Duration,
 };
@@ -29,11 +30,13 @@ fn get_styles() -> &'static [ProgressStyle] {
 }
 
 /// Get a unit-agnostic/unit-unaware style for drawing progress bars.
+#[allow(unused)]
 pub fn get_unit_agnostic_style() -> &'static ProgressStyle {
 	&get_styles()[0]
 }
 
 /// Get a progress bar style that formats the position and length as bytes.
+#[allow(unused)]
 pub fn get_bytes_style() -> &'static ProgressStyle {
 	&get_styles()[1]
 }
@@ -48,6 +51,7 @@ pub struct ProgressPhase {
 	pub(super) bar: ProgressBar,
 }
 
+#[allow(unused)]
 impl ProgressPhase {
 	/// Create a new progress bar and attach it to the global [Shell]'s multi-progress.
 	///
@@ -100,21 +104,18 @@ impl ProgressPhase {
 		self.bar.inc(amount)
 	}
 
-	/// Internal function to finish with a status and an emoji.
-	fn finish_status(&self, status: impl Display, prefix: &Emoji) {
-		self.bar.set_message(format!("{} ({status})", self.name));
-		self.bar.set_prefix(prefix.to_string());
-		self.bar.finish()
-	}
-
-	/// Finishes this spinner, leaving it in the terminal with an updated "done" message and a green check.
+	/// Finishes this bar, leaving a "done" message with a timestamp in the terminal. 
+	#[allow(unused)]
 	pub fn finish_successful(&self) {
-		self.finish_status(style("done").green(), &GREEN_CHECKBOX);
+		super::macros::println!("{:>LEFT_COL_WIDTH$} {} ({})", Title::Done, self.name, style(HumanDuration(self.elapsed())).bold());
+		self.bar.finish_and_clear();
 	}
 
-	/// Finish this spinner, leaving it in the terminal with an updated "error" message and a red exclamation.
+	/// Finishes this bar, leaving a "errored" message in the terminal with a timestamp. 
+	#[allow(unused)]
 	pub fn finish_error(&self) {
-		self.finish_status(style("error").red().bold(), &ERROR_ESCLAMATION);
+		super::macros::println!("{:>LEFT_COL_WIDTH$} {} ({})", Title::Errored, self.name, style(HumanDuration(self.elapsed())).bold());
+		self.bar.finish_and_clear();
 	}
 }
 

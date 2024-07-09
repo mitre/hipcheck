@@ -1,126 +1,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/*!
- * The interface to print things to the end-user.
- *
- * ## How to use the `Shell`
- *
- * Generally, you'll interact with the [`Shell`] through the `Session` type. The initialization
- * of the [`Shell`] is one of the first things to happen in Hipcheck after parsing, so we can
- * gracefully report errors if they arise.
- *
- * The [`Shell`] is initialized by providing the desired [`Verbosity`], [`ColorChoice`], and
- * [`Encoding`].
- *
- * Printing progress in Hipcheck has three parts: the prelude, the phases, and the result.
- *
- * The prelude is printed with [`Shell::prelude`], which takes the raw string name of the source
- * to be analyzed. This printing happens _before_ source specifiers are resolved into the
- * `Source` type, which is why it's a string here.
- *
- * Throughout Hipcheck's run, you can add new lines of progress to report using the [`Shell::phase`]
- * method, which takes in a string describing the work being done during the phase, and
- * returns a [`Phase`] handle which can be used to provide update messages with the [`Phase::update`]
- * method, and is closed out with the [`Phase::finish`] method.
- *
- * Finally, the final result is printed using the [`Shell::report`] method.
- * These methods don't print using the `Shell`'s `output` and `error_output` streams, but rather
- * accept a caller-provided stream to write to. This allows flexibility in sending the final
- * report to a different destination than log messages.
- * These methods take a `&mut Output`, a [`Report`], and a [`Format`].
- *
- * At any point, errors may also be printed using [`Shell::error`], which takes an
- * [`&Error`][crate::error:Error] and a [`Format`].
- *
- * ## Why the shell interface?
- *
- * This crate exists for a few reasons:
- *
- * 1. To ensure Hipcheck always prints things out in a consistent format.
- * 2. To make sure information is always printed to the correct stream.
- * 3. To make it so other parts of the system don't have to worry about printing things.
- * 4. To encapsulate handling of things like color, character encoding, output format, verbosity,
- *    stream redirection, and more.
- *
- * ## Why is the shell implementation so complex?
- *
- * This module is one of the more complex ones within Hipcheck. This complexity is present
- * for a few reasons:
- *
- * - The [`Shell`] type needs to take `&self` for its methods to avoid issues when used in
- *   Hipcheck's central `Session` type (because then we'd be mutating `Session`, which is
- *   a no-no).
- * - The nature of the output can vary along multiple dimensions (format, verbosity, TTY
- *   or not), and those all need to be handled correctly.
- * - Shell printing involves some degree of cross-platform code (in our case to ensure we
- *   are clearing lines consistently on all platforms).
- * - Different types of messages should be printed consistently in a visually pleasing
- *   format.
- *
- * To take care of this, we do a few things here:
- *
- * First, [`Shell`] wraps `Cell<Option<ShellInner>>`, where all the important logic is
- * implemented on [`ShellInner`]. The methods on [`Shell`], simply take the inner value out,
- * call the method on it, and then put it back in the [`Cell`]. This lets us keep the
- * user-facing methods taking `&self` instead of `&mut self`.
- *
- * Then, [`Shell`] incorporates a [`Printer`] type to handle the logic of when to print newline
- * or not, when to silence or not, and when to clear a line or not. All three of these are
- * dependent both on the configuration of the [`Printer`] _and_ the nature of the `Message`
- * being printed. Some messages must always be printed (i.e., the final output messages).
- *
- * Also, we sometimes want lines which we can update with progress as a phase of work
- * progresses. This is achieved with the `Phase` type, which provides a simple API (internally
- * calling methods on [`ShellInner`]) to create and then update a line, before ending a phase and
- * moving on to other messages.
- *
- * We also want to make sure [`Message`] values are printed consistently, which we accomplish
- * using a [`Print`] trait which abstracts over the handling of color, bolding, width, and
- * alignment.
- *
- * Finally, we incorporate some platform-specific code to handle clearing the line, which it
- * turns out is more complicated than you may expect!
- */
-
 #![deny(missing_docs)]
 
-use console::style;
 use console::Emoji;
 use verbosity::Verbosity;
-
 use crate::error::Error;
 use crate::error::Result;
-use crate::hc_error;
 use crate::report::Format;
 use crate::report::RecommendationKind;
 use crate::report::Report;
-use console::Color;
 use console::Style;
 use console::Term;
-use dashmap::DashMap;
 use indicatif::MultiProgress;
-use indicatif::ProgressBar;
-use indicatif::ProgressStyle;
-use indicatif::TermLike;
-use std::borrow::Cow;
-use std::cell::Cell;
-use std::cell::OnceCell;
 use std::fmt;
 use std::fmt::Alignment;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::io;
-use std::io::stderr;
-use std::io::stdout;
-use std::io::IsTerminal;
-use std::io::IsTerminal as _;
 use std::io::Write;
-use std::ops::Not as _;
-use std::str::FromStr;
 use std::sync::OnceLock;
 use std::sync::RwLock;
-use std::time::Duration;
+
+#[cfg(feature = "print-timings")]
+use console::style;
+
+#[cfg(feature = "print-timings")]
 use std::time::Instant;
 
 pub mod color_choice;
@@ -135,25 +39,14 @@ pub mod verbosity;
 /// Global static shell instance, stored in a [`OnceLock`] to make it thread safe and lazy.
 static GLOBAL_SHELL: OnceLock<Shell> = OnceLock::new();
 
-/// Global static storing the style that should be used for progress bars.
-static ITER_PROGRESS_BAR_STYLE: OnceLock<ProgressStyle> = OnceLock::new();
-
 const ROCKET_SHIP: Emoji = Emoji("🚀", "....");
 const HOUR_GLASS: Emoji = Emoji("⏳", ">>>>");
-const GREEN_CHECKBOX: Emoji = Emoji("✅", "DONE ");
-const ERROR_ESCLAMATION: Emoji = Emoji("❗", "!!!!");
-
-/// The color used to print the prelude.
-const PRELUDE_COLOR: Color = Color::Cyan;
-
-// The color used to print "Analyzed" in reports.
-const ANALYZED_COLOR: Color = Color::Blue;
 
 /// The width of the left column when printing errors/reports/etc.
-const LEFT_COL_WIDTH: usize = 20;
+pub const LEFT_COL_WIDTH: usize = 20;
 
 /// Empty static string used for drawing padding.
-const EMPTY: &'static str = "";
+const EMPTY: &str = "";
 
 /// Type interface to the global shell used to produce output in the user's terminal.
 #[derive(Debug)]
@@ -211,11 +104,13 @@ impl Shell {
 	///
 	/// Be aware that the value may become outdated if another thread calls [Shell::set_verbosity].
 	pub fn get_verbosity() -> Verbosity {
-		Self::get()
+		let guard = Self::get()
 			.verbosity
 			.read()
-			.expect("acquired read guard to global verbosity")
-			.clone()
+			.expect("acquired read guard to global verbosity");
+
+		// Deref-copy and return. 
+		*guard
 	}
 
 	/// Update whether colors are enabled for all of hipcheck.
@@ -225,11 +120,13 @@ impl Shell {
 	}
 
 	/// Get a clone of the [`MultiProgress`] instance stored using [`Arc::clone`] under the hood.
+	#[allow(unused)]
 	pub fn progress_bars() -> MultiProgress {
 		Self::get().multi_progress.clone()
 	}
 
 	/// Print timing info. Only enabled while hipcheck is being benchmarked.
+	#[allow(unused)]
 	#[cfg(feature = "benchmarking")]
 	pub fn print_timing(timing: &crate::benchmarking::PrintTime) {
 		use crate::benchmarking::PrintTime;
@@ -248,6 +145,7 @@ impl Shell {
 
 	/// Print a message to the standard output if the standard output is a terminal.
 	/// Panics if the global shell is not initialized or if there's an issue printing to the standard output.
+	#[allow(unused)]
 	pub fn println_if_terminal(msg: impl AsRef<str>) {
 		Shell::get()
 			.multi_progress
@@ -519,6 +417,7 @@ impl Shell {
 
 /// The "title" of a message; may be accompanied by a timestamp or outcome.
 #[derive(Debug)]
+#[allow(unused)]
 enum Title {
 	/// "Analyzing"
 	Analyzing,
@@ -536,16 +435,12 @@ enum Title {
 	InProgress,
 	/// "Done"
 	Done,
-	/// "Done" (with a timestamp attached)
-	TimestampedDone,
 	/// "PASS"
 	Pass,
 	/// "INVESTIGATE"
 	Investigate,
 	/// "Error"
 	Error,
-	/// No title, used when you need the spacing but no text.
-	Empty,
 }
 
 impl Title {
@@ -560,11 +455,10 @@ impl Title {
 			Failed => "-",
 			Errored => "?",
 			InProgress => "In Progress",
-			Done | TimestampedDone => "Done",
+			Done => "Done",
 			Pass => "PASS",
 			Investigate => "INVESTIGATE",
 			Error => "Error",
-			Empty => "",
 		}
 	}
 
@@ -574,13 +468,12 @@ impl Title {
 
 		let color = match self {
 			Analyzed | Section(..) => Some(Blue),
-			Analyzing | Done | TimestampedDone => Some(Cyan),
+			Analyzing | Done => Some(Cyan),
 			InProgress => Some(Magenta),
 			Passed | Pass => Some(Green),
 			Failed | Investigate => Some(Red),
 			Errored => Some(Yellow),
 			Error => Some(Red),
-			Empty => None,
 		};
 
 		match color {
@@ -758,150 +651,7 @@ macro_rules! pm {
 		$( pm!($self, $e) );*
 	}
 }
-*/
-/// Construct a `Message` with a shorthand format.
-///
-/// Constructors defined here look like `#name [parameter_name: parameter] thing_to_print`.
-macro_rules! m {
-	(#title_analyzed $msg:expr) => {
-		Message::ReportBasic {
-			title: Title::Analyzed,
-			msg: $msg,
-		}
-	};
 
-	(#nothing) => {
-		Message::Nothing
-	};
-
-	(#more $msg:expr) => {
-		Message::ReportBasic {
-			title: Title::Empty,
-			msg: $msg,
-		}
-	};
-
-	(#report_nothing) => {
-		Message::ReportNothing
-	};
-
-	(#report_json $report:expr) => {
-		Message::ReportJson { report: $report }
-	};
-
-	(#title_passing) => {
-		Message::ReportSection {
-			title: Title::Section("Passing"),
-		}
-	};
-
-	(#title_failing) => {
-		Message::ReportSection {
-			title: Title::Section("Failing"),
-		}
-	};
-
-	(#title_errored) => {
-		Message::ReportSection {
-			title: Title::Section("Errored"),
-		}
-	};
-
-	(#title_recommendation) => {
-		Message::ReportSection {
-			title: Title::Section("Recommendation"),
-		}
-	};
-
-	(#analysis_passed [encoded_as: $encoding:expr] $msg:expr) => {
-		Message::ReportBasic {
-			title: Title::Passed,
-			msg: $msg,
-		}
-	};
-
-	(#analysis_failed [encoded_as: $encoding:expr] $msg:expr) => {
-		Message::ReportBasic {
-			title: Title::Failed,
-			msg: $msg,
-		}
-	};
-
-	(#analysis_errored $msg:expr) => {
-		Message::ReportBasic {
-			title: Title::Errored,
-			msg: $msg,
-		}
-	};
-
-	(#analysis_explanation $msg:expr) => {
-		Message::ReportBasic {
-			title: Title::Empty,
-			msg: $msg,
-		}
-	};
-
-	(#recommendation [kind: $kind:expr] $msg:expr) => {
-		Message::ReportBasic {
-			title: Title::from($kind),
-			msg: $msg,
-		}
-	};
-
-	(#finish [elapsed: $duration:expr] $msg:expr) => {
-		match $duration {
-			Some(duration) => Message::Timestamped {
-				timestamp: Timestamp(duration),
-				title: Title::TimestampedDone,
-				msg: $msg,
-			},
-			None => Message::Basic {
-				title: Title::Done,
-				msg: $msg,
-			},
-		}
-	};
-
-	(#in_progress $msg:expr) => {
-		Message::Basic {
-			title: Title::InProgress,
-			msg: $msg,
-		}
-	};
-
-	(#warning $msg:expr) => {
-		Message::Warning {
-			title: Title::Warning,
-			msg: $msg,
-		}
-	};
-
-	(#phase_warning $msg:expr) => {
-		Message::PhaseWarning {
-			title: Title::Warning,
-			msg: $msg,
-		}
-	};
-
-	(#error $error:expr) => {
-		Message::Error {
-			title: Title::Error,
-			error: $error,
-		}
-	};
-
-	(#error_json $error:expr) => {
-		Message::ErrorJson { error: $error }
-	};
-
-	(#prelude $msg:expr) => {
-		Message::Prelude {
-			title: Title::Analyzing,
-			msg: $msg,
-		}
-	};
-}
-/*
 impl ShellInner {
 	/// Create a new `ShellInner` wrapping the output and error streams.
 	fn new(output: Output, error_output: Output, verbosity: Verbosity) -> ShellInner {
@@ -1051,127 +801,6 @@ struct Printer {
 	mode: PrintMode,
 }
 
-impl Printer {
-	/// Construct a `Printer` with the appropriate config.
-	fn new(is_atty: bool, verbosity: Verbosity) -> Printer {
-		let mode = PrintMode::if_out(is_atty);
-
-		Printer { verbosity, mode }
-	}
-
-	/// Print to the stream based on configuration without clearing before the next line.
-	fn print(&mut self, stream: &mut impl WriteColor, msg: Message) -> Result<()> {
-		self.print_with_clear(stream, Clear::No, msg)
-	}
-
-	/// Print to the stream based on configuration and clear before the next line.
-	fn update(&mut self, stream: &mut impl WriteColor, msg: Message) -> Result<()> {
-		self.print_with_clear(stream, Clear::Yes, msg)
-	}
-
-	/// Print to the stream based on configuration.
-	///
-	/// This is the core of the printing logic, that ensures the following:
-	///
-	/// 1. Nothing optional is output in quiet mode.
-	/// 2. Lines are cleared when necessary if the configuration supports it.
-	/// 3. Newlines are printed when necessary or as required by the configuration.
-	///
-	/// This function is why the `Printer` type exists.
-	fn print_with_clear(
-		&mut self,
-		stream: &mut impl WriteColor,
-		clear: Clear,
-		msg: Message,
-	) -> Result<()> {
-		// Never print anything in silent mode.
-		if self.is_silent() {
-			return Ok(());
-		}
-
-		// If we're quiet, never print anything.
-		// If we need to always print it, then don't skip.
-		if self.is_quiet() && msg.may_not_print() {
-			return Ok(());
-		}
-
-		// If mode supports clearing, and we're set for a clear, erase
-		// the current line.
-		if self.supports_clear() && clear.should() {
-			print(stream, Message::Clear)?;
-		}
-
-		// If we don't need to clear the next line, or we need to always
-		// print newlines, print a newline.
-		if self.requires_newlines() || clear.should().not() {
-			print(stream, Message::Newline)?;
-		}
-
-		// Print the message.
-		print(stream, msg)
-	}
-
-	/// Indicates if a newline should be printed after each message.
-	fn requires_newlines(&self) -> bool {
-		self.mode == PrintMode::Newline
-	}
-
-	/// Indicates if the prior line needs to be cleared before printing.
-	fn supports_clear(&self) -> bool {
-		self.mode == PrintMode::Replace
-	}
-
-	/// Indicates if we're in quiet mode.
-	fn is_quiet(&self) -> bool {
-		self.verbosity == Verbosity::Quiet
-	}
-
-	/// Indicates if we're in silent mode.
-	fn is_silent(&self) -> bool {
-		self.verbosity == Verbosity::Silent
-	}
-}
-
-/// Indicates whether to clear the line before printing the next.
-enum Clear {
-	/// Clear the line before printing the next.
-	Yes,
-	/// Do not clear the line before printing the next.
-	No,
-}
-
-impl Clear {
-	/// Indicates whether it's time to clear the line before printing.
-	fn should(&self) -> bool {
-		match self {
-			Clear::Yes => true,
-			Clear::No => false,
-		}
-	}
-}
-
-/// Differentiates printing behavior if the output is a TTY.
-#[derive(Debug, PartialEq)]
-enum PrintMode {
-	/// Only use newlines (non-TTY output)
-	Newline,
-	/// Sometimes replace a previous line with a new one
-	Replace,
-}
-
-impl PrintMode {
-	/// Sets the print mode based on whether the output stream is a TTY.
-	fn if_out(is_atty: bool) -> PrintMode {
-		if is_atty {
-			PrintMode::Replace
-		} else {
-			PrintMode::Newline
-		}
-	}
-}
-
-
-
 /// Print a message out to a stream.
 fn print(stream: &mut dyn WriteColor, msg: Message) -> Result<()> {
 
@@ -1213,36 +842,12 @@ fn print(stream: &mut dyn WriteColor, msg: Message) -> Result<()> {
 	}
 }
 
-/// Print a string to the stream.
-fn print_str(msg: &str, stream: &mut dyn WriteColor) -> Result<()> {
-	stream.reset()?;
-	let to_write = format!(" {}\r", msg);
-	log::trace!("writing message part [part='{:?}']", to_write);
-	write!(stream, "{}", to_write)?;
-	stream.flush()?;
-	Ok(())
-}
-
 /// Print (prettily) a JSON value to the stream for pull requests.
 fn print_pr_report_json(pr_report: PrReport, stream: &mut dyn WriteColor) -> Result<()> {
 	stream.reset()?;
 	log::trace!("writing message part [part='{:?}']", pr_report);
 	serde_json::to_writer_pretty(&mut *stream, &pr_report)?;
 	stream.flush()?;
-	Ok(())
-}
-
-/// Print nothing to the stream.
-fn print_nothing(stream: &mut dyn WriteColor) -> Result<()> {
-	log::trace!("writing message part [part='']");
-	write!(stream, "")?;
-	stream.flush()?;
-	Ok(())
-}
-
-/// Print a platform-specific line-clearing output.
-fn print_clear(stream: &mut dyn WriteColor) -> Result<()> {
-	imp::erase_line(stream)?;
 	Ok(())
 }
 
