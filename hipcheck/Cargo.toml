@@ -15,8 +15,6 @@ include = ["src/**/*", "../LICENSE", "../README.md"]
 print-timings = ["benchmarking"]
 # Benchmarking enables the benchmarking module, containing special utilities for benchmarking. 
 benchmarking = []
-# Print git2 tracing events.
-trace-git2 = []
 
 [[bin]]
 name = "hc"
@@ -98,7 +96,8 @@ features = [
 
 # Vendor libgit2 and openssl so that they will be statically included and not cause problems on certain systems that might not have one or the other. 
 [dependencies.git2]
-version = "0.19.0"
+# version = "0.19.0"
+path = "../git2-rs"
 default-features = false
 features = [
     "vendored-libgit2", 
