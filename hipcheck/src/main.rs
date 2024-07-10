@@ -97,29 +97,8 @@ fn main() -> ExitCode {
 	CryptoProvider::install_default(ring::default_provider())
 		.expect("installed process-wide default crypto provider");
 
-	// Enable the `trace-git2` feature for warnings from `git2`. 
-	git2::trace_set(git2::TraceLevel::Trace, |level, msg| {
-		use log::RecordBuilder;
-		use git2::TraceLevel;
-		use log::Level;
-
-		let log_level = match level {
-			TraceLevel::Debug => Level::Debug,
-			TraceLevel::Fatal | TraceLevel::Error => Level::Error,
-			TraceLevel::Warn => Level::Warn,
-			TraceLevel::Info => Level::Info,
-			TraceLevel::Trace => Level::Trace,
-			other => panic!("Unsupported git2 log level: {other:?}"),
-		};
-
-		let mut record_builder = RecordBuilder::new();
-
-		record_builder
-			.level(log_level)
-			.target("git2");
-
-		log::logger().log(&record_builder.args(format_args!("{}", msg)).build());
-	});
+	// Pass libgit2 tracing events to `log`.
+	git2::trace_shim_log_crate();
 
 	if cfg!(feature = "print-timings") {
 		Shell::eprintln("[TIMINGS]: Timing information will be printed.");
