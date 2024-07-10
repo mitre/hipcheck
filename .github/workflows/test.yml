@@ -34,6 +34,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
       - name: Dependency Tree
         run: cargo tree
       - name: Build
