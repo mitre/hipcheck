@@ -82,6 +82,9 @@ fn init_logging() {
 fn main() -> ExitCode {
 	init_logging();
 
+	println!("Testing a code change to use the rust cache.");
+	println!("This is test 1.");
+
 	// Install a process-wide default crypto provider.
 	CryptoProvider::install_default(ring::default_provider())
 		.expect("installed process-wide default crypto provider");
