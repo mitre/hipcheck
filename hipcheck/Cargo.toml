@@ -1,6 +1,6 @@
 [package]
 name = "hipcheck"
-description = "Automatically assess and score software repositories for supply chain risk"
+description = "Automatically assess and score software repositories for supply chain risk, and break caches 1"
 keywords = ["security", "sbom"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "../README.md"
