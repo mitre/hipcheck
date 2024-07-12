@@ -8,8 +8,7 @@ use super::{Shell, HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP};
 use console::style;
 use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
 use std::{
-	sync::{Arc, OnceLock},
-	time::Duration,
+	fmt::Display, sync::{Arc, OnceLock}, time::Duration
 };
 
 /// Global static storing the style that should be used for progress bars over a number of units.
@@ -112,6 +111,13 @@ impl ProgressPhase {
 		} 
 
 		self.bar.set_position(new_position);
+	}
+
+	/// Update the status and redraw this bar with the new status.
+	/// This status may be over-written if the bar changes states into "done" or the status is updated otherwise.
+	pub fn update_status(&self, status: impl Display) {
+		self.bar.set_message(format!("{} ({status})", self.name));
+		self.bar.set_prefix(HOUR_GLASS.to_string());
 	}
 
 	/// Finishes this bar, optionally leaving a "done" message with a timestamp in the terminal.

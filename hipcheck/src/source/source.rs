@@ -714,7 +714,7 @@ fn clone_remote(url: &Url, dest: &Path) -> Result<()> {
 	let mut checkout_opts = CheckoutBuilder::new();
 
 	// We don't care about the path being resolved, only the total and current numbers.
-	checkout_opts.progress(|_path, current, total| {
+	checkout_opts.progress(|path, current, total| {
 		// Initialize the phase if we haven't already. 
 		let phase = checkout_phase.get_or_init(|| {
 			ProgressPhase::start(total as u64, "(git) checkout")
@@ -722,6 +722,8 @@ fn clone_remote(url: &Url, dest: &Path) -> Result<()> {
 
 		// Set the bar to have the amount of progress in resolving. 
 		phase.set_position(current as u64);
+		// Set the progress bar's status to the path being resolved. 
+		phase.update_status(path.map(Path::to_string_lossy).unwrap_or("resolving...".into()));
 
 		// If we have resolved everything, finish the phase.
 		if current == total {

@@ -16,10 +16,12 @@ mod setup;
 mod shell;
 mod source;
 mod target;
-#[cfg(test)]
-mod test_util;
 mod util;
 mod version;
+mod git2_rustls_transport;
+
+#[cfg(test)]
+mod test_util;
 
 #[cfg(feature = "benchmarking")]
 mod benchmarking;
@@ -99,6 +101,10 @@ fn main() -> ExitCode {
 
 	// Pass libgit2 tracing events to `log`.
 	git2::trace_shim_log_crate();
+
+	// Register the custom rustls based transport with libgit2 to override the operating system 
+	// default git2 transport. 
+	git2_rustls_transport::register();
 
 	if cfg!(feature = "print-timings") {
 		Shell::eprintln("[TIMINGS]: Timing information will be printed.");
