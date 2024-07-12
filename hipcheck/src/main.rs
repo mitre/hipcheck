@@ -204,9 +204,9 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	// Get the raw hipcheck version.
 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 
-	// Set the global verbosity to silent so that we don't print phases/progress while downloading
-	// the dummy repo.
-	Shell::set_verbosity(Verbosity::Silent);
+	// Silence the global shell while we're checking the dummy repo to prevent progress bars and
+	// title messages from displaying while calculating the weight tree.
+	let silence_guard = Shell::silence();
 
 	// Create a dummy session to query the salsa database for a weight graph for printing.
 	let session = Session::new(
@@ -282,8 +282,8 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		}
 	}
 
-	// Reset the verbosity to normal to print the tree.
-	Shell::set_verbosity(Verbosity::Normal);
+	// Drop the silence guard to make the shell produce output again.
+	drop(silence_guard);
 
 	let mut print_tree = ConvertTree(Arena::with_capacity(weight_tree.tree.capacity()));
 	let print_root = print_tree.convert_tree(weight_tree.root, &weight_tree.tree);
