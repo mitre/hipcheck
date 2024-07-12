@@ -195,7 +195,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	// Get the raw hipcheck version.
 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 
-	// Silence the global shell while we're checking the dummy repo to prevent progress bars and 
+	// Silence the global shell while we're checking the dummy repo to prevent progress bars and
 	// title messages from displaying while calculating the weight tree.
 	let silence_guard = Shell::silence();
 
@@ -273,7 +273,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		}
 	}
 
-	// Drop the silence guard to make the shell produce output again. 
+	// Drop the silence guard to make the shell produce output again.
 	drop(silence_guard);
 
 	let mut print_tree = ConvertTree(Arena::with_capacity(weight_tree.tree.capacity()));

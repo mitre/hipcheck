@@ -12,7 +12,6 @@ use console::Style;
 use console::Term;
 use indicatif::MultiProgress;
 use indicatif::ProgressDrawTarget;
-use verbosity::SilenceGuard;
 use std::fmt;
 use std::fmt::Alignment;
 use std::fmt::Debug;
@@ -21,6 +20,7 @@ use std::fmt::Formatter;
 use std::io::Write;
 use std::sync::OnceLock;
 use std::sync::RwLock;
+use verbosity::SilenceGuard;
 use verbosity::Verbosity;
 
 #[cfg(feature = "print-timings")]
@@ -91,7 +91,9 @@ impl Shell {
 	pub fn set_verbosity(verbosity: Verbosity) {
 		// If the new verbosity is "silent", hide all progress bars.
 		if verbosity == Verbosity::Silent {
-			Shell::get().multi_progress.set_draw_target(ProgressDrawTarget::hidden());
+			Shell::get()
+				.multi_progress
+				.set_draw_target(ProgressDrawTarget::hidden());
 		}
 
 		let mut write_guard = Self::get()
@@ -99,19 +101,21 @@ impl Shell {
 			.write()
 			.expect("acquired write guard to global verbosity");
 
-		// If moving from a "silent" verbosity state to a not-silent verbosity, reset the 
+		// If moving from a "silent" verbosity state to a not-silent verbosity, reset the
 		// draw target for the progress bars back to the stderr (default).
 		if *write_guard == Verbosity::Silent && verbosity != Verbosity::Silent {
-			Shell::get().multi_progress.set_draw_target(ProgressDrawTarget::stderr());
+			Shell::get()
+				.multi_progress
+				.set_draw_target(ProgressDrawTarget::stderr());
 		}
 
 		*write_guard = verbosity;
 	}
 
-	/// Silence the global [Shell] for the remainder of this scope. 
-	/// 
+	/// Silence the global [Shell] for the remainder of this scope.
+	///
 	/// This is equivalent to using [Shell::set_verbosity] to silence the global shell,
-	/// and then reseting it back to the previous value whenever the returned [SilenceGuard] is [drop]ped. 
+	/// and then reseting it back to the previous value whenever the returned [SilenceGuard] is [drop]ped.
 	pub fn silence() -> SilenceGuard {
 		let previous_verbosity = Shell::get_verbosity();
 		Shell::set_verbosity(Verbosity::Silent);

@@ -27,12 +27,12 @@ impl Verbosity {
 	}
 }
 
-/// A [SilenceGuard] is created by calling [Shell::silence], which returns an opaque 
-/// value of this type. Once that value is [drop]ped, the global [Shell]'s verbosity is set to 
+/// A [SilenceGuard] is created by calling [Shell::silence], which returns an opaque
+/// value of this type. Once that value is [drop]ped, the global [Shell]'s verbosity is set to
 /// whatever it was prior to calling [Shell::silence].
 #[derive(Debug)]
 pub struct SilenceGuard {
-	pub(super) previous_verbosity: Verbosity
+	pub(super) previous_verbosity: Verbosity,
 }
 
 impl Drop for SilenceGuard {
