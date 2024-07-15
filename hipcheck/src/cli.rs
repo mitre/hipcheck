@@ -439,23 +439,48 @@ impl CheckArgs {
 				"a target must be provided. The CLI should have caught this"
 			));
 		};
-		// If a target type was provided use that, otherwise try to resolve from
-		// the target string
-		let opt_subcmd = self
-			.target_type
-			.clone()
-			.or_else(|| TargetType::try_resolve_from_target(target.as_str()));
-		let Some(subcmd) = opt_subcmd else {
-			return Err(hc_error!(
-				"could not resolve target '{}' to a target type. please specify with the `-t` flag",
-				target
-			));
-		};
+
+		let subcmd_str;
+		let target_str;
+
+		// Try to resolve the type by checking if the target string is a pURL, GitHub URL, or .spdx file
+		match TargetType::try_resolve_from_target(target.as_str()) {
+			Some((subcmd, new_target)) => {
+				subcmd_str = subcmd.as_str();
+				// If the type had to be resolved from a pURL, the target string must be reformatted
+				// Update that string here
+				target_str = new_target;
+				// Check if the user also provided a type, and error if it does not agree with the inferred type.
+				if let Some(user_submcd) = self.target_type.clone() {
+					if user_submcd.as_str() != subcmd_str {
+						return Err(hc_error!(
+							"Provided target type '{}' does not match the type, '{}', inferred from the target '{}'. Check that you have specified the correct type and provided the intended target.",
+							user_submcd.as_str(), subcmd_str, target
+						));
+					}
+				}
+			}
+			None => match self.target_type.clone() {
+				// If a type could not be inferred, check if a type was provided
+				Some(subcmd) => {
+					subcmd_str = subcmd.as_str();
+					// If a type was provided, use the provided target string
+					target_str = target.clone();
+				}
+				// If no type was inferred or provided, return an error
+				None => {
+					return Err(hc_error!(
+					"could not resolve target '{}' to a target type. please specify with the `-t` flag",
+					target
+				))
+				}
+			},
+		}
+
 		// We have resolved the subcommand type. Re-construct a string with all args
 		// that we can feed back into clap
 		let binding = "check".to_owned();
-		let subcmd_str = subcmd.as_str();
-		let mut reconst_args: Vec<&String> = vec![&binding, &subcmd_str, &target];
+		let mut reconst_args: Vec<&String> = vec![&binding, &subcmd_str, &target_str];
 		reconst_args.extend(self.trailing_args.iter());
 
 		CheckCommand::try_parse_from(reconst_args).map_err(|e| hc_error!("{}", e))
@@ -876,6 +901,16 @@ mod tests {
 		chck_args.command()
 	}
 
+	fn get_target_from_cmd(cmd: CheckCommand) -> String {
+		match cmd {
+			CheckCommand::Maven(args) => args.package,
+			CheckCommand::Npm(args) => args.package,
+			CheckCommand::Pypi(args) => args.package,
+			CheckCommand::Repo(args) => args.source,
+			CheckCommand::Spdx(args) => args.path,
+		}
+	}
+
 	#[test]
 	fn test_deprecated_check_repo() {
 		let cmd = get_check_cmd_from_cli(vec![
@@ -901,13 +936,52 @@ mod tests {
 	}
 
 	#[test]
-	fn test_deductive_check_maven_pkg() {
+	fn test_deductive_check_github_purl() {
+		let url = "https://github.com/mitre/hipcheck.git".to_string();
+		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "pkg:github/mitre/hipcheck"]);
+		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
+		if let Ok(chk_cmd) = cmd {
+			let target = get_target_from_cmd(chk_cmd);
+			assert_eq!(target, url);
+		}
+	}
+
+	#[test]
+	fn test_deductive_check_maven_purl() {
+		let url = "https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.14.0/commons-lang3-3.14.0.pom".to_string();
 		let cmd = get_check_cmd_from_cli(vec![
 			"hc",
 			"check",
-			"pkg:maven/org.apache.xmlgraphics/batik-anim@1.9.1",
+			"pkg:maven/org.apache.commons/commons-lang3@3.14.0",
 		]);
 		assert!(matches!(cmd, Ok(CheckCommand::Maven(..))));
+		if let Ok(chk_cmd) = cmd {
+			let target = get_target_from_cmd(chk_cmd);
+			assert_eq!(target, url);
+		}
+	}
+
+	#[test]
+	fn test_deductive_check_npm_purl() {
+		let package = "express@4.19.2".to_string();
+		let cmd =
+			get_check_cmd_from_cli(vec!["hc", "check", "pkg:npm/%40expressjs/express@4.19.2"]);
+		assert!(matches!(cmd, Ok(CheckCommand::Npm(..))));
+		if let Ok(chk_cmd) = cmd {
+			let target = get_target_from_cmd(chk_cmd);
+			assert_eq!(target, package);
+		}
+	}
+
+	#[test]
+	fn test_deductive_check_pypi_purl() {
+		let package = "django@5.0.7".to_string();
+		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "pkg:pypi/django@5.0.7"]);
+		assert!(matches!(cmd, Ok(CheckCommand::Pypi(..))));
+		if let Ok(chk_cmd) = cmd {
+			let target = get_target_from_cmd(chk_cmd);
+			assert_eq!(target, package);
+		}
 	}
 
 	#[test]
@@ -920,5 +994,17 @@ mod tests {
 			"https://github.com/mitre/hipcheck.git",
 		]);
 		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
+	}
+
+	#[test]
+	fn test_check_with_incorrect_target_flag() {
+		let cmd = get_check_cmd_from_cli(vec![
+			"hc",
+			"check",
+			"-t",
+			"npm",
+			"https://github.com/mitre/hipcheck.git",
+		]);
+		assert!(matches!(cmd, Err(..)));
 	}
 }

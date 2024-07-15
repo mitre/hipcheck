@@ -780,6 +780,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "ordered-float",
+ "packageurl",
  "paste",
  "pathbuf",
  "petgraph",
@@ -1209,6 +1210,16 @@ checksum = "29d73ba8daf8fac13b0501d1abeddcfe21ba7401ada61a819144b6c2a4f32209"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "packageurl"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fd2afe7e71d621b1771201bcdede645dd1a404012cdd6673b56d10be495f2a8"
+dependencies = [
+ "percent-encoding",
+ "thiserror",
 ]
 
 [[package]]
