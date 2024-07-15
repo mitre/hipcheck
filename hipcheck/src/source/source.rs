@@ -63,7 +63,7 @@ impl SourceRepo {
 				local.display()
 			)),
 			// It's a local dir.
-			(true, true) => SourceRepo::resolve_local_repo(phase, raw, local),
+			(true, true) => SourceRepo::resolve_local_repo(phase, root, raw, local),
 			// It's possibly a remote URL.
 			(false, _) => SourceRepo::resolve_remote_repo(phase, root, raw),
 		};
@@ -95,7 +95,13 @@ impl SourceRepo {
 		&self.raw
 	}
 
-	fn resolve_local_repo(_phase: &mut Phase, raw: &str, local: PathBuf) -> Result<SourceRepo> {
+	fn resolve_local_repo(
+		_phase: &mut Phase,
+		root: &Path,
+		raw: &str,
+		src: PathBuf,
+	) -> Result<SourceRepo> {
+        let local = clone_local_repo_to_cache(src.as_path(), root)?;
 		let head = get_head_commit(&local).context("can't get head commit for local source")?;
 		let remote = match SourceRepo::try_resolve_remote_for_local(&local) {
 			Ok(remote) => Some(remote),
@@ -612,6 +618,27 @@ fn build_unknown_remote_clone_dir(url: &Url) -> Result<String> {
 	}
 
 	Ok(dir)
+}
+
+fn clone_local_repo_to_cache(src: &Path, root: &Path) -> Result<PathBuf> {
+    let src = src.canonicalize()?;
+	let hc_data_root = pathbuf![root, "clones"];
+	// If src dir is already in HC_CACHE/clones, leave it be. else clone from local fs
+	if src.starts_with(&hc_data_root) {
+		return Ok(src);
+	}
+	let dest = pathbuf![&hc_data_root, "local", src.file_name().unwrap()];
+    if dest.exists() {
+        std::fs::remove_dir_all(&dest)?;
+    }
+    let src_str = src.to_str().ok_or_else(|| hc_error!("source isn't UTF-8 encoded '{}'", src.display()))?;
+    let dest_str = dest.to_str().ok_or_else(|| hc_error!("destination isn't UTF-8 encoded '{}'", dest.display()))?;
+    let _output = GitCommand::new_repo([
+        "clone",
+        src_str,
+        dest_str
+    ])?.output()?;
+	Ok(dest)
 }
 
 fn clone_or_update_remote(phase: &mut Phase, url: &Url, dest: &Path) -> Result<()> {
