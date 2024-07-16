@@ -427,7 +427,7 @@ pub struct CheckArgs {
 		help = "The target package, URL, commit, etc. for Hipcheck to analyze. If ambiguous, the -t flag must be set"
 	)]
 	pub target: Option<String>,
-	#[arg(trailing_var_arg(true), hide = true)]
+	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	pub trailing_args: Vec<String>,
 }
 
@@ -563,6 +563,9 @@ pub struct CheckPypiArgs {
 pub struct CheckRepoArgs {
 	/// Repository to analyze; can be a local path or a URI
 	pub source: String,
+    /// The ref of the repo to analyze
+    #[clap(long = "ref")]
+    pub ref_: Option<String>
 }
 
 #[derive(Debug, Clone, clap::Args)]
