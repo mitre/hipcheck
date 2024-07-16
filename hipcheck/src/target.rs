@@ -2,6 +2,7 @@ use clap::ValueEnum;
 use packageurl::PackageUrl;
 use serde::Serialize;
 use std::str::FromStr;
+use url::Url;
 
 #[derive(Debug, Clone, ValueEnum, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -87,6 +88,32 @@ impl TargetType {
 					Some((Pypi, package))
 				}
 				_ => None,
+			}
+		// Otherwise check if it is a Git VCS URL
+		} else if tgt.starts_with("git+") {
+			// Remove Git prefix
+			let tgt_trimmed = tgt.replace("git+", "");
+			// If the URL is not correctly formatted, we cannot identify the target type
+			if let Ok(vcs_url) = Url::parse(&tgt_trimmed) {
+				match vcs_url.scheme() {
+					// If the URL is for a file, trim the file scheme idenfifier and return the presumptive file path
+					// If the path is not valid, we will handle that error later
+					"file" => {
+						let filepath = vcs_url.path().to_string();
+						Some((Repo, filepath))
+					}
+					// If the scheme is anything other than a file (e.g. https, ssh) clean up and return the repo URL
+					_ => {
+						// Remove any git ref information that trails the end of the URL
+						let mut url =
+							tgt_trimmed.split(".git").collect::<Vec<&str>>()[0].to_string();
+						// Restore ".git" to the end of the URL, since we did not intend to remove that part
+						url.push_str(".git");
+						Some((Repo, url))
+					}
+				}
+			} else {
+				None
 			}
 		// Otherwise, check if it is a GitHub repo URL
 		} else if tgt.starts_with("https://github.com/") {

@@ -985,6 +985,39 @@ mod tests {
 	}
 
 	#[test]
+	fn test_deductive_check_repo_vcs_https() {
+		let url = "https://github.com/mitre/hipcheck.git".to_string();
+		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "git+https://github.com/mitre/hipcheck.git"]);
+		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
+		if let Ok(chk_cmd) = cmd {
+			let target = get_target_from_cmd(chk_cmd);
+			assert_eq!(target, url);
+		}
+	}
+
+	#[test]
+	fn test_deductive_check_repo_vcs_ssh() {
+		let url = "ssh://git@github.com/mitre/hipcheck.git".to_string();
+		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "git+ssh://git@github.com/mitre/hipcheck.git"]);
+		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
+		if let Ok(chk_cmd) = cmd {
+			let target = get_target_from_cmd(chk_cmd);
+			assert_eq!(target, url);
+		}
+	}
+
+	#[test]
+	fn test_deductive_check_repo_filepath() {
+		let path = "/home/me/projects/hipcheck".to_string();
+		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "git+file:///home/me/projects/hipcheck"]);
+		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
+		if let Ok(chk_cmd) = cmd {
+			let target = get_target_from_cmd(chk_cmd);
+			assert_eq!(target, path);
+		}
+	}
+
+	#[test]
 	fn test_check_with_target_flag() {
 		let cmd = get_check_cmd_from_cli(vec![
 			"hc",

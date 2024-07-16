@@ -101,7 +101,7 @@ impl SourceRepo {
 		raw: &str,
 		src: PathBuf,
 	) -> Result<SourceRepo> {
-        let local = clone_local_repo_to_cache(src.as_path(), root)?;
+		let local = clone_local_repo_to_cache(src.as_path(), root)?;
 		let head = get_head_commit(&local).context("can't get head commit for local source")?;
 		let remote = match SourceRepo::try_resolve_remote_for_local(&local) {
 			Ok(remote) => Some(remote),
@@ -621,23 +621,23 @@ fn build_unknown_remote_clone_dir(url: &Url) -> Result<String> {
 }
 
 fn clone_local_repo_to_cache(src: &Path, root: &Path) -> Result<PathBuf> {
-    let src = src.canonicalize()?;
+	let src = src.canonicalize()?;
 	let hc_data_root = pathbuf![root, "clones"];
 	// If src dir is already in HC_CACHE/clones, leave it be. else clone from local fs
 	if src.starts_with(&hc_data_root) {
 		return Ok(src);
 	}
 	let dest = pathbuf![&hc_data_root, "local", src.file_name().unwrap()];
-    if dest.exists() {
-        std::fs::remove_dir_all(&dest)?;
-    }
-    let src_str = src.to_str().ok_or_else(|| hc_error!("source isn't UTF-8 encoded '{}'", src.display()))?;
-    let dest_str = dest.to_str().ok_or_else(|| hc_error!("destination isn't UTF-8 encoded '{}'", dest.display()))?;
-    let _output = GitCommand::new_repo([
-        "clone",
-        src_str,
-        dest_str
-    ])?.output()?;
+	if dest.exists() {
+		std::fs::remove_dir_all(&dest)?;
+	}
+	let src_str = src
+		.to_str()
+		.ok_or_else(|| hc_error!("source isn't UTF-8 encoded '{}'", src.display()))?;
+	let dest_str = dest
+		.to_str()
+		.ok_or_else(|| hc_error!("destination isn't UTF-8 encoded '{}'", dest.display()))?;
+	let _output = GitCommand::new_repo(["clone", src_str, dest_str])?.output()?;
 	Ok(dest)
 }
 
