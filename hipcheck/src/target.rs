@@ -1,6 +1,6 @@
 #[allow(unused)]
-
 pub mod types;
+pub use types::Target;
 
 use clap::ValueEnum;
 use packageurl::PackageUrl;
