@@ -1,3 +1,7 @@
+#[allow(unused)]
+
+pub mod types;
+
 use clap::ValueEnum;
 use packageurl::PackageUrl;
 use serde::Serialize;
