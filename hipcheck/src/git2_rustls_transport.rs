@@ -157,7 +157,7 @@ impl CustomSubtransportStream {
                 // Add the header to the request and resend.
                 let new_req = self.req
                     .clone()
-                    .set("Authorization", &format!("Basic: {encoded}"));
+                    .set("Authorization", &format!("Basic {encoded}"));
 
                 match new_req.send_bytes(body) {
                     Ok(response) => {
