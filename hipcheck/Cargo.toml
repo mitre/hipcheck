@@ -78,7 +78,6 @@ indextree = "4.6.1"
 num-traits = "0.2.19"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
 term_size = "0.3.2"
-# openssl-probe = "0.1.5"
 http = "1"
 dialoguer = "0.11.0"
 base64 = "0.22.1"
