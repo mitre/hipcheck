@@ -7,7 +7,7 @@ use crate::hc_error;
 use crate::report::Format;
 use crate::session::session::Check;
 use crate::shell::{color_choice::ColorChoice, verbosity::Verbosity};
-use crate::target::{Target, TargetType};
+use crate::target::{TargetSeed, TargetType};
 use crate::CheckKind;
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
@@ -540,7 +540,7 @@ impl CheckCommand {
 			},
 		}
 	}
-	pub fn as_target(&self) -> Target {
+	pub fn as_target_seed(&self) -> TargetSeed {
 		todo!();
 	}
 }

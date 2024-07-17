@@ -41,6 +41,7 @@ use crate::shell::Shell;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
 use cli::CheckArgs;
+use cli::CheckCommand;
 use cli::CliConfig;
 use cli::FullCommands;
 use cli::SchemaArgs;
@@ -74,6 +75,7 @@ use std::process::Command;
 use std::process::ExitCode;
 use std::result::Result as StdResult;
 use std::time::Duration;
+use target::{RemoteGitRepo, TargetSeed};
 use util::fs::create_dir_all;
 use which::which;
 
@@ -144,22 +146,18 @@ fn main() -> ExitCode {
 
 /// Run the `check` command.
 fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
-	let check = match args.command() {
-		Ok(chk) => chk.as_target(),
+	let target = match args.command() {
+		Ok(chk) => chk.as_target_seed(),
 		Err(e) => {
 			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;
 		}
 	};
 
-	if check.kind.target_kind().is_checkable().not() {
-		print_missing();
-	}
-
 	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 
 	let report = run(
-		check,
+		target,
 		config.config().map(ToOwned::to_owned),
 		config.data().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
@@ -201,12 +199,11 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 
 	// Create a dummy session to query the salsa database for a weight graph for printing.
 	let session = Session::new(
-		&Check {
-			target: "dummy".to_owned(),
-			kind: CheckKind::Repo,
-		},
 		// Use the hipcheck repo as a dummy url until checking is de-coupled from `Session`.
-		"https://github.com/mitre/hipcheck.git",
+		&TargetSeed::RemoteRepo(RemoteGitRepo {
+			url: url::Url::parse("https://github.com/mitre/hipcheck.git").unwrap(),
+			known_remote: None,
+		}),
 		config.config().map(ToOwned::to_owned),
 		config.data().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
@@ -825,7 +822,7 @@ impl CheckKind {
 #[allow(clippy::too_many_arguments)]
 #[doc(hidden)]
 fn run(
-	check: Check,
+	target: TargetSeed,
 	config_path: Option<PathBuf>,
 	data_path: Option<PathBuf>,
 	home_dir: Option<PathBuf>,
@@ -834,8 +831,7 @@ fn run(
 ) -> Result<AnyReport> {
 	// Initialize the session.
 	let session = match Session::new(
-		&check,
-		&check.target,
+		&target,
 		config_path,
 		data_path,
 		home_dir,
@@ -846,38 +842,17 @@ fn run(
 		Err(err) => return Err(err),
 	};
 
-	match check.kind.target_kind() {
-		TargetKind::RepoSource | TargetKind::SpdxDocument => {
-			// Run analyses against a repo and score the results (score calls analyses that call metrics).
-			let phase = SpinnerPhase::start("analyzing and scoring results");
+	// Run analyses against a repo and score the results (score calls analyses that call metrics).
+	let phase = SpinnerPhase::start("analyzing and scoring results");
 
-			// Enable steady ticking on the spinner, since we currently don't increment it manually.
-			phase.enable_steady_tick(Duration::from_millis(250));
+	// Enable steady ticking on the spinner, since we currently don't increment it manually.
+	phase.enable_steady_tick(Duration::from_millis(250));
 
-			let scoring = score_results(&phase, &session)?;
-			phase.finish_successful();
+	let scoring = score_results(&phase, &session)?;
+	phase.finish_successful();
 
-			// Build the final report.
-			let report =
-				build_report(&session, &scoring).context("failed to build final report")?;
+	// Build the final report.
+	let report = build_report(&session, &scoring).context("failed to build final report")?;
 
-			Ok(AnyReport::Report(report))
-		}
-
-		TargetKind::PackageVersion => {
-			// Run analyses against a repo and score the results (score calls analyses that call metrics).
-			let phase = SpinnerPhase::start("analyzing and scoring results");
-			// Enable steady ticking on the spinner, since we currently don't increment it manually.
-			phase.enable_steady_tick(Duration::from_millis(250));
-
-			let scoring = score_results(&phase, &session)?;
-			phase.finish_successful();
-
-			// Build the final report.
-			let report =
-				build_report(&session, &scoring).context("failed to build final report")?;
-
-			Ok(AnyReport::Report(report))
-		}
-	}
+	Ok(AnyReport::Report(report))
 }

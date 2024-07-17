@@ -45,6 +45,7 @@ use crate::source::source::SourceKind;
 use crate::source::source::SourceQuery;
 use crate::source::source::SourceQueryStorage;
 use crate::source::source::SourceRepo;
+use crate::target::{Target, TargetSeed};
 use crate::version::get_version;
 use crate::version::VersionQuery;
 use crate::version::VersionQueryStorage;
@@ -116,8 +117,7 @@ impl Session {
 	/// Construct a new `Session` which owns all the data needed in later phases.
 	#[allow(clippy::too_many_arguments)]
 	pub fn new(
-		source_type: &Check,
-		source: &str,
+		target: &TargetSeed,
 		config_path: Option<PathBuf>,
 		data_path: Option<PathBuf>,
 		home_dir: Option<PathBuf>,
@@ -138,7 +138,7 @@ impl Session {
 		 * Printing the prelude.
 		 *-----------------------------------------------------------------*/
 
-		Shell::print_prelude(source);
+		Shell::print_prelude(target.to_string());
 
 		/*===================================================================
 		 *  Loading current versions of needed software git, npm, and eslint into salsa.
@@ -189,7 +189,7 @@ impl Session {
 		 *  Resolving the source.
 		 *-----------------------------------------------------------------*/
 
-		let source = match load_source(source, source_type, &home) {
+		let source = match load_target(target, &home) {
 			Ok(results) => results,
 			Err(err) => return Err(err),
 		};
@@ -266,19 +266,19 @@ fn load_config_and_data(
 	))
 }
 
-fn load_source(source: &str, source_type: &Check, home: &Path) -> Result<Source> {
+fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	// Resolve the source specifier into an actual source.
-	let phase_desc = match source_type.kind.target_kind() {
-		TargetKind::RepoSource => "resolving git repository source",
-		TargetKind::PackageVersion => "resolving package source",
-		TargetKind::SpdxDocument => "parsing SPDX document",
+	let phase_desc = match seed {
+		TargetSeed::LocalRepo(_) | TargetSeed::RemoteRepo(_) => "resolving git repository source",
+		TargetSeed::Package(_) => "resolving package source",
+		TargetSeed::Spdx(_) => "parsing SPDX document",
 	};
 
 	let phase = SpinnerPhase::start(phase_desc);
-	let source = resolve_source(source_type, &phase, home, source)?;
+	let target = resolve_target(seed, &phase, home)?;
 	phase.finish_successful();
 
-	Ok(source)
+	Ok(target)
 }
 
 /// Resolves github token for Hipcheck to query github with.
@@ -290,12 +290,7 @@ fn resolve_token() -> Result<String> {
 }
 
 /// Resolves the source specifier into an actual source.
-fn resolve_source(
-	source_type: &Check,
-	phase: &SpinnerPhase,
-	home: &Path,
-	source: &str,
-) -> Result<Source> {
+fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Result<Source> {
 	#[cfg(feature = "print-timings")]
 	let _0 = crate::benchmarking::print_scope_time!("resolve_source");
 
