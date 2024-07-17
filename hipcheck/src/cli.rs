@@ -636,12 +636,11 @@ impl<T: Clone> Update for Option<T> {
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct CacheArgs {
-	#[clap(subcommand)]
 	pub command: CacheCommand,
 	pub target: Option<CacheOpTarget>,
 }
 
-#[derive(Debug, Clone, clap::Subcommand)]
+#[derive(Debug, Clone, clap::ValueEnum)]
 pub enum CacheCommand {
 	List,
 	Delete,
@@ -650,13 +649,19 @@ pub enum CacheCommand {
 #[derive(Debug, Clone)]
 pub enum CacheOpTarget {
 	Single(String),
-	Group(u32, String),
+	Group(u32, CacheGroupSpec),
 }
 impl FromStr for CacheOpTarget {
 	type Err = &'static str;
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		Ok(CacheOpTarget::Single(s.to_owned()))
 	}
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum CacheGroupSpec {
+	Oldest,
+	Largest,
 }
 
 // none, or specific target, or N largest/oldest
