@@ -185,8 +185,14 @@ impl Read for CustomSubtransportStream {
         // Unwrap here is fine, since sending the request should have instantiated the response reader
         // or errored. 
         match self.response_reader.as_mut().unwrap().read(buf) {
+            // Ok reads are ok.
             ok @ Ok(_) => ok,
+            
+            // UnexpectedEOF probably means a TLS close_notify was missed -- just ignore that here
+            // in this case.
             Err(err) if err.kind() == ErrorKind::UnexpectedEof => Ok(0),
+
+            // All other errors just return as themselves.
             err => err
         }
     }
