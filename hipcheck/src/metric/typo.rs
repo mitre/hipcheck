@@ -744,7 +744,7 @@ mod test {
         };
     }
 
-	const NAME: &'static str = "hello";
+	const NAME: &str = "hello";
 
 	#[test]
 	fn fuzz_hello_to_hallo() {

@@ -2,6 +2,7 @@
 
 #[allow(unused)]
 mod analysis;
+mod cache;
 mod cli;
 mod command_util;
 mod config;
@@ -33,6 +34,7 @@ use crate::analysis::report_builder::AnyReport;
 use crate::analysis::report_builder::Format;
 use crate::analysis::report_builder::Report;
 use crate::analysis::score::score_results;
+use crate::cache::HcCache;
 use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
@@ -42,6 +44,8 @@ use crate::shell::verbosity::Verbosity;
 use crate::shell::Shell;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
+use cli::CacheArgs;
+use cli::CacheOp;
 use cli::CheckArgs;
 use cli::CliConfig;
 use cli::FullCommands;
@@ -133,6 +137,7 @@ fn main() -> ExitCode {
 		Some(FullCommands::Setup(args)) => return cmd_setup(&args, &config),
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
+		Some(FullCommands::Cache(args)) => return cmd_cache(args, &config),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
@@ -713,6 +718,35 @@ fn updater_command(command_name: &str, args: &UpdateArgs) -> Command {
 	}
 
 	command
+}
+
+fn cmd_cache(args: CacheArgs, config: &CliConfig) -> ExitCode {
+	let Some(path) = config.cache() else {
+		println!("cache path must be defined by cmdline arg or $HC_CACHE env var");
+		return ExitCode::FAILURE;
+	};
+	let op: CacheOp = match args.try_into() {
+		Ok(o) => o,
+		Err(e) => {
+			println!("{e}");
+			return ExitCode::FAILURE;
+		}
+	};
+	let mut cache = HcCache::new(path);
+	let res = match op {
+		CacheOp::List { scope, filter } => cache.list(scope, filter),
+		CacheOp::Delete {
+			scope,
+			filter,
+			force,
+		} => cache.delete(scope, filter, force),
+	};
+	if let Err(e) = res {
+		println!("{e}");
+		ExitCode::FAILURE
+	} else {
+		ExitCode::SUCCESS
+	}
 }
 
 /// Print the current home directory for Hipcheck.

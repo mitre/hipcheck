@@ -2,6 +2,7 @@
 
 //! Data structures for Hipcheck's main CLI.
 
+use crate::cache::{CacheDeleteScope, CacheListScope, CacheSort};
 use crate::context::Context;
 use crate::error::Result;
 use crate::hc_error;
@@ -372,6 +373,7 @@ pub enum FullCommands {
 	Setup(SetupArgs),
 	Ready,
 	Update(UpdateArgs),
+	Cache(CacheArgs),
 	PrintConfig,
 	PrintData,
 	PrintCache,
@@ -387,6 +389,7 @@ impl From<&Commands> for FullCommands {
 			Commands::Ready => FullCommands::Ready,
 			Commands::Scoring => FullCommands::Scoring,
 			Commands::Update(args) => FullCommands::Update(args.clone()),
+			Commands::Cache(args) => FullCommands::Cache(args.clone()),
 		}
 	}
 }
@@ -413,6 +416,8 @@ pub enum Commands {
 	Scoring,
 	/// Run Hipcheck self-updater, if installed
 	Update(UpdateArgs),
+	/// Manage Hipcheck cache
+	Cache(CacheArgs),
 }
 
 // If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
@@ -709,6 +714,190 @@ impl<T: Clone> Update for Option<T> {
 	}
 }
 
+#[derive(Debug, Clone, clap::Parser)]
+pub struct CacheArgs {
+	#[clap(subcommand)]
+	pub subcmd: CacheSubcmds,
+}
+impl TryFrom<CacheArgs> for CacheOp {
+	type Error = crate::error::Error;
+	fn try_from(value: CacheArgs) -> Result<Self> {
+		value.subcmd.try_into()
+	}
+}
+
+// The target struct to which a CacheArgs instance must be translated
+#[derive(Debug, Clone)]
+pub enum CacheOp {
+	List {
+		scope: CacheListScope,
+		filter: Option<String>,
+	},
+	Delete {
+		scope: CacheDeleteScope,
+		filter: Option<String>,
+		force: bool,
+	},
+}
+
+#[derive(Debug, Clone, clap::Subcommand)]
+#[command(arg_required_else_help = true)]
+pub enum CacheSubcmds {
+	/// List existing caches.
+	List(CliCacheListArgs),
+	/// Delete existing caches.
+	Delete(CliCacheDeleteArgs),
+}
+impl TryFrom<CacheSubcmds> for CacheOp {
+	type Error = crate::error::Error;
+	fn try_from(value: CacheSubcmds) -> Result<Self> {
+		use CacheSubcmds::*;
+		match value {
+			List(args) => Ok(args.into()),
+			Delete(args) => args.try_into(),
+		}
+	}
+}
+
+// CLI version of cache::CacheSort with `invert` field expanded to different
+// named sort strategies
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum CliSortStrategy {
+	/// Oldest entries first
+	Oldest,
+	/// Newest entries first
+	Newest,
+	/// Largest entries first
+	Largest,
+	/// Smallest entries first
+	Smallest,
+	/// Entries sorted alphabetically
+	Alpha,
+	/// Entries sorted reverse-alphabetically
+	Ralpha,
+}
+impl CliSortStrategy {
+	pub fn to_cache_sort(&self) -> (CacheSort, bool) {
+		use CliSortStrategy::*;
+		match self {
+			Oldest => (CacheSort::Oldest, false),
+			Newest => (CacheSort::Oldest, true),
+			Largest => (CacheSort::Largest, false),
+			Smallest => (CacheSort::Largest, true),
+			Alpha => (CacheSort::Alpha, false),
+			Ralpha => (CacheSort::Alpha, true),
+		}
+	}
+}
+
+// Args for `hc cache list`
+#[derive(Debug, Clone, clap::Args)]
+pub struct CliCacheListArgs {
+	/// Sorting strategy for the list, default is 'alpha'
+	#[arg(short = 's', long, default_value = "alpha")]
+	pub strategy: CliSortStrategy,
+	/// Max number of entries to display
+	#[arg(short = 'm', long)]
+	pub max: Option<usize>,
+	/// Consider only entries matching this pattern
+	#[arg(short = 'p', long = "pattern")]
+	pub filter: Option<String>,
+}
+impl From<CliCacheListArgs> for CacheOp {
+	fn from(value: CliCacheListArgs) -> Self {
+		let (sort, invert) = value.strategy.to_cache_sort();
+		let scope = CacheListScope {
+			sort,
+			invert,
+			n: value.max,
+		};
+		CacheOp::List {
+			scope,
+			filter: value.filter,
+		}
+	}
+}
+
+// Args for `hc cache delete`
+#[derive(Debug, Clone, clap::Args)]
+pub struct CliCacheDeleteArgs {
+	/// Sorting strategy for deletion. Args of the form 'all|{<STRAT> [N]}'. Where <STRAT> is the
+	/// same set of strategies for `hc cache list`. If [N], the max number of entries to delete is
+	/// omitted, it will default to 1.
+	#[arg(short = 's', long, num_args=1..=2, value_delimiter = ' ')]
+	pub strategy: Vec<String>,
+	/// Consider only entries matching this pattern
+	#[arg(short = 'p', long = "pattern")]
+	pub filter: Option<String>,
+	/// Do not prompt user to confirm the entries to delete
+	#[arg(long, default_value_t = false)]
+	pub force: bool,
+}
+// Must be fallible conversion because we are doing validation that clap can't
+// support as of writing
+impl TryFrom<CliCacheDeleteArgs> for CacheOp {
+	type Error = crate::error::Error;
+	fn try_from(value: CliCacheDeleteArgs) -> Result<Self> {
+		if value.strategy.is_empty() && value.filter.is_none() {
+			return Err(hc_error!(
+				"`hc cache delete` without args is not allowed. please \
+                tailor the operation with flags, or use `-s all` to delete all \
+                entries"
+			));
+		}
+		let scope: CacheDeleteScope = value.strategy.try_into()?;
+		Ok(CacheOp::Delete {
+			scope,
+			filter: value.filter,
+			force: value.force,
+		})
+	}
+}
+
+// A valid cli string for CacheDeleteScope may be:
+//  1. "all"
+//  2. "<SORT> <N>", where <SORT> is one of the CliSortStrategy variants, <N> is
+//      number of entries
+//  3. "<SORT>", same as #2 but <N> defaults to 1
+impl TryFrom<Vec<String>> for CacheDeleteScope {
+	type Error = crate::error::Error;
+	fn try_from(value: Vec<String>) -> Result<Self> {
+		if value.len() > 2 {
+			return Err(hc_error!("strategy takes at most two tokens"));
+		}
+		let Some(raw_spec) = value.first() else {
+			return Ok(CacheDeleteScope::All);
+		};
+		if raw_spec.to_lowercase() == "all" {
+			if let Some(n) = value.get(1) {
+				return Err(hc_error!(
+					"unnecessary additional token '{}' after 'all'",
+					n
+				));
+			}
+			Ok(CacheDeleteScope::All)
+		} else {
+			let strat = CliSortStrategy::from_str(raw_spec, true).or(Err(hc_error!(
+				"'{}' is not a valid sort strategy. strategies include {}, or 'all'",
+				raw_spec,
+				CliSortStrategy::value_variants()
+					.iter()
+					.map(|s| format!("'{s:?}'").to_lowercase())
+					.collect::<Vec<String>>()
+					.join(", "),
+			)))?;
+			let (sort, invert) = strat.to_cache_sort();
+			let n: usize = match value.get(1) {
+				Some(raw_n) => raw_n
+					.parse::<usize>()
+					.context("max entry token is not a valid unsigned int")?,
+				None => 1,
+			};
+			Ok(CacheDeleteScope::Group { sort, invert, n })
+		}
+	}
+}
+
 /// Test CLI commands
 #[cfg(test)]
 mod tests {
@@ -958,14 +1147,14 @@ mod tests {
 		let check_args = vec!["hc", "check"];
 		let schema_args = vec!["hc", "schema"];
 
-		let parsed = CliConfig::try_parse_from(check_args.into_iter());
+		let parsed = CliConfig::try_parse_from(check_args);
 		assert!(parsed.is_err());
 		assert_eq!(
 			parsed.unwrap_err().kind(),
 			clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
 		);
 
-		let parsed = CliConfig::try_parse_from(schema_args.into_iter());
+		let parsed = CliConfig::try_parse_from(schema_args);
 		assert!(parsed.is_err());
 		assert_eq!(
 			parsed.unwrap_err().kind(),
@@ -974,11 +1163,10 @@ mod tests {
 	}
 
 	fn get_check_cmd_from_cli(args: Vec<&str>) -> Result<CheckCommand> {
-		let parsed = CliConfig::try_parse_from(args.into_iter());
+		let parsed = CliConfig::try_parse_from(args);
 		assert!(parsed.is_ok());
 		let command = parsed.unwrap().command;
 		let Some(Commands::Check(chck_args)) = command else {
-			assert!(false);
 			unreachable!();
 		};
 		chck_args.command()
