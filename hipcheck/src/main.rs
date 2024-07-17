@@ -41,6 +41,7 @@ use crate::shell::Shell;
 use crate::shell::Verbosity;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
+use cli::CacheArgs;
 use cli::CheckArgs;
 use cli::CliConfig;
 use cli::FullCommands;
@@ -102,6 +103,7 @@ fn main() -> ExitCode {
 		Some(FullCommands::Setup(args)) => return cmd_setup(&args, &config),
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
+		Some(FullCommands::Cache(args)) => cmd_cache(&args),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
@@ -662,6 +664,8 @@ fn updater_command(command_name: &str, args: &UpdateArgs) -> Command {
 
 	command
 }
+
+fn cmd_cache(args: &CacheArgs) {}
 
 /// Print the current home directory for Hipcheck.
 ///

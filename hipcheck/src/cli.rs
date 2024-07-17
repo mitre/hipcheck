@@ -13,6 +13,7 @@ use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 /// Automatated supply chain risk assessment of software packages.
 #[derive(Debug, Default, clap::Parser, hc::Update)]
@@ -367,6 +368,7 @@ pub enum FullCommands {
 	Setup(SetupArgs),
 	Ready,
 	Update(UpdateArgs),
+	Cache(CacheArgs),
 	PrintConfig,
 	PrintData,
 	PrintCache,
@@ -382,6 +384,7 @@ impl From<&Commands> for FullCommands {
 			Commands::Ready => FullCommands::Ready,
 			Commands::Scoring => FullCommands::Scoring,
 			Commands::Update(args) => FullCommands::Update(args.clone()),
+			Commands::Cache(args) => FullCommands::Cache(args.clone()),
 		}
 	}
 }
@@ -408,6 +411,8 @@ pub enum Commands {
 	Scoring,
 	/// Run Hipcheck self-updater, if installed
 	Update(UpdateArgs),
+	/// Manage Hipcheck cache
+	Cache(CacheArgs),
 }
 
 // If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
@@ -563,9 +568,9 @@ pub struct CheckPypiArgs {
 pub struct CheckRepoArgs {
 	/// Repository to analyze; can be a local path or a URI
 	pub source: String,
-    /// The ref of the repo to analyze
-    #[clap(long = "ref")]
-    pub ref_: Option<String>
+	/// The ref of the repo to analyze
+	#[clap(long = "ref")]
+	pub ref_: Option<String>,
 }
 
 #[derive(Debug, Clone, clap::Args)]
@@ -628,6 +633,33 @@ impl<T: Clone> Update for Option<T> {
 		}
 	}
 }
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct CacheArgs {
+	#[clap(subcommand)]
+	pub command: CacheCommand,
+	pub target: Option<CacheOpTarget>,
+}
+
+#[derive(Debug, Clone, clap::Subcommand)]
+pub enum CacheCommand {
+	List,
+	Delete,
+}
+
+#[derive(Debug, Clone)]
+pub enum CacheOpTarget {
+	Single(String),
+	Group(u32, String),
+}
+impl FromStr for CacheOpTarget {
+	type Err = &'static str;
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Ok(CacheOpTarget::Single(s.to_owned()))
+	}
+}
+
+// none, or specific target, or N largest/oldest
 
 /// Test CLI commands
 #[cfg(test)]
@@ -990,7 +1022,11 @@ mod tests {
 	#[test]
 	fn test_deductive_check_repo_vcs_https() {
 		let url = "https://github.com/mitre/hipcheck.git".to_string();
-		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "git+https://github.com/mitre/hipcheck.git"]);
+		let cmd = get_check_cmd_from_cli(vec![
+			"hc",
+			"check",
+			"git+https://github.com/mitre/hipcheck.git",
+		]);
 		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
 		if let Ok(chk_cmd) = cmd {
 			let target = get_target_from_cmd(chk_cmd);
@@ -1001,7 +1037,11 @@ mod tests {
 	#[test]
 	fn test_deductive_check_repo_vcs_ssh() {
 		let url = "ssh://git@github.com/mitre/hipcheck.git".to_string();
-		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "git+ssh://git@github.com/mitre/hipcheck.git"]);
+		let cmd = get_check_cmd_from_cli(vec![
+			"hc",
+			"check",
+			"git+ssh://git@github.com/mitre/hipcheck.git",
+		]);
 		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
 		if let Ok(chk_cmd) = cmd {
 			let target = get_target_from_cmd(chk_cmd);
@@ -1012,7 +1052,8 @@ mod tests {
 	#[test]
 	fn test_deductive_check_repo_filepath() {
 		let path = "/home/me/projects/hipcheck".to_string();
-		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "git+file:///home/me/projects/hipcheck"]);
+		let cmd =
+			get_check_cmd_from_cli(vec!["hc", "check", "git+file:///home/me/projects/hipcheck"]);
 		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
 		if let Ok(chk_cmd) = cmd {
 			let target = get_target_from_cmd(chk_cmd);
