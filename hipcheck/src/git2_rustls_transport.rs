@@ -3,7 +3,7 @@
 //! This should accurately implement the spec described at
 /// <https://www.git-scm.com/docs/http-protocol>.
 
-use std::{io::{self, Read, Write, Error as IoError}, sync::{Arc, Once, OnceLock}};
+use std::{io::{self, Error as IoError, ErrorKind, Read, Write}, sync::{Arc, Once, OnceLock}};
 use base64::Engine;
 use dialoguer::{Input, Password};
 use git2::{transport::{self, Service, SmartSubtransport, SmartSubtransportStream, Transport}, Error as Git2Error, Remote};
@@ -184,7 +184,11 @@ impl Read for CustomSubtransportStream {
 
         // Unwrap here is fine, since sending the request should have instantiated the response reader
         // or errored. 
-        self.response_reader.as_mut().unwrap().read(buf)
+        match self.response_reader.as_mut().unwrap().read(buf) {
+            ok @ Ok(_) => ok,
+            Err(err) if err.kind() == ErrorKind::UnexpectedEof => Ok(0),
+            err => err
+        }
     }
 }
 

@@ -76,7 +76,11 @@ impl SourceRepo {
 			(false, _) => SourceRepo::resolve_remote_repo(phase, root, raw),
 		};
 
-		log::debug!("resolved source [source={:?}]", source);
+		if source.is_ok() {
+			log::debug!("resolved source [source={:?}]", source);
+		} else {
+			log::error!("could not resolve source: {:?}", source);
+		}
 
 		source
 	}
@@ -757,26 +761,6 @@ fn clone_remote(url: &Url, dest: &Path) -> Result<()> {
 		.with_checkout(checkout_opts)
 		.fetch_options(fetch_opts)
 		.clone(url.as_str(), dest)?;
-
-
-	// fs::create_dir_all(dest).context(format!(
-	// 	"can't make local clone directory '{}'",
-	// 	dest.display()
-	// ))?;
-
-	// let dest = dest
-	// 	.to_str()
-	// 	.ok_or_else(|| hc_error!("destination isn't UTF-8 encoded '{}'", dest.display()))?;
-
-	// let _output = GitCommand::new_repo([
-	// 	"clone",
-	// 	"-q",
-	// 	"--single-branch",
-	// 	"--no-tags",
-	// 	url.as_str(),
-	// 	dest,
-	// ])?
-	// .output()?;
 
 	Ok(())
 }
