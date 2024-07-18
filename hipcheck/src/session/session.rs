@@ -189,12 +189,12 @@ impl Session {
 		 *  Resolving the source.
 		 *-----------------------------------------------------------------*/
 
-		let source = match load_target(target, &home) {
+		let target = match load_target(target, &home) {
 			Ok(results) => results,
 			Err(err) => return Err(err),
 		};
 
-		session.set_source(Arc::new(source));
+		session.set_target(Arc::new(target));
 
 		/*===================================================================
 		 *  Resolving the Hipcheck version.
@@ -269,9 +269,10 @@ fn load_config_and_data(
 fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	// Resolve the source specifier into an actual source.
 	let phase_desc = match seed {
-		TargetSeed::LocalRepo(_) | TargetSeed::RemoteRepo(_) => "resolving git repository source",
-		TargetSeed::Package(_) => "resolving package source",
+		TargetSeed::LocalRepo(_) | TargetSeed::RemoteRepo(_) => "resolving git repository target",
+		TargetSeed::Package(_) => "resolving package target",
 		TargetSeed::Spdx(_) => "parsing SPDX document",
+		TargetSeed::MavenPackage(_) => "resolving maven package target",
 	};
 
 	let phase = SpinnerPhase::start(phase_desc);
@@ -290,7 +291,9 @@ fn resolve_token() -> Result<String> {
 }
 
 /// Resolves the source specifier into an actual source.
-fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Result<Source> {
+fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Result<Target> {
+	todo!()
+	/*
 	#[cfg(feature = "print-timings")]
 	let _0 = crate::benchmarking::print_scope_time!("resolve_source");
 
@@ -321,6 +324,7 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 			})
 		}
 	}
+	*/
 }
 
 pub struct Check {

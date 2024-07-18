@@ -4,22 +4,22 @@ use url::Url;
 #[derive(Clone, Debug)]
 pub struct Target {
 	/// The original specifier provided by the user.
-	specifier: String,
+	pub specifier: String,
 
 	/// The path to the local repository.
-	local: LocalGitRepo,
+	pub local: LocalGitRepo,
 
 	/// The url of the remote repository, if any.
-	remote: Option<RemoteGitRepo>,
+	pub remote: Option<RemoteGitRepo>,
 
 	/// The package associated with the target, if any.
-	package: Option<Package>,
+	pub package: Option<Package>,
 }
 
 #[derive(Clone, Debug)]
 pub struct RemoteGitRepo {
-	url: Url,
-	known_remote: Option<KnownRemote>,
+	pub url: Url,
+	pub known_remote: Option<KnownRemote>,
 }
 
 #[derive(Clone, Debug)]
@@ -30,30 +30,30 @@ pub enum KnownRemote {
 #[derive(Clone, Debug)]
 pub struct LocalGitRepo {
 	/// The path to the repo.
-	path: PathBuf,
+	pub path: PathBuf,
 
 	/// The Git ref we're referring to.
-	git_ref: String,
+	pub git_ref: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct Package {
 	/// A package url for the package.
-	purl: Url,
+	pub purl: Url,
 
 	/// The package name
-	name: String,
+	pub name: String,
 
 	/// The package version
-	version: String,
+	pub version: String,
 
 	/// What host the package is from.
-	host: PackageHost,
+	pub host: PackageHost,
 }
 #[derive(Clone, Debug)]
 pub struct MavenPackage {
 	/// The Maven url
-	url: Url,
+	pub url: Url,
 }
 
 #[derive(Clone, Debug)]

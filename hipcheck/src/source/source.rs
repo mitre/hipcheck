@@ -6,6 +6,7 @@ use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
 use crate::shell::spinner_phase::SpinnerPhase;
+use crate::target::{KnownRemote, RemoteGitRepo, Target};
 // use crate::shell::Phase;
 pub use crate::source::query::*;
 use log::debug;
@@ -702,4 +703,38 @@ pub(crate) fn get_head_commit(path: &Path) -> Result<String> {
 	let output = GitCommand::for_repo(path, ["rev-parse", "--short", "HEAD"])?.output()?;
 
 	Ok(output.trim().to_owned())
+}
+
+impl From<RemoteGitRepo> for Remote {
+	fn from(value: RemoteGitRepo) -> Self {
+		let mut o = "".to_owned();
+		let mut r = "".to_owned();
+		if let Some(KnownRemote::GitHub { owner, repo }) = value.known_remote {
+			o = owner;
+			r = repo;
+		};
+		Remote::GitHub {
+			owner: o,
+			repo: r,
+			url: value.url,
+		}
+	}
+}
+
+impl TryFrom<Target> for Source {
+	type Error = crate::error::Error;
+	fn try_from(value: Target) -> Result<Self> {
+		let raw = value.specifier;
+		let local = value.local.path;
+		let remote = value.remote.map(Remote::from);
+		let head = get_head_commit(&local).context("can't get head commit for local source")?;
+		Ok(Source {
+			kind: SourceKind::Repo(SourceRepo {
+				raw,
+				local,
+				remote,
+				head,
+			}),
+		})
+	}
 }
