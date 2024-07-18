@@ -16,10 +16,11 @@ mod setup;
 mod shell;
 mod source;
 mod target;
-#[cfg(test)]
-mod test_util;
 mod util;
 mod version;
+
+#[cfg(test)]
+mod test_util;
 
 #[cfg(feature = "benchmarking")]
 mod benchmarking;
