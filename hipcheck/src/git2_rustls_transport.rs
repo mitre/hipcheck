@@ -53,7 +53,7 @@ fn agent() -> &'static Agent {
     })
 }
 
-// The following 3 functions use info from 
+// The following 4 functions use info from 
 // https://github.com/libgit2/libgit2/blob/2ecc8586f7eec4063b5da1563d0a33f9e9f9fcf7/src/libgit2/transports/http.c#L68-L95
 
 /// Get the url path for a [Service].
