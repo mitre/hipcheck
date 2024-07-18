@@ -327,28 +327,6 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 	*/
 }
 
-pub struct Check {
-	pub target: String,
-	pub kind: CheckKind,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum TargetKind {
-	RepoSource,
-	PackageVersion,
-	SpdxDocument,
-}
-
-impl TargetKind {
-	pub fn is_checkable(&self) -> bool {
-		use TargetKind::*;
-
-		match self {
-			RepoSource | PackageVersion | SpdxDocument => true,
-		}
-	}
-}
-
 #[cfg(test)]
 mod tests {
 	use super::*;

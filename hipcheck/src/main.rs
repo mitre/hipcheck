@@ -32,16 +32,13 @@ use crate::analysis::score::score_results;
 use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
-use crate::session::session::Check;
 use crate::session::session::Session;
-use crate::session::session::TargetKind;
 use crate::setup::{resolve_and_transform_source, SourceType};
 use crate::shell::verbosity::Verbosity;
 use crate::shell::Shell;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
 use cli::CheckArgs;
-use cli::CheckCommand;
 use cli::CliConfig;
 use cli::FullCommands;
 use cli::SchemaArgs;
@@ -802,17 +799,6 @@ impl CheckKind {
 			CheckKind::Npm => "npm",
 			CheckKind::Pypi => "pypi",
 			CheckKind::Spdx => "spdx",
-		}
-	}
-
-	/// Get the kind of target implied by the object being checked.
-	const fn target_kind(&self) -> TargetKind {
-		match self {
-			CheckKind::Repo => TargetKind::RepoSource,
-			CheckKind::Maven => TargetKind::PackageVersion,
-			CheckKind::Npm => TargetKind::PackageVersion,
-			CheckKind::Pypi => TargetKind::PackageVersion,
-			CheckKind::Spdx => TargetKind::SpdxDocument,
 		}
 	}
 }

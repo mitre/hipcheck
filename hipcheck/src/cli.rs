@@ -5,10 +5,8 @@
 use crate::error::Error;
 use crate::hc_error;
 use crate::report::Format;
-use crate::session::session::Check;
 use crate::shell::{color_choice::ColorChoice, verbosity::Verbosity};
 use crate::target::{TargetSeed, TargetType};
-use crate::CheckKind;
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
@@ -516,30 +514,6 @@ pub enum CheckCommand {
 }
 
 impl CheckCommand {
-	pub fn as_check(&self) -> Check {
-		match self {
-			CheckCommand::Maven(args) => Check {
-				target: args.package.clone(),
-				kind: CheckKind::Maven,
-			},
-			CheckCommand::Npm(args) => Check {
-				target: args.package.clone(),
-				kind: CheckKind::Npm,
-			},
-			CheckCommand::Pypi(args) => Check {
-				target: args.package.clone(),
-				kind: CheckKind::Pypi,
-			},
-			CheckCommand::Repo(args) => Check {
-				target: args.source.clone(),
-				kind: CheckKind::Repo,
-			},
-			CheckCommand::Spdx(args) => Check {
-				target: args.path.clone(),
-				kind: CheckKind::Spdx,
-			},
-		}
-	}
 	pub fn as_target_seed(&self) -> TargetSeed {
 		todo!();
 	}
