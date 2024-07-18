@@ -50,11 +50,16 @@ pub struct Package {
 	/// What host the package is from.
 	host: PackageHost,
 }
+#[derive(Clone, Debug)]
+pub struct MavenPackage {
+	/// The Maven url
+	url: Url,
+}
 
 #[derive(Clone, Debug)]
+// Maven as a possible host is ommitted because a MavenPackage is currently its own struct without a host field
 pub enum PackageHost {
 	Npm,
-	Maven,
 	PyPi,
 }
 
@@ -63,6 +68,7 @@ pub enum TargetSeed {
 	LocalRepo(LocalGitRepo),
 	RemoteRepo(RemoteGitRepo),
 	Package(Package),
+	MavenPackage(MavenPackage),
 	Spdx(PathBuf),
 }
 impl ToString for TargetSeed {
