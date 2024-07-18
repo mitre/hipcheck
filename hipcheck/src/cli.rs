@@ -564,9 +564,9 @@ pub struct CheckPypiArgs {
 pub struct CheckRepoArgs {
 	/// Repository to analyze; can be a local path or a URI
 	pub source: String,
-    /// The ref of the repo to analyze
-    #[clap(long = "ref")]
-    pub ref_: Option<String>
+	/// The ref of the repo to analyze
+	#[clap(long = "ref")]
+	pub ref_: Option<String>,
 }
 
 #[derive(Debug, Clone, clap::Args)]
@@ -991,7 +991,11 @@ mod tests {
 	#[test]
 	fn test_deductive_check_repo_vcs_https() {
 		let url = "https://github.com/mitre/hipcheck.git".to_string();
-		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "git+https://github.com/mitre/hipcheck.git"]);
+		let cmd = get_check_cmd_from_cli(vec![
+			"hc",
+			"check",
+			"git+https://github.com/mitre/hipcheck.git",
+		]);
 		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
 		if let Ok(chk_cmd) = cmd {
 			let target = get_target_from_cmd(chk_cmd);
@@ -1002,7 +1006,11 @@ mod tests {
 	#[test]
 	fn test_deductive_check_repo_vcs_ssh() {
 		let url = "ssh://git@github.com/mitre/hipcheck.git".to_string();
-		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "git+ssh://git@github.com/mitre/hipcheck.git"]);
+		let cmd = get_check_cmd_from_cli(vec![
+			"hc",
+			"check",
+			"git+ssh://git@github.com/mitre/hipcheck.git",
+		]);
 		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
 		if let Ok(chk_cmd) = cmd {
 			let target = get_target_from_cmd(chk_cmd);
@@ -1013,7 +1021,8 @@ mod tests {
 	#[test]
 	fn test_deductive_check_repo_filepath() {
 		let path = "/home/me/projects/hipcheck".to_string();
-		let cmd = get_check_cmd_from_cli(vec!["hc", "check", "git+file:///home/me/projects/hipcheck"]);
+		let cmd =
+			get_check_cmd_from_cli(vec!["hc", "check", "git+file:///home/me/projects/hipcheck"]);
 		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));
 		if let Ok(chk_cmd) = cmd {
 			let target = get_target_from_cmd(chk_cmd);

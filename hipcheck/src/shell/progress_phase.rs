@@ -8,6 +8,7 @@ use super::{Shell, HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP};
 use console::style;
 use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
 use std::{
+	fmt::Display,
 	sync::{Arc, OnceLock},
 	time::Duration,
 };
@@ -19,12 +20,12 @@ static STYLES: OnceLock<[ProgressStyle; 2]> = OnceLock::new();
 fn get_styles() -> &'static [ProgressStyle] {
 	STYLES.get_or_init(|| [
 		// Unit agnostic progress style. 
-        ProgressStyle::with_template("{prefix:.bold.dim} {msg} {wide_bar} [{pos}/{len}] ({percent:>4.bold}) {elapsed:.italic}")
+        ProgressStyle::with_template("{prefix:.bold.dim} {msg} {wide_bar} [{pos}/{len}] ({percent:>3.bold}%) {elapsed:.italic}/{duration:.italic}")
             .expect("valid style"),
 
 		// Bytes/file transfer prgress style. 
 		ProgressStyle::with_template("{prefix:.bold.dim} {msg} {wide_bar} \
-			[{decimal_bytes}/{decimal_total_bytes}: {decimal_bytes_per_sec:.bold}] ({percent:>4.bold}) {elapsed:.italic}")
+			[{decimal_bytes}/{decimal_total_bytes}: {decimal_bytes_per_sec:.bold}] ({percent:>3.bold}%) {elapsed:.italic}/{duration:.italic}")
 			.expect("valid style"),
     ])
 }
@@ -104,15 +105,33 @@ impl ProgressPhase {
 		self.bar.inc(amount)
 	}
 
-	/// Finishes this bar, leaving a "done" message with a timestamp in the terminal.
-	#[allow(unused)]
-	pub fn finish_successful(&self) {
-		super::macros::println!(
-			"{:>LEFT_COL_WIDTH$} {} ({})",
-			Title::Done,
-			self.name,
-			style(HumanDuration(self.elapsed())).bold()
-		);
+	/// Set the current amount of progress made.
+	pub fn set_position(&self, new_position: u64) {
+		if self.bar.position() == 0 && new_position > 0 {
+			self.bar.set_message(format!("{} (running...)", self.name));
+			self.bar.set_prefix(HOUR_GLASS.to_string());
+		}
+
+		self.bar.set_position(new_position);
+	}
+
+	/// Update the status and redraw this bar with the new status.
+	/// This status may be over-written if the bar changes states into "done" or the status is updated otherwise.
+	pub fn update_status(&self, status: impl Display) {
+		self.bar.set_message(format!("{} ({status})", self.name));
+		self.bar.set_prefix(HOUR_GLASS.to_string());
+	}
+
+	/// Finishes this bar, optionally leaving a "done" message with a timestamp in the terminal.
+	pub fn finish_successful(&self, print_message: bool) {
+		if print_message {
+			super::macros::println!(
+				"{:>LEFT_COL_WIDTH$} {} ({})",
+				Title::Done,
+				self.name,
+				style(HumanDuration(self.elapsed())).bold()
+			);
+		}
 
 		self.bar.finish_and_clear();
 	}
@@ -128,6 +147,11 @@ impl ProgressPhase {
 		);
 
 		self.bar.finish_and_clear();
+	}
+
+	/// Check if this phase is finished.
+	pub fn is_finished(&self) -> bool {
+		self.bar.is_finished()
 	}
 }
 
