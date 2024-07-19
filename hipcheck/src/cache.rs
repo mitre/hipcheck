@@ -2,36 +2,60 @@
 
 use crate::error::Result;
 use crate::hc_error;
+use clap::{ArgAction, Args, Parser, Subcommand};
 use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 use std::time::SystemTime;
 use walkdir::{DirEntry, FilterEntry, IntoIter, WalkDir};
 
-#[derive(Debug, Clone, clap::ValueEnum)]
+#[derive(Debug, Clone, Subcommand)]
+#[command(arg_required_else_help = true)]
+pub enum CacheSubcmds {
+	/// List existing caches.
+	List(CacheTarget),
+	/// Delete existing caches.
+	Delete(CacheTarget),
+}
+
+#[derive(Debug, Clone, Args)]
+#[command(arg_required_else_help = true)]
+pub struct CacheTarget {
+	#[clap(subcommand)]
+	pub command: Option<CacheOpTarget>,
+
+	pub pattern: Option<String>,
+}
+
+#[derive(Copy, Clone, Debug, Subcommand)]
+
+pub enum CacheSelect {
+	Oldest {
+		n: usize,
+	},
+
+	Largest {
+		n: usize,
+	},
+
+	Alpha {
+		n: usize
+	}
+}
+
+#[derive(Debug, Clone)]
 pub enum CacheSort {
 	Oldest,
 	Largest,
 	Alpha,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Subcommand)]
 pub enum CacheOpTarget {
-	Pattern(String),
-	Group(usize, CacheSort),
+	#[command(flatten)]
+	Group(CacheSelect),
+
 	All,
-}
-
-#[derive(Debug, Clone, clap::ValueEnum)]
-pub enum CacheOpSpec {
-	List,
-	Delete,
-}
-
-#[derive(Debug, Clone)]
-pub struct CacheOp {
-	pub op: CacheOpSpec,
-	pub target: CacheOpTarget,
 }
 
 #[derive(Debug, Clone)]

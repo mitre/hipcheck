@@ -30,7 +30,7 @@ use crate::analysis::report_builder::AnyReport;
 use crate::analysis::report_builder::Format;
 use crate::analysis::report_builder::Report;
 use crate::analysis::score::score_results;
-use crate::cache::{CacheOp, CacheOpSpec, CacheOpTarget, CacheSort, HcCache};
+use crate::cache::{CacheOpTarget, CacheSort, HcCache};
 use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
@@ -43,6 +43,8 @@ use crate::shell::Shell;
 use crate::shell::Verbosity;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
+use cache::CacheSubcmds;
+use cache::CacheTarget;
 use cli::CacheArgs;
 use cli::CheckArgs;
 use cli::CliConfig;
@@ -672,35 +674,61 @@ fn cmd_cache(args: CacheArgs, config: &CliConfig) -> ExitCode {
 		println!("cache path must be defined by cmdline arg or $HC_CACHE env var");
 		return ExitCode::FAILURE;
 	};
-	let op: CacheOp = args.into();
-	let (spec, target) = (op.op, op.target);
-	let mut cache = HcCache::new(path);
-	match spec {
-		CacheOpSpec::List => match target {
-			CacheOpTarget::Pattern(pat) => {
-				cache.list_match(pat);
-			}
-			CacheOpTarget::All => {
-				cache.list_n(CacheSort::Alpha, None);
-			}
-			CacheOpTarget::Group(n, sort) => {
-				cache.list_n(sort, Some(n));
-			}
-		},
-		CacheOpSpec::Delete => match target {
-			CacheOpTarget::Pattern(pat) => {
-				cache.delete_match(pat);
-			}
-			CacheOpTarget::All => {
-				cache.clear();
-			}
-			CacheOpTarget::Group(n, sort) => {
-				cache.delete_n(sort, n);
-			}
-		},
+
+	match args.subcmd {
+		// Delete some pattern.
+		CacheSubcmds::Delete(CacheTarget { pattern: Some(ref pat), ..}) => todo!(),
+
+		// Delete all caches.
+		CacheSubcmds::Delete(CacheTarget { command: Some(CacheOpTarget::All), .. }) => todo!(),
+
+		// Delete a selection of caches.
+		CacheSubcmds::Delete(CacheTarget { command: Some(selection), .. }) => todo!(),
+		
+		// List some pattern of caches.
+		CacheSubcmds::List(CacheTarget { pattern: Some(ref pat), ..}) => todo!(),
+
+		// List all caches.
+		CacheSubcmds::List(CacheTarget { command: Some(CacheOpTarget::All), .. }) => todo!(),
+
+		// List a selection of caches.
+		CacheSubcmds::List(CacheTarget { command: Some(selection), .. }) => todo!(),
+
+		| CacheSubcmds::Delete(CacheTarget { command: None, pattern: None })
+		| CacheSubcmds::List(CacheTarget { command: None, pattern: None })
+		=> unreachable!("Target should always be specified, enforced by clap"),
 	}
 
-	ExitCode::SUCCESS
+
+	// let op: CacheOp = args.into();
+	// let (spec, target) = (op.op, op.target);
+	// let mut cache = HcCache::new(path);
+	// match spec {
+	// 	CacheOpSpec::List => match target {
+	// 		CacheOpTarget::Pattern(pat) => {
+	// 			cache.list_match(pat);
+	// 		}
+	// 		CacheOpTarget::All => {
+	// 			cache.list_n(CacheSort::Alpha, None);
+	// 		}
+	// 		CacheOpTarget::Group(n, sort) => {
+	// 			cache.list_n(sort, Some(n));
+	// 		}
+	// 	},
+	// 	CacheOpSpec::Delete => match target {
+	// 		CacheOpTarget::Pattern(pat) => {
+	// 			cache.delete_match(pat);
+	// 		}
+	// 		CacheOpTarget::All => {
+	// 			cache.clear();
+	// 		}
+	// 		CacheOpTarget::Group(n, sort) => {
+	// 			cache.delete_n(sort, n);
+	// 		}
+	// 	},
+	// }
+
+	// ExitCode::SUCCESS
 }
 
 /// Print the current home directory for Hipcheck.

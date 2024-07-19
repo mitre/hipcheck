@@ -2,7 +2,7 @@
 
 //! Data structures for Hipcheck's main CLI.
 
-use crate::cache::{CacheGroupSpec, CacheOp, CacheOpSpec, CacheOpTarget};
+use crate::cache::{CacheOpTarget, CacheSort, CacheSubcmds};
 use crate::error::Error;
 use crate::hc_error;
 use crate::report::Format;
@@ -10,7 +10,7 @@ use crate::session::session::Check;
 use crate::shell::{ColorChoice, Verbosity};
 use crate::target::TargetType;
 use crate::CheckKind;
-use clap::{Parser as _, ValueEnum};
+use clap::{Parser as _, Subcommand, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};
@@ -637,38 +637,8 @@ impl<T: Clone> Update for Option<T> {
 
 #[derive(Debug, Clone, clap::Parser)]
 pub struct CacheArgs {
-	pub op: CacheOpSpec,
 	#[clap(subcommand)]
-	pub ints: Option<CacheNSpec>,
-	pub target: Option<String>,
-}
-
-#[derive(Debug, Clone, clap::Subcommand)]
-pub enum CacheNSpec {
-	N(CacheNSpecArgs),
-}
-
-#[derive(Debug, Clone, clap::Args)]
-pub struct CacheNSpecArgs {
-	/// The sorting function to use
-	pub sort: CacheGroupSpec,
-	/// The number of sorted cache entries the operation is applied against
-	pub count: usize,
-}
-
-impl From<CacheArgs> for CacheOp {
-	fn from(value: CacheArgs) -> CacheOp {
-		let target = match (value.ints, value.target) {
-			(Some(CacheNSpec::N(args)), None) => CacheOpTarget::Group(args.count, args.sort),
-			(None, Some(tgt)) => CacheOpTarget::Pattern(tgt),
-			(None, None) => CacheOpTarget::All,
-			(Some(_), Some(_)) => unreachable!(),
-		};
-		CacheOp {
-			op: value.op,
-			target,
-		}
-	}
+	pub subcmd: CacheSubcmds
 }
 
 /// Test CLI commands
