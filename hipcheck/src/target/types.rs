@@ -33,7 +33,7 @@ pub struct LocalGitRepo {
 	pub path: PathBuf,
 
 	/// The Git ref we're referring to.
-	pub git_ref: String,
+	pub git_ref: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Package {

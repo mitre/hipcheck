@@ -144,7 +144,7 @@ fn main() -> ExitCode {
 /// Run the `check` command.
 fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	let target = match args.command() {
-		Ok(chk) => chk.as_target_seed(),
+		Ok(chk) => chk,
 		Err(e) => {
 			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;

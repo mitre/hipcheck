@@ -6,11 +6,15 @@ use crate::error::Error;
 use crate::hc_error;
 use crate::report::Format;
 use crate::shell::{color_choice::ColorChoice, verbosity::Verbosity};
-use crate::target::{TargetSeed, TargetType};
+use crate::target::{
+	KnownRemote, LocalGitRepo, MavenPackage, Package, PackageHost, RemoteGitRepo, TargetSeed,
+	TargetType,
+};
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};
+use url::{Host, Url};
 
 /// Automatated supply chain risk assessment of software packages.
 #[derive(Debug, Default, clap::Parser, hc::Update)]
@@ -485,11 +489,11 @@ impl CheckArgs {
 		CheckCommand::try_parse_from(reconst_args).map_err(|e| hc_error!("{}", e))
 	}
 
-	pub fn command(&self) -> Result<CheckCommand, Error> {
+	pub fn command(&self) -> Result<TargetSeed, Error> {
 		if let Some(cmd) = self.command.clone() {
-			Ok(cmd)
+			cmd.as_target_seed()
 		} else {
-			self.target_to_check_command()
+			self.target_to_check_command()?.as_target_seed()
 		}
 	}
 }
@@ -514,8 +518,14 @@ pub enum CheckCommand {
 }
 
 impl CheckCommand {
-	pub fn as_target_seed(&self) -> TargetSeed {
-		todo!();
+	pub fn as_target_seed(&self) -> Result<TargetSeed, Error> {
+		match self {
+			CheckCommand::Maven(args) => args.maven_chk_to_target(),
+			CheckCommand::Npm(args) => args.npm_chk_to_target(),
+			CheckCommand::Pypi(args) => args.pypi_chk_to_target(),
+			CheckCommand::Repo(args) => args.repo_chk_to_target(),
+			CheckCommand::Spdx(args) => args.spdx_chk_to_target(),
+		}
 	}
 }
 
@@ -525,16 +535,74 @@ pub struct CheckMavenArgs {
 	pub package: String,
 }
 
+impl CheckMavenArgs {
+	fn maven_chk_to_target(&self) -> Result<TargetSeed, Error> {
+		let arg = &self.package;
+		// Confirm that the provided URL is valid.
+		let url = Url::parse(arg)
+			.map_err(|e| hc_error!("The provided Maven URL {} is not a valid URL. {}", arg, e))?;
+		Ok(TargetSeed::MavenPackage(MavenPackage { url }))
+	}
+}
+
 #[derive(Debug, Clone, clap::Args)]
 pub struct CheckNpmArgs {
 	/// NPM package URI or package[@<optional version>] to analyze
 	pub package: String,
 }
 
+impl CheckNpmArgs {
+	fn npm_chk_to_target(&self) -> Result<TargetSeed, Error> {
+		let raw_package = &self.package;
+
+		let (name, version) = match Url::parse(raw_package) {
+			Ok(url_parsed) => extract_package_version_from_url(url_parsed)?,
+			_ => extract_package_version(raw_package)?,
+		};
+
+		let purl = Url::parse(&match version.as_str() {
+			"no version" => format!("pkg:npm/{}", name),
+			_ => format!("pkg:npm/{}@{}", name, version),
+		})
+		.unwrap();
+
+		Ok(TargetSeed::Package(Package {
+			purl,
+			name,
+			version,
+			host: PackageHost::Npm,
+		}))
+	}
+}
+
 #[derive(Debug, Clone, clap::Args)]
 pub struct CheckPypiArgs {
 	/// PyPI package URI or package[@<optional version>] to analyze"
 	pub package: String,
+}
+
+impl CheckPypiArgs {
+	fn pypi_chk_to_target(&self) -> Result<TargetSeed, Error> {
+		let raw_package = &self.package;
+
+		let (name, version) = match Url::parse(raw_package) {
+			Ok(url_parsed) => extract_package_version_from_url(url_parsed)?,
+			_ => extract_package_version(raw_package)?,
+		};
+
+		let purl = Url::parse(&match version.as_str() {
+			"no version" => format!("pkg:pypi/{}", name),
+			_ => format!("pkg:pypi/{}@{}", name, version),
+		})
+		.unwrap();
+
+		Ok(TargetSeed::Package(Package {
+			purl,
+			name,
+			version,
+			host: PackageHost::PyPi,
+		}))
+	}
 }
 
 #[derive(Debug, Clone, clap::Args)]
@@ -546,10 +614,137 @@ pub struct CheckRepoArgs {
 	pub ref_: Option<String>,
 }
 
+impl CheckRepoArgs {
+	fn repo_chk_to_target(&self) -> Result<TargetSeed, Error> {
+		if let Ok(url) = Url::parse(&self.source) {
+			let known_remote = match url.host() {
+				Some(Host::Domain("github.com")) => {
+					let mut path_segments = url
+						.path_segments()
+						.ok_or(hc_error!("Provided GitHub repo URL cannot be parsed."))?;
+					let owner = path_segments
+						.next()
+						.ok_or(hc_error!(
+							"Provided GitHub repo URL does not have an owner."
+						))?
+						.to_string();
+					let repo = path_segments
+						.next()
+						.ok_or(hc_error!("Provided GitHub repo URL does not have a repo."))?
+						.to_string();
+					Some(KnownRemote::GitHub { owner, repo })
+				}
+				_ => None,
+			};
+			Ok(TargetSeed::RemoteRepo(RemoteGitRepo { url, known_remote }))
+		} else {
+			let path = PathBuf::from(&self.source);
+			if path.exists() {
+				Ok(TargetSeed::LocalRepo(LocalGitRepo {
+					path,
+					git_ref: self.ref_.clone(),
+				}))
+			} else {
+				Err(hc_error!("Provided target repository could not be identified as either a remote url or path to a local file"))
+			}
+		}
+	}
+}
+
 #[derive(Debug, Clone, clap::Args)]
 pub struct CheckSpdxArgs {
 	/// SPDX document to analyze
 	pub path: String,
+}
+
+impl CheckSpdxArgs {
+	fn spdx_chk_to_target(&self) -> Result<TargetSeed, Error> {
+		let path = PathBuf::from(&self.path);
+		if path.exists() {
+			Ok(TargetSeed::Spdx(path))
+		} else {
+			Err(hc_error!("The provided SPDX file does not exist"))
+		}
+	}
+}
+
+#[derive(Debug, Copy, Clone)]
+enum PackageManager {
+	Npm,
+
+	Pypi,
+
+	Maven,
+}
+
+impl PackageManager {
+	fn detect(url: &Url) -> Result<PackageManager, Error> {
+		match url.host() {
+			Some(Host::Domain("registry.npmjs.org")) => Ok(PackageManager::Npm),
+			Some(Host::Domain(
+				"pypi.io" | "pypi.org" | "pypi.python.org" | "files.pythonhosted.org",
+			)) => Ok(PackageManager::Pypi),
+			Some(Host::Domain("repo.maven.apache.org")) => Ok(PackageManager::Maven),
+			_ => Err(Error::msg("not a known package manager URL")),
+		}
+	}
+}
+
+fn extract_package_version(raw_package: &str) -> Result<(String, String), Error> {
+	// Get the package and version from package argument in form package@version because it has @ symbol in it
+	let mut package_and_version = raw_package.split('@');
+	let package_value = match package_and_version.next() {
+		Some(package) => Ok(package),
+		_ => Err(Error::msg("unable to get package from package@version")),
+	};
+	Ok((
+		package_value.unwrap().to_string(), //this wont panic because we check for it above
+		package_and_version
+			.next()
+			.unwrap_or("no version")
+			.to_string(), //we check for this in match so we can format url correctly
+	))
+}
+
+fn extract_package_version_from_url(url: Url) -> Result<(String, String), Error> {
+	//Get package and version from the URL, npm and pypi only
+	//Note maven urls are too complex to work with the npm and pypi url parsing model below
+
+	let package_type = match PackageManager::detect(&url) {
+		Ok(PackageManager::Npm) => "npm",
+		Ok(PackageManager::Pypi) => "pypi",
+		_ => "no package found for package url",
+	};
+
+	// Get the package and version from the URL
+	if package_type.contains("npm") {
+		//npm gets the first two segments
+		let (package, version) = url
+			.path_segments()
+			.map(|mut i| (i.next(), i.next()))
+			.ok_or_else(|| hc_error!("can't detect package name"))?;
+		Ok((
+			package.unwrap().to_string(), //this will graceful error if empty because of the mapping above I believe
+			version.unwrap_or("no version").to_string(),
+		))
+	} else if package_type.contains("pypi") {
+		//pypi gets the second and third segments
+		let mut path_segments = url
+			.path_segments()
+			.ok_or_else(|| hc_error!("Unable to get path"))?;
+		let _project = path_segments.next();
+		let package_value = match path_segments.next() {
+			Some(package) => Ok(package),
+			_ => Err(Error::msg("unable to get package from uri")),
+		};
+		let version = path_segments.next();
+		Ok((
+			package_value.unwrap().to_string(), //this will graceful error if empty because of panic checking above
+			version.unwrap_or("no version").to_string(), //we check for this in match so we can format url correctly
+		))
+	} else {
+		Err(Error::msg("not a known package manager URL"))
+	}
 }
 
 #[derive(Debug, Clone, clap::Args)]
