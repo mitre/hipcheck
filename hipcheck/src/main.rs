@@ -39,6 +39,7 @@ use crate::shell::Shell;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
 use cli::CheckArgs;
+use cli::CheckCommand;
 use cli::CliConfig;
 use cli::FullCommands;
 use cli::SchemaArgs;
@@ -144,7 +145,13 @@ fn main() -> ExitCode {
 /// Run the `check` command.
 fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	let target = match args.command() {
-		Ok(chk) => chk,
+		Ok(chk) => match chk.as_target_seed() {
+			Ok(target) => target,
+			Err(e) => {
+				Shell::print_error(&e, Format::Human);
+				return ExitCode::FAILURE;
+			}
+		},
 		Err(e) => {
 			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;

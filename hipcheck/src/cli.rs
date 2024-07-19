@@ -489,11 +489,11 @@ impl CheckArgs {
 		CheckCommand::try_parse_from(reconst_args).map_err(|e| hc_error!("{}", e))
 	}
 
-	pub fn command(&self) -> Result<TargetSeed, Error> {
+	pub fn command(&self) -> Result<CheckCommand, Error> {
 		if let Some(cmd) = self.command.clone() {
-			cmd.as_target_seed()
+			Ok(cmd)
 		} else {
-			self.target_to_check_command()?.as_target_seed()
+			self.target_to_check_command()
 		}
 	}
 }
