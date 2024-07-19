@@ -2,6 +2,7 @@
 
 //! Data structures for Hipcheck's main CLI.
 
+use crate::cache::{CacheGroupSpec, CacheOp, CacheOpSpec, CacheOpTarget};
 use crate::error::Error;
 use crate::hc_error;
 use crate::report::Format;
@@ -634,37 +635,41 @@ impl<T: Clone> Update for Option<T> {
 	}
 }
 
-#[derive(Debug, Clone, clap::Args)]
+#[derive(Debug, Clone, clap::Parser)]
 pub struct CacheArgs {
-	pub command: CacheCommand,
-	pub target: Option<CacheOpTarget>,
+	pub op: CacheOpSpec,
+	#[clap(subcommand)]
+	pub ints: Option<CacheNSpec>,
+	pub target: Option<String>,
 }
 
-#[derive(Debug, Clone, clap::ValueEnum)]
-pub enum CacheCommand {
-	List,
-	Delete,
+#[derive(Debug, Clone, clap::Subcommand)]
+pub enum CacheNSpec {
+	N(CacheNSpecArgs),
 }
 
-#[derive(Debug, Clone)]
-pub enum CacheOpTarget {
-	Single(String),
-	Group(u32, CacheGroupSpec),
+#[derive(Debug, Clone, clap::Args)]
+pub struct CacheNSpecArgs {
+	/// The sorting function to use
+	pub sort: CacheGroupSpec,
+	/// The number of sorted cache entries the operation is applied against
+	pub count: usize,
 }
-impl FromStr for CacheOpTarget {
-	type Err = &'static str;
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		Ok(CacheOpTarget::Single(s.to_owned()))
+
+impl From<CacheArgs> for CacheOp {
+	fn from(value: CacheArgs) -> CacheOp {
+		let target = match (value.ints, value.target) {
+			(Some(CacheNSpec::N(args)), None) => CacheOpTarget::Group(args.count, args.sort),
+			(None, Some(tgt)) => CacheOpTarget::Pattern(tgt),
+			(None, None) => CacheOpTarget::All,
+			(Some(_), Some(_)) => unreachable!(),
+		};
+		CacheOp {
+			op: value.op,
+			target,
+		}
 	}
 }
-
-#[derive(Debug, Clone, clap::ValueEnum)]
-pub enum CacheGroupSpec {
-	Oldest,
-	Largest,
-}
-
-// none, or specific target, or N largest/oldest
 
 /// Test CLI commands
 #[cfg(test)]

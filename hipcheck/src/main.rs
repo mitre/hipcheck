@@ -2,6 +2,7 @@
 
 #[allow(unused)]
 mod analysis;
+mod cache;
 mod cli;
 mod command_util;
 mod config;
@@ -29,6 +30,7 @@ use crate::analysis::report_builder::AnyReport;
 use crate::analysis::report_builder::Format;
 use crate::analysis::report_builder::Report;
 use crate::analysis::score::score_results;
+use crate::cache::{CacheOp, CacheOpSpec, CacheOpTarget, CacheSort, HcCache};
 use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
@@ -103,7 +105,7 @@ fn main() -> ExitCode {
 		Some(FullCommands::Setup(args)) => return cmd_setup(&args, &config),
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
-		Some(FullCommands::Cache(args)) => cmd_cache(&args),
+		Some(FullCommands::Cache(args)) => return cmd_cache(args, &config),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
@@ -665,7 +667,41 @@ fn updater_command(command_name: &str, args: &UpdateArgs) -> Command {
 	command
 }
 
-fn cmd_cache(args: &CacheArgs) {}
+fn cmd_cache(args: CacheArgs, config: &CliConfig) -> ExitCode {
+	let Some(path) = config.cache() else {
+		println!("cache path must be defined by cmdline arg or $HC_CACHE env var");
+		return ExitCode::FAILURE;
+	};
+	let op: CacheOp = args.into();
+	let (spec, target) = (op.op, op.target);
+	let mut cache = HcCache::new(path);
+	match spec {
+		CacheOpSpec::List => match target {
+			CacheOpTarget::Pattern(pat) => {
+				cache.list_match(pat);
+			}
+			CacheOpTarget::All => {
+				cache.list_n(CacheSort::Alpha, None);
+			}
+			CacheOpTarget::Group(n, sort) => {
+				cache.list_n(sort, Some(n));
+			}
+		},
+		CacheOpSpec::Delete => match target {
+			CacheOpTarget::Pattern(pat) => {
+				cache.delete_match(pat);
+			}
+			CacheOpTarget::All => {
+				cache.clear();
+			}
+			CacheOpTarget::Group(n, sort) => {
+				cache.delete_n(sort, n);
+			}
+		},
+	}
+
+	ExitCode::SUCCESS
+}
 
 /// Print the current home directory for Hipcheck.
 ///
