@@ -22,6 +22,11 @@ each release.
 
 {{ button(link="https://github.com/mitre/hipcheck/releases/latest", text="Install with the latest install script") }}
 
+{% info(title="Setting up post-install") %}
+After running the install script, run `hc setup` to set up your local
+configuration and script files so Hipcheck can run.
+{% end %}
+
 We currently provide prebuilt binaries for the following targets:
 
 - x64 Linux (`x86_64-unknown-linux-gnu`)
@@ -69,6 +74,11 @@ Then you can run:
 $ cargo binstall hipcheck
 ```
 
+{% info(title="Setting up post-install") %}
+After running the install script, run `hc setup` to set up your local
+configuration and script files so Hipcheck can run.
+{% end %}
+
 This will install the latest version of Hipcheck. To install a specific older
 version instead, replace `hipcheck` with `hipcheck@<VERSION>`, replacing
 `<VERSION>` with the version you need.
@@ -112,6 +122,11 @@ $ git clone https://github.com/mitre/hipcheck
 $ cd hipcheck
 $ cargo install --path hipcheck
 ```
+
+{% info(title="Setting up post-install") %}
+After running the install script, run `hc setup` to set up your local
+configuration and script files so Hipcheck can run.
+{% end %}
 
 This will install the `hc` binary into your Cargo-specific binary
 directory.
