@@ -5,16 +5,24 @@ use crate::data::git_command::GitCommand;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
+use crate::shell::progress_phase::ProgressPhase;
 use crate::shell::spinner_phase::SpinnerPhase;
-// use crate::shell::Phase;
+use crate::shell::Shell;
 pub use crate::source::query::*;
+use console::Term;
+use git2::build::CheckoutBuilder;
+use git2::build::RepoBuilder;
+use git2::FetchOptions;
+use git2::Progress;
+use git2::RemoteCallbacks;
 use log::debug;
 use pathbuf::pathbuf;
+use std::cell::OnceCell;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use url::Url;
@@ -69,7 +77,11 @@ impl SourceRepo {
 			(false, _) => SourceRepo::resolve_remote_repo(phase, root, raw),
 		};
 
-		log::debug!("resolved source [source={:?}]", source);
+		if source.is_ok() {
+			log::debug!("resolved source [source={:?}]", source);
+		} else {
+			log::error!("could not resolve source: {:?}", source);
+		}
 
 		source
 	}
@@ -676,24 +688,98 @@ fn update_remote(dest: &Path) -> Result<()> {
 
 fn clone_remote(url: &Url, dest: &Path) -> Result<()> {
 	log::debug!("remote repository cloning url is {}", url);
-	fs::create_dir_all(dest).context(format!(
-		"can't make local clone directory '{}'",
-		dest.display()
-	))?;
 
-	let dest = dest
-		.to_str()
-		.ok_or_else(|| hc_error!("destination isn't UTF-8 encoded '{}'", dest.display()))?;
+	// Create progress phases for recieving the objects and and resolving deltas.
+	let transfer_phase: OnceCell<ProgressPhase> = OnceCell::new();
+	let resolution_phase: OnceCell<ProgressPhase> = OnceCell::new();
+	let checkout_phase: OnceCell<ProgressPhase> = OnceCell::new();
 
-	let _output = GitCommand::new_repo([
-		"clone",
-		"-q",
-		"--single-branch",
-		"--no-tags",
-		url.as_str(),
-		dest,
-	])?
-	.output()?;
+	// Create a struct to hold the callbacks for cloning the repo.
+	let mut callbacks = RemoteCallbacks::new();
+
+	// Messages from the remote ("Counting objects" etc) are sent over the sideband.
+	// This involves clearing and replacing the line in many cases -- use console to do this effectively.
+	callbacks.sideband_progress(|msg: &[u8]| {
+		Shell::in_suspend(|| {
+			// use the standard output.
+			let mut term = Term::stdout();
+
+			// Crash on errors here, since they should be relatively uncommon.
+			term.clear_line().expect("clear line on standard output");
+
+			write!(&mut term, "remote: {}", String::from_utf8_lossy(msg))
+				.expect("wrote to standard output");
+
+			term.flush().expect("flushed standard output");
+		});
+
+		true
+	});
+
+	callbacks.transfer_progress(|prog: Progress| {
+		if prog.received_objects() > 0 {
+			let phase = transfer_phase.get_or_init(|| {
+				ProgressPhase::start(prog.total_objects() as u64, "(git) recieving objects")
+			});
+
+			phase.set_position(prog.received_objects() as u64);
+
+			if prog.received_objects() == prog.total_objects() && !phase.is_finished() {
+				phase.finish_successful(false);
+			}
+		}
+
+		if prog.indexed_deltas() > 0 {
+			let phase = resolution_phase.get_or_init(|| {
+				ProgressPhase::start(prog.total_deltas() as u64, "(git) resolving deltas")
+			});
+
+			phase.set_position(prog.indexed_deltas() as u64);
+
+			if prog.indexed_deltas() == prog.total_deltas() && !phase.is_finished() {
+				phase.finish_successful(false);
+			}
+		}
+
+		true
+	});
+
+	// Wrap the callbacks into the fetch options we pass to the repo builder.
+	let mut fetch_opts = FetchOptions::new();
+
+	fetch_opts
+		// Use the remote callbacks for transfer.
+		.remote_callbacks(callbacks)
+		// Don't download any tags.
+		.download_tags(git2::AutotagOption::None);
+
+	// Create a struct to hold callbacks while checking out the cloned repo.
+	let mut checkout_opts = CheckoutBuilder::new();
+
+	// We don't care about the path being resolved, only the total and current numbers.
+	checkout_opts.progress(|path, current, total| {
+		// Initialize the phase if we haven't already.
+		let phase =
+			checkout_phase.get_or_init(|| ProgressPhase::start(total as u64, "(git) checkout"));
+
+		// Set the bar to have the amount of progress in resolving.
+		phase.set_position(current as u64);
+		// Set the progress bar's status to the path being resolved.
+		phase.update_status(
+			path.map(Path::to_string_lossy)
+				.unwrap_or("resolving...".into()),
+		);
+
+		// If we have resolved everything, finish the phase.
+		if current == total {
+			phase.finish_successful(false);
+		}
+	});
+
+	RepoBuilder::new()
+		.with_checkout(checkout_opts)
+		.fetch_options(fetch_opts)
+		.clone(url.as_str(), dest)?;
 
 	Ok(())
 }

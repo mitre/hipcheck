@@ -81,6 +81,9 @@ indextree = "4.6.1"
 num-traits = "0.2.19"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
 term_size = "0.3.2"
+base64 = "0.22.1"
+http = "1.1.0"
+dialoguer = "0.11.0"
 
 # Exactly matching the version of rustls used by ureq
 # Get rid of default features since we don't use the AWS backed crypto provider (we use ring).

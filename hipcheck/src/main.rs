@@ -8,6 +8,8 @@ mod config;
 mod context;
 mod data;
 mod error;
+mod git2_log_shim;
+mod git2_rustls_transport;
 mod http;
 mod metric;
 mod report;
@@ -93,6 +95,14 @@ fn main() -> ExitCode {
 	// This must be done after shell initialization.
 	// Panic if this fails.
 	init_logging().unwrap();
+
+	// Tell the git2 crate to pass its tracing messages to the log crate.
+	git2_log_shim::git2_set_trace_log_shim();
+
+	// Make libgit2 use a rustls + ureq based transport for executing the git protocol over http(s).
+	// I would normally just let libgit2 use its own implementation but have seen that this rustls/ureq transport is
+	// 2-3 times faster on my machine -- enough of a performance bump to warrant using this.
+	git2_rustls_transport::register();
 
 	// Install a process-wide default crypto provider.
 	CryptoProvider::install_default(ring::default_provider())
