@@ -600,7 +600,7 @@ impl CheckPypiArgs {
 			purl,
 			name,
 			version,
-			host: PackageHost::PyPi,
+			host: PackageHost::PyPI,
 		}))
 	}
 }

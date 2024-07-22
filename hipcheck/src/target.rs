@@ -81,7 +81,7 @@ impl TargetType {
 					Some((Npm, package))
 				}
 				"pypi" => {
-					// Construct PyPi package w/optional version from pURL as the updated target string
+					// Construct PyPI package w/optional version from pURL as the updated target string
 					let name = purl.name();
 					let mut package = name.to_string();
 					// Include version if providedc

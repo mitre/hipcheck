@@ -1,3 +1,6 @@
+use std::fmt;
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::path::PathBuf;
 use url::Url;
 
@@ -59,7 +62,16 @@ pub struct MavenPackage {
 // Maven as a possible host is ommitted because a MavenPackage is currently its own struct without a host field
 pub enum PackageHost {
 	Npm,
-	PyPi,
+	PyPI,
+}
+
+impl Display for PackageHost {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		match self {
+			PackageHost::Npm => write!(f, "Npm"),
+			PackageHost::PyPI => write!(f, "PyPI"),
+		}
+	}
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,8 +82,26 @@ pub enum TargetSeed {
 	MavenPackage(MavenPackage),
 	Spdx(PathBuf),
 }
-impl ToString for TargetSeed {
-	fn to_string(&self) -> String {
-		todo!()
+
+impl Display for TargetSeed {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		match self {
+			TargetSeed::LocalRepo(repo) => write!(f, "local repo at {}", repo.path.display()),
+			TargetSeed::RemoteRepo(remote_repo) => match &remote_repo.known_remote {
+				Some(KnownRemote::GitHub { owner, repo }) => {
+					write!(f, "GitHub repo {}/{} from {}", owner, repo, remote_repo.url)
+				}
+				_ => write!(f, "remote repo at {}", remote_repo.url.as_str()),
+			},
+			TargetSeed::Package(package) => write!(
+				f,
+				"{} package {}@{}",
+				package.host, package.name, package.version
+			),
+			TargetSeed::MavenPackage(package) => {
+				write!(f, "Maven package {}", package.url.as_str())
+			}
+			TargetSeed::Spdx(path) => write!(f, "SPDX file at {}", path.display()),
+		}
 	}
 }
