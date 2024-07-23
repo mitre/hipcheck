@@ -5,7 +5,7 @@ use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
-use crate::http::tls::new_agent;
+use crate::http::agent;
 use crate::CheckKind;
 use crate::EXIT_FAILURE;
 use serde_json::Value;
@@ -364,7 +364,7 @@ fn extract_repo_for_npm(raw_package: &str) -> Result<Url> {
 	};
 
 	// Make an HTTP request to that URL.
-	let response = new_agent()?
+	let response = agent::agent()
 		.get(&registry)
 		.call()
 		.context("request to npm API failed, make sure the package name is correct as well as the project version")?;
@@ -413,7 +413,7 @@ fn extract_repo_for_pypi(raw_package: &str) -> Result<Url> {
 	};
 
 	// Make an HTTP request to that URL.
-	let response = new_agent()?
+	let response = agent::agent()
 		.get(&registry)
 		.call()
 		.context("request to PYPI API failed, make sure the project name is correct (case matters) as well as the project version")?;
@@ -446,7 +446,7 @@ fn extract_repo_for_pypi(raw_package: &str) -> Result<Url> {
 fn extract_repo_for_maven(url: &str) -> Result<Url> {
 	// Make an HTTP request to that URL to get the POM file.
 
-	let response = new_agent()?
+	let response = agent::agent()
 		.get(url)
 		.call()
 		.context("request to Maven API failed")?;
