@@ -11,6 +11,7 @@ mod error;
 mod git2_log_shim;
 mod git2_rustls_transport;
 mod http;
+mod log_bridge;
 mod metric;
 mod report;
 mod session;
@@ -52,11 +53,9 @@ use command_util::DependentProgram;
 use config::WeightTreeNode;
 use config::WeightTreeProvider;
 use core::fmt;
-use env_logger::Builder as EnvLoggerBuilder;
 use env_logger::Env;
 use indextree::Arena;
 use indextree::NodeId;
-use indicatif_log_bridge::LogWrapper;
 use ordered_float::NotNan;
 use pathbuf::pathbuf;
 use rustls::crypto::ring;
@@ -80,10 +79,11 @@ use util::fs::create_dir_all;
 use which::which;
 
 fn init_logging() -> std::result::Result<(), log::SetLoggerError> {
-	let logger =
-		EnvLoggerBuilder::from_env(Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE")).build();
+	let env = Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE");
 
-	LogWrapper::new(Shell::progress_bars(), logger).try_init()
+	let logger = env_logger::Builder::from_env(env).build();
+
+	log_bridge::LogWrapper(logger).try_init()
 }
 
 /// Entry point for Hipcheck.
