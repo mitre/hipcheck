@@ -1,3 +1,4 @@
+use crate::error::Error;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -104,4 +105,8 @@ impl Display for TargetSeed {
 			TargetSeed::Spdx(path) => write!(f, "SPDX file at {}", path.display()),
 		}
 	}
+}
+
+pub trait ToTargetSeed {
+	fn to_target_seed(&self) -> Result<TargetSeed, Error>;
 }

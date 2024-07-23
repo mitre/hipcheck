@@ -39,7 +39,6 @@ use crate::shell::Shell;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
 use cli::CheckArgs;
-use cli::CheckCommand;
 use cli::CliConfig;
 use cli::FullCommands;
 use cli::SchemaArgs;
@@ -73,7 +72,7 @@ use std::process::Command;
 use std::process::ExitCode;
 use std::result::Result as StdResult;
 use std::time::Duration;
-use target::{RemoteGitRepo, TargetSeed};
+use target::{RemoteGitRepo, TargetSeed, ToTargetSeed};
 use util::fs::create_dir_all;
 use which::which;
 
@@ -145,7 +144,7 @@ fn main() -> ExitCode {
 /// Run the `check` command.
 fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	let target = match args.command() {
-		Ok(chk) => match chk.as_target_seed() {
+		Ok(chk) => match chk.to_target_seed() {
 			Ok(target) => target,
 			Err(e) => {
 				Shell::print_error(&e, Format::Human);
@@ -790,10 +789,12 @@ const EXIT_FAILURE: i32 = 1;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum CheckKind {
+	#[allow(dead_code)]
 	Repo,
 	Maven,
 	Npm,
 	Pypi,
+	#[allow(dead_code)]
 	Spdx,
 }
 
