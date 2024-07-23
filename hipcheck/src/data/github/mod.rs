@@ -26,7 +26,7 @@ impl<'a> GitHub<'a> {
 		Ok(GitHub {
 			owner,
 			repo,
-			agent: AuthenticatedAgent::new(token)?,
+			agent: AuthenticatedAgent::new(token),
 		})
 	}
 
@@ -57,7 +57,7 @@ impl<'a> GitHubPr<'a> {
 			owner,
 			repo,
 			pull_request,
-			agent: AuthenticatedAgent::new(token)?,
+			agent: AuthenticatedAgent::new(token),
 		})
 	}
 

@@ -1,6 +1,10 @@
 //! Custom lib[git2] transport that uses [rustls] over the operating systems's transport.
 //!
 //! This should accurately implement the spec described at
+//!
+//! <https://www.git-scm.com/docs/http-protocol>.
+
+use crate::http::agent;
 use crate::shell::Shell;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -10,19 +14,14 @@ use git2::{
 	Error as Git2Error, Remote,
 };
 use http::Method;
-use rustls::{ClientConfig, RootCertStore};
-/// <https://www.git-scm.com/docs/http-protocol>.
 use std::{
 	io::{self, Error as IoError, Read, Write},
-	sync::{Arc, Once, OnceLock},
+	sync::Once,
 };
-use ureq::{Agent, AgentBuilder, Error as UreqError, Request};
+use ureq::{Error as UreqError, Request};
 
 /// A global static [Once] to make sure we don't register the custom transport more than once.
 static REGISTER: Once = Once::new();
-
-/// The agent used by the custom transport that includes system certs.
-static AGENT: OnceLock<Agent> = OnceLock::new();
 
 /// Register this transport with lib[git2].
 pub fn register() {
@@ -34,27 +33,6 @@ pub fn register() {
 		// ignore/not use them.
 		transport::register("https", make_transport).unwrap();
 		transport::register("http", make_transport).unwrap();
-	})
-}
-
-// TODO: maybe replace [crate::http::tls::new_agent] with this function.
-/// Get or initialize the global static agent used in the git2 custom transport.
-/// This is similar to [crate::http::tls::new_agent] but it uses a global static
-/// and is more forgiving to invalid system native certs.
-fn agent() -> &'static Agent {
-	AGENT.get_or_init(|| {
-		// Retrieve system certs
-		let mut roots = RootCertStore::empty();
-		let native_certs = rustls_native_certs::load_native_certs().expect("loaded native certs");
-		roots.add_parsable_certificates(native_certs);
-
-		// Add certs to connection configuration
-		let tls_config = ClientConfig::builder()
-			.with_root_certificates(roots)
-			.with_no_client_auth();
-
-		// Construct agent
-		AgentBuilder::new().tls_config(Arc::new(tls_config)).build()
 	})
 }
 
@@ -214,7 +192,7 @@ impl SmartSubtransport for CustomTransport {
 		let url = format!("{url}{}", service_url_path(action));
 
 		// Get the agent with rustls native certs to create an http request.
-		let mut req = agent()
+		let mut req = agent::agent()
 			.request(service_method(action).as_str(), url.as_str())
 			.set("Accept", service_response_type(action));
 

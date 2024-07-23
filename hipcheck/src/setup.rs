@@ -1,7 +1,7 @@
 use crate::cli::SetupArgs;
 use crate::error::Result;
 use crate::hc_error;
-use crate::http::tls::new_agent;
+use crate::http::agent;
 use regex::Regex;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -162,7 +162,7 @@ pub fn try_resolve_source_path(args: &SetupArgs) -> Result<SetupSourcePath> {
 		);
 
 		let mut out_file = File::create(f_name)?;
-		let agent = new_agent()?;
+		let agent = agent::agent();
 
 		println!("Downloading Hipcheck release from remote.");
 		let resp = agent.get(remote.as_str()).call()?;
