@@ -13,7 +13,10 @@ impl log::Log for LogWrapper {
 	}
 
 	fn log(&self, record: &log::Record) {
-		Shell::in_suspend(|| self.0.log(record))
+		// Don't suspend the shell if we're not gonna log the message.
+		if log::logger().enabled(record.metadata()) {
+			Shell::in_suspend(|| self.0.log(record))
+		}
 	}
 
 	fn flush(&self) {
