@@ -76,6 +76,11 @@ impl Shell {
 		});
 	}
 
+	/// Check if the global shell is initialized.
+	pub fn is_init() -> bool {
+		Shell::try_get().is_some()
+	}
+
 	/// Get the global shell if it's initialized or return [None].
 	#[inline]
 	pub fn try_get() -> Option<&'static Self> {

@@ -801,7 +801,6 @@ dependencies = [
  "indexmap 2.2.6",
  "indextree",
  "indicatif",
- "indicatif-log-bridge",
  "log",
  "maplit",
  "nom",
@@ -954,16 +953,6 @@ dependencies = [
  "portable-atomic",
  "rayon",
  "unicode-width",
-]
-
-[[package]]
-name = "indicatif-log-bridge"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2963046f28a204e3e3fd7e754fd90a6235da05b5378f24707ff0ec9513725ce3"
-dependencies = [
- "indicatif",
- "log",
 ]
 
 [[package]]
