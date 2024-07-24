@@ -57,6 +57,7 @@ pub fn resolve_local_repo(
 		.to_string();
 
 	let local = clone_local_repo_to_cache(src.as_path(), root)?;
+	// TODO - use git2 to set the local repo to the correct ref
 	let head = get_head_commit(&local).context("can't get head commit for local source")?;
 	let remote = match try_resolve_remote_for_local(&local) {
 		Ok(remote) => Some(remote),
@@ -144,7 +145,7 @@ fn resolve_github_remote_repo(
 
 	let local = LocalGitRepo {
 		path,
-		git_ref: None,
+		git_ref: head,
 	};
 
 	Ok(Target {
@@ -173,7 +174,7 @@ fn resolve_unknown_remote_repo(
 
 	let local = LocalGitRepo {
 		path,
-		git_ref: None,
+		git_ref: head,
 	};
 
 	Ok(Target {

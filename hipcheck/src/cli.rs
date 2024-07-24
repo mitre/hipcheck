@@ -2,7 +2,8 @@
 
 //! Data structures for Hipcheck's main CLI.
 
-use crate::error::Error;
+use crate::context::Context;
+use crate::error::Result;
 use crate::hc_error;
 use crate::report::Format;
 use crate::session::pm;
@@ -436,7 +437,7 @@ pub struct CheckArgs {
 }
 
 impl CheckArgs {
-	fn target_to_check_command(&self) -> Result<CheckCommand, Error> {
+	fn target_to_check_command(&self) -> Result<CheckCommand> {
 		// Get target str
 		let Some(target) = self.target.clone() else {
 			return Err(hc_error!(
@@ -490,7 +491,7 @@ impl CheckArgs {
 		CheckCommand::try_parse_from(reconst_args).map_err(|e| hc_error!("{}", e))
 	}
 
-	pub fn command(&self) -> Result<CheckCommand, Error> {
+	pub fn command(&self) -> Result<CheckCommand> {
 		if let Some(cmd) = self.command.clone() {
 			Ok(cmd)
 		} else {
@@ -519,7 +520,7 @@ pub enum CheckCommand {
 }
 
 impl ToTargetSeed for CheckCommand {
-	fn to_target_seed(&self) -> Result<TargetSeed, Error> {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
 		match self {
 			CheckCommand::Maven(args) => args.to_target_seed(),
 			CheckCommand::Npm(args) => args.to_target_seed(),
@@ -537,7 +538,7 @@ pub struct CheckMavenArgs {
 }
 
 impl ToTargetSeed for CheckMavenArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed, Error> {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
 		let arg = &self.package;
 		// Confirm that the provided URL is valid.
 		let url = Url::parse(arg)
@@ -553,7 +554,7 @@ pub struct CheckNpmArgs {
 }
 
 impl ToTargetSeed for CheckNpmArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed, Error> {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
 		let raw_package = &self.package;
 
 		let (name, version) = match Url::parse(raw_package) {
@@ -583,7 +584,7 @@ pub struct CheckPypiArgs {
 }
 
 impl ToTargetSeed for CheckPypiArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed, Error> {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
 		let raw_package = &self.package;
 
 		let (name, version) = match Url::parse(raw_package) {
@@ -616,17 +617,19 @@ pub struct CheckRepoArgs {
 }
 
 impl ToTargetSeed for CheckRepoArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed, Error> {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
 		if let Ok(url) = Url::parse(&self.source) {
 			let remote_repo = source::get_remote_repo_from_url(url)?;
 			Ok(TargetSeed::RemoteRepo(remote_repo))
 		} else {
 			let path = PathBuf::from(&self.source);
+			let git_ref = match &self.ref_ {
+				Some(r) => r.clone(),
+				None => source::get_head_commit(path.as_path())
+					.context("can't get head commit for local source")?,
+			};
 			if path.exists() {
-				Ok(TargetSeed::LocalRepo(LocalGitRepo {
-					path,
-					git_ref: self.ref_.clone(),
-				}))
+				Ok(TargetSeed::LocalRepo(LocalGitRepo { path, git_ref }))
 			} else {
 				Err(hc_error!("Provided target repository could not be identified as either a remote url or path to a local file"))
 			}
@@ -641,7 +644,7 @@ pub struct CheckSpdxArgs {
 }
 
 impl ToTargetSeed for CheckSpdxArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed, Error> {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
 		let path = PathBuf::from(&self.path);
 		if path.exists() {
 			Ok(TargetSeed::Spdx(path))
@@ -970,7 +973,7 @@ mod tests {
 		);
 	}
 
-	fn get_check_cmd_from_cli(args: Vec<&str>) -> Result<CheckCommand, Error> {
+	fn get_check_cmd_from_cli(args: Vec<&str>) -> Result<CheckCommand> {
 		let parsed = CliConfig::try_parse_from(args.into_iter());
 		assert!(parsed.is_ok());
 		let command = parsed.unwrap().command;
