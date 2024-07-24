@@ -246,7 +246,7 @@ fn load_config_and_data(
 
 	// Load the configuration file.
 	let config = Config::load_from(valid_config_path)
-		.context("Failed to load configuration. Please make sure the config files are in the config directory.")?;
+		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
 
 	// Get the directory the data file is in.
 	let data_dir = data_path
