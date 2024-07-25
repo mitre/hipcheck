@@ -6,6 +6,7 @@ use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
 use crate::http::agent;
+use crate::target::{Package, PackageHost};
 use crate::CheckKind;
 use crate::EXIT_FAILURE;
 use serde_json::Value;
@@ -21,15 +22,13 @@ const MAVEN: &str = CheckKind::Maven.name();
 const NPM: &str = CheckKind::Npm.name();
 const PYPI: &str = CheckKind::Pypi.name();
 
-pub fn detect_and_extract(raw_package: &str, parent_command_value: String) -> Result<Url> {
-	//using parent_command_value string here because we can not detect package type if/when package@version is given and not uri
-
-	let package_trimmed = raw_package.trim(); //trimming leading/trailing white space
-	match parent_command_value.as_str() {
-		NPM => extract_repo_for_npm(package_trimmed),
-		PYPI => extract_repo_for_pypi(package_trimmed),
-		MAVEN => extract_repo_for_maven(package_trimmed),
-		_ => Err(Error::msg("not a known package")),
+/// Detect a package's host and extract its correspinding git repo URL
+/// Note: This function is not used for Maven packages, as they are specified differently
+pub fn detect_and_extract(package: &Package) -> Result<Url> {
+	// We check that the package is a valid NPM or PyPI package before calling this function, so it is not neccessary to worry about other matches
+	match package.host {
+		PackageHost::Npm => extract_repo_for_npm(package),
+		PackageHost::PyPI => extract_repo_for_pypi(package),
 	}
 }
 
@@ -289,7 +288,7 @@ impl PackageManager {
 		}
 	}
 }
-fn extract_package_version(raw_package: &str) -> Result<(String, String)> {
+pub fn extract_package_version(raw_package: &str) -> Result<(String, String)> {
 	// Get the package and version from package argument in form package@version because it has @ symbol in it
 	let mut package_and_version = raw_package.split('@');
 	let package_value = match package_and_version.next() {
@@ -305,7 +304,7 @@ fn extract_package_version(raw_package: &str) -> Result<(String, String)> {
 	))
 }
 
-fn extract_package_version_from_url(url: Url) -> Result<(String, String)> {
+pub fn extract_package_version_from_url(url: Url) -> Result<(String, String)> {
 	//Get package and version from the URL, npm and pypi only
 	//Note maven urls are too complex to work with the npm and pypi url parsing model below
 	let package_type = match PackageManager::detect(&url) {
@@ -317,13 +316,22 @@ fn extract_package_version_from_url(url: Url) -> Result<(String, String)> {
 	// Get the package and version from the URL
 	if package_type.contains(NPM) {
 		//npm gets the first two segments
-		let (package, version) = url
+		let mut path_segments = url
 			.path_segments()
-			.map(|mut i| (i.next(), i.next()))
-			.ok_or_else(|| hc_error!("can't detect package name"))?;
+			.ok_or_else(|| hc_error!("Unable to get path"))?;
+		let package_value = match path_segments.next() {
+			Some(package) => Ok(package),
+			_ => Err(Error::msg("unable to get package from uri")),
+		};
+		// An empty string or no string at all should both give "no version" as the version
+		let version = match path_segments.next() {
+			Some("") => "no version",
+			Some(version) => version,
+			None => "no version",
+		};
 		Ok((
-			package.unwrap().to_string(), //this will graceful error if empty because of the mapping above I believe
-			version.unwrap_or("no version").to_string(),
+			package_value.unwrap().to_string(), //this will graceful error if empty because of panic checking above
+			version.to_string(),                //we check for this in match so we can format url correctly
 		))
 	} else if package_type.contains(PYPI) {
 		//pypi gets the second and third segments
@@ -345,12 +353,9 @@ fn extract_package_version_from_url(url: Url) -> Result<(String, String)> {
 	}
 }
 
-fn extract_repo_for_npm(raw_package: &str) -> Result<Url> {
-	// Get the package and version from passed in package value in url format or package@version
-	let (package, version) = match Url::parse(raw_package) {
-		Ok(url_parsed) => extract_package_version_from_url(url_parsed).unwrap(),
-		_ => extract_package_version(raw_package).unwrap(),
-	};
+pub fn extract_repo_for_npm(full_package: &Package) -> Result<Url> {
+	// Get the package and version
+	let (package, version) = (full_package.name.clone(), full_package.version.clone());
 
 	// Construct the registry URL.
 	let package = error_if_empty(Some(&package), "no repository given for npm package");
@@ -398,12 +403,9 @@ fn extract_repo_for_npm(raw_package: &str) -> Result<Url> {
 	Ok(repository)
 }
 
-fn extract_repo_for_pypi(raw_package: &str) -> Result<Url> {
-	// Get the package and version from passed in package value in url format or package@version
-	let (package, version) = match Url::parse(raw_package) {
-		Ok(url_parsed) => extract_package_version_from_url(url_parsed).unwrap(),
-		_ => extract_package_version(raw_package).unwrap(),
-	};
+fn extract_repo_for_pypi(full_package: &Package) -> Result<Url> {
+	// Get the package and version
+	let (package, version) = (full_package.name.clone(), full_package.version.clone());
 	let package = error_if_empty(Some(&package), "no repository given for python package");
 
 	// Construct the registry URL.
@@ -443,7 +445,7 @@ fn extract_repo_for_pypi(raw_package: &str) -> Result<Url> {
 	}
 }
 
-fn extract_repo_for_maven(url: &str) -> Result<Url> {
+pub fn extract_repo_for_maven(url: &str) -> Result<Url> {
 	// Make an HTTP request to that URL to get the POM file.
 
 	let response = agent::agent()
@@ -509,6 +511,11 @@ fn is_none_or_empty(s: Option<&str>) -> bool {
 
 #[cfg(test)]
 mod tests {
+	use crate::{
+		cli::{CheckNpmArgs, CheckPypiArgs},
+		target::{TargetSeed, ToTargetSeed},
+	};
+
 	// Note this useful idiom: importing names from outer (for mod tests) scope.
 	use super::*;
 	use serde_json::json;
@@ -518,48 +525,168 @@ mod tests {
 	fn test_extract_repo_for_pypi() {
 		let link = "https://pypi.org/project/certifi/2021.5.30";
 		let link2 = "https://github.com/certifi/python-certifi";
-		let pypi_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_pypi(link).unwrap(), pypi_git);
+
+		let target_seed = CheckPypiArgs {
+			package: link.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:pypi/certifi@2021.5.30").unwrap(),
+					name: "certifi".to_string(),
+					version: "2021.5.30".to_string(),
+					host: PackageHost::PyPI
+				}
+			);
+
+			let pypi_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
 	fn test_extract_repo_for_pypi_2() {
 		let link = "https://pypi.org/project/urllib3/1.26.6";
 		let link2 = "https://github.com/urllib3/urllib3";
-		let pypi_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_pypi(link).unwrap(), pypi_git);
+
+		let target_seed = CheckPypiArgs {
+			package: link.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:pypi/urllib3@1.26.6").unwrap(),
+					name: "urllib3".to_string(),
+					version: "1.26.6".to_string(),
+					host: PackageHost::PyPI
+				}
+			);
+
+			let pypi_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
 	fn test_extract_repo_for_pypi_3() {
 		let link = "https://pypi.org/project/Flask/2.1.1";
 		let link2 = "https://github.com/pallets/flask";
-		let pypi_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_pypi(link).unwrap(), pypi_git);
+
+		let target_seed = CheckPypiArgs {
+			package: link.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:pypi/Flask@2.1.1").unwrap(),
+					name: "Flask".to_string(),
+					version: "2.1.1".to_string(),
+					host: PackageHost::PyPI
+				}
+			);
+
+			let pypi_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
 	fn test_extract_repo_for_pypi_4() {
 		let link = "Flask@2.1.1";
 		let link2 = "https://github.com/pallets/flask";
-		let pypi_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_pypi(link).unwrap(), pypi_git);
+
+		let target_seed = CheckPypiArgs {
+			package: link.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:pypi/Flask@2.1.1").unwrap(),
+					name: "Flask".to_string(),
+					version: "2.1.1".to_string(),
+					host: PackageHost::PyPI
+				}
+			);
+
+			let pypi_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
 	fn test_extract_repo_for_pypi_5() {
 		let link = "Flask";
 		let link2 = "https://github.com/pallets/flask";
-		let pypi_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_pypi(link).unwrap(), pypi_git);
+
+		let target_seed = CheckPypiArgs {
+			package: link.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:pypi/Flask").unwrap(),
+					name: "Flask".to_string(),
+					version: "no version".to_string(),
+					host: PackageHost::PyPI
+				}
+			);
+
+			let pypi_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
 	fn test_extract_repo_for_pypi_6() {
 		let link = "flask";
 		let link2 = "https://github.com/pallets/flask";
-		let pypi_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_pypi(link).unwrap(), pypi_git);
+
+		let target_seed = CheckPypiArgs {
+			package: link.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:pypi/flask").unwrap(),
+					name: "flask".to_string(),
+					version: "no version".to_string(),
+					host: PackageHost::PyPI
+				}
+			);
+
+			let pypi_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
@@ -567,49 +694,169 @@ mod tests {
 		//should fail
 		let link = "Flaskx";
 		let link2 = "https://github.com/pallets/flask";
-		let pypi_git = Url::parse(link2).unwrap();
-		println!("{}", extract_repo_for_pypi(link).unwrap().as_str());
-		assert_ne!(extract_repo_for_pypi(link).unwrap(), pypi_git);
+
+		let target_seed = CheckPypiArgs {
+			package: link.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:pypi/Flaskx").unwrap(),
+					name: "Flaskx".to_string(),
+					version: "no version".to_string(),
+					host: PackageHost::PyPI
+				}
+			);
+
+			let pypi_git = Url::parse(link2).unwrap();
+			println!("{}", extract_repo_for_pypi(&package).unwrap().as_str());
+			assert_ne!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
 	fn test_extract_repo_for_npm() {
 		let link = "https://registry.npmjs.org/lodash/";
 		let link2 = "https://github.com/lodash/lodash.git";
-		let npm_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_npm(link).unwrap(), npm_git);
+
+		let target_seed = CheckNpmArgs {
+			package: link.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:npm/lodash").unwrap(),
+					name: "lodash".to_string(),
+					version: "no version".to_string(),
+					host: PackageHost::Npm
+				}
+			);
+
+			let npm_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_npm(&package).unwrap(), npm_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
 	fn test_extract_repo_for_npm_2() {
 		let link = "https://registry.npmjs.org/chalk/";
 		let link2 = "https://github.com/chalk/chalk.git";
-		let npm_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_npm(link).unwrap(), npm_git);
+
+		let target_seed = CheckNpmArgs {
+			package: link.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:npm/chalk").unwrap(),
+					name: "chalk".to_string(),
+					version: "no version".to_string(),
+					host: PackageHost::Npm
+				}
+			);
+
+			let npm_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_npm(&package).unwrap(), npm_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
 	fn test_extract_repo_for_npm_3() {
 		let link = "https://registry.npmjs.org/node-ipc/9.2.1";
 		let link2 = "https://github.com/RIAEvangelist/node-ipc.git";
-		let npm_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_npm(link).unwrap(), npm_git);
+
+		let target_seed = CheckNpmArgs {
+			package: link.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:npm/node-ipc@9.2.1").unwrap(),
+					name: "node-ipc".to_string(),
+					version: "9.2.1".to_string(),
+					host: PackageHost::Npm
+				}
+			);
+
+			let npm_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_npm(&package).unwrap(), npm_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
 	fn test_extract_repo_for_npm_4() {
-		let package = "node-ipc@9.2.1";
+		let npm_package = "node-ipc@9.2.1";
 		let link2 = "https://github.com/RIAEvangelist/node-ipc.git";
-		let npm_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_npm(package).unwrap(), npm_git);
+
+		let target_seed = CheckNpmArgs {
+			package: npm_package.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:npm/node-ipc@9.2.1").unwrap(),
+					name: "node-ipc".to_string(),
+					version: "9.2.1".to_string(),
+					host: PackageHost::Npm
+				}
+			);
+
+			let npm_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_npm(&package).unwrap(), npm_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]
 	fn test_extract_repo_for_npm_5() {
-		let package = "node-ipc";
+		let npm_package = "node-ipc";
 		let link2 = "https://github.com/RIAEvangelist/node-ipc.git";
-		let npm_git = Url::parse(link2).unwrap();
-		assert_eq!(extract_repo_for_npm(package).unwrap(), npm_git);
+
+		let target_seed = CheckNpmArgs {
+			package: npm_package.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:npm/node-ipc").unwrap(),
+					name: "node-ipc".to_string(),
+					version: "no version".to_string(),
+					host: PackageHost::Npm
+				}
+			);
+
+			let npm_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_npm(&package).unwrap(), npm_git);
+		} else {
+			panic!()
+		}
 	}
 
 	#[test]

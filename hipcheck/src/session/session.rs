@@ -40,15 +40,13 @@ use crate::session::pm::detect_and_extract;
 use crate::session::spdx::extract_download_url;
 use crate::shell::spinner_phase::SpinnerPhase;
 use crate::shell::Shell;
-use crate::source::source::Source;
-use crate::source::source::SourceKind;
+use crate::source::source;
 use crate::source::source::SourceQuery;
 use crate::source::source::SourceQueryStorage;
-use crate::source::source::SourceRepo;
+use crate::target::{Target, TargetSeed};
 use crate::version::get_version;
 use crate::version::VersionQuery;
 use crate::version::VersionQueryStorage;
-use crate::CheckKind;
 use chrono::prelude::*;
 use dotenv::var;
 use std::fmt;
@@ -58,6 +56,9 @@ use std::rc::Rc;
 use std::result::Result as StdResult;
 use std::sync::Arc;
 use std::time::Duration;
+use url::Url;
+
+use super::pm::extract_repo_for_maven;
 
 /// Immutable configuration and base data for a run of Hipcheck.
 #[salsa::database(
@@ -116,8 +117,7 @@ impl Session {
 	/// Construct a new `Session` which owns all the data needed in later phases.
 	#[allow(clippy::too_many_arguments)]
 	pub fn new(
-		source_type: &Check,
-		source: &str,
+		target: &TargetSeed,
 		config_path: Option<PathBuf>,
 		data_path: Option<PathBuf>,
 		home_dir: Option<PathBuf>,
@@ -138,7 +138,7 @@ impl Session {
 		 * Printing the prelude.
 		 *-----------------------------------------------------------------*/
 
-		Shell::print_prelude(source);
+		Shell::print_prelude(target.to_string());
 
 		/*===================================================================
 		 *  Loading current versions of needed software git, npm, and eslint into salsa.
@@ -189,12 +189,12 @@ impl Session {
 		 *  Resolving the source.
 		 *-----------------------------------------------------------------*/
 
-		let source = match load_source(source, source_type, &home) {
+		let target = match load_target(target, &home) {
 			Ok(results) => results,
 			Err(err) => return Err(err),
 		};
 
-		session.set_source(Arc::new(source));
+		session.set_target(Arc::new(target));
 
 		/*===================================================================
 		 *  Resolving the Hipcheck version.
@@ -266,21 +266,22 @@ fn load_config_and_data(
 	))
 }
 
-fn load_source(source: &str, source_type: &Check, home: &Path) -> Result<Source> {
+fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	// Resolve the source specifier into an actual source.
-	let phase_desc = match source_type.kind.target_kind() {
-		TargetKind::RepoSource => "resolving git repository source",
-		TargetKind::PackageVersion => "resolving package source",
-		TargetKind::SpdxDocument => "parsing SPDX document",
+	let phase_desc = match seed {
+		TargetSeed::LocalRepo(_) | TargetSeed::RemoteRepo(_) => "resolving git repository target",
+		TargetSeed::Package(_) => "resolving package target",
+		TargetSeed::Spdx(_) => "parsing SPDX document",
+		TargetSeed::MavenPackage(_) => "resolving maven package target",
 	};
 
 	let phase = SpinnerPhase::start(phase_desc);
 	// Set the phase to tick steadily 10 times a second.
 	phase.enable_steady_tick(Duration::from_millis(100));
-	let source = resolve_source(source_type, &phase, home, source)?;
+	let target = resolve_target(seed, &phase, home)?;
 	phase.finish_successful();
 
-	Ok(source)
+	Ok(target)
 }
 
 /// Resolves github token for Hipcheck to query github with.
@@ -291,63 +292,52 @@ fn resolve_token() -> Result<String> {
 	}
 }
 
-/// Resolves the source specifier into an actual source.
-fn resolve_source(
-	source_type: &Check,
-	phase: &SpinnerPhase,
-	home: &Path,
-	source: &str,
-) -> Result<Source> {
+/// Resolves the target specifier into an actual target.
+fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Result<Target> {
 	#[cfg(feature = "print-timings")]
 	let _0 = crate::benchmarking::print_scope_time!("resolve_source");
 
-	match source_type.kind.target_kind() {
-		TargetKind::RepoSource => {
-			SourceRepo::resolve_repo(phase, home, source).map(|repo| Source {
-				kind: SourceKind::Repo(repo),
-			})
+	match seed {
+		TargetSeed::RemoteRepo(repo) => source::resolve_remote_repo(phase, home, repo.to_owned()),
+		TargetSeed::LocalRepo(source) => source::resolve_local_repo(phase, home, source.to_owned()),
+		TargetSeed::Package(package) => {
+			// Attempt to get the git repo URL for the package
+			let package_git_repo_url =
+				detect_and_extract(package).context("Could not get git repo URL for package")?;
+
+			// Create Target for a remote git repo originating with a package
+			let package_git_repo = source::get_remote_repo_from_url(package_git_repo_url)?;
+			source::resolve_remote_package_repo(
+				phase,
+				home,
+				package_git_repo,
+				format!("{}@{}", package.name, package.version),
+			)
 		}
-		TargetKind::PackageVersion => {
-			let package = source;
+		TargetSeed::MavenPackage(package) => {
+			// Attempt to get the git repo URL for the Maven package
+			let package_git_repo_url = extract_repo_for_maven(package.url.as_ref())
+				.context("Could not get git repo URL for Maven package")?;
 
-			let command = &source_type.to_owned().kind;
-
-			let package_git_repo_url = detect_and_extract(package, command.name().to_owned())
-				.context("Could not get git repo URL for package")?;
-
-			SourceRepo::resolve_repo(phase, home, package_git_repo_url.as_str()).map(|repo| {
-				Source {
-					kind: SourceKind::Repo(repo),
-				}
-			})
+			// Create Target for a remote git repo originating with a Maven package
+			let package_git_repo = source::get_remote_repo_from_url(package_git_repo_url)?;
+			source::resolve_remote_package_repo(
+				phase,
+				home,
+				package_git_repo,
+				package.url.to_string(),
+			)
 		}
-		TargetKind::SpdxDocument => {
-			let download_url = extract_download_url(source)?;
-			SourceRepo::resolve_repo(phase, home, &download_url).map(|repo| Source {
-				kind: SourceKind::Repo(repo),
-			})
-		}
-	}
-}
+		TargetSeed::Spdx(path) => {
+			let source = path.to_str().ok_or(hc_error!(
+				"SPDX path contained one or more invalid characters"
+			))?;
+			// Attempt to get the download location for the local SPDX package
+			let download_url = Url::parse(&extract_download_url(source)?)?;
 
-pub struct Check {
-	pub target: String,
-	pub kind: CheckKind,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum TargetKind {
-	RepoSource,
-	PackageVersion,
-	SpdxDocument,
-}
-
-impl TargetKind {
-	pub fn is_checkable(&self) -> bool {
-		use TargetKind::*;
-
-		match self {
-			RepoSource | PackageVersion | SpdxDocument => true,
+			// Create a Target for a remote git repo originating with an SPDX document
+			let spdx_git_repo = source::get_remote_repo_from_url(download_url)?;
+			source::resolve_remote_package_repo(phase, home, spdx_git_repo, source.to_string())
 		}
 	}
 }

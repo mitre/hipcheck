@@ -3,9 +3,11 @@
 //! A query group for accessing Git repository data.
 
 use crate::hash;
-use crate::source::source::Remote;
-use crate::source::source::Source;
+use crate::source::source::{Remote, Source};
+use crate::target::Target;
 use pathbuf::pathbuf;
+use std::convert::TryInto;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -14,6 +16,8 @@ use std::sync::Arc;
 pub trait SourceQuery: salsa::Database {
 	/// Returns the input `Source` struct
 	#[salsa::input]
+	fn target(&self) -> Arc<Target>;
+
 	#[salsa::query_type(SourceTypeQuery)]
 	fn source(&self) -> Arc<Source>;
 
@@ -41,8 +45,18 @@ pub trait SourceQuery: salsa::Database {
 // `Source` will always contain a `SourceRepo`, so `get_repo()` will
 // not return an error here.
 fn local(db: &dyn SourceQuery) -> Arc<PathBuf> {
-	let source = db.source();
-	Arc::new(source.get_repo().local().to_path_buf())
+	let target = db.target();
+	Arc::new(target.local.path.clone())
+}
+
+fn source(db: &dyn SourceQuery) -> Arc<Source> {
+	Arc::new(
+		db.target()
+			.deref()
+			.clone()
+			.try_into()
+			.expect("failed to convert Target to Source"),
+	)
 }
 
 fn remote(db: &dyn SourceQuery) -> Option<Arc<Remote>> {
