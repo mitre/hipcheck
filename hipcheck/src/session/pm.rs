@@ -316,15 +316,6 @@ pub fn extract_package_version_from_url(url: Url) -> Result<(String, String)> {
 	// Get the package and version from the URL
 	if package_type.contains(NPM) {
 		//npm gets the first two segments
-		// let (package, version) = url
-		// 	.path_segments()
-		// 	.map(|mut i| (i.next(), i.next()))
-		// 	.ok_or_else(|| hc_error!("can't detect package name"))?;
-		// Ok((
-		// 	package.unwrap().to_string(), //this will graceful error if empty because of the mapping above I believe
-		// 	version.unwrap_or("no version").to_string(),
-		// ))
-
 		let mut path_segments = url
 			.path_segments()
 			.ok_or_else(|| hc_error!("Unable to get path"))?;
