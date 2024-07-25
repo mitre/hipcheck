@@ -2,5 +2,4 @@
 
 pub mod query;
 #[allow(clippy::module_inception)]
-#[allow(unused)]
 pub mod source;
