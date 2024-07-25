@@ -2,17 +2,21 @@
 
 //! Data structures for Hipcheck's main CLI.
 
-use crate::error::Error;
+use crate::context::Context;
+use crate::error::Result;
 use crate::hc_error;
 use crate::report::Format;
-use crate::session::session::Check;
+use crate::session::pm;
 use crate::shell::{color_choice::ColorChoice, verbosity::Verbosity};
-use crate::target::TargetType;
-use crate::CheckKind;
+use crate::source::source;
+use crate::target::{
+	LocalGitRepo, MavenPackage, Package, PackageHost, TargetSeed, TargetType, ToTargetSeed,
+};
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};
+use url::Url;
 
 /// Automatated supply chain risk assessment of software packages.
 #[derive(Debug, Default, clap::Parser, hc::Update)]
@@ -433,7 +437,7 @@ pub struct CheckArgs {
 }
 
 impl CheckArgs {
-	fn target_to_check_command(&self) -> Result<CheckCommand, Error> {
+	fn target_to_check_command(&self) -> Result<CheckCommand> {
 		// Get target str
 		let Some(target) = self.target.clone() else {
 			return Err(hc_error!(
@@ -487,7 +491,7 @@ impl CheckArgs {
 		CheckCommand::try_parse_from(reconst_args).map_err(|e| hc_error!("{}", e))
 	}
 
-	pub fn command(&self) -> Result<CheckCommand, Error> {
+	pub fn command(&self) -> Result<CheckCommand> {
 		if let Some(cmd) = self.command.clone() {
 			Ok(cmd)
 		} else {
@@ -515,29 +519,14 @@ pub enum CheckCommand {
 	Spdx(CheckSpdxArgs),
 }
 
-impl CheckCommand {
-	pub fn as_check(&self) -> Check {
+impl ToTargetSeed for CheckCommand {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
 		match self {
-			CheckCommand::Maven(args) => Check {
-				target: args.package.clone(),
-				kind: CheckKind::Maven,
-			},
-			CheckCommand::Npm(args) => Check {
-				target: args.package.clone(),
-				kind: CheckKind::Npm,
-			},
-			CheckCommand::Pypi(args) => Check {
-				target: args.package.clone(),
-				kind: CheckKind::Pypi,
-			},
-			CheckCommand::Repo(args) => Check {
-				target: args.source.clone(),
-				kind: CheckKind::Repo,
-			},
-			CheckCommand::Spdx(args) => Check {
-				target: args.path.clone(),
-				kind: CheckKind::Spdx,
-			},
+			CheckCommand::Maven(args) => args.to_target_seed(),
+			CheckCommand::Npm(args) => args.to_target_seed(),
+			CheckCommand::Pypi(args) => args.to_target_seed(),
+			CheckCommand::Repo(args) => args.to_target_seed(),
+			CheckCommand::Spdx(args) => args.to_target_seed(),
 		}
 	}
 }
@@ -548,16 +537,74 @@ pub struct CheckMavenArgs {
 	pub package: String,
 }
 
+impl ToTargetSeed for CheckMavenArgs {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
+		let arg = &self.package;
+		// Confirm that the provided URL is valid.
+		let url = Url::parse(arg)
+			.map_err(|e| hc_error!("The provided Maven URL {} is not a valid URL. {}", arg, e))?;
+		Ok(TargetSeed::MavenPackage(MavenPackage { url }))
+	}
+}
+
 #[derive(Debug, Clone, clap::Args)]
 pub struct CheckNpmArgs {
 	/// NPM package URI or package[@<optional version>] to analyze
 	pub package: String,
 }
 
+impl ToTargetSeed for CheckNpmArgs {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
+		let raw_package = &self.package;
+
+		let (name, version) = match Url::parse(raw_package) {
+			Ok(url_parsed) => pm::extract_package_version_from_url(url_parsed)?,
+			_ => pm::extract_package_version(raw_package)?,
+		};
+
+		let purl = Url::parse(&match version.as_str() {
+			"no version" => format!("pkg:npm/{}", name),
+			_ => format!("pkg:npm/{}@{}", name, version),
+		})
+		.unwrap();
+
+		Ok(TargetSeed::Package(Package {
+			purl,
+			name,
+			version,
+			host: PackageHost::Npm,
+		}))
+	}
+}
+
 #[derive(Debug, Clone, clap::Args)]
 pub struct CheckPypiArgs {
 	/// PyPI package URI or package[@<optional version>] to analyze"
 	pub package: String,
+}
+
+impl ToTargetSeed for CheckPypiArgs {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
+		let raw_package = &self.package;
+
+		let (name, version) = match Url::parse(raw_package) {
+			Ok(url_parsed) => pm::extract_package_version_from_url(url_parsed)?,
+			_ => pm::extract_package_version(raw_package)?,
+		};
+
+		let purl = Url::parse(&match version.as_str() {
+			"no version" => format!("pkg:pypi/{}", name),
+			_ => format!("pkg:pypi/{}@{}", name, version),
+		})
+		.unwrap();
+
+		Ok(TargetSeed::Package(Package {
+			purl,
+			name,
+			version,
+			host: PackageHost::PyPI,
+		}))
+	}
 }
 
 #[derive(Debug, Clone, clap::Args)]
@@ -569,10 +616,42 @@ pub struct CheckRepoArgs {
 	pub ref_: Option<String>,
 }
 
+impl ToTargetSeed for CheckRepoArgs {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
+		if let Ok(url) = Url::parse(&self.source) {
+			let remote_repo = source::get_remote_repo_from_url(url)?;
+			Ok(TargetSeed::RemoteRepo(remote_repo))
+		} else {
+			let path = PathBuf::from(&self.source);
+			let git_ref = match &self.ref_ {
+				Some(r) => r.clone(),
+				None => source::get_head_commit(path.as_path())
+					.context("can't get head commit for local source")?,
+			};
+			if path.exists() {
+				Ok(TargetSeed::LocalRepo(LocalGitRepo { path, git_ref }))
+			} else {
+				Err(hc_error!("Provided target repository could not be identified as either a remote url or path to a local file"))
+			}
+		}
+	}
+}
+
 #[derive(Debug, Clone, clap::Args)]
 pub struct CheckSpdxArgs {
 	/// SPDX document to analyze
 	pub path: String,
+}
+
+impl ToTargetSeed for CheckSpdxArgs {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
+		let path = PathBuf::from(&self.path);
+		if path.exists() {
+			Ok(TargetSeed::Spdx(path))
+		} else {
+			Err(hc_error!("The provided SPDX file does not exist"))
+		}
+	}
 }
 
 #[derive(Debug, Clone, clap::Args)]
@@ -894,7 +973,7 @@ mod tests {
 		);
 	}
 
-	fn get_check_cmd_from_cli(args: Vec<&str>) -> Result<CheckCommand, Error> {
+	fn get_check_cmd_from_cli(args: Vec<&str>) -> Result<CheckCommand> {
 		let parsed = CliConfig::try_parse_from(args.into_iter());
 		assert!(parsed.is_ok());
 		let command = parsed.unwrap().command;
