@@ -741,6 +741,7 @@ fn cmd_cache(args: CacheArgs, config: &CliConfig) -> ExitCode {
 			force,
 		} => cache.delete(scope, filter, force),
 	};
+	drop(cache);
 	if let Err(e) = res {
 		println!("{e}");
 		ExitCode::FAILURE

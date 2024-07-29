@@ -5,12 +5,17 @@ use crate::hc_error;
 use dialoguer::Confirm;
 use pathbuf::pathbuf;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 use std::time::SystemTime;
 use tabled::{Table, Tabled};
 use walkdir::{DirEntry, WalkDir};
+
+static CACHE_FILE_NAME: &str = "index.json";
 
 #[derive(Debug, Clone)]
 pub enum CacheSort {
@@ -45,31 +50,6 @@ struct CacheEntry {
 	pub size: usize,
 	#[tabled(display_with("Self::display_modified", self))]
 	pub modified: SystemTime,
-}
-impl TryFrom<DirEntry> for CacheEntry {
-	type Error = crate::error::Error;
-	fn try_from(value: DirEntry) -> Result<Self> {
-		let mut path = value.into_path();
-		// Remove ".git"
-		path.pop();
-		let name: String = path
-			.as_path()
-			.file_name()
-			.ok_or(hc_error!("cache directory doesn't have a name"))?
-			.to_str()
-			.unwrap()
-			.to_owned();
-		let md = std::fs::metadata(path.as_path())?;
-		let size = fs_extra::dir::get_size(path.as_path())? as usize;
-		let mut parent = path.clone();
-		parent.pop();
-		Ok(CacheEntry {
-			name,
-			parent,
-			modified: md.modified()?,
-			size,
-		})
-	}
 }
 impl CacheEntry {
 	// Helper funcs for displaying CacheEntry using `tabled` crate
@@ -112,15 +92,54 @@ impl CacheEntry {
 	}
 }
 
+// We store a cached version of the `HcCache` object on disk at the root of the
+// `clones` dir in the cache folder. When instantiating an `HcCache` object, we
+// load this cached version and use it to short-cut entry size calculation if
+// the repo has not changed since the last calculation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HcCacheDiskEntry {
+	pub size: usize,
+	pub modified: SystemTime,
+}
+impl From<CacheEntry> for (PathBuf, HcCacheDiskEntry) {
+	fn from(value: CacheEntry) -> (PathBuf, HcCacheDiskEntry) {
+		let path = pathbuf![value.parent.as_path(), value.name.as_str()];
+		let entry = HcCacheDiskEntry {
+			size: value.size,
+			modified: value.modified,
+		};
+		(path, entry)
+	}
+}
+type HcCacheDisk = HashMap<PathBuf, HcCacheDiskEntry>;
+fn try_load(path: &Path) -> Result<HcCacheDisk> {
+	let data = fs::read_to_string(path)?;
+	let disk: HcCacheDisk = serde_json::from_str(data.as_str())?;
+	Ok(disk)
+}
+fn load_or_get_empty(path: &Path) -> HcCacheDisk {
+	try_load(path).unwrap_or_default()
+}
+
+fn try_get_last_modified(path: &Path) -> Result<SystemTime> {
+	Ok(fs::metadata(path)?.modified()?)
+}
+fn get_last_modified_or_now(path: &Path) -> SystemTime {
+	try_get_last_modified(path).unwrap_or(SystemTime::now())
+}
+
 /// Starting from a given cache dir, finds and iterates over git repos as "CacheEntry" structs
 struct HcCacheIterator {
 	root: PathBuf,
+	disk: HcCacheDisk,
 	wd: Box<dyn Iterator<Item = StdResult<DirEntry, walkdir::Error>>>,
 }
 impl HcCacheIterator {
 	pub fn new(dir: &Path) -> Self {
+		let disk_path = pathbuf![dir, CACHE_FILE_NAME];
 		HcCacheIterator {
 			root: PathBuf::from(dir),
+			disk: load_or_get_empty(disk_path.as_path()),
 			wd: Box::new(
 				WalkDir::new(dir)
 					.max_depth(5) // reduce time wasted churning through repos
@@ -130,21 +149,47 @@ impl HcCacheIterator {
 		}
 	}
 }
+impl HcCacheIterator {
+	fn path_to_cache_entry(&self, path: &Path) -> Result<CacheEntry> {
+		let name = path
+			.file_name()
+			.ok_or(hc_error!("cache directory doesn't have a name"))?
+			.to_str()
+			.unwrap()
+			.to_owned();
+		let modified = get_last_modified_or_now(path);
+		let cache_subdir = pathbuf![path.strip_prefix(self.root.as_path()).unwrap()];
+		let mut parent = cache_subdir.clone();
+		parent.pop();
+		let size: usize = match self.disk.get(&cache_subdir) {
+			// If existing cache entry exists and is not outdated, use size
+			Some(existing) => {
+				if modified == existing.modified {
+					existing.size
+				} else {
+					fs_extra::dir::get_size(path)? as usize
+				}
+			}
+			None => fs_extra::dir::get_size(path)? as usize,
+		};
+		Ok(CacheEntry {
+			name,
+			parent,
+			modified,
+			size,
+		})
+	}
+}
 impl Iterator for HcCacheIterator {
 	type Item = CacheEntry;
 	fn next(&mut self) -> Option<Self::Item> {
 		loop {
 			if let Some(Ok(e)) = self.wd.next() {
 				if e.file_name().to_str().map(|s| s == ".git").unwrap_or(false) {
-					match TryInto::<CacheEntry>::try_into(e) {
-						Ok(mut e) => {
-							e.parent =
-								pathbuf![e.parent.strip_prefix(self.root.as_path()).unwrap()];
-							return Some(e);
-						}
-						Err(err) => {
-							println!("Err: {err:?}");
-						}
+					let mut path = e.into_path();
+					path.pop(); // Remove ".git"
+					if let Ok(ce) = self.path_to_cache_entry(path.as_path()) {
+						return Some(ce);
 					}
 				}
 			} else {
@@ -286,5 +331,30 @@ impl HcCache {
 	/// Internal helper for list functions
 	fn display(&self, to_show: Vec<&CacheEntry>) {
 		println!("{}", Table::new(to_show));
+	}
+}
+// This ensures the current state of the cache gets written to file. It is
+// important that a "HcCache" instance is dropped before execution terminates
+// so that this function gets a chance to run
+impl Drop for HcCache {
+	fn drop(&mut self) {
+		let file_path = pathbuf![self.path.as_path(), CACHE_FILE_NAME];
+		// Create a file-oriented representation of the cache
+		let mut hc_disk_cache = HcCacheDisk::new();
+		for e in self.entries.drain(0..) {
+			let (key, val): (PathBuf, HcCacheDiskEntry) = e.into();
+			hc_disk_cache.insert(key, val);
+		}
+		// Jsonify cache and write to file
+		let data = match serde_json::to_string(&hc_disk_cache) {
+			Ok(d) => d,
+			Err(e) => {
+				log::debug!("Failed to jsonify Hipcheck cache info: {e}");
+				return;
+			}
+		};
+		if let Err(e) = fs::write(file_path, data) {
+			log::debug!("Failed to write Hipcheck cache info: {e}");
+		}
 	}
 }
