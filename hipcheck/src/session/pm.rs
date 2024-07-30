@@ -291,10 +291,22 @@ impl PackageManager {
 pub fn extract_package_version(raw_package: &str) -> Result<(String, String)> {
 	// Get the package and version from package argument in form package@version because it has @ symbol in it
 	let mut package_and_version = raw_package.split('@');
-	let package_value = match package_and_version.next() {
-		Some(package) => Ok(package),
-		_ => Err(Error::msg("unable to get package from package@version")),
+
+	// Check if the package is scoped, in the form "@scope/package". If it is, include the scope and package as the package name
+	let package_value = match raw_package.starts_with('@') {
+		true => {
+			package_and_version.next();
+			match package_and_version.next() {
+				Some(package) => Ok(format!("@{}", package)),
+				_ => Err(Error::msg("unable to get package from package@version")),
+			}
+		}
+		false => match package_and_version.next() {
+			Some(package) => Ok(package.to_string()),
+			_ => Err(Error::msg("unable to get package from package@version")),
+		},
 	};
+
 	Ok((
 		package_value.unwrap().to_string(), //this wont panic because we check for it above
 		package_and_version
@@ -320,7 +332,17 @@ pub fn extract_package_version_from_url(url: Url) -> Result<(String, String)> {
 			.path_segments()
 			.ok_or_else(|| hc_error!("Unable to get path"))?;
 		let package_value = match path_segments.next() {
-			Some(package) => Ok(package),
+			Some(first) => {
+				// Check if the package is scoped, in the form "@scope/package". If it is, include the scope and package as the package name
+				if first.starts_with('@') {
+					match path_segments.next() {
+						Some(package) => Ok(format!("{}/{}", first, package)),
+						_ => Err(Error::msg("unable to get package from uri")),
+					}
+				} else {
+					Ok(first.to_string())
+				}
+			}
 			_ => Err(Error::msg("unable to get package from uri")),
 		};
 		// An empty string or no string at all should both give "no version" as the version
@@ -330,8 +352,8 @@ pub fn extract_package_version_from_url(url: Url) -> Result<(String, String)> {
 			None => "no version",
 		};
 		Ok((
-			package_value.unwrap().to_string(), //this will graceful error if empty because of panic checking above
-			version.to_string(),                //we check for this in match so we can format url correctly
+			package_value.unwrap(), //this will graceful error if empty because of panic checking above
+			version.to_string(),    //we check for this in match so we can format url correctly
 		))
 	} else if package_type.contains(PYPI) {
 		//pypi gets the second and third segments
@@ -865,6 +887,62 @@ mod tests {
 					purl: Url::parse("pkg:npm/node-ipc").unwrap(),
 					name: "node-ipc".to_string(),
 					version: "no version".to_string(),
+					host: PackageHost::Npm
+				}
+			);
+
+			let npm_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_npm_package(&package).unwrap(), npm_git);
+		} else {
+			panic!()
+		}
+	}
+
+	#[test]
+	fn test_extract_repo_for_npm_6() {
+		let npm_package = "@types/ua-parser-js@0.7.36";
+		let link2 = "https://github.com/DefinitelyTyped/DefinitelyTyped.git";
+
+		let target_seed = CheckNpmArgs {
+			package: npm_package.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:npm/%40types/ua-parser-js@0.7.36").unwrap(),
+					name: "@types/ua-parser-js".to_string(),
+					version: "0.7.36".to_string(),
+					host: PackageHost::Npm
+				}
+			);
+
+			let npm_git = Url::parse(link2).unwrap();
+			assert_eq!(extract_repo_for_npm_package(&package).unwrap(), npm_git);
+		} else {
+			panic!()
+		}
+	}
+
+	#[test]
+	fn test_extract_repo_for_npm_7() {
+		let npm_package = "https://registry.npmjs.org/@types/ua-parser-js/0.7.36";
+		let link2 = "https://github.com/DefinitelyTyped/DefinitelyTyped.git";
+
+		let target_seed = CheckNpmArgs {
+			package: npm_package.to_string(),
+		}
+		.to_target_seed()
+		.unwrap();
+		if let TargetSeed::Package(package) = target_seed {
+			assert_eq!(
+				package,
+				Package {
+					purl: Url::parse("pkg:npm/%40types/ua-parser-js@0.7.36").unwrap(),
+					name: "@types/ua-parser-js".to_string(),
+					version: "0.7.36".to_string(),
 					host: PackageHost::Npm
 				}
 			);

@@ -568,9 +568,10 @@ impl ToTargetSeed for CheckNpmArgs {
 			_ => pm::extract_package_version(raw_package)?,
 		};
 
+		// If the package is scoped, replace the leading '@' in the scope with %40 for proper pURL formatting
 		let purl = Url::parse(&match version.as_str() {
-			"no version" => format!("pkg:npm/{}", name),
-			_ => format!("pkg:npm/{}@{}", name, version),
+			"no version" => format!("pkg:npm/{}", str::replace(&name, '@', "%40")),
+			_ => format!("pkg:npm/{}@{}", str::replace(&name, '@', "%40"), version),
 		})
 		.unwrap();
 
@@ -1248,7 +1249,7 @@ mod tests {
 
 	#[test]
 	fn test_deductive_check_npm_purl() {
-		let package = "express@4.19.2".to_string();
+		let package = "@expressjs/express@4.19.2".to_string();
 		let cmd =
 			get_check_cmd_from_cli(vec!["hc", "check", "pkg:npm/%40expressjs/express@4.19.2"]);
 		assert!(matches!(cmd, Ok(CheckCommand::Npm(..))));

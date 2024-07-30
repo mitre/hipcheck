@@ -70,8 +70,15 @@ impl TargetType {
 				}
 				"npm" => {
 					// Construct NPM package w/ optional version from pURL as the updated target string
+					let mut package = String::new();
+
+					// Include scope if provided
+					if let Some(scope) = purl.namespace() {
+						package.push_str(scope);
+						package.push('/');
+					}
 					let name = purl.name();
-					let mut package = name.to_string();
+					package.push_str(name);
 					// Include version if provided
 					if let Some(version) = purl.version() {
 						package.push('@');
