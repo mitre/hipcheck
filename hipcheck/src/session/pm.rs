@@ -27,8 +27,8 @@ const PYPI: &str = CheckKind::Pypi.name();
 pub fn detect_and_extract(package: &Package) -> Result<Url> {
 	// We check that the package is a valid NPM or PyPI package before calling this function, so it is not neccessary to worry about other matches
 	match package.host {
-		PackageHost::Npm => extract_repo_for_npm(package),
-		PackageHost::PyPI => extract_repo_for_pypi(package),
+		PackageHost::Npm => extract_repo_for_npm_package(package),
+		PackageHost::PyPI => extract_repo_for_pypi_package(package),
 	}
 }
 
@@ -353,16 +353,23 @@ pub fn extract_package_version_from_url(url: Url) -> Result<(String, String)> {
 	}
 }
 
-pub fn extract_repo_for_npm(full_package: &Package) -> Result<Url> {
+/// Function to extract repo URL for NPM package given a Package struct
+fn extract_repo_for_npm_package(full_package: &Package) -> Result<Url> {
 	// Get the package and version
-	let (package, version) = (full_package.name.clone(), full_package.version.clone());
+	let (package, version) = (full_package.name.as_ref(), full_package.version.as_ref());
 
-	// Construct the registry URL.
-	let package = error_if_empty(Some(&package), "no repository given for npm package");
+	let package = error_if_empty(Some(package), "no repository given for npm package");
 	let version = warn_if_empty(
-		Some(&version),
+		Some(version),
 		"no version given for npm package; getting URL for latest version",
 	);
+
+	extract_repo_for_npm(package, version)
+}
+
+/// Function to extract repo URL for NPM package given a package name and version
+pub fn extract_repo_for_npm(package: &str, version: &str) -> Result<Url> {
+	// Construct the registry URL.
 	let registry = match version {
 		"no version" => format!("https://registry.npmjs.org/{}", package),
 		_ => format!("https://registry.npmjs.org/{}/{}", package, version),
@@ -403,13 +410,20 @@ pub fn extract_repo_for_npm(full_package: &Package) -> Result<Url> {
 	Ok(repository)
 }
 
-fn extract_repo_for_pypi(full_package: &Package) -> Result<Url> {
+/// Function to extract repo URL for PyPI package given a Package struct
+fn extract_repo_for_pypi_package(full_package: &Package) -> Result<Url> {
 	// Get the package and version
-	let (package, version) = (full_package.name.clone(), full_package.version.clone());
-	let package = error_if_empty(Some(&package), "no repository given for python package");
+	let (package, version) = (full_package.name.as_ref(), full_package.version.as_ref());
 
+	let package = error_if_empty(Some(package), "no repository given for python package");
+
+	extract_repo_for_pypi(package, version)
+}
+
+/// Function to extract repo URL for PyPI package given a package name and version
+pub fn extract_repo_for_pypi(package: &str, version: &str) -> Result<Url> {
 	// Construct the registry URL.
-	let registry = match version.as_str() {
+	let registry = match version {
 		"no version" => format!("https://pypi.org/pypi/{}/json", package),
 		_ => format!("https://pypi.org/pypi/{}/{}/json", package, version),
 	};
@@ -543,7 +557,7 @@ mod tests {
 			);
 
 			let pypi_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+			assert_eq!(extract_repo_for_pypi_package(&package).unwrap(), pypi_git);
 		} else {
 			panic!()
 		}
@@ -571,7 +585,7 @@ mod tests {
 			);
 
 			let pypi_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+			assert_eq!(extract_repo_for_pypi_package(&package).unwrap(), pypi_git);
 		} else {
 			panic!()
 		}
@@ -599,7 +613,7 @@ mod tests {
 			);
 
 			let pypi_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+			assert_eq!(extract_repo_for_pypi_package(&package).unwrap(), pypi_git);
 		} else {
 			panic!()
 		}
@@ -627,7 +641,7 @@ mod tests {
 			);
 
 			let pypi_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+			assert_eq!(extract_repo_for_pypi_package(&package).unwrap(), pypi_git);
 		} else {
 			panic!()
 		}
@@ -655,7 +669,7 @@ mod tests {
 			);
 
 			let pypi_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+			assert_eq!(extract_repo_for_pypi_package(&package).unwrap(), pypi_git);
 		} else {
 			panic!()
 		}
@@ -683,7 +697,7 @@ mod tests {
 			);
 
 			let pypi_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+			assert_eq!(extract_repo_for_pypi_package(&package).unwrap(), pypi_git);
 		} else {
 			panic!()
 		}
@@ -712,8 +726,11 @@ mod tests {
 			);
 
 			let pypi_git = Url::parse(link2).unwrap();
-			println!("{}", extract_repo_for_pypi(&package).unwrap().as_str());
-			assert_ne!(extract_repo_for_pypi(&package).unwrap(), pypi_git);
+			println!(
+				"{}",
+				extract_repo_for_pypi_package(&package).unwrap().as_str()
+			);
+			assert_ne!(extract_repo_for_pypi_package(&package).unwrap(), pypi_git);
 		} else {
 			panic!()
 		}
@@ -741,7 +758,7 @@ mod tests {
 			);
 
 			let npm_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_npm(&package).unwrap(), npm_git);
+			assert_eq!(extract_repo_for_npm_package(&package).unwrap(), npm_git);
 		} else {
 			panic!()
 		}
@@ -769,7 +786,7 @@ mod tests {
 			);
 
 			let npm_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_npm(&package).unwrap(), npm_git);
+			assert_eq!(extract_repo_for_npm_package(&package).unwrap(), npm_git);
 		} else {
 			panic!()
 		}
@@ -797,7 +814,7 @@ mod tests {
 			);
 
 			let npm_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_npm(&package).unwrap(), npm_git);
+			assert_eq!(extract_repo_for_npm_package(&package).unwrap(), npm_git);
 		} else {
 			panic!()
 		}
@@ -825,7 +842,7 @@ mod tests {
 			);
 
 			let npm_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_npm(&package).unwrap(), npm_git);
+			assert_eq!(extract_repo_for_npm_package(&package).unwrap(), npm_git);
 		} else {
 			panic!()
 		}
@@ -853,7 +870,7 @@ mod tests {
 			);
 
 			let npm_git = Url::parse(link2).unwrap();
-			assert_eq!(extract_repo_for_npm(&package).unwrap(), npm_git);
+			assert_eq!(extract_repo_for_npm_package(&package).unwrap(), npm_git);
 		} else {
 			panic!()
 		}

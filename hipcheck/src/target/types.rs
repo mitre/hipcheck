@@ -76,12 +76,36 @@ impl Display for PackageHost {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Sbom {
+	/// The path to the SBOM file
+	pub path: PathBuf,
+
+	/// What standard the SBOM uses
+	pub standard: SbomStandard,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SbomStandard {
+	Spdx,
+	CycloneDX,
+}
+
+impl Display for SbomStandard {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		match self {
+			SbomStandard::Spdx => write!(f, "SPDX"),
+			SbomStandard::CycloneDX => write!(f, "CycloneDX"),
+		}
+	}
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TargetSeed {
 	LocalRepo(LocalGitRepo),
 	RemoteRepo(RemoteGitRepo),
 	Package(Package),
 	MavenPackage(MavenPackage),
-	Spdx(PathBuf),
+	Sbom(Sbom),
 }
 
 impl Display for TargetSeed {
@@ -102,7 +126,9 @@ impl Display for TargetSeed {
 			TargetSeed::MavenPackage(package) => {
 				write!(f, "Maven package {}", package.url.as_str())
 			}
-			TargetSeed::Spdx(path) => write!(f, "SPDX file at {}", path.display()),
+			TargetSeed::Sbom(sbom) => {
+				write!(f, "{} SBOM file at {}", sbom.standard, sbom.path.display())
+			}
 		}
 	}
 }

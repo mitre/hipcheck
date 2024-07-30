@@ -37,12 +37,13 @@ use crate::report::Format;
 use crate::report::ReportParams;
 use crate::report::ReportParamsStorage;
 use crate::session::pm::detect_and_extract;
-use crate::session::spdx::extract_download_url;
+use crate::session::spdx::extract_spdx_download_url;
 use crate::shell::spinner_phase::SpinnerPhase;
 use crate::shell::Shell;
 use crate::source::source;
 use crate::source::source::SourceQuery;
 use crate::source::source::SourceQueryStorage;
+use crate::target::SbomStandard;
 use crate::target::{Target, TargetSeed};
 use crate::version::get_version;
 use crate::version::VersionQuery;
@@ -58,6 +59,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
+use super::cyclone_dx::extract_cyclonedx_download_url;
 use super::pm::extract_repo_for_maven;
 
 /// Immutable configuration and base data for a run of Hipcheck.
@@ -271,7 +273,7 @@ fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	let phase_desc = match seed {
 		TargetSeed::LocalRepo(_) | TargetSeed::RemoteRepo(_) => "resolving git repository target",
 		TargetSeed::Package(_) => "resolving package target",
-		TargetSeed::Spdx(_) => "parsing SPDX document",
+		TargetSeed::Sbom(_) => "parsing SBOM document",
 		TargetSeed::MavenPackage(_) => "resolving maven package target",
 	};
 
@@ -328,16 +330,20 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 				package.url.to_string(),
 			)
 		}
-		TargetSeed::Spdx(path) => {
-			let source = path.to_str().ok_or(hc_error!(
-				"SPDX path contained one or more invalid characters"
+		TargetSeed::Sbom(sbom) => {
+			let source = sbom.path.to_str().ok_or(hc_error!(
+				"SBOM path contained one or more invalid characters"
 			))?;
-			// Attempt to get the download location for the local SPDX package
-			let download_url = Url::parse(&extract_download_url(source)?)?;
+			// Attempt to get the download location for the local SBOM package, using the function
+			// appropriate to the SBOM standard
+			let download_url = match sbom.standard {
+				SbomStandard::Spdx => Url::parse(&extract_spdx_download_url(source)?)?,
+				SbomStandard::CycloneDX => extract_cyclonedx_download_url(source)?,
+			};
 
-			// Create a Target for a remote git repo originating with an SPDX document
-			let spdx_git_repo = source::get_remote_repo_from_url(download_url)?;
-			source::resolve_remote_package_repo(phase, home, spdx_git_repo, source.to_string())
+			// Create a Target for a remote git repo originating with an SBOM
+			let sbom_git_repo = source::get_remote_repo_from_url(download_url)?;
+			source::resolve_remote_package_repo(phase, home, sbom_git_repo, source.to_string())
 		}
 	}
 }

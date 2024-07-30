@@ -11,7 +11,8 @@ use crate::session::pm;
 use crate::shell::{color_choice::ColorChoice, verbosity::Verbosity};
 use crate::source::source;
 use crate::target::{
-	LocalGitRepo, MavenPackage, Package, PackageHost, TargetSeed, TargetType, ToTargetSeed,
+	LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, TargetSeed, TargetType,
+	ToTargetSeed,
 };
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
@@ -453,7 +454,7 @@ impl CheckArgs {
 		let subcmd_str;
 		let target_str;
 
-		// Try to resolve the type by checking if the target string is a pURL, GitHub URL, or .spdx file
+		// Try to resolve the type by checking if the target string is a pURL, GitHub URL, or SBOM (SPDX or CycloneDX) file
 		match TargetType::try_resolve_from_target(target.as_str()) {
 			Some((subcmd, new_target)) => {
 				subcmd_str = subcmd.as_str();
@@ -519,9 +520,9 @@ pub enum CheckCommand {
 	/// Analyze a repository and output an overall risk assessment
 	#[command(hide = true)]
 	Repo(CheckRepoArgs),
-	/// Analyze packages specified in an SPDX document
+	/// Analyze packages specified in an SBOM document
 	#[command(hide = true)]
-	Spdx(CheckSpdxArgs),
+	Sbom(CheckSbomArgs),
 }
 
 impl ToTargetSeed for CheckCommand {
@@ -531,7 +532,7 @@ impl ToTargetSeed for CheckCommand {
 			CheckCommand::Npm(args) => args.to_target_seed(),
 			CheckCommand::Pypi(args) => args.to_target_seed(),
 			CheckCommand::Repo(args) => args.to_target_seed(),
-			CheckCommand::Spdx(args) => args.to_target_seed(),
+			CheckCommand::Sbom(args) => args.to_target_seed(),
 		}
 	}
 }
@@ -643,18 +644,31 @@ impl ToTargetSeed for CheckRepoArgs {
 }
 
 #[derive(Debug, Clone, clap::Args)]
-pub struct CheckSpdxArgs {
+pub struct CheckSbomArgs {
 	/// SPDX document to analyze
 	pub path: String,
 }
 
-impl ToTargetSeed for CheckSpdxArgs {
+impl ToTargetSeed for CheckSbomArgs {
 	fn to_target_seed(&self) -> Result<TargetSeed> {
 		let path = PathBuf::from(&self.path);
 		if path.exists() {
-			Ok(TargetSeed::Spdx(path))
+			if self.path.ends_with(".spdx") {
+				Ok(TargetSeed::Sbom(Sbom {
+					path,
+					standard: SbomStandard::Spdx,
+				}))
+			} else {
+				// If the file does not end in a SPDX or CycloneDX file extension, the code
+				// should not reach this funciton, so we can assume if the file does not have
+				// an .spdx extension, it has one of the acceptable CycloneDX extensions
+				Ok(TargetSeed::Sbom(Sbom {
+					path,
+					standard: SbomStandard::CycloneDX,
+				}))
+			}
 		} else {
-			Err(hc_error!("The provided SPDX file does not exist"))
+			Err(hc_error!("The provided SBOM file does not exist"))
 		}
 	}
 }
@@ -1178,7 +1192,7 @@ mod tests {
 			CheckCommand::Npm(args) => args.package,
 			CheckCommand::Pypi(args) => args.package,
 			CheckCommand::Repo(args) => args.source,
-			CheckCommand::Spdx(args) => args.path,
+			CheckCommand::Sbom(args) => args.path,
 		}
 	}
 
