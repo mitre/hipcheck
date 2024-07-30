@@ -15,7 +15,7 @@ pub enum TargetType {
 	Pypi,
 	Repo,
 	Request,
-	Spdx,
+	Sbom,
 }
 
 impl TargetType {
@@ -83,7 +83,7 @@ impl TargetType {
 					// Construct PyPI package w/optional version from pURL as the updated target string
 					let name = purl.name();
 					let mut package = name.to_string();
-					// Include version if providedc
+					// Include version if provided
 					if let Some(version) = purl.version() {
 						package.push('@');
 						package.push_str(version);
@@ -121,9 +121,14 @@ impl TargetType {
 		// Otherwise, check if it is a GitHub repo URL
 		} else if tgt.starts_with("https://github.com/") {
 			Some((Repo, tgt.to_string()))
-		// Otherwise check if it has an SPDX file extension
-		} else if tgt.ends_with(".spdx") {
-			Some((Spdx, tgt.to_string()))
+		// Otherwise check if it has an SPDX or CycloneDX SBOM file extension
+		} else if tgt.ends_with(".spdx")
+			|| tgt.ends_with("bom.json")
+			|| tgt.ends_with(".cdx.json")
+			|| tgt.ends_with("bom.xml")
+			|| tgt.ends_with(".cdx.xml")
+		{
+			Some((Sbom, tgt.to_string()))
 		} else {
 			None
 		}

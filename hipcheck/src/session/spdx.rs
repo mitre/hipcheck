@@ -28,7 +28,7 @@ const SCM_HTTPS: &str = "https";
 
 /// Extract the first compatible package download location from an
 /// SPDX document
-pub fn extract_download_url(filepath: &str) -> Result<String> {
+pub fn extract_spdx_download_url(filepath: &str) -> Result<String> {
 	let contents = std::fs::read_to_string(filepath)?;
 
 	if contents.contains(DLOAD_LOCN_TAG) {
