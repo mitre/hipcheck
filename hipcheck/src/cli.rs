@@ -620,17 +620,20 @@ pub struct CheckRepoArgs {
 	pub source: String,
 	/// The ref of the repo to analyze
 	#[clap(long = "ref")]
-	pub ref_: Option<String>,
+	pub refspec: Option<String>,
 }
 
 impl ToTargetSeed for CheckRepoArgs {
 	fn to_target_seed(&self) -> Result<TargetSeed> {
 		if let Ok(url) = Url::parse(&self.source) {
 			let remote_repo = source::get_remote_repo_from_url(url)?;
-			Ok(TargetSeed::RemoteRepo(remote_repo))
+			Ok(TargetSeed::RemoteRepo {
+				target: remote_repo,
+				refspec: self.refspec.clone(),
+			})
 		} else {
 			let path = PathBuf::from(&self.source);
-			let git_ref = match &self.ref_ {
+			let git_ref = match &self.refspec {
 				Some(r) => r.clone(),
 				None => source::get_head_commit(path.as_path())
 					.context("can't get head commit for local source")?,

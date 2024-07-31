@@ -102,7 +102,10 @@ impl Display for SbomStandard {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TargetSeed {
 	LocalRepo(LocalGitRepo),
-	RemoteRepo(RemoteGitRepo),
+	RemoteRepo {
+		target: RemoteGitRepo,
+		refspec: Option<String>,
+	},
 	Package(Package),
 	MavenPackage(MavenPackage),
 	Sbom(Sbom),
@@ -112,11 +115,11 @@ impl Display for TargetSeed {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		match self {
 			TargetSeed::LocalRepo(repo) => write!(f, "local repo at {}", repo.path.display()),
-			TargetSeed::RemoteRepo(remote_repo) => match &remote_repo.known_remote {
+			TargetSeed::RemoteRepo { target, .. } => match &target.known_remote {
 				Some(KnownRemote::GitHub { owner, repo }) => {
-					write!(f, "GitHub repo {}/{} from {}", owner, repo, remote_repo.url)
+					write!(f, "GitHub repo {}/{} from {}", owner, repo, target.url)
 				}
-				_ => write!(f, "remote repo at {}", remote_repo.url.as_str()),
+				_ => write!(f, "remote repo at {}", target.url.as_str()),
 			},
 			TargetSeed::Package(package) => write!(
 				f,

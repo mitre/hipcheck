@@ -271,7 +271,9 @@ fn load_config_and_data(
 fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	// Resolve the source specifier into an actual source.
 	let phase_desc = match seed {
-		TargetSeed::LocalRepo(_) | TargetSeed::RemoteRepo(_) => "resolving git repository target",
+		TargetSeed::LocalRepo(_) | TargetSeed::RemoteRepo { .. } => {
+			"resolving git repository target"
+		}
 		TargetSeed::Package(_) => "resolving package target",
 		TargetSeed::Sbom(_) => "parsing SBOM document",
 		TargetSeed::MavenPackage(_) => "resolving maven package target",
@@ -300,7 +302,9 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 	let _0 = crate::benchmarking::print_scope_time!("resolve_source");
 
 	match seed {
-		TargetSeed::RemoteRepo(repo) => source::resolve_remote_repo(phase, home, repo.to_owned()),
+		TargetSeed::RemoteRepo { target, refspec } => {
+			source::resolve_remote_repo(phase, home, target.to_owned(), refspec.clone())
+		}
 		TargetSeed::LocalRepo(source) => source::resolve_local_repo(phase, home, source.to_owned()),
 		TargetSeed::Package(package) => {
 			// Attempt to get the git repo URL for the package

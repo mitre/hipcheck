@@ -8,7 +8,7 @@ use crate::{
 use console::Term;
 use git2::{
 	build::{CheckoutBuilder, RepoBuilder},
-	FetchOptions, Progress, Reference, RemoteCallbacks, Repository,
+	AnnotatedCommit, Branch, FetchOptions, Progress, Reference, RemoteCallbacks, Repository,
 };
 use std::io::Write;
 use std::{cell::OnceCell, path::Path};
@@ -128,11 +128,12 @@ pub fn clone(url: &Url, dest: &Path) -> HcResult<()> {
 	Ok(())
 }
 
-/// Update a repo in the filesystem at a given location.
-///
-/// This only supports fast-forwarding, and does so with no regard to the user's prefs.
-/// Use with care, as that's not desireable in user facing repos (outside of the hipcheck cache).
-pub fn update(repo_path: &Path) -> HcResult<()> {
+/// For a given repo, checkout a particular ref in a detached HEAD state. If no
+/// ref is provided, instead try to resolve the most correct ref to target. If
+/// the repo has one branch, try fast-forwarding to match upstream, then set HEAD
+/// to top of branch. Else, if the repo has one remote, try to find a local branch
+/// tracking the default branch of remote and set HEAD to that. Otherwise, error.
+pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<()> {
 	// Open the repo with git2.
 	let repo: Repository = Repository::open(repo_path)?;
 	// Get the repo's head.
@@ -141,47 +142,93 @@ pub fn update(repo_path: &Path) -> HcResult<()> {
 	let short_name = head
 		.shorthand()
 		.ok_or(HcError::msg("HEAD shorthand should be UTF-8"))?;
-	// Get the refname of head.
-	let refname = head.name().ok_or(HcError::msg(
-		"Head name should be something like 'refs/heads/master'",
-	))?;
-	let mut local_branch_ref = repo.find_reference(refname)?;
-	// Get the name of the remote that the local HEAD branch is tracking.
-	let remote_name = repo.branch_upstream_remote(refname)?;
-	let remote_name_str: &str = remote_name
-		.as_str()
-		.ok_or(HcError::msg("Remote name should be UTF-8"))?;
-	// Find the remote object itself.
-	let mut remote = repo.find_remote(remote_name_str)?;
-
-	log::info!(
-		"Fetched current refs for {refname} in {}",
-		repo_path.display()
-	);
-
-	// Fetch the updated remote.
-	remote.fetch(&[refname], Some(&mut make_fetch_opts()), None)?;
-
-	// Get the commit we just fetched to.
-	let fetch_head: Reference = repo.find_reference("FETCH_HEAD").context(format!(
-		"Error finding FETCH_HEAD on {}",
-		repo_path.display()
-	))?;
-
-	// Get the annotated commit to merge.
-	let target_commit = repo
-		.reference_to_annotated_commit(&fetch_head)
-		.context("Error creating annotated commit")?;
-
-	let reflog_msg = format!("Fast-forward {short_name} to id: {}", target_commit.id());
-
-	// Set the local branch to the given commit
-	local_branch_ref.set_target(target_commit.id(), &reflog_msg)?;
-
-	// Update head and checkout.
-	repo.set_head(refname)?;
-	// Checkout with force.
+	if let Some(refspec_str) = refspec {
+		// Parse refspec as an annotated commit, and set HEAD based on that
+		let tgt_ref: AnnotatedCommit =
+			repo.find_annotated_commit(repo.revparse_single(&refspec_str)?.peel_to_commit()?.id())?;
+		repo.set_head_detached_from_annotated(tgt_ref)?;
+	} else {
+		// Get names of remotes
+		let raw_remotes = repo.remotes()?;
+		let remotes = raw_remotes.into_iter().flatten().collect::<Vec<&str>>();
+		let mut local_branches = repo
+			.branches(Some(git2::BranchType::Local))?
+			.filter_map(|x| match x {
+				Ok((b, _)) => Some(b),
+				_ => None,
+			})
+			.collect::<Vec<Branch>>();
+		if local_branches.len() == 1 {
+			let mut local_branch = local_branches.remove(0);
+			// if applicable, update local_branch reference to match newest remote commit
+			if let Ok(upstr) = local_branch.upstream() {
+				let remote_ref = upstr.into_reference();
+				let target_commit = repo
+					.reference_to_annotated_commit(&remote_ref)
+					.context("Error creating annotated commit")?;
+				let reflog_msg = format!("Fast-forward {short_name} to id: {}", target_commit.id());
+				// Set the local branch to the given commit
+				local_branch
+					.get_mut()
+					.set_target(target_commit.id(), &reflog_msg)?;
+			}
+			// Get branch name in form "refs/heads/<NAME>"
+			let local_name = local_branch.get().name().unwrap();
+			repo.set_head(local_name)?;
+		} else if remotes.len() == 1 {
+			// Get name of default branch for remote
+			let mut remote = repo.find_remote(remotes.first().unwrap())?;
+			remote.connect(git2::Direction::Fetch)?;
+			let default = remote.default_branch()?;
+			// Get the <NAME> in "refs/heads/<NAME>" for remote
+			let default_name = default.as_str().unwrap();
+			let (_, remote_branch_name) = default_name.rsplit_once('/').unwrap();
+			// Check if any local branches are tracking it
+			let mut opt_tgt_head: Option<&str> = None;
+			for branch in local_branches.iter() {
+				let Ok(upstr) = branch.upstream() else {
+					continue;
+				};
+				// Get the <NAME> in "refs/remote/<REMOTE>/<NAME>"
+				let upstream_name = upstr.get().name().unwrap();
+				let (_, upstream_branch_name) = upstream_name.rsplit_once('/').unwrap();
+				// If the branch names match, we have found our branch
+				if upstream_branch_name == remote_branch_name {
+					opt_tgt_head = Some(branch.get().name().unwrap());
+					break;
+				}
+			}
+			let Some(local_name) = opt_tgt_head else {
+				return Err(HcError::msg(
+					"could not find local branch tracking remote default",
+				));
+			};
+			repo.set_head(local_name)?;
+		} else {
+			return Err(HcError::msg(
+				"repo has multiple local branches and remotes, target is ambiguous",
+			));
+		}
+	}
 	repo.checkout_head(Some(make_checkout_builder().force()))?;
+
+	Ok(())
+}
+
+/// Do a `git fetch` for all remotes in the repo.
+pub fn fetch(repo_path: &Path) -> HcResult<()> {
+	// Open the repo with git2.
+	let repo: Repository = Repository::open(repo_path)?;
+
+	// Do a general `git fetch` to get all new refs/tags
+	let remotes = repo.remotes()?;
+	for remote_name_str in remotes.into_iter().flatten() {
+		let mut remote = repo.find_remote(remote_name_str)?;
+		let refspecs = remote.fetch_refspecs()?;
+		let rs_arr = refspecs.into_iter().flatten().collect::<Vec<&str>>();
+		// Fetch the updated remote.
+		remote.fetch(rs_arr.as_slice(), Some(&mut make_fetch_opts()), None)?;
+	}
 
 	Ok(())
 }
