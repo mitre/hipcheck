@@ -333,9 +333,12 @@ impl HcCache {
 		println!("{}", Table::new(to_show));
 	}
 }
-// This ensures the current state of the cache gets written to file. It is
-// important that a "HcCache" instance is dropped before execution terminates
-// so that this function gets a chance to run
+// This causes the current state of the cache to be written to the cache index
+// file when the HcCache instance is dropped. On instantiation, the index file
+// is referenced opportunistically, it is not treated as ground-truth about the
+// contents of the Hipcheck cache. Therefore, while it is preferable to ensure
+// `drop` gets called before program termination, the next `HcCache` instance
+// will not be corrupted if a hard-kill occurs.
 impl Drop for HcCache {
 	fn drop(&mut self) {
 		let file_path = pathbuf![self.path.as_path(), CACHE_FILE_NAME];
