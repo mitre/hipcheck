@@ -549,7 +549,7 @@ fn is_none_or_empty(s: Option<&str>) -> bool {
 mod tests {
 	use crate::{
 		cli::{CheckNpmArgs, CheckPypiArgs},
-		target::{TargetSeed, ToTargetSeed},
+		target::{TargetSeedKind, ToTargetSeedKind},
 	};
 
 	// Note this useful idiom: importing names from outer (for mod tests) scope.
@@ -565,9 +565,9 @@ mod tests {
 		let target_seed = CheckPypiArgs {
 			package: link.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -593,9 +593,9 @@ mod tests {
 		let target_seed = CheckPypiArgs {
 			package: link.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -621,9 +621,9 @@ mod tests {
 		let target_seed = CheckPypiArgs {
 			package: link.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -649,9 +649,9 @@ mod tests {
 		let target_seed = CheckPypiArgs {
 			package: link.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -677,9 +677,9 @@ mod tests {
 		let target_seed = CheckPypiArgs {
 			package: link.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -705,9 +705,9 @@ mod tests {
 		let target_seed = CheckPypiArgs {
 			package: link.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -734,9 +734,9 @@ mod tests {
 		let target_seed = CheckPypiArgs {
 			package: link.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -766,9 +766,9 @@ mod tests {
 		let target_seed = CheckNpmArgs {
 			package: link.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -794,9 +794,9 @@ mod tests {
 		let target_seed = CheckNpmArgs {
 			package: link.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -822,9 +822,9 @@ mod tests {
 		let target_seed = CheckNpmArgs {
 			package: link.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -850,9 +850,9 @@ mod tests {
 		let target_seed = CheckNpmArgs {
 			package: npm_package.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -878,9 +878,9 @@ mod tests {
 		let target_seed = CheckNpmArgs {
 			package: npm_package.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -906,9 +906,9 @@ mod tests {
 		let target_seed = CheckNpmArgs {
 			package: npm_package.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -934,9 +934,9 @@ mod tests {
 		let target_seed = CheckNpmArgs {
 			package: npm_package.to_string(),
 		}
-		.to_target_seed()
+		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeed::Package(package) = target_seed {
+		if let TargetSeedKind::Package(package) = target_seed {
 			assert_eq!(
 				package,
 				Package {

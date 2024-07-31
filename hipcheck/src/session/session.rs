@@ -44,7 +44,7 @@ use crate::source::source;
 use crate::source::source::SourceQuery;
 use crate::source::source::SourceQueryStorage;
 use crate::target::SbomStandard;
-use crate::target::{Target, TargetSeed};
+use crate::target::{Target, TargetSeed, TargetSeedKind};
 use crate::version::get_version;
 use crate::version::VersionQuery;
 use crate::version::VersionQueryStorage;
@@ -270,13 +270,13 @@ fn load_config_and_data(
 
 fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	// Resolve the source specifier into an actual source.
-	let phase_desc = match seed {
-		TargetSeed::LocalRepo(_) | TargetSeed::RemoteRepo { .. } => {
+	let phase_desc = match seed.kind {
+		TargetSeedKind::LocalRepo(_) | TargetSeedKind::RemoteRepo(_) => {
 			"resolving git repository target"
 		}
-		TargetSeed::Package(_) => "resolving package target",
-		TargetSeed::Sbom(_) => "parsing SBOM document",
-		TargetSeed::MavenPackage(_) => "resolving maven package target",
+		TargetSeedKind::Package(_) => "resolving package target",
+		TargetSeedKind::Sbom(_) => "parsing SBOM document",
+		TargetSeedKind::MavenPackage(_) => "resolving maven package target",
 	};
 
 	let phase = SpinnerPhase::start(phase_desc);
@@ -298,15 +298,22 @@ fn resolve_token() -> Result<String> {
 
 /// Resolves the target specifier into an actual target.
 fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Result<Target> {
+	use TargetSeedKind::*;
 	#[cfg(feature = "print-timings")]
 	let _0 = crate::benchmarking::print_scope_time!("resolve_source");
 
-	match seed {
-		TargetSeed::RemoteRepo { target, refspec } => {
-			source::resolve_remote_repo(phase, home, target.to_owned(), refspec.clone())
+	match &seed.kind {
+		RemoteRepo(remote) => {
+			source::resolve_remote_repo(phase, home, remote.to_owned(), seed.refspec.clone())
 		}
-		TargetSeed::LocalRepo(source) => source::resolve_local_repo(phase, home, source.to_owned()),
-		TargetSeed::Package(package) => {
+		LocalRepo(source) => {
+			// Because other TargetSeedKind variants need to transfer refspec info from the CLI,
+			// there's overlap with LocalGitRepo.git_ref. Copy CLI refspec here.
+			let mut source = source.to_owned();
+			source.git_ref = seed.refspec.clone().unwrap_or("HEAD".to_owned());
+			source::resolve_local_repo(phase, home, source)
+		}
+		Package(package) => {
 			// Attempt to get the git repo URL for the package
 			let package_git_repo_url =
 				detect_and_extract(package).context("Could not get git repo URL for package")?;
@@ -320,7 +327,7 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 				format!("{}@{}", package.name, package.version),
 			)
 		}
-		TargetSeed::MavenPackage(package) => {
+		MavenPackage(package) => {
 			// Attempt to get the git repo URL for the Maven package
 			let package_git_repo_url = extract_repo_for_maven(package.url.as_ref())
 				.context("Could not get git repo URL for Maven package")?;
@@ -334,7 +341,7 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 				package.url.to_string(),
 			)
 		}
-		TargetSeed::Sbom(sbom) => {
+		Sbom(sbom) => {
 			let source = sbom.path.to_str().ok_or(hc_error!(
 				"SBOM path contained one or more invalid characters"
 			))?;
