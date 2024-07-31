@@ -11,8 +11,8 @@ use crate::session::pm;
 use crate::shell::{color_choice::ColorChoice, verbosity::Verbosity};
 use crate::source::source;
 use crate::target::{
-	LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, TargetSeed, TargetType,
-	ToTargetSeed,
+	LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, TargetSeed,
+	TargetSeedKind, TargetType, ToTargetSeed, ToTargetSeedKind,
 };
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
@@ -428,6 +428,10 @@ pub enum Commands {
 #[command(subcommand_negates_reqs = true)]
 #[command(arg_required_else_help = true)]
 pub struct CheckArgs {
+	/// The ref of the target to analyze
+	#[clap(long = "ref")]
+	pub refspec: Option<String>,
+
 	#[clap(subcommand)]
 	command: Option<CheckCommand>,
 
@@ -505,6 +509,15 @@ impl CheckArgs {
 		}
 	}
 }
+impl ToTargetSeed for CheckArgs {
+	fn to_target_seed(&self) -> Result<TargetSeed> {
+		let kind = self.command()?.to_target_seed_kind()?;
+		Ok(TargetSeed {
+			kind,
+			refspec: self.refspec.clone(),
+		})
+	}
+}
 
 #[derive(Debug, Clone, clap::Parser)]
 pub enum CheckCommand {
@@ -525,14 +538,14 @@ pub enum CheckCommand {
 	Sbom(CheckSbomArgs),
 }
 
-impl ToTargetSeed for CheckCommand {
-	fn to_target_seed(&self) -> Result<TargetSeed> {
+impl ToTargetSeedKind for CheckCommand {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind> {
 		match self {
-			CheckCommand::Maven(args) => args.to_target_seed(),
-			CheckCommand::Npm(args) => args.to_target_seed(),
-			CheckCommand::Pypi(args) => args.to_target_seed(),
-			CheckCommand::Repo(args) => args.to_target_seed(),
-			CheckCommand::Sbom(args) => args.to_target_seed(),
+			CheckCommand::Maven(args) => args.to_target_seed_kind(),
+			CheckCommand::Npm(args) => args.to_target_seed_kind(),
+			CheckCommand::Pypi(args) => args.to_target_seed_kind(),
+			CheckCommand::Repo(args) => args.to_target_seed_kind(),
+			CheckCommand::Sbom(args) => args.to_target_seed_kind(),
 		}
 	}
 }
@@ -543,13 +556,13 @@ pub struct CheckMavenArgs {
 	pub package: String,
 }
 
-impl ToTargetSeed for CheckMavenArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed> {
+impl ToTargetSeedKind for CheckMavenArgs {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind> {
 		let arg = &self.package;
 		// Confirm that the provided URL is valid.
 		let url = Url::parse(arg)
 			.map_err(|e| hc_error!("The provided Maven URL {} is not a valid URL. {}", arg, e))?;
-		Ok(TargetSeed::MavenPackage(MavenPackage { url }))
+		Ok(TargetSeedKind::MavenPackage(MavenPackage { url }))
 	}
 }
 
@@ -559,8 +572,8 @@ pub struct CheckNpmArgs {
 	pub package: String,
 }
 
-impl ToTargetSeed for CheckNpmArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed> {
+impl ToTargetSeedKind for CheckNpmArgs {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind> {
 		let raw_package = &self.package;
 
 		let (name, version) = match Url::parse(raw_package) {
@@ -575,7 +588,7 @@ impl ToTargetSeed for CheckNpmArgs {
 		})
 		.unwrap();
 
-		Ok(TargetSeed::Package(Package {
+		Ok(TargetSeedKind::Package(Package {
 			purl,
 			name,
 			version,
@@ -590,8 +603,8 @@ pub struct CheckPypiArgs {
 	pub package: String,
 }
 
-impl ToTargetSeed for CheckPypiArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed> {
+impl ToTargetSeedKind for CheckPypiArgs {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind> {
 		let raw_package = &self.package;
 
 		let (name, version) = match Url::parse(raw_package) {
@@ -605,7 +618,7 @@ impl ToTargetSeed for CheckPypiArgs {
 		})
 		.unwrap();
 
-		Ok(TargetSeed::Package(Package {
+		Ok(TargetSeedKind::Package(Package {
 			purl,
 			name,
 			version,
@@ -618,28 +631,20 @@ impl ToTargetSeed for CheckPypiArgs {
 pub struct CheckRepoArgs {
 	/// Repository to analyze; can be a local path or a URI
 	pub source: String,
-	/// The ref of the repo to analyze
-	#[clap(long = "ref")]
-	pub refspec: Option<String>,
 }
 
-impl ToTargetSeed for CheckRepoArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed> {
+impl ToTargetSeedKind for CheckRepoArgs {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind> {
 		if let Ok(url) = Url::parse(&self.source) {
 			let remote_repo = source::get_remote_repo_from_url(url)?;
-			Ok(TargetSeed::RemoteRepo {
-				target: remote_repo,
-				refspec: self.refspec.clone(),
-			})
+			Ok(TargetSeedKind::RemoteRepo(remote_repo))
 		} else {
 			let path = Path::new(&self.source).canonicalize()?;
-			let git_ref = match &self.refspec {
-				Some(r) => r.clone(),
-				None => source::get_head_commit(path.as_path())
-					.context("can't get head commit for local source")?,
-			};
 			if path.exists() {
-				Ok(TargetSeed::LocalRepo(LocalGitRepo { path, git_ref }))
+				Ok(TargetSeedKind::LocalRepo(LocalGitRepo {
+					path,
+					git_ref: "".to_owned(),
+				}))
 			} else {
 				Err(hc_error!("Provided target repository could not be identified as either a remote url or path to a local file"))
 			}
@@ -653,12 +658,12 @@ pub struct CheckSbomArgs {
 	pub path: String,
 }
 
-impl ToTargetSeed for CheckSbomArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed> {
+impl ToTargetSeedKind for CheckSbomArgs {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind> {
 		let path = PathBuf::from(&self.path);
 		if path.exists() {
 			if self.path.ends_with(".spdx") {
-				Ok(TargetSeed::Sbom(Sbom {
+				Ok(TargetSeedKind::Sbom(Sbom {
 					path,
 					standard: SbomStandard::Spdx,
 				}))
@@ -667,7 +672,7 @@ impl ToTargetSeed for CheckSbomArgs {
 				|| self.path.ends_with("bom.xml")
 				|| self.path.ends_with(".cdx.xml")
 			{
-				Ok(TargetSeed::Sbom(Sbom {
+				Ok(TargetSeedKind::Sbom(Sbom {
 					path,
 					standard: SbomStandard::CycloneDX,
 				}))

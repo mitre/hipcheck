@@ -100,40 +100,53 @@ impl Display for SbomStandard {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TargetSeed {
+pub enum TargetSeedKind {
 	LocalRepo(LocalGitRepo),
-	RemoteRepo {
-		target: RemoteGitRepo,
-		refspec: Option<String>,
-	},
+	RemoteRepo(RemoteGitRepo),
 	Package(Package),
 	MavenPackage(MavenPackage),
 	Sbom(Sbom),
 }
 
-impl Display for TargetSeed {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TargetSeed {
+	pub kind: TargetSeedKind,
+	pub refspec: Option<String>,
+}
+
+impl Display for TargetSeedKind {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		use TargetSeedKind::*;
 		match self {
-			TargetSeed::LocalRepo(repo) => write!(f, "local repo at {}", repo.path.display()),
-			TargetSeed::RemoteRepo { target, .. } => match &target.known_remote {
+			LocalRepo(repo) => write!(f, "local repo at {}", repo.path.display()),
+			RemoteRepo(remote) => match &remote.known_remote {
 				Some(KnownRemote::GitHub { owner, repo }) => {
-					write!(f, "GitHub repo {}/{} from {}", owner, repo, target.url)
+					write!(f, "GitHub repo {}/{} from {}", owner, repo, remote.url)
 				}
-				_ => write!(f, "remote repo at {}", target.url.as_str()),
+				_ => write!(f, "remote repo at {}", remote.url.as_str()),
 			},
-			TargetSeed::Package(package) => write!(
+			Package(package) => write!(
 				f,
 				"{} package {}@{}",
 				package.host, package.name, package.version
 			),
-			TargetSeed::MavenPackage(package) => {
+			MavenPackage(package) => {
 				write!(f, "Maven package {}", package.url.as_str())
 			}
-			TargetSeed::Sbom(sbom) => {
+			Sbom(sbom) => {
 				write!(f, "{} SBOM file at {}", sbom.standard, sbom.path.display())
 			}
 		}
 	}
+}
+impl Display for TargetSeed {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		self.kind.fmt(f)
+	}
+}
+
+pub trait ToTargetSeedKind {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind, Error>;
 }
 
 pub trait ToTargetSeed {

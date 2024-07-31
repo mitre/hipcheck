@@ -78,7 +78,7 @@ use std::process::Command;
 use std::process::ExitCode;
 use std::result::Result as StdResult;
 use std::time::Duration;
-use target::{RemoteGitRepo, TargetSeed, ToTargetSeed};
+use target::{RemoteGitRepo, TargetSeed, TargetSeedKind, ToTargetSeed};
 use util::fs::create_dir_all;
 use which::which;
 
@@ -159,14 +159,8 @@ fn main() -> ExitCode {
 
 /// Run the `check` command.
 fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
-	let target = match args.command() {
-		Ok(chk) => match chk.to_target_seed() {
-			Ok(target) => target,
-			Err(e) => {
-				Shell::print_error(&e, Format::Human);
-				return ExitCode::FAILURE;
-			}
-		},
+	let target = match args.to_target_seed() {
+		Ok(target) => target,
 		Err(e) => {
 			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;
@@ -219,11 +213,11 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	// Create a dummy session to query the salsa database for a weight graph for printing.
 	let session = Session::new(
 		// Use the hipcheck repo as a dummy url until checking is de-coupled from `Session`.
-		&TargetSeed::RemoteRepo {
-			target: RemoteGitRepo {
+		&TargetSeed {
+			kind: TargetSeedKind::RemoteRepo(RemoteGitRepo {
 				url: url::Url::parse("https://github.com/mitre/hipcheck.git").unwrap(),
 				known_remote: None,
-			},
+			}),
 			refspec: Some("HEAD".to_owned()),
 		},
 		config.config().map(ToOwned::to_owned),
