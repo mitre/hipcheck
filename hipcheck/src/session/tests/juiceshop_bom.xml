@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bom xmlns="http://cyclonedx.org/schema/bom/1.4" serialNumber="urn:uuid:d6aa76fa-e488-480d-9ad0-f67765dfd015" version="1">
+    <metadata>
+        <timestamp>2020-08-03T03:19:55.999Z</timestamp>
+        <tools>
+            <tool>
+                <vendor>CycloneDX</vendor>
+                <name>Node.js module</name>
+                <version>2.0.0</version>
+            </tool>
+        </tools>
+        <component type="library" bom-ref="pkg:github/juice-shop/juice-shop">
+            <name>juice-shop</name>
+            <version>11.1.2</version>
+            <description>
+                <![CDATA[Probably the most modern and sophisticated insecure web application]]>
+            </description>
+            <licenses>
+                <license>
+                    <id>MIT</id>
+                </license>
+            </licenses>
+            <purl>pkg:github/juice-shop/juice-shop</purl>
+            <externalReferences>
+                <reference type="website">
+                    <url>https://owasp-juice.shop</url>
+                </reference>
+                <reference type="issue-tracker">
+                    <url>https://github.com/bkimminich/juice-shop/issues</url>
+                </reference>
+                <reference type="vcs">
+                    <url>git+https://github.com/bkimminich/juice-shop.git</url>
+                </reference>
+            </externalReferences>
+        </component>
+    </metadata>
+    <components>
+        <component type="library" bom-ref="pkg:npm/body-parser@1.19.0">
+            <name>body-parser</name>
+            <version>1.19.0</version>
+            <description>
+                <![CDATA[Node.js body parsing middleware]]>
+            </description>
+            <hashes>
+                <hash alg="SHA-1">96b2709e57c9c4e09a6fd66a8fd979844f69f08a</hash>
+            </hashes>
+            <licenses>
+                <license>
+                    <id>MIT</id>
+                </license>
+            </licenses>
+            <purl>pkg:npm/body-parser@1.19.0</purl>
+            <externalReferences>
+                <reference type="website">
+                    <url>https://github.com/expressjs/body-parser#readme</url>
+                </reference>
+                <reference type="issue-tracker">
+                    <url>https://github.com/expressjs/body-parser/issues</url>
+                </reference>
+                <reference type="vcs">
+                    <url>git+https://github.com/expressjs/body-parser.git</url>
+                </reference>
+            </externalReferences>
+        </component>
+    </components>
+</bom>

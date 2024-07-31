@@ -659,14 +659,19 @@ impl ToTargetSeed for CheckSbomArgs {
 					path,
 					standard: SbomStandard::Spdx,
 				}))
-			} else {
-				// If the file does not end in a SPDX or CycloneDX file extension, the code
-				// should not reach this funciton, so we can assume if the file does not have
-				// an .spdx extension, it has one of the acceptable CycloneDX extensions
+			} else if self.path.ends_with("bom.json")
+				|| self.path.ends_with(".cdx.json")
+				|| self.path.ends_with("bom.xml")
+				|| self.path.ends_with(".cdx.xml")
+			{
 				Ok(TargetSeed::Sbom(Sbom {
 					path,
 					standard: SbomStandard::CycloneDX,
 				}))
+			} else {
+				Err(hc_error!(
+					"The provided SBOM file is not an SPDX or CycloneDX file type"
+				))
 			}
 		} else {
 			Err(hc_error!("The provided SBOM file does not exist"))

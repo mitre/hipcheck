@@ -19,7 +19,7 @@ pub fn extract_cyclonedx_download_url(filepath: &str) -> Result<Url> {
 
 	if filepath.contains(".json") {
 		let bom = Bom::parse_from_json(contents.as_bytes()).map_err(|_| {
-			hc_error!("CycloneDX JSON file is corrupt or otherwise cannot be parsed")
+			hc_error!("CycloneDX JSON file is corrupt or otherwise cannot be parsed. It may be in an incompatble CycloneDX format (only v. 1.3 - 1.5 supported)")
 		})?;
 		if bom.validate().passed() {
 			extract_download_url(bom)
@@ -27,8 +27,12 @@ pub fn extract_cyclonedx_download_url(filepath: &str) -> Result<Url> {
 			Err(hc_error!("CycloneDX file is not a valid SBOM"))
 		}
 	} else if filepath.contains(".xml") {
-        // TODO: Handle XML files
-        Err(hc_error!("Hipcheck does not currently support CycloneDX SBOMs as XML files"))
+		let bom = parse_from_xml(contents)?;
+		if bom.validate().passed() {
+			extract_download_url(bom)
+		} else {
+			Err(hc_error!("CycloneDX file is not a valid SBOM"))
+		}
 	} else {
 		Err(hc_error!("CycloneDX file is not in a comatible format"))
 	}
@@ -130,6 +134,22 @@ fn extract_download_url(bom: Bom) -> Result<Url> {
 	}
 }
 
+/// General function to parse an XML file; tries to parse as an XML of each compatible version in turn
+fn parse_from_xml(contents: String) -> Result<Bom> {
+	// First check if the XML file conforms to CycloneDX v. 1.5
+	match Bom::parse_from_xml_v1_5(contents.as_bytes()) {
+		Ok(bom) => Ok(bom),
+		// If it does not,  check if the XML file conforms to CycloneDX v. 1.4
+		_ => match Bom::parse_from_xml_v1_4(contents.as_bytes()) {
+			Ok(bom) => Ok(bom),
+			// If it does not,  check if the XML file conforms to CycloneDX v. 1.3. If not, return an error
+			_ => Bom::parse_from_xml_v1_3(contents.as_bytes()).map_err(|_| {
+				hc_error!("CycloneDX XML file is corrupt or otherwise cannot be parsed. It may be in an incompatble CycloneDX format (only v. 1.3 - 1.5 supported)")
+			}),
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -143,6 +163,20 @@ mod tests {
 			.collect();
 		let json = path.to_str().unwrap();
 		let url = extract_cyclonedx_download_url(json).unwrap();
+		assert_eq!(
+			url.to_string(),
+			"https://github.com/juice-shop/juice-shop.git".to_string()
+		);
+	}
+
+	#[test]
+	fn test_extract_url_from_cyclonedx_xml() {
+		let manifest = env!("CARGO_MANIFEST_DIR");
+		let path: PathBuf = [manifest, "src", "session", "tests", "juiceshop_bom.xml"]
+			.iter()
+			.collect();
+		let xml = path.to_str().unwrap();
+		let url = extract_cyclonedx_download_url(xml).unwrap();
 		assert_eq!(
 			url.to_string(),
 			"https://github.com/juice-shop/juice-shop.git".to_string()
