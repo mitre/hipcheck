@@ -632,7 +632,7 @@ impl ToTargetSeed for CheckRepoArgs {
 				refspec: self.refspec.clone(),
 			})
 		} else {
-			let path = PathBuf::from(&self.source);
+			let path = Path::new(&self.source).canonicalize()?;
 			let git_ref = match &self.refspec {
 				Some(r) => r.clone(),
 				None => source::get_head_commit(path.as_path())

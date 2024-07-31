@@ -38,7 +38,7 @@ use url::Url;
 pub fn resolve_local_repo(
 	phase: &SpinnerPhase,
 	root: &Path,
-	local_repo: LocalGitRepo,
+	mut local_repo: LocalGitRepo,
 ) -> Result<Target> {
 	let src = local_repo.path.clone();
 
@@ -51,8 +51,7 @@ pub fn resolve_local_repo(
 
 	phase.update_status("copying");
 	let local = clone_local_repo_to_cache(src.as_path(), root)?;
-	// TODO - use git2 to set the local repo to the correct ref
-	let _head = get_head_commit(&local).context("can't get head commit for local source")?;
+	git::checkout(&local, Some(local_repo.git_ref.clone()))?;
 	phase.update_status("trying to get remote");
 	let remote = match try_resolve_remote_for_local(&local) {
 		Ok(remote) => Some(remote),
@@ -61,6 +60,8 @@ pub fn resolve_local_repo(
 			None
 		}
 	};
+
+	local_repo.path = local;
 
 	Ok(Target {
 		specifier,
