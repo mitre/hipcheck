@@ -93,17 +93,38 @@ pub fn resolve_remote_repo(
 	phase: &SpinnerPhase,
 	root: &Path,
 	remote_repo: RemoteGitRepo,
+	refspec: Option<String>,
 ) -> Result<Target> {
 	// For remote repos originally specified by their URL, the specifier is just that URL
 	let specifier = remote_repo.url.to_string();
 
-	match remote_repo.known_remote {
+	let path = match remote_repo.known_remote {
 		Some(KnownRemote::GitHub {
 			ref owner,
 			ref repo,
-		}) => resolve_github_remote_repo(phase, root, remote_repo.clone(), owner, repo, specifier),
-		_ => resolve_unknown_remote_repo(phase, root, remote_repo.clone(), specifier),
-	}
+		}) => pathbuf![root, "clones", "github", owner, repo],
+		_ => {
+			let clone_dir = build_unknown_remote_clone_dir(&remote_repo.url)
+				.context("failed to prepare local clone directory")?;
+			pathbuf![root, "clones", "unknown", &clone_dir]
+		}
+	};
+
+	clone_or_update_remote(phase, &remote_repo.url, &path, refspec)?;
+
+	let head = get_head_commit(&path)?;
+
+	let local = LocalGitRepo {
+		path,
+		git_ref: head,
+	};
+
+	Ok(Target {
+		specifier,
+		local,
+		remote: Some(remote_repo),
+		package: None,
+	})
 }
 
 /// Resolves a remote git repo derived from a source other than its remote location (e.g. a package or SPDX file) into a Target for analysis by Hipcheck
@@ -134,7 +155,7 @@ fn resolve_github_remote_repo(
 
 	let path = pathbuf![root, "clones", "github", owner, repo];
 
-	clone_or_update_remote(phase, url, &path)?;
+	clone_or_update_remote(phase, url, &path, None)?;
 
 	let head = get_head_commit(&path)?;
 
@@ -163,7 +184,7 @@ fn resolve_unknown_remote_repo(
 		build_unknown_remote_clone_dir(url).context("failed to prepare local clone directory")?;
 	let path = pathbuf![root, "clones", "unknown", &clone_dir];
 
-	clone_or_update_remote(phase, url, &path)?;
+	clone_or_update_remote(phase, url, &path, None)?;
 
 	let head = get_head_commit(&path)?;
 
@@ -336,14 +357,20 @@ fn clone_local_repo_to_cache(src: &Path, root: &Path) -> Result<PathBuf> {
 	Ok(dest)
 }
 
-pub fn clone_or_update_remote(phase: &SpinnerPhase, url: &Url, dest: &Path) -> Result<()> {
+pub fn clone_or_update_remote(
+	phase: &SpinnerPhase,
+	url: &Url,
+	dest: &Path,
+	refspec: Option<String>,
+) -> Result<()> {
 	if dest.exists() {
 		phase.update_status("pulling");
-		git::update(dest).context("failed to update remote repository")
+		git::fetch(dest).context("failed to update remote repository")?;
 	} else {
 		phase.update_status("cloning");
-		git::clone(url, dest).context("failed to clone remote repository")
+		git::clone(url, dest).context("failed to clone remote repository")?;
 	}
+	git::checkout(dest, refspec)
 }
 
 fn get_symbolic_ref(dest: &Path) -> Result<String> {

@@ -219,10 +219,13 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	// Create a dummy session to query the salsa database for a weight graph for printing.
 	let session = Session::new(
 		// Use the hipcheck repo as a dummy url until checking is de-coupled from `Session`.
-		&TargetSeed::RemoteRepo(RemoteGitRepo {
-			url: url::Url::parse("https://github.com/mitre/hipcheck.git").unwrap(),
-			known_remote: None,
-		}),
+		&TargetSeed::RemoteRepo {
+			target: RemoteGitRepo {
+				url: url::Url::parse("https://github.com/mitre/hipcheck.git").unwrap(),
+				known_remote: None,
+			},
+			refspec: Some("HEAD".to_owned()),
+		},
 		config.config().map(ToOwned::to_owned),
 		config.data().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
