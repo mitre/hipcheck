@@ -63,8 +63,13 @@ is updated and superseded here. The manifests will be defined using [KDL].
 - __Version__ (`String`): The version number of the plugin, following
   [Semantic Versioning][semver] conventions of the `<MAJOR>.<MINOR>.<PATCH>`
   format.
-- __Entrypoint__ (`String`): The command to run the plugin's executable
+- __Entrypoint__ (`Node`): The command to run the plugin's executable
   artifact from the command line.
+  - (Child) __On__ (`Node`): An entry for a specific architecture.
+    - (Named Attribute) __Arch__ (`String`): The target triple for the
+      architecture whose entrypoint is being specified.
+    - (Positional Attribute) __Operation__ (`String`): The entrypoint CLI
+      program to run.
 - __License__ (`String`): An [SPDX license expression][spdx_license_expr]
   specifying all licenses which apply to the plugin. See the
   [SPDX license list][spdx_license_list] for the full list of known named
@@ -107,7 +112,12 @@ publisher "mitre"
 name "affiliation"
 version "0.1.0"
 license "Apache-2.0"
-entrypoint "./hc-mitre-affiliation"
+entrypoint {
+  on arch="aarch64-apple-darwin" "./hc-mitre-affiliation"
+  on arch="x86_64-apple-darwin" "./hc-mitre-affiliation"
+  on arch="x86_64-unknown-linux-gnu" "./hc-mitre-affiliation"
+  on arch="x86_64-pc-windows-msvc" "./hc-mitre-affiliation"
+}
 
 dependencies {
   plugin "mitre/git" version="0.1.0" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl"
