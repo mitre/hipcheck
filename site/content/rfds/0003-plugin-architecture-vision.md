@@ -8,6 +8,12 @@ extra:
 
 # Plugin Architecture Vision
 
+{% info(title="Partially Superseded") %}
+Parts of this RFD have been superseded by RFD #4, which provides a more
+detailed description of the design of the plugin system and the API
+between Hipcheck and plugins.
+{% end %}
+
 Currently, all analyses and data sources in Hipcheck are part of Hipcheck
 itself, built into the `hc` binary. This places some constraints on the
 evolution and growth of Hipcheck's capabilities, including:
