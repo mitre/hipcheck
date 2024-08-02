@@ -512,10 +512,21 @@ impl CheckArgs {
 impl ToTargetSeed for CheckArgs {
 	fn to_target_seed(&self) -> Result<TargetSeed> {
 		let kind = self.command()?.to_target_seed_kind()?;
-		Ok(TargetSeed {
+		let target = TargetSeed {
 			kind,
 			refspec: self.refspec.clone(),
-		})
+		};
+		// Validate
+		if let Some(refspec) = &target.refspec {
+			if let TargetSeedKind::Package(p) = &target.kind {
+				if p.has_version() && &p.version != refspec {
+					return Err(hc_error!("ambiguous version for package target: package target specified {}, but refspec flag specified {}. please specify only one.", p.version, refspec));
+				}
+			}
+		};
+
+		// TargetSeed is valid
+		Ok(target)
 	}
 }
 

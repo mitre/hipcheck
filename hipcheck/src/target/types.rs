@@ -53,6 +53,15 @@ pub struct Package {
 	/// What host the package is from.
 	pub host: PackageHost,
 }
+impl Package {
+	pub fn has_version(&self) -> bool {
+		self.version != Package::no_version()
+	}
+	pub fn no_version() -> &'static str {
+		"no version"
+	}
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MavenPackage {
 	/// The Maven url

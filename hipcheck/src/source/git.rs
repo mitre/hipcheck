@@ -133,20 +133,22 @@ pub fn clone(url: &Url, dest: &Path) -> HcResult<()> {
 /// the repo has one branch, try fast-forwarding to match upstream, then set HEAD
 /// to top of branch. Else, if the repo has one remote, try to find a local branch
 /// tracking the default branch of remote and set HEAD to that. Otherwise, error.
-pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<()> {
+pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<String> {
 	// Open the repo with git2.
 	let repo: Repository = Repository::open(repo_path)?;
 	// Get the repo's head.
 	let head: Reference = repo.head()?;
 	// Get the shortname for later debugging.
-	let short_name = head
+	let init_short_name = head
 		.shorthand()
 		.ok_or(HcError::msg("HEAD shorthand should be UTF-8"))?;
+	let ret_str: String;
 	if let Some(refspec_str) = refspec {
 		// Parse refspec as an annotated commit, and set HEAD based on that
 		let tgt_ref: AnnotatedCommit =
 			repo.find_annotated_commit(repo.revparse_single(&refspec_str)?.peel_to_commit()?.id())?;
 		repo.set_head_detached_from_annotated(tgt_ref)?;
+		ret_str = refspec_str;
 	} else {
 		// Get names of remotes
 		let raw_remotes = repo.remotes()?;
@@ -166,15 +168,20 @@ pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<()> {
 				let target_commit = repo
 					.reference_to_annotated_commit(&remote_ref)
 					.context("Error creating annotated commit")?;
-				let reflog_msg = format!("Fast-forward {short_name} to id: {}", target_commit.id());
+				let reflog_msg = format!(
+					"Fast-forward {init_short_name} to id: {}",
+					target_commit.id()
+				);
 				// Set the local branch to the given commit
 				local_branch
 					.get_mut()
 					.set_target(target_commit.id(), &reflog_msg)?;
 			}
 			// Get branch name in form "refs/heads/<NAME>"
-			let local_name = local_branch.get().name().unwrap();
+			let tgt_ref = local_branch.get();
+			let local_name = tgt_ref.name().unwrap();
 			repo.set_head(local_name)?;
+			ret_str = tgt_ref.shorthand().unwrap_or(local_name).to_owned();
 		} else if remotes.len() == 1 {
 			// Get name of default branch for remote
 			let mut remote = repo.find_remote(remotes.first().unwrap())?;
@@ -204,6 +211,8 @@ pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<()> {
 				));
 			};
 			repo.set_head(local_name)?;
+			let head_ref = repo.head()?;
+			ret_str = head_ref.shorthand().unwrap_or(local_name).to_owned();
 		} else {
 			return Err(HcError::msg(
 				"repo has multiple local branches and remotes, target is ambiguous",
@@ -212,7 +221,7 @@ pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<()> {
 	}
 	repo.checkout_head(Some(make_checkout_builder().force()))?;
 
-	Ok(())
+	Ok(ret_str)
 }
 
 /// Do a `git fetch` for all remotes in the repo.
