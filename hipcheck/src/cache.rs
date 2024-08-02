@@ -3,6 +3,7 @@
 use crate::error::Result;
 use crate::hc_error;
 use dialoguer::Confirm;
+use git2::Repository;
 use pathbuf::pathbuf;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -46,6 +47,7 @@ struct CacheEntry {
 	pub name: String,
 	#[tabled(display_with("Self::display_parent", self), rename = "path")]
 	pub parent: PathBuf,
+	pub commit: String,
 	#[tabled(display_with("Self::display_size", self))]
 	pub size: usize,
 	#[tabled(display_with("Self::display_modified", self))]
@@ -99,6 +101,7 @@ impl CacheEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct HcCacheDiskEntry {
 	pub size: usize,
+	pub commit: String,
 	pub modified: SystemTime,
 }
 impl From<CacheEntry> for (PathBuf, HcCacheDiskEntry) {
@@ -106,6 +109,7 @@ impl From<CacheEntry> for (PathBuf, HcCacheDiskEntry) {
 		let path = pathbuf![value.parent.as_path(), value.name.as_str()];
 		let entry = HcCacheDiskEntry {
 			size: value.size,
+			commit: value.commit,
 			modified: value.modified,
 		};
 		(path, entry)
@@ -157,6 +161,15 @@ impl HcCacheIterator {
 			.to_str()
 			.unwrap()
 			.to_owned();
+		let repo = Repository::open(path)?;
+		let commit = repo
+			.head()?
+			.peel_to_commit()?
+			.as_object()
+			.short_id()?
+			.as_str()
+			.unwrap()
+			.to_owned();
 		let modified = get_last_modified_or_now(path);
 		let cache_subdir = pathbuf![path.strip_prefix(self.root.as_path()).unwrap()];
 		let mut parent = cache_subdir.clone();
@@ -164,10 +177,10 @@ impl HcCacheIterator {
 		let size: usize = match self.disk.get(&cache_subdir) {
 			// If existing cache entry exists and is not outdated, use size
 			Some(existing) => {
-				if modified == existing.modified {
-					existing.size
-				} else {
+				if modified != existing.modified || commit != existing.commit {
 					fs_extra::dir::get_size(path)? as usize
+				} else {
+					existing.size
 				}
 			}
 			None => fs_extra::dir::get_size(path)? as usize,
@@ -175,6 +188,7 @@ impl HcCacheIterator {
 		Ok(CacheEntry {
 			name,
 			parent,
+			commit,
 			modified,
 			size,
 		})
