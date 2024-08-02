@@ -390,7 +390,7 @@ themselves. This section answers that question.
 ### Policy Files
 
 Today, Hipcheck determines what analyses to run and how to configure those
-analyses a "configuration file," and when you first install Hipcheck you
+analyses with a "configuration file," and when you first install Hipcheck you
 must run the `hc setup` command to get a copy of the default configuration
 files and helper scripts necessary for Hipcheck to run. This approach has
 several problems:
@@ -799,6 +799,11 @@ This stage has several subparts:
   interaction via gRPC.
 - Validating policy-specific configuration with the policy plugins,
   reporting errors out to the user.
+
+We'll likely want to offer an `--offline` flag and/or configuration
+item which the user could use to tell Hipcheck _not_ to download
+plugins itself. In that case, it would be up to the user to place
+plugins into the Hipcheck plugin cache themselves.
 
 At the end of this stage, all of Hipcheck's plugins are running, their
 configurations have been validated and set, and Hipcheck is prepared to
