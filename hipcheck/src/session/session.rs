@@ -283,6 +283,7 @@ fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	// Set the phase to tick steadily 10 times a second.
 	phase.enable_steady_tick(Duration::from_millis(100));
 	let target = resolve_target(seed, &phase, home)?;
+	println!("TARGET: {target:?}");
 	phase.finish_successful();
 
 	Ok(target)
@@ -320,11 +321,21 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 
 			// Create Target for a remote git repo originating with a package
 			let package_git_repo = source::get_remote_repo_from_url(package_git_repo_url)?;
+			// TargetSeed validation step should have already ensured both refspec and package
+			// version are not provided, so we can do this
+			let refspec = if let Some(refspec) = &seed.refspec {
+				Some(refspec.to_owned())
+			} else if package.has_version() {
+				Some(package.version.to_owned())
+			} else {
+				None
+			};
 			source::resolve_remote_package_repo(
 				phase,
 				home,
 				package_git_repo,
 				format!("{}@{}", package.name, package.version),
+				refspec,
 			)
 		}
 		MavenPackage(package) => {
@@ -334,11 +345,13 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 
 			// Create Target for a remote git repo originating with a Maven package
 			let package_git_repo = source::get_remote_repo_from_url(package_git_repo_url)?;
+			// We do not currently harvest version info from the maven url
 			source::resolve_remote_package_repo(
 				phase,
 				home,
 				package_git_repo,
 				package.url.to_string(),
+				seed.refspec.clone(),
 			)
 		}
 		Sbom(sbom) => {
@@ -354,7 +367,13 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 
 			// Create a Target for a remote git repo originating with an SBOM
 			let sbom_git_repo = source::get_remote_repo_from_url(download_url)?;
-			source::resolve_remote_package_repo(phase, home, sbom_git_repo, source.to_string())
+			source::resolve_remote_package_repo(
+				phase,
+				home,
+				sbom_git_repo,
+				source.to_string(),
+				seed.refspec.clone(),
+			)
 		}
 	}
 }

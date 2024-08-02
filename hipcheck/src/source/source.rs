@@ -38,7 +38,7 @@ use url::Url;
 pub fn resolve_local_repo(
 	phase: &SpinnerPhase,
 	root: &Path,
-	mut local_repo: LocalGitRepo,
+	local_repo: LocalGitRepo,
 ) -> Result<Target> {
 	let src = local_repo.path.clone();
 
@@ -50,10 +50,10 @@ pub fn resolve_local_repo(
 		.to_string();
 
 	phase.update_status("copying");
-	let local = clone_local_repo_to_cache(src.as_path(), root)?;
-	git::checkout(&local, Some(local_repo.git_ref.clone()))?;
+	let path = clone_local_repo_to_cache(src.as_path(), root)?;
+	let git_ref = git::checkout(&path, Some(local_repo.git_ref.clone()))?;
 	phase.update_status("trying to get remote");
-	let remote = match try_resolve_remote_for_local(&local) {
+	let remote = match try_resolve_remote_for_local(&path) {
 		Ok(remote) => Some(remote),
 		Err(err) => {
 			log::debug!("failed to get remote [err='{}']", err);
@@ -61,11 +61,11 @@ pub fn resolve_local_repo(
 		}
 	};
 
-	local_repo.path = local;
+	let local = LocalGitRepo { path, git_ref };
 
 	Ok(Target {
 		specifier,
-		local: local_repo,
+		local,
 		remote,
 		package: None,
 	})
@@ -111,14 +111,9 @@ pub fn resolve_remote_repo(
 		}
 	};
 
-	clone_or_update_remote(phase, &remote_repo.url, &path, refspec)?;
+	let git_ref = clone_or_update_remote(phase, &remote_repo.url, &path, refspec)?;
 
-	let head = get_head_commit(&path)?;
-
-	let local = LocalGitRepo {
-		path,
-		git_ref: head,
-	};
+	let local = LocalGitRepo { path, git_ref };
 
 	Ok(Target {
 		specifier,
@@ -134,72 +129,11 @@ pub fn resolve_remote_package_repo(
 	root: &Path,
 	remote_repo: RemoteGitRepo,
 	specifier: String,
+	refspec: Option<String>,
 ) -> Result<Target> {
-	match remote_repo.known_remote {
-		Some(KnownRemote::GitHub {
-			ref owner,
-			ref repo,
-		}) => resolve_github_remote_repo(phase, root, remote_repo.clone(), owner, repo, specifier),
-		_ => resolve_unknown_remote_repo(phase, root, remote_repo.clone(), specifier),
-	}
-}
-
-fn resolve_github_remote_repo(
-	phase: &SpinnerPhase,
-	root: &Path,
-	remote_repo: RemoteGitRepo,
-	owner: &str,
-	repo: &str,
-	specifier: String,
-) -> Result<Target> {
-	let url = &remote_repo.url;
-
-	let path = pathbuf![root, "clones", "github", owner, repo];
-
-	clone_or_update_remote(phase, url, &path, None)?;
-
-	let head = get_head_commit(&path)?;
-
-	let local = LocalGitRepo {
-		path,
-		git_ref: head,
-	};
-
-	Ok(Target {
-		specifier,
-		local,
-		remote: Some(remote_repo),
-		package: None,
-	})
-}
-
-fn resolve_unknown_remote_repo(
-	phase: &SpinnerPhase,
-	root: &Path,
-	remote_repo: RemoteGitRepo,
-	specifier: String,
-) -> Result<Target> {
-	let url = &remote_repo.url;
-
-	let clone_dir =
-		build_unknown_remote_clone_dir(url).context("failed to prepare local clone directory")?;
-	let path = pathbuf![root, "clones", "unknown", &clone_dir];
-
-	clone_or_update_remote(phase, url, &path, None)?;
-
-	let head = get_head_commit(&path)?;
-
-	let local = LocalGitRepo {
-		path,
-		git_ref: head,
-	};
-
-	Ok(Target {
-		specifier,
-		local,
-		remote: Some(remote_repo),
-		package: None,
-	})
+	let mut target = resolve_remote_repo(phase, root, remote_repo, refspec)?;
+	target.specifier = specifier;
+	Ok(target)
 }
 
 fn try_resolve_remote_for_local(local: &Path) -> Result<RemoteGitRepo> {
@@ -363,7 +297,7 @@ pub fn clone_or_update_remote(
 	url: &Url,
 	dest: &Path,
 	refspec: Option<String>,
-) -> Result<()> {
+) -> Result<String> {
 	if dest.exists() {
 		phase.update_status("pulling");
 		git::fetch(dest).context("failed to update remote repository")?;
@@ -395,12 +329,6 @@ fn get_upstream_for_ref(dest: &Path, symbolic_ref: &str) -> Result<String> {
 
 fn get_url_for_remote(dest: &Path, remote: &str) -> Result<String> {
 	let output = GitCommand::for_repo(dest, ["remote", "get-url", remote])?.output()?;
-
-	Ok(output.trim().to_owned())
-}
-
-pub(crate) fn get_head_commit(path: &Path) -> Result<String> {
-	let output = GitCommand::for_repo(path, ["rev-parse", "--short", "HEAD"])?.output()?;
 
 	Ok(output.trim().to_owned())
 }
