@@ -3,6 +3,98 @@
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+## [3.5.0] - 2024-08-05
+
+Hipcheck 3.5.0 continues our focus on user experience improvements with
+three major additions:
+
+- Improved target selection
+- The `hc cache` subcommand
+- Better progress reporting
+
+### Improved Target Selection
+
+In Hipcheck 3.5.0 we've enhanced the ability to specify your _target of
+analysis_. This is Hipcheck's term for "the thing you want to analyze."
+With this new version, you can now provide:
+
+- __Package URLs (pURLs)__: pURLs are a specification for a unified way of
+  referencing packages on a variety of popular package hosts. For example,
+  the pURL `pkg:npm/foobar@12.3.1` refers to the package `foobar` version
+  `12.3.1` on NPM.
+- __VCS URLs__: VCS URLs come from the Python ecoystem, where they're used
+  by PIP to refer to Git repositories with additional metadata embedded in
+  the URL. They're also used by the SPDX Software Bill of Materials standard.
+  A VCS URL looks like `git+ssh://git@git.example.com/MyProject`, with the
+  VCS being used as a prefix to the rest of the protocol, separated by a `+`.
+- __Git References__: References are how Git refers to specific things you
+  can checkout in a Git repository, including specific commits, branches,
+  and tags. By default, Hipcheck checks out the latest (`HEAD`) commit of a
+  repository, but you can now use the `--ref` flag to specify a different
+  ref to check out.
+- __CycloneDX SBOMs__: Hipcheck can now accept CycloneDX Software Bills of
+  Material in addition to SPDX ones, in either JSON or XML format.
+
+Note that some of the methods above allow embedding some target-type
+information directly, in ways that can contradict the `--type` flag when
+running `hc check`. If the `--type` flag and the target specifier metadata
+ever conflict, Hipcheck will produce an error rather than picking one option
+over the other automatically.
+
+The following commits were for this work:
+
+* remove use of Source, SourceRepo, Remote structs in favor of Target by [@j-lanson](https://github.com/j-lanson) in [#229](https://github.com/mitre/hipcheck/pull/229)
+* added types for new target repo spec and resolution by [@j-lanson](https://github.com/j-lanson) in [#210](https://github.com/mitre/hipcheck/pull/210)
+* add more robust 'target resolution' systemD by [@mchernicoff](https://github.com/mchernicoff) in [#227](https://github.com/mitre/hipcheck/pull/227)
+* add --ref support to remaining target seed kinds by [@j-lanson](https://github.com/j-lanson) in [#244](https://github.com/mitre/hipcheck/pull/244)
+* CLI can infer target type from target pURL by [@mchernicoff](https://github.com/mchernicoff) in [#205](https://github.com/mitre/hipcheck/pull/205)
+* CLI can infer target type from target VCS URL by [@mchernicoff](https://github.com/mchernicoff) in [#209](https://github.com/mitre/hipcheck/pull/209)
+* Hipcheck can process SBOMs using CycloneDX (currently JSON only) standard by [@mchernicoff](https://github.com/mchernicoff) in [#237](https://github.com/mitre/hipcheck/pull/237)
+* Hipcheck can process SBOMs using CycloneDX XML files by [@mchernicoff](https://github.com/mchernicoff) in [#239](https://github.com/mitre/hipcheck/pull/239)
+* update remote-repo updating to support git refs by [@j-lanson](https://github.com/j-lanson) in [#240](https://github.com/mitre/hipcheck/pull/240)
+* update local-repo copying to support git refs by [@j-lanson](https://github.com/j-lanson) in [#242](https://github.com/mitre/hipcheck/pull/242)
+* distinguish TargetSeed and TargetSeedKind to transfer ref info from cli by [@j-lanson](https://github.com/j-lanson) in [#243](https://github.com/mitre/hipcheck/pull/243)
+
+### `hc cache` subcommand
+
+We've also added a new subcommand, `hc cache`, for managing the repository
+cache that Hipcheck maintains. When Hipcheck runs, it creates a local clone
+of the repository being analyzed (if the repository is already local, Hipcheck
+still clones it into the repository cache to avoid mutating the original). Over
+time, this repository cache will grow, and some repositories may be quite
+large. The new `hc cache` subcommand lets the user see what's in the cache
+with `hc cache list`, and delete elements in the cache with `hc cache delete`.
+
+The following commits were for this work:
+
+* add `hc cache` subcommand for manually listing/deleting elements of the cache by [@j-lanson](https://github.com/j-lanson) in [#224](https://github.com/mitre/hipcheck/pull/224)
+* add commit info to hc cache display and index file by [@j-lanson](https://github.com/j-lanson) in [#245](https://github.com/mitre/hipcheck/pull/245)
+* local repos are also cloned to HC_CACHE by [@j-lanson](https://github.com/j-lanson) in [#208](https://github.com/mitre/hipcheck/pull/208)
+* shortcut cache entry size calculation with cache index file by [@j-lanson](https://github.com/j-lanson) in [#236](https://github.com/mitre/hipcheck/pull/236)
+
+### Progress Reporting
+
+Hipcheck now shows a progress bar during execution, especially during
+repository cloning, which can be quite slow for larger repositories. This is
+intended to make it clearer how Hipcheck's time is being spent, and went it's
+continuing to make progress vs. being stuck.
+
+The following commits were for this work:
+
+* major refactor to enable better control of phases and progress bars by [@vcfxb](https://github.com/vcfxb) in [#198](https://github.com/mitre/hipcheck/pull/198)
+* Variety of tweaks to the shell and phase infrastructure by [@vcfxb](https://github.com/vcfxb) in [#213](https://github.com/mitre/hipcheck/pull/213)
+* Add progress bars when cloning repos (powered by the `git2` crate). Integrate `libgit2` trace messages into our logging by [@vcfxb](https://github.com/vcfxb) in [#222](https://github.com/mitre/hipcheck/pull/222)
+
+### And More...
+
+As always, there are more changes in a single version that can be adequately
+described here. View the full changelog to see the rest:
+
+__Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.4.0...hipcheck-v3.5.0>
+
+
+[3.5.0]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.4.0..hipcheck-v3.5.0
+
 ## [3.4.0] - 2024-07-04
 
 Hipcheck 3.4.0 is an exciting release featuring 3 new subcommands!
