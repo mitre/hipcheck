@@ -41,3 +41,25 @@ jobs:
           push: true
           platforms: "linux/amd64,linux/arm64"
           tags: mitre/hipcheck:latest,mitre/hipcheck:${{ steps.format-tag.outputs.replaced }}
+      - name: Verify Dockerhub Description Size
+        id: verify_dockerhub_readme_size
+        run: |
+          FILE_PATH="./dist/dockerhub/README.md"
+          MAX_SIZE=25000
+          if [ ! -f "$FILE_PATH" ]; then
+            echo "File does not exist: $FILE_PATH"
+            exit 1
+          fi
+          FILE_SIZE=$(wc -c < $FILE_PATH)
+          if [ $FILE_SIZE -ge $MAX_SIZE ]; then
+            echo "File is too large: $FILE_SIZE bytes (MAX allowed is $MAX_SIZE)"
+            exit 1
+          fi
+          echo "File is small enough to push: $FILE_SIZE (MAX allowed is $MAX_SIZE)"
+      - name: Update Dockerhub description
+        if: success()
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          readme-filepath: ./dist/dockerhub/README.md
