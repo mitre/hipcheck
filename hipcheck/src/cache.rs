@@ -246,15 +246,18 @@ impl HcCache {
 		filter: Option<String>,
 		force: bool,
 	) -> Result<()> {
+		// Parse filter to regex if provided
+		let opt_pat: Option<Regex> = match filter {
+			Some(raw_p) => Some(Regex::new(format!("^{raw_p}$").as_str())?),
+			None => None,
+		};
 		// Drain and partition self.entries into two vecs for saving and deletion
 		let (to_keep, to_del): (Vec<CacheEntry>, Vec<CacheEntry>) = match scope {
-			CacheDeleteScope::All => (vec![], self.entries.drain(0..).collect()),
+			CacheDeleteScope::All => self.entries.drain(0..).partition(|e| match &opt_pat {
+				Some(pat) => !pat.is_match(e.name.as_str()),
+				None => true,
+			}),
 			CacheDeleteScope::Group { sort, invert, n } => {
-				// Parse filter to regex if provided
-				let opt_pat: Option<Regex> = match filter {
-					Some(raw_p) => Some(Regex::new(format!("^{raw_p}$").as_str())?),
-					None => None,
-				};
 				// First sort entries in-place in self.entries
 				HcCache::sort(&mut self.entries, sort, invert);
 				let mut hits = 0;
