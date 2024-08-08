@@ -381,7 +381,7 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::test_util::with_env_vars;
+	use crate::util::test::with_env_vars;
 
 	#[test]
 	fn resolve_token_test() {

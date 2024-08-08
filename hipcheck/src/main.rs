@@ -2,6 +2,8 @@
 
 #[allow(unused)]
 mod analysis;
+#[cfg(feature = "benchmarking")]
+mod benchmarking;
 mod cache;
 mod cli;
 mod command_util;
@@ -22,12 +24,6 @@ mod source;
 mod target;
 mod util;
 mod version;
-
-#[cfg(test)]
-mod test_util;
-
-#[cfg(feature = "benchmarking")]
-mod benchmarking;
 
 use crate::analysis::report_builder::build_report;
 use crate::analysis::report_builder::AnyReport;
