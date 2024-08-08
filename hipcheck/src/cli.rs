@@ -942,7 +942,7 @@ impl TryFrom<Vec<String>> for CacheDeleteScope {
 mod tests {
 	use super::*;
 	use crate::cli::CliConfig;
-	use crate::test_util::with_env_vars;
+	use crate::util::test::with_env_vars;
 	use clap::CommandFactory;
 	use tempfile::TempDir;
 

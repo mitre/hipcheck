@@ -5,3 +5,5 @@
 pub mod fs;
 pub mod hidden;
 pub mod iter;
+#[cfg(test)]
+pub mod test;
