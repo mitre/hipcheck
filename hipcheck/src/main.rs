@@ -2,6 +2,8 @@
 
 #[allow(unused)]
 mod analysis;
+#[cfg(feature = "benchmarking")]
+mod benchmarking;
 mod cache;
 mod cli;
 mod command_util;
@@ -14,20 +16,17 @@ mod git2_rustls_transport;
 mod http;
 mod log_bridge;
 mod metric;
+mod policy_exprs;
 mod report;
 mod session;
 mod setup;
 mod shell;
 mod source;
 mod target;
-mod util;
-mod version;
-
 #[cfg(test)]
 mod test_util;
-
-#[cfg(feature = "benchmarking")]
-mod benchmarking;
+mod util;
+mod version;
 
 use crate::analysis::report_builder::build_report;
 use crate::analysis::report_builder::AnyReport;
@@ -81,14 +80,6 @@ use std::time::Duration;
 use target::{RemoteGitRepo, TargetSeed, TargetSeedKind, ToTargetSeed};
 use util::fs::create_dir_all;
 use which::which;
-
-fn init_logging() -> std::result::Result<(), log::SetLoggerError> {
-	let env = Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE");
-
-	let logger = env_logger::Builder::from_env(env).build();
-
-	log_bridge::LogWrapper(logger).try_init()
-}
 
 /// Entry point for Hipcheck.
 fn main() -> ExitCode {
@@ -155,6 +146,12 @@ fn main() -> ExitCode {
 
 	// If we didn't early return, return success.
 	ExitCode::SUCCESS
+}
+
+fn init_logging() -> std::result::Result<(), log::SetLoggerError> {
+	let env = Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE");
+	let logger = env_logger::Builder::from_env(env).build();
+	log_bridge::LogWrapper(logger).try_init()
 }
 
 /// Run the `check` command.
