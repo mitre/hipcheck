@@ -4,8 +4,8 @@
 //!
 //! <https://www.git-scm.com/docs/http-protocol>.
 
-use crate::http::agent;
 use crate::shell::Shell;
+use crate::util::http::agent;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use dialoguer::{Input, Password};
