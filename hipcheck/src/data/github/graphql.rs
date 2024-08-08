@@ -9,7 +9,7 @@ use crate::data::github::data::*;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
-use crate::http::authenticated_agent::AuthenticatedAgent;
+use crate::util::http::authenticated_agent::AuthenticatedAgent;
 use graphql_client::GraphQLQuery;
 use graphql_client::QueryBody;
 use graphql_client::Response;
