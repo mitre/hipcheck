@@ -1,10 +1,10 @@
-name: Deploy Website
+name: Website
 
 # Runs on pushed to the default branch but can also be
 # run manually from the GitHub Actions page.
 on:
   push:
-    branches: [$default-branch]
+    branches: [main]
   workflow_dispatch:
 
 # Sets permissions of the `GITHUB_TOKEN` to allow deployment to GitHub Pages
@@ -24,7 +24,7 @@ jobs:
   #==========================================================================
   # Build the Hipcheck site with Zola and the Tailwindcss CLI
   #--------------------------------------------------------------------------
-  build:
+  website-build:
     runs-on: ubuntu-latest
 
     env:
@@ -81,7 +81,7 @@ jobs:
   #==========================================================================
   # Deploy the site to GitHub Pages
   #--------------------------------------------------------------------------
-  deploy:
+  website-deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
