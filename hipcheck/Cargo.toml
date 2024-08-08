@@ -1,47 +1,100 @@
 [package]
 name = "hipcheck"
-description = "Automatically assess and score software repositories for supply chain risk"
+description = """
+Automatically assess and score software packages for supply chain risk.
+"""
 keywords = ["security", "sbom"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "../README.md"
 version = "3.5.0"
 edition = "2021"
 license = "Apache-2.0"
+homepage = "https://mitre.github.io/hipcheck"
 repository = "https://github.com/mitre/hipcheck"
 include = ["src/**/*", "../LICENSE", "../README.md"]
 
-[features]
-# Print timings feature is used to print timing information throughout hipchecks runtime.
-print-timings = ["benchmarking"]
-# Benchmarking enables the benchmarking module, containing special utilities for benchmarking.
-benchmarking = []
-
+# Rename the binary from the default "hipcheck" (based on the package name)
+# to "hc".
 [[bin]]
 name = "hc"
 path = "src/main.rs"
 
+[features]
+
+# Print timings feature is used to print timing information throughout
+# Hipcheck's runtime.
+print-timings = ["benchmarking"]
+
+# Benchmarking enables the benchmarking module, containing special utilities
+# for benchmarking.
+benchmarking = []
+
 [dependencies]
 
+async-stream = "0.3.5"
+base64 = "0.22.1"
 content_inspector = "0.2.4"
 cyclonedx-bom = "0.7.0"
 dotenv = "0.15.0"
 chrono = { version = "0.4.19", features = ["alloc", "serde"] }
 clap = { version = "4.5.13", features = ["derive"] }
+console = { version = "0.15.8", features = ["windows-console-colors"] }
+dashmap = { version = "6.0.1", features = ["rayon", "inline"] }
+dialoguer = "0.11.0"
 dirs = "5.0.1"
 duct = "0.13.5"
 env_logger = { version = "0.11.5" }
+finl_unicode = { version = "1.2.0", default-features = false, features = [
+    "grapheme_clusters",
+] }
+fs_extra = "1.3.0"
+futures = "0.3.30"
+# Vendor libgit2 and openssl so that they will be statically included
+# and not cause problems on certain systems that might not have one or
+# the other.
+git2 = { version = "0.19.0", features = [
+    "vendored-libgit2",
+    "vendored-openssl",
+] }
 graphql_client = "0.14.0"
+# Include with both a `path` and `version` reference.
+# Local builds will use the `path` dependency, which may be a newer
+# version than the one published to Crates.io.
+# People building from Crates.io will use the published version.
+#
+# See: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#multiple-locations
 hipcheck-macros = { path = "../hipcheck-macros", version = "0.3.1" }
+http = "1.1.0"
+indexmap = "2.2.6"
+indextree = "4.6.1"
+indicatif = { version = "0.17.8", features = ["rayon"] }
+itertools = "0.13.0"
+kdl = "4.6.0"
 log = "0.4.22"
+logos = "0.14.0"
 maplit = "1.0.2"
 nom = "7.1.3"
+num-traits = "0.2.19"
+num_enum = "0.7.3"
 once_cell = "1.10.0"
 ordered-float = { version = "4.2.2", features = ["serde"] }
 packageurl = "0.4.0"
 paste = "1.0.7"
 pathbuf = "1.0.0"
 petgraph = { version = "0.6.0", features = ["serde-1"] }
-regex = "1.10.6"
+prost = "0.13.1"
+rand = "0.8.5"
+rayon = "1.10.0"
+regex = "1.10.5"
+# Exactly matching the version of rustls used by ureq
+# Get rid of default features since we don't use the AWS backed crypto
+# provider (we use ring) and it breaks stuff on windows.
+rustls = { version = "0.23.10", default-features = false, features = [
+    "logging",
+    "std",
+    "tls12",
+    "ring",
+] }
 rustls-native-certs = "0.7.1"
 salsa = "0.16.1"
 schemars = { version = "0.8.21", default-features = false, features = [
@@ -55,7 +108,18 @@ serde_derive = "1.0.137"
 serde_json = "1.0.122"
 smart-default = "0.7.1"
 spdx-rs = "0.5.0"
+tabled = "0.15.0"
+tar = "0.4.41"
+term_size = "0.3.2"
+tokio = { version = "1.39.3", features = [
+    "rt",
+    "rt-multi-thread",
+    "sync",
+    "time",
+] }
 toml = "0.8.19"
+tonic = "0.12.1"
+thiserror = "1.0.63"
 unicode-normalization = "0.1.19"
 ureq = { version = "2.10.0", default-features = false, features = [
     "json",
@@ -64,58 +128,21 @@ ureq = { version = "2.10.0", default-features = false, features = [
 url = "2.5.1"
 walkdir = "2.5.0"
 which = { version = "6.0.1", default-features = false }
-xml-rs = "0.8.21"
-rayon = "1.10.0"
-indexmap = "2.2.6"
-dashmap = { version = "6.0.1", features = ["rayon", "inline"] }
-# Vendor libgit2 and openssl so that they will be statically included and not cause problems on certain systems that might not have one or the other.
-git2 = { version = "0.19.0", features = ["vendored-libgit2", "vendored-openssl"]}
-indicatif = { version = "0.17.8", features = ["rayon"] }
-finl_unicode = { version = "1.2.0", default-features = false, features = [
-    "grapheme_clusters",
-] }
-tar = "0.4.41"
-zip = "2.1.6"
+xml-rs = "0.8.20"
 xz2 = "0.1.7"
-indextree = "4.7.2"
-num-traits = "0.2.19"
-console = { version = "0.15.8", features = ["windows-console-colors"] }
-term_size = "0.3.2"
-base64 = "0.22.1"
-http = "1.1.0"
-dialoguer = "0.11.0"
-tabled = "0.15.0"
-fs_extra = "1.3.0"
-tonic = "0.12.1"
-prost = "0.13.1"
-rand = "0.8.5"
-kdl = "4.6.0"
-tokio = { version = "1.39.2", features = ["rt", "rt-multi-thread", "sync", "time"] }
-futures = "0.3.30"
-async-stream = "0.3.5"
-num_enum = "0.7.3"
-
-# Exactly matching the version of rustls used by ureq
-# Get rid of default features since we don't use the AWS backed crypto provider (we use ring).
-# and it breaks stuff on windows.
-[dependencies.rustls]
-version = "0.23.10"
-default-features = false
-features = [
-    "logging",
-    "std",
-    "tls12",
-    "ring"
-]
+zip = "2.1.6"
 
 [build-dependencies]
+
 anyhow = "1.0.86"
 tonic-build = "0.12.1"
 which = { version = "6.0.1", default-features = false }
 
 [dev-dependencies]
+
 dirs = "5.0.1"
 tempfile = "3.12.0"
+test-log = "0.2.16"
 
 [package.metadata.dist]
 

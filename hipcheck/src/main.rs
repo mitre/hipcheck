@@ -17,6 +17,7 @@ mod log_bridge;
 mod metric;
 #[allow(unused)]
 mod plugin;
+mod policy_exprs;
 mod report;
 mod session;
 mod setup;
@@ -84,14 +85,6 @@ use target::{RemoteGitRepo, TargetSeed, TargetSeedKind, ToTargetSeed};
 use util::fs::create_dir_all;
 use which::which;
 
-fn init_logging() -> std::result::Result<(), log::SetLoggerError> {
-	let env = Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE");
-
-	let logger = env_logger::Builder::from_env(env).build();
-
-	log_bridge::LogWrapper(logger).try_init()
-}
-
 /// Entry point for Hipcheck.
 fn main() -> ExitCode {
 	// Initialize the global shell with normal verbosity by default.
@@ -158,6 +151,12 @@ fn main() -> ExitCode {
 
 	// If we didn't early return, return success.
 	ExitCode::SUCCESS
+}
+
+fn init_logging() -> std::result::Result<(), log::SetLoggerError> {
+	let env = Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE");
+	let logger = env_logger::Builder::from_env(env).build();
+	log_bridge::LogWrapper(logger).try_init()
 }
 
 /// Run the `check` command.
