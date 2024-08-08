@@ -13,7 +13,6 @@ mod data;
 mod error;
 mod git2_log_shim;
 mod git2_rustls_transport;
-mod http;
 mod log_bridge;
 mod metric;
 mod report;

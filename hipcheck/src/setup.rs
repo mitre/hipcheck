@@ -1,7 +1,7 @@
 use crate::cli::SetupArgs;
 use crate::error::Result;
 use crate::hc_error;
-use crate::http::agent;
+use crate::util::http::agent;
 use regex::Regex;
 use std::fs::File;
 use std::path::{Path, PathBuf};

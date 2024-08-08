@@ -3,6 +3,7 @@
 //! Utility methods and types used throughout Hipcheck.
 
 pub mod fs;
+pub mod http;
 pub mod iter;
 pub mod redacted;
 #[cfg(test)]
