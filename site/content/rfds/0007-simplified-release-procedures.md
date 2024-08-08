@@ -1,5 +1,9 @@
 ---
 title: "Simplified Release Procedures"
+weight: 7
+slug: 0007
+extra:
+  rfd: 7
 ---
 
 ## The Current Situation
