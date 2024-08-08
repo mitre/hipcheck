@@ -1,0 +1,49 @@
+name: Website
+
+# Run when PRs would modify the site code.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "site/**"
+
+permissions:
+  contents: read
+
+jobs:
+  #==========================================================================
+  # Build the Hipcheck site with Zola and the Tailwindcss CLI
+  #--------------------------------------------------------------------------
+  website-test:
+    runs-on: ubuntu-latest
+
+    env:
+      TAILWIND_VERSION: 3.4.4
+
+    steps:
+      # Check out the Hipcheck repository.
+      - name: Checkout Hipcheck Repository
+        uses: actions/checkout@v4
+
+      # Install the latest version of Zola.
+      - name: Install Zola
+        uses: taiki-e/install-action@v2
+        with:
+          tool: zola@0.19.1
+
+      # Install the latest version of the Tailwind CLI.
+      - name: Install Tailwind CLI
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSLO https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAILWIND_VERSION}/tailwindcss-linux-x64
+          chmod +x tailwindcss-linux-x64
+          mv tailwindcss-linux-x64 tailwindcss
+          mkdir -p "${HOME}/.local/bin"
+          mv tailwindcss "${HOME}/.local/bin/tailwindcss"
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+
+      # Build the actual site with Zola and Tailwind.
+      - name: Build Hipcheck Website
+        run: |
+          cd site
+          zola build
+          tailwindcss -i styles/main.css -o public/main.css

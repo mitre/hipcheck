@@ -1,21 +1,15 @@
-name: Conventional Commits
+name: Commits
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
 permissions:
   contents: read
 
-env:
-  RUSTFLAGS: -Dwarnings
-  CARGO_TERM_COLOR: always
-
 jobs:
   conventional-commits:
-    name: Check Format
+    name: Conventional Commits
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

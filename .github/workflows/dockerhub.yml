@@ -1,4 +1,4 @@
-name: Docker Hub Image Publish
+name: Docker Hub
 
 on:
   release:
@@ -10,7 +10,7 @@ on:
         required: true
 
 jobs:
-  docker:
+  push:
     runs-on: ubuntu-latest
     steps:
       - name: Set up QEMU
