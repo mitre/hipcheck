@@ -3,7 +3,7 @@
 //! Defines an authenticated [`Agent`] type that adds token auth to all requests.
 
 use super::agent;
-use crate::util::hidden::Hidden;
+use crate::util::redacted::Redacted;
 use ureq::{Agent, Request};
 
 /// An [`Agent`] which authenticates requests with token auth.
@@ -15,7 +15,7 @@ pub struct AuthenticatedAgent<'token> {
 	agent: &'static Agent,
 
 	/// The token to use with each request.
-	token: Hidden<&'token str>,
+	token: Redacted<&'token str>,
 }
 
 impl<'token> AuthenticatedAgent<'token> {
@@ -23,7 +23,7 @@ impl<'token> AuthenticatedAgent<'token> {
 	pub fn new(token: &'token str) -> AuthenticatedAgent<'token> {
 		AuthenticatedAgent {
 			agent: agent::agent(),
-			token: Hidden::new(token),
+			token: Redacted::new(token),
 		}
 	}
 
