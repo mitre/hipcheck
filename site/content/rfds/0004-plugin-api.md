@@ -1,3 +1,10 @@
+---
+title: Plugin API
+weight: 4
+slug: 0004
+extra:
+  rfd: 4
+---
 
 # Plugin API
 
