@@ -1,4 +1,4 @@
-name: Commits
+name: Commit Checks
 
 on:
   pull_request:
