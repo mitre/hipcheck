@@ -1,4 +1,4 @@
-name: Website
+name: Website Deploy
 
 # Runs on pushed to the default branch but can also be
 # run manually from the GitHub Actions page.
@@ -86,7 +86,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: website-build
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

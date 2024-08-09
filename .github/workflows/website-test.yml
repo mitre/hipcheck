@@ -1,4 +1,4 @@
-name: Website
+name: Website Test
 
 # Run when PRs would modify the site code.
 on:
