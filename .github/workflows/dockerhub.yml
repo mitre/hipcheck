@@ -63,3 +63,14 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           readme-filepath: ./dist/dockerhub/README.md
+  
+  build-sbom:
+    needs: push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create docker image SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: mitre/hipcheck:latest
+          format: spdx-json
+          artifact-name: hipcheck-docker-sbom.spdx
