@@ -1,13 +1,8 @@
-name: CI
+name: Hipcheck
 
+# Run on PRs before merging. We disallow pushing directly to main
+# without going through a PR, so we don't run on `push` events for main.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "config/**"
-      - "hipcheck/**"
-      - "scripts/**"
-      - "xtask/**"
   pull_request:
     branches: [main]
     paths:
