@@ -32,6 +32,17 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           key: ${{ matrix.os }}
+        # Install protoc dependency - Linux
+      - if: runner.os == 'Linux'
+        run: sudo apt-get install -y protobuf-compiler
+        # Install protoc dependency - MacOS
+      - if: runner.os == 'macOS'
+        run: brew install protobuf
+        # Install protoc dependency - Windows
+      - if: runner.os == 'Windows'
+        run: |
+          curl -L -O https://github.com/protocolbuffers/protobuf/releases/download/v27.3/protoc-27.3-win64.zip
+          unzip -j protoc-27.3-win64.zip bin/protoc.exe -d C:\Windows\System32\
       - name: Dependency Tree
         run: cargo tree
       - name: Build

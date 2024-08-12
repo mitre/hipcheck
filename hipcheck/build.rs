@@ -11,11 +11,14 @@ use std::path::Path;
 use std::process::Command;
 use which::which;
 
-fn main() {
+fn main() -> Result<()> {
 	let repo_dir = env!("CARGO_MANIFEST_DIR", "can't find Cargo manifest directory");
 	let head = get_head_commit(repo_dir).unwrap_or_default();
 
-	println!("cargo:rustc-env=HC_HEAD_COMMIT={}", head)
+	tonic_build::compile_protos("proto/hipcheck.proto")?;
+
+	println!("cargo:rustc-env=HC_HEAD_COMMIT={}", head);
+	Ok(())
 }
 
 fn get_head_commit<P: AsRef<Path>>(path: P) -> Result<String> {
