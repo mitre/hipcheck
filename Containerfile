@@ -29,7 +29,7 @@ COPY scripts/ scripts/
 
 RUN set -eux && \
     apt-get update && \
-    apt-get install -y npm git && \
+    apt-get install -y npm git protobuf-compiler && \
     apt-get clean && \
     npm install -g module-deps@6.2 --no-audit --no-fund && \
     adduser --disabled-password hc_user && \

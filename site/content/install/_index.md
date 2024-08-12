@@ -100,6 +100,7 @@ will need to build Hipcheck from source.
 To build Hipcheck from source, you'll need:
 
 - A Rust toolchain: see the [official Rust installation instructions](https://www.rust-lang.org/tools/install)
+- The `protoc` compiler: see the [installation instructions](https://grpc.io/docs/protoc-installation/)
 
 If you _only_ want to build from source without configuring the build in any
 way, you can use `cargo install` to install Hipcheck into a Cargo0-specific
