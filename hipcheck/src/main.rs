@@ -15,6 +15,8 @@ mod git2_log_shim;
 mod git2_rustls_transport;
 mod log_bridge;
 mod metric;
+#[allow(unused)]
+mod plugin;
 mod report;
 mod session;
 mod setup;
