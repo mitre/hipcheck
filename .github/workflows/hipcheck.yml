@@ -1,8 +1,23 @@
 name: Hipcheck
 
-# Run on PRs before merging. We disallow pushing directly to main
-# without going through a PR, so we don't run on `push` events for main.
+# Run on both PRs and pushes to the main branch.
+# It may seem redundant to run tests on main, since we disallow pushing directly
+# to main and all PRs get tested before merging.
+#
+# But due to how GitHub Actions isolates caches, we need to run the tests on
+# main so that caches are available to new PRs. The caches created when testing
+# PR code cannot be re-used outside of testing that PR.
+#
+# See the GitHub Actions documentation here:
+# https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/caching-dependencies-to-speed-up-workflows#restrictions-for-accessing-a-cache
 on:
+  push:
+    branches: [main]
+    paths:
+      - "config/**"
+      - "hipcheck/**"
+      - "scripts/**"
+      - "xtask/**"
   pull_request:
     branches: [main]
     paths:
