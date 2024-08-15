@@ -1,19 +1,21 @@
 use crate::hipcheck::plugin_client::PluginClient;
 use crate::plugin::{HcPluginClient, Plugin, PluginContext};
 use crate::{hc_error, Result, F64};
+use futures::future::join_all;
+use futures::Future;
 use rand::Rng;
 use std::collections::HashSet;
 use std::ops::Range;
 use std::process::Command;
 use tokio::time::{sleep_until, Duration, Instant};
 
+#[derive(Clone, Debug)]
 pub struct PluginExecutor {
 	max_spawn_attempts: usize,
 	max_conn_attempts: usize,
 	port_range: Range<u16>,
 	backoff_interval: Duration,
 	jitter_percent: u8,
-	est_ports: HashSet<u16>,
 }
 impl PluginExecutor {
 	pub fn new(
@@ -36,21 +38,23 @@ impl PluginExecutor {
 			port_range,
 			backoff_interval,
 			jitter_percent,
-			est_ports: HashSet::new(),
 		})
 	}
-	fn get_available_port(&mut self) -> Result<u16> {
+	fn get_available_port(&self) -> Result<u16> {
 		for i in self.port_range.start..self.port_range.end {
-			if !self.est_ports.contains(&i)
-				&& std::net::TcpListener::bind(format!("127.0.0.1:{i}")).is_ok()
-			{
+			if std::net::TcpListener::bind(format!("127.0.0.1:{i}")).is_ok() {
 				return Ok(i);
 			}
 		}
 		Err(hc_error!("Failed to find available port"))
 	}
-	pub async fn start_plugin(&mut self, plugin: &Plugin) -> Result<PluginContext> {
-		let mut rng = rand::thread_rng();
+	pub async fn start_plugins(&self, plugins: Vec<Plugin>) -> Result<Vec<PluginContext>> {
+		join_all(plugins.into_iter().map(|p| self.start_plugin(p)))
+			.await
+			.into_iter()
+			.collect()
+	}
+	pub async fn start_plugin(&self, plugin: Plugin) -> Result<PluginContext> {
 		// Plugin startup design has inherent TOCTOU flaws since we tell the plugin
 		// which port we expect it to bind to. We can try to ensure the port we pass
 		// on the cmdline is not already in use, but it is still possible for that
@@ -76,7 +80,7 @@ impl PluginExecutor {
 			let mut opt_grpc: Option<HcPluginClient> = None;
 			while conn_attempts < self.max_conn_attempts {
 				// Jitter could be positive or negative, so mult by 2 to cover both sides
-				let jitter: i32 = rng.gen_range(0..(2 * self.jitter_percent)) as i32;
+				let jitter: i32 = rand::thread_rng().gen_range(0..(2 * self.jitter_percent)) as i32;
 				// Then subtract by self.jitter_percent to center around 0, and add to 100%
 				let jitter_percent = 1.0 + ((jitter - (self.jitter_percent as i32)) as f64 / 100.0);
 				// Once we are confident this math works, we can remove this
@@ -107,14 +111,12 @@ impl PluginExecutor {
 				spawn_attempts += 1;
 				continue;
 			};
-			self.est_ports.insert(port);
 			// We now have an open gRPC connection to our plugin process
 			return Ok(PluginContext {
 				plugin: plugin.clone(),
 				port,
 				grpc,
 				proc,
-				channel: None,
 			});
 		}
 		Err(hc_error!(
