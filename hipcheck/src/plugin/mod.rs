@@ -1,3 +1,4 @@
+mod download_manifest;
 mod manager;
 mod types;
 
