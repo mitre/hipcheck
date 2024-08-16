@@ -1,53 +1,21 @@
+use super::extract_data;
+use crate::plugin::parser::ParseKdlNode;
+use crate::string_newtype_parse_kdl_node;
 use crate::{error::Error, hc_error};
 use kdl::{KdlDocument, KdlNode, KdlValue};
 use std::{fmt::Display, str::FromStr};
+use url::Url;
 
 // NOTE: the implementation in this crate was largely derived from RFD #0004
 
-#[allow(unused)]
-// Helper trait to make it easier to parse KdlNodes into our own types
-trait ParseKdlNode
-where
-	Self: Sized,
-{
-	/// Return the name of the attribute used to identify the node pertaining to this struct
-	fn kdl_key() -> &'static str;
-
-	/// Attempt to convert a `kdl::KdlNode` into Self
-	fn parse_node(node: &KdlNode) -> Option<Self>;
-}
-
-#[allow(unused)]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Url(pub String);
-
-impl Url {
-	pub fn new(url: String) -> Self {
-		Self(url)
-	}
-}
-
-impl AsRef<String> for Url {
-	fn as_ref(&self) -> &String {
-		&self.0
-	}
-}
-
-impl ParseKdlNode for Url {
+impl ParseKdlNode for url::Url {
 	fn kdl_key() -> &'static str {
 		"url"
 	}
 
 	fn parse_node(node: &KdlNode) -> Option<Self> {
-		if node.name().to_string().as_str() != Self::kdl_key() {
-			return None;
-		}
-		// per RFD #0004, the first positional argument will be the URL and it will be a String
-		let url = node.entries().first()?;
-		match url.value() {
-			KdlValue::String(url) => Some(Url(url.clone())),
-			_ => None,
-		}
+		let raw_url = node.entries().first()?.value().as_string()?;
+		url::Url::from_str(raw_url).ok()
 	}
 }
 
@@ -105,24 +73,15 @@ impl ParseKdlNode for HashWithDigest {
 		if node.name().to_string().as_str() != Self::kdl_key() {
 			return None;
 		}
-
-		let specified_algorithm = node.get("alg")?;
-		let hash_algorithm = match specified_algorithm.value() {
-			KdlValue::String(alg) => HashAlgorithm::try_from(alg.as_str()).ok()?,
-			_ => return None,
-		};
-
-		let specified_digest = node.get("digest")?;
-		let digest = match specified_digest.value() {
-			KdlValue::String(digest) => digest.clone(),
-			_ => return None,
-		};
-
+		// Per RFD #0004, the hash algorithm is of type String
+		let specified_algorithm = node.get("alg")?.value().as_string()?;
+		let hash_algorithm = HashAlgorithm::try_from(specified_algorithm).ok()?;
+		// Per RFD #0004, the digest is of type String
+		let digest = node.get("digest")?.value().as_string()?.to_string();
 		Some(HashWithDigest::new(hash_algorithm, digest))
 	}
 }
 
-#[allow(unused)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ArchiveFormat {
 	/// archived with tar and compressed with the XZ algorithm
@@ -164,7 +123,6 @@ impl TryFrom<&str> for ArchiveFormat {
 	}
 }
 
-#[allow(unused)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Compress {
 	/// compression algorithm used for the downloaded archive
@@ -188,16 +146,13 @@ impl ParseKdlNode for Compress {
 		if node.name().to_string().as_str() != Self::kdl_key() {
 			return None;
 		}
-		let specified_format = node.get("format")?;
-		let format = match specified_format.value() {
-			KdlValue::String(format) => ArchiveFormat::try_from(format.as_str()).ok()?,
-			_ => return None,
-		};
+		// Per RFD #0004, the format is of type String
+		let specified_format = node.get("format")?.value().as_string()?;
+		let format = ArchiveFormat::try_from(specified_format).ok()?;
 		Some(Compress { format })
 	}
 }
 
-#[allow(unused)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Size {
 	/// size of the downloaded artifact, in bytes
@@ -246,7 +201,6 @@ impl ParseKdlNode for Size {
 ///  size bytes=2_869_896
 ///}
 ///```
-#[allow(unused)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DownloadManifestEntry {
 	// TODO: make this a SemVer type?
@@ -258,7 +212,7 @@ pub struct DownloadManifestEntry {
 	pub arch: String,
 	/// The URL of the archive file to download containing the plugin executable artifact and
 	/// plugin manifest.
-	pub url: Url,
+	pub url: url::Url,
 	/// Contains info about what algorithm was used to hash the archive and what the expected
 	/// digest is
 	pub hash: HashWithDigest,
@@ -267,19 +221,6 @@ pub struct DownloadManifestEntry {
 	/// Describes the size of the downloaded artifact, used to validate the download was
 	/// successful, makes it more difficult for an attacker to distribute malformed artifacts
 	pub size: Size,
-}
-
-/// Returns the first successful node that can be parsed into T, if there is one
-fn extract_data<T>(nodes: &[KdlNode]) -> Option<T>
-where
-	T: ParseKdlNode,
-{
-	for node in nodes {
-		if let Some(val) = T::parse_node(node) {
-			return Some(val);
-		}
-	}
-	None
 }
 
 impl ParseKdlNode for DownloadManifestEntry {
@@ -291,25 +232,17 @@ impl ParseKdlNode for DownloadManifestEntry {
 		if node.name().to_string().as_str() != Self::kdl_key() {
 			return None;
 		}
-
-		let version = node.get("version")?;
-		let version = match version.value() {
-			KdlValue::String(version) => version.to_string(),
-			_ => return None,
-		};
-
-		let arch = node.get("arch")?;
-		let arch = match arch.value() {
-			KdlValue::String(arch) => arch.to_string(),
-			_ => return None,
-		};
+		// Per RFD #0004, version is of type String
+		let version = node.get("version")?.value().as_string()?.to_string();
+		// Per RFD #0004, arch is of type String
+		let arch = node.get("arch")?.value().as_string()?.to_string();
 
 		// there should be one child for each plugin and it should contain the url, hash, compress
 		// and size information
 		let nodes = node.children()?.nodes();
 
 		// extract the url, hash, compress and size from the child
-		let url: Url = extract_data(nodes)?;
+		let url: url::Url = extract_data(nodes)?;
 		let hash: HashWithDigest = extract_data(nodes)?;
 		let compress: Compress = extract_data(nodes)?;
 		let size: Size = extract_data(nodes)?;
@@ -438,9 +371,12 @@ mod test {
 
 	#[test]
 	fn test_parsing_url() {
-		let url = "https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz";
-		let node = KdlNode::from_str(format!(r#"url "{}""#, url).as_str()).unwrap();
-		assert_eq!(Url::parse_node(&node).unwrap(), Url(url.to_string()));
+		let raw_url = "https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz";
+		let node = KdlNode::from_str(format!(r#"url "{}""#, raw_url).as_str()).unwrap();
+		assert_eq!(
+			url::Url::parse_node(&node).unwrap(),
+			Url::parse(raw_url).unwrap()
+		);
 	}
 
 	#[test]
@@ -470,7 +406,7 @@ mod test {
 		let expected_entry = DownloadManifestEntry {
 			version: version.to_string(),
 			arch: arch.to_string(),
-			url: Url(url.to_string()),
+			url: Url::parse(url).unwrap(),
 			hash: HashWithDigest::new(
 				HashAlgorithm::try_from(hash_alg).unwrap(),
 				digest.to_string(),
@@ -511,7 +447,7 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 			&DownloadManifestEntry {
 				version: "0.1.0".to_owned(),
 				arch: "aarch64-apple-darwin".to_owned(),
-				url: Url::new("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-aarch64-apple-darwin.tar.xz".to_owned()),
+				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-aarch64-apple-darwin.tar.xz").unwrap(),
 				hash: HashWithDigest::new(HashAlgorithm::Sha256, "b8e111e7817c4a1eb40ed50712d04e15b369546c4748be1aa8893b553f4e756b".to_owned()),
 				compress: Compress::new(ArchiveFormat::TarXz),
 				size: Size {
@@ -524,7 +460,7 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 			&DownloadManifestEntry {
 				version: "0.1.0".to_owned(),
 				arch: "x86_64-apple-darwin".to_owned(),
-				url: Url::new("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz".to_owned()),
+				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz").unwrap(),
 				hash: HashWithDigest::new(HashAlgorithm::Sha256, "ddb8c6d26dd9a91e11c99b3bd7ee2b9585aedac6e6df614190f1ba2bfe86dc19".to_owned()),
                 compress: Compress::new(ArchiveFormat::TarXz),
                 size: Size::new(3_183_768)
