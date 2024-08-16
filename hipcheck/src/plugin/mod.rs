@@ -1,5 +1,5 @@
-mod download_manifest;
 mod manager;
+mod parser;
 mod types;
 
 use crate::hipcheck::Query;
