@@ -89,7 +89,7 @@ fs_extra = "1.3.0"
 tonic = "0.12.1"
 prost = "0.13.1"
 rand = "0.8.5"
-tokio = { version = "1.39.2", features = ["time"] }
+tokio = { version = "1.39.3", features = ["time"] }
 kdl = "4.6.0"
 
 # Exactly matching the version of rustls used by ureq
