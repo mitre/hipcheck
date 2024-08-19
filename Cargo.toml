@@ -11,7 +11,7 @@
 resolver = "2"
 
 # Members of the workspace.
-members = ["hipcheck", "hipcheck-macros", "xtask"]
+members = ["hipcheck", "hipcheck-macros", "xtask", "plugins/dummy_rand_data"]
 
 # Make sure Hipcheck is run with `cargo run`.
 #

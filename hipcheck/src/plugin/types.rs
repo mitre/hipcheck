@@ -212,15 +212,16 @@ pub enum HcQueryResult {
 	Err(Error),
 }
 
-struct Query {
-	id: usize,
+#[derive(Debug)]
+pub struct Query {
+	pub id: usize,
 	// if false, response
-	request: bool,
-	publisher: String,
-	plugin: String,
-	query: String,
-	key: Value,
-	output: Value,
+	pub request: bool,
+	pub publisher: String,
+	pub plugin: String,
+	pub query: String,
+	pub key: Value,
+	pub output: Value,
 }
 impl TryFrom<PluginQuery> for Query {
 	type Error = Error;
@@ -283,14 +284,15 @@ impl PluginTransport {
 	pub fn name(&self) -> &str {
 		&self.ctx.plugin.name
 	}
-	async fn send(&mut self, query: Query) -> Result<()> {
+	pub async fn send(&mut self, query: Query) -> Result<()> {
 		let query: PluginQuery = query.try_into()?;
+		eprintln!("Sending query: {query:?}");
 		self.tx
 			.send(query)
 			.await
 			.map_err(|e| hc_error!("sending query failed: {}", e))
 	}
-	async fn recv(&mut self) -> Result<Option<Query>> {
+	pub async fn recv(&mut self) -> Result<Option<Query>> {
 		use QueryState::*;
 		let Some(mut raw) = self.rx.message().await? else {
 			// gRPC channel was closed
@@ -300,7 +302,6 @@ impl PluginTransport {
 		// As long as we expect successive chunks, keep receiving
 		if matches!(state, QueryReplyInProgress) {
 			while matches!(state, QueryReplyInProgress) {
-				println!("Retrieving next response");
 				let Some(next) = self.rx.message().await? else {
 					return Err(hc_error!(
 						"plugin gRPC channel closed while sending chunked message"

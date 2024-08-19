@@ -395,6 +395,7 @@ pub enum FullCommands {
 	Ready,
 	Update(UpdateArgs),
 	Cache(CacheArgs),
+	Plugin,
 	PrintConfig,
 	PrintData,
 	PrintCache,
@@ -411,6 +412,7 @@ impl From<&Commands> for FullCommands {
 			Commands::Scoring => FullCommands::Scoring,
 			Commands::Update(args) => FullCommands::Update(args.clone()),
 			Commands::Cache(args) => FullCommands::Cache(args.clone()),
+			Commands::Plugin => FullCommands::Plugin,
 		}
 	}
 }
@@ -439,6 +441,9 @@ pub enum Commands {
 	Update(UpdateArgs),
 	/// Manage Hipcheck cache
 	Cache(CacheArgs),
+	/// Execute temporary code for exercising plugin engine
+	#[command(hide = true)]
+	Plugin,
 }
 
 // If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In

@@ -1,0 +1,14 @@
+[package]
+name = "dummy_rand_data"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+clap = { version = "4.5.15", features = ["derive"] }
+prost = "0.13.1"
+rand = "0.8.5"
+serde_json = "1.0.125"
+tokio = { version = "1.39.2", features = ["rt"] }
+tokio-stream = "0.1.15"
+tonic = "0.12.1"

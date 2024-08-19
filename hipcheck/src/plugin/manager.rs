@@ -6,7 +6,7 @@ use futures::Future;
 use rand::Rng;
 use std::collections::HashSet;
 use std::ops::Range;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use tokio::time::{sleep_until, Duration, Instant};
 
 #[derive(Clone, Debug)]
@@ -69,6 +69,9 @@ impl PluginExecutor {
 			// Spawn plugin process
 			let Ok(mut proc) = Command::new(&plugin.entrypoint)
 				.args(["--port", port_str.as_str()])
+				// @Temporary - directly forward stdout/stderr from plugin to shell
+				.stdout(std::io::stdout())
+				.stderr(std::io::stderr())
 				.spawn()
 			else {
 				spawn_attempts += 1;
