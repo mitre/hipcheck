@@ -2,8 +2,7 @@ mod download_manifest;
 mod manager;
 mod types;
 
-use crate::hipcheck::Query;
-use crate::plugin::manager::*;
+pub use crate::plugin::manager::*;
 pub use crate::plugin::types::*;
 use crate::Result;
 use futures::future::join_all;
@@ -42,7 +41,7 @@ pub async fn initialize_plugins(
 	Ok(out)
 }
 
-struct HcPluginCore {
+pub struct HcPluginCore {
 	executor: PluginExecutor,
 	plugins: HashMap<String, PluginTransport>,
 }
@@ -78,5 +77,29 @@ impl HcPluginCore {
 		);
 		// Now we have a set of started and initialized plugins to interact with
 		Ok(HcPluginCore { executor, plugins })
+	}
+	// @Temporary
+	pub async fn run(&mut self) -> Result<()> {
+		let channel = self.plugins.get_mut("rand_data").unwrap();
+		match channel
+			.send(Query {
+				id: 1,
+				request: true,
+				publisher: "".to_owned(),
+				plugin: "".to_owned(),
+				query: "rand_data".to_owned(),
+				key: serde_json::json!(7),
+				output: serde_json::json!(null),
+			})
+			.await
+		{
+			Ok(q) => q,
+			Err(e) => {
+				println!("Failed: {e}");
+			}
+		};
+		let resp = channel.recv().await?;
+		println!("Plugin response: {resp:?}");
+		Ok(())
 	}
 }

@@ -39,6 +39,7 @@ use crate::cache::HcCache;
 use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
+use crate::plugin::{HcPluginCore, Plugin, PluginExecutor, PluginWithConfig};
 use crate::session::session::Session;
 use crate::setup::{resolve_and_transform_source, SourceType};
 use crate::shell::verbosity::Verbosity;
@@ -139,6 +140,7 @@ fn main() -> ExitCode {
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
 		Some(FullCommands::Cache(args)) => return cmd_cache(args, &config),
+		Some(FullCommands::Plugin) => cmd_plugin(),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
@@ -619,6 +621,48 @@ fn check_github_token() -> StdResult<(), EnvVarCheckError> {
 			name,
 			kind: EnvVarCheckErrorKind::VarNotFound,
 		})
+}
+
+fn cmd_plugin() {
+	use tokio::runtime::Runtime;
+	let tgt_dir = "./target/debug";
+	let entrypoint = pathbuf![tgt_dir, "dummy_rand_data"];
+	let plugin = Plugin {
+		name: "rand_data".to_owned(),
+		entrypoint: entrypoint.display().to_string(),
+	};
+	let plugin_executor = PluginExecutor::new(
+		/* max_spawn_attempts */ 3,
+		/* max_conn_attempts */ 5,
+		/* port_range */ 40000..u16::MAX,
+		/* backoff_interval_micros */ 1000,
+		/* jitter_percent */ 10,
+	)
+	.unwrap();
+	let rt = Runtime::new().unwrap();
+	rt.block_on(async move {
+		println!("Started executor");
+		let mut core = match HcPluginCore::new(
+			plugin_executor,
+			vec![PluginWithConfig(plugin, serde_json::json!(null))],
+		)
+		.await
+		{
+			Ok(c) => c,
+			Err(e) => {
+				println!("{e}");
+				return;
+			}
+		};
+		match core.run().await {
+			Ok(_) => {
+				println!("HcCore run completed");
+			}
+			Err(e) => {
+				println!("HcCore run failed with '{e}'");
+			}
+		};
+	});
 }
 
 fn cmd_ready(config: &CliConfig) {
