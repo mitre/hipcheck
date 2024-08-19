@@ -77,7 +77,7 @@ finl_unicode = { version = "1.2.0", default-features = false, features = [
 tar = "0.4.41"
 zip = "2.1.6"
 xz2 = "0.1.7"
-indextree = "4.6.1"
+indextree = "4.7.2"
 num-traits = "0.2.19"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
 term_size = "0.3.2"
