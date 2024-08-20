@@ -22,7 +22,7 @@ default-members = ["hipcheck"]
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.18.1-prerelease.1"
+cargo-dist-version = "0.21.0"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
@@ -40,6 +40,8 @@ pr-run-mode = "plan"
 install-updater = true
 # Extra static files to include in each App (path relative to this Cargo.toml's dir)
 include = ["config/", "scripts/"]
+# Path that installers should place binaries in
+install-path = "CARGO_HOME"
 
 
 # The profile that 'cargo dist' will build with
