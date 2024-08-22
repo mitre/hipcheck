@@ -175,6 +175,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 		config.config().map(ToOwned::to_owned),
 		config.data().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
+		config.policy().map(ToOwned::to_owned),
 		config.format(),
 		raw_version,
 	);
@@ -224,6 +225,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		config.config().map(ToOwned::to_owned),
 		config.data().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
+		config.policy().map(ToOwned::to_owned),
 		config.format(),
 		raw_version,
 	)?;
@@ -445,6 +447,7 @@ struct ReadyChecks {
 	config_path_check: StdResult<PathBuf, PathCheckError>,
 	data_path_check: StdResult<PathBuf, PathCheckError>,
 	cache_path_check: StdResult<PathBuf, PathCheckError>,
+	policy_path_check: StdResult<PathBuf, PathCheckError>,
 	github_token_check: StdResult<(), EnvVarCheckError>,
 }
 
@@ -459,6 +462,7 @@ impl ReadyChecks {
 			&& self.config_path_check.is_ok()
 			&& self.data_path_check.is_ok()
 			&& self.cache_path_check.is_ok()
+			&& self.policy_path_check.is_ok()
 	}
 }
 
@@ -492,12 +496,14 @@ enum VersionCheckErrorKind {
 #[derive(Debug)]
 enum PathCheckError {
 	PathNotFound,
+	PolicyNotFound,
 }
 
 impl Display for PathCheckError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		match self {
-			PathCheckError::PathNotFound => write!(f, "path not found"),
+			PathCheckError::PathNotFound => write!(f, "Path not found"),
+			PathCheckError::PolicyNotFound => write!(f, "Policy file not found. Specify the location of a policy file using the --policy flag.")
 		}
 	}
 }
@@ -606,6 +612,16 @@ fn check_data_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	Ok(path.to_owned())
 }
 
+fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
+	let path = config.policy().ok_or(PathCheckError::PathNotFound)?;
+
+	if path.exists().not() {
+		return Err(PathCheckError::PolicyNotFound);
+	}
+
+	Ok(path.to_owned())
+}
+
 /// Check that a GitHub token has been provided as an environment variable
 /// This does not check if the token is valid or not
 /// The absence of a token does not trigger the failure state for the readiness check, because
@@ -629,6 +645,7 @@ fn cmd_ready(config: &CliConfig) {
 		config_path_check: check_config_path(config),
 		data_path_check: check_data_path(config),
 		cache_path_check: check_cache_path(config),
+		policy_path_check: check_policy_path(config),
 		github_token_check: check_github_token(),
 	};
 
@@ -661,6 +678,12 @@ fn cmd_ready(config: &CliConfig) {
 		Ok(path) => println!("{:<17} {}", "Data Path:", path.display()),
 		Err(e) => println!("{:<17} {}", "Data Path:", e),
 	}
+
+	match &ready.policy_path_check {
+		Ok(path) => println!("{:<17} {}", "Policy Path:", path.display()),
+		Err(e) => println!("{:<17} {}", "Policy Path:", e),
+	}
+
 
 	match &ready.github_token_check {
 		Ok(_) => println!("{:<17} Found!", "GitHub Token:"),
@@ -864,6 +887,7 @@ fn run(
 	config_path: Option<PathBuf>,
 	data_path: Option<PathBuf>,
 	home_dir: Option<PathBuf>,
+	policy_path: Option<PathBuf>,
 	format: Format,
 	raw_version: &str,
 ) -> Result<AnyReport> {
@@ -873,6 +897,7 @@ fn run(
 		config_path,
 		data_path,
 		home_dir,
+		policy_path,
 		format,
 		raw_version,
 	) {

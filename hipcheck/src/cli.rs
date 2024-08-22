@@ -17,7 +17,7 @@ use crate::target::{
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
-use std::path::{Path, PathBuf};
+use std::{env, path::{Path, PathBuf}};
 use url::Url;
 
 /// Automatated supply chain risk assessment of software packages.
@@ -109,6 +109,16 @@ struct PathArgs {
 		long_help = "Path to the cache folder. Can also be set with the `HC_CACHE` environment variable"
 	)]
 	cache: Option<PathBuf>,
+
+	/// Path to the policy file
+	#[arg(
+		short = 'p',
+		long = "policy",
+		global = true,
+		help_heading = "Path Flags",
+		long_help = "Path to the policy file."
+	)]
+	policy: Option<PathBuf>,
 }
 
 /// Soft-deprecated arguments, to be removed in a future version.
@@ -231,6 +241,11 @@ impl CliConfig {
 		}
 	}
 
+	/// Get the path to the policy file.
+	pub fn policy(&self) -> Option<&Path> {
+		self.path_args.policy.as_deref()
+	}
+
 	/// Check if the `--print-home` flag was used.
 	pub fn print_home(&self) -> bool {
 		self.deprecated_args.print_home.unwrap_or(false)
@@ -274,6 +289,8 @@ impl CliConfig {
 				config: hc_env_var("config"),
 				data: hc_env_var("data"),
 				cache: hc_env_var("cache"),
+				// For now, we do not get this from the environment, so pass a None to never update this field
+				policy: None,
 			},
 			deprecated_args: DeprecatedArgs {
 				home: hc_env_var("home"),
@@ -293,6 +310,8 @@ impl CliConfig {
 				cache: platform_cache(),
 				config: platform_config(),
 				data: platform_data(),
+				// There is no central per-user or per-system location for the policy file, so pass a None to never update this field
+				policy: None,
 			},
 			..Default::default()
 		}
@@ -305,6 +324,7 @@ impl CliConfig {
 				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),
 				data: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "data"]),
 				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
+				policy: env::current_dir().ok().map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
 			},
 			..Default::default()
 		}
@@ -839,7 +859,7 @@ pub struct CliCacheListArgs {
 	#[arg(short = 'm', long)]
 	pub max: Option<usize>,
 	/// Consider only entries matching this pattern
-	#[arg(short = 'p', long = "pattern")]
+	#[arg(short = 'P', long = "pattern")]
 	pub filter: Option<String>,
 }
 impl From<CliCacheListArgs> for CacheOp {
@@ -866,7 +886,7 @@ pub struct CliCacheDeleteArgs {
 	#[arg(short = 's', long, num_args=1..=2, value_delimiter = ' ')]
 	pub strategy: Vec<String>,
 	/// Consider only entries matching this pattern
-	#[arg(short = 'p', long = "pattern")]
+	#[arg(short = 'P', long = "pattern")]
 	pub filter: Option<String>,
 	/// Do not prompt user to confirm the entries to delete
 	#[arg(long, default_value_t = false)]
@@ -1179,6 +1199,29 @@ mod tests {
 
 			assert_eq!(config.data().unwrap(), expected);
 		});
+	}
+
+	#[test]
+	fn resolve_policy_with_flag() {
+		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
+
+		let expected = pathbuf![tempdir.path(), "HipcheckPolicy.kdl"];
+
+		let config = {
+			let mut temp = CliConfig::empty();
+			temp.update(&CliConfig::from_platform());
+			temp.update(&CliConfig::from_env());
+			temp.update(&CliConfig {
+				path_args: PathArgs {
+					policy: Some(expected.clone()),
+					..Default::default()
+				},
+				..Default::default()
+			});
+			temp
+		};
+
+		assert_eq!(config.policy().unwrap(), expected);
 	}
 
 	#[test]
