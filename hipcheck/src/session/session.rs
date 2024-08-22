@@ -123,6 +123,7 @@ impl Session {
 		config_path: Option<PathBuf>,
 		data_path: Option<PathBuf>,
 		home_dir: Option<PathBuf>,
+		policy_path: Option<PathBuf>,
 		format: Format,
 		raw_version: &str,
 	) -> StdResult<Session, Error> {
@@ -158,6 +159,12 @@ impl Session {
 		 *  Loading configuration.
 		 *-----------------------------------------------------------------*/
 
+		// Check if a currently unsuporrted policy file was provided
+		// TODO: Remove this error once policy files are supported
+		if policy_path.is_some() {
+			return Err(hc_error!("Policy files are not supported by Hipcheck at this time."))
+		}
+		
 		let (config, config_dir, data_dir, hc_github_token) =
 			match load_config_and_data(config_path.as_deref(), data_path.as_deref()) {
 				Ok(results) => results,
@@ -241,7 +248,7 @@ fn load_config_and_data(
 	phase.inc();
 	// Set the spinner phase to tick constantly, 10 times a second.
 	phase.enable_steady_tick(Duration::from_millis(100));
-
+	
 	// Resolve the path to the config file.
 	let valid_config_path = config_path
 	   .ok_or_else(|| hc_error!("Failed to load configuration. Please make sure the path set by the hc_config env variable exists."))?;
