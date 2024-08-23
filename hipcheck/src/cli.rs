@@ -17,7 +17,7 @@ use crate::target::{
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
-use std::{env, path::{Path, PathBuf}};
+use std::path::{Path, PathBuf};
 use url::Url;
 
 /// Automatated supply chain risk assessment of software packages.
@@ -324,7 +324,10 @@ impl CliConfig {
 				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),
 				data: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "data"]),
 				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
-				policy: env::current_dir().ok().map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
+				// TODO: currently if this is set, then when running `hc check`, it errors out
+				// because policy files are not yet supported
+				// policy: env::current_dir().ok().map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
+				policy: None,
 			},
 			..Default::default()
 		}

@@ -4,9 +4,9 @@
 
 use crate::shell::Title;
 
-use super::{Shell, HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP};
+use super::{verbosity::Verbosity, Shell, HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP};
 use console::style;
-use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
+use indicatif::{HumanDuration, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::{
 	fmt::Display,
 	sync::{Arc, OnceLock},
@@ -41,11 +41,18 @@ impl SpinnerPhase {
 	///
 	/// The phase will remain in the "starting..." state until incremented.
 	pub fn start(name: impl Into<Arc<str>>) -> Self {
-		// Create the spinner progress bar with our styling.
-		let bar = ProgressBar::new_spinner().with_style(spinner_style().clone());
-
-		// Add to the global shell.
-		Shell::progress_bars().add(bar.clone());
+		// Add to the global shell, only if Verbosity::Normal
+		let bar = match Shell::get_verbosity() {
+			Verbosity::Quiet | Verbosity::Silent => {
+				// ProgressBar::new_spinner internally assumes data will be written to stderr, which is not what is wanted for Silent/Quiet
+				ProgressBar::with_draw_target(None, ProgressDrawTarget::hidden())
+			}
+			Verbosity::Normal => {
+				let bar = ProgressBar::new_spinner().with_style(spinner_style().clone());
+				Shell::progress_bars().add(bar.clone());
+				bar
+			}
+		};
 
 		let name = name.into();
 
@@ -91,13 +98,17 @@ impl SpinnerPhase {
 
 	/// Finishes this spinner, leaving it in the terminal with an updated "done" message.
 	pub fn finish_successful(&self) {
-		super::macros::println!(
-			"{:>LEFT_COL_WIDTH$} {} ({})",
-			Title::Done,
-			self.name,
-			style(HumanDuration(self.elapsed())).bold()
-		);
-
+		match Shell::get_verbosity() {
+			Verbosity::Normal => {
+				super::macros::println!(
+					"{:>LEFT_COL_WIDTH$} {} ({})",
+					Title::Done,
+					self.name,
+					style(HumanDuration(self.elapsed())).bold()
+				);
+			}
+			Verbosity::Quiet | Verbosity::Silent => {}
+		}
 		self.bar.finish_and_clear()
 	}
 

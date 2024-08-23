@@ -224,7 +224,12 @@ impl Shell {
 
 	/// Print "Analysing {source}" with the proper color/styling.
 	pub fn print_prelude(source: impl AsRef<str>) {
-		macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Analyzing, source.as_ref());
+		match Shell::get_verbosity() {
+			Verbosity::Normal => {
+				macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Analyzing, source.as_ref());
+			}
+			Verbosity::Quiet | Verbosity::Silent => {}
+		}
 	}
 
 	/// Print a hipcheck [Error]. Human readable errors will go to the standard error, JSON will go to the standard output.
