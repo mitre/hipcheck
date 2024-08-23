@@ -10,6 +10,7 @@ mod command_util;
 mod config;
 mod context;
 mod data;
+mod engine;
 mod error;
 mod git2_log_shim;
 mod git2_rustls_transport;
@@ -38,9 +39,10 @@ use crate::analysis::report_builder::Report;
 use crate::analysis::score::score_results;
 use crate::cache::HcCache;
 use crate::context::Context as _;
+use crate::engine::{HcEngine, HcEngineImpl};
 use crate::error::Error;
 use crate::error::Result;
-use crate::plugin::{HcPluginCore, Plugin, PluginExecutor, PluginWithConfig};
+use crate::plugin::{Plugin, PluginExecutor, PluginWithConfig};
 use crate::session::session::Session;
 use crate::setup::{resolve_and_transform_source, SourceType};
 use crate::shell::verbosity::Verbosity;
@@ -639,7 +641,6 @@ fn check_github_token() -> StdResult<(), EnvVarCheckError> {
 }
 
 fn cmd_plugin() {
-	use tokio::runtime::Runtime;
 	let tgt_dir = "./target/debug";
 	let entrypoint = pathbuf![tgt_dir, "dummy_rand_data"];
 	let plugin = Plugin {
@@ -654,30 +655,29 @@ fn cmd_plugin() {
 		/* jitter_percent */ 10,
 	)
 	.unwrap();
-	let rt = Runtime::new().unwrap();
-	rt.block_on(async move {
-		println!("Started executor");
-		let mut core = match HcPluginCore::new(
-			plugin_executor,
-			vec![PluginWithConfig(plugin, serde_json::json!(null))],
-		)
-		.await
-		{
-			Ok(c) => c,
-			Err(e) => {
-				println!("{e}");
-				return;
-			}
-		};
-		match core.run().await {
-			Ok(_) => {
-				println!("HcCore run completed");
-			}
-			Err(e) => {
-				println!("HcCore run failed with '{e}'");
-			}
-		};
-	});
+	let engine = match HcEngineImpl::new(
+		plugin_executor,
+		vec![PluginWithConfig(plugin, serde_json::json!(null))],
+	) {
+		Ok(e) => e,
+		Err(e) => {
+			println!("Failed to create engine: {e}");
+			return;
+		}
+	};
+	let res = match engine.query(
+		"MITRE".to_owned(),
+		"rand_data".to_owned(),
+		"rand_data".to_owned(),
+		serde_json::json!(7),
+	) {
+		Ok(r) => r,
+		Err(e) => {
+			println!("Query failed: {e}");
+			return;
+		}
+	};
+	println!("Result: {res}");
 }
 
 fn cmd_ready(config: &CliConfig) {
@@ -726,7 +726,6 @@ fn cmd_ready(config: &CliConfig) {
 		Ok(path) => println!("{:<17} {}", "Policy Path:", path.display()),
 		Err(e) => println!("{:<17} {}", "Policy Path:", e),
 	}
-
 
 	match &ready.github_token_check {
 		Ok(_) => println!("{:<17} Found!", "GitHub Token:"),

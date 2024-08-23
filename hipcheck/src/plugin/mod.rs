@@ -41,7 +41,8 @@ pub async fn initialize_plugins(
 	Ok(out)
 }
 
-struct ActivePlugin {
+#[derive(Debug)]
+pub struct ActivePlugin {
 	next_id: Mutex<usize>,
 	channel: PluginTransport,
 }
@@ -91,9 +92,10 @@ impl ActivePlugin {
 	}
 }
 
+#[derive(Debug)]
 pub struct HcPluginCore {
 	executor: PluginExecutor,
-	plugins: HashMap<String, ActivePlugin>,
+	pub plugins: HashMap<String, ActivePlugin>,
 }
 impl HcPluginCore {
 	// When this object is returned, the plugins are all connected but the
@@ -127,14 +129,5 @@ impl HcPluginCore {
 		);
 		// Now we have a set of started and initialized plugins to interact with
 		Ok(HcPluginCore { executor, plugins })
-	}
-	// @Temporary
-	pub async fn run(&mut self) -> Result<()> {
-		let handle = self.plugins.get("rand_data").unwrap();
-		let resp = handle
-			.query("rand_data".to_owned(), serde_json::json!(7))
-			.await?;
-		println!("Plugin response: {resp:?}");
-		Ok(())
 	}
 }
