@@ -22,6 +22,7 @@ pub struct Plugin {
 }
 
 // Hipcheck-facing version of struct from crate::hipcheck
+#[derive(Clone, Debug)]
 pub struct Schema {
 	pub query_name: String,
 	pub key_schema: Value,
@@ -118,6 +119,7 @@ impl std::fmt::Display for ConfigError {
 }
 
 // State for managing an actively running plugin process
+#[derive(Debug)]
 pub struct PluginContext {
 	pub plugin: Plugin,
 	pub port: u16,
@@ -273,6 +275,7 @@ impl TryFrom<Query> for PluginQuery {
 	}
 }
 
+#[derive(Debug)]
 pub struct MultiplexedQueryReceiver {
 	rx: Streaming<PluginQuery>,
 	backlog: HashMap<i32, VecDeque<PluginQuery>>,
@@ -314,6 +317,7 @@ impl MultiplexedQueryReceiver {
 
 // Encapsulate an "initialized" state of a Plugin with interfaces that abstract
 // query chunking to produce whole messages for the Hipcheck engine
+#[derive(Debug)]
 pub struct PluginTransport {
 	pub schemas: HashMap<String, Schema>,
 	pub default_policy_expr: String, // TODO - update with policy_expr type
