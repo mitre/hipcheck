@@ -1,6 +1,7 @@
 //! Git related types and implementations for pulling/cloning source repos.
 
 use crate::error::{Error as HcError, Result as HcResult};
+use crate::shell::verbosity::Verbosity;
 use crate::{
 	context::Context,
 	shell::{progress_phase::ProgressPhase, Shell},
@@ -25,27 +26,33 @@ fn make_remote_callbacks() -> RemoteCallbacks<'static> {
 
 	// Messages from the remote ("Counting objects" etc) are sent over the sideband.
 	// This involves clearing and replacing the line -- use console to do this effectively.
-	callbacks.sideband_progress(move |msg: &[u8]| {
-		Shell::in_suspend(|| {
-			// use the standard output.
-			let mut term = Term::stdout();
 
-			// Crash on errors here, since they should be relatively uncommon.
-			term.clear_line().expect("clear line on standard output");
+	match Shell::get_verbosity() {
+		Verbosity::Normal => {
+			callbacks.sideband_progress(move |msg: &[u8]| {
+				Shell::in_suspend(|| {
+					// use the standard output.
+					let mut term = Term::stdout();
 
-			write!(&mut term, "remote: {}", String::from_utf8_lossy(msg))
-				.expect("wrote to standard output");
+					// Crash on errors here, since they should be relatively uncommon.
+					term.clear_line().expect("clear line on standard output");
 
-			term.flush().expect("flushed standard output");
-		});
+					write!(&mut term, "remote: {}", String::from_utf8_lossy(msg))
+						.expect("wrote to standard output");
 
-		true
-	});
+					term.flush().expect("flushed standard output");
+				});
+
+				true
+			});
+		}
+		Verbosity::Quiet | Verbosity::Silent => {}
+	}
 
 	callbacks.transfer_progress(move |prog: Progress| {
 		if prog.received_objects() > 0 {
 			let phase = transfer_phase.get_or_init(|| {
-				ProgressPhase::start(prog.total_objects() as u64, "(git) recieving objects")
+				ProgressPhase::start(prog.total_objects() as u64, "(git) receiving objects")
 			});
 
 			phase.set_position(prog.received_objects() as u64);

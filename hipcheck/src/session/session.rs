@@ -290,7 +290,6 @@ fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	// Set the phase to tick steadily 10 times a second.
 	phase.enable_steady_tick(Duration::from_millis(100));
 	let target = resolve_target(seed, &phase, home)?;
-	println!("TARGET: {target:?}");
 	phase.finish_successful();
 
 	Ok(target)
