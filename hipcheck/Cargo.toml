@@ -127,7 +127,7 @@ ureq = { version = "2.10.0", default-features = false, features = [
 ] }
 url = "2.5.1"
 walkdir = "2.5.0"
-which = { version = "6.0.1", default-features = false }
+which = { version = "6.0.3", default-features = false }
 xml-rs = "0.8.20"
 xz2 = "0.1.7"
 zip = "2.1.6"
@@ -136,7 +136,7 @@ zip = "2.1.6"
 
 anyhow = "1.0.86"
 tonic-build = "0.12.1"
-which = { version = "6.0.1", default-features = false }
+which = { version = "6.0.3", default-features = false }
 
 [dev-dependencies]
 
