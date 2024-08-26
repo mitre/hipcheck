@@ -1,10 +1,12 @@
 #![allow(unused)]
 
-use crate::plugin::{ActivePlugin, HcPluginCore, PluginExecutor, PluginResponse, PluginWithConfig};
+use crate::plugin::{ActivePlugin, PluginResponse};
+pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
 use crate::{hc_error, Result};
+use futures::future::{BoxFuture, FutureExt};
 use serde_json::Value;
 use std::sync::{Arc, LazyLock};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 // Salsa doesn't natively support async functions, so our recursive `query()` function that
 // interacts with plugins (which use async) has to get a handle to the underlying runtime,
@@ -62,6 +64,54 @@ fn query(
 	}
 }
 
+// Demonstration of how the above `query()` function would be implemented as async
+pub fn async_query(
+	core: Arc<HcPluginCore>,
+	publisher: String,
+	plugin: String,
+	query: String,
+	key: Value,
+) -> BoxFuture<'static, Result<Value>> {
+	async move {
+		// Find the plugin
+		let Some(p_handle) = core.plugins.get(&plugin) else {
+			return Err(hc_error!("No such plugin {}::{}", publisher, plugin));
+		};
+		// Initiate the query. If remote closed or we got our response immediately,
+		// return
+		let mut ar = match p_handle.query(query, key).await? {
+			PluginResponse::RemoteClosed => {
+				return Err(hc_error!("Plugin channel closed unexpected"));
+			}
+			PluginResponse::Completed(v) => {
+				return Ok(v);
+			}
+			PluginResponse::AwaitingResult(a) => a,
+		};
+		// Otherwise, the plugin needs more data to continue. Recursively query
+		// (with salsa memo-ization) to get the needed data, and resume our
+		// current query by providing the plugin the answer.
+		loop {
+			let answer = async_query(
+				Arc::clone(&core),
+				ar.publisher.clone(),
+				ar.plugin.clone(),
+				ar.query.clone(),
+				ar.key.clone(),
+			)
+			.await?;
+			ar = match p_handle.resume_query(ar, answer).await? {
+				PluginResponse::RemoteClosed => {
+					return Err(hc_error!("Plugin channel closed unexpected"));
+				}
+				PluginResponse::Completed(v) => return Ok(v),
+				PluginResponse::AwaitingResult(a) => a,
+			};
+		}
+	}
+	.boxed()
+}
+
 #[salsa::database(HcEngineStorage)]
 pub struct HcEngineImpl {
 	// Query storage
@@ -77,12 +127,16 @@ impl HcEngineImpl {
 	// independent of Salsa.
 	pub fn new(executor: PluginExecutor, plugins: Vec<(PluginWithConfig)>) -> Result<Self> {
 		let runtime = RUNTIME.handle();
+		println!("Starting HcPluginCore");
 		let core = runtime.block_on(HcPluginCore::new(executor, plugins))?;
 		let mut engine = HcEngineImpl {
 			storage: Default::default(),
 		};
 		engine.set_core(Arc::new(core));
 		Ok(engine)
+	}
+	pub fn runtime() -> &'static Handle {
+		RUNTIME.handle()
 	}
 	// TODO - "run" function that takes analysis heirarchy and target, and queries each
 	// analysis plugin to kick off the execution

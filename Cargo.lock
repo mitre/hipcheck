@@ -698,7 +698,9 @@ dependencies = [
 name = "dummy_rand_data"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap",
+ "indexmap 2.4.0",
  "prost",
  "rand",
  "serde_json",
