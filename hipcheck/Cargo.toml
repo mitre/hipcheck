@@ -37,7 +37,7 @@ content_inspector = "0.2.4"
 cyclonedx-bom = "0.7.0"
 dotenv = "0.15.0"
 chrono = { version = "0.4.19", features = ["alloc", "serde"] }
-clap = { version = "4.5.13", features = ["derive"] }
+clap = { version = "4.5.16", features = ["derive"] }
 console = { version = "0.15.8", features = ["windows-console-colors"] }
 dashmap = { version = "6.0.1", features = ["rayon", "inline"] }
 dialoguer = "0.11.0"
