@@ -39,7 +39,6 @@ use crate::analysis::report_builder::Report;
 use crate::analysis::score::score_results;
 use crate::cache::HcCache;
 use crate::context::Context as _;
-use crate::engine::{HcEngine, HcEngineImpl};
 use crate::error::Error;
 use crate::error::Result;
 use crate::plugin::{Plugin, PluginExecutor, PluginWithConfig};
@@ -641,6 +640,10 @@ fn check_github_token() -> StdResult<(), EnvVarCheckError> {
 }
 
 fn cmd_plugin() {
+	use crate::engine::{async_query, HcEngine, HcEngineImpl};
+	use std::sync::Arc;
+	use tokio::task::JoinSet;
+
 	let tgt_dir = "./target/debug";
 	let entrypoint = pathbuf![tgt_dir, "dummy_rand_data"];
 	let plugin = Plugin {
@@ -665,19 +668,49 @@ fn cmd_plugin() {
 			return;
 		}
 	};
-	let res = match engine.query(
-		"MITRE".to_owned(),
-		"rand_data".to_owned(),
-		"rand_data".to_owned(),
-		serde_json::json!(7),
-	) {
-		Ok(r) => r,
-		Err(e) => {
-			println!("Query failed: {e}");
-			return;
+	let core = engine.core();
+	let handle = HcEngineImpl::runtime();
+	// @Note - how to initiate multiple queries with async calls
+	handle.block_on(async move {
+		let mut futs = JoinSet::new();
+		for i in 1..10 {
+			let arc_core = Arc::clone(&core);
+			println!("Spawning");
+			futs.spawn(async_query(
+				arc_core,
+				"MITRE".to_owned(),
+				"rand_data".to_owned(),
+				"rand_data".to_owned(),
+				serde_json::json!(i),
+			));
 		}
-	};
-	println!("Result: {res}");
+		while let Some(res) = futs.join_next().await {
+			println!("res: {res:?}");
+		}
+	});
+	// @Note - how to initiate multiple queries with sync calls
+	// let conc: Vec<thread::JoinHandle<()>> = vec![];
+	// for i in 0..10 {
+	// 	let fut = thread::spawn(|| {
+	// 		let res = match engine.query(
+	// 			"MITRE".to_owned(),
+	// 			"rand_data".to_owned(),
+	// 			"rand_data".to_owned(),
+	// 			serde_json::json!(i),
+	// 		) {
+	// 			Ok(r) => r,
+	// 			Err(e) => {
+	// 				println!("{i}: Query failed: {e}");
+	// 				return;
+	// 			}
+	// 		};
+	// 		println!("{i}: Result: {res}");
+	// 	});
+	// 	conc.push(fut);
+	// }
+	// while let Some(x) = conc.pop() {
+	// 	x.join().unwrap();
+	// }
 }
 
 fn cmd_ready(config: &CliConfig) {

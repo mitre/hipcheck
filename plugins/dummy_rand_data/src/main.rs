@@ -4,6 +4,7 @@ mod hipcheck;
 mod hipcheck_transport;
 
 use crate::hipcheck_transport::*;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use hipcheck::plugin_server::{Plugin, PluginServer};
 use hipcheck::{
@@ -27,6 +28,21 @@ fn get_rand(num_bytes: usize) -> Vec<u8> {
 	vec
 }
 
+pub async fn handle_rand_data(channel: HcTransport, id: usize, key: u64) -> Result<()> {
+	let res = get_rand(key as usize);
+	let output = serde_json::to_value(res)?;
+	let resp = Query {
+		id,
+		request: false,
+		publisher: "".to_owned(),
+		plugin: "".to_owned(),
+		query: "".to_owned(),
+		key: json!(null),
+		output,
+	};
+	channel.send(resp).await?;
+	Ok(())
+}
 struct RandDataRunner {
 	channel: HcTransport,
 }
@@ -34,42 +50,39 @@ impl RandDataRunner {
 	pub fn new(channel: HcTransport) -> Self {
 		RandDataRunner { channel }
 	}
-	pub fn handle_query(id: usize, name: String, key: Value) -> Result<Query, String> {
+	async fn handle_query(channel: HcTransport, id: usize, name: String, key: Value) -> Result<()> {
 		if name == "rand_data" {
 			let Value::Number(num_size) = &key else {
-				return Err("get_rand argument must be a number".to_owned());
+				return Err(anyhow!("get_rand argument must be a number"));
 			};
 			let Some(size) = num_size.as_u64() else {
-				return Err("get_rand argument must be an unsigned integer".to_owned());
+				return Err(anyhow!("get_rand argument must be an unsigned integer"));
 			};
-			let res = get_rand(size as usize);
-			let output = serde_json::to_value(res).map_err(|e| e.to_string())?;
-			Ok(Query {
-				id,
-				request: false,
-				publisher: "".to_owned(),
-				plugin: "".to_owned(),
-				query: "".to_owned(),
-				key: json!(null),
-				output,
-			})
+			handle_rand_data(channel, id, size).await?;
+			Ok(())
 		} else {
-			Err(format!("unrecognized query '{name}'"))
+			Err(anyhow!("unrecognized query '{}'", name))
 		}
 	}
-	pub async fn run(mut self) -> Result<(), String> {
+	pub async fn run(self) -> Result<()> {
 		loop {
 			eprintln!("Looping");
-			let Some(msg) = self.channel.recv().await? else {
+			let Some(msg) = self.channel.recv_new().await? else {
 				eprintln!("Channel closed by remote");
 				break;
 			};
 			if msg.request {
-				let rsp = RandDataRunner::handle_query(msg.id, msg.query, msg.key)?;
-				eprintln!("Sending response: {rsp:?}");
-				self.channel.send(rsp).await?;
+				let child_channel = self.channel.clone();
+				tokio::spawn(async move {
+					if let Err(e) =
+						RandDataRunner::handle_query(child_channel, msg.id, msg.query, msg.key)
+							.await
+					{
+						eprintln!("handle_query failed: {e}");
+					};
+				});
 			} else {
-				return Err("Did not expect a response-type message here".to_owned());
+				return Err(anyhow!("Did not expect a response-type message here"));
 			}
 		}
 		Ok(())
