@@ -2,7 +2,7 @@
 
 //! Data structures for Hipcheck's main CLI.
 
-use crate::cache::{CacheDeleteScope, CacheListScope, CacheSort};
+use crate::cache::repo_cache::{RepoCacheDeleteScope, RepoCacheListScope, RepoCacheSort};
 use crate::context::Context;
 use crate::error::Result;
 use crate::hc_error;
@@ -797,11 +797,11 @@ impl TryFrom<CacheArgs> for CacheOp {
 #[derive(Debug, Clone)]
 pub enum CacheOp {
 	List {
-		scope: CacheListScope,
+		scope: RepoCacheListScope,
 		filter: Option<String>,
 	},
 	Delete {
-		scope: CacheDeleteScope,
+		scope: RepoCacheDeleteScope,
 		filter: Option<String>,
 		force: bool,
 	},
@@ -844,15 +844,15 @@ pub enum CliSortStrategy {
 	Ralpha,
 }
 impl CliSortStrategy {
-	pub fn to_cache_sort(&self) -> (CacheSort, bool) {
+	pub fn to_cache_sort(&self) -> (RepoCacheSort, bool) {
 		use CliSortStrategy::*;
 		match self {
-			Oldest => (CacheSort::Oldest, false),
-			Newest => (CacheSort::Oldest, true),
-			Largest => (CacheSort::Largest, false),
-			Smallest => (CacheSort::Largest, true),
-			Alpha => (CacheSort::Alpha, false),
-			Ralpha => (CacheSort::Alpha, true),
+			Oldest => (RepoCacheSort::Oldest, false),
+			Newest => (RepoCacheSort::Oldest, true),
+			Largest => (RepoCacheSort::Largest, false),
+			Smallest => (RepoCacheSort::Largest, true),
+			Alpha => (RepoCacheSort::Alpha, false),
+			Ralpha => (RepoCacheSort::Alpha, true),
 		}
 	}
 }
@@ -873,7 +873,7 @@ pub struct CliCacheListArgs {
 impl From<CliCacheListArgs> for CacheOp {
 	fn from(value: CliCacheListArgs) -> Self {
 		let (sort, invert) = value.strategy.to_cache_sort();
-		let scope = CacheListScope {
+		let scope = RepoCacheListScope {
 			sort,
 			invert,
 			n: value.max,
@@ -912,7 +912,7 @@ impl TryFrom<CliCacheDeleteArgs> for CacheOp {
                 entries"
 			));
 		}
-		let scope: CacheDeleteScope = value.strategy.try_into()?;
+		let scope: RepoCacheDeleteScope = value.strategy.try_into()?;
 		Ok(CacheOp::Delete {
 			scope,
 			filter: value.filter,
@@ -926,14 +926,14 @@ impl TryFrom<CliCacheDeleteArgs> for CacheOp {
 //  2. "<SORT> <N>", where <SORT> is one of the CliSortStrategy variants, <N> is
 //      number of entries
 //  3. "<SORT>", same as #2 but <N> defaults to 1
-impl TryFrom<Vec<String>> for CacheDeleteScope {
+impl TryFrom<Vec<String>> for RepoCacheDeleteScope {
 	type Error = crate::error::Error;
 	fn try_from(value: Vec<String>) -> Result<Self> {
 		if value.len() > 2 {
 			return Err(hc_error!("strategy takes at most two tokens"));
 		}
 		let Some(raw_spec) = value.first() else {
-			return Ok(CacheDeleteScope::All);
+			return Ok(RepoCacheDeleteScope::All);
 		};
 		if raw_spec.to_lowercase() == "all" {
 			if let Some(n) = value.get(1) {
@@ -942,7 +942,7 @@ impl TryFrom<Vec<String>> for CacheDeleteScope {
 					n
 				));
 			}
-			Ok(CacheDeleteScope::All)
+			Ok(RepoCacheDeleteScope::All)
 		} else {
 			let strat = CliSortStrategy::from_str(raw_spec, true).or(Err(hc_error!(
 				"'{}' is not a valid sort strategy. strategies include {}, or 'all'",
@@ -960,7 +960,7 @@ impl TryFrom<Vec<String>> for CacheDeleteScope {
 					.context("max entry token is not a valid unsigned int")?,
 				None => 1,
 			};
-			Ok(CacheDeleteScope::Group { sort, invert, n })
+			Ok(RepoCacheDeleteScope::Group { sort, invert, n })
 		}
 	}
 }
