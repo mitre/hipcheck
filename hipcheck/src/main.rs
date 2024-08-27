@@ -37,7 +37,7 @@ use crate::analysis::report_builder::AnyReport;
 use crate::analysis::report_builder::Format;
 use crate::analysis::report_builder::Report;
 use crate::analysis::score::score_results;
-use crate::cache::HcCache;
+use crate::cache::repo_cache::HcRepoCache;
 use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
@@ -828,7 +828,7 @@ fn cmd_cache(args: CacheArgs, config: &CliConfig) -> ExitCode {
 			return ExitCode::FAILURE;
 		}
 	};
-	let mut cache = HcCache::new(path);
+	let mut cache = HcRepoCache::new(path);
 	let res = match op {
 		CacheOp::List { scope, filter } => cache.list(scope, filter),
 		CacheOp::Delete {
