@@ -12,9 +12,7 @@ mod context;
 mod data;
 mod engine;
 mod error;
-mod git2_log_shim;
-mod git2_rustls_transport;
-mod log_bridge;
+mod init;
 mod metric;
 #[allow(unused)]
 mod plugin;
@@ -44,7 +42,6 @@ use crate::error::Result;
 use crate::plugin::{Plugin, PluginExecutor, PluginWithConfig};
 use crate::session::Session;
 use crate::setup::{resolve_and_transform_source, SourceType};
-use crate::shell::verbosity::Verbosity;
 use crate::shell::Shell;
 use crate::util::iter::TryAny;
 use crate::util::iter::TryFilter;
@@ -61,13 +58,10 @@ use command_util::DependentProgram;
 use config::WeightTreeNode;
 use config::WeightTreeProvider;
 use core::fmt;
-use env_logger::Env;
 use indextree::Arena;
 use indextree::NodeId;
 use ordered_float::NotNan;
 use pathbuf::pathbuf;
-use rustls::crypto::ring;
-use rustls::crypto::CryptoProvider;
 use schemars::schema_for;
 use shell::color_choice::ColorChoice;
 use shell::spinner_phase::SpinnerPhase;
@@ -88,24 +82,7 @@ use which::which;
 
 /// Entry point for Hipcheck.
 fn main() -> ExitCode {
-	// Initialize the global shell with normal verbosity by default.
-	Shell::init(Verbosity::Normal);
-	// Initialize logging.
-	// This must be done after shell initialization.
-	// Panic if this fails.
-	init_logging().unwrap();
-
-	// Tell the git2 crate to pass its tracing messages to the log crate.
-	git2_log_shim::git2_set_trace_log_shim();
-
-	// Make libgit2 use a rustls + ureq based transport for executing the git protocol over http(s).
-	// I would normally just let libgit2 use its own implementation but have seen that this rustls/ureq transport is
-	// 2-3 times faster on my machine -- enough of a performance bump to warrant using this.
-	git2_rustls_transport::register();
-
-	// Install a process-wide default crypto provider.
-	CryptoProvider::install_default(ring::default_provider())
-		.expect("installed process-wide default crypto provider");
+	init::init();
 
 	if cfg!(feature = "print-timings") {
 		Shell::eprintln("[TIMINGS]: Timing information will be printed.");
@@ -152,12 +129,6 @@ fn main() -> ExitCode {
 
 	// If we didn't early return, return success.
 	ExitCode::SUCCESS
-}
-
-fn init_logging() -> std::result::Result<(), log::SetLoggerError> {
-	let env = Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE");
-	let logger = env_logger::Builder::from_env(env).build();
-	log_bridge::LogWrapper(logger).try_init()
 }
 
 /// Run the `check` command.
