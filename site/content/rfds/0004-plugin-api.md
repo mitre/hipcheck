@@ -476,10 +476,10 @@ analyze {
     investigate-if-fail "mitre/typo" "mitre/binary"
 
     category "practices" {
-        analysis "mitre/activity" policy="(lte 52 $.weeks)" weight=3
+        analysis "mitre/activity" policy="(lte 52 $/weeks)" weight=3
         analysis "mitre/binary" policy="(eq 0 (count $))"
         analysis "mitre/fuzz" policy="(eq #t $)"
-        analysis "mitre/review" policy="(lte 0.05 $.pct_reviewed)"
+        analysis "mitre/review" policy="(lte 0.05 $/pct_reviewed)"
     }
 
     category "attacks" {
@@ -488,7 +488,7 @@ analyze {
         }
 
         category "commit" {
-            analysis "mitre/affiliation" poilicy="(eq 0 (count $))" {
+            analysis "mitre/affiliation" policy="(eq 0 (count $))" {
                 orgs-file "./config/orgs.kdl"
             }
 
@@ -695,11 +695,26 @@ The following functions are currently defined for policy expressions:
 In policy expressions, the `$` character stands for the input object, in
 JSON format, and in fact any "substitution pointer" can be used. `$` is
 the root JSON object, which may be of any valid JSON type. If it's an
-object, the `.[field_name]` can be used to select a named field of the
-object, and `.[index]` can be used to select any numbered index of an
-array. So `$.items.0`, for example, would select into the `items` field
+object, the `/[field_name]` can be used to select a named field of the
+object, and `/[index]` can be used to select any numbered index of an
+array. So `$/items/0`, for example, would select into the `items` field
 of the provided object, and then into the first (`0`-th) element of that
 array.
+
+#### Limitations of JSON Pointer syntax relative to RFC
+
+The [JSON Pointer spec (RFC 6901)](https://datatracker.ietf.org/doc/html/rfc6901)
+allows almost any character to appear in the path string. This includes control
+characters, whitespace, and NULLs. But to keep the syntax compatible with Policy
+expression syntax, JSON Pointers are currently limited to alphanumerics, '/'
+(forward slash), '~' (tilde), and '_' (underscore).
+
+#### Limitations of JSON value interpretation into Policy expression language
+
+JSON can contain a number of different types, but not all of them are compatible
+with the Policy expression type system. Currently, only booleans, floats, and
+homogenous arrays of booleans or floats are supported. This excludes strings,
+objects, and arrays containing anything but supported primitive types.
 
 It's also useful to understand _how_ policy expressions were reached as a
 design. Previous versions of the design for plugins in Hipcheck, including

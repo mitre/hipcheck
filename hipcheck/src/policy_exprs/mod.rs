@@ -4,6 +4,7 @@ mod bridge;
 mod env;
 mod error;
 pub mod expr;
+mod json_pointer;
 mod token;
 
 pub(crate) use crate::policy_exprs::bridge::Tokens;
@@ -17,6 +18,8 @@ pub use crate::policy_exprs::token::LexingError;
 use env::Binding;
 pub use expr::parse;
 pub use expr::Primitive;
+use json_pointer::process_json_pointers;
+use serde_json::Value;
 use std::ops::Deref;
 
 /// Evaluates `deke` expressions.
@@ -31,16 +34,17 @@ impl Executor {
 	}
 
 	/// Run a `deke` program.
-	pub fn run(&self, raw_program: &str) -> Result<bool> {
-		match self.parse_and_eval(raw_program)? {
+	pub fn run(&self, raw_program: &str, context: &Value) -> Result<bool> {
+		match self.parse_and_eval(raw_program, context)? {
 			Expr::Primitive(Primitive::Bool(b)) => Ok(b),
 			result => Err(Error::DidNotReturnBool(result)),
 		}
 	}
 
 	/// Run a `deke` program, but don't try to convert the result to a `bool`.
-	pub fn parse_and_eval(&self, raw_program: &str) -> Result<Expr> {
-		let program = parse(raw_program)?;
+	pub fn parse_and_eval(&self, raw_program: &str, context: &Value) -> Result<Expr> {
+		let processed_program = process_json_pointers(raw_program, context)?;
+		let program = parse(&processed_program)?;
 		let expr = eval(&self.env, &program)?;
 		Ok(expr)
 	}
@@ -78,42 +82,48 @@ mod tests {
 	#[test]
 	fn run_basic() {
 		let program = "(eq (add 1 2) 3)";
-		let is_true = Executor::std().run(program).unwrap();
+		let context = Value::Null;
+		let is_true = Executor::std().run(program, &context).unwrap();
 		assert!(is_true);
 	}
 
 	#[test]
 	fn eval_basic() {
 		let program = "(add 1 2)";
-		let result = Executor::std().parse_and_eval(program).unwrap();
+		let context = Value::Null;
+		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(result, Expr::Primitive(Primitive::Int(3)));
 	}
 
 	#[test]
 	fn eval_bools() {
 		let program = "(neq 1 2)";
-		let result = Executor::std().parse_and_eval(program).unwrap();
+		let context = Value::Null;
+		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(result, Expr::Primitive(Primitive::Bool(true)));
 	}
 
 	#[test]
 	fn eval_array() {
 		let program = "(max [1 4 6 10 2 3 0])";
-		let result = Executor::std().parse_and_eval(program).unwrap();
+		let context = Value::Null;
+		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(result, Expr::Primitive(Primitive::Int(10)));
 	}
 
 	#[test]
 	fn run_array() {
 		let program = "(eq 7 (count [1 4 6 10 2 3 0]))";
-		let is_true = Executor::std().run(program).unwrap();
+		let context = Value::Null;
+		let is_true = Executor::std().run(program, &context).unwrap();
 		assert!(is_true);
 	}
 
 	#[test]
 	fn eval_higher_order_func() {
 		let program = "(eq 3 (count (filter (gt 8.0) [1.0 2.0 10.0 20.0 30.0])))";
-		let result = Executor::std().parse_and_eval(program).unwrap();
+		let context = Value::Null;
+		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(result, Expr::Primitive(Primitive::Bool(true)));
 	}
 
@@ -121,14 +131,16 @@ mod tests {
 	fn eval_foreach() {
 		let program =
 			"(eq 3 (count (filter (gt 8.0) (foreach (sub 1.0) [1.0 2.0 10.0 20.0 30.0]))))";
-		let result = Executor::std().parse_and_eval(program).unwrap();
+		let context = Value::Null;
+		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(result, Expr::Primitive(Primitive::Bool(true)));
 	}
 
 	#[test]
 	fn eval_basic_filter() {
 		let program = "(filter (eq 0) [1 0 1 0 0 1 2])";
-		let result = Executor::std().parse_and_eval(program).unwrap();
+		let context = Value::Null;
+		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(
 			result,
 			Expr::Array(vec![
