@@ -6,8 +6,11 @@ use ordered_float::FloatIsNan;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// An error arising during program execution.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum Error {
+	#[error("Multiple errors: {0:?}")]
+	MultipleErrors(Vec<Error>),
+
 	#[error("missing close paren")]
 	MissingOpenParen,
 
@@ -87,6 +90,38 @@ pub enum Error {
 
 	#[error("variable is already bound")]
 	AlreadyBound,
+
+	#[error(
+		"JSON Pointer invalid syntax: non-empty pointer must start with '/'. \
+		pointer: '{pointer}'"
+	)]
+	JSONPointerInvalidSyntax { pointer: String },
+
+	#[error("JSON Pointer lookup failed. pointer: '{pointer}'; context: {context}")]
+	JSONPointerLookupFailed {
+		pointer: String,
+		context: serde_json::Value,
+	},
+
+	#[error(
+		"JSON Pointer lookup returned a value whose type \
+		is unrepresentable in Policy Expressions ({json_type:?}). \
+		pointer: '{pointer}'; value: {value}; context: {context}"
+	)]
+	JSONPointerUnrepresentableType {
+		json_type: UnrepresentableJSONType,
+		pointer: String,
+		value: serde_json::Value,
+		context: serde_json::Value,
+	},
+}
+
+#[derive(Debug, PartialEq)]
+pub enum UnrepresentableJSONType {
+	NonPrimitiveInArray,
+	JSONObject,
+	JSONString,
+	JSONNull,
 }
 
 fn needed_str(needed: &Needed) -> String {
