@@ -1,24 +1,27 @@
-#![allow(unused_variables)]
+mod transport;
+mod proto {
+	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
+}
 
-mod hipcheck;
-mod hipcheck_transport;
-
-use crate::hipcheck_transport::*;
+use crate::{
+	proto::{
+		plugin_service_server::{PluginService, PluginServiceServer},
+		ConfigurationStatus, GetDefaultPolicyExpressionRequest, GetDefaultPolicyExpressionResponse,
+		GetQuerySchemasRequest, GetQuerySchemasResponse, InitiateQueryProtocolRequest,
+		InitiateQueryProtocolResponse, SetConfigurationRequest, SetConfigurationResponse,
+	},
+	transport::*,
+};
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use hipcheck::plugin_server::{Plugin, PluginServer};
-use hipcheck::{
-	Configuration, ConfigurationResult, ConfigurationStatus, Empty, PolicyExpression,
-	Query as PluginQuery, Schema,
-};
 use serde_json::{json, Value};
 use std::pin::Pin;
 use tokio::sync::mpsc;
 use tokio_stream::{wrappers::ReceiverStream, Stream};
 use tonic::{transport::Server, Request, Response, Status, Streaming};
 
-static GET_RAND_KEY_SCHEMA: &str = include_str!("query_schema_get_rand.json");
-static GET_RAND_OUTPUT_SCHEMA: &str = include_str!("query_schema_get_rand.json");
+static GET_RAND_KEY_SCHEMA: &str = include_str!("../schema/query_schema_get_rand.json");
+static GET_RAND_OUTPUT_SCHEMA: &str = include_str!("../schema/query_schema_get_rand.json");
 
 fn reduce(input: u64) -> u64 {
 	input % 7
@@ -30,7 +33,7 @@ pub async fn handle_rand_data(mut session: QuerySession, key: u64) -> Result<()>
 	eprintln!("RAND-{id}: key: {key}, reduced: {sha_input}");
 
 	let sha_req = Query {
-		request: true,
+		direction: QueryDirection::Request,
 		publisher: "MITRE".to_owned(),
 		plugin: "sha256".to_owned(),
 		query: "sha256".to_owned(),
@@ -43,23 +46,21 @@ pub async fn handle_rand_data(mut session: QuerySession, key: u64) -> Result<()>
 		return Err(anyhow!("channel closed prematurely by remote"));
 	};
 
-	if res.request {
+	if res.direction == QueryDirection::Request {
 		return Err(anyhow!("expected response from remote"));
 	}
 
 	let mut sha_vec: Vec<u8> = serde_json::from_value(res.output)?;
 	eprintln!("RAND-{id}: hash: {sha_vec:02x?}");
-	let key_vec = key.to_le_bytes().to_vec();
-
-	for (i, val) in key_vec.into_iter().enumerate() {
-		*sha_vec.get_mut(i).unwrap() += val;
+	for (sha_val, key_val) in Iterator::zip(sha_vec.iter_mut(), key.to_le_bytes()) {
+		*sha_val += key_val;
 	}
 
 	eprintln!("RAND-{id}: output: {sha_vec:02x?}");
 	let output = serde_json::to_value(sha_vec)?;
 
 	let resp = Query {
-		request: false,
+		direction: QueryDirection::Response,
 		publisher: "".to_owned(),
 		plugin: "".to_owned(),
 		query: "".to_owned(),
@@ -78,28 +79,28 @@ async fn handle_session(mut session: QuerySession) -> Result<()> {
 		return Ok(());
 	};
 
-	if !query.request {
+	if query.direction == QueryDirection::Response {
 		return Err(anyhow!("Expected request from remote"));
 	}
 
 	let name = query.query;
 	let key = query.key;
 
-	if name == "rand_data" {
-		let Value::Number(num_size) = &key else {
-			return Err(anyhow!("get_rand argument must be a number"));
-		};
-
-		let Some(size) = num_size.as_u64() else {
-			return Err(anyhow!("get_rand argument must be an unsigned integer"));
-		};
-
-		handle_rand_data(session, size).await?;
-
-		Ok(())
-	} else {
-		Err(anyhow!("unrecognized query '{}'", name))
+	if name != "rand_data" {
+		return Err(anyhow!("unrecognized query '{}'", name));
 	}
+
+	let Value::Number(num_size) = &key else {
+		return Err(anyhow!("get_rand argument must be a number"));
+	};
+
+	let Some(size) = num_size.as_u64() else {
+		return Err(anyhow!("get_rand argument must be an unsigned integer"));
+	};
+
+	handle_rand_data(session, size).await?;
+
+	Ok(())
 }
 
 struct RandDataRunner {
@@ -133,29 +134,32 @@ impl RandDataRunner {
 
 #[derive(Debug)]
 struct RandDataPlugin {
-	pub schema: Schema,
+	pub schema: GetQuerySchemasResponse,
 }
 
 impl RandDataPlugin {
 	pub fn new() -> Self {
-		let schema = Schema {
+		let schema = GetQuerySchemasResponse {
 			query_name: "rand_data".to_owned(),
 			key_schema: GET_RAND_KEY_SCHEMA.to_owned(),
 			output_schema: GET_RAND_OUTPUT_SCHEMA.to_owned(),
 		};
+
 		RandDataPlugin { schema }
 	}
 }
 
 #[tonic::async_trait]
-impl Plugin for RandDataPlugin {
+impl PluginService for RandDataPlugin {
 	type GetQuerySchemasStream =
-		Pin<Box<dyn Stream<Item = Result<Schema, Status>> + Send + 'static>>;
-	type InitiateQueryProtocolStream = ReceiverStream<Result<PluginQuery, Status>>;
+		Pin<Box<dyn Stream<Item = Result<GetQuerySchemasResponse, Status>> + Send + 'static>>;
+
+	type InitiateQueryProtocolStream =
+		ReceiverStream<Result<InitiateQueryProtocolResponse, Status>>;
 
 	async fn get_query_schemas(
 		&self,
-		_request: Request<Empty>,
+		_request: Request<GetQuerySchemasRequest>,
 	) -> Result<Response<Self::GetQuerySchemasStream>, Status> {
 		Ok(Response::new(Box::pin(tokio_stream::iter(vec![Ok(self
 			.schema
@@ -164,29 +168,29 @@ impl Plugin for RandDataPlugin {
 
 	async fn set_configuration(
 		&self,
-		request: Request<Configuration>,
-	) -> Result<Response<ConfigurationResult>, Status> {
-		Ok(Response::new(ConfigurationResult {
-			status: ConfigurationStatus::ErrorNone as i32,
+		_request: Request<SetConfigurationRequest>,
+	) -> Result<Response<SetConfigurationResponse>, Status> {
+		Ok(Response::new(SetConfigurationResponse {
+			status: ConfigurationStatus::None as i32,
 			message: "".to_owned(),
 		}))
 	}
 
 	async fn get_default_policy_expression(
 		&self,
-		request: Request<Empty>,
-	) -> Result<Response<PolicyExpression>, Status> {
-		Ok(Response::new(PolicyExpression {
+		_request: Request<GetDefaultPolicyExpressionRequest>,
+	) -> Result<Response<GetDefaultPolicyExpressionResponse>, Status> {
+		Ok(Response::new(GetDefaultPolicyExpressionResponse {
 			policy_expression: "".to_owned(),
 		}))
 	}
 
 	async fn initiate_query_protocol(
 		&self,
-		request: Request<Streaming<PluginQuery>>,
+		request: Request<Streaming<InitiateQueryProtocolRequest>>,
 	) -> Result<Response<Self::InitiateQueryProtocolStream>, Status> {
 		let rx = request.into_inner();
-		let (tx, out_rx) = mpsc::channel::<Result<PluginQuery, Status>>(4);
+		let (tx, out_rx) = mpsc::channel::<Result<InitiateQueryProtocolResponse, Status>>(4);
 
 		tokio::spawn(async move {
 			let channel = HcSessionSocket::new(tx, rx);
@@ -210,7 +214,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let args = Args::try_parse().map_err(Box::new)?;
 	let addr = format!("127.0.0.1:{}", args.port);
 	let plugin = RandDataPlugin::new();
-	let svc = PluginServer::new(plugin);
+	let svc = PluginServiceServer::new(plugin);
 
 	Server::builder()
 		.add_service(svc)

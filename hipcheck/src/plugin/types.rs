@@ -1,19 +1,30 @@
-use crate::hipcheck::plugin_client::PluginClient;
-use crate::hipcheck::{
-	Configuration, ConfigurationResult as PluginConfigResult, ConfigurationStatus, Empty,
-	Query as PluginQuery, QueryState, Schema as PluginSchema,
+use crate::{
+	hc_error,
+	hipcheck::{
+		plugin_service_client::PluginServiceClient, ConfigurationStatus, Empty,
+		GetDefaultPolicyExpressionRequest, GetQuerySchemasRequest,
+		GetQuerySchemasResponse as PluginSchema, InitiateQueryProtocolRequest,
+		InitiateQueryProtocolResponse, Query as PluginQuery, QueryState, SetConfigurationRequest,
+		SetConfigurationResponse as PluginConfigResult,
+	},
+	Error, Result,
 };
-use crate::{hc_error, Error, Result, StdResult};
+use futures::{Stream, StreamExt};
 use serde_json::Value;
-use std::collections::{HashMap, VecDeque};
-use std::convert::TryFrom;
-use std::ops::Not;
-use std::process::Child;
+use std::{
+	collections::{HashMap, VecDeque},
+	convert::TryFrom,
+	future::{self, poll_fn},
+	ops::Not as _,
+	pin::Pin,
+	process::Child,
+	result::Result as StdResult,
+};
 use tokio::sync::{mpsc, Mutex};
-use tonic::codec::Streaming;
-use tonic::transport::Channel;
+use tokio_stream::wrappers::ReceiverStream;
+use tonic::{codec::Streaming, transport::Channel, Code, Status};
 
-pub type HcPluginClient = PluginClient<Channel>;
+pub type HcPluginClient = PluginServiceClient<Channel>;
 
 #[derive(Clone, Debug)]
 pub struct Plugin {
@@ -28,6 +39,7 @@ pub struct Schema {
 	pub key_schema: Value,
 	pub output_schema: Value,
 }
+
 impl TryFrom<PluginSchema> for Schema {
 	type Error = crate::error::Error;
 	fn try_from(value: PluginSchema) -> Result<Self> {
@@ -46,6 +58,7 @@ pub struct ConfigurationResult {
 	pub status: ConfigurationStatus,
 	pub message: Option<String>,
 }
+
 impl TryFrom<PluginConfigResult> for ConfigurationResult {
 	type Error = crate::error::Error;
 	fn try_from(value: PluginConfigResult) -> Result<Self> {
@@ -54,6 +67,7 @@ impl TryFrom<PluginConfigResult> for ConfigurationResult {
 		Ok(ConfigurationResult { status, message })
 	}
 }
+
 // hipcheck::ConfigurationStatus has an enum that captures both error and success
 // scenarios. The below code allows interpreting the struct as a Rust Result. If
 // the success variant was the status, Ok(()) is returned, otherwise the code
@@ -70,37 +84,42 @@ impl ConfigurationResult {
 		))
 	}
 }
+
 pub enum ConfigErrorType {
 	Unknown = 0,
 	MissingRequiredConfig = 2,
 	UnrecognizedConfig = 3,
 	InvalidConfigValue = 4,
 }
+
 impl TryFrom<ConfigurationStatus> for ConfigErrorType {
 	type Error = crate::error::Error;
 	fn try_from(value: ConfigurationStatus) -> Result<Self> {
 		use ConfigErrorType::*;
 		use ConfigurationStatus::*;
 		Ok(match value as i32 {
-			x if x == ErrorUnknown as i32 => Unknown,
-			x if x == ErrorMissingRequiredConfiguration as i32 => MissingRequiredConfig,
-			x if x == ErrorUnrecognizedConfiguration as i32 => UnrecognizedConfig,
-			x if x == ErrorInvalidConfigurationValue as i32 => InvalidConfigValue,
+			x if x == Unspecified as i32 => Unknown,
+			x if x == MissingRequiredConfiguration as i32 => MissingRequiredConfig,
+			x if x == UnrecognizedConfiguration as i32 => UnrecognizedConfig,
+			x if x == InvalidConfigurationValue as i32 => InvalidConfigValue,
 			x => {
 				return Err(hc_error!("status value '{}' is not an error", x));
 			}
 		})
 	}
 }
+
 pub struct ConfigError {
 	error: ConfigErrorType,
 	message: Option<String>,
 }
+
 impl ConfigError {
 	pub fn new(error: ConfigErrorType, message: Option<String>) -> Self {
 		ConfigError { error, message }
 	}
 }
+
 impl std::fmt::Display for ConfigError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> StdResult<(), std::fmt::Error> {
 		use ConfigErrorType::*;
@@ -126,11 +145,17 @@ pub struct PluginContext {
 	pub grpc: HcPluginClient,
 	pub proc: Child,
 }
+
 // Redefinition of `grpc` field's functions with more useful types, additional
 // error & sanity checking
 impl PluginContext {
 	pub async fn get_query_schemas(&mut self) -> Result<Vec<Schema>> {
-		let mut res = self.grpc.get_query_schemas(Empty {}).await?;
+		let mut res = self
+			.grpc
+			.get_query_schemas(GetQuerySchemasRequest {
+				empty: Some(Empty {}),
+			})
+			.await?;
 		let stream = res.get_mut();
 		let mut schema_builder: HashMap<String, PluginSchema> = HashMap::new();
 		while let Some(msg) = stream.message().await? {
@@ -149,36 +174,58 @@ impl PluginContext {
 			.map(TryInto::try_into)
 			.collect()
 	}
+
 	pub async fn set_configuration(&mut self, conf: &Value) -> Result<ConfigurationResult> {
-		let conf_query = Configuration {
+		let req = SetConfigurationRequest {
 			configuration: serde_json::to_string(&conf)?,
 		};
-		let res = self.grpc.set_configuration(conf_query).await?;
+		let res = self.grpc.set_configuration(req).await?;
 		res.into_inner().try_into()
 	}
+
 	// TODO - the String in the result should be replaced with a structured
 	// type once the policy expression code is integrated
 	pub async fn get_default_policy_expression(&mut self) -> Result<String> {
-		let mut res = self.grpc.get_default_policy_expression(Empty {}).await?;
-		Ok(res.get_ref().policy_expression.to_owned())
+		let req = GetDefaultPolicyExpressionRequest {
+			empty: Some(Empty {}),
+		};
+
+		let res = self.grpc.get_default_policy_expression(req).await?;
+		let policy_expression = res.get_ref().policy_expression.to_owned();
+		Ok(policy_expression)
 	}
+
 	pub async fn initiate_query_protocol(
 		&mut self,
 		mut rx: mpsc::Receiver<PluginQuery>,
-	) -> Result<Streaming<PluginQuery>> {
-		let stream = async_stream::stream! {
-			while let Some(item) = rx.recv().await {
-				yield item;
-			}
-		};
-		match self.grpc.initiate_query_protocol(stream).await {
-			Ok(resp) => Ok(resp.into_inner()),
-			Err(e) => Err(hc_error!(
-				"query protocol initiation failed with tonic status code {}",
-				e
-			)),
-		}
+	) -> Result<QueryStream> {
+		// Convert the receiver into a stream.
+		let stream = ReceiverStream::new(rx)
+			.map(|query| InitiateQueryProtocolRequest { query: Some(query) });
+
+		// Make the gRPC request.
+		let resp = self
+			.grpc
+			.initiate_query_protocol(stream)
+			.await
+			.map_err(|err| {
+				hc_error!(
+					"query protocol initiation failed with tonic status code {}",
+					err
+				)
+			})?;
+
+		// Pull out the inner query from the response.
+		let stream = resp.into_inner().map(|response| {
+			response.and_then(|res| {
+				res.query
+					.ok_or_else(|| Status::new(Code::Unknown, "no query present in response"))
+			})
+		});
+
+		Ok(Box::new(stream))
 	}
+
 	pub async fn initialize(mut self, config: Value) -> Result<PluginTransport> {
 		let schemas = HashMap::<String, Schema>::from_iter(
 			self.get_query_schemas()
@@ -227,22 +274,27 @@ pub struct Query {
 	pub key: Value,
 	pub output: Value,
 }
+
 impl TryFrom<PluginQuery> for Query {
 	type Error = Error;
+
 	fn try_from(value: PluginQuery) -> Result<Query> {
 		use QueryState::*;
+
 		let request = match TryInto::<QueryState>::try_into(value.state)? {
-			QueryUnspecified => return Err(hc_error!("unspecified error from plugin")),
-			QueryReplyInProgress => {
+			Unspecified => return Err(hc_error!("unspecified error from plugin")),
+			ReplyInProgress => {
 				return Err(hc_error!(
 					"invalid state QueryReplyInProgress for conversion to Query"
 				))
 			}
-			QueryReplyComplete => false,
-			QuerySubmit => true,
+			ReplyComplete => false,
+			Submit => true,
 		};
+
 		let key: Value = serde_json::from_str(value.key.as_str())?;
 		let output: Value = serde_json::from_str(value.output.as_str())?;
+
 		Ok(Query {
 			id: value.id as usize,
 			request,
@@ -254,15 +306,19 @@ impl TryFrom<PluginQuery> for Query {
 		})
 	}
 }
+
 impl TryFrom<Query> for PluginQuery {
 	type Error = crate::error::Error;
+
 	fn try_from(value: Query) -> Result<PluginQuery> {
 		let state_enum = match value.request {
-			true => QueryState::QuerySubmit,
-			false => QueryState::QueryReplyComplete,
+			true => QueryState::Submit,
+			false => QueryState::ReplyComplete,
 		};
+
 		let key = serde_json::to_string(&value.key)?;
 		let output = serde_json::to_string(&value.output)?;
+
 		Ok(PluginQuery {
 			id: value.id as i32,
 			state: state_enum as i32,
@@ -275,18 +331,47 @@ impl TryFrom<Query> for PluginQuery {
 	}
 }
 
-#[derive(Debug)]
 pub struct MultiplexedQueryReceiver {
-	rx: Streaming<PluginQuery>,
+	rx: QueryStream,
 	backlog: HashMap<i32, VecDeque<PluginQuery>>,
 }
+
+impl std::fmt::Debug for MultiplexedQueryReceiver {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("MultiplexedQueryReceiver")
+			.field("rx", &"<receiver>")
+			.field("backlog", &self.backlog)
+			.finish()
+	}
+}
+
+/// Helper type for a stream of query messages.
+///
+/// Note that the inner item is a `Result` because the inner
+/// `query` field on the message can technically be missing.
+///
+/// This case is handled in the `message` method to flatten
+/// that kind of error so code consuming the stream doesn't
+/// have to worry about it.
+type QueryStream = Box<dyn Stream<Item = StdResult<PluginQuery, Status>> + Send + Unpin + 'static>;
+
 impl MultiplexedQueryReceiver {
-	pub fn new(rx: Streaming<PluginQuery>) -> Self {
+	pub fn new(rx: QueryStream) -> Self {
 		Self {
 			rx,
 			backlog: HashMap::new(),
 		}
 	}
+
+	/// Poll the underlying stream future to get the next query, if present.
+	async fn message(&mut self) -> StdResult<Option<PluginQuery>, Status> {
+		match poll_fn(|cx| Pin::new(self.rx.as_mut()).poll_next(cx)).await {
+			Some(Ok(m)) => Ok(Some(m)),
+			Some(Err(e)) => Err(e),
+			None => Ok(None),
+		}
+	}
+
 	// @Invariant - this function will never return an empty VecDeque
 	pub async fn recv(&mut self, id: i32) -> Result<Option<VecDeque<PluginQuery>>> {
 		// If we have 1+ messages on backlog for `id`, return them all,
@@ -294,15 +379,18 @@ impl MultiplexedQueryReceiver {
 		if let Some(msgs) = self.backlog.remove(&id) {
 			return Ok(Some(msgs));
 		}
+
 		// No backlog message, need to operate the receiver
 		loop {
-			let Some(raw) = self.rx.message().await? else {
+			let Some(raw) = self.message().await? else {
 				// gRPC channel was closed
 				return Ok(None);
 			};
+
 			if raw.id == id {
 				return Ok(Some(VecDeque::from([raw])));
 			}
+
 			match self.backlog.get_mut(&raw.id) {
 				Some(vec) => {
 					vec.push_back(raw);
@@ -325,10 +413,12 @@ pub struct PluginTransport {
 	tx: mpsc::Sender<PluginQuery>,
 	rx: Mutex<MultiplexedQueryReceiver>,
 }
+
 impl PluginTransport {
 	pub fn name(&self) -> &str {
 		&self.ctx.plugin.name
 	}
+
 	pub async fn query(&self, query: Query) -> Result<Option<Query>> {
 		use QueryState::*;
 
@@ -351,8 +441,8 @@ impl PluginTransport {
 		let mut state: QueryState = raw.state.try_into()?;
 
 		// If response is the first of a set of chunks, handle
-		if matches!(state, QueryReplyInProgress) {
-			while matches!(state, QueryReplyInProgress) {
+		if matches!(state, ReplyInProgress) {
+			while matches!(state, ReplyInProgress) {
 				// We expect another message. Pull it off the existing queue,
 				// or get a new one if we have run out
 				let next = match msg_chunks.pop_front() {
@@ -375,13 +465,13 @@ impl PluginTransport {
 				// By now we have our "next" message
 				state = next.state.try_into()?;
 				match state {
-					QueryUnspecified => return Err(hc_error!("unspecified error from plugin")),
-					QuerySubmit => {
+					Unspecified => return Err(hc_error!("unspecified error from plugin")),
+					Submit => {
 						return Err(hc_error!(
 							"plugin sent QuerySubmit state when reply chunk expected"
 						))
 					}
-					QueryReplyInProgress | QueryReplyComplete => {
+					ReplyInProgress | ReplyComplete => {
 						raw.output.push_str(next.output.as_str());
 					}
 				};
@@ -404,6 +494,7 @@ impl From<PluginWithConfig> for (Plugin, Value) {
 		(value.0, value.1)
 	}
 }
+
 pub struct PluginContextWithConfig(pub PluginContext, pub Value);
 impl From<PluginContextWithConfig> for (PluginContext, Value) {
 	fn from(value: PluginContextWithConfig) -> Self {
@@ -419,6 +510,7 @@ pub struct AwaitingResult {
 	pub query: String,
 	pub key: Value,
 }
+
 impl From<Query> for AwaitingResult {
 	fn from(value: Query) -> Self {
 		AwaitingResult {
@@ -437,6 +529,7 @@ pub enum PluginResponse {
 	AwaitingResult(AwaitingResult),
 	Completed(Value),
 }
+
 impl From<Option<Query>> for PluginResponse {
 	fn from(value: Option<Query>) -> Self {
 		match value {
@@ -445,6 +538,7 @@ impl From<Option<Query>> for PluginResponse {
 		}
 	}
 }
+
 impl From<Query> for PluginResponse {
 	fn from(value: Query) -> Self {
 		if !value.request {
