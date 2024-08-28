@@ -42,8 +42,15 @@ impl PluginExecutor {
 	}
 	fn get_available_port(&self) -> Result<u16> {
 		for i in self.port_range.start..self.port_range.end {
-			if std::net::TcpListener::bind(format!("127.0.0.1:{i}")).is_ok() {
-				return Ok(i);
+			// @Todo - either TcpListener::bind returns Ok even if port is bound
+			// or we have a race condition. For now just have OS assign a port
+			// if std::net::TcpListener::bind(format!("127.0.0.1:{i}")).is_ok() {
+			// 	return Ok(i);
+			// }
+			if let Ok(addr) = std::net::TcpListener::bind("127.0.0.1:0") {
+				if let Ok(local_addr) = addr.local_addr() {
+					return Ok(local_addr.port());
+				}
 			}
 		}
 		Err(hc_error!("Failed to find available port"))
@@ -60,6 +67,7 @@ impl PluginExecutor {
 		// on the cmdline is not already in use, but it is still possible for that
 		// port to become unavailable between our check and the plugin's bind attempt.
 		// Hence the need for subsequent attempts if we get unlucky
+		eprintln!("Starting plugin '{}'", plugin.name);
 		let mut spawn_attempts: usize = 0;
 		while spawn_attempts < self.max_spawn_attempts {
 			// Find free port for process. Don't retry if we fail since this means all
@@ -67,6 +75,7 @@ impl PluginExecutor {
 			let port = self.get_available_port()?;
 			let port_str = port.to_string();
 			// Spawn plugin process
+			eprintln!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
 			let Ok(mut proc) = Command::new(&plugin.entrypoint)
 				.args(["--port", port_str.as_str()])
 				// @Temporary - directly forward stdout/stderr from plugin to shell

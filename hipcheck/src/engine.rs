@@ -37,6 +37,7 @@ fn query(
 	};
 	// Initiate the query. If remote closed or we got our response immediately,
 	// return
+	println!("Querying {plugin}::{query} with key {key:?}");
 	let mut ar = match runtime.block_on(p_handle.query(query, key))? {
 		PluginResponse::RemoteClosed => {
 			return Err(hc_error!("Plugin channel closed unexpected"));
@@ -48,12 +49,14 @@ fn query(
 	// (with salsa memo-ization) to get the needed data, and resume our
 	// current query by providing the plugin the answer.
 	loop {
+		println!("Query needs more info, recursing...");
 		let answer = db.query(
 			ar.publisher.clone(),
 			ar.plugin.clone(),
 			ar.query.clone(),
 			ar.key.clone(),
 		)?;
+		println!("Got answer {answer:?}, resuming");
 		ar = match runtime.block_on(p_handle.resume_query(ar, answer))? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));
@@ -79,6 +82,7 @@ pub fn async_query(
 		};
 		// Initiate the query. If remote closed or we got our response immediately,
 		// return
+		println!("Querying: {query}, key: {key:?}");
 		let mut ar = match p_handle.query(query, key).await? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));
@@ -92,6 +96,7 @@ pub fn async_query(
 		// (with salsa memo-ization) to get the needed data, and resume our
 		// current query by providing the plugin the answer.
 		loop {
+			println!("Awaiting result, now recursing");
 			let answer = async_query(
 				Arc::clone(&core),
 				ar.publisher.clone(),
@@ -100,6 +105,7 @@ pub fn async_query(
 				ar.key.clone(),
 			)
 			.await?;
+			println!("Resuming query with answer {answer:?}");
 			ar = match p_handle.resume_query(ar, answer).await? {
 				PluginResponse::RemoteClosed => {
 					return Err(hc_error!("Plugin channel closed unexpected"));
@@ -119,6 +125,14 @@ pub struct HcEngineImpl {
 }
 
 impl salsa::Database for HcEngineImpl {}
+
+impl salsa::ParallelDatabase for HcEngineImpl {
+	fn snapshot(&self) -> salsa::Snapshot<Self> {
+		salsa::Snapshot::new(HcEngineImpl {
+			storage: self.storage.snapshot(),
+		})
+	}
+}
 
 impl HcEngineImpl {
 	// Really HcEngineImpl and HcPluginCore do the same thing right now, except HcPluginCore

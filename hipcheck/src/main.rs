@@ -50,6 +50,7 @@ use cli::CacheOp;
 use cli::CheckArgs;
 use cli::CliConfig;
 use cli::FullCommands;
+use cli::PluginArgs;
 use cli::SchemaArgs;
 use cli::SchemaCommand;
 use cli::SetupArgs;
@@ -111,7 +112,7 @@ fn main() -> ExitCode {
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
 		Some(FullCommands::Cache(args)) => return cmd_cache(args, &config),
-		Some(FullCommands::Plugin) => cmd_plugin(),
+		Some(FullCommands::Plugin(args)) => cmd_plugin(args),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
@@ -603,16 +604,21 @@ fn check_github_token() -> StdResult<(), EnvVarCheckError> {
 		})
 }
 
-fn cmd_plugin() {
+fn cmd_plugin(args: PluginArgs) {
 	use crate::engine::{async_query, HcEngine, HcEngineImpl};
 	use std::sync::Arc;
 	use tokio::task::JoinSet;
 
 	let tgt_dir = "./target/debug";
-	let entrypoint = pathbuf![tgt_dir, "dummy_rand_data"];
-	let plugin = Plugin {
+	let entrypoint1 = pathbuf![tgt_dir, "dummy_rand_data"];
+	let entrypoint2 = pathbuf![tgt_dir, "dummy_sha256"];
+	let plugin1 = Plugin {
 		name: "rand_data".to_owned(),
-		entrypoint: entrypoint.display().to_string(),
+		entrypoint: entrypoint1.display().to_string(),
+	};
+	let plugin2 = Plugin {
+		name: "sha256".to_owned(),
+		entrypoint: entrypoint2.display().to_string(),
 	};
 	let plugin_executor = PluginExecutor::new(
 		/* max_spawn_attempts */ 3,
@@ -624,7 +630,10 @@ fn cmd_plugin() {
 	.unwrap();
 	let engine = match HcEngineImpl::new(
 		plugin_executor,
-		vec![PluginWithConfig(plugin, serde_json::json!(null))],
+		vec![
+			PluginWithConfig(plugin1, serde_json::json!(null)),
+			PluginWithConfig(plugin2, serde_json::json!(null)),
+		],
 	) {
 		Ok(e) => e,
 		Err(e) => {
@@ -632,49 +641,62 @@ fn cmd_plugin() {
 			return;
 		}
 	};
-	let core = engine.core();
-	let handle = HcEngineImpl::runtime();
-	// @Note - how to initiate multiple queries with async calls
-	handle.block_on(async move {
-		let mut futs = JoinSet::new();
-		for i in 1..10 {
-			let arc_core = Arc::clone(&core);
-			println!("Spawning");
-			futs.spawn(async_query(
-				arc_core,
-				"MITRE".to_owned(),
-				"rand_data".to_owned(),
-				"rand_data".to_owned(),
-				serde_json::json!(i),
-			));
-		}
-		while let Some(res) = futs.join_next().await {
-			println!("res: {res:?}");
-		}
-	});
-	// @Note - how to initiate multiple queries with sync calls
-	// let conc: Vec<thread::JoinHandle<()>> = vec![];
-	// for i in 0..10 {
-	// 	let fut = thread::spawn(|| {
-	// 		let res = match engine.query(
-	// 			"MITRE".to_owned(),
-	// 			"rand_data".to_owned(),
-	// 			"rand_data".to_owned(),
-	// 			serde_json::json!(i),
-	// 		) {
-	// 			Ok(r) => r,
-	// 			Err(e) => {
-	// 				println!("{i}: Query failed: {e}");
-	// 				return;
-	// 			}
-	// 		};
-	// 		println!("{i}: Result: {res}");
-	// 	});
-	// 	conc.push(fut);
-	// }
-	// while let Some(x) = conc.pop() {
-	// 	x.join().unwrap();
-	// }
+	if args.asynch {
+		// @Note - how to initiate multiple queries with async calls
+		let core = engine.core();
+		let handle = HcEngineImpl::runtime();
+		handle.block_on(async move {
+			let mut futs = JoinSet::new();
+			for i in 1..10 {
+				let arc_core = Arc::clone(&core);
+				println!("Spawning");
+				futs.spawn(async_query(
+					arc_core,
+					"MITRE".to_owned(),
+					"rand_data".to_owned(),
+					"rand_data".to_owned(),
+					serde_json::json!(i),
+				));
+			}
+			while let Some(res) = futs.join_next().await {
+				println!("res: {res:?}");
+			}
+		});
+	} else {
+		let res = engine.query(
+			"MITRE".to_owned(),
+			"rand_data".to_owned(),
+			"rand_data".to_owned(),
+			serde_json::json!(1),
+		);
+		println!("res: {res:?}");
+		// @Note - how to initiate multiple queries with sync calls
+		// Currently does not work, compiler complains need Sync impl
+		// use std::thread;
+		// let conc: Vec<thread::JoinHandle<()>> = vec![];
+		// for i in 0..10 {
+		// 	let snapshot = engine.snapshot();
+		// 	let fut = thread::spawn(|| {
+		// 		let res = match snapshot.query(
+		// 			"MITRE".to_owned(),
+		// 			"rand_data".to_owned(),
+		// 			"rand_data".to_owned(),
+		// 			serde_json::json!(i),
+		// 		) {
+		// 			Ok(r) => r,
+		// 			Err(e) => {
+		// 				println!("{i}: Query failed: {e}");
+		// 				return;
+		// 			}
+		// 		};
+		// 		println!("{i}: Result: {res}");
+		// 	});
+		// 	conc.push(fut);
+		// }
+		// while let Some(x) = conc.pop() {
+		// 	x.join().unwrap();
+		// }
+	}
 }
 
 fn cmd_ready(config: &CliConfig) {
