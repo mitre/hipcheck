@@ -170,8 +170,6 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 		}
 	};
 
-	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
-
 	let report = run(
 		target,
 		config.config().map(ToOwned::to_owned),
@@ -179,7 +177,6 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 		config.cache().map(ToOwned::to_owned),
 		config.policy().map(ToOwned::to_owned),
 		config.format(),
-		raw_version,
 	);
 
 	match report {
@@ -207,9 +204,6 @@ fn cmd_schema(args: &SchemaArgs) {
 }
 
 fn cmd_print_weights(config: &CliConfig) -> Result<()> {
-	// Get the raw hipcheck version.
-	let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
-
 	// Silence the global shell while we're checking the dummy repo to prevent progress bars and
 	// title messages from displaying while calculating the weight tree.
 	let silence_guard = Shell::silence();
@@ -229,7 +223,6 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		config.cache().map(ToOwned::to_owned),
 		config.policy().map(ToOwned::to_owned),
 		config.format(),
-		raw_version,
 	)?;
 
 	// Get the weight tree and print it.
@@ -964,7 +957,6 @@ fn run(
 	home_dir: Option<PathBuf>,
 	policy_path: Option<PathBuf>,
 	format: Format,
-	raw_version: &str,
 ) -> Result<AnyReport> {
 	// Initialize the session.
 	let session = match Session::new(
@@ -974,7 +966,6 @@ fn run(
 		home_dir,
 		policy_path,
 		format,
-		raw_version,
 	) {
 		Ok(session) => session,
 		Err(err) => return Err(err),

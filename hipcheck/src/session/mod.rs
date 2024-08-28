@@ -48,7 +48,6 @@ use crate::source::SourceQuery;
 use crate::source::SourceQueryStorage;
 use crate::target::SbomStandard;
 use crate::target::{Target, TargetSeed, TargetSeedKind};
-use crate::version::get_version;
 use crate::version::VersionQuery;
 use crate::version::VersionQueryStorage;
 use chrono::prelude::*;
@@ -125,7 +124,6 @@ impl Session {
 		home_dir: Option<PathBuf>,
 		policy_path: Option<PathBuf>,
 		format: Format,
-		raw_version: &str,
 	) -> StdResult<Session, Error> {
 		/*===================================================================
 		 *  Setting up the session.
@@ -211,12 +209,8 @@ impl Session {
 		 *  Resolving the Hipcheck version.
 		 *-----------------------------------------------------------------*/
 
-		let version = match get_version(raw_version) {
-			Ok(version) => version,
-			Err(err) => return Err(err),
-		};
-
-		session.set_hc_version(Rc::new(version));
+		let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
+		session.set_hc_version(Rc::new(raw_version.to_string()));
 
 		/*===================================================================
 		 *  Remaining input queries.
