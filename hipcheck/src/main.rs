@@ -42,7 +42,7 @@ use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
 use crate::plugin::{Plugin, PluginExecutor, PluginWithConfig};
-use crate::session::session::Session;
+use crate::session::Session;
 use crate::setup::{resolve_and_transform_source, SourceType};
 use crate::shell::verbosity::Verbosity;
 use crate::shell::Shell;

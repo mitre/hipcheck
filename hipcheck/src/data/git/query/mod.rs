@@ -18,7 +18,7 @@ use crate::data::git::SignerKeyView;
 use crate::data::git::SignerNameView;
 use crate::data::git::SignerView;
 use crate::error::Result;
-use crate::source::source::SourceQuery;
+use crate::source::SourceQuery;
 use crate::version::VersionQuery;
 use chrono::prelude::*;
 use std::sync::Arc;
