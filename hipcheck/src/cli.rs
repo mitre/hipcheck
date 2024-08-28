@@ -398,7 +398,7 @@ pub enum FullCommands {
 	Ready,
 	Update(UpdateArgs),
 	Cache(CacheArgs),
-	Plugin,
+	Plugin(PluginArgs),
 	PrintConfig,
 	PrintData,
 	PrintCache,
@@ -415,7 +415,7 @@ impl From<&Commands> for FullCommands {
 			Commands::Scoring => FullCommands::Scoring,
 			Commands::Update(args) => FullCommands::Update(args.clone()),
 			Commands::Cache(args) => FullCommands::Cache(args.clone()),
-			Commands::Plugin => FullCommands::Plugin,
+			Commands::Plugin(args) => FullCommands::Plugin(args.clone()),
 		}
 	}
 }
@@ -446,7 +446,7 @@ pub enum Commands {
 	Cache(CacheArgs),
 	/// Execute temporary code for exercising plugin engine
 	#[command(hide = true)]
-	Plugin,
+	Plugin(PluginArgs),
 }
 
 // If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
@@ -963,6 +963,12 @@ impl TryFrom<Vec<String>> for RepoCacheDeleteScope {
 			Ok(RepoCacheDeleteScope::Group { sort, invert, n })
 		}
 	}
+}
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct PluginArgs {
+	#[arg(long = "async")]
+	pub asynch: bool,
 }
 
 /// Test CLI commands

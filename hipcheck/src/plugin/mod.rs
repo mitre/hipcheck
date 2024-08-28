@@ -88,6 +88,7 @@ impl ActivePlugin {
 			key: serde_json::json!(null),
 			output,
 		};
+		eprintln!("Resuming query with answer {query:?}");
 		Ok(self.channel.query(query).await?.into())
 	}
 }
