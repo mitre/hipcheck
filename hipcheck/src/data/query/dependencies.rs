@@ -6,7 +6,7 @@ use crate::data::npm::get_package_file;
 use crate::data::npm::PackageFile;
 use crate::data::Dependencies;
 use crate::error::Result;
-use crate::source::source::SourceQuery;
+use crate::source::SourceQuery;
 use crate::version::VersionQuery;
 use std::sync::Arc;
 

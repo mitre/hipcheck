@@ -9,7 +9,7 @@ use crate::hc_error;
 use crate::report::Format;
 use crate::session::pm;
 use crate::shell::{color_choice::ColorChoice, verbosity::Verbosity};
-use crate::source::source;
+use crate::source;
 use crate::target::{
 	LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, TargetSeed,
 	TargetSeedKind, TargetType, ToTargetSeed, ToTargetSeedKind,

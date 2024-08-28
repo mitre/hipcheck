@@ -4,7 +4,7 @@
 
 use crate::error::Error;
 use crate::error::Result;
-use crate::source::source::SourceQuery;
+use crate::source::SourceQuery;
 use crate::target::KnownRemote;
 use std::sync::Arc;
 

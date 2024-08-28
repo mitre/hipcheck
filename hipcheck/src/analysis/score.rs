@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::analysis::AnalysisOutcome;
 use crate::analysis::result::*;
+use crate::analysis::AnalysisOutcome;
 use crate::analysis::AnalysisProvider;
 use crate::config::{visit_leaves, WeightTree, WeightTreeProvider};
 use crate::error::Result;
