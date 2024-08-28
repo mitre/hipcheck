@@ -1,9 +1,8 @@
 //! The `indicatif-log-bridge` crate discards filtering information when using env_logger, so I'm writting my own.
 
+use crate::shell::Shell;
 use env_logger::Logger;
 use log::SetLoggerError;
-
-use crate::shell::Shell;
 
 pub struct LogWrapper(pub Logger);
 
