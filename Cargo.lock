@@ -700,6 +700,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "futures",
  "indexmap 2.4.0",
  "prost",
  "rand",
@@ -707,6 +708,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
+ "tonic-build",
 ]
 
 [[package]]
@@ -715,6 +717,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "futures",
  "indexmap 2.4.0",
  "prost",
  "rand",
@@ -723,6 +726,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
+ "tonic-build",
 ]
 
 [[package]]
@@ -1174,6 +1178,7 @@ dependencies = [
  "test-log",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "toml",
  "tonic",
  "tonic-build",

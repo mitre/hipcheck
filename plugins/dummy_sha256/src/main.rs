@@ -1,15 +1,21 @@
-#![allow(unused_variables)]
+mod transport;
+mod proto {
+	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
+}
 
-mod hipcheck;
-mod hipcheck_transport;
-
-use crate::hipcheck_transport::*;
+use crate::{
+	proto::{
+		plugin_service_server::{PluginService, PluginServiceServer},
+		ConfigurationStatus, GetDefaultPolicyExpressionRequest, GetQuerySchemasRequest,
+		SetConfigurationRequest, SetConfigurationResponse,
+	},
+	transport::*,
+};
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use hipcheck::plugin_server::{Plugin, PluginServer};
-use hipcheck::{
-	Configuration, ConfigurationResult, ConfigurationStatus, Empty, PolicyExpression,
-	Query as PluginQuery, Schema,
+use proto::{
+	GetDefaultPolicyExpressionResponse, GetQuerySchemasResponse, InitiateQueryProtocolRequest,
+	InitiateQueryProtocolResponse,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -18,145 +24,165 @@ use tokio::sync::mpsc;
 use tokio_stream::{wrappers::ReceiverStream, Stream};
 use tonic::{transport::Server, Request, Response, Status, Streaming};
 
-static SHA256_KEY_SCHEMA: &str = include_str!("query_schema_sha256.json");
-static SHA256_OUTPUT_SCHEMA: &str = include_str!("query_schema_sha256.json");
+static SHA256_KEY_SCHEMA: &str = include_str!("../schema/query_schema_sha256.json");
+static SHA256_OUTPUT_SCHEMA: &str = include_str!("../schema/query_schema_sha256.json");
 
-fn sha256(content: Vec<u8>) -> Vec<u8> {
+fn sha256(content: &[u8]) -> Vec<u8> {
 	let mut hasher = Sha256::new();
 	hasher.update(content);
 	hasher.finalize().to_vec()
 }
 
-pub async fn handle_sha256(channel: HcTransport, id: usize, key: Vec<u8>) -> Result<()> {
-	println!("SHA256-{id}: Key: {key:02x?}");
+async fn handle_sha256(session: QuerySession, key: &[u8]) -> Result<()> {
+	println!("Key: {key:02x?}");
 	let res = sha256(key);
-	println!("SHA256-{id}: Hash: {res:02x?}");
+
+	println!("Hash: {res:02x?}");
 	let output = serde_json::to_value(res)?;
+
 	let resp = Query {
-		id,
-		request: false,
+		direction: QueryDirection::Response,
 		publisher: "".to_owned(),
 		plugin: "".to_owned(),
 		query: "".to_owned(),
 		key: json!(null),
 		output,
 	};
-	channel.send(resp).await?;
+
+	session.send(resp).await?;
+
 	Ok(())
 }
-struct Sha256Runner {
-	channel: HcTransport,
+
+async fn handle_session(mut session: QuerySession) -> Result<()> {
+	let Some(query) = session.recv().await? else {
+		eprintln!("session closed by remote");
+		return Ok(());
+	};
+
+	if query.direction == QueryDirection::Response {
+		return Err(anyhow!("Expected request from remote"));
+	}
+
+	let name = query.query;
+	let key = query.key;
+
+	if name != "sha256" {
+		return Err(anyhow!("unrecognized query '{}'", name));
+	}
+
+	let Value::Array(data) = &key else {
+		return Err(anyhow!("get_sha256 argument must be an array"));
+	};
+
+	let data = data
+		.iter()
+		.map(|elem| elem.as_u64().map(|num| num as u8))
+		.collect::<Option<Vec<_>>>()
+		.ok_or_else(|| anyhow!("non-numeric data in get_sha256 array argument"))?;
+
+	handle_sha256(session, &data[..]).await?;
+
+	Ok(())
 }
+
+struct Sha256Runner {
+	channel: HcSessionSocket,
+}
+
 impl Sha256Runner {
-	pub fn new(channel: HcTransport) -> Self {
+	pub fn new(channel: HcSessionSocket) -> Self {
 		Sha256Runner { channel }
 	}
-	async fn handle_query(channel: HcTransport, id: usize, name: String, key: Value) -> Result<()> {
-		if name == "sha256" {
-			let Value::Array(val_vec) = &key else {
-				return Err(anyhow!("get_rand argument must be a number"));
-			};
-			let byte_vec = val_vec
-				.iter()
-				.map(|x| {
-					let Value::Number(val_byte) = x else {
-						return Err(anyhow!("expected all integers"));
-					};
-					let Some(byte) = val_byte.as_u64() else {
-						return Err(anyhow!(
-							"sha256 input array must contain only unsigned integers"
-						));
-					};
-					Ok(byte as u8)
-				})
-				.collect::<Result<Vec<u8>>>()?;
-			handle_sha256(channel, id, byte_vec).await?;
-			Ok(())
-		} else {
-			Err(anyhow!("unrecognized query '{}'", name))
-		}
-	}
-	pub async fn run(self) -> Result<()> {
+
+	pub async fn run(mut self) -> Result<()> {
 		loop {
 			eprintln!("SHA256: Looping");
-			let Some(msg) = self.channel.recv_new().await? else {
+
+			let Some(session) = self.channel.listen().await? else {
 				eprintln!("Channel closed by remote");
 				break;
 			};
-			if msg.request {
-				let child_channel = self.channel.clone();
-				tokio::spawn(async move {
-					if let Err(e) =
-						Sha256Runner::handle_query(child_channel, msg.id, msg.query, msg.key).await
-					{
-						eprintln!("handle_query failed: {e}");
-					};
-				});
-			} else {
-				return Err(anyhow!("Did not expect a response-type message here"));
-			}
+
+			tokio::spawn(async move {
+				if let Err(e) = handle_session(session).await {
+					eprintln!("handle_session failed: {e}");
+				};
+			});
 		}
+
 		Ok(())
 	}
 }
 
 #[derive(Debug)]
-struct RandDataPlugin {
-	pub schema: Schema,
+struct Sha256Plugin {
+	schema: GetQuerySchemasResponse,
 }
-impl RandDataPlugin {
-	pub fn new() -> Self {
-		let schema = Schema {
-			query_name: "sha256".to_owned(),
-			key_schema: SHA256_KEY_SCHEMA.to_owned(),
-			output_schema: SHA256_OUTPUT_SCHEMA.to_owned(),
-		};
-		RandDataPlugin { schema }
+
+impl Sha256Plugin {
+	fn new() -> Self {
+		Sha256Plugin {
+			schema: GetQuerySchemasResponse {
+				query_name: "sha256".to_owned(),
+				key_schema: SHA256_KEY_SCHEMA.to_owned(),
+				output_schema: SHA256_OUTPUT_SCHEMA.to_owned(),
+			},
+		}
 	}
 }
 
 #[tonic::async_trait]
-impl Plugin for RandDataPlugin {
+impl PluginService for Sha256Plugin {
 	type GetQuerySchemasStream =
-		Pin<Box<dyn Stream<Item = Result<Schema, Status>> + Send + 'static>>;
-	type InitiateQueryProtocolStream = ReceiverStream<Result<PluginQuery, Status>>;
+		Pin<Box<dyn Stream<Item = Result<GetQuerySchemasResponse, Status>> + Send + 'static>>;
+
+	type InitiateQueryProtocolStream =
+		ReceiverStream<Result<InitiateQueryProtocolResponse, Status>>;
+
 	async fn get_query_schemas(
 		&self,
-		_request: Request<Empty>,
+		_request: Request<GetQuerySchemasRequest>,
 	) -> Result<Response<Self::GetQuerySchemasStream>, Status> {
 		Ok(Response::new(Box::pin(tokio_stream::iter(vec![Ok(self
 			.schema
 			.clone())]))))
 	}
+
 	async fn set_configuration(
 		&self,
-		request: Request<Configuration>,
-	) -> Result<Response<ConfigurationResult>, Status> {
-		Ok(Response::new(ConfigurationResult {
-			status: ConfigurationStatus::ErrorNone as i32,
+		_request: Request<SetConfigurationRequest>,
+	) -> Result<Response<SetConfigurationResponse>, Status> {
+		Ok(Response::new(SetConfigurationResponse {
+			status: ConfigurationStatus::None as i32,
 			message: "".to_owned(),
 		}))
 	}
+
 	async fn get_default_policy_expression(
 		&self,
-		request: Request<Empty>,
-	) -> Result<Response<PolicyExpression>, Status> {
-		Ok(Response::new(PolicyExpression {
+		_request: Request<GetDefaultPolicyExpressionRequest>,
+	) -> Result<Response<GetDefaultPolicyExpressionResponse>, Status> {
+		Ok(Response::new(GetDefaultPolicyExpressionResponse {
 			policy_expression: "".to_owned(),
 		}))
 	}
+
 	async fn initiate_query_protocol(
 		&self,
-		request: Request<Streaming<PluginQuery>>,
+		request: Request<Streaming<InitiateQueryProtocolRequest>>,
 	) -> Result<Response<Self::InitiateQueryProtocolStream>, Status> {
 		let rx = request.into_inner();
-		let (tx, out_rx) = mpsc::channel::<Result<PluginQuery, Status>>(4);
+		let (tx, out_rx) = mpsc::channel::<Result<InitiateQueryProtocolResponse, Status>>(4);
+
 		tokio::spawn(async move {
-			let channel = HcTransport::new(rx, tx);
+			let channel = HcSessionSocket::new(tx, rx);
+
 			if let Err(e) = Sha256Runner::new(channel).run().await {
 				eprintln!("sha256 plugin ended in error: {e}");
 			}
 		});
+
 		Ok(Response::new(ReceiverStream::new(out_rx)))
 	}
 }
@@ -170,12 +196,11 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let args = Args::try_parse().map_err(Box::new)?;
-	let addr = format!("127.0.0.1:{}", args.port);
-	let plugin = RandDataPlugin::new();
-	let svc = PluginServer::new(plugin);
-	Server::builder()
-		.add_service(svc)
-		.serve(addr.parse().unwrap())
-		.await?;
+
+	let service = PluginServiceServer::new(Sha256Plugin::new());
+	let host = format!("127.0.0.1:{}", args.port).parse().unwrap();
+
+	Server::builder().add_service(service).serve(host).await?;
+
 	Ok(())
 }

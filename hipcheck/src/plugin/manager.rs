@@ -1,4 +1,4 @@
-use crate::hipcheck::plugin_client::PluginClient;
+use crate::hipcheck::plugin_service_client::PluginServiceClient;
 use crate::plugin::{HcPluginClient, Plugin, PluginContext};
 use crate::{hc_error, Result, F64};
 use futures::future::join_all;
@@ -106,7 +106,7 @@ impl PluginExecutor {
 					.mul_f64(jitter_percent);
 				sleep_until(Instant::now() + sleep_duration).await;
 				if let Ok(grpc) =
-					PluginClient::connect(format!("http://127.0.0.1:{port_str}")).await
+					PluginServiceClient::connect(format!("http://127.0.0.1:{port_str}")).await
 				{
 					opt_grpc = Some(grpc);
 					break;

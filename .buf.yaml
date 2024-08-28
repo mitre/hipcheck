@@ -1,0 +1,5 @@
+version: v2
+lint:
+  use:
+    - DEFAULT
+  rpc_allow_same_request_response: true

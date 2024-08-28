@@ -27,7 +27,7 @@ mod util;
 mod version;
 
 pub mod hipcheck {
-	include!(concat!(env!("OUT_DIR"), "/hipcheck.rs"));
+	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
 }
 
 use crate::analysis::report_builder::build_report;
