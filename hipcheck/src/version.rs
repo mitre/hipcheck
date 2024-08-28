@@ -3,10 +3,8 @@
 use crate::context::Context;
 use crate::error::Result;
 use semver::Version;
-use std::ops::Not as _;
 use std::rc::Rc;
 
-/// Query the environment to identify the proper version string.
 pub fn get_version(raw_version: &str) -> Result<String> {
 	// Basic algorithm:
 	//     1. Check the version number in `Cargo.toml`.
@@ -16,17 +14,7 @@ pub fn get_version(raw_version: &str) -> Result<String> {
 	//        as `<version number> (<HEAD commit>)`
 
 	let version = Version::parse(raw_version).context("can't parse version in Cargo.toml")?;
-
 	log::debug!("detected Hipcheck version [version='{:?}']", version);
-
-	if version.pre.as_str().starts_with("alpha") {
-		let head = option_env!("HC_HEAD_COMMIT").unwrap_or("");
-
-		if head.is_empty().not() {
-			return Ok(format!("{} ({})", raw_version, head));
-		}
-	}
-
 	Ok(raw_version.to_string())
 }
 
