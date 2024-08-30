@@ -23,7 +23,7 @@ pub struct TypoOutput {
 	pub typos: Vec<TypoDep>,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct TypoDep {
 	pub dependency: Arc<String>,
 	pub typo: Typo,

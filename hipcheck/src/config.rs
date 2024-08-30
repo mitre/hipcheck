@@ -6,6 +6,7 @@ use crate::analysis::score::*;
 use crate::context::Context;
 use crate::error::Result;
 use crate::hc_error;
+use crate::policy_exprs::{Expr, Primitive};
 use crate::util::fs as file;
 use crate::BINARY_CONFIG_FILE;
 use crate::F64;
@@ -17,7 +18,9 @@ use num_traits::identities::Zero;
 use pathbuf::pathbuf;
 use serde::Deserialize;
 use serde::Serialize;
+use serde_json::Value;
 use smart_default::SmartDefault;
+use std::collections::HashMap;
 use std::default::Default;
 use std::path::Path;
 use std::path::PathBuf;
@@ -591,6 +594,186 @@ pub trait CommitConfigQuery: ConfigSource {
 	fn entropy_percent_threshold(&self) -> F64;
 }
 
+pub static MITRE_PUBLISHER: &str = "MITRE";
+pub static LEGACY_PLUGIN: &str = "legacy";
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Analysis {
+	pub publisher: String,
+	pub plugin: String,
+	pub query: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PoliciedAnalysis(pub Analysis, pub Expr);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AnalysisTreeNode {
+	Category {
+		label: String,
+		weight: F64,
+	},
+	Analysis {
+		analysis: PoliciedAnalysis,
+		weight: F64,
+	},
+}
+impl AnalysisTreeNode {
+	pub fn get_weight(&self) -> F64 {
+		match self {
+			AnalysisTreeNode::Category { weight, .. } => *weight,
+			AnalysisTreeNode::Analysis { weight, .. } => *weight,
+		}
+	}
+	pub fn normalize_weight(&mut self, divisor: F64) {
+		match self {
+			AnalysisTreeNode::Category { weight, .. } => {
+				*weight /= divisor;
+			}
+			AnalysisTreeNode::Analysis { weight, .. } => {
+				*weight /= divisor;
+			}
+		}
+	}
+	pub fn category(label: &str, weight: F64) -> Self {
+		AnalysisTreeNode::Category {
+			label: label.to_owned(),
+			weight,
+		}
+	}
+	pub fn analysis(analysis: Analysis, expr: Expr, weight: F64) -> Self {
+		AnalysisTreeNode::Analysis {
+			analysis: PoliciedAnalysis(analysis, expr),
+			weight,
+		}
+	}
+	pub fn augment(&self, metrics: &HashMap<Analysis, Result<Value>>) -> ScoreTreeNode {
+		match self {
+			AnalysisTreeNode::Category { label, weight } => ScoreTreeNode {
+				label: label.clone(),
+				score: 0f64,
+				weight: (*weight).into(),
+			},
+			AnalysisTreeNode::Analysis {
+				analysis,
+				weight: _,
+			} => {
+				let _analysis_res = metrics.get(&analysis.0);
+				todo!("Extract relevant Value output from map, load into and execute policy, return score")
+			}
+		}
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalysisTree {
+	pub tree: Arena<AnalysisTreeNode>,
+	pub root: NodeId,
+}
+impl AnalysisTree {
+	#[allow(unused)] // Will be used once RFD4 impl lands
+	pub fn new(root_label: &str) -> Self {
+		let mut tree = Arena::new();
+		let root = tree.new_node(AnalysisTreeNode::category(
+			root_label,
+			F64::new(1.0).unwrap(),
+		));
+		AnalysisTree { tree, root }
+	}
+	pub fn get_analyses(&self) -> Vec<Analysis> {
+		visit_leaves(
+			self.root,
+			&self.tree,
+			|_n| false,
+			|_a, n| match n {
+				AnalysisTreeNode::Analysis { analysis, .. } => analysis.0.clone(),
+				AnalysisTreeNode::Category { .. } => unreachable!(),
+			},
+		)
+	}
+	#[allow(unused)] // Will be used once RFD4 impl lands
+	pub fn node_is_category(&self, id: NodeId) -> Result<bool> {
+		let node_ref = self.tree.get(id).ok_or(hc_error!("node not in tree"))?;
+		Ok(matches!(node_ref.get(), AnalysisTreeNode::Category { .. }))
+	}
+	#[allow(unused)] // Will be used once RFD4 impl lands
+	pub fn add_category(&mut self, under: NodeId, label: &str, weight: F64) -> Result<NodeId> {
+		if self.node_is_category(under)? {
+			let child = self
+				.tree
+				.new_node(AnalysisTreeNode::category(label, weight));
+			under.append(child, &mut self.tree);
+			Ok(child)
+		} else {
+			Err(hc_error!("cannot append to analysis node"))
+		}
+	}
+	#[allow(unused)] // Will be used once RFD4 impl lands
+	pub fn add_analysis(
+		&mut self,
+		under: NodeId,
+		analysis: Analysis,
+		policy: Expr,
+		weight: F64,
+	) -> Result<NodeId> {
+		if self.node_is_category(under)? {
+			let child = self
+				.tree
+				.new_node(AnalysisTreeNode::analysis(analysis, policy, weight));
+			under.append(child, &mut self.tree);
+			Ok(child)
+		} else {
+			Err(hc_error!("cannot append to analysis node"))
+		}
+	}
+	// @Temporary - WeightTree will be replaced by AnalysisTree, and WeightTree and this function
+	// will cease to exit
+	pub fn from_weight_tree(weight_tree: &WeightTree) -> Result<Self> {
+		use indextree::NodeEdge::*;
+		let mut tree = Arena::<AnalysisTreeNode>::new();
+		let weight_root = weight_tree.root;
+		let analysis_root = tree.new_node(
+			weight_tree
+				.tree
+				.get(weight_root)
+				.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+				.get()
+				.with_hardcoded_expr(),
+		);
+
+		let mut scope: Vec<NodeId> = vec![analysis_root];
+		for edge in weight_root.traverse(&weight_tree.tree) {
+			match edge {
+				Start(n) => {
+					let curr_weight_node = weight_tree
+						.tree
+						.get(n)
+						.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+						.get();
+					// If is a category node
+					let curr_node = if n.children(&weight_tree.tree).next().is_some() {
+						tree.new_node(curr_weight_node.as_category_node())
+					} else {
+						tree.new_node(curr_weight_node.with_hardcoded_expr())
+					};
+					scope
+						.last()
+						.ok_or(hc_error!("Scope stack is empty, invalid state"))?
+						.append(curr_node, &mut tree);
+					scope.push(curr_node);
+				}
+				End(_) => {
+					scope.pop();
+				}
+			};
+		}
+		Ok(AnalysisTree {
+			tree,
+			root: analysis_root,
+		})
+	}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WeightTreeNode {
 	pub label: String,
@@ -612,6 +795,26 @@ impl WeightTreeNode {
 			label: self.label.clone(),
 			score: score as f64,
 			weight: self.weight.into(),
+		}
+	}
+	pub fn as_category_node(&self) -> AnalysisTreeNode {
+		AnalysisTreeNode::Category {
+			label: self.label.clone(),
+			weight: self.weight,
+		}
+	}
+	// @Temporary - until policy file impl'd and integrated, we hard-code
+	// the policy for our analyses
+	pub fn with_hardcoded_expr(&self) -> AnalysisTreeNode {
+		let expr = Expr::Primitive(Primitive::Bool(false));
+		let analysis = Analysis {
+			publisher: MITRE_PUBLISHER.to_owned(),
+			plugin: LEGACY_PLUGIN.to_owned(),
+			query: self.label.clone(),
+		};
+		AnalysisTreeNode::Analysis {
+			analysis: PoliciedAnalysis(analysis, expr),
+			weight: self.weight,
 		}
 	}
 }
@@ -685,6 +888,16 @@ pub trait WeightTreeProvider:
 	fn weight_tree(&self) -> Result<Rc<WeightTree>>;
 	/// Returns the tree of normalized weights for analyses from the config
 	fn normalized_weight_tree(&self) -> Result<Rc<WeightTree>>;
+
+	/// Returns the weight tree including policy expressions
+	fn analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
+	/// Returns the tree of normalized weights for analyses from the config
+	fn normalized_analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
+}
+
+pub fn analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<AnalysisTree>> {
+	let weight_tree = db.weight_tree()?;
+	AnalysisTree::from_weight_tree(&weight_tree).map(Rc::new)
 }
 
 pub fn weight_tree(db: &dyn WeightTreeProvider) -> Result<Rc<WeightTree>> {
@@ -708,6 +921,28 @@ pub fn weight_tree(db: &dyn WeightTreeProvider) -> Result<Rc<WeightTree>> {
 		}
 	}
 	Ok(Rc::new(tree))
+}
+
+fn normalize_at_internal(node: NodeId, tree: &mut Arena<AnalysisTreeNode>) -> F64 {
+	let children: Vec<NodeId> = node.children(tree).collect();
+	let weight_sum: F64 = children
+		.iter()
+		.map(|n| normalize_at_internal(*n, tree))
+		.sum();
+	if !weight_sum.is_zero() {
+		for c in children {
+			let child = tree.get_mut(c).unwrap().get_mut();
+			child.normalize_weight(weight_sum);
+		}
+	}
+	tree.get(node).unwrap().get().get_weight()
+}
+
+pub fn normalized_analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<AnalysisTree>> {
+	let tree = db.analysis_tree();
+	let mut norm_tree: AnalysisTree = (*tree?).clone();
+	normalize_at_internal(norm_tree.root, &mut norm_tree.tree);
+	Ok(Rc::new(norm_tree))
 }
 
 fn normalize_wt_internal(node: NodeId, tree: &mut Arena<WeightTreeNode>) -> F64 {

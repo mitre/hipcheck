@@ -19,7 +19,7 @@ pub struct ChurnOutput {
 	pub commit_churn_freqs: Vec<CommitChurnFreq>,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct CommitChurnFreq {
 	pub commit: Arc<Commit>,
 	pub churn: F64,

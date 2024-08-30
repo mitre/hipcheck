@@ -12,7 +12,7 @@ pub struct ReviewOutput {
 	pub pull_reviews: Vec<PullReview>,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct PullReview {
 	pub pull_request: Arc<PullRequest>,
 	pub has_review: bool,

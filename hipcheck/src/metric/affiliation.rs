@@ -28,7 +28,7 @@ pub struct AffiliationOutput {
 	pub affiliations: Vec<Affiliation>,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct Affiliation {
 	pub commit: Arc<Commit>,
 	pub affiliated_type: AffiliatedType,

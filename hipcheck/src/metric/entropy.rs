@@ -94,7 +94,7 @@ impl EntropyOutput {
 }
 
 /// The entropy of a single commit.
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Clone)]
 pub struct CommitEntropy {
 	/// The commit
 	pub commit: Arc<Commit>,
