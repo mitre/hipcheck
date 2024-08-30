@@ -1,9 +1,18 @@
+mod download_manifest;
+mod kdl_parsing;
 mod manager;
-mod parser;
+mod plugin_manifest;
+mod retrieval;
 mod types;
 
 pub use crate::plugin::manager::*;
 pub use crate::plugin::types::*;
+pub use download_manifest::{
+	ArchiveFormat, DownloadManifest, DownloadManifestEntry, HashAlgorithm, HashWithDigest,
+};
+pub use kdl_parsing::{extract_data, ParseKdlNode};
+pub use plugin_manifest::{PluginArch, PluginManifest, PluginName, PluginPublisher, PluginVersion};
+
 use crate::Result;
 use futures::future::join_all;
 use serde_json::Value;

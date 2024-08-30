@@ -1,8 +1,18 @@
-use super::extract_data;
-use crate::plugin::parser::ParseKdlNode;
+use super::plugin_manifest::PluginArch;
+use super::{extract_data, PluginName, PluginPublisher, PluginVersion};
+use crate::cache::plugin_cache::HcPluginCache;
+use crate::context::Context;
+use crate::plugin::retrieval::{download_plugin, extract_plugin};
+use crate::plugin::ParseKdlNode;
 use crate::string_newtype_parse_kdl_node;
+use crate::util::http::agent::agent;
 use crate::{error::Error, hc_error};
+use fs_extra::dir::remove;
 use kdl::{KdlDocument, KdlNode, KdlValue};
+use std::fs::File;
+use std::hash::Hash;
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
 use std::{fmt::Display, str::FromStr};
 use url::Url;
 
@@ -56,7 +66,7 @@ pub struct HashWithDigest {
 }
 
 impl HashWithDigest {
-	fn new(hash_algorithm: HashAlgorithm, digest: String) -> Self {
+	pub fn new(hash_algorithm: HashAlgorithm, digest: String) -> Self {
 		Self {
 			hash_algorithm,
 			digest,
@@ -82,7 +92,7 @@ impl ParseKdlNode for HashWithDigest {
 	}
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ArchiveFormat {
 	/// archived with tar and compressed with the XZ algorithm
 	TarXz,
@@ -206,7 +216,7 @@ pub struct DownloadManifestEntry {
 	// TODO: make this a SemVer type?
 	/// A `SemVer` version of the plugin. Not a version requirement as in the plugin manifest file,
 	/// but only a specific concrete version
-	pub version: String,
+	pub version: PluginVersion,
 	// TODO: make this a target-triple enum?
 	/// The target architecture for a plugin
 	pub arch: String,
@@ -233,7 +243,7 @@ impl ParseKdlNode for DownloadManifestEntry {
 			return None;
 		}
 		// Per RFD #0004, version is of type String
-		let version = node.get("version")?.value().as_string()?.to_string();
+		let version = PluginVersion(node.get("version")?.value().as_string()?.to_string());
 		// Per RFD #0004, arch is of type String
 		let arch = node.get("arch")?.value().as_string()?.to_string();
 
@@ -258,9 +268,59 @@ impl ParseKdlNode for DownloadManifestEntry {
 	}
 }
 
+impl DownloadManifestEntry {
+	/// Download the specified plugin, verifies its size and hash and extracts it into the appropriate folder
+	pub fn download_and_unpack_plugin(
+		&self,
+		plugin_cache: &HcPluginCache,
+		publisher: &PluginPublisher,
+		name: &PluginName,
+		version: &PluginVersion,
+		arch: &PluginArch,
+	) -> Result<(), Error> {
+		// currently plugins are put in HC_CACHE/plugins/<publisher>/<name>/<version>/<arch>
+		let download_dir = plugin_cache.plugin_download_dir(publisher, name, version, arch);
+
+		// currently, if the directory exists, then we assume that we downloaded the plugin successfully
+		if download_dir.exists() {
+			return Ok(());
+		}
+
+		let output_path = download_plugin(
+			&self.url,
+			download_dir.as_path(),
+			self.size.bytes,
+			&self.hash,
+		)
+		.map_err(|e| {
+			// delete any leftover remnants
+			let _ = remove(download_dir.as_path());
+			hc_error!("Error [{}] downloading '{}'", e, &self.url)
+		})?;
+
+		extract_plugin(
+			output_path.as_path(),
+			download_dir.as_path(),
+			self.compress.format,
+		)
+		.map_err(|e| {
+			// delete any leftover remnants
+			let _ = remove(download_dir.as_path());
+			hc_error!(
+				"Error [{}] extracting plugin '{}/{}' version {} for {}",
+				e,
+				publisher.0,
+				name.0,
+				version.0,
+				arch.0
+			)
+		})
+	}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DownloadManifest {
-	entries: Vec<DownloadManifestEntry>,
+	pub entries: Vec<DownloadManifestEntry>,
 }
 
 impl DownloadManifest {
@@ -270,6 +330,19 @@ impl DownloadManifest {
 
 	pub fn len(&self) -> usize {
 		self.entries.len()
+	}
+
+	pub fn download_and_unpack_all_plugins(
+		&self,
+		plugin_cache: &HcPluginCache,
+		publisher: &PluginPublisher,
+		name: &PluginName,
+		version: &PluginVersion,
+		arch: &PluginArch,
+	) -> Result<(), Error> {
+		self.entries.iter().try_for_each(|entry| {
+			entry.download_and_unpack_plugin(plugin_cache, publisher, name, version, arch)
+		})
 	}
 }
 
@@ -404,7 +477,7 @@ mod test {
 		.unwrap();
 
 		let expected_entry = DownloadManifestEntry {
-			version: version.to_string(),
+			version: PluginVersion(version.to_string()),
 			arch: arch.to_string(),
 			url: Url::parse(url).unwrap(),
 			hash: HashWithDigest::new(
@@ -445,7 +518,7 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 		let mut entries_iter = entries.iter();
 		assert_eq!(
 			&DownloadManifestEntry {
-				version: "0.1.0".to_owned(),
+				version: PluginVersion("0.1.0".to_owned()),
 				arch: "aarch64-apple-darwin".to_owned(),
 				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-aarch64-apple-darwin.tar.xz").unwrap(),
 				hash: HashWithDigest::new(HashAlgorithm::Sha256, "b8e111e7817c4a1eb40ed50712d04e15b369546c4748be1aa8893b553f4e756b".to_owned()),
@@ -458,7 +531,7 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 		);
 		assert_eq!(
 			&DownloadManifestEntry {
-				version: "0.1.0".to_owned(),
+				version: PluginVersion("0.1.0".to_owned()),
 				arch: "x86_64-apple-darwin".to_owned(),
 				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz").unwrap(),
 				hash: HashWithDigest::new(HashAlgorithm::Sha256, "ddb8c6d26dd9a91e11c99b3bd7ee2b9585aedac6e6df614190f1ba2bfe86dc19".to_owned()),
