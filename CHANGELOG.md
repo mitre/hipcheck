@@ -3,6 +3,83 @@
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+## [3.6.0] - 2024-08-30
+
+This is a relatively small release, as we work on the initial implementation
+of our new plugin system as described in [RFD #4][rfd_4].
+
+There are two fixes in this release:
+
+* `hc cache` now applies pattern to `all` target by [@j-lanson](https://github.com/j-lanson) in [#258](https://github.com/mitre/hipcheck/pull/258)
+* Fix quiet verbosity regression introduced in 3.5.0 by [@patrickjcasey](https://github.com/patrickjcasey) in [#299](https://github.com/mitre/hipcheck/pull/299)
+
+Plus lots of work on implementing plugins (not yet ready for use):
+
+* add proto-file based code gen by [@j-lanson](https://github.com/j-lanson) in [#277](https://github.com/mitre/hipcheck/pull/277)
+* added parsing logic for download manifests by [@patrickjcasey](https://github.com/patrickjcasey) in [#282](https://github.com/mitre/hipcheck/pull/282)
+* add plugin initialization over gRPC and plugin engine struct by [@j-lanson](https://github.com/j-lanson) in [#281](https://github.com/mitre/hipcheck/pull/281)
+* added parsing logic for plugin manifests by [@patrickjcasey](https://github.com/patrickjcasey) in [#293](https://github.com/mitre/hipcheck/pull/293)
+* add dummy plugin and hidden cli command for invoking it by [@j-lanson](https://github.com/j-lanson) in [#290](https://github.com/mitre/hipcheck/pull/290)
+* added salsa integration to plugin core by [@j-lanson](https://github.com/j-lanson) in [#298](https://github.com/mitre/hipcheck/pull/298)
+* inital handling of plugin startup and context management by [@j-lanson](https://github.com/j-lanson) in [#278](https://github.com/mitre/hipcheck/pull/278)
+* plugin comms interface can handle multiple active sessions by [@j-lanson](https://github.com/j-lanson) in [#297](https://github.com/mitre/hipcheck/pull/297)
+* Integrated policy expressions code by [@alilleybrinker](https://github.com/alilleybrinker) in [#265](https://github.com/mitre/hipcheck/pull/265)
+* update dummy plugin to handle concurrent queries by [@j-lanson](https://github.com/j-lanson) in [#307](https://github.com/mitre/hipcheck/pull/307)
+* create plugin path alongside repo cache by [@patrickjcasey](https://github.com/patrickjcasey) in [#301](https://github.com/mitre/hipcheck/pull/301)
+* Update proto def to pass 'buf lint' by [@alilleybrinker](https://github.com/alilleybrinker) in [#308](https://github.com/mitre/hipcheck/pull/308)
+* dummy plugin refactored to use "Session" tracking so to overcome hanging by [@j-lanson](https://github.com/j-lanson) in [#309](https://github.com/mitre/hipcheck/pull/309)
+
+Some improvements to the website and to CI testing:
+
+* Added README for dockerhub by [@patrickjcasey](https://github.com/patrickjcasey) in [#255](https://github.com/mitre/hipcheck/pull/255)
+* Fix website, announcement 3.5.0 by [@alilleybrinker](https://github.com/alilleybrinker) in [#263](https://github.com/mitre/hipcheck/pull/263)
+* CI improvements by [@alilleybrinker](https://github.com/alilleybrinker) in [#264](https://github.com/mitre/hipcheck/pull/264)
+* Always run tests on main to create reusable caches by [@cstepanian](https://github.com/cstepanian) in [#279](https://github.com/mitre/hipcheck/pull/279)
+* Fix broken containerfile by [@alilleybrinker](https://github.com/alilleybrinker) in [#267](https://github.com/mitre/hipcheck/pull/267)
+* Fix broken website deploy CI job by [@alilleybrinker](https://github.com/alilleybrinker) in [#271](https://github.com/mitre/hipcheck/pull/271)
+
+Refactoring of the Hipcheck source code:
+
+* Moved test_util.rs to util/test.rs by [@alilleybrinker](https://github.com/alilleybrinker)
+* Renamed util/hidden.rs to util/redacted.rs by [@alilleybrinker](https://github.com/alilleybrinker)
+* Move 'http' module under 'util' module by [@alilleybrinker](https://github.com/alilleybrinker) in [#270](https://github.com/mitre/hipcheck/pull/270)
+* Use consistent module folder structure by [@alilleybrinker](https://github.com/alilleybrinker) in [#310](https://github.com/mitre/hipcheck/pull/310)
+* No more "module-inception" by [@alilleybrinker](https://github.com/alilleybrinker) in [#311](https://github.com/mitre/hipcheck/pull/311)
+* Remove unused version handling by [@alilleybrinker](https://github.com/alilleybrinker) in [#312](https://github.com/mitre/hipcheck/pull/312)
+* Create new 'init' top-level module by [@alilleybrinker](https://github.com/alilleybrinker) in [#313](https://github.com/mitre/hipcheck/pull/313)
+* Simplify .gitignore by [@alilleybrinker](https://github.com/alilleybrinker) in [#314](https://github.com/mitre/hipcheck/pull/314)
+
+Updates to our release infrastructure:
+
+* Update cargo-dist to 0.21.0 by [@mchernicoff](https://github.com/mchernicoff) in [#291](https://github.com/mitre/hipcheck/pull/291)
+
+And finally, many dependency version bumps:
+
+* Bump serde from 1.0.204 to 1.0.206 by [@dependabot[bot]](https://github.com/dependabot) in [#276](https://github.com/mitre/hipcheck/pull/276)
+* Bump clap from 4.5.11 to 4.5.13 by [@dependabot[bot]](https://github.com/dependabot) in [#275](https://github.com/mitre/hipcheck/pull/275)
+* Bump syn from 2.0.72 to 2.0.74 by [@dependabot[bot]](https://github.com/dependabot) in [#273](https://github.com/mitre/hipcheck/pull/273)
+* Bump tempfile from 3.11.0 to 3.12.0 by [@dependabot[bot]](https://github.com/dependabot) in [#272](https://github.com/mitre/hipcheck/pull/272)
+* Bump cyclonedx-bom from 0.6.2 to 0.7.0 by [@dependabot[bot]](https://github.com/dependabot) in [#274](https://github.com/mitre/hipcheck/pull/274)
+* Bump syn from 2.0.74 to 2.0.75 by [@dependabot[bot]](https://github.com/dependabot) in [#285](https://github.com/mitre/hipcheck/pull/285)
+* Bump regex from 1.10.5 to 1.10.6 by [@dependabot[bot]](https://github.com/dependabot) in [#286](https://github.com/mitre/hipcheck/pull/286)
+* Bump tokio from 1.39.2 to 1.39.3 by [@dependabot[bot]](https://github.com/dependabot) in [#287](https://github.com/mitre/hipcheck/pull/287)
+* Bump indextree from 4.6.1 to 4.7.2 by [@dependabot[bot]](https://github.com/dependabot) in [#288](https://github.com/mitre/hipcheck/pull/288)
+* Bump xml-rs from 0.8.20 to 0.8.21 by [@dependabot[bot]](https://github.com/dependabot) in [#289](https://github.com/mitre/hipcheck/pull/289)
+* Bump quote from 1.0.36 to 1.0.37 by [@dependabot[bot]](https://github.com/dependabot) in [#302](https://github.com/mitre/hipcheck/pull/302)
+* Bump which from 6.0.1 to 6.0.3 by [@dependabot[bot]](https://github.com/dependabot) in [#303](https://github.com/mitre/hipcheck/pull/303)
+* Bump tabled from 0.15.0 to 0.16.0 by [@dependabot[bot]](https://github.com/dependabot) in [#304](https://github.com/mitre/hipcheck/pull/304)
+* Bump indexmap from 2.2.6 to 2.4.0 by [@dependabot[bot]](https://github.com/dependabot) in [#305](https://github.com/mitre/hipcheck/pull/305)
+* Bump clap from 4.5.15 to 4.5.16 by [@dependabot[bot]](https://github.com/dependabot) in [#306](https://github.com/mitre/hipcheck/pull/306)
+
+### New Contributors
+
+* [@patrickjcasey](https://github.com/patrickjcasey) made their first contribution in [#301](https://github.com/mitre/hipcheck/pull/301)
+
+__Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.5.0...hipcheck-v3.6.0>
+
+[3.6.0]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.5.0..hipcheck-v3.6.0
+[rfd_4]: https://mitre.github.io/hipcheck/rfds/0004/
+
 ## [3.5.0] - 2024-08-05
 
 Hipcheck 3.5.0 continues our focus on user experience improvements with
