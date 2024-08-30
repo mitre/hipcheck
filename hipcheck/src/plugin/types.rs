@@ -1,3 +1,4 @@
+use crate::policy_exprs::{parse, Expr};
 use crate::{
 	hc_error,
 	hipcheck::{
@@ -183,16 +184,19 @@ impl PluginContext {
 		res.into_inner().try_into()
 	}
 
-	// TODO - the String in the result should be replaced with a structured
-	// type once the policy expression code is integrated
-	pub async fn get_default_policy_expression(&mut self) -> Result<String> {
+	pub async fn get_default_policy_expression(&mut self) -> Result<Option<Expr>> {
 		let req = GetDefaultPolicyExpressionRequest {
 			empty: Some(Empty {}),
 		};
-
-		let res = self.grpc.get_default_policy_expression(req).await?;
-		let policy_expression = res.get_ref().policy_expression.to_owned();
-		Ok(policy_expression)
+		let mut res = self.grpc.get_default_policy_expression(req).await?;
+		let expr_str = res.get_ref().policy_expression.as_str();
+		if expr_str.is_empty() {
+			Ok(None)
+		} else {
+			parse(expr_str)
+				.map_err(|e| hc_error!("{}", e.to_string()))
+				.map(Some)
+		}
 	}
 
 	pub async fn initiate_query_protocol(
@@ -234,18 +238,16 @@ impl PluginContext {
 				.map(|s| (s.query_name.clone(), s)),
 		);
 		self.set_configuration(&config).await?.as_result()?;
-		let default_policy_expr = self.get_default_policy_expression().await?;
+		let opt_default_policy_expr = self.get_default_policy_expression().await?;
 		let (tx, mut out_rx) = mpsc::channel::<PluginQuery>(10);
 		let rx = self.initiate_query_protocol(out_rx).await?;
 		let rx = Mutex::new(MultiplexedQueryReceiver::new(rx));
 		Ok(PluginTransport {
 			schemas,
-			default_policy_expr,
+			opt_default_policy_expr,
 			ctx: self,
 			tx,
 			rx,
-			//	active_query: None,
-			//	last_id: 0,
 		})
 	}
 }
@@ -408,7 +410,7 @@ impl MultiplexedQueryReceiver {
 #[derive(Debug)]
 pub struct PluginTransport {
 	pub schemas: HashMap<String, Schema>,
-	pub default_policy_expr: String, // TODO - update with policy_expr type
+	pub opt_default_policy_expr: Option<Expr>,
 	ctx: PluginContext,
 	tx: mpsc::Sender<PluginQuery>,
 	rx: Mutex<MultiplexedQueryReceiver>,

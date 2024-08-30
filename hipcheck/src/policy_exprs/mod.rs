@@ -15,7 +15,7 @@ pub use crate::policy_exprs::expr::Ident;
 pub(crate) use crate::policy_exprs::expr::F64;
 pub use crate::policy_exprs::token::LexingError;
 use env::Binding;
-use expr::parse;
+pub use expr::parse;
 pub use expr::Primitive;
 use std::ops::Deref;
 

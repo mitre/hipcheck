@@ -28,6 +28,7 @@ use crate::data::GitHubProviderStorage;
 use crate::data::ModuleProvider;
 use crate::data::ModuleProviderStorage;
 use crate::data::PullRequestReviewProviderStorage;
+use crate::engine::HcEngineStorage;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
@@ -72,6 +73,7 @@ use url::Url;
 	DependenciesProviderStorage,
 	GitProviderStorage,
 	GitHubProviderStorage,
+	HcEngineStorage,
 	LanguagesConfigQueryStorage,
 	LinguistStorage,
 	MetricProviderStorage,

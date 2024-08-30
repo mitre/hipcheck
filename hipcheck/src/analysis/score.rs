@@ -3,12 +3,17 @@
 use crate::analysis::result::*;
 use crate::analysis::AnalysisOutcome;
 use crate::analysis::AnalysisProvider;
-use crate::config::{visit_leaves, WeightTree, WeightTreeProvider};
+use crate::config::{
+	visit_leaves, Analysis, AnalysisTree, WeightTree, WeightTreeProvider, LEGACY_PLUGIN,
+	MITRE_PUBLISHER,
+};
+use crate::engine::HcEngine;
 use crate::error::Result;
 use crate::hc_error;
 use crate::report::Concern;
 use crate::shell::spinner_phase::SpinnerPhase;
 use num_traits::identities::Zero;
+use serde_json::Value;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::default::Default;
@@ -69,6 +74,12 @@ impl HCStoredResult {
 		}
 	}
 }
+
+#[derive(Debug, Default)]
+pub struct PluginAnalysisResults {
+	pub table: HashMap<Analysis, Result<Value>>,
+}
+
 #[derive(Debug, Default)]
 pub struct AnalysisResults {
 	pub table: HashMap<String, HCStoredResult>,
@@ -107,7 +118,14 @@ pub struct Score {
 }
 
 #[salsa::query_group(ScoringProviderStorage)]
-pub trait ScoringProvider: AnalysisProvider + WeightTreeProvider {
+pub trait ScoringProvider: HcEngine + AnalysisProvider + WeightTreeProvider {
+	fn wrapped_query(
+		&self,
+		publisher: String,
+		plugin: String,
+		query: String,
+		key: Value,
+	) -> Result<Value>;
 	/// Returns result of phase outcome and scoring
 	fn phase_outcome(&self, phase_name: Arc<String>) -> Result<Arc<ScoreResult>>;
 }
@@ -176,6 +194,52 @@ impl ScoreTree {
 	pub fn normalize(mut self) -> Self {
 		let _ = normalize_st_internal(self.root, &mut self.tree);
 		self
+	}
+
+	pub fn synthesize_plugin(
+		analysis_tree: &AnalysisTree,
+		scores: &PluginAnalysisResults,
+	) -> Result<Self> {
+		use indextree::NodeEdge::*;
+		let mut tree = Arena::<ScoreTreeNode>::new();
+		let analysis_root = analysis_tree.root;
+		let score_root = tree.new_node(
+			analysis_tree
+				.tree
+				.get(analysis_root)
+				.ok_or(hc_error!("AnalysisTree root not in tree, invalid state"))?
+				.get()
+				.augment(&scores.table),
+		);
+
+		let mut scope: Vec<NodeId> = vec![score_root];
+		for edge in analysis_root.traverse(&analysis_tree.tree) {
+			match edge {
+				Start(n) => {
+					let curr_node = tree.new_node(
+						analysis_tree
+							.tree
+							.get(n)
+							.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+							.get()
+							.augment(&scores.table),
+					);
+					scope
+						.last()
+						.ok_or(hc_error!("Scope stack is empty, invalid state"))?
+						.append(curr_node, &mut tree);
+					scope.push(curr_node);
+				}
+				End(_) => {
+					scope.pop();
+				}
+			};
+		}
+
+		Ok(ScoreTree {
+			tree,
+			root: score_root,
+		})
 	}
 
 	// Given a weight tree and set of analysis results, produce an AltScoreTree by creating
@@ -295,6 +359,61 @@ macro_rules! run_and_score_threshold_analysis {
 	}};
 }
 
+fn wrapped_query(
+	db: &dyn ScoringProvider,
+	publisher: String,
+	plugin: String,
+	query: String,
+	key: Value,
+) -> Result<Value> {
+	if publisher == *MITRE_PUBLISHER {
+		if plugin == *LEGACY_PLUGIN {
+			Ok(match query.as_str() {
+				ACTIVITY_PHASE => {
+					let raw = db.activity_metric()?;
+					serde_json::to_value(raw)?
+				}
+				AFFILIATION_PHASE => {
+					let raw = db.affiliation_metric()?;
+					serde_json::to_value(&raw.affiliations)?
+				}
+				BINARY_PHASE => serde_json::to_value(db.binary_metric()?)?,
+				CHURN_PHASE => {
+					let raw = db.churn_metric()?;
+					serde_json::to_value(&raw.commit_churn_freqs)?
+				}
+				ENTROPY_PHASE => {
+					let raw = db.entropy_metric()?;
+					serde_json::to_value(&raw.commit_entropies)?
+				}
+				IDENTITY_PHASE => {
+					let raw = db.identity_metric()?;
+					serde_json::to_value(&raw.matches)?
+				}
+				FUZZ_PHASE => {
+					let raw = db.fuzz_metric()?.fuzz_result.exists;
+					serde_json::to_value(raw)?
+				}
+				REVIEW_PHASE => {
+					let raw = db.review_metric()?;
+					serde_json::to_value(&raw.pull_reviews)?
+				}
+				TYPO_PHASE => {
+					let raw = db.typo_metric()?;
+					serde_json::to_value(&raw.typos)?
+				}
+				other => {
+					return Err(hc_error!("Unrecognized legacy analysis '{other}'"));
+				}
+			})
+		} else {
+			Err(hc_error!("Unrecognized MITRE plugin '{plugin}'"))
+		}
+	} else {
+		db.query(publisher, plugin, query, key)
+	}
+}
+
 pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
 	/*
 	Scoring should be performed by the construction of a "score tree" where scores are the
@@ -307,9 +426,28 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 	*/
 	// Values set with -1.0 are reseved for parent nodes whose score comes always from children nodes with a score set by hc_analysis algorithms
 
+	let analysis_tree = db.normalized_analysis_tree()?;
+	let target = db.target();
+	let target_json = serde_json::to_value(target.as_ref())?;
+	let mut plug_results = PluginAnalysisResults::default();
+
+	// @FollowUp - remove this once we implement policy expr calculation
 	let weight_tree = db.normalized_weight_tree()?;
 	let mut results = AnalysisResults::default();
+
 	let mut score = Score::default();
+
+	// RFD4 analysis style - get all "leaf" analyses and call through plugin architecture
+	let analyses = analysis_tree.get_analyses();
+	for a in analyses {
+		db.wrapped_query(
+			a.publisher.clone(),
+			a.plugin.clone(),
+			a.query.clone(),
+			target_json.clone(),
+		);
+	}
+
 	/* PRACTICES NODE ADDITION */
 	if db.practices_active() {
 		/*===NEW_PHASE===*/
@@ -464,6 +602,7 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 	}
 
 	let alt_score_tree = ScoreTree::synthesize(&weight_tree, &results)?;
+	// let plug_score_tree = ScoreTree::synthesize_plugin(&analysis_tree, &plug_results)?;
 	score.total = alt_score_tree.score();
 
 	Ok(ScoringResults { results, score })

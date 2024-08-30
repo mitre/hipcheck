@@ -8,17 +8,17 @@ mod types;
 
 pub use crate::plugin::manager::*;
 pub use crate::plugin::types::*;
+use crate::policy_exprs::Expr;
+use crate::Result;
 pub use download_manifest::{
 	ArchiveFormat, DownloadManifest, DownloadManifestEntry, HashAlgorithm, HashWithDigest,
 };
+use futures::future::join_all;
 pub use kdl_parsing::{extract_data, ParseKdlNode};
 pub use plugin_manifest::{PluginManifest, PluginName, PluginPublisher, PluginVersion};
-pub use supported_arch::SupportedArch;
-
-use crate::Result;
-use futures::future::join_all;
 use serde_json::Value;
 use std::collections::HashMap;
+pub use supported_arch::SupportedArch;
 use tokio::sync::{mpsc, Mutex};
 
 pub fn dummy() {
@@ -64,6 +64,9 @@ impl ActivePlugin {
 			channel,
 		}
 	}
+	pub fn get_default_policy_expr(&self) -> Option<&Expr> {
+		self.channel.opt_default_policy_expr.as_ref()
+	}
 	async fn get_unique_id(&self) -> usize {
 		let mut id_lock = self.next_id.lock().await;
 		let res: usize = *id_lock;
@@ -74,6 +77,7 @@ impl ActivePlugin {
 	}
 	pub async fn query(&self, name: String, key: Value) -> Result<PluginResponse> {
 		let id = self.get_unique_id().await;
+		// @Todo - check name+key valid for schema
 		let query = Query {
 			id,
 			request: true,

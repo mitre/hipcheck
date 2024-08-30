@@ -12,7 +12,7 @@ pub struct IdentityOutput {
 	pub matches: Vec<Match>,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct Match {
 	pub commit: Arc<Commit>,
 	pub identities_match: bool,

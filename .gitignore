@@ -21,6 +21,9 @@
 # dotenv env configuration file
 .env
 
+# Vim swap files
+.*.swp
+
 # We generate a file with this name when prepping each release, and don't
 # want it to be checked in.
 CHANGELOG-NEXT.md

@@ -1,7 +1,17 @@
 #![allow(unused)]
 
+use crate::analysis::{
+	score::{
+		ACTIVITY_PHASE, AFFILIATION_PHASE, BINARY_PHASE, CHURN_PHASE, ENTROPY_PHASE, FUZZ_PHASE,
+		IDENTITY_PHASE, REVIEW_PHASE, TYPO_PHASE,
+	},
+	AnalysisProvider,
+};
+use crate::config::{visit_leaves, WeightTree, WeightTreeProvider};
+use crate::metric::{review::PullReview, MetricProvider};
 use crate::plugin::{ActivePlugin, PluginResponse};
 pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
+use crate::policy_exprs::Expr;
 use crate::{hc_error, Result};
 use futures::future::{BoxFuture, FutureExt};
 use serde_json::Value;
@@ -19,7 +29,22 @@ pub trait HcEngine: salsa::Database {
 	#[salsa::input]
 	fn core(&self) -> Arc<HcPluginCore>;
 
+	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<Expr>>;
+
 	fn query(&self, publisher: String, plugin: String, query: String, key: Value) -> Result<Value>;
+}
+
+fn default_policy_expr(
+	db: &dyn HcEngine,
+	publisher: String,
+	plugin: String,
+) -> Result<Option<Expr>> {
+	let core = db.core();
+	// @Todo - plugins map should be keyed on publisher too
+	let Some(p_handle) = core.plugins.get(&plugin) else {
+		return Err(hc_error!("No such plugin {}::{}", publisher, plugin));
+	};
+	Ok(p_handle.get_default_policy_expr().cloned())
 }
 
 fn query(
