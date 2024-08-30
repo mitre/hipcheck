@@ -1,4 +1,4 @@
-use crate::plugin::parser::ParseKdlNode;
+use crate::plugin::ParseKdlNode;
 use crate::string_newtype_parse_kdl_node;
 use crate::{error::Error, hc_error};
 use core::panic;
@@ -12,38 +12,41 @@ use super::extract_data;
 // NOTE: the implementation in this crate was largely derived from RFD #0004
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Publisher(pub String);
-string_newtype_parse_kdl_node!(Publisher, "publisher");
+pub struct PluginPublisher(pub String);
+string_newtype_parse_kdl_node!(PluginPublisher, "publisher");
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Name(pub String);
-string_newtype_parse_kdl_node!(Name, "name");
+pub struct PluginName(pub String);
+string_newtype_parse_kdl_node!(PluginName, "name");
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Version(pub String);
-string_newtype_parse_kdl_node!(Version, "version");
+pub struct PluginVersion(pub String);
+string_newtype_parse_kdl_node!(PluginVersion, "version");
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct License(pub String);
 string_newtype_parse_kdl_node!(License, "license");
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 // TODO: target-triple enum
-pub struct Entrypoints(pub HashMap<String, String>);
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PluginArch(pub String);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Entrypoints(pub HashMap<PluginArch, String>);
 
 impl Entrypoints {
 	pub fn new() -> Self {
 		Self(HashMap::new())
 	}
 
-	pub fn insert(&mut self, arch: String, entrypoint: String) -> Result<(), Error> {
+	pub fn insert(&mut self, arch: PluginArch, entrypoint: String) -> Result<(), Error> {
 		match self.0.insert(arch.clone(), entrypoint) {
-			Some(_duplicate_key) => Err(hc_error!("Multiple entrypoints specified for {}", arch)),
+			Some(_duplicate_key) => Err(hc_error!("Multiple entrypoints specified for {}", arch.0)),
 			None => Ok(()),
 		}
 	}
 
-	pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> {
+	pub fn iter(&self) -> impl Iterator<Item = (&PluginArch, &String)> {
 		self.0.iter()
 	}
 }
@@ -60,11 +63,13 @@ impl ParseKdlNode for Entrypoints {
 		let mut entrypoints = Entrypoints::new();
 		for entrypoint_spec in node.children()?.nodes() {
 			// per RFD #0004, the value for "arch" is of type String
-			let arch = entrypoint_spec
-				.get("arch")?
-				.value()
-				.as_string()?
-				.to_string();
+			let arch = PluginArch(
+				entrypoint_spec
+					.get("arch")?
+					.value()
+					.as_string()?
+					.to_string(),
+			);
 			// per RFD #0004, the actual entrypoint is the first positional arg after "arch" and is
 			// of type String
 			let entrypoint = entrypoint_spec
@@ -74,7 +79,7 @@ impl ParseKdlNode for Entrypoints {
 				.as_string()?
 				.to_string();
 			if let Err(e) = entrypoints.insert(arch.clone(), entrypoint) {
-				log::error!("Duplicate entrypoint detected for [{arch}]");
+				log::error!("Duplicate entrypoint detected for [{}]", arch.0);
 				return None;
 			}
 		}
@@ -84,15 +89,22 @@ impl ParseKdlNode for Entrypoints {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PluginDependency {
-	pub name: String,
-	pub version: String,
+	pub publisher: PluginPublisher,
+	pub name: PluginName,
+	pub version: PluginVersion,
 	// NOTE: until Hipcheck supports a registry, this is effectively required
 	pub manifest: Option<url::Url>,
 }
 
 impl PluginDependency {
-	pub fn new(name: String, version: String, manifest: Option<url::Url>) -> Self {
+	pub fn new(
+		publisher: PluginPublisher,
+		name: PluginName,
+		version: PluginVersion,
+		manifest: Option<url::Url>,
+	) -> Self {
 		Self {
+			publisher,
 			name,
 			version,
 			manifest,
@@ -110,9 +122,17 @@ impl ParseKdlNode for PluginDependency {
 			return None;
 		}
 
-		// per RFD #0004, the name is the first positional entry and has type String
-		let name = node.entries().first()?.value().as_string()?.to_string();
-		let version = node.get("version")?.value().as_string()?.to_string();
+		// per RFD #0004, the name is the first positional entry and has type String and is of the format `<publisher>/<name>`
+		let publisher_and_name = node.entries().first()?.value().as_string()?;
+		let (publisher, name) = match publisher_and_name.split_once('/') {
+			Some((publisher, name)) => (
+				PluginPublisher(publisher.to_string()),
+				PluginName(name.to_string()),
+			),
+			None => return None,
+		};
+
+		let version = PluginVersion(node.get("version")?.value().as_string()?.to_string());
 		let manifest = match node.get("manifest") {
 			Some(manifest) => {
 				let raw_url = manifest.value().as_string()?;
@@ -123,6 +143,7 @@ impl ParseKdlNode for PluginDependency {
 
 		Some(Self {
 			name,
+			publisher,
 			version,
 			manifest,
 		})
@@ -174,9 +195,9 @@ impl ParseKdlNode for PluginDependencyList {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PluginManifest {
-	pub publisher: Publisher,
-	pub name: Name,
-	pub version: Version,
+	pub publisher: PluginPublisher,
+	pub name: PluginName,
+	pub version: PluginVersion,
 	pub license: License,
 	pub entrypoints: Entrypoints,
 	pub dependencies: PluginDependencyList,
@@ -190,10 +211,11 @@ impl FromStr for PluginManifest {
 			.map_err(|e| hc_error!("Error parsing plugin manifest file: {e}"))?;
 		let nodes = document.nodes();
 
-		let publisher: Publisher =
+		let publisher: PluginPublisher =
 			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'publisher'"))?;
-		let name: Name = extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'name'"))?;
-		let version: Version =
+		let name: PluginName =
+			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'name'"))?;
+		let version: PluginVersion =
 			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'version'"))?;
 		let license: License =
 			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'license'"))?;
@@ -225,8 +247,8 @@ mod test {
 		let data = r#"publisher "mitre""#;
 		let node = KdlNode::from_str(data).unwrap();
 		assert_eq!(
-			Publisher::new("mitre".to_owned()),
-			Publisher::parse_node(&node).unwrap()
+			PluginPublisher::new("mitre".to_owned()),
+			PluginPublisher::parse_node(&node).unwrap()
 		)
 	}
 
@@ -235,8 +257,8 @@ mod test {
 		let data = r#"version "0.1.0""#;
 		let node = KdlNode::from_str(data).unwrap();
 		assert_eq!(
-			Version::new("0.1.0".to_owned()),
-			Version::parse_node(&node).unwrap()
+			PluginVersion::new("0.1.0".to_owned()),
+			PluginVersion::parse_node(&node).unwrap()
 		)
 	}
 
@@ -245,8 +267,8 @@ mod test {
 		let data = r#"name "affiliation""#;
 		let node = KdlNode::from_str(data).unwrap();
 		assert_eq!(
-			Name::new("affiliation".to_owned()),
-			Name::parse_node(&node).unwrap()
+			PluginName::new("affiliation".to_owned()),
+			PluginName::parse_node(&node).unwrap()
 		);
 	}
 
@@ -269,7 +291,7 @@ mod test {
 		let mut expected = Entrypoints::new();
 		expected
 			.insert(
-				"aarch64-apple-darwin".to_owned(),
+				PluginArch("aarch64-apple-darwin".to_owned()),
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();
@@ -298,19 +320,19 @@ mod test {
 		let node = KdlNode::from_str(multiple_entrypoint).unwrap();
 		let mut expected = Entrypoints::new();
 		expected.insert(
-			"aarch64-apple-darwin".to_owned(),
+			PluginArch("aarch64-apple-darwin".to_owned()),
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		expected.insert(
-			"x86_64-apple-darwin".to_owned(),
+			PluginArch("x86_64-apple-darwin".to_owned()),
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		expected.insert(
-			"x86_64-unknown-linux-gnu".to_owned(),
+			PluginArch("x86_64-unknown-linux-gnu".to_owned()),
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		expected.insert(
-			"x86_64-pc-windows-msvc".to_owned(),
+			PluginArch("x86_64-pc-windows-msvc".to_owned()),
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		assert_eq!(Entrypoints::parse_node(&node).unwrap(), expected)
@@ -323,8 +345,9 @@ mod test {
 		assert_eq!(
 			PluginDependency::parse_node(&node).unwrap(),
 			PluginDependency::new(
-				"mitre/git".to_owned(),
-				"0.1.0".to_owned(),
+				PluginPublisher("mitre".to_string()),
+				PluginName("git".to_string()),
+				PluginVersion("0.1.0".to_string()),
 				Some(
 					Url::parse(
 						"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl"
@@ -344,8 +367,9 @@ mod test {
 		let node = KdlNode::from_str(dependencies).unwrap();
 		let mut expected = PluginDependencyList::new();
 		expected.push(PluginDependency::new(
-			"mitre/git".to_owned(),
-			"0.1.0".to_owned(),
+			PluginPublisher("mitre".to_string()),
+			PluginName("git".to_string()),
+			PluginVersion("0.1.0".to_string()),
 			Some(
 				url::Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl",
@@ -355,8 +379,9 @@ mod test {
 			.to_owned(),
 		));
 		expected.push(PluginDependency::new(
-			"mitre/plugin2".to_owned(),
-			"0.4.0".to_owned(),
+			PluginPublisher("mitre".to_string()),
+			PluginName("plugin2".to_string()),
+			PluginVersion("0.4.0".to_string()),
 			Some(
 				url::Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-plugin2.kdl",
@@ -387,26 +412,27 @@ dependencies {
 
 		let mut entrypoints = Entrypoints::new();
 		entrypoints.insert(
-			"aarch64-apple-darwin".to_owned(),
+			PluginArch("aarch64-apple-darwin".to_owned()),
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		entrypoints.insert(
-			"x86_64-apple-darwin".to_owned(),
+			PluginArch("x86_64-apple-darwin".to_owned()),
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		entrypoints.insert(
-			"x86_64-unknown-linux-gnu".to_owned(),
+			PluginArch("x86_64-unknown-linux-gnu".to_owned()),
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		entrypoints.insert(
-			"x86_64-pc-windows-msvc".to_owned(),
+			PluginArch("x86_64-pc-windows-msvc".to_owned()),
 			"./hc-mitre-affiliation".to_owned(),
 		);
 
 		let mut dependencies = PluginDependencyList::new();
 		dependencies.push(PluginDependency::new(
-			"mitre/git".to_owned(),
-			"0.1.0".to_owned(),
+			PluginPublisher("mitre".to_string()),
+			PluginName("git".to_string()),
+			PluginVersion("0.1.0".to_string()),
 			Some(
 				url::Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl",
@@ -416,9 +442,9 @@ dependencies {
 		));
 
 		let expected_manifest = PluginManifest {
-			publisher: Publisher::new("mitre".to_owned()),
-			name: Name::new("affiliation".to_owned()),
-			version: Version::new("0.1.0".to_owned()),
+			publisher: PluginPublisher::new("mitre".to_owned()),
+			name: PluginName::new("affiliation".to_owned()),
+			version: PluginVersion::new("0.1.0".to_owned()),
 			license: License::new("Apache-2.0".to_owned()),
 			entrypoints,
 			dependencies,

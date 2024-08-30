@@ -1,10 +1,7 @@
-mod download_manifest;
-mod plugin_manifest;
-
 use kdl::KdlNode;
 
 // Helper trait to make it easier to parse KdlNodes into our own types
-trait ParseKdlNode
+pub trait ParseKdlNode
 where
 	Self: Sized,
 {
@@ -16,7 +13,7 @@ where
 }
 
 /// Returns the first successful node that can be parsed into T, if there is one
-fn extract_data<T>(nodes: &[KdlNode]) -> Option<T>
+pub fn extract_data<T>(nodes: &[KdlNode]) -> Option<T>
 where
 	T: ParseKdlNode,
 {
