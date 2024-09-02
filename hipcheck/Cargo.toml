@@ -130,7 +130,7 @@ walkdir = "2.5.0"
 which = { version = "6.0.3", default-features = false }
 xml-rs = "0.8.20"
 xz2 = "0.1.7"
-zip = "2.1.6"
+zip = "2.2.0"
 tokio-stream = "0.1.15"
 
 [build-dependencies]
