@@ -121,7 +121,7 @@ toml = "0.8.19"
 tonic = "0.12.1"
 thiserror = "1.0.63"
 unicode-normalization = "0.1.19"
-ureq = { version = "2.10.0", default-features = false, features = [
+ureq = { version = "2.10.1", default-features = false, features = [
     "json",
     "tls",
 ] }
