@@ -11,7 +11,7 @@ edition = "2021"
 license = "Apache-2.0"
 homepage = "https://mitre.github.io/hipcheck"
 repository = "https://github.com/mitre/hipcheck"
-include = ["src/**/*", "../LICENSE", "../README.md", "build.rs"]
+include = ["src/**", "../LICENSE", "../README.md", "build.rs", "proto/**"]
 
 # Rename the binary from the default "hipcheck" (based on the package name)
 # to "hc".
@@ -141,6 +141,7 @@ zstd = "0.13.2"
 [build-dependencies]
 
 anyhow = "1.0.86"
+pathbuf = "1.0.0"
 tonic-build = "0.12.1"
 which = { version = "6.0.3", default-features = false }
 
