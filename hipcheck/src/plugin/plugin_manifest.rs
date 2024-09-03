@@ -1,3 +1,5 @@
+use super::extract_data;
+use crate::plugin::supported_arch::SupportedArch;
 use crate::plugin::ParseKdlNode;
 use crate::string_newtype_parse_kdl_node;
 use crate::{error::Error, hc_error};
@@ -5,9 +7,8 @@ use core::panic;
 use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};
 use petgraph::graphmap::NeighborsDirected;
 use std::collections::HashMap;
+use std::fmt::write;
 use std::{fmt::Display, str::FromStr};
-
-use super::extract_data;
 
 // NOTE: the implementation in this crate was largely derived from RFD #0004
 
@@ -27,26 +28,22 @@ string_newtype_parse_kdl_node!(PluginVersion, "version");
 pub struct License(pub String);
 string_newtype_parse_kdl_node!(License, "license");
 
-// TODO: target-triple enum
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PluginArch(pub String);
-
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Entrypoints(pub HashMap<PluginArch, String>);
+pub struct Entrypoints(pub HashMap<SupportedArch, String>);
 
 impl Entrypoints {
 	pub fn new() -> Self {
 		Self(HashMap::new())
 	}
 
-	pub fn insert(&mut self, arch: PluginArch, entrypoint: String) -> Result<(), Error> {
-		match self.0.insert(arch.clone(), entrypoint) {
-			Some(_duplicate_key) => Err(hc_error!("Multiple entrypoints specified for {}", arch.0)),
+	pub fn insert(&mut self, arch: SupportedArch, entrypoint: String) -> Result<(), Error> {
+		match self.0.insert(arch, entrypoint) {
+			Some(_duplicate_key) => Err(hc_error!("Multiple entrypoints specified for {}", arch)),
 			None => Ok(()),
 		}
 	}
 
-	pub fn iter(&self) -> impl Iterator<Item = (&PluginArch, &String)> {
+	pub fn iter(&self) -> impl Iterator<Item = (&SupportedArch, &String)> {
 		self.0.iter()
 	}
 }
@@ -63,13 +60,8 @@ impl ParseKdlNode for Entrypoints {
 		let mut entrypoints = Entrypoints::new();
 		for entrypoint_spec in node.children()?.nodes() {
 			// per RFD #0004, the value for "arch" is of type String
-			let arch = PluginArch(
-				entrypoint_spec
-					.get("arch")?
-					.value()
-					.as_string()?
-					.to_string(),
-			);
+			let arch =
+				SupportedArch::from_str(entrypoint_spec.get("arch")?.value().as_string()?).ok()?;
 			// per RFD #0004, the actual entrypoint is the first positional arg after "arch" and is
 			// of type String
 			let entrypoint = entrypoint_spec
@@ -78,8 +70,8 @@ impl ParseKdlNode for Entrypoints {
 				.value()
 				.as_string()?
 				.to_string();
-			if let Err(e) = entrypoints.insert(arch.clone(), entrypoint) {
-				log::error!("Duplicate entrypoint detected for [{}]", arch.0);
+			if let Err(e) = entrypoints.insert(arch, entrypoint) {
+				log::error!("Duplicate entrypoint detected for [{}]", arch);
 				return None;
 			}
 		}
@@ -291,7 +283,7 @@ mod test {
 		let mut expected = Entrypoints::new();
 		expected
 			.insert(
-				PluginArch("aarch64-apple-darwin".to_owned()),
+				SupportedArch::Aarch64AppleDarwin,
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();
@@ -320,19 +312,19 @@ mod test {
 		let node = KdlNode::from_str(multiple_entrypoint).unwrap();
 		let mut expected = Entrypoints::new();
 		expected.insert(
-			PluginArch("aarch64-apple-darwin".to_owned()),
+			SupportedArch::Aarch64AppleDarwin,
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		expected.insert(
-			PluginArch("x86_64-apple-darwin".to_owned()),
+			SupportedArch::X86_64AppleDarwin,
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		expected.insert(
-			PluginArch("x86_64-unknown-linux-gnu".to_owned()),
+			SupportedArch::X86_64UnknownLinuxGnu,
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		expected.insert(
-			PluginArch("x86_64-pc-windows-msvc".to_owned()),
+			SupportedArch::X86_64PcWindowsMsvc,
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		assert_eq!(Entrypoints::parse_node(&node).unwrap(), expected)
@@ -412,19 +404,19 @@ dependencies {
 
 		let mut entrypoints = Entrypoints::new();
 		entrypoints.insert(
-			PluginArch("aarch64-apple-darwin".to_owned()),
+			SupportedArch::Aarch64AppleDarwin,
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		entrypoints.insert(
-			PluginArch("x86_64-apple-darwin".to_owned()),
+			SupportedArch::X86_64AppleDarwin,
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		entrypoints.insert(
-			PluginArch("x86_64-unknown-linux-gnu".to_owned()),
+			SupportedArch::X86_64UnknownLinuxGnu,
 			"./hc-mitre-affiliation".to_owned(),
 		);
 		entrypoints.insert(
-			PluginArch("x86_64-pc-windows-msvc".to_owned()),
+			SupportedArch::X86_64PcWindowsMsvc,
 			"./hc-mitre-affiliation".to_owned(),
 		);
 

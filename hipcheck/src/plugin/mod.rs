@@ -3,6 +3,7 @@ mod kdl_parsing;
 mod manager;
 mod plugin_manifest;
 mod retrieval;
+mod supported_arch;
 mod types;
 
 pub use crate::plugin::manager::*;
@@ -11,7 +12,8 @@ pub use download_manifest::{
 	ArchiveFormat, DownloadManifest, DownloadManifestEntry, HashAlgorithm, HashWithDigest,
 };
 pub use kdl_parsing::{extract_data, ParseKdlNode};
-pub use plugin_manifest::{PluginArch, PluginManifest, PluginName, PluginPublisher, PluginVersion};
+pub use plugin_manifest::{PluginManifest, PluginName, PluginPublisher, PluginVersion};
+pub use supported_arch::SupportedArch;
 
 use crate::Result;
 use futures::future::join_all;

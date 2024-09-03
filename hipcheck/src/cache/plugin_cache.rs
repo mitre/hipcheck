@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use pathbuf::pathbuf;
 
-use crate::plugin::{PluginArch, PluginName, PluginPublisher, PluginVersion};
+use crate::plugin::{PluginName, PluginPublisher, PluginVersion, SupportedArch};
 
 /// Plugins are stored with the following format `<path_to_plugin_cache>/<publisher>/<plugin_name>/<version>/<arch>`
 pub struct HcPluginCache {
@@ -23,12 +23,12 @@ impl HcPluginCache {
 		publisher: &PluginPublisher,
 		name: &PluginName,
 		version: &PluginVersion,
-		arch: &PluginArch,
+		arch: SupportedArch,
 	) -> PathBuf {
 		self.path
 			.join(&publisher.0)
 			.join(&name.0)
 			.join(&version.0)
-			.join(&arch.0)
+			.join(arch.to_string())
 	}
 }

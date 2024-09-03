@@ -1,8 +1,8 @@
-use super::plugin_manifest::PluginArch;
 use super::{extract_data, PluginName, PluginPublisher, PluginVersion};
 use crate::cache::plugin_cache::HcPluginCache;
 use crate::context::Context;
 use crate::plugin::retrieval::{download_plugin, extract_plugin};
+use crate::plugin::supported_arch::SupportedArch;
 use crate::plugin::ParseKdlNode;
 use crate::string_newtype_parse_kdl_node;
 use crate::util::http::agent::agent;
@@ -217,9 +217,8 @@ pub struct DownloadManifestEntry {
 	/// A `SemVer` version of the plugin. Not a version requirement as in the plugin manifest file,
 	/// but only a specific concrete version
 	pub version: PluginVersion,
-	// TODO: make this a target-triple enum?
 	/// The target architecture for a plugin
-	pub arch: String,
+	pub arch: SupportedArch,
 	/// The URL of the archive file to download containing the plugin executable artifact and
 	/// plugin manifest.
 	pub url: url::Url,
@@ -245,7 +244,7 @@ impl ParseKdlNode for DownloadManifestEntry {
 		// Per RFD #0004, version is of type String
 		let version = PluginVersion(node.get("version")?.value().as_string()?.to_string());
 		// Per RFD #0004, arch is of type String
-		let arch = node.get("arch")?.value().as_string()?.to_string();
+		let arch = SupportedArch::from_str(node.get("arch")?.value().as_string()?).ok()?;
 
 		// there should be one child for each plugin and it should contain the url, hash, compress
 		// and size information
@@ -276,7 +275,7 @@ impl DownloadManifestEntry {
 		publisher: &PluginPublisher,
 		name: &PluginName,
 		version: &PluginVersion,
-		arch: &PluginArch,
+		arch: SupportedArch,
 	) -> Result<(), Error> {
 		// currently plugins are put in HC_CACHE/plugins/<publisher>/<name>/<version>/<arch>
 		let download_dir = plugin_cache.plugin_download_dir(publisher, name, version, arch);
@@ -312,7 +311,7 @@ impl DownloadManifestEntry {
 				publisher.0,
 				name.0,
 				version.0,
-				arch.0
+				arch
 			)
 		})
 	}
@@ -338,7 +337,7 @@ impl DownloadManifest {
 		publisher: &PluginPublisher,
 		name: &PluginName,
 		version: &PluginVersion,
-		arch: &PluginArch,
+		arch: SupportedArch,
 	) -> Result<(), Error> {
 		self.entries.iter().try_for_each(|entry| {
 			entry.download_and_unpack_plugin(plugin_cache, publisher, name, version, arch)
@@ -478,7 +477,7 @@ mod test {
 
 		let expected_entry = DownloadManifestEntry {
 			version: PluginVersion(version.to_string()),
-			arch: arch.to_string(),
+			arch: SupportedArch::from_str(arch).unwrap(),
 			url: Url::parse(url).unwrap(),
 			hash: HashWithDigest::new(
 				HashAlgorithm::try_from(hash_alg).unwrap(),
@@ -519,7 +518,7 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 		assert_eq!(
 			&DownloadManifestEntry {
 				version: PluginVersion("0.1.0".to_owned()),
-				arch: "aarch64-apple-darwin".to_owned(),
+				arch: SupportedArch::Aarch64AppleDarwin,
 				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-aarch64-apple-darwin.tar.xz").unwrap(),
 				hash: HashWithDigest::new(HashAlgorithm::Sha256, "b8e111e7817c4a1eb40ed50712d04e15b369546c4748be1aa8893b553f4e756b".to_owned()),
 				compress: Compress::new(ArchiveFormat::TarXz),
@@ -532,7 +531,7 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 		assert_eq!(
 			&DownloadManifestEntry {
 				version: PluginVersion("0.1.0".to_owned()),
-				arch: "x86_64-apple-darwin".to_owned(),
+				arch: SupportedArch::X86_64AppleDarwin,
 				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz").unwrap(),
 				hash: HashWithDigest::new(HashAlgorithm::Sha256, "ddb8c6d26dd9a91e11c99b3bd7ee2b9585aedac6e6df614190f1ba2bfe86dc19".to_owned()),
                 compress: Compress::new(ArchiveFormat::TarXz),
