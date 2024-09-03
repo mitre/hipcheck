@@ -122,7 +122,7 @@ tokio = { version = "1.39.3", features = [
 ] }
 tokio-stream = "0.1.15"
 toml = "0.8.19"
-tonic = "0.12.1"
+tonic = "0.12.2"
 thiserror = "1.0.63"
 unicode-normalization = "0.1.19"
 ureq = { version = "2.10.0", default-features = false, features = [

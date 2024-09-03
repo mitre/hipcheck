@@ -15,7 +15,7 @@ serde_json = "1.0.125"
 sha2 = "0.10.8"
 tokio = { version = "1.39.2", features = ["rt"] }
 tokio-stream = "0.1.15"
-tonic = "0.12.1"
+tonic = "0.12.2"
 
 [build-dependencies]
 anyhow = "1.0.86"
