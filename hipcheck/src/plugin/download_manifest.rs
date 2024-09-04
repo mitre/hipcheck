@@ -1,9 +1,9 @@
-use super::{extract_data, PluginName, PluginPublisher, PluginVersion};
+use super::{PluginName, PluginPublisher, PluginVersion};
 use crate::cache::plugin_cache::HcPluginCache;
 use crate::context::Context;
+use crate::kdl_helper::{extract_data, ParseKdlNode};
 use crate::plugin::retrieval::{download_plugin, extract_plugin};
 use crate::plugin::supported_arch::SupportedArch;
-use crate::plugin::ParseKdlNode;
 use crate::string_newtype_parse_kdl_node;
 use crate::util::http::agent::agent;
 use crate::{error::Error, hc_error};

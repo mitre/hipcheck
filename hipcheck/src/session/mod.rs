@@ -35,6 +35,7 @@ use crate::hc_error;
 use crate::metric::binary_detector::BinaryFileStorage;
 use crate::metric::linguist::LinguistStorage;
 use crate::metric::MetricProviderStorage;
+use crate::policy::PolicyFile;
 use crate::report::Format;
 use crate::report::ReportParams;
 use crate::report::ReportParamsStorage;
@@ -159,14 +160,27 @@ impl Session {
 		 *  Loading configuration.
 		 *-----------------------------------------------------------------*/
 
-		// Check if a currently unsuporrted policy file was provided
-		// TODO: Remove this error once policy files are supported
+		// Check if a policy file was provided, otherwise use a config folder the old way
+		// Currently this does nothing, as the PolicyFile is not actively parsed
 		if policy_path.is_some() {
-			return Err(hc_error!(
-				"Policy files are not supported by Hipcheck at this time."
-			));
-		}
+			let (_policy, _policy_dir, _data_dir, _hc_github_token) =
+				match load_policy_and_data(policy_path.as_deref(), data_path.as_deref()) {
+					Ok(results) => results,
+					Err(err) => return Err(err),
+				};
 
+			// Needed if we use Salsa for this
+			// session.set_policy(Rc::new(policy));
+			// session.set_policy_dir(Rc::new(policy_dir));
+
+			// Set data folder location for module analysis
+			// session.set_data_dir(Arc::new(data_dir));
+
+			// Set github token in salsa
+			// session.set_github_api_token(Some(Rc::new(hc_github_token)));
+		}
+		// Once we no longer need config information, put this in an else block until config has been deprecated
+		// Until then we need this for Hipcheck to still run
 		let (config, config_dir, data_dir, hc_github_token) =
 			match load_config_and_data(config_path.as_deref(), data_path.as_deref()) {
 				Ok(results) => results,
@@ -268,6 +282,46 @@ fn load_config_and_data(
 	Ok((
 		config,
 		valid_config_path.to_path_buf(),
+		data_dir,
+		hc_github_token,
+	))
+}
+
+fn load_policy_and_data(
+	policy_path: Option<&Path>,
+	data_path: Option<&Path>,
+) -> Result<(PolicyFile, PathBuf, PathBuf, String)> {
+	// Start the phase.
+	let phase = SpinnerPhase::start("loading policy and data files");
+	// Increment the phase into the "running" stage.
+	phase.inc();
+	// Set the spinner phase to tick constantly, 10 times a second.
+	phase.enable_steady_tick(Duration::from_millis(100));
+
+	// Resolve the path to the policy file.
+	let valid_policy_path = policy_path.ok_or_else(|| {
+		hc_error!(
+			"Failed to load policy. Please make sure the path set by the --policy flag exists."
+		)
+	})?;
+
+	// Load the policy file.
+	let policy = PolicyFile::load_from(valid_policy_path)
+		.context("Failed to load policy. Plase make sure the policy file is in the proived location and is formatted correctly.")?;
+
+	// Get the directory the data file is in.
+	let data_dir = data_path
+	   .ok_or_else(|| hc_error!("Failed to load data files. Please make sure the path set by the hc_data env variable exists."))?
+		.to_owned();
+
+	// Resolve the github token file.
+	let hc_github_token = resolve_token()?;
+
+	phase.finish_successful();
+
+	Ok((
+		policy,
+		valid_policy_path.to_path_buf(),
 		data_dir,
 		hc_github_token,
 	))
