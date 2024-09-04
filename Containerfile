@@ -8,6 +8,7 @@ WORKDIR /build
 COPY .cargo/ .cargo/
 COPY hipcheck-macros/ hipcheck-macros/
 COPY hipcheck/ hipcheck/
+COPY plugins/ plugins/
 COPY xtask/ xtask/
 COPY Cargo.toml Cargo.lock ./
 
