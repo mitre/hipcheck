@@ -241,22 +241,25 @@ impl ParseKdlNode for PolicyAnalysis {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyCategory {
 	name: String,
+	weight: Option<u16>,
 	children: Vec<PolicyCategoryChild>,
 }
 
 impl PolicyCategory {
 	#[allow(dead_code)]
-	pub fn new(name: String) -> Self {
+	pub fn new(name: String, weight: Option<u16>) -> Self {
 		Self {
 			name,
+			weight,
 			children: Vec::new(),
 		}
 	}
 
 	#[allow(dead_code)]
-	pub fn with_capacity(name: String, capacity: usize) -> Self {
+	pub fn with_capacity(name: String, weight: Option<u16>, capacity: usize) -> Self {
 		Self {
 			name,
+			weight,
 			children: Vec::with_capacity(capacity),
 		}
 	}
@@ -283,6 +286,10 @@ impl ParseKdlNode for PolicyCategory {
 		}
 
 		let name = node.entries().first()?.value().as_string()?.to_string();
+		let weight = match node.get("weight") {
+			Some(entry) => Some(entry.value().as_i64()? as u16),
+			None => None,
+		};
 
 		let mut children = Vec::new();
 
@@ -299,7 +306,7 @@ impl ParseKdlNode for PolicyCategory {
 			}
 		}
 
-		Some(Self { name, children })
+		Some(Self { name, weight, children })
 	}
 }
 
