@@ -1,6 +1,5 @@
-use super::extract_data;
+use crate::kdl_helper::{extract_data, ParseKdlNode};
 use crate::plugin::supported_arch::SupportedArch;
-use crate::plugin::ParseKdlNode;
 use crate::string_newtype_parse_kdl_node;
 use crate::{error::Error, hc_error};
 use core::panic;

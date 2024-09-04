@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+
+//! General shared types and functions for KDL files
+
 use kdl::KdlNode;
 
 // Helper trait to make it easier to parse KdlNodes into our own types
@@ -44,6 +48,7 @@ where
 macro_rules! string_newtype_parse_kdl_node {
 	($type:ty, $identifier:expr) => {
 		impl $type {
+			#[allow(dead_code)]
 			pub fn new(value: String) -> Self {
 				Self(value)
 			}

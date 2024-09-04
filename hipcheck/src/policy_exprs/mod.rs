@@ -3,7 +3,7 @@
 mod bridge;
 mod env;
 mod error;
-mod expr;
+pub mod expr;
 mod token;
 
 pub(crate) use crate::policy_exprs::bridge::Tokens;
