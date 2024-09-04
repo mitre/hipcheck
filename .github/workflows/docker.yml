@@ -1,0 +1,19 @@
+name: Docker
+
+# Run once a week on Monday at midnight.
+on:
+  schedule:
+    - cron: "0 0 * * 1"
+
+# This only tries to build the Containerfile, and does not push
+# the resulting image to Docker Hub.
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          file: Containerfile
+          push: false

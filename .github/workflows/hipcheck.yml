@@ -16,6 +16,7 @@ on:
     paths:
       - "config/**"
       - "hipcheck/**"
+      - "plugins/**"
       - "scripts/**"
       - "xtask/**"
   pull_request:
@@ -23,6 +24,7 @@ on:
     paths:
       - "config/**"
       - "hipcheck/**"
+      - "plugins/**"
       - "scripts/**"
       - "xtask/**"
 
@@ -42,27 +44,40 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
+      # Get the repo, get Rust, get `cargo-nextest`, setup caching.
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@nextest
       - uses: swatinem/rust-cache@v2
         with:
           key: ${{ matrix.os }}
-        # Install protoc dependency - Linux
+
+      # Install the protobuf compiler
       - if: runner.os == 'Linux'
         run: sudo apt-get install -y protobuf-compiler
-        # Install protoc dependency - MacOS
       - if: runner.os == 'macOS'
         run: brew install protobuf
-        # Install protoc dependency - Windows
       - if: runner.os == 'Windows'
-        run: |
-          curl -L -O https://github.com/protocolbuffers/protobuf/releases/download/v27.3/protoc-27.3-win64.zip
-          unzip -j protoc-27.3-win64.zip bin/protoc.exe -d C:\Windows\System32\
+        run: choco install protoc
+
+      # Print dependency info (useful for debugging)
       - name: Dependency Tree
         run: cargo tree
+
+      # Try building every crate in the workspace.
+      # Note that this actually runs "cargo check" and doesn't attempt
+      # to link the resulting artifacts together.
       - name: Build
-        run: cargo build --verbose --workspace
+        run: cargo check --verbose --workspace
+
+      # Test the code.
       - name: Test
-        run: cargo test --verbose --workspace
+        run: cargo nextest r --verbose --workspace
+
+      # Run the linter.
       - name: Lint
         run: cargo clippy --verbose --workspace
+
+      # Run our own checks for licensing and other info.
+      - name: Check
+        run: cargo xtask check
