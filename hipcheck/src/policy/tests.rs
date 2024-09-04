@@ -159,7 +159,7 @@ mod test {
             investigate policy="(gt 0.5 $)"
             investigate-if-fail "mitre/typo" "mitre/binary"
 
-            category "practices" {
+            category "practices" weight=2 {
                 analysis "mitre/activity" policy="(lte 52 $.weeks)" weight=3
                 analysis "mitre/binary" policy="(eq 0 (count $))"
             }
@@ -187,7 +187,7 @@ mod test {
 		if_fail.push("mitre/typo");
 		if_fail.push("mitre/binary");
 
-		let mut practices = PolicyCategory::new("practices".to_string());
+		let mut practices = PolicyCategory::new("practices".to_string(), Some(2));
 		practices.push(PolicyCategoryChild::Analysis(PolicyAnalysis::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
 			Some("(lte 52 $.weeks)".to_string()),
@@ -211,7 +211,7 @@ mod test {
 			.insert("typo-file".to_string(), "./config/typo.kdl".to_string())
 			.unwrap();
 
-		let mut commit = PolicyCategory::new("commit".to_string());
+		let mut commit = PolicyCategory::new("commit".to_string(), None);
 		commit.push(PolicyCategoryChild::Analysis(PolicyAnalysis::new(
 			PolicyPluginName::new("mitre/affiliation").unwrap(),
 			Some("(eq 0 (count $))".to_string()),
@@ -231,7 +231,7 @@ mod test {
 			None,
 		)));
 
-		let mut attacks = PolicyCategory::new("attacks".to_string());
+		let mut attacks = PolicyCategory::new("attacks".to_string(), None);
 		attacks.push(PolicyCategoryChild::Analysis(PolicyAnalysis::new(
 			PolicyPluginName::new("mitre/typo").unwrap(),
 			Some("(eq 0 (count $))".to_string()),
@@ -291,7 +291,7 @@ mod test {
 		let mut if_fail = InvestigateIfFail::new();
 		if_fail.push("mitre/binary");
 
-		let mut practices = PolicyCategory::new("practices".to_string());
+		let mut practices = PolicyCategory::new("practices".to_string(), None);
 		practices.push(PolicyCategoryChild::Analysis(PolicyAnalysis::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
 			Some("(lte 52 $.weeks)".to_string()),
