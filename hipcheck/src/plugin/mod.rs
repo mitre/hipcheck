@@ -9,7 +9,6 @@ use crate::context::Context;
 use crate::kdl_helper::{extract_data, ParseKdlNode};
 pub use crate::plugin::manager::*;
 pub use crate::plugin::types::*;
-use crate::policy_exprs::Expr;
 use crate::Result;
 pub use download_manifest::{
 	ArchiveFormat, DownloadManifest, DownloadManifestEntry, HashAlgorithm, HashWithDigest,
@@ -64,7 +63,7 @@ impl ActivePlugin {
 			channel,
 		}
 	}
-	pub fn get_default_policy_expr(&self) -> Option<&Expr> {
+	pub fn get_default_policy_expr(&self) -> Option<&String> {
 		self.channel.opt_default_policy_expr.as_ref()
 	}
 	async fn get_unique_id(&self) -> usize {

@@ -163,24 +163,26 @@ impl Session {
 		// Check if a policy file was provided, otherwise use a config folder the old way
 		// Currently this does nothing, as the PolicyFile is not actively parsed
 		if policy_path.is_some() {
-			let (_policy, _policy_dir, _data_dir, _hc_github_token) =
+			let (policy, _policy_dir, _data_dir, _hc_github_token) =
 				match load_policy_and_data(policy_path.as_deref(), data_path.as_deref()) {
 					Ok(results) => results,
 					Err(err) => return Err(err),
 				};
 
 			// Needed if we use Salsa for this
-			// session.set_policy(Rc::new(policy));
-			// session.set_policy_dir(Rc::new(policy_dir));
+			session.set_policy(Some(Rc::new(policy)));
+		// session.set_policy_dir(Rc::new(policy_dir));
 
-			// Set data folder location for module analysis
-			// session.set_data_dir(Arc::new(data_dir));
+		// Set data folder location for module analysis
+		// session.set_data_dir(Arc::new(data_dir));
 
-			// Set github token in salsa
-			// session.set_github_api_token(Some(Rc::new(hc_github_token)));
+		// Set github token in salsa
+		// session.set_github_api_token(Some(Rc::new(hc_github_token)));
+		} else {
+			session.set_policy(None);
 		}
-		// Once we no longer need config information, put this in an else block until config has been deprecated
-		// Until then we need this for Hipcheck to still run
+		// Once we no longer need config information, put this in the above else block until config has
+		// been deprecated. Until then we need this for Hipcheck to still run
 		let (config, config_dir, data_dir, hc_github_token) =
 			match load_config_and_data(config_path.as_deref(), data_path.as_deref()) {
 				Ok(results) => results,

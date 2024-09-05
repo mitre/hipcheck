@@ -2,7 +2,7 @@
 
 //! Data types and functions for parsing policy KDL files
 
-mod policy_file;
+pub mod policy_file;
 mod tests;
 
 use crate::kdl_helper::extract_data;

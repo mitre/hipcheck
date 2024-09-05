@@ -4,9 +4,11 @@
 
 use crate::analysis::score::*;
 use crate::context::Context;
+use crate::engine::HcEngine;
 use crate::error::Result;
 use crate::hc_error;
-use crate::policy_exprs::{Expr, Primitive};
+use crate::policy::policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild};
+use crate::policy::PolicyFile;
 use crate::util::fs as file;
 use crate::BINARY_CONFIG_FILE;
 use crate::F64;
@@ -448,6 +450,8 @@ pub trait ConfigSource: salsa::Database {
 	/// Returns the directory containing the config file
 	#[salsa::input]
 	fn config_dir(&self) -> Rc<PathBuf>;
+	#[salsa::input]
+	fn policy(&self) -> Option<Rc<PolicyFile>>;
 	/// Returns the token set in HC_GITHUB_TOKEN env var
 	#[salsa::input]
 	fn github_api_token(&self) -> Option<Rc<String>>;
@@ -605,7 +609,7 @@ pub struct Analysis {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PoliciedAnalysis(pub Analysis, pub Expr);
+pub struct PoliciedAnalysis(pub Analysis, pub String);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnalysisTreeNode {
@@ -641,13 +645,35 @@ impl AnalysisTreeNode {
 			weight,
 		}
 	}
-	pub fn analysis(analysis: Analysis, expr: Expr, weight: F64) -> Self {
+	pub fn analysis(analysis: Analysis, raw_policy: String, weight: F64) -> Self {
 		AnalysisTreeNode::Analysis {
-			analysis: PoliciedAnalysis(analysis, expr),
+			analysis: PoliciedAnalysis(analysis, raw_policy),
 			weight,
 		}
 	}
-	pub fn augment(&self, metrics: &HashMap<Analysis, Result<Value>>) -> ScoreTreeNode {
+	pub fn augment(&self, scores: &AnalysisResults) -> Result<ScoreTreeNode> {
+		match self {
+			AnalysisTreeNode::Category { label, weight } => Ok(ScoreTreeNode {
+				label: label.clone(),
+				score: 0f64,
+				weight: (*weight).into(),
+			}),
+			AnalysisTreeNode::Analysis { analysis, weight } => {
+				let label = analysis.0.query.clone();
+				let stored_res = scores.table.get(&label).ok_or(hc_error!(
+					"missing expected analysis results {}",
+					analysis.0.query
+				))?;
+				let score = stored_res.score().0;
+				Ok(ScoreTreeNode {
+					label,
+					score: score as f64,
+					weight: (*weight).into(),
+				})
+			}
+		}
+	}
+	pub fn augment_plugin(&self, metrics: &HashMap<Analysis, Result<Value>>) -> ScoreTreeNode {
 		match self {
 			AnalysisTreeNode::Category { label, weight } => ScoreTreeNode {
 				label: label.clone(),
@@ -713,13 +739,13 @@ impl AnalysisTree {
 		&mut self,
 		under: NodeId,
 		analysis: Analysis,
-		policy: Expr,
+		raw_policy: String,
 		weight: F64,
 	) -> Result<NodeId> {
 		if self.node_is_category(under)? {
 			let child = self
 				.tree
-				.new_node(AnalysisTreeNode::analysis(analysis, policy, weight));
+				.new_node(AnalysisTreeNode::analysis(analysis, raw_policy, weight));
 			under.append(child, &mut self.tree);
 			Ok(child)
 		} else {
@@ -738,7 +764,7 @@ impl AnalysisTree {
 				.get(weight_root)
 				.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
 				.get()
-				.with_hardcoded_expr(),
+				.as_category_node(),
 		);
 
 		let mut scope: Vec<NodeId> = vec![analysis_root];
@@ -786,6 +812,7 @@ impl WeightTreeNode {
 			weight,
 		}
 	}
+	#[allow(unused)]
 	pub fn augment(&self, scores: &AnalysisResults) -> ScoreTreeNode {
 		let score = match scores.table.get(&self.label) {
 			Some(res) => res.score().0,
@@ -806,7 +833,7 @@ impl WeightTreeNode {
 	// @Temporary - until policy file impl'd and integrated, we hard-code
 	// the policy for our analyses
 	pub fn with_hardcoded_expr(&self) -> AnalysisTreeNode {
-		let expr = Expr::Primitive(Primitive::Bool(false));
+		let expr = "true".to_owned();
 		let analysis = Analysis {
 			publisher: MITRE_PUBLISHER.to_owned(),
 			plugin: LEGACY_PLUGIN.to_owned(),
@@ -882,7 +909,7 @@ where
 
 #[salsa::query_group(WeightTreeQueryStorage)]
 pub trait WeightTreeProvider:
-	FuzzConfigQuery + PracticesConfigQuery + AttacksConfigQuery + CommitConfigQuery
+	FuzzConfigQuery + PracticesConfigQuery + AttacksConfigQuery + CommitConfigQuery + HcEngine
 {
 	/// Returns the tree of raw analysis weights from the config
 	fn weight_tree(&self) -> Result<Rc<WeightTree>>;
@@ -895,9 +922,70 @@ pub trait WeightTreeProvider:
 	fn normalized_analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
 }
 
+fn add_analysis(
+	core: &dyn WeightTreeProvider,
+	tree: &mut AnalysisTree,
+	under: NodeId,
+	analysis: PolicyAnalysis,
+) -> Result<NodeId> {
+	let publisher = analysis.name.publisher;
+	let plugin = analysis.name.name;
+	let weight = match analysis.weight {
+		Some(u) => F64::new(u as f64)?,
+		None => F64::new(1.0)?,
+	};
+	let raw_policy = match analysis.policy_expression {
+        Some(x) => x,
+        None => core.default_policy_expr(publisher.clone(), plugin.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file"))?
+    };
+	let analysis = Analysis {
+		publisher,
+		plugin,
+		query: "default".to_owned(),
+	};
+	tree.add_analysis(under, analysis, raw_policy, weight)
+}
+
+fn add_category(
+	core: &dyn WeightTreeProvider,
+	tree: &mut AnalysisTree,
+	under: NodeId,
+	category: &PolicyCategory,
+) -> Result<NodeId> {
+	let weight = F64::new(match category.weight {
+		Some(w) => w as f64,
+		None => 1.0,
+	})
+	.unwrap();
+	let id = tree.add_category(under, category.name.as_str(), weight)?;
+	for c in category.children.iter() {
+		match c {
+			PolicyCategoryChild::Analysis(analysis) => {
+				add_analysis(core, tree, id, analysis.clone())?;
+			}
+			PolicyCategoryChild::Category(category) => {
+				add_category(core, tree, id, category)?;
+			}
+		}
+	}
+	Ok(id)
+}
+
 pub fn analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<AnalysisTree>> {
-	let weight_tree = db.weight_tree()?;
-	AnalysisTree::from_weight_tree(&weight_tree).map(Rc::new)
+	// @Todo - once ConfigFile-->PolicyFile implemented, deprecate else block
+	if let Some(policy) = db.policy() {
+		let mut tree = AnalysisTree::new("risk");
+		let root = tree.root;
+
+		for c in policy.analyze.categories.iter() {
+			add_category(db, &mut tree, root, c)?;
+		}
+
+		Ok(Rc::new(tree))
+	} else {
+		let weight_tree = db.weight_tree()?;
+		AnalysisTree::from_weight_tree(&weight_tree).map(Rc::new)
+	}
 }
 
 pub fn weight_tree(db: &dyn WeightTreeProvider) -> Result<Rc<WeightTree>> {

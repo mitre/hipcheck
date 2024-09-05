@@ -1,4 +1,3 @@
-use crate::policy_exprs::{parse, Expr};
 use crate::{
 	hc_error,
 	hipcheck::{
@@ -184,19 +183,17 @@ impl PluginContext {
 		res.into_inner().try_into()
 	}
 
-	pub async fn get_default_policy_expression(&mut self) -> Result<Option<Expr>> {
+	pub async fn get_default_policy_expression(&mut self) -> Result<Option<String>> {
 		let req = GetDefaultPolicyExpressionRequest {
 			empty: Some(Empty {}),
 		};
 		let mut res = self.grpc.get_default_policy_expression(req).await?;
-		let expr_str = res.get_ref().policy_expression.as_str();
-		if expr_str.is_empty() {
-			Ok(None)
+		let raw_expr = res.get_ref().policy_expression.clone();
+		Ok(if raw_expr.is_empty() {
+			None
 		} else {
-			parse(expr_str)
-				.map_err(|e| hc_error!("{}", e.to_string()))
-				.map(Some)
-		}
+			Some(raw_expr)
+		})
 	}
 
 	pub async fn initiate_query_protocol(
@@ -410,7 +407,7 @@ impl MultiplexedQueryReceiver {
 #[derive(Debug)]
 pub struct PluginTransport {
 	pub schemas: HashMap<String, Schema>,
-	pub opt_default_policy_expr: Option<Expr>,
+	pub opt_default_policy_expr: Option<String>,
 	ctx: PluginContext,
 	tx: mpsc::Sender<PluginQuery>,
 	rx: Mutex<MultiplexedQueryReceiver>,

@@ -7,7 +7,6 @@ use crate::analysis::{
 	},
 	AnalysisProvider,
 };
-use crate::config::{visit_leaves, WeightTree, WeightTreeProvider};
 use crate::metric::{review::PullReview, MetricProvider};
 use crate::plugin::{ActivePlugin, PluginResponse};
 pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
@@ -29,7 +28,7 @@ pub trait HcEngine: salsa::Database {
 	#[salsa::input]
 	fn core(&self) -> Arc<HcPluginCore>;
 
-	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<Expr>>;
+	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<String>>;
 
 	fn query(&self, publisher: String, plugin: String, query: String, key: Value) -> Result<Value>;
 }
@@ -38,7 +37,7 @@ fn default_policy_expr(
 	db: &dyn HcEngine,
 	publisher: String,
 	plugin: String,
-) -> Result<Option<Expr>> {
+) -> Result<Option<String>> {
 	let core = db.core();
 	// @Todo - plugins map should be keyed on publisher too
 	let Some(p_handle) = core.plugins.get(&plugin) else {
