@@ -2,6 +2,7 @@
 
 //! Data types and functions for parsing policy KDL files
 
+pub mod config_to_policy;
 pub mod policy_file;
 mod tests;
 
