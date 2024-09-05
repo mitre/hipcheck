@@ -840,7 +840,7 @@ impl WeightTreeNode {
 	// the policy for our analyses
 	#[allow(dead_code)]
 	pub fn with_hardcoded_expr(&self) -> AnalysisTreeNode {
-		let expr = "true".to_owned();
+		let expr = "#t".to_owned();
 		let analysis = Analysis {
 			publisher: MITRE_PUBLISHER.to_owned(),
 			plugin: LEGACY_PLUGIN.to_owned(),

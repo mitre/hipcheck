@@ -164,7 +164,7 @@ mod test {
             investigate-if-fail "mitre/typo" "mitre/binary"
 
             category "practices" weight=2 {
-                analysis "mitre/activity" policy="(lte 52 $.weeks)" weight=3
+                analysis "mitre/activity" policy="(lte 52 $/weeks)" weight=3
                 analysis "mitre/binary" policy="(eq 0 (count $))"
             }
 
@@ -194,7 +194,7 @@ mod test {
 		let mut practices = PolicyCategory::new("practices".to_string(), Some(2));
 		practices.push(PolicyCategoryChild::Analysis(PolicyAnalysis::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
-			Some("(lte 52 $.weeks)".to_string()),
+			Some("(lte 52 $/weeks)".to_string()),
 			Some(3),
 			None,
 		)));
@@ -263,7 +263,7 @@ mod test {
             investigate-if-fail "mitre/binary"
 
             category "practices" {
-                analysis "mitre/activity" policy="(lte 52 $.weeks)" weight=3
+                analysis "mitre/activity" policy="(lte 52 $/weeks)" weight=3
                 analysis "mitre/binary" policy="(eq 0 (count $))"
             }
         }"#;
@@ -298,7 +298,7 @@ mod test {
 		let mut practices = PolicyCategory::new("practices".to_string(), None);
 		practices.push(PolicyCategoryChild::Analysis(PolicyAnalysis::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
-			Some("(lte 52 $.weeks)".to_string()),
+			Some("(lte 52 $/weeks)".to_string()),
 			Some(3),
 			None,
 		)));
