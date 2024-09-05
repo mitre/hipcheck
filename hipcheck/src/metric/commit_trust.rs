@@ -47,7 +47,8 @@ pub fn commit_trust_metric(db: &dyn MetricProvider) -> Result<Arc<CommitTrustOut
 
 			*trust_map
 				.entry(commit_view.commit.hash.to_string())
-				.or_insert(true) = (email == &commit_view.committer.email || email == &commit_view.author.email)
+				.or_insert(true) = (email == &commit_view.committer.email
+				|| email == &commit_view.author.email)
 				&& count.count >= value_threshold;
 		}
 	}
