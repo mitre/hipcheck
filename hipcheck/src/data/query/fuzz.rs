@@ -26,10 +26,11 @@ fn fuzz_check(db: &dyn FuzzProvider) -> Result<Fuzz> {
 
 	log::debug!("repo url {}", repo_uri);
 
-	let token =
-		db.github_api_token().ok_or_else(|| {
-			Error::msg("missing GitHub token with permissions for accessing public repository data in config")
-		})?;
+	let token = db.github_api_token().ok_or_else(|| {
+		Error::msg(
+			"missing GitHub token with permissions for accessing public repository data in config",
+		)
+	})?;
 
 	let fuzz = get_fuzz_check(&token, repo_uri)?;
 

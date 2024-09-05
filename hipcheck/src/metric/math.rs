@@ -19,13 +19,13 @@ pub fn mean(data: &[f64]) -> Option<f64> {
 pub fn std_dev(mean: f64, data: &[f64]) -> Option<f64> {
 	match (mean, data.len()) {
 		(mean, count) if count > 0 => {
-			let variance = data
-				.iter()
-				.map(|value| {
-					let diff = mean - *value;
-					diff * diff
-				})
-				.sum::<f64>() / count as f64;
+			let variance =
+				data.iter()
+					.map(|value| {
+						let diff = mean - *value;
+						diff * diff
+					})
+					.sum::<f64>() / count as f64;
 
 			Some(variance.sqrt())
 		}
