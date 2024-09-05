@@ -4,14 +4,15 @@ use crate::analysis::result::*;
 use crate::analysis::AnalysisOutcome;
 use crate::analysis::AnalysisProvider;
 use crate::config::{
-	visit_leaves, Analysis, AnalysisTree, WeightTree, WeightTreeProvider, LEGACY_PLUGIN,
-	MITRE_PUBLISHER,
+	visit_leaves, Analysis, AnalysisTree, WeightTreeProvider, LEGACY_PLUGIN, MITRE_PUBLISHER,
 };
 use crate::engine::HcEngine;
 use crate::error::Result;
 use crate::hc_error;
+use crate::policy::PolicyFile;
 use crate::report::Concern;
 use crate::shell::spinner_phase::SpinnerPhase;
+use crate::F64;
 use num_traits::identities::Zero;
 use serde_json::Value;
 use std::cmp::Ordering;
@@ -209,7 +210,7 @@ impl ScoreTree {
 				.get(analysis_root)
 				.ok_or(hc_error!("AnalysisTree root not in tree, invalid state"))?
 				.get()
-				.augment(&scores.table),
+				.augment_plugin(&scores.table),
 		);
 
 		let mut scope: Vec<NodeId> = vec![score_root];
@@ -220,9 +221,9 @@ impl ScoreTree {
 						analysis_tree
 							.tree
 							.get(n)
-							.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+							.ok_or(hc_error!("AnalaysisTree node not in tree, invalid state"))?
 							.get()
-							.augment(&scores.table),
+							.augment_plugin(&scores.table),
 					);
 					scope
 						.last()
@@ -242,33 +243,33 @@ impl ScoreTree {
 		})
 	}
 
-	// Given a weight tree and set of analysis results, produce an AltScoreTree by creating
+	// Given an analysis tree and set of analysis results, produce an AltScoreTree by creating
 	// ScoreTreeNode objects for each analysis that was not skipped, and composing them into
 	// a tree structure matching that of the WeightTree
-	pub fn synthesize(weight_tree: &WeightTree, scores: &AnalysisResults) -> Result<Self> {
+	pub fn synthesize(analysis_tree: &AnalysisTree, scores: &AnalysisResults) -> Result<Self> {
 		use indextree::NodeEdge::*;
 		let mut tree = Arena::<ScoreTreeNode>::new();
-		let weight_root = weight_tree.root;
+		let analysis_root = analysis_tree.root;
 		let score_root = tree.new_node(
-			weight_tree
+			analysis_tree
 				.tree
-				.get(weight_root)
-				.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+				.get(analysis_root)
+				.ok_or(hc_error!("AnalysisTree root not in tree, invalid state"))?
 				.get()
-				.augment(scores),
+				.augment(scores)?,
 		);
 
 		let mut scope: Vec<NodeId> = vec![score_root];
-		for edge in weight_root.traverse(&weight_tree.tree) {
+		for edge in analysis_root.traverse(&analysis_tree.tree) {
 			match edge {
 				Start(n) => {
 					let curr_node = tree.new_node(
-						weight_tree
+						analysis_tree
 							.tree
 							.get(n)
-							.ok_or(hc_error!("WeightTree root not in tree, invalid state"))?
+							.ok_or(hc_error!("AnalysisTree node not in tree, invalid state"))?
 							.get()
-							.augment(scores),
+							.augment(scores)?,
 					);
 					scope
 						.last()
@@ -432,7 +433,6 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 	let mut plug_results = PluginAnalysisResults::default();
 
 	// @FollowUp - remove this once we implement policy expr calculation
-	let weight_tree = db.normalized_weight_tree()?;
 	let mut results = AnalysisResults::default();
 
 	let mut score = Score::default();
@@ -601,7 +601,7 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 		}
 	}
 
-	let alt_score_tree = ScoreTree::synthesize(&weight_tree, &results)?;
+	let alt_score_tree = ScoreTree::synthesize(&analysis_tree, &results)?;
 	// let plug_score_tree = ScoreTree::synthesize_plugin(&analysis_tree, &plug_results)?;
 	score.total = alt_score_tree.score();
 

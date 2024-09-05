@@ -174,10 +174,10 @@ impl ParseKdlNode for PolicyConfig {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyAnalysis {
-	name: PolicyPluginName,
-	policy_expression: Option<String>,
-	weight: Option<u16>,
-	config: Option<PolicyConfig>,
+	pub name: PolicyPluginName,
+	pub policy_expression: Option<String>,
+	pub weight: Option<u16>,
+	pub config: Option<PolicyConfig>,
 }
 
 impl PolicyAnalysis {
@@ -240,9 +240,9 @@ impl ParseKdlNode for PolicyAnalysis {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyCategory {
-	name: String,
-	weight: Option<u16>,
-	children: Vec<PolicyCategoryChild>,
+	pub name: String,
+	pub weight: Option<u16>,
+	pub children: Vec<PolicyCategoryChild>,
 }
 
 impl PolicyCategory {
@@ -306,7 +306,11 @@ impl ParseKdlNode for PolicyCategory {
 			}
 		}
 
-		Some(Self { name, weight, children })
+		Some(Self {
+			name,
+			weight,
+			children,
+		})
 	}
 }
 
@@ -379,7 +383,7 @@ impl ParseKdlNode for InvestigateIfFail {
 pub struct PolicyAnalyze {
 	investigate_policy: InvestigatePolicy,
 	if_fail: Option<InvestigateIfFail>,
-	categories: Vec<PolicyCategory>,
+	pub categories: Vec<PolicyCategory>,
 }
 
 impl PolicyAnalyze {
@@ -451,8 +455,8 @@ impl ParseKdlNode for PolicyAnalyze {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyPluginName {
-	publisher: String,
-	name: String,
+	pub publisher: String,
+	pub name: String,
 }
 
 impl PolicyPluginName {
