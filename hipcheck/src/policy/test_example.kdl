@@ -14,11 +14,11 @@ analyze {
     investigate policy="(gt 0.5 $)"
 
     category "practices" weight=1 {
-        analysis "mitre/activity" policy="(lte 71 $.weeks)" weight=1
+        analysis "mitre/activity" policy="(lte 71 $/weeks)" weight=1
         analysis "mitre/binary" policy="(eq 0 (count $))" weight=1
         analysis "mitre/fuzz" policy="(eq #t $)" weight=1
-        analysis "mitre/identity" policy="(lte 0.2 $.pct_match)" weight=1
-        analysis "mitre/review" policy="(lte 0.05 $.pct_reviewed)" weight=1
+        analysis "mitre/identity" policy="(lte 0.2 $/pct_match)" weight=1
+        analysis "mitre/review" policy="(lte 0.05 $/pct_reviewed)" weight=1
     }
 
     category "attacks" weight=1 {
