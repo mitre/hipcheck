@@ -325,7 +325,7 @@ pub struct IdentityConfig {
 	#[default = 1]
 	pub weight: u64,
 
-	/// A percentage of commits permitted to have a mismatch between committer and
+	/// A percentage of commits permitted to have a match between committer and
 	/// submitter identity, over which a repo fails the analysis.
 	#[default(_code = "F64::new(0.20).unwrap()")]
 	#[serde(deserialize_with = "de::percent")]
@@ -450,8 +450,12 @@ pub trait ConfigSource: salsa::Database {
 	/// Returns the directory containing the config file
 	#[salsa::input]
 	fn config_dir(&self) -> Rc<PathBuf>;
+	/// Returns the input `Policy File` struct
 	#[salsa::input]
-	fn policy(&self) -> Option<Rc<PolicyFile>>;
+	fn policy(&self) -> Rc<PolicyFile>;
+	/// Returns the location of the policy file
+	#[salsa::input]
+	fn policy_path(&self) -> Option<Rc<PathBuf>>;
 	/// Returns the token set in HC_GITHUB_TOKEN env var
 	#[salsa::input]
 	fn github_api_token(&self) -> Option<Rc<String>>;
@@ -754,6 +758,7 @@ impl AnalysisTree {
 	}
 	// @Temporary - WeightTree will be replaced by AnalysisTree, and WeightTree and this function
 	// will cease to exit
+	#[allow(dead_code)]
 	pub fn from_weight_tree(weight_tree: &WeightTree) -> Result<Self> {
 		use indextree::NodeEdge::*;
 		let mut tree = Arena::<AnalysisTreeNode>::new();
@@ -824,6 +829,7 @@ impl WeightTreeNode {
 			weight: self.weight.into(),
 		}
 	}
+	#[allow(dead_code)]
 	pub fn as_category_node(&self) -> AnalysisTreeNode {
 		AnalysisTreeNode::Category {
 			label: self.label.clone(),
@@ -832,6 +838,7 @@ impl WeightTreeNode {
 	}
 	// @Temporary - until policy file impl'd and integrated, we hard-code
 	// the policy for our analyses
+	#[allow(dead_code)]
 	pub fn with_hardcoded_expr(&self) -> AnalysisTreeNode {
 		let expr = "true".to_owned();
 		let analysis = Analysis {
@@ -972,20 +979,15 @@ fn add_category(
 }
 
 pub fn analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<AnalysisTree>> {
-	// @Todo - once ConfigFile-->PolicyFile implemented, deprecate else block
-	if let Some(policy) = db.policy() {
-		let mut tree = AnalysisTree::new("risk");
-		let root = tree.root;
+	let policy = db.policy();
+	let mut tree = AnalysisTree::new("risk");
+	let root = tree.root;
 
-		for c in policy.analyze.categories.iter() {
-			add_category(db, &mut tree, root, c)?;
-		}
-
-		Ok(Rc::new(tree))
-	} else {
-		let weight_tree = db.weight_tree()?;
-		AnalysisTree::from_weight_tree(&weight_tree).map(Rc::new)
+	for c in policy.analyze.categories.iter() {
+		add_category(db, &mut tree, root, c)?;
 	}
+
+	Ok(Rc::new(tree))
 }
 
 pub fn weight_tree(db: &dyn WeightTreeProvider) -> Result<Rc<WeightTree>> {

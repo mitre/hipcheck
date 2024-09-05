@@ -3,11 +3,15 @@
 //! Tests of policy file parsing functions
 #[cfg(test)]
 mod test {
+	use crate::config::Config;
 	use crate::kdl_helper::ParseKdlNode;
+	use crate::policy::config_to_policy::config_to_policy;
 	use crate::policy::policy_file::*;
 	use crate::policy::PolicyFile;
 
 	use kdl::KdlNode;
+	use pathbuf::pathbuf;
+	use std::env;
 	use std::str::FromStr;
 	use url::Url;
 
@@ -311,5 +315,25 @@ mod test {
 		let expected = PolicyFile { plugins, analyze };
 
 		assert_eq!(expected, PolicyFile::from_str(data).unwrap())
+	}
+
+	#[test]
+	fn test_config_to_policy() {
+		let config_path = pathbuf![&env::current_dir().unwrap(), "..", "config"];
+		let config = Config::load_from(&config_path).unwrap();
+		let policy_file = config_to_policy(config).unwrap();
+
+		let expected_path = pathbuf![
+			&env::current_dir().unwrap(),
+			"src",
+			"policy",
+			"test_example.kdl"
+		];
+
+		// let expected_path =
+		// 	Path::new("/home/mchernicoff/hipcheck/hipcheck/src/policy/test_example.kdl");
+		let expected = PolicyFile::load_from(&expected_path).unwrap();
+
+		assert_eq!(expected, policy_file)
 	}
 }

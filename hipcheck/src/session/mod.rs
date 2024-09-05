@@ -35,7 +35,7 @@ use crate::hc_error;
 use crate::metric::binary_detector::BinaryFileStorage;
 use crate::metric::linguist::LinguistStorage;
 use crate::metric::MetricProviderStorage;
-use crate::policy::PolicyFile;
+use crate::policy::{config_to_policy::config_to_policy, PolicyFile};
 use crate::report::Format;
 use crate::report::ReportParams;
 use crate::report::ReportParamsStorage;
@@ -160,44 +160,43 @@ impl Session {
 		 *  Loading configuration.
 		 *-----------------------------------------------------------------*/
 
-		// Check if a policy file was provided, otherwise use a config folder the old way
-		// Currently this does nothing, as the PolicyFile is not actively parsed
+		// Check if a policy file was provided, otherwise convert a deprecated config file to a policy file
 		if policy_path.is_some() {
-			let (policy, _policy_dir, _data_dir, _hc_github_token) =
+			let (policy, policy_path, data_dir, hc_github_token) =
 				match load_policy_and_data(policy_path.as_deref(), data_path.as_deref()) {
 					Ok(results) => results,
 					Err(err) => return Err(err),
 				};
 
-			// Needed if we use Salsa for this
-			session.set_policy(Some(Rc::new(policy)));
-		// session.set_policy_dir(Rc::new(policy_dir));
+			// Set policy file and its location
+			session.set_policy(Rc::new(policy));
+			session.set_policy_path(Some(Rc::new(policy_path)));
 
-		// Set data folder location for module analysis
-		// session.set_data_dir(Arc::new(data_dir));
+			// Set data folder location for module analysis
+			session.set_data_dir(Arc::new(data_dir));
 
-		// Set github token in salsa
-		// session.set_github_api_token(Some(Rc::new(hc_github_token)));
+			// Set github token in salsa
+			session.set_github_api_token(Some(Rc::new(hc_github_token)));
 		} else {
-			session.set_policy(None);
+			let (policy, config_dir, data_dir, hc_github_token) =
+				match load_config_and_data(config_path.as_deref(), data_path.as_deref()) {
+					Ok(results) => results,
+					Err(err) => return Err(err),
+				};
+
+			// Set policy file, with no location to represent that none was given
+			session.set_policy(Rc::new(policy));
+			session.set_policy_path(None);
+
+			// Set the location of the config file that was converted
+			session.set_config_dir(Rc::new(config_dir));
+
+			// Set data folder location for module analysis
+			session.set_data_dir(Arc::new(data_dir));
+
+			// Set github token in salsa
+			session.set_github_api_token(Some(Rc::new(hc_github_token)));
 		}
-		// Once we no longer need config information, put this in the above else block until config has
-		// been deprecated. Until then we need this for Hipcheck to still run
-		let (config, config_dir, data_dir, hc_github_token) =
-			match load_config_and_data(config_path.as_deref(), data_path.as_deref()) {
-				Ok(results) => results,
-				Err(err) => return Err(err),
-			};
-
-		// Set config input queries for use below
-		session.set_config(Rc::new(config));
-		session.set_config_dir(Rc::new(config_dir));
-
-		// Set data folder location for module analysis
-		session.set_data_dir(Arc::new(data_dir));
-
-		// Set github token in salsa
-		session.set_github_api_token(Some(Rc::new(hc_github_token)));
 
 		/*===================================================================
 		 *  Resolving the Hipcheck home.
@@ -255,7 +254,7 @@ fn load_software_versions() -> Result<(String, String)> {
 fn load_config_and_data(
 	config_path: Option<&Path>,
 	data_path: Option<&Path>,
-) -> Result<(Config, PathBuf, PathBuf, String)> {
+) -> Result<(PolicyFile, PathBuf, PathBuf, String)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("loading configuration and data files");
 	// Increment the phase into the "running" stage.
@@ -271,6 +270,9 @@ fn load_config_and_data(
 	let config = Config::load_from(valid_config_path)
 		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
 
+	// Convert the Config struct to a PolicyFile struct
+	let policy = config_to_policy(config)?;
+
 	// Get the directory the data file is in.
 	let data_dir = data_path
 	   .ok_or_else(|| hc_error!("Failed to load data files. Please make sure the path set by the hc_data env variable exists."))?
@@ -282,7 +284,7 @@ fn load_config_and_data(
 	phase.finish_successful();
 
 	Ok((
-		config,
+		policy,
 		valid_config_path.to_path_buf(),
 		data_dir,
 		hc_github_token,
