@@ -141,10 +141,7 @@ impl PolicyConfig {
 	}
 
 	pub fn get(self, description: &str) -> Option<String> {
-		match self.0.get(description) {
-			Some(info) => Some(info.to_string()),
-			None => None,
-		}
+		self.0.get(description).map(|info| info.to_string())
 	}
 
 	#[allow(dead_code)]

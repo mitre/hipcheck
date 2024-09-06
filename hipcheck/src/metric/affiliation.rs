@@ -55,6 +55,7 @@ impl AffiliatedType {
 		}
 	}
 
+    #[allow(unused)]
 	pub fn is_affiliated(&self) -> bool {
 		matches!(self, AffiliatedType::Neither).not()
 	}

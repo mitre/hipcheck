@@ -39,6 +39,7 @@ pub async fn handle_rand_data(mut session: QuerySession, key: u64) -> Result<()>
 		query: "sha256".to_owned(),
 		key: json!(vec![sha_input]),
 		output: json!(null),
+		concerns: vec![],
 	};
 
 	session.send(sha_req).await?;
@@ -66,6 +67,7 @@ pub async fn handle_rand_data(mut session: QuerySession, key: u64) -> Result<()>
 		query: "".to_owned(),
 		key: json!(null),
 		output,
+		concerns: vec!["sample concern".to_owned()],
 	};
 
 	session.send(resp).await?;

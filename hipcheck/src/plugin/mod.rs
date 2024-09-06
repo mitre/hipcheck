@@ -85,6 +85,7 @@ impl ActivePlugin {
 			query: name,
 			key,
 			output: serde_json::json!(null),
+			concerns: vec![],
 		};
 		Ok(self.channel.query(query).await?.into())
 	}
@@ -101,6 +102,7 @@ impl ActivePlugin {
 			query: state.query,
 			key: serde_json::json!(null),
 			output,
+			concerns: vec![],
 		};
 		eprintln!("Resuming query with answer {query:?}");
 		Ok(self.channel.query(query).await?.into())

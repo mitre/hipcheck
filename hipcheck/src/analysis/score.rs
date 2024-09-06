@@ -9,6 +9,7 @@ use crate::config::{
 use crate::engine::HcEngine;
 use crate::error::Result;
 use crate::hc_error;
+use crate::plugin::QueryResult;
 use crate::policy::PolicyFile;
 use crate::report::Concern;
 use crate::shell::spinner_phase::SpinnerPhase;
@@ -78,7 +79,7 @@ impl HCStoredResult {
 
 #[derive(Debug, Default)]
 pub struct PluginAnalysisResults {
-	pub table: HashMap<Analysis, Result<Value>>,
+	pub table: HashMap<Analysis, Result<QueryResult>>,
 }
 
 #[derive(Debug, Default)]
@@ -126,7 +127,7 @@ pub trait ScoringProvider: HcEngine + AnalysisProvider + WeightTreeProvider {
 		plugin: String,
 		query: String,
 		key: Value,
-	) -> Result<Value>;
+	) -> Result<QueryResult>;
 	/// Returns result of phase outcome and scoring
 	fn phase_outcome(&self, phase_name: Arc<String>) -> Result<Arc<ScoreResult>>;
 }
@@ -366,13 +367,14 @@ fn wrapped_query(
 	plugin: String,
 	query: String,
 	key: Value,
-) -> Result<Value> {
+) -> Result<QueryResult> {
 	println!("publisher: {publisher}, plugin: {plugin}, query: {query}");
 	if publisher == *MITRE_PUBLISHER {
 		if query != *DEFAULT_QUERY {
 			return Err(hc_error!("legacy analyses only have a default query"));
 		}
-		Ok(match plugin.as_str() {
+		// @Todo - revise metric functions to return QueryResult
+		let value = match plugin.as_str() {
 			ACTIVITY_PHASE => {
 				let raw = db.activity_metric()?;
 				serde_json::to_value(raw)?
@@ -409,6 +411,10 @@ fn wrapped_query(
 			other => {
 				return Err(hc_error!("Unrecognized legacy analysis '{other}'"));
 			}
+		};
+		Ok(QueryResult {
+			value,
+			concerns: vec![],
 		})
 	} else {
 		db.query(publisher, plugin, query, key)

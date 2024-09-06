@@ -8,7 +8,7 @@ use crate::analysis::{
 	AnalysisProvider,
 };
 use crate::metric::{review::PullReview, MetricProvider};
-use crate::plugin::{ActivePlugin, PluginResponse};
+use crate::plugin::{ActivePlugin, PluginResponse, QueryResult};
 pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
 use crate::policy::PolicyFile;
 use crate::policy_exprs::Expr;
@@ -32,7 +32,13 @@ pub trait HcEngine: salsa::Database {
 
 	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<String>>;
 
-	fn query(&self, publisher: String, plugin: String, query: String, key: Value) -> Result<Value>;
+	fn query(
+		&self,
+		publisher: String,
+		plugin: String,
+		query: String,
+		key: Value,
+	) -> Result<QueryResult>;
 }
 
 fn default_policy_expr(
@@ -54,7 +60,7 @@ fn query(
 	plugin: String,
 	query: String,
 	key: Value,
-) -> Result<Value> {
+) -> Result<QueryResult> {
 	let runtime = RUNTIME.handle();
 	let core = db.core();
 	// Find the plugin
@@ -76,12 +82,14 @@ fn query(
 	// current query by providing the plugin the answer.
 	loop {
 		println!("Query needs more info, recursing...");
-		let answer = db.query(
-			ar.publisher.clone(),
-			ar.plugin.clone(),
-			ar.query.clone(),
-			ar.key.clone(),
-		)?;
+		let answer = db
+			.query(
+				ar.publisher.clone(),
+				ar.plugin.clone(),
+				ar.query.clone(),
+				ar.key.clone(),
+			)?
+			.value;
 		println!("Got answer {answer:?}, resuming");
 		ar = match runtime.block_on(p_handle.resume_query(ar, answer))? {
 			PluginResponse::RemoteClosed => {
@@ -100,7 +108,7 @@ pub fn async_query(
 	plugin: String,
 	query: String,
 	key: Value,
-) -> BoxFuture<'static, Result<Value>> {
+) -> BoxFuture<'static, Result<QueryResult>> {
 	async move {
 		// Find the plugin
 		let Some(p_handle) = core.plugins.get(&plugin) else {
@@ -130,7 +138,8 @@ pub fn async_query(
 				ar.query.clone(),
 				ar.key.clone(),
 			)
-			.await?;
+			.await?
+			.value;
 			println!("Resuming query with answer {answer:?}");
 			ar = match p_handle.resume_query(ar, answer).await? {
 				PluginResponse::RemoteClosed => {
