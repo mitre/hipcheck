@@ -4,7 +4,7 @@ use crate::analysis::result::*;
 use crate::analysis::AnalysisOutcome;
 use crate::analysis::AnalysisProvider;
 use crate::config::{
-	visit_leaves, Analysis, AnalysisTree, WeightTreeProvider, LEGACY_PLUGIN, MITRE_PUBLISHER,
+	visit_leaves, Analysis, AnalysisTree, WeightTreeProvider, MITRE_PUBLISHER, DEFAULT_QUERY
 };
 use crate::engine::HcEngine;
 use crate::error::Result;
@@ -368,48 +368,47 @@ fn wrapped_query(
 	key: Value,
 ) -> Result<Value> {
 	if publisher == *MITRE_PUBLISHER {
-		if plugin == *LEGACY_PLUGIN {
-			Ok(match query.as_str() {
-				ACTIVITY_PHASE => {
-					let raw = db.activity_metric()?;
-					serde_json::to_value(raw)?
-				}
-				AFFILIATION_PHASE => {
-					let raw = db.affiliation_metric()?;
-					serde_json::to_value(&raw.affiliations)?
-				}
-				BINARY_PHASE => serde_json::to_value(db.binary_metric()?)?,
-				CHURN_PHASE => {
-					let raw = db.churn_metric()?;
-					serde_json::to_value(&raw.commit_churn_freqs)?
-				}
-				ENTROPY_PHASE => {
-					let raw = db.entropy_metric()?;
-					serde_json::to_value(&raw.commit_entropies)?
-				}
-				IDENTITY_PHASE => {
-					let raw = db.identity_metric()?;
-					serde_json::to_value(&raw.matches)?
-				}
-				FUZZ_PHASE => {
-					let raw = db.fuzz_metric()?.fuzz_result.exists;
-					serde_json::to_value(raw)?
-				}
-				REVIEW_PHASE => {
-					let raw = db.review_metric()?;
-					serde_json::to_value(&raw.pull_reviews)?
-				}
-				TYPO_PHASE => {
-					let raw = db.typo_metric()?;
-					serde_json::to_value(&raw.typos)?
-				}
-				other => {
-					return Err(hc_error!("Unrecognized legacy analysis '{other}'"));
-				}
-			})
-		} else {
-			Err(hc_error!("Unrecognized MITRE plugin '{plugin}'"))
+		if query != *DEFAULT_QUERY {
+			return Err(hc_error!("legacy analyses only have a default query"));
 		}
+		Ok(match plugin.as_str() {
+			ACTIVITY_PHASE => {
+				let raw = db.activity_metric()?;
+				serde_json::to_value(raw)?
+			}
+			AFFILIATION_PHASE => {
+				let raw = db.affiliation_metric()?;
+				serde_json::to_value(&raw.affiliations)?
+			}
+			BINARY_PHASE => serde_json::to_value(db.binary_metric()?)?,
+			CHURN_PHASE => {
+				let raw = db.churn_metric()?;
+				serde_json::to_value(&raw.commit_churn_freqs)?
+			}
+			ENTROPY_PHASE => {
+				let raw = db.entropy_metric()?;
+				serde_json::to_value(&raw.commit_entropies)?
+			}
+			IDENTITY_PHASE => {
+				let raw = db.identity_metric()?;
+				serde_json::to_value(&raw.matches)?
+			}
+			FUZZ_PHASE => {
+				let raw = db.fuzz_metric()?.fuzz_result.exists;
+				serde_json::to_value(raw)?
+			}
+			REVIEW_PHASE => {
+				let raw = db.review_metric()?;
+				serde_json::to_value(&raw.pull_reviews)?
+			}
+			TYPO_PHASE => {
+				let raw = db.typo_metric()?;
+				serde_json::to_value(&raw.typos)?
+			}
+			other => {
+				return Err(hc_error!("Unrecognized legacy analysis '{other}'"));
+			}
+		})
 	} else {
 		db.query(publisher, plugin, query, key)
 	}

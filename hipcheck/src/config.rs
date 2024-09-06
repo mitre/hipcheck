@@ -603,7 +603,6 @@ pub trait CommitConfigQuery: ConfigSource {
 }
 
 pub static MITRE_PUBLISHER: &str = "MITRE";
-pub static LEGACY_PLUGIN: &str = "legacy";
 pub static DEFAULT_QUERY: &str = "";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -844,8 +843,8 @@ impl WeightTreeNode {
 		let expr = "#t".to_owned();
 		let analysis = Analysis {
 			publisher: MITRE_PUBLISHER.to_owned(),
-			plugin: LEGACY_PLUGIN.to_owned(),
-			query: self.label.clone(),
+			plugin: self.label.to_owned(),
+			query: DEFAULT_QUERY.to_owned(),
 		};
 		AnalysisTreeNode::Analysis {
 			analysis: PoliciedAnalysis(analysis, expr),
