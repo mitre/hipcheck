@@ -7,6 +7,7 @@ use crate::context::Context;
 use crate::engine::HcEngine;
 use crate::error::Result;
 use crate::hc_error;
+use crate::plugin::QueryResult;
 use crate::policy::policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild};
 use crate::policy::PolicyFile;
 use crate::policy_exprs::Executor;
@@ -21,7 +22,6 @@ use num_traits::identities::Zero;
 use pathbuf::pathbuf;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
 use smart_default::SmartDefault;
 use std::collections::HashMap;
 use std::default::Default;
@@ -590,7 +590,10 @@ impl AnalysisTreeNode {
 			}
 		}
 	}
-	pub fn augment_plugin(&self, metrics: &HashMap<Analysis, Result<Value>>) -> ScoreTreeNode {
+	pub fn augment_plugin(
+		&self,
+		metrics: &HashMap<Analysis, Result<QueryResult>>,
+	) -> ScoreTreeNode {
 		match self {
 			AnalysisTreeNode::Category { label, weight } => ScoreTreeNode {
 				label: label.clone(),
@@ -610,7 +613,7 @@ impl AnalysisTreeNode {
 					Ok(output) => {
 						println!("expr: {}", analysis.1);
 						println!("context: {:?}", &output);
-						let score = match Executor::std().run(analysis.1.as_str(), &output) {
+						let score = match Executor::std().run(analysis.1.as_str(), &output.value) {
 							Ok(true) => 0.0,
 							Ok(false) => 1.0,
 							Err(e) => {
@@ -849,10 +852,13 @@ fn langs_file_rel(_db: &dyn LanguagesConfigQuery) -> Rc<String> {
 
 fn langs_file(db: &dyn LanguagesConfigQuery) -> Result<Rc<PathBuf>> {
 	if let Some(config_dir) = db.config_dir() {
-		Ok(Rc::new(pathbuf![config_dir.as_ref(), db.langs_file_rel().as_ref()]))
+		Ok(Rc::new(pathbuf![
+			config_dir.as_ref(),
+			db.langs_file_rel().as_ref()
+		]))
 	} else {
 		let policy_file = db.policy();
-		for category in  &policy_file.as_ref().analyze.categories {
+		for category in &policy_file.as_ref().analyze.categories {
 			if category.name.eq("languages") {
 				for child in &category.children {
 					match child {
@@ -886,7 +892,7 @@ fn binary_formats_file(db: &dyn PracticesConfigQuery) -> Result<Rc<PathBuf>> {
 		]))
 	} else {
 		let policy_file = db.policy();
-		for category in  &policy_file.as_ref().analyze.categories {
+		for category in &policy_file.as_ref().analyze.categories {
 			if category.name.eq("practices") {
 				for child in &category.children {
 					match child {
@@ -914,10 +920,13 @@ fn typo_file_rel(_db: &dyn AttacksConfigQuery) -> Rc<String> {
 
 fn typo_file(db: &dyn AttacksConfigQuery) -> Result<Rc<PathBuf>> {
 	if let Some(config_dir) = db.config_dir() {
-		Ok(Rc::new(pathbuf![config_dir.as_ref(), db.typo_file_rel().as_ref()]))
+		Ok(Rc::new(pathbuf![
+			config_dir.as_ref(),
+			db.typo_file_rel().as_ref()
+		]))
 	} else {
 		let policy_file = db.policy();
-		for category in  &policy_file.as_ref().analyze.categories {
+		for category in &policy_file.as_ref().analyze.categories {
 			if category.name.eq("attacks") {
 				for child in &category.children {
 					match child {
@@ -945,10 +954,13 @@ fn orgs_file_rel(_db: &dyn CommitConfigQuery) -> Rc<String> {
 
 fn orgs_file(db: &dyn CommitConfigQuery) -> Result<Rc<PathBuf>> {
 	if let Some(config_dir) = db.config_dir() {
-		Ok(Rc::new(pathbuf![config_dir.as_ref(), db.orgs_file_rel().as_ref()]))
+		Ok(Rc::new(pathbuf![
+			config_dir.as_ref(),
+			db.orgs_file_rel().as_ref()
+		]))
 	} else {
 		let policy_file = db.policy();
-		for category in  &policy_file.as_ref().analyze.categories {
+		for category in &policy_file.as_ref().analyze.categories {
 			if category.name.eq("attacks") {
 				for child in &category.children {
 					match child {
@@ -979,10 +991,12 @@ fn orgs_file(db: &dyn CommitConfigQuery) -> Result<Rc<PathBuf>> {
 	}
 }
 
+#[allow(unused)]
 fn contributor_trust_value_threshold(db: &dyn CommitConfigQuery) -> u64 {
 	todo!("back it out from policy file config")
 }
 
+#[allow(unused)]
 fn contributor_trust_month_count_threshold(db: &dyn CommitConfigQuery) -> u64 {
 	todo!("back it out from policy file config")
 }

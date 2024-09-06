@@ -21,6 +21,7 @@ pub struct Query {
 	pub query: String,
 	pub key: Value,
 	pub output: Value,
+	pub concerns: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -64,6 +65,7 @@ impl TryFrom<PluginQuery> for Query {
 			query: value.query_name,
 			key: serde_json::from_str(value.key.as_str())?,
 			output: serde_json::from_str(value.output.as_str())?,
+			concerns: value.concern,
 		})
 	}
 }
@@ -98,6 +100,7 @@ impl QuerySession {
 			query_name: value.query,
 			key,
 			output,
+			concern: value.concerns,
 		})
 	}
 
@@ -199,6 +202,7 @@ impl QuerySession {
 					}
 					ReplyInProgress | ReplyComplete => {
 						raw.output.push_str(next.output.as_str());
+						raw.concern.extend_from_slice(next.concern.as_slice());
 					}
 				};
 			}

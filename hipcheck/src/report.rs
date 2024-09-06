@@ -657,6 +657,7 @@ impl Analysis {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(untagged)]
 #[schemars(crate = "schemars")]
+#[allow(unused)]
 pub enum Concern {
 	/// Commits with affiliated contributor(s)
 	Affiliation { contributor: String, count: i64 },

@@ -47,6 +47,7 @@ async fn handle_sha256(session: QuerySession, key: &[u8]) -> Result<()> {
 		query: "".to_owned(),
 		key: json!(null),
 		output,
+		concerns: vec![],
 	};
 
 	session.send(resp).await?;
