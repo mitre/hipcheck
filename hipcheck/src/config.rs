@@ -472,7 +472,7 @@ pub trait LanguagesConfigQuery: ConfigSource {
 	/// Returns the langs file path relative to the config file
 	fn langs_file_rel(&self) -> Rc<String>;
 	/// Returns the langs file absolute path
-	fn langs_file(&self) -> Rc<PathBuf>;
+	fn langs_file(&self) -> Result<Rc<PathBuf>>;
 }
 
 /// Queries for accessing the practices analysis config
@@ -482,7 +482,7 @@ pub trait PracticesConfigQuery: ConfigSource {
 	/// config file
 	fn binary_formats_file_rel(&self) -> Rc<String>;
 	/// Returns the binary formats file absolute path
-	fn binary_formats_file(&self) -> Rc<PathBuf>;
+	fn binary_formats_file(&self) -> Result<Rc<PathBuf>>;
 }
 
 /// Queries for accessing the attacks analysis config
@@ -491,7 +491,7 @@ pub trait AttacksConfigQuery: CommitConfigQuery {
 	/// Returns the typo file path relative to the config file
 	fn typo_file_rel(&self) -> Rc<String>;
 	/// Returns the typo file absolute path
-	fn typo_file(&self) -> Rc<PathBuf>;
+	fn typo_file(&self) -> Result<Rc<PathBuf>>;
 }
 
 /// Queries for accessing the commit analysis config
@@ -500,7 +500,7 @@ pub trait CommitConfigQuery: ConfigSource {
 	/// Returns the orgs file path relative to the config file
 	fn orgs_file_rel(&self) -> Rc<String>;
 	/// Returns the orgs file absolute path
-	fn orgs_file(&self) -> Rc<PathBuf>;
+	fn orgs_file(&self) -> Result<Rc<PathBuf>>;
 	/// Returns the contributor trust analysis count threshold
 	fn contributor_trust_value_threshold(&self) -> u64;
 	/// Returns the contributor trust analysis month threshold
@@ -847,11 +847,30 @@ fn langs_file_rel(_db: &dyn LanguagesConfigQuery) -> Rc<String> {
 	Rc::new(LANGS_FILE.to_string())
 }
 
-fn langs_file(db: &dyn LanguagesConfigQuery) -> Rc<PathBuf> {
+fn langs_file(db: &dyn LanguagesConfigQuery) -> Result<Rc<PathBuf>> {
 	if let Some(config_dir) = db.config_dir() {
-		Rc::new(pathbuf![config_dir.as_ref(), db.langs_file_rel().as_ref()])
+		Ok(Rc::new(pathbuf![config_dir.as_ref(), db.langs_file_rel().as_ref()]))
 	} else {
-		todo!("back it out from policy file config")
+		let policy_file = db.policy();
+		for category in  &policy_file.as_ref().analyze.categories {
+			if category.name.eq("languages") {
+				for child in &category.children {
+					match child {
+						PolicyCategoryChild::Analysis(analysis) => {
+							if analysis.name.name == "linguist" {
+								if let Some(config) = &analysis.config {
+									if let Some(filepath) = config.clone().get("langs-file") {
+										return Ok(Rc::new(Path::new(&filepath).to_path_buf()))
+									}
+								}
+							}
+						},
+						_ => return Err(hc_error!("Cannot find path to languages config file in policy file. This file is necessary for running the linguist analysis."))
+					}
+				}
+			}
+		}
+		Err(hc_error!("Cannot find path to languages config file in policy file. This file is necessary for running the linguist analysis."))
 	}
 }
 
@@ -859,14 +878,33 @@ fn binary_formats_file_rel(_db: &dyn PracticesConfigQuery) -> Rc<String> {
 	Rc::new(BINARY_CONFIG_FILE.to_string())
 }
 
-fn binary_formats_file(db: &dyn PracticesConfigQuery) -> Rc<PathBuf> {
+fn binary_formats_file(db: &dyn PracticesConfigQuery) -> Result<Rc<PathBuf>> {
 	if let Some(config_dir) = db.config_dir() {
-		Rc::new(pathbuf![
+		Ok(Rc::new(pathbuf![
 			config_dir.as_ref(),
 			db.binary_formats_file_rel().as_ref()
-		])
+		]))
 	} else {
-		todo!("back it out from policy file config")
+		let policy_file = db.policy();
+		for category in  &policy_file.as_ref().analyze.categories {
+			if category.name.eq("practices") {
+				for child in &category.children {
+					match child {
+						PolicyCategoryChild::Analysis(analysis) => {
+							if analysis.name.name == "binary" {
+								if let Some(config) = &analysis.config {
+									if let Some(filepath) = config.clone().get("binary-file") {
+										return Ok(Rc::new(Path::new(&filepath).to_path_buf()))
+									}
+								}
+							}
+						},
+						_ => return Err(hc_error!("Cannot find path to bonary formats config file in policy file. This file is necessary for running the binary analysis."))
+					}
+				}
+			}
+		}
+		Err(hc_error!("Cannot find path to binary format config file in policy file. This file is necessary for running the binary analysis."))
 	}
 }
 
@@ -874,11 +912,30 @@ fn typo_file_rel(_db: &dyn AttacksConfigQuery) -> Rc<String> {
 	Rc::new(TYPO_FILE.to_string())
 }
 
-fn typo_file(db: &dyn AttacksConfigQuery) -> Rc<PathBuf> {
+fn typo_file(db: &dyn AttacksConfigQuery) -> Result<Rc<PathBuf>> {
 	if let Some(config_dir) = db.config_dir() {
-		Rc::new(pathbuf![config_dir.as_ref(), db.typo_file_rel().as_ref()])
+		Ok(Rc::new(pathbuf![config_dir.as_ref(), db.typo_file_rel().as_ref()]))
 	} else {
-		todo!("back it out from policy file config")
+		let policy_file = db.policy();
+		for category in  &policy_file.as_ref().analyze.categories {
+			if category.name.eq("attacks") {
+				for child in &category.children {
+					match child {
+						PolicyCategoryChild::Analysis(analysis) => {
+							if analysis.name.name == "typo" {
+								if let Some(config) = &analysis.config {
+									if let Some(filepath) = config.clone().get("typo-file") {
+										return Ok(Rc::new(Path::new(&filepath).to_path_buf()))
+									}
+								}
+							}
+						},
+						_ => return Err(hc_error!("Cannot find path to typos config file in policy file. This file is necessary for running the typo analysis."))
+					}
+				}
+			}
+		}
+		Err(hc_error!("Cannot find path to typo config file in policy file. This file is necessary for running the typo analysis."))
 	}
 }
 
@@ -886,11 +943,39 @@ fn orgs_file_rel(_db: &dyn CommitConfigQuery) -> Rc<String> {
 	Rc::new(ORGS_FILE.to_string())
 }
 
-fn orgs_file(db: &dyn CommitConfigQuery) -> Rc<PathBuf> {
+fn orgs_file(db: &dyn CommitConfigQuery) -> Result<Rc<PathBuf>> {
 	if let Some(config_dir) = db.config_dir() {
-		Rc::new(pathbuf![config_dir.as_ref(), db.orgs_file_rel().as_ref()])
+		Ok(Rc::new(pathbuf![config_dir.as_ref(), db.orgs_file_rel().as_ref()]))
 	} else {
-		todo!("back it out from policy file config")
+		let policy_file = db.policy();
+		for category in  &policy_file.as_ref().analyze.categories {
+			if category.name.eq("attacks") {
+				for child in &category.children {
+					match child {
+						PolicyCategoryChild::Category(child_category) => {
+							if child_category.name.eq("commit") {
+								for child in &child_category.children {
+									match child {
+										PolicyCategoryChild::Analysis(analysis) => {
+											if analysis.name.name == "affiliation" {
+												if let Some(config) = &analysis.config {
+													if let Some(filepath) = config.clone().get("orgs-file") {
+														return Ok(Rc::new(Path::new(&filepath).to_path_buf()))
+													}
+												}
+											}
+										},
+										_ => return Err(hc_error!("Cannot find path to orgs config file in policy file. This file is necessary for running the affiliation analysis."))
+									}
+								}
+							}
+						},
+						_ => return Err(hc_error!("Cannot find path to orgs config file in policy file. This file is necessary for running the affiliation analysis."))
+					}
+				}
+			}
+		}
+		Err(hc_error!("Cannot find path to orgs config file in policy file. This file is necessary for running the affiliation analysis."))
 	}
 }
 

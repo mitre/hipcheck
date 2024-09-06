@@ -21,7 +21,7 @@ pub trait Linguist: LanguagesConfigQuery {
 /// Derived query implementations
 
 fn source_file_detector(db: &dyn Linguist) -> Result<Arc<SourceFileDetector>> {
-	let detector = SourceFileDetector::load(db.langs_file().as_ref())
+	let detector = SourceFileDetector::load(db.langs_file()?.as_ref())
 		.context("failed to build a source file detector from langs file")?;
 
 	Ok(Arc::new(detector))

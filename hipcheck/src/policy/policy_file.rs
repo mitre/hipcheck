@@ -140,6 +140,13 @@ impl PolicyConfig {
 		}
 	}
 
+	pub fn get(self, description: &str) -> Option<String> {
+		match self.0.get(description) {
+			Some(info) => Some(info.to_string()),
+			None => None,
+		}
+	}
+
 	#[allow(dead_code)]
 	pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> {
 		self.0.iter()
