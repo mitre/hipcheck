@@ -7,15 +7,17 @@ pub mod score;
 use crate::analysis::result::*;
 use crate::config::AttacksConfigQuery;
 use crate::config::CommitConfigQuery;
-use crate::config::FuzzConfigQuery;
 use crate::config::PracticesConfigQuery;
 use crate::data::git::GitProvider;
 use crate::error::Error;
 use crate::error::Result;
 use crate::metric::affiliation::AffiliatedType;
+use crate::metric::affiliation::Affiliation;
 use crate::metric::MetricProvider;
+use crate::plugin::QueryResult;
 use crate::report::Concern;
 use crate::F64;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::default::Default;
@@ -28,39 +30,34 @@ use std::sync::Arc;
 /// Queries about analyses
 #[salsa::query_group(AnalysisProviderStorage)]
 pub trait AnalysisProvider:
-	AttacksConfigQuery
-	+ CommitConfigQuery
-	+ GitProvider
-	+ MetricProvider
-	+ FuzzConfigQuery
-	+ PracticesConfigQuery
+	AttacksConfigQuery + CommitConfigQuery + GitProvider + MetricProvider + PracticesConfigQuery
 {
 	/// Returns result of activity analysis
-	fn activity_analysis(&self) -> Arc<HCAnalysisReport>;
+	fn activity_analysis(&self) -> Result<QueryResult>;
 
 	/// Returns result of affiliation analysis
-	fn affiliation_analysis(&self) -> Arc<HCAnalysisReport>;
+	fn affiliation_analysis(&self) -> Result<QueryResult>;
 
 	/// Returns result of binary analysis
-	fn binary_analysis(&self) -> Arc<HCAnalysisReport>;
+	fn binary_analysis(&self) -> Result<QueryResult>;
 
 	/// Returns result of churn analysis
-	fn churn_analysis(&self) -> Arc<HCAnalysisReport>;
+	fn churn_analysis(&self) -> Result<QueryResult>;
 
 	/// Returns result of entropy analysis
-	fn entropy_analysis(&self) -> Arc<HCAnalysisReport>;
+	fn entropy_analysis(&self) -> Result<QueryResult>;
 
 	/// Returns result of identity analysis
-	fn identity_analysis(&self) -> Arc<HCAnalysisReport>;
+	fn identity_analysis(&self) -> Result<QueryResult>;
 
 	/// Returns result of fuzz analysis
-	fn fuzz_analysis(&self) -> Arc<HCAnalysisReport>;
+	fn fuzz_analysis(&self) -> Result<QueryResult>;
 
 	/// Returns result of review analysis
-	fn review_analysis(&self) -> Arc<HCAnalysisReport>;
+	fn review_analysis(&self) -> Result<QueryResult>;
 
 	/// Returns result of typo analysis
-	fn typo_analysis(&self) -> Arc<HCAnalysisReport>;
+	fn typo_analysis(&self) -> Result<QueryResult>;
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -152,38 +149,30 @@ impl Display for AnalysisOutcome {
 	}
 }
 
-pub fn activity_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.activity_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
+pub fn activity_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.activity_metric()?;
 	let value = results.time_since_last_commit.num_weeks() as u64;
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(value.into())),
+	Ok(QueryResult {
+		value: serde_json::to_value(value)?,
 		concerns: vec![],
 	})
 }
 
-pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.affiliation_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
+pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.affiliation_metric()?;
 
 	let affiliated_iter = results
 		.affiliations
 		.iter()
 		.filter(|a| a.affiliated_type.is_affiliated());
 
-	let value = affiliated_iter.clone().count() as u64;
+	// @Note - policy expr json injection can't handle objs/strings currently
+	let value: Vec<bool> = affiliated_iter.clone().map(|_| true).collect();
 
 	let mut contributor_freq_map = HashMap::new();
 
 	for affiliation in affiliated_iter {
-		let commit_view = match db.contributors_for_commit(Arc::clone(&affiliation.commit)) {
-			Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-			Ok(cv) => cv,
-		};
+		let commit_view = db.contributors_for_commit(Arc::clone(&affiliation.commit))?;
 
 		let contributor = match affiliation.affiliated_type {
 			AffiliatedType::Author => String::from(&commit_view.author.name),
@@ -212,109 +201,54 @@ pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> 
 		contributor_freq_map.insert(contributor, commit_count);
 	}
 
-	let concerns = contributor_freq_map
+	let concerns: Vec<String> = contributor_freq_map
 		.into_iter()
-		.map(|(contributor, count)| Concern::Affiliation { contributor, count })
+		.map(|(contributor, count)| format!("Contributor {} has count {}", contributor, count))
 		.collect();
 
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(value.into())),
+	Ok(QueryResult {
+		value: serde_json::to_value(value)?,
 		concerns,
 	})
 }
 
-pub fn binary_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.binary_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
-	let value = results.binary_files.len() as u64;
-	let concerns = results
+pub fn binary_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.binary_metric()?;
+	let concerns: Vec<String> = results
 		.binary_files
-		.clone()
-		.into_iter()
-		.map(|binary_file| Concern::Binary {
-			file_path: binary_file.as_ref().to_string(),
-		})
+		.iter()
+		.map(|binary_file| format!("Binary file at '{}'", binary_file))
 		.collect();
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(value.into())),
+	Ok(QueryResult {
+		value: serde_json::to_value(&results.binary_files)?,
 		concerns,
 	})
 }
 
-pub fn churn_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.churn_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
-	let value_threshold = *db.churn_value_threshold();
-	let num_flagged = results
-		.commit_churn_freqs
-		.iter()
-		.filter(|c| c.churn.into_inner() > value_threshold)
-		.count() as u64;
-	let percent_flagged = num_flagged as f64 / results.commit_churn_freqs.len() as f64;
-	let value = F64::new(percent_flagged).expect("Percent threshold should never be NaN");
-	let concerns = results
-		.commit_churn_freqs
-		.iter()
-		.filter(|c| c.churn.into_inner() > value_threshold)
-		.map(|cf| Concern::Churn {
-			commit_hash: cf.commit.hash.clone(),
-			score: cf.churn.into_inner(),
-			threshold: value_threshold,
-		})
-		.collect::<Vec<_>>();
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(value.into())),
-		concerns,
+pub fn churn_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.churn_metric()?;
+	let value: Vec<F64> = results.commit_churn_freqs.iter().map(|o| o.churn).collect();
+	// @Todo - in RFD4 transition we lost the ability to flag commits, because
+	// the need to flag them as concerns is dependent on policy expr
+	Ok(QueryResult {
+		value: serde_json::to_value(value)?,
+		concerns: vec![],
 	})
 }
 
-pub fn entropy_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.entropy_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
-	let value_threshold = *db.entropy_value_threshold();
-	let num_flagged = results
-		.commit_entropies
-		.iter()
-		.filter(|c| c.entropy.into_inner() > value_threshold)
-		.count() as u64;
-	let percent_flagged = num_flagged as f64 / results.commit_entropies.len() as f64;
-
-	let value = F64::new(percent_flagged).expect("Percent threshold should never be NaN");
-	let res_concerns = results
-		.commit_entropies
-		.iter()
-		.filter(|c| c.entropy.into_inner() > value_threshold)
-		.map(|cf| {
-			db.get_short_hash(Arc::new(cf.commit.hash.clone()))
-				.map(|commit_hash| Concern::Entropy {
-					commit_hash: commit_hash.trim().to_owned(),
-					score: cf.entropy.into_inner(),
-					threshold: value_threshold,
-				})
-		})
-		.collect::<Result<Vec<_>>>();
-	let concerns = match res_concerns {
-		Ok(c) => c,
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-	};
-
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(value.into())),
-		concerns,
+pub fn entropy_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.entropy_metric()?;
+	let value: Vec<F64> = results.commit_entropies.iter().map(|o| o.entropy).collect();
+	// @Todo - in RFD4 transition we lost the ability to flag commits, because
+	// the need to flag them as concerns is dependent on policy expr
+	Ok(QueryResult {
+		value: serde_json::to_value(value)?,
+		concerns: vec![],
 	})
 }
 
-pub fn identity_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.identity_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
+pub fn identity_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.identity_metric()?;
 	let num_flagged = results
 		.matches
 		.iter()
@@ -322,37 +256,28 @@ pub fn identity_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
 		.count() as u64;
 	let percent_flagged = num_flagged as f64 / results.matches.len() as f64;
 	let value = F64::new(percent_flagged).expect("Percent threshold should never be NaN");
-
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(value.into())),
+	Ok(QueryResult {
+		value: serde_json::to_value(value)?,
 		concerns: vec![],
 	})
 }
 
-pub fn fuzz_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.fuzz_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
-	let exists = results.fuzz_result.exists;
-
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(exists.into())),
+pub fn fuzz_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.fuzz_metric()?;
+	let value = results.fuzz_result.exists;
+	Ok(QueryResult {
+		value: serde_json::to_value(value)?,
 		concerns: vec![],
 	})
 }
 
-pub fn review_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.review_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
+pub fn review_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.review_metric()?;
 	let num_flagged = results
 		.pull_reviews
 		.iter()
 		.filter(|p| p.has_review.not())
 		.count() as u64;
-
 	let percent_flagged = match (num_flagged, results.pull_reviews.len()) {
 		(flagged, total) if flagged != 0 && total != 0 => {
 			num_flagged as f64 / results.pull_reviews.len() as f64
@@ -360,32 +285,30 @@ pub fn review_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
 		_ => 0.0,
 	};
 	let value = F64::new(percent_flagged).expect("Percent threshold should never be NaN");
-
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(value.into())),
+	Ok(QueryResult {
+		value: serde_json::to_value(value)?,
 		concerns: vec![],
 	})
 }
 
-pub fn typo_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.typo_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
+pub fn typo_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.typo_metric()?;
+
+	// @Note - policy expr json injection does not support string/obj as array elts
+	let value = results.typos.iter().map(|_| true).collect::<Vec<bool>>();
+
 	let num_flagged = results.typos.len() as u64;
 
-	let concerns: Vec<_> = results
+	let concerns: Vec<String> = results
 		.typos
 		.iter()
-		.map(|typodep| Concern::Typo {
-			dependency_name: typodep.dependency.to_string(),
-		})
+		.map(|typodep| typodep.dependency.to_string())
 		.collect::<HashSet<_>>()
 		.into_iter()
 		.collect();
 
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(num_flagged.into())),
+	Ok(QueryResult {
+		value: serde_json::to_value(value)?,
 		concerns,
 	})
 }

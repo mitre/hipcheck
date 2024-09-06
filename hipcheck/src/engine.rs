@@ -1,19 +1,32 @@
 #![allow(unused)]
 
-use crate::analysis::{
-	score::{
-		ACTIVITY_PHASE, AFFILIATION_PHASE, BINARY_PHASE, CHURN_PHASE, ENTROPY_PHASE, FUZZ_PHASE,
-		IDENTITY_PHASE, REVIEW_PHASE, TYPO_PHASE,
-	},
-	AnalysisProvider,
-};
+use crate::cache::plugin_cache::HcPluginCache;
 use crate::metric::{review::PullReview, MetricProvider};
-use crate::plugin::{ActivePlugin, PluginResponse};
+use crate::plugin::{
+	retrieve_plugins, ActivePlugin, Plugin, PluginManifest, PluginResponse, QueryResult,
+	CURRENT_ARCH,
+};
 pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
+use crate::policy::PolicyFile;
 use crate::policy_exprs::Expr;
+use crate::session::Session;
+use crate::util::fs::{find_file_by_name, read_string};
+use crate::{
+	analysis::{
+		score::{
+			ACTIVITY_PHASE, AFFILIATION_PHASE, BINARY_PHASE, CHURN_PHASE, ENTROPY_PHASE,
+			FUZZ_PHASE, IDENTITY_PHASE, REVIEW_PHASE, TYPO_PHASE,
+		},
+		AnalysisProvider,
+	},
+	shell,
+};
 use crate::{hc_error, Result};
 use futures::future::{BoxFuture, FutureExt};
+use serde::Serialize;
 use serde_json::Value;
+use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
 use tokio::runtime::{Handle, Runtime};
 
@@ -30,7 +43,13 @@ pub trait HcEngine: salsa::Database {
 
 	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<String>>;
 
-	fn query(&self, publisher: String, plugin: String, query: String, key: Value) -> Result<Value>;
+	fn query(
+		&self,
+		publisher: String,
+		plugin: String,
+		query: String,
+		key: Value,
+	) -> Result<QueryResult>;
 }
 
 fn default_policy_expr(
@@ -52,7 +71,7 @@ fn query(
 	plugin: String,
 	query: String,
 	key: Value,
-) -> Result<Value> {
+) -> Result<QueryResult> {
 	let runtime = RUNTIME.handle();
 	let core = db.core();
 	// Find the plugin
@@ -74,12 +93,14 @@ fn query(
 	// current query by providing the plugin the answer.
 	loop {
 		println!("Query needs more info, recursing...");
-		let answer = db.query(
-			ar.publisher.clone(),
-			ar.plugin.clone(),
-			ar.query.clone(),
-			ar.key.clone(),
-		)?;
+		let answer = db
+			.query(
+				ar.publisher.clone(),
+				ar.plugin.clone(),
+				ar.query.clone(),
+				ar.key.clone(),
+			)?
+			.value;
 		println!("Got answer {answer:?}, resuming");
 		ar = match runtime.block_on(p_handle.resume_query(ar, answer))? {
 			PluginResponse::RemoteClosed => {
@@ -98,7 +119,7 @@ pub fn async_query(
 	plugin: String,
 	query: String,
 	key: Value,
-) -> BoxFuture<'static, Result<Value>> {
+) -> BoxFuture<'static, Result<QueryResult>> {
 	async move {
 		// Find the plugin
 		let Some(p_handle) = core.plugins.get(&plugin) else {
@@ -128,7 +149,8 @@ pub fn async_query(
 				ar.query.clone(),
 				ar.key.clone(),
 			)
-			.await?;
+			.await?
+			.value;
 			println!("Resuming query with answer {answer:?}");
 			ar = match p_handle.resume_query(ar, answer).await? {
 				PluginResponse::RemoteClosed => {
@@ -178,4 +200,74 @@ impl HcEngineImpl {
 	}
 	// TODO - "run" function that takes analysis heirarchy and target, and queries each
 	// analysis plugin to kick off the execution
+}
+
+pub fn start_plugins(
+	policy_file: &PolicyFile,
+	plugin_cache: &HcPluginCache,
+) -> Result<Arc<HcPluginCore>> {
+	let executor = PluginExecutor::new(
+		/* max_spawn_attempts */ 3,
+		/* max_conn_attempts */ 5,
+		/* port_range */ 40000..u16::MAX,
+		/* backoff_interval_micros */ 1000,
+		/* jitter_percent */ 10,
+	)?;
+
+	// retrieve, verify and extract all required plugins
+	let required_plugin_names = retrieve_plugins(&policy_file.plugins.0, plugin_cache)?;
+
+	let mut plugins = vec![];
+	for plugin_id in required_plugin_names.iter() {
+		let plugin_dir = plugin_cache.plugin_download_dir(
+			&plugin_id.publisher,
+			&plugin_id.name,
+			&plugin_id.version,
+		);
+
+		// determine entrypoint for this plugin
+		let plugin_kdl = find_file_by_name(plugin_dir, "plugin.kdl")?;
+		let contents = read_string(&plugin_kdl)?;
+		let plugin_manifest = PluginManifest::from_str(contents.as_str())?;
+		let entrypoint = plugin_manifest
+			.get_entrypoint(CURRENT_ARCH)
+			.ok_or_else(|| {
+				hc_error!(
+					"Could not find {} entrypoint for {}/{} {}",
+					CURRENT_ARCH,
+					plugin_id.publisher.0,
+					plugin_id.name.0,
+					plugin_id.version.0
+				)
+			})?;
+
+		let plugin = Plugin {
+			name: plugin_id.name.0.clone(),
+			entrypoint,
+		};
+
+		// find and serialize config for plugin
+		let config = policy_file
+			.get_config(plugin_id.to_policy_file_plugin_identifier().as_str())
+			.ok_or_else(|| {
+				hc_error!(
+					"Could not find config for {} {}",
+					plugin_id.to_policy_file_plugin_identifier(),
+					plugin_id.version.0
+				)
+			})?;
+		let config = serde_json::to_value(&config).map_err(|e| {
+			hc_error!(
+				"Error serializing config for {}",
+				plugin_id.to_policy_file_plugin_identifier()
+			)
+		})?;
+
+		let plugin_with_config = PluginWithConfig(plugin, config);
+		plugins.push(plugin_with_config);
+	}
+
+	let runtime = RUNTIME.handle();
+	let core = runtime.block_on(HcPluginCore::new(executor, plugins))?;
+	Ok(Arc::new(core))
 }

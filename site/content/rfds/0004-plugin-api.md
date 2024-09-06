@@ -62,7 +62,8 @@ in the plugin's manifest.
 The __plugin manifest__ describes the start command for the plugin, along
 with additional metadata necessary for Hipcheck to run the plugin. The
 set of metadata intended for plugins was initially defined in RFD #3, but
-is updated and superseded here. The manifests will be defined using [KDL].
+is updated and superseded here. The manifests will be defined using [KDL], and
+should be named `plugin.kdl`.
 
 - __Publisher__ (`String`): The name of the individual or organization that
   created the plugin.

@@ -4,11 +4,12 @@ use crate::analysis::result::*;
 use crate::analysis::AnalysisOutcome;
 use crate::analysis::AnalysisProvider;
 use crate::config::{
-	visit_leaves, Analysis, AnalysisTree, WeightTreeProvider, LEGACY_PLUGIN, MITRE_PUBLISHER,
+	visit_leaves, Analysis, AnalysisTree, WeightTreeProvider, DEFAULT_QUERY, MITRE_PUBLISHER,
 };
 use crate::engine::HcEngine;
 use crate::error::Result;
 use crate::hc_error;
+use crate::plugin::QueryResult;
 use crate::policy::PolicyFile;
 use crate::report::Concern;
 use crate::shell::spinner_phase::SpinnerPhase;
@@ -78,7 +79,7 @@ impl HCStoredResult {
 
 #[derive(Debug, Default)]
 pub struct PluginAnalysisResults {
-	pub table: HashMap<Analysis, Result<Value>>,
+	pub table: HashMap<Analysis, Result<QueryResult>>,
 }
 
 #[derive(Debug, Default)]
@@ -126,7 +127,7 @@ pub trait ScoringProvider: HcEngine + AnalysisProvider + WeightTreeProvider {
 		plugin: String,
 		query: String,
 		key: Value,
-	) -> Result<Value>;
+	) -> Result<QueryResult>;
 	/// Returns result of phase outcome and scoring
 	fn phase_outcome(&self, phase_name: Arc<String>) -> Result<Arc<ScoreResult>>;
 }
@@ -366,49 +367,22 @@ fn wrapped_query(
 	plugin: String,
 	query: String,
 	key: Value,
-) -> Result<Value> {
+) -> Result<QueryResult> {
 	if publisher == *MITRE_PUBLISHER {
-		if plugin == *LEGACY_PLUGIN {
-			Ok(match query.as_str() {
-				ACTIVITY_PHASE => {
-					let raw = db.activity_metric()?;
-					serde_json::to_value(raw)?
-				}
-				AFFILIATION_PHASE => {
-					let raw = db.affiliation_metric()?;
-					serde_json::to_value(&raw.affiliations)?
-				}
-				BINARY_PHASE => serde_json::to_value(db.binary_metric()?)?,
-				CHURN_PHASE => {
-					let raw = db.churn_metric()?;
-					serde_json::to_value(&raw.commit_churn_freqs)?
-				}
-				ENTROPY_PHASE => {
-					let raw = db.entropy_metric()?;
-					serde_json::to_value(&raw.commit_entropies)?
-				}
-				IDENTITY_PHASE => {
-					let raw = db.identity_metric()?;
-					serde_json::to_value(&raw.matches)?
-				}
-				FUZZ_PHASE => {
-					let raw = db.fuzz_metric()?.fuzz_result.exists;
-					serde_json::to_value(raw)?
-				}
-				REVIEW_PHASE => {
-					let raw = db.review_metric()?;
-					serde_json::to_value(&raw.pull_reviews)?
-				}
-				TYPO_PHASE => {
-					let raw = db.typo_metric()?;
-					serde_json::to_value(&raw.typos)?
-				}
-				other => {
-					return Err(hc_error!("Unrecognized legacy analysis '{other}'"));
-				}
-			})
-		} else {
-			Err(hc_error!("Unrecognized MITRE plugin '{plugin}'"))
+		if query != *DEFAULT_QUERY {
+			return Err(hc_error!("legacy analyses only have a default query"));
+		}
+		match plugin.as_str() {
+			ACTIVITY_PHASE => db.activity_analysis(),
+			AFFILIATION_PHASE => db.affiliation_analysis(),
+			BINARY_PHASE => db.binary_analysis(),
+			CHURN_PHASE => db.churn_analysis(),
+			ENTROPY_PHASE => db.entropy_analysis(),
+			IDENTITY_PHASE => db.identity_analysis(),
+			FUZZ_PHASE => db.fuzz_analysis(),
+			REVIEW_PHASE => db.review_analysis(),
+			TYPO_PHASE => db.typo_analysis(),
+			other => Err(hc_error!("Unrecognized legacy analysis '{other}'")),
 		}
 	} else {
 		db.query(publisher, plugin, query, key)
@@ -440,170 +414,125 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 	// RFD4 analysis style - get all "leaf" analyses and call through plugin architecture
 	let analyses = analysis_tree.get_analyses();
 	for a in analyses {
-		db.wrapped_query(
+		let result = db.wrapped_query(
 			a.publisher.clone(),
 			a.plugin.clone(),
 			a.query.clone(),
 			target_json.clone(),
 		);
+		plug_results.table.insert(a.clone(), result);
 	}
 
+	/*
 	/* PRACTICES NODE ADDITION */
-	if db.practices_active() {
-		/*===NEW_PHASE===*/
-		if db.activity_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.activity_week_count_threshold()),
-				units: Some("weeks inactivity".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.activity = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				ACTIVITY_PHASE,
-				db.activity_analysis(),
-				spec
-			);
-		}
+	/*===NEW_PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.activity_week_count_threshold()),
+		units: Some("weeks inactivity".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.activity = run_and_score_threshold_analysis!(
+		results,
+		phase,
+		ACTIVITY_PHASE,
+		db.activity_analysis(),
+		spec
+	);
 
-		/*===REVIEW PHASE===*/
-		if db.review_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.review_percent_threshold()),
-				units: Some("% pull requests without review".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.review = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				REVIEW_PHASE,
-				db.review_analysis(),
-				spec
-			);
-		}
+	/*===REVIEW PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.review_percent_threshold()),
+		units: Some("% pull requests without review".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.review =
+		run_and_score_threshold_analysis!(results, phase, REVIEW_PHASE, db.review_analysis(), spec);
 
-		/*===BINARY PHASE===*/
-		if db.binary_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.binary_count_threshold()),
-				units: Some("binary files found".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.binary = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				BINARY_PHASE,
-				db.binary_analysis(),
-				spec
-			);
-		}
+	/*===BINARY PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.binary_count_threshold()),
+		units: Some("binary files found".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.binary =
+		run_and_score_threshold_analysis!(results, phase, BINARY_PHASE, db.binary_analysis(), spec);
 
-		/*===IDENTITY PHASE===*/
-		if db.identity_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.identity_percent_threshold()),
-				units: Some("% identity match".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.identity = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				IDENTITY_PHASE,
-				db.identity_analysis(),
-				spec
-			);
-		}
+	/*===IDENTITY PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.identity_percent_threshold()),
+		units: Some("% identity match".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.identity = run_and_score_threshold_analysis!(
+		results,
+		phase,
+		IDENTITY_PHASE,
+		db.identity_analysis(),
+		spec
+	);
 
-		/*===FUZZ PHASE===*/
-		if db.fuzz_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(true),
-				units: None,
-				ordering: Ordering::Equal,
-			};
-			score.fuzz = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				FUZZ_PHASE,
-				db.fuzz_analysis(),
-				spec
-			);
-		}
-	}
+	/*===FUZZ PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(true),
+		units: None,
+		ordering: Ordering::Equal,
+	};
+	score.fuzz =
+		run_and_score_threshold_analysis!(results, phase, FUZZ_PHASE, db.fuzz_analysis(), spec);
 
 	/* ATTACKS NODE ADDITION */
-	if db.attacks_active() {
-		/*===TYPO PHASE===*/
-		if db.typo_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.typo_count_threshold()),
-				units: Some("possible typos".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.typo = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				TYPO_PHASE,
-				db.typo_analysis(),
-				spec
-			);
-		}
+	/*===TYPO PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.typo_count_threshold()),
+		units: Some("possible typos".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.typo =
+		run_and_score_threshold_analysis!(results, phase, TYPO_PHASE, db.typo_analysis(), spec);
 
-		/*High risk commits node addition*/
-		if db.commit_active() {
-			/*===NEW_PHASE===*/
-			if db.affiliation_active() {
-				let spec = ThresholdSpec {
-					threshold: HCBasicValue::from(db.affiliation_count_threshold()),
-					units: Some("affiliated".to_owned()),
-					ordering: Ordering::Less,
-				};
-				score.affiliation = run_and_score_threshold_analysis!(
-					results,
-					phase,
-					AFFILIATION_PHASE,
-					db.affiliation_analysis(),
-					spec
-				);
-			}
+	/*High risk commits node addition*/
+	/*===NEW_PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.affiliation_count_threshold()),
+		units: Some("affiliated".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.affiliation = run_and_score_threshold_analysis!(
+		results,
+		phase,
+		AFFILIATION_PHASE,
+		db.affiliation_analysis(),
+		spec
+	);
 
-			/*===NEW_PHASE===*/
-			if db.churn_active() {
-				let spec = ThresholdSpec {
-					threshold: HCBasicValue::from(db.churn_percent_threshold()),
-					units: Some("% over churn threshold".to_owned()),
-					ordering: Ordering::Less,
-				};
-				score.churn = run_and_score_threshold_analysis!(
-					results,
-					phase,
-					CHURN_PHASE,
-					db.churn_analysis(),
-					spec
-				);
-			}
+	/*===NEW_PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.churn_percent_threshold()),
+		units: Some("% over churn threshold".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.churn =
+		run_and_score_threshold_analysis!(results, phase, CHURN_PHASE, db.churn_analysis(), spec);
 
-			/*===NEW_PHASE===*/
-			if db.entropy_active() {
-				let spec = ThresholdSpec {
-					threshold: HCBasicValue::from(db.entropy_percent_threshold()),
-					units: Some("% over entropy threshold".to_owned()),
-					ordering: Ordering::Less,
-				};
-				score.entropy = run_and_score_threshold_analysis!(
-					results,
-					phase,
-					ENTROPY_PHASE,
-					db.entropy_analysis(),
-					spec
-				);
-			}
-		}
-	}
+	/*===NEW_PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.entropy_percent_threshold()),
+		units: Some("% over entropy threshold".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.entropy = run_and_score_threshold_analysis!(
+		results,
+		phase,
+		ENTROPY_PHASE,
+		db.entropy_analysis(),
+		spec
+	);
+	*/
 
-	let alt_score_tree = ScoreTree::synthesize(&analysis_tree, &results)?;
-	// let plug_score_tree = ScoreTree::synthesize_plugin(&analysis_tree, &plug_results)?;
-	score.total = alt_score_tree.score();
+	let plug_score_tree = ScoreTree::synthesize_plugin(&analysis_tree, &plug_results)?;
+	// let alt_score_tree = ScoreTree::synthesize(&analysis_tree, &results)?;
+
+	score.total = plug_score_tree.score();
 
 	Ok(ScoringResults { results, score })
 }

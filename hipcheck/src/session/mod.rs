@@ -6,13 +6,13 @@ pub mod spdx;
 
 use crate::analysis::score::ScoringProviderStorage;
 use crate::analysis::AnalysisProviderStorage;
+use crate::cache::plugin_cache::HcPluginCache;
 use crate::command_util::DependentProgram;
 use crate::config::AttacksConfigQueryStorage;
 use crate::config::CommitConfigQueryStorage;
 use crate::config::Config;
 use crate::config::ConfigSource;
 use crate::config::ConfigSourceStorage;
-use crate::config::FuzzConfigQueryStorage;
 use crate::config::LanguagesConfigQueryStorage;
 use crate::config::PracticesConfigQueryStorage;
 use crate::config::RiskConfigQueryStorage;
@@ -28,6 +28,8 @@ use crate::data::GitHubProviderStorage;
 use crate::data::ModuleProvider;
 use crate::data::ModuleProviderStorage;
 use crate::data::PullRequestReviewProviderStorage;
+use crate::engine::start_plugins;
+use crate::engine::HcEngine;
 use crate::engine::HcEngineStorage;
 use crate::error::Error;
 use crate::error::Result;
@@ -79,7 +81,6 @@ use url::Url;
 	LinguistStorage,
 	MetricProviderStorage,
 	ModuleProviderStorage,
-	FuzzConfigQueryStorage,
 	FuzzProviderStorage,
 	PracticesConfigQueryStorage,
 	PullRequestReviewProviderStorage,
@@ -168,6 +169,9 @@ impl Session {
 					Err(err) => return Err(err),
 				};
 
+			// No config or dir
+			session.set_config_dir(None);
+
 			// Set policy file and its location
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(Some(Rc::new(policy_path)));
@@ -184,12 +188,12 @@ impl Session {
 					Err(err) => return Err(err),
 				};
 
+			// Set config dir
+			session.set_config_dir(Some(Rc::new(config_dir)));
+
 			// Set policy file, with no location to represent that none was given
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(None);
-
-			// Set the location of the config file that was converted
-			session.set_config_dir(Rc::new(config_dir));
 
 			// Set data folder location for module analysis
 			session.set_data_dir(Arc::new(data_dir));
@@ -212,6 +216,10 @@ impl Session {
 			Ok(results) => results,
 			Err(err) => return Err(err),
 		};
+
+		session.set_cache_dir(Rc::new(home.clone()));
+
+		let plugin_cache = HcPluginCache::new(&home);
 
 		/*===================================================================
 		 *  Resolving the source.
@@ -238,6 +246,20 @@ impl Session {
 		// Set remaining input queries
 		session.set_format(format);
 		session.set_started_at(Local::now().into());
+
+		/*===================================================================
+		 *  Plugin startup.
+		 *-----------------------------------------------------------------*/
+
+		// The fact that we set the policy above to be accessible through the salsa
+		// infrastructure would suggest that plugin startup should also be done
+		// through salsa. Our goal is to produce an HcPluginCore instance, which
+		// has all the plugins up and running. However, HcPluginCore does not impl
+		// equal, and the idea of memoizing/invalidating it does not make sense.
+		// Thus, we will do the plugin startup here.
+		let policy = session.policy();
+		let core = start_plugins(policy.as_ref(), &plugin_cache)?;
+		session.set_core(core);
 
 		Ok(session)
 	}

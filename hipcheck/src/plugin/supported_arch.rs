@@ -17,6 +17,32 @@ pub enum SupportedArch {
 	X86_64UnknownLinuxGnu,
 }
 
+/// Architecture `hc` was built for
+pub const CURRENT_ARCH: SupportedArch = {
+	#[cfg(target_arch = "x86_64")]
+	{
+		#[cfg(target_os = "macos")]
+		{
+			SupportedArch::X86_64AppleDarwin
+		}
+		#[cfg(target_os = "linux")]
+		{
+			SupportedArch::X86_64UnknownLinuxGnu
+		}
+		#[cfg(target_os = "windows")]
+		{
+			SupportedArch::X86_64PcWindowsMsvc
+		}
+	}
+	#[cfg(target_arch = "aarch64")]
+	{
+		#[cfg(target_os = "macos")]
+		{
+			SupportedArch::Aarch64AppleDarwin
+		}
+	}
+};
+
 impl FromStr for SupportedArch {
 	type Err = crate::Error;
 

@@ -1,3 +1,5 @@
+use crate::plugin::PluginName;
+use crate::policy::policy_file::PolicyPluginName;
 use crate::{
 	hc_error,
 	hipcheck::{
@@ -272,6 +274,7 @@ pub struct Query {
 	pub query: String,
 	pub key: Value,
 	pub output: Value,
+	pub concerns: Vec<String>,
 }
 
 impl TryFrom<PluginQuery> for Query {
@@ -302,6 +305,7 @@ impl TryFrom<PluginQuery> for Query {
 			query: value.query_name,
 			key,
 			output,
+			concerns: value.concern,
 		})
 	}
 }
@@ -326,6 +330,7 @@ impl TryFrom<Query> for PluginQuery {
 			query_name: value.query,
 			key,
 			output,
+			concern: value.concerns,
 		})
 	}
 }
@@ -472,6 +477,7 @@ impl PluginTransport {
 					}
 					ReplyInProgress | ReplyComplete => {
 						raw.output.push_str(next.output.as_str());
+						raw.concern.extend_from_slice(next.concern.as_slice());
 					}
 				};
 			}
@@ -522,11 +528,17 @@ impl From<Query> for AwaitingResult {
 	}
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QueryResult {
+	pub value: Value,
+	pub concerns: Vec<String>,
+}
+
 #[derive(Clone, Debug)]
 pub enum PluginResponse {
 	RemoteClosed,
 	AwaitingResult(AwaitingResult),
-	Completed(Value),
+	Completed(QueryResult),
 }
 
 impl From<Option<Query>> for PluginResponse {
@@ -541,7 +553,11 @@ impl From<Option<Query>> for PluginResponse {
 impl From<Query> for PluginResponse {
 	fn from(value: Query) -> Self {
 		if !value.request {
-			PluginResponse::Completed(value.output)
+			let result = QueryResult {
+				value: value.output,
+				concerns: value.concerns,
+			};
+			PluginResponse::Completed(result)
 		} else {
 			PluginResponse::AwaitingResult(value.into())
 		}

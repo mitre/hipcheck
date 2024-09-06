@@ -38,6 +38,7 @@ use crate::analysis::report_builder::Format;
 use crate::analysis::report_builder::Report;
 use crate::analysis::score::score_results;
 use crate::cache::repo_cache::HcRepoCache;
+use crate::config::WeightTreeProvider;
 use crate::context::Context as _;
 use crate::error::Error;
 use crate::error::Result;
@@ -58,8 +59,7 @@ use cli::SchemaCommand;
 use cli::SetupArgs;
 use cli::UpdateArgs;
 use command_util::DependentProgram;
-use config::WeightTreeNode;
-use config::WeightTreeProvider;
+use config::AnalysisTreeNode;
 use core::fmt;
 use indextree::Arena;
 use indextree::NodeId;
@@ -200,7 +200,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	)?;
 
 	// Get the weight tree and print it.
-	let weight_tree = session.normalized_weight_tree()?;
+	let weight_tree = session.normalized_analysis_tree()?;
 
 	// Create a special wrapper to override `Debug` so that we can use indextree's \
 	// debug pretty print function instead of writing our own.
@@ -217,7 +217,11 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	struct ConvertTree(Arena<PrintNode>);
 
 	impl ConvertTree {
-		fn convert_tree(&mut self, old_root: NodeId, old_arena: &Arena<WeightTreeNode>) -> NodeId {
+		fn convert_tree(
+			&mut self,
+			old_root: NodeId,
+			old_arena: &Arena<AnalysisTreeNode>,
+		) -> NodeId {
 			// Get a reference to the old node.
 			let old_node = old_arena
 				.get(old_root)
@@ -228,17 +232,17 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 				// If no children, include the weight product.
 				let weight_product = old_root
 					.ancestors(old_arena)
-					.map(|ancestor| old_arena.get(ancestor).unwrap().get().weight)
+					.map(|ancestor| old_arena.get(ancestor).unwrap().get().get_weight())
 					.product::<NotNan<f64>>();
 
 				// Format as percentage.
 				PrintNode(format!(
 					"{}: {:.2}%",
-					old_node.get().label,
+					old_node.get().get_print_label(),
 					weight_product * 100f64
 				))
 			} else {
-				PrintNode(old_node.get().label.clone())
+				PrintNode(old_node.get().get_print_label().clone())
 			};
 
 			// Add the new node to the new arena.

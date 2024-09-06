@@ -1,23 +1,28 @@
 mod download_manifest;
 mod manager;
+mod plugin_id;
 mod plugin_manifest;
 mod retrieval;
 mod supported_arch;
 mod types;
 
-use crate::context::Context;
-use crate::kdl_helper::{extract_data, ParseKdlNode};
 pub use crate::plugin::manager::*;
+pub use crate::plugin::plugin_id::PluginId;
 pub use crate::plugin::types::*;
-use crate::Result;
+use crate::policy::policy_file::PolicyPluginName;
 pub use download_manifest::{
 	ArchiveFormat, DownloadManifest, DownloadManifestEntry, HashAlgorithm, HashWithDigest,
 };
-use futures::future::join_all;
 pub use plugin_manifest::{PluginManifest, PluginName, PluginPublisher, PluginVersion};
+pub use retrieval::retrieve_plugins;
+pub use supported_arch::{SupportedArch, CURRENT_ARCH};
+
+use crate::context::Context;
+use crate::kdl_helper::{extract_data, ParseKdlNode};
+use crate::Result;
+use futures::future::join_all;
 use serde_json::Value;
 use std::collections::HashMap;
-pub use supported_arch::SupportedArch;
 use tokio::sync::{mpsc, Mutex};
 
 pub fn dummy() {
@@ -85,6 +90,7 @@ impl ActivePlugin {
 			query: name,
 			key,
 			output: serde_json::json!(null),
+			concerns: vec![],
 		};
 		Ok(self.channel.query(query).await?.into())
 	}
@@ -101,6 +107,7 @@ impl ActivePlugin {
 			query: state.query,
 			key: serde_json::json!(null),
 			output,
+			concerns: vec![],
 		};
 		eprintln!("Resuming query with answer {query:?}");
 		Ok(self.channel.query(query).await?.into())
