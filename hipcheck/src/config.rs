@@ -852,32 +852,33 @@ fn langs_file_rel(_db: &dyn LanguagesConfigQuery) -> Rc<String> {
 
 fn langs_file(db: &dyn LanguagesConfigQuery) -> Result<Rc<PathBuf>> {
 	if let Some(config_dir) = db.config_dir() {
-		Ok(Rc::new(pathbuf![
+		return Ok(Rc::new(pathbuf![
 			config_dir.as_ref(),
 			db.langs_file_rel().as_ref()
-		]))
-	} else {
-		let policy_file = db.policy();
-		for category in &policy_file.as_ref().analyze.categories {
-			if category.name.eq("languages") {
-				for child in &category.children {
-					match child {
-						PolicyCategoryChild::Analysis(analysis) => {
-							if analysis.name.name == "linguist" {
-								if let Some(config) = &analysis.config {
-									if let Some(filepath) = config.clone().get("langs-file") {
-										return Ok(Rc::new(Path::new(&filepath).to_path_buf()))
-									}
+		]));
+	}
+
+	let policy_file = db.policy();
+	for category in &policy_file.as_ref().analyze.categories {
+		if category.name.eq("languages") {
+			for child in &category.children {
+				match child {
+					PolicyCategoryChild::Analysis(analysis) => {
+						if analysis.name.name == "linguist" {
+							if let Some(config) = &analysis.config {
+								if let Some(filepath) = config.clone().get("langs-file") {
+									return Ok(Rc::new(Path::new(&filepath).to_path_buf()))
 								}
 							}
-						},
-						_ => return Err(hc_error!("Cannot find path to languages config file in policy file. This file is necessary for running the linguist analysis."))
-					}
+						}
+					},
+					_ => return Err(hc_error!("Cannot find path to languages config file in policy file. This file is necessary for running the linguist analysis."))
 				}
 			}
 		}
-		Err(hc_error!("Cannot find path to languages config file in policy file. This file is necessary for running the linguist analysis."))
 	}
+
+	Err(hc_error!("Cannot find path to languages config file in policy file. This file is necessary for running the linguist analysis."))
 }
 
 fn binary_formats_file_rel(_db: &dyn PracticesConfigQuery) -> Rc<String> {
@@ -992,11 +993,11 @@ fn orgs_file(db: &dyn CommitConfigQuery) -> Result<Rc<PathBuf>> {
 }
 
 #[allow(unused)]
-fn contributor_trust_value_threshold(db: &dyn CommitConfigQuery) -> u64 {
+fn contributor_trust_value_threshold(_db: &dyn CommitConfigQuery) -> u64 {
 	todo!("back it out from policy file config")
 }
 
 #[allow(unused)]
-fn contributor_trust_month_count_threshold(db: &dyn CommitConfigQuery) -> u64 {
+fn contributor_trust_month_count_threshold(_db: &dyn CommitConfigQuery) -> u64 {
 	todo!("back it out from policy file config")
 }
