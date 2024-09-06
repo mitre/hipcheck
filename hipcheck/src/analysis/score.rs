@@ -367,6 +367,7 @@ fn wrapped_query(
 	query: String,
 	key: Value,
 ) -> Result<Value> {
+	println!("publisher: {publisher}, plugin: {plugin}, query: {query}");
 	if publisher == *MITRE_PUBLISHER {
 		if query != *DEFAULT_QUERY {
 			return Err(hc_error!("legacy analyses only have a default query"));
@@ -440,12 +441,13 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 	let analyses = analysis_tree.get_analyses();
 	for a in analyses {
 		println!("Analysis: {a:?}");
-		db.wrapped_query(
+		let result = db.wrapped_query(
 			a.publisher.clone(),
 			a.plugin.clone(),
 			a.query.clone(),
 			target_json.clone(),
 		);
+		plug_results.table.insert(a.clone(), result);
 	}
 
 	/*
@@ -554,9 +556,10 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 	);
 	*/
 
-	let alt_score_tree = ScoreTree::synthesize(&analysis_tree, &results)?;
-	// let plug_score_tree = ScoreTree::synthesize_plugin(&analysis_tree, &plug_results)?;
-	score.total = alt_score_tree.score();
+	let plug_score_tree = ScoreTree::synthesize_plugin(&analysis_tree, &plug_results)?;
+	// let alt_score_tree = ScoreTree::synthesize(&analysis_tree, &results)?;
+
+	score.total = plug_score_tree.score();
 
 	Ok(ScoringResults { results, score })
 }

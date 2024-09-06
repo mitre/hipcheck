@@ -9,6 +9,7 @@ use crate::error::Result;
 use crate::hc_error;
 use crate::policy::policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild};
 use crate::policy::PolicyFile;
+use crate::policy_exprs::Executor;
 use crate::util::fs as file;
 use crate::BINARY_CONFIG_FILE;
 use crate::F64;
@@ -506,7 +507,7 @@ pub trait CommitConfigQuery: ConfigSource {
 	fn contributor_trust_month_count_threshold(&self) -> u64;
 }
 
-pub static MITRE_PUBLISHER: &str = "MITRE";
+pub static MITRE_PUBLISHER: &str = "mitre";
 pub static DEFAULT_QUERY: &str = "";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -596,12 +597,41 @@ impl AnalysisTreeNode {
 				score: 0f64,
 				weight: (*weight).into(),
 			},
-			AnalysisTreeNode::Analysis {
-				analysis,
-				weight: _,
-			} => {
-				let _analysis_res = metrics.get(&analysis.0);
-				todo!("Extract relevant Value output from map, load into and execute policy, return score")
+			AnalysisTreeNode::Analysis { analysis, weight } => {
+				let Some(analysis_res) = metrics.get(&analysis.0) else {
+					panic!(
+						"missing expected analysis results for {}",
+						self.get_print_label()
+					);
+				};
+				let label = self.get_print_label();
+				let weight = (*weight).into();
+				match analysis_res {
+					Ok(output) => {
+						println!("expr: {}", analysis.1);
+						println!("context: {:?}", &output);
+						let score = match Executor::std().run(analysis.1.as_str(), &output) {
+							Ok(true) => 0.0,
+							Ok(false) => 1.0,
+							Err(e) => {
+								panic!("policy evaluation failed: {e}");
+							}
+						};
+						ScoreTreeNode {
+							label,
+							score,
+							weight,
+						}
+					}
+					Err(e) => {
+						println!("Analysis error: {e}");
+						ScoreTreeNode {
+							label,
+							score: 1f64,
+							weight,
+						}
+					}
+				}
 			}
 		}
 	}
