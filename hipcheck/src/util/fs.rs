@@ -4,9 +4,9 @@ use crate::context::Context as _;
 use crate::error::Result;
 use crate::hc_error;
 use serde::de::DeserializeOwned;
-use std::fs;
+use std::fs::{self, read_dir};
 use std::ops::Not;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Read a file to a string.
 pub fn read_string<P: AsRef<Path>>(path: P) -> Result<String> {
@@ -67,4 +67,32 @@ pub fn exists<P: AsRef<Path>>(path: P) -> Result<()> {
 	}
 
 	inner(path.as_ref())
+}
+
+/// find the first file that has a given name
+pub fn find_file_by_name<P: AsRef<Path>>(dir: P, file_name: &str) -> Result<PathBuf> {
+	fn inner(dir: &Path, file_name: &str) -> Result<PathBuf> {
+		if dir.is_dir() {
+			for entry in read_dir(dir)
+				.map_err(|e| hc_error!("Error [{}] reading {}", e, dir.to_string_lossy()))?
+			{
+				let entry = entry.map_err(|_| hc_error!("Failed to read entry"))?;
+				let path = entry.path();
+				if path.is_dir() {
+					if let Ok(found) = find_file_by_name(&path, file_name) {
+						return Ok(found);
+					}
+				} else if path.file_name().map_or(false, |name| name == file_name) {
+					return Ok(path);
+				}
+			}
+		}
+		Err(hc_error!(
+			"Could not find {} inside {}",
+			file_name,
+			dir.to_string_lossy()
+		))
+	}
+
+	inner(dir.as_ref(), file_name)
 }

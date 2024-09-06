@@ -1,0 +1,43 @@
+plugins {
+    plugin "mitre/activity" version="0.1.0"
+    plugin "mitre/binary" version="0.1.0"
+    plugin "mitre/fuzz" version="0.1.0"
+    plugin "mitre/review" version="0.1.0"
+    plugin "mitre/typo" version="0.1.0"
+    plugin "mitre/affiliation" version="0.1.0"
+    plugin "mitre/entropy" version="0.1.0"
+    plugin "mitre/churn" version="0.1.0"
+}
+
+analyze {
+    investigate policy="(gt 0.5 $)"
+    investigate-if-fail "mitre/typo" "mitre/binary"
+
+    category "practices" {
+        analysis "mitre/activity" policy="(lte 52 $)" weight=3
+        analysis "mitre/binary" policy="(eq 0 (count $))" {
+			binary-file "./config/Binary.toml"
+		}
+        analysis "mitre/fuzz" policy="(eq #t $)"
+        analysis "mitre/review" policy="(lte 0.05 $)"
+    }
+
+    category "attacks" {
+        analysis "mitre/typo" policy="(eq 0 (count $))" {
+            typo-file "./config/Typos.toml"
+        }
+
+        category "commit" {
+            analysis "mitre/affiliation" policy="(eq 0 (count $))" {
+                orgs-file "./config/Orgs.toml"
+            }
+
+            analysis "mitre/entropy" policy="(eq 0 (count (filter (gt 8.0) $)))" {
+				langs-file "./config/Langs.toml"
+			}
+            analysis "mitre/churn" policy="(eq 0 (count (filter (gt 8.0) $)))" {
+				langs-file "./config/Langs.toml"
+			}
+        }
+    }
+}

@@ -13,6 +13,7 @@ use crate::config::{
 };
 use crate::error::Result;
 use crate::hc_error;
+use crate::plugin::PluginVersion;
 
 use url::Url;
 
@@ -125,7 +126,7 @@ fn parse_activity(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
-			PLUGIN_VERSION.to_string(),
+			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
@@ -162,7 +163,7 @@ fn parse_binary(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/binary").unwrap(),
-			PLUGIN_VERSION.to_string(),
+			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl",
@@ -194,7 +195,7 @@ fn parse_fuzz(plugins: &mut PolicyPluginList, practices: &mut PolicyCategory, fu
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/fuzz").unwrap(),
-			PLUGIN_VERSION.to_string(),
+			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-fuzz.kdl",
@@ -231,7 +232,7 @@ fn parse_identity(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/identity").unwrap(),
-			PLUGIN_VERSION.to_string(),
+			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-identity.kdl",
@@ -268,7 +269,7 @@ fn parse_review(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/review").unwrap(),
-			PLUGIN_VERSION.to_string(),
+			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-review.kdl",
@@ -306,7 +307,7 @@ fn parse_typo(plugins: &mut PolicyPluginList, attacks: &mut PolicyCategory, typo
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/typo").unwrap(),
-			PLUGIN_VERSION.to_string(),
+			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-typo.kdl",
@@ -348,7 +349,7 @@ fn parse_affiliation(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/affiliation").unwrap(),
-			PLUGIN_VERSION.to_string(),
+			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-affiliation.kdl",
@@ -385,7 +386,7 @@ fn parse_churn(plugins: &mut PolicyPluginList, commit: &mut PolicyCategory, chur
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/churn").unwrap(),
-			PLUGIN_VERSION.to_string(),
+			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-churn.kdl",
@@ -426,7 +427,7 @@ fn parse_entropy(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/entropy").unwrap(),
-			PLUGIN_VERSION.to_string(),
+			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-entropy.kdl",

@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 
 use pathbuf::pathbuf;
 
-use crate::plugin::{PluginName, PluginPublisher, PluginVersion, SupportedArch};
+use crate::plugin::{PluginName, PluginPublisher, PluginVersion};
 
-/// Plugins are stored with the following format `<path_to_plugin_cache>/<publisher>/<plugin_name>/<version>/<arch>`
+/// Plugins are stored with the following format `<path_to_plugin_cache>/<publisher>/<plugin_name>/<version>`
 pub struct HcPluginCache {
 	path: PathBuf,
 }
@@ -17,18 +17,13 @@ impl HcPluginCache {
 		Self { path: plugins_path }
 	}
 
-	/// `<path_to_plugin_cache>/<publisher>/<plugin_name>/<version>/<arch>`
+	/// `<path_to_plugin_cache>/<publisher>/<plugin_name>/<version>`
 	pub fn plugin_download_dir(
 		&self,
 		publisher: &PluginPublisher,
 		name: &PluginName,
 		version: &PluginVersion,
-		arch: SupportedArch,
 	) -> PathBuf {
-		self.path
-			.join(&publisher.0)
-			.join(&name.0)
-			.join(&version.0)
-			.join(arch.to_string())
+		self.path.join(&publisher.0).join(&name.0).join(&version.0)
 	}
 }

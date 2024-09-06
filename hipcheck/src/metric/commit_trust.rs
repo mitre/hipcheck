@@ -26,7 +26,7 @@ pub fn commit_trust_metric(db: &dyn MetricProvider) -> Result<Arc<CommitTrustOut
 
 	let mut trust_map: HashMap<String, bool> = HashMap::new();
 
-	let value_threshold = db.contributor_trust_value_threshold() as u32;
+	let value_threshold = db.contributor_trust_value_threshold()? as u32;
 
 	for commit in commits.iter() {
 		// Check if a commit matches contributor trust map

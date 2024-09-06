@@ -160,6 +160,10 @@ message Query {
     // Hipcheck for future queries matching the publisher name, plugin name,
     // query name, and key.
     string output = 7;
+
+	// An unstructured concern raised during the query that will be raised
+	// in the final Hipcheck report.
+	repeated string concern = 8;
 }
 
 enum QueryState {
