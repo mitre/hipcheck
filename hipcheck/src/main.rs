@@ -413,7 +413,6 @@ struct ReadyChecks {
 	hipcheck_version_check: StdResult<String, VersionCheckError>,
 	git_version_check: StdResult<String, VersionCheckError>,
 	npm_version_check: StdResult<String, VersionCheckError>,
-	config_path_check: StdResult<PathBuf, PathCheckError>,
 	data_path_check: StdResult<PathBuf, PathCheckError>,
 	cache_path_check: StdResult<PathBuf, PathCheckError>,
 	policy_path_check: StdResult<PathBuf, PathCheckError>,
@@ -428,7 +427,6 @@ impl ReadyChecks {
 		self.hipcheck_version_check.is_ok()
 			&& self.git_version_check.is_ok()
 			&& self.npm_version_check.is_ok()
-			&& self.config_path_check.is_ok()
 			&& self.data_path_check.is_ok()
 			&& self.cache_path_check.is_ok()
 			&& self.policy_path_check.is_ok()
@@ -548,18 +546,6 @@ fn check_npm_version() -> StdResult<String, VersionCheckError> {
 		})
 }
 
-fn check_config_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
-	let path = config.config().ok_or(PathCheckError::PathNotFound)?;
-
-	let path = pathbuf![path, HIPCHECK_TOML_FILE];
-
-	if path.exists().not() {
-		return Err(PathCheckError::PathNotFound);
-	}
-
-	Ok(path)
-}
-
 fn check_cache_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	let path = config.cache().ok_or(PathCheckError::PathNotFound)?;
 
@@ -582,7 +568,7 @@ fn check_data_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 }
 
 fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
-	let path = config.policy().ok_or(PathCheckError::PathNotFound)?;
+	let path = config.policy().ok_or(PathCheckError::PolicyNotFound)?;
 
 	if path.exists().not() {
 		return Err(PathCheckError::PolicyNotFound);
@@ -706,7 +692,6 @@ fn cmd_ready(config: &CliConfig) {
 		hipcheck_version_check: check_hipcheck_version(),
 		git_version_check: check_git_version(),
 		npm_version_check: check_npm_version(),
-		config_path_check: check_config_path(config),
 		data_path_check: check_data_path(config),
 		cache_path_check: check_cache_path(config),
 		policy_path_check: check_policy_path(config),
@@ -731,11 +716,6 @@ fn cmd_ready(config: &CliConfig) {
 	match &ready.cache_path_check {
 		Ok(path) => println!("{:<17} {}", "Cache Path:", path.display()),
 		Err(e) => println!("{:<17} {}", "Cache Path:", e),
-	}
-
-	match &ready.config_path_check {
-		Ok(path) => println!("{:<17} {}", "Config Path:", path.display()),
-		Err(e) => println!("{:<17} {}", "Config Path:", e),
 	}
 
 	match &ready.data_path_check {
@@ -911,7 +891,6 @@ const LANGS_FILE: &str = "Langs.toml";
 const BINARY_CONFIG_FILE: &str = "Binary.toml";
 const TYPO_FILE: &str = "Typos.toml";
 const ORGS_FILE: &str = "Orgs.toml";
-const HIPCHECK_TOML_FILE: &str = "Hipcheck.toml";
 
 // Constants for exiting with error codes.
 /// Indicates the program failed.
