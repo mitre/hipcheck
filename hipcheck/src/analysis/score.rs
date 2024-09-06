@@ -376,33 +376,29 @@ fn wrapped_query(
 		// @Todo - revise metric functions to return QueryResult
 		let value = match plugin.as_str() {
 			ACTIVITY_PHASE => {
-				let raw = db.activity_metric()?;
-				serde_json::to_value(raw)?
+				return db.activity_analysis();
 			}
 			AFFILIATION_PHASE => {
 				let raw = db.affiliation_metric()?;
 				serde_json::to_value(&raw.affiliations)?
 			}
-			BINARY_PHASE => serde_json::to_value(db.binary_metric()?)?,
+			BINARY_PHASE => {
+				return db.binary_analysis();
+			}
 			CHURN_PHASE => {
-				let raw = db.churn_metric()?;
-				serde_json::to_value(&raw.commit_churn_freqs)?
+				return db.churn_analysis();
 			}
 			ENTROPY_PHASE => {
-				let raw = db.entropy_metric()?;
-				serde_json::to_value(&raw.commit_entropies)?
+				return db.entropy_analysis();
 			}
 			IDENTITY_PHASE => {
-				let raw = db.identity_metric()?;
-				serde_json::to_value(&raw.matches)?
+				return db.identity_analysis();
 			}
 			FUZZ_PHASE => {
-				let raw = db.fuzz_metric()?.fuzz_result.exists;
-				serde_json::to_value(raw)?
+				return db.fuzz_analysis();
 			}
 			REVIEW_PHASE => {
-				let raw = db.review_metric()?;
-				serde_json::to_value(&raw.pull_reviews)?
+				return db.review_analysis();
 			}
 			TYPO_PHASE => {
 				let raw = db.typo_metric()?;
