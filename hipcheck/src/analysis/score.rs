@@ -4,7 +4,7 @@ use crate::analysis::result::*;
 use crate::analysis::AnalysisOutcome;
 use crate::analysis::AnalysisProvider;
 use crate::config::{
-	visit_leaves, Analysis, AnalysisTree, WeightTreeProvider, MITRE_PUBLISHER, DEFAULT_QUERY
+	visit_leaves, Analysis, AnalysisTree, WeightTreeProvider, DEFAULT_QUERY, MITRE_PUBLISHER,
 };
 use crate::engine::HcEngine;
 use crate::error::Result;
@@ -439,6 +439,7 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 	// RFD4 analysis style - get all "leaf" analyses and call through plugin architecture
 	let analyses = analysis_tree.get_analyses();
 	for a in analyses {
+		println!("Analysis: {a:?}");
 		db.wrapped_query(
 			a.publisher.clone(),
 			a.plugin.clone(),
@@ -447,158 +448,111 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 		);
 	}
 
+	/*
 	/* PRACTICES NODE ADDITION */
-	if db.practices_active() {
-		/*===NEW_PHASE===*/
-		if db.activity_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.activity_week_count_threshold()),
-				units: Some("weeks inactivity".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.activity = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				ACTIVITY_PHASE,
-				db.activity_analysis(),
-				spec
-			);
-		}
+	/*===NEW_PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.activity_week_count_threshold()),
+		units: Some("weeks inactivity".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.activity = run_and_score_threshold_analysis!(
+		results,
+		phase,
+		ACTIVITY_PHASE,
+		db.activity_analysis(),
+		spec
+	);
 
-		/*===REVIEW PHASE===*/
-		if db.review_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.review_percent_threshold()),
-				units: Some("% pull requests without review".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.review = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				REVIEW_PHASE,
-				db.review_analysis(),
-				spec
-			);
-		}
+	/*===REVIEW PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.review_percent_threshold()),
+		units: Some("% pull requests without review".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.review =
+		run_and_score_threshold_analysis!(results, phase, REVIEW_PHASE, db.review_analysis(), spec);
 
-		/*===BINARY PHASE===*/
-		if db.binary_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.binary_count_threshold()),
-				units: Some("binary files found".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.binary = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				BINARY_PHASE,
-				db.binary_analysis(),
-				spec
-			);
-		}
+	/*===BINARY PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.binary_count_threshold()),
+		units: Some("binary files found".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.binary =
+		run_and_score_threshold_analysis!(results, phase, BINARY_PHASE, db.binary_analysis(), spec);
 
-		/*===IDENTITY PHASE===*/
-		if db.identity_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.identity_percent_threshold()),
-				units: Some("% identity match".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.identity = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				IDENTITY_PHASE,
-				db.identity_analysis(),
-				spec
-			);
-		}
+	/*===IDENTITY PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.identity_percent_threshold()),
+		units: Some("% identity match".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.identity = run_and_score_threshold_analysis!(
+		results,
+		phase,
+		IDENTITY_PHASE,
+		db.identity_analysis(),
+		spec
+	);
 
-		/*===FUZZ PHASE===*/
-		if db.fuzz_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(true),
-				units: None,
-				ordering: Ordering::Equal,
-			};
-			score.fuzz = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				FUZZ_PHASE,
-				db.fuzz_analysis(),
-				spec
-			);
-		}
-	}
+	/*===FUZZ PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(true),
+		units: None,
+		ordering: Ordering::Equal,
+	};
+	score.fuzz =
+		run_and_score_threshold_analysis!(results, phase, FUZZ_PHASE, db.fuzz_analysis(), spec);
 
 	/* ATTACKS NODE ADDITION */
-	if db.attacks_active() {
-		/*===TYPO PHASE===*/
-		if db.typo_active() {
-			let spec = ThresholdSpec {
-				threshold: HCBasicValue::from(db.typo_count_threshold()),
-				units: Some("possible typos".to_owned()),
-				ordering: Ordering::Less,
-			};
-			score.typo = run_and_score_threshold_analysis!(
-				results,
-				phase,
-				TYPO_PHASE,
-				db.typo_analysis(),
-				spec
-			);
-		}
+	/*===TYPO PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.typo_count_threshold()),
+		units: Some("possible typos".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.typo =
+		run_and_score_threshold_analysis!(results, phase, TYPO_PHASE, db.typo_analysis(), spec);
 
-		/*High risk commits node addition*/
-		if db.commit_active() {
-			/*===NEW_PHASE===*/
-			if db.affiliation_active() {
-				let spec = ThresholdSpec {
-					threshold: HCBasicValue::from(db.affiliation_count_threshold()),
-					units: Some("affiliated".to_owned()),
-					ordering: Ordering::Less,
-				};
-				score.affiliation = run_and_score_threshold_analysis!(
-					results,
-					phase,
-					AFFILIATION_PHASE,
-					db.affiliation_analysis(),
-					spec
-				);
-			}
+	/*High risk commits node addition*/
+	/*===NEW_PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.affiliation_count_threshold()),
+		units: Some("affiliated".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.affiliation = run_and_score_threshold_analysis!(
+		results,
+		phase,
+		AFFILIATION_PHASE,
+		db.affiliation_analysis(),
+		spec
+	);
 
-			/*===NEW_PHASE===*/
-			if db.churn_active() {
-				let spec = ThresholdSpec {
-					threshold: HCBasicValue::from(db.churn_percent_threshold()),
-					units: Some("% over churn threshold".to_owned()),
-					ordering: Ordering::Less,
-				};
-				score.churn = run_and_score_threshold_analysis!(
-					results,
-					phase,
-					CHURN_PHASE,
-					db.churn_analysis(),
-					spec
-				);
-			}
+	/*===NEW_PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.churn_percent_threshold()),
+		units: Some("% over churn threshold".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.churn =
+		run_and_score_threshold_analysis!(results, phase, CHURN_PHASE, db.churn_analysis(), spec);
 
-			/*===NEW_PHASE===*/
-			if db.entropy_active() {
-				let spec = ThresholdSpec {
-					threshold: HCBasicValue::from(db.entropy_percent_threshold()),
-					units: Some("% over entropy threshold".to_owned()),
-					ordering: Ordering::Less,
-				};
-				score.entropy = run_and_score_threshold_analysis!(
-					results,
-					phase,
-					ENTROPY_PHASE,
-					db.entropy_analysis(),
-					spec
-				);
-			}
-		}
-	}
+	/*===NEW_PHASE===*/
+	let spec = ThresholdSpec {
+		threshold: HCBasicValue::from(db.entropy_percent_threshold()),
+		units: Some("% over entropy threshold".to_owned()),
+		ordering: Ordering::Less,
+	};
+	score.entropy = run_and_score_threshold_analysis!(
+		results,
+		phase,
+		ENTROPY_PHASE,
+		db.entropy_analysis(),
+		spec
+	);
+	*/
 
 	let alt_score_tree = ScoreTree::synthesize(&analysis_tree, &results)?;
 	// let plug_score_tree = ScoreTree::synthesize_plugin(&analysis_tree, &plug_results)?;

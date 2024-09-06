@@ -7,7 +7,6 @@ pub mod score;
 use crate::analysis::result::*;
 use crate::config::AttacksConfigQuery;
 use crate::config::CommitConfigQuery;
-use crate::config::FuzzConfigQuery;
 use crate::config::PracticesConfigQuery;
 use crate::data::git::GitProvider;
 use crate::error::Error;
@@ -28,13 +27,9 @@ use std::sync::Arc;
 /// Queries about analyses
 #[salsa::query_group(AnalysisProviderStorage)]
 pub trait AnalysisProvider:
-	AttacksConfigQuery
-	+ CommitConfigQuery
-	+ GitProvider
-	+ MetricProvider
-	+ FuzzConfigQuery
-	+ PracticesConfigQuery
+	AttacksConfigQuery + CommitConfigQuery + GitProvider + MetricProvider + PracticesConfigQuery
 {
+	/*
 	/// Returns result of activity analysis
 	fn activity_analysis(&self) -> Arc<HCAnalysisReport>;
 
@@ -61,6 +56,7 @@ pub trait AnalysisProvider:
 
 	/// Returns result of typo analysis
 	fn typo_analysis(&self) -> Arc<HCAnalysisReport>;
+	*/
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -152,6 +148,7 @@ impl Display for AnalysisOutcome {
 	}
 }
 
+/*
 pub fn activity_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
 	let results = match db.activity_metric() {
 		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
@@ -389,6 +386,7 @@ pub fn typo_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
 		concerns,
 	})
 }
+*/
 
 fn score_by_threshold<T: PartialOrd>(value: T, threshold: T) -> i64 {
 	if value > threshold {

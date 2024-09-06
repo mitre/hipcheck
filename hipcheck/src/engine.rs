@@ -10,7 +10,9 @@ use crate::analysis::{
 use crate::metric::{review::PullReview, MetricProvider};
 use crate::plugin::{ActivePlugin, PluginResponse};
 pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
+use crate::policy::PolicyFile;
 use crate::policy_exprs::Expr;
+use crate::session::Session;
 use crate::{hc_error, Result};
 use futures::future::{BoxFuture, FutureExt};
 use serde_json::Value;
@@ -178,4 +180,18 @@ impl HcEngineImpl {
 	}
 	// TODO - "run" function that takes analysis heirarchy and target, and queries each
 	// analysis plugin to kick off the execution
+}
+
+pub fn start_plugins(policy_file: &PolicyFile) -> Result<Arc<HcPluginCore>> {
+	let executor = PluginExecutor::new(
+		/* max_spawn_attempts */ 3,
+		/* max_conn_attempts */ 5,
+		/* port_range */ 40000..u16::MAX,
+		/* backoff_interval_micros */ 1000,
+		/* jitter_percent */ 10,
+	)?;
+	let plugins = vec![];
+	let runtime = RUNTIME.handle();
+	let core = runtime.block_on(HcPluginCore::new(executor, plugins))?;
+	Ok(Arc::new(core))
 }
