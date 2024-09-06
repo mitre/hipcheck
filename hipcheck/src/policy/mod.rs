@@ -65,11 +65,6 @@ impl PolicyFile {
 	pub fn get_config(&self, analysis_name: &str) -> Option<HashMap<String, String>> {
 		self.analyze
 			.find_analysis_by_name(analysis_name)
-			.map(|analysis| {
-				analysis
-					.config
-					.map(|config| config.0)
-					.unwrap_or_else(HashMap::new)
-			})
+			.map(|analysis| analysis.config.map(|config| config.0).unwrap_or_default())
 	}
 }

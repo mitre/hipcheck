@@ -140,6 +140,7 @@ impl PolicyConfig {
 		}
 	}
 
+	#[allow(dead_code)]
 	pub fn get(self, description: &str) -> Option<String> {
 		self.0.get(description).map(|info| info.to_string())
 	}

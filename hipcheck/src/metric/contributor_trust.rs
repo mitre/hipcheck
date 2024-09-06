@@ -24,9 +24,9 @@ pub struct ContributorTrustResult {
 pub fn contributor_trust_metric(db: &dyn MetricProvider) -> Result<Arc<ContributorTrustOutput>> {
 	log::debug!("running {} metric", TRUST_PHASE);
 
-	let month_range = db.contributor_trust_month_count_threshold().to_string();
+	let month_range = db.contributor_trust_month_count_threshold()?.to_string();
 
-	let value_threshold = db.contributor_trust_value_threshold() as u32;
+	let value_threshold = db.contributor_trust_value_threshold()? as u32;
 
 	let commit_from_date = Arc::new(month_range);
 
