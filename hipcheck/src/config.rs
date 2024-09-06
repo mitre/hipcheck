@@ -604,6 +604,7 @@ pub trait CommitConfigQuery: ConfigSource {
 
 pub static MITRE_PUBLISHER: &str = "MITRE";
 pub static LEGACY_PLUGIN: &str = "legacy";
+pub static DEFAULT_QUERY: &str = "";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Analysis {
@@ -948,7 +949,7 @@ fn add_analysis(
 	let analysis = Analysis {
 		publisher,
 		plugin,
-		query: "default".to_owned(),
+		query: DEFAULT_QUERY.to_owned(),
 	};
 	tree.add_analysis(under, analysis, raw_policy, weight)
 }
