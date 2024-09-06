@@ -21,7 +21,7 @@ pub trait BinaryFile: PracticesConfigQuery {
 /// Derived query implementations
 
 fn binary_file_detector(db: &dyn BinaryFile) -> Result<Arc<BinaryFileDetector>> {
-	let detector = BinaryFileDetector::load(db.binary_formats_file().as_ref())
+	let detector = BinaryFileDetector::load(db.binary_formats_file()?.as_ref())
 		.context("failed to build a binary file detector from binary format file")?;
 
 	Ok(Arc::new(detector))

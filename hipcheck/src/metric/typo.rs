@@ -32,7 +32,7 @@ pub struct TypoDep {
 pub fn typo_metric(db: &dyn MetricProvider) -> Result<Arc<TypoOutput>> {
 	log::debug!("running typo metric");
 
-	let typo_file = TypoFile::load_from(&db.typo_file()).context("failed to load typo file")?;
+	let typo_file = TypoFile::load_from(&db.typo_file()?).context("failed to load typo file")?;
 
 	let dependencies = db.dependencies().context("failed to get dependencies")?;
 

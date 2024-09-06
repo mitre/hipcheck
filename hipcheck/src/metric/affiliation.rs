@@ -64,7 +64,7 @@ pub(crate) fn affiliation_metric(db: &dyn MetricProvider) -> Result<Arc<Affiliat
 	log::debug!("running affiliation metric");
 
 	// Parse the Orgs file and construct an OrgSpec.
-	let org_spec = OrgSpec::from_file(&db.orgs_file()).context("failed to load org spec")?;
+	let org_spec = OrgSpec::from_file(&db.orgs_file()?).context("failed to load org spec")?;
 
 	// Get the commits for the source.
 	let commits = db
