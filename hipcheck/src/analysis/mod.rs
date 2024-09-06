@@ -12,10 +12,12 @@ use crate::data::git::GitProvider;
 use crate::error::Error;
 use crate::error::Result;
 use crate::metric::affiliation::AffiliatedType;
+use crate::metric::affiliation::Affiliation;
 use crate::metric::MetricProvider;
 use crate::plugin::QueryResult;
 use crate::report::Concern;
 use crate::F64;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::default::Default;
@@ -33,10 +35,8 @@ pub trait AnalysisProvider:
 	/// Returns result of activity analysis
 	fn activity_analysis(&self) -> Result<QueryResult>;
 
-	/*
-		/// Returns result of affiliation analysis
-		fn affiliation_analysis(&self) -> Arc<HCAnalysisReport>;
-	*/
+	/// Returns result of affiliation analysis
+	fn affiliation_analysis(&self) -> Result<QueryResult>;
 
 	/// Returns result of binary analysis
 	fn binary_analysis(&self) -> Result<QueryResult>;
@@ -160,27 +160,21 @@ pub fn activity_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
 	})
 }
 
-/*
-pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.affiliation_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
+pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.affiliation_metric()?;
 
 	let affiliated_iter = results
 		.affiliations
 		.iter()
 		.filter(|a| a.affiliated_type.is_affiliated());
 
-	let value = affiliated_iter.clone().count() as u64;
+	// @Note - policy expr json injection can't handle objs/strings currently
+	let value: Vec<bool> = affiliated_iter.clone().map(|_| true).collect();
 
 	let mut contributor_freq_map = HashMap::new();
 
 	for affiliation in affiliated_iter {
-		let commit_view = match db.contributors_for_commit(Arc::clone(&affiliation.commit)) {
-			Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-			Ok(cv) => cv,
-		};
+		let commit_view = db.contributors_for_commit(Arc::clone(&affiliation.commit))?;
 
 		let contributor = match affiliation.affiliated_type {
 			AffiliatedType::Author => String::from(&commit_view.author.name),
@@ -209,29 +203,26 @@ pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> 
 		contributor_freq_map.insert(contributor, commit_count);
 	}
 
-	let concerns = contributor_freq_map
+	let concerns: Vec<String> = contributor_freq_map
 		.into_iter()
-		.map(|(contributor, count)| Concern::Affiliation { contributor, count })
+		.map(|(contributor, count)| format!("Contributor {} has count {}", contributor, count))
 		.collect();
 
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(value.into())),
+	Ok(QueryResult {
+		value: serde_json::to_value(value)?,
 		concerns,
 	})
 }
-*/
 
 pub fn binary_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
 	let results = db.binary_metric()?;
-	let value = results.binary_files.len() as u64;
 	let concerns: Vec<String> = results
 		.binary_files
-		.clone()
-		.into_iter()
-		.map(|binary_file| format!("Binary file at '{}'", binary_file.as_ref().to_string()))
+		.iter()
+		.map(|binary_file| format!("Binary file at '{}'", binary_file.to_string()))
 		.collect();
 	Ok(QueryResult {
-		value: serde_json::to_value(value)?,
+		value: serde_json::to_value(&results.binary_files)?,
 		concerns,
 	})
 }

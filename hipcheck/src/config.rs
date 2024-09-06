@@ -457,6 +457,9 @@ pub trait ConfigSource: salsa::Database {
 	/// Returns the token set in HC_GITHUB_TOKEN env var
 	#[salsa::input]
 	fn github_api_token(&self) -> Option<Rc<String>>;
+	/// Returns the directory being used to hold cache data
+	#[salsa::input]
+	fn cache_dir(&self) -> Rc<PathBuf>;
 }
 
 /// Query for accessing the risk threshold config
@@ -611,8 +614,6 @@ impl AnalysisTreeNode {
 				let weight = (*weight).into();
 				match analysis_res {
 					Ok(output) => {
-						println!("expr: {}", analysis.1);
-						println!("context: {:?}", &output);
 						let score = match Executor::std().run(analysis.1.as_str(), &output.value) {
 							Ok(true) => 0.0,
 							Ok(false) => 1.0,
@@ -764,11 +765,11 @@ fn add_analysis(
 	};
 	let raw_policy = match analysis.policy_expression {
         Some(x) => x,
-        None => core.default_policy_expr(publisher.clone(), plugin.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file"))?
+        None => core.default_policy_expr(publisher.0.clone(), plugin.0.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file"))?
     };
 	let analysis = Analysis {
-		publisher,
-		plugin,
+		publisher: publisher.0,
+		plugin: plugin.0,
 		query: DEFAULT_QUERY.to_owned(),
 	};
 	tree.add_analysis(under, analysis, raw_policy, weight)
@@ -858,12 +859,15 @@ fn langs_file(db: &dyn LanguagesConfigQuery) -> Result<Rc<PathBuf>> {
 		]));
 	}
 
+	let options = vec!["mitre/churn", "mitre/entropy"];
 	let policy_file = db.policy();
-	if let Some(langs_config) = policy_file.get_config("linguist") {
-		if let Some(filepath) = langs_config.get("langs-file") {
-			return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
-		}
-	};
+	for opt in options {
+		if let Some(langs_config) = policy_file.get_config(opt) {
+			if let Some(filepath) = langs_config.get("langs-file") {
+				return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
+			}
+		};
+	}
 
 	Err(hc_error!("Cannot find path to languages config file in policy file. This file is necessary for running the linguist analysis."))
 }
@@ -881,7 +885,7 @@ fn binary_formats_file(db: &dyn PracticesConfigQuery) -> Result<Rc<PathBuf>> {
 	}
 
 	let policy_file = db.policy();
-	if let Some(binary_config) = policy_file.get_config("binary") {
+	if let Some(binary_config) = policy_file.get_config("mitre/binary") {
 		if let Some(filepath) = binary_config.get("binary-file") {
 			return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
 		}
@@ -903,7 +907,7 @@ fn typo_file(db: &dyn AttacksConfigQuery) -> Result<Rc<PathBuf>> {
 	}
 
 	let policy_file = db.policy();
-	if let Some(typo_config) = policy_file.get_config("typo") {
+	if let Some(typo_config) = policy_file.get_config("mitre/typo") {
 		if let Some(filepath) = typo_config.get("typo-file") {
 			return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
 		}
@@ -925,7 +929,7 @@ fn orgs_file(db: &dyn CommitConfigQuery) -> Result<Rc<PathBuf>> {
 	}
 
 	let policy_file = db.policy();
-	if let Some(affiliation_config) = policy_file.get_config("affiliation") {
+	if let Some(affiliation_config) = policy_file.get_config("mitre/affiliation") {
 		if let Some(filepath) = affiliation_config.get("orgs-file") {
 			return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
 		}
@@ -937,7 +941,7 @@ fn orgs_file(db: &dyn CommitConfigQuery) -> Result<Rc<PathBuf>> {
 #[allow(unused)]
 fn contributor_trust_value_threshold(db: &dyn CommitConfigQuery) -> Result<u64> {
 	let policy_file = db.policy();
-	if let Some(trust_config) = policy_file.get_config("contributor-trust") {
+	if let Some(trust_config) = policy_file.get_config("mitre/contributor-trust") {
 		if let Some(str_threshold) = trust_config.get("value-threshold") {
 			return str_threshold.parse::<u64>().map_err(|e| hc_error!("{}", e));
 		}
@@ -949,7 +953,7 @@ fn contributor_trust_value_threshold(db: &dyn CommitConfigQuery) -> Result<u64> 
 #[allow(unused)]
 fn contributor_trust_month_count_threshold(db: &dyn CommitConfigQuery) -> Result<u64> {
 	let policy_file = db.policy();
-	if let Some(trust_config) = policy_file.get_config("contributor-trust") {
+	if let Some(trust_config) = policy_file.get_config("mitre/contributor-trust") {
 		if let Some(str_threshold) = trust_config.get("month-count-threshold") {
 			return str_threshold.parse::<u64>().map_err(|e| hc_error!("{}", e));
 		}

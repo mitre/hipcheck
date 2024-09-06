@@ -368,7 +368,6 @@ fn wrapped_query(
 	query: String,
 	key: Value,
 ) -> Result<QueryResult> {
-	println!("publisher: {publisher}, plugin: {plugin}, query: {query}");
 	if publisher == *MITRE_PUBLISHER {
 		if query != *DEFAULT_QUERY {
 			return Err(hc_error!("legacy analyses only have a default query"));
@@ -379,8 +378,7 @@ fn wrapped_query(
 				return db.activity_analysis();
 			}
 			AFFILIATION_PHASE => {
-				let raw = db.affiliation_metric()?;
-				serde_json::to_value(&raw.affiliations)?
+				return db.affiliation_analysis();
 			}
 			BINARY_PHASE => {
 				return db.binary_analysis();
@@ -442,7 +440,6 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 	// RFD4 analysis style - get all "leaf" analyses and call through plugin architecture
 	let analyses = analysis_tree.get_analyses();
 	for a in analyses {
-		println!("Analysis: {a:?}");
 		let result = db.wrapped_query(
 			a.publisher.clone(),
 			a.plugin.clone(),

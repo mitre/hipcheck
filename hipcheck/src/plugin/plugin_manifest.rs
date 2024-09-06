@@ -11,15 +11,15 @@ use std::{fmt::Display, str::FromStr};
 
 // NOTE: the implementation in this crate was largely derived from RFD #0004
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PluginPublisher(pub String);
 string_newtype_parse_kdl_node!(PluginPublisher, "publisher");
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PluginName(pub String);
 string_newtype_parse_kdl_node!(PluginName, "name");
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PluginVersion(pub String);
 string_newtype_parse_kdl_node!(PluginVersion, "version");
 
@@ -192,6 +192,12 @@ pub struct PluginManifest {
 	pub license: License,
 	pub entrypoints: Entrypoints,
 	pub dependencies: PluginDependencyList,
+}
+
+impl PluginManifest {
+	pub fn get_entrypoint(&self, arch: SupportedArch) -> Option<String> {
+		self.entrypoints.0.get(&arch).cloned()
+	}
 }
 
 impl FromStr for PluginManifest {

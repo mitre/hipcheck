@@ -6,6 +6,7 @@ pub mod spdx;
 
 use crate::analysis::score::ScoringProviderStorage;
 use crate::analysis::AnalysisProviderStorage;
+use crate::cache::plugin_cache::HcPluginCache;
 use crate::command_util::DependentProgram;
 use crate::config::AttacksConfigQueryStorage;
 use crate::config::CommitConfigQueryStorage;
@@ -214,6 +215,10 @@ impl Session {
 			Err(err) => return Err(err),
 		};
 
+		session.set_cache_dir(Rc::new(home.clone()));
+
+		let plugin_cache = HcPluginCache::new(&home);
+
 		/*===================================================================
 		 *  Resolving the source.
 		 *-----------------------------------------------------------------*/
@@ -251,7 +256,7 @@ impl Session {
 		// equal, and the idea of memoizing/invalidating it does not make sense.
 		// Thus, we will do the plugin startup here.
 		let policy = session.policy();
-		let core = start_plugins(policy.as_ref())?;
+		let core = start_plugins(policy.as_ref(), &plugin_cache)?;
 		session.set_core(core);
 
 		Ok(session)

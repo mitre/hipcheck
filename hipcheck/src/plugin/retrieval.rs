@@ -1,4 +1,5 @@
 use std::{
+	collections::HashSet,
 	fs::File,
 	io::{Read, Seek, Write},
 	path::{Path, PathBuf},
@@ -10,13 +11,54 @@ use url::Url;
 use xz2::read::XzDecoder;
 use zip_extensions::{zip_extract, ZipArchiveExtensions};
 
-use crate::error::Error;
-use crate::hc_error;
-use crate::plugin::{ArchiveFormat, HashAlgorithm, HashWithDigest};
-use crate::util::http::agent::agent;
+use crate::{cache::plugin_cache::HcPluginCache, hc_error};
+use crate::{config::MITRE_PUBLISHER, util::http::agent::agent};
+use crate::{error::Error, policy::policy_file::PolicyPlugin};
+use crate::{
+	plugin::{ArchiveFormat, HashAlgorithm, HashWithDigest},
+	policy::policy_file::PolicyPluginName,
+};
+
+use super::{DownloadManifest, PluginId, PluginName};
+
+/// download, verify and unpack all of the plugins specified in a Policy file, as well as all of their dependencies
+pub fn retrieve_plugins(
+	policy_plugins: &[PolicyPlugin],
+	plugin_cache: &HcPluginCache,
+) -> Result<HashSet<PluginId>, Error> {
+	let mut download_plugins = HashSet::new();
+
+	for policy_plugin in policy_plugins.iter() {
+		/// TODO: while the legacy passes are still integrated in the main codebase, we skip downloading them!
+		if policy_plugin.name.publisher.0.as_str() == MITRE_PUBLISHER {
+			continue;
+		}
+
+		match &policy_plugin.manifest {
+			Some(url) => {
+				let download_manifest = DownloadManifest::from_network(url).map_err(|e| {
+					hc_error!(
+						"Error [{}] retrieving plugin manifest for {}",
+						e,
+						&policy_plugin.name
+					)
+				})?;
+				download_manifest.download_and_unpack_all_plugins(
+					plugin_cache,
+					&policy_plugin.name.publisher,
+					&policy_plugin.name.name,
+					&policy_plugin.version,
+					&mut download_plugins,
+				)?;
+			}
+			None => return Err(hc_error!("No manifest provided for {}", policy_plugin.name)),
+		}
+	}
+	Ok(download_plugins)
+}
 
 /// download a plugin, verify its size and hash
-pub fn download_plugin(
+pub(super) fn download_plugin(
 	url: &Url,
 	download_dir: &Path,
 	expected_size: u64,
@@ -69,6 +111,13 @@ pub fn download_plugin(
 	}
 
 	let filename = url.path_segments().unwrap().last().unwrap();
+	std::fs::create_dir_all(download_dir).map_err(|e| {
+		hc_error!(
+			"Error [{}] creating download directory {}",
+			e,
+			download_dir.to_string_lossy()
+		)
+	})?;
 	let output_path = Path::new(download_dir).join(filename);
 	let mut file = File::create(&output_path).map_err(|e| {
 		hc_error!(
@@ -89,7 +138,7 @@ pub fn download_plugin(
 }
 
 /// Extract a bundle located at `bundle_path` into `extract_dir` by applying the specified `ArchiveFormat` extractions
-pub fn extract_plugin(
+pub(super) fn extract_plugin(
 	bundle_path: &Path,
 	extract_dir: &Path,
 	archive_format: ArchiveFormat,

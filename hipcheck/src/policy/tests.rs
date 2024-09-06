@@ -5,6 +5,7 @@
 mod test {
 	use crate::config::Config;
 	use crate::kdl_helper::ParseKdlNode;
+	use crate::plugin::PluginVersion;
 	use crate::policy::config_to_policy::config_to_policy;
 	use crate::policy::policy_file::*;
 	use crate::policy::PolicyFile;
@@ -22,7 +23,7 @@ mod test {
 
 		let expected = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
-			"0.1.0".to_string(),
+			PluginVersion::new("0.1.0".to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
@@ -45,7 +46,7 @@ mod test {
 		let mut expected = PolicyPluginList::new();
 		expected.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
-			"0.1.0".to_string(),
+			PluginVersion::new("0.1.0".to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
@@ -55,7 +56,7 @@ mod test {
 		));
 		expected.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/binary").unwrap(),
-			"0.1.1".to_string(),
+			PluginVersion::new("0.1.1".to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl",
@@ -271,7 +272,7 @@ mod test {
 		let mut plugins = PolicyPluginList::new();
 		plugins.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
-			"0.1.0".to_string(),
+			PluginVersion::new("0.1.0".to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
@@ -281,7 +282,7 @@ mod test {
 		));
 		plugins.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/binary").unwrap(),
-			"0.1.1".to_string(),
+			PluginVersion::new("0.1.1".to_string()),
 			Some(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl",

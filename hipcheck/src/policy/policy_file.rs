@@ -5,6 +5,7 @@
 use crate::error::Result;
 use crate::hc_error;
 use crate::kdl_helper::{extract_data, ParseKdlNode};
+use crate::plugin::{PluginName, PluginPublisher, PluginVersion};
 use crate::string_newtype_parse_kdl_node;
 
 use kdl::KdlNode;
@@ -15,14 +16,14 @@ use url::Url;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyPlugin {
-	name: PolicyPluginName,
-	version: String,
-	manifest: Option<Url>,
+	pub name: PolicyPluginName,
+	pub version: PluginVersion,
+	pub manifest: Option<Url>,
 }
 
 impl PolicyPlugin {
 	#[allow(dead_code)]
-	pub fn new(name: PolicyPluginName, version: String, manifest: Option<Url>) -> Self {
+	pub fn new(name: PolicyPluginName, version: PluginVersion, manifest: Option<Url>) -> Self {
 		Self {
 			name,
 			version,
@@ -51,7 +52,7 @@ impl ParseKdlNode for PolicyPlugin {
 				return None;
 			}
 		};
-		let version = node.get("version")?.value().as_string()?.to_string();
+		let version = PluginVersion::new(node.get("version")?.value().as_string()?.to_string());
 
 		// The manifest is technically optional, as there should be a default Hipcheck plugin artifactory sometime in the future
 		// But for now it is essentially mandatory, so a plugin without a manifest will return an error downstream
@@ -335,7 +336,12 @@ impl PolicyCategoryChild {
 	fn find_analysis_by_name(&self, name: &str) -> Option<PolicyAnalysis> {
 		match self {
 			PolicyCategoryChild::Analysis(analysis) => {
-				if analysis.name.name == name {
+				let analysis_name = format!(
+					"{}/{}",
+					analysis.name.publisher.0.as_str(),
+					analysis.name.name.0.as_str()
+				);
+				if analysis_name.as_str() == name {
 					Some(analysis.clone())
 				} else {
 					None
@@ -486,18 +492,18 @@ impl ParseKdlNode for PolicyAnalyze {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PolicyPluginName {
-	pub publisher: String,
-	pub name: String,
+	pub publisher: PluginPublisher,
+	pub name: PluginName,
 }
 
 impl PolicyPluginName {
 	pub fn new(full_name: &str) -> Result<Self> {
 		let parsed_name: Vec<&str> = full_name.split('/').collect();
 		if parsed_name.len() > 1 {
-			let publisher = parsed_name[0].to_string();
-			let name = parsed_name[1].to_string();
+			let publisher = PluginPublisher::new(parsed_name[0].to_string());
+			let name = PluginName::new(parsed_name[1].to_string());
 			Ok(Self { publisher, name })
 		} else {
 			Err(hc_error!(
@@ -510,6 +516,6 @@ impl PolicyPluginName {
 
 impl Display for PolicyPluginName {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}/{}", self.publisher, self.name)
+		write!(f, "{}/{}", self.publisher.0, self.name.0)
 	}
 }
