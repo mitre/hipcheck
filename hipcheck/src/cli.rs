@@ -80,16 +80,6 @@ struct OutputArgs {
 /// Arguments configuring paths for Hipcheck to use.
 #[derive(Debug, Default, clap::Args, hc::Update)]
 struct PathArgs {
-	/// Path to the configuration folder.
-	#[arg(
-		short = 'c',
-		long = "config",
-		global = true,
-		help_heading = "Path Flags",
-		long_help = "Path to the configuration folder. Can also be set with the `HC_CONFIG` environment variable"
-	)]
-	config: Option<PathBuf>,
-
 	/// Path to the data folder.
 	#[arg(
 		short = 'd',
@@ -143,6 +133,10 @@ struct DeprecatedArgs {
 	/// Print the data folder path for Hipcheck.
 	#[arg(long = "print-data", hide = true, global = true)]
 	print_data: Option<bool>,
+
+	/// Path to the configuration folder.
+	#[arg(short = 'c', long = "config", hide = true, global = true)]
+	config: Option<PathBuf>,
 
 	/// Path to the Hipcheck home folder.
 	#[arg(short = 'H', long = "home", hide = true, global = true)]
@@ -218,11 +212,6 @@ impl CliConfig {
 		}
 	}
 
-	/// Get the path to the configuration directory.
-	pub fn config(&self) -> Option<&Path> {
-		self.path_args.config.as_deref()
-	}
-
 	/// Get the path to the data directory.
 	pub fn data(&self) -> Option<&Path> {
 		self.path_args.data.as_deref()
@@ -244,6 +233,11 @@ impl CliConfig {
 	/// Get the path to the policy file.
 	pub fn policy(&self) -> Option<&Path> {
 		self.path_args.policy.as_deref()
+	}
+
+	/// Get the path to the configuration directory.
+	pub fn config(&self) -> Option<&Path> {
+		self.deprecated_args.config.as_deref()
 	}
 
 	/// Check if the `--print-home` flag was used.
@@ -286,13 +280,13 @@ impl CliConfig {
 				format: hc_env_var_value_enum("format"),
 			},
 			path_args: PathArgs {
-				config: hc_env_var("config"),
 				data: hc_env_var("data"),
 				cache: hc_env_var("cache"),
 				// For now, we do not get this from the environment, so pass a None to never update this field
 				policy: None,
 			},
 			deprecated_args: DeprecatedArgs {
+				config: hc_env_var("config"),
 				home: hc_env_var("home"),
 				..Default::default()
 			},
@@ -308,10 +302,13 @@ impl CliConfig {
 		CliConfig {
 			path_args: PathArgs {
 				cache: platform_cache(),
-				config: platform_config(),
 				data: platform_data(),
 				// There is no central per-user or per-system location for the policy file, so pass a None to never update this field
 				policy: None,
+			},
+			deprecated_args: DeprecatedArgs {
+				config: platform_config(),
+				..Default::default()
 			},
 			..Default::default()
 		}
@@ -321,13 +318,16 @@ impl CliConfig {
 	fn backups() -> CliConfig {
 		CliConfig {
 			path_args: PathArgs {
-				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),
 				data: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "data"]),
 				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
 				// TODO: currently if this is set, then when running `hc check`, it errors out
 				// because policy files are not yet supported
 				// policy: env::current_dir().ok().map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
 				policy: None,
+			},
+			deprecated_args: DeprecatedArgs {
+				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),
+				..Default::default()
 			},
 			..Default::default()
 		}
@@ -1126,7 +1126,7 @@ mod tests {
 				temp.update(&CliConfig::from_platform());
 				temp.update(&CliConfig::from_env());
 				temp.update(&CliConfig {
-					path_args: PathArgs {
+					deprecated_args: DeprecatedArgs {
 						config: Some(expected.clone()),
 						..Default::default()
 					},

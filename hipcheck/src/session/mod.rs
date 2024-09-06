@@ -160,7 +160,7 @@ impl Session {
 		 *  Loading configuration.
 		 *-----------------------------------------------------------------*/
 
-		// Check if a policy file was provided, otherwise convert a deprecated config file to a policy file
+		// Check if a policy file was provided, otherwise convert a deprecated config file to a policy file. If neither was provided, error out.
 		if policy_path.is_some() {
 			let (policy, policy_path, data_dir, hc_github_token) =
 				match load_policy_and_data(policy_path.as_deref(), data_path.as_deref()) {
@@ -177,7 +177,7 @@ impl Session {
 
 			// Set github token in salsa
 			session.set_github_api_token(Some(Rc::new(hc_github_token)));
-		} else {
+		} else if config_path.is_some() {
 			let (policy, config_dir, data_dir, hc_github_token) =
 				match load_config_and_data(config_path.as_deref(), data_path.as_deref()) {
 					Ok(results) => results,
@@ -196,6 +196,8 @@ impl Session {
 
 			// Set github token in salsa
 			session.set_github_api_token(Some(Rc::new(hc_github_token)));
+		} else {
+			return Err(hc_error!("No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."));
 		}
 
 		/*===================================================================
@@ -256,7 +258,7 @@ fn load_config_and_data(
 	data_path: Option<&Path>,
 ) -> Result<(PolicyFile, PathBuf, PathBuf, String)> {
 	// Start the phase.
-	let phase = SpinnerPhase::start("loading configuration and data files");
+	let phase = SpinnerPhase::start("Loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.");
 	// Increment the phase into the "running" stage.
 	phase.inc();
 	// Set the spinner phase to tick constantly, 10 times a second.
@@ -311,7 +313,7 @@ fn load_policy_and_data(
 
 	// Load the policy file.
 	let policy = PolicyFile::load_from(valid_policy_path)
-		.context("Failed to load policy. Plase make sure the policy file is in the proived location and is formatted correctly.")?;
+		.context("Failed to load policy. Plase make sure the policy file is in the proidved location and is formatted correctly.")?;
 
 	// Get the directory the data file is in.
 	let data_dir = data_path
