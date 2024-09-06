@@ -277,6 +277,12 @@ impl PolicyCategory {
 	pub fn pop(&mut self) -> Option<PolicyCategoryChild> {
 		self.children.pop()
 	}
+
+	pub fn find_analysis_by_name(&self, name: &str) -> Option<PolicyAnalysis> {
+		self.children
+			.iter()
+			.find_map(|child| child.find_analysis_by_name(name))
+	}
 }
 
 impl ParseKdlNode for PolicyCategory {
@@ -323,6 +329,22 @@ pub enum PolicyCategoryChild {
 	Analysis(PolicyAnalysis),
 	Category(PolicyCategory),
 }
+
+impl PolicyCategoryChild {
+	fn find_analysis_by_name(&self, name: &str) -> Option<PolicyAnalysis> {
+		match self {
+			PolicyCategoryChild::Analysis(analysis) => {
+				if analysis.name.name == name {
+					Some(analysis.clone())
+				} else {
+					None
+				}
+			}
+			PolicyCategoryChild::Category(category) => category.find_analysis_by_name(name),
+		}
+	}
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InvestigatePolicy(pub String);
 string_newtype_parse_kdl_node!(InvestigatePolicy, "investigate");
@@ -421,6 +443,12 @@ impl PolicyAnalyze {
 	#[allow(dead_code)]
 	pub fn pop(&mut self) -> Option<PolicyCategory> {
 		self.categories.pop()
+	}
+
+	pub fn find_analysis_by_name(&self, name: &str) -> Option<PolicyAnalysis> {
+		self.categories
+			.iter()
+			.find_map(|category| category.find_analysis_by_name(name))
 	}
 }
 
