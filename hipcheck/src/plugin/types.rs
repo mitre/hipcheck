@@ -1,3 +1,5 @@
+use crate::plugin::PluginName;
+use crate::policy::policy_file::PolicyPluginName;
 use crate::{
 	hc_error,
 	hipcheck::{
