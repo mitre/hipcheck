@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	command_util::{log_args, DependentProgram},
 	error::{Context, Result},
 	hc_error,
+	util::command::{log_args, DependentProgram},
 	util::fs as file,
 };
 use pathbuf::pathbuf;
@@ -255,7 +255,7 @@ impl NpmCommand {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::command_util::DependentProgram;
+	use crate::util::command::DependentProgram;
 
 	#[test]
 	#[ignore = "can't guarantee availability of NPM"]

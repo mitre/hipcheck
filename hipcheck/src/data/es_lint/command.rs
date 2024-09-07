@@ -3,9 +3,9 @@
 use std::{ffi::OsStr, process::Command};
 
 use crate::{
-	command_util::{log_args, DependentProgram},
 	error::{Context as _, Result},
 	hc_error,
+	util::command::{log_args, DependentProgram},
 };
 
 #[derive(Debug)]

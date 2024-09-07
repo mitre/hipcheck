@@ -31,7 +31,7 @@ pub fn get_eslint_reports(path: &Path, version: String) -> Result<ESLintReports>
 mod test {
 	use super::*;
 
-	use crate::command_util::DependentProgram;
+	use crate::util::command::DependentProgram;
 	use std::{fs::File, io::Write};
 	use tempfile::tempdir;
 

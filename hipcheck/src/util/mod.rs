@@ -2,6 +2,7 @@
 
 //! Utility methods and types used throughout Hipcheck.
 
+pub mod command;
 pub mod fs;
 pub mod http;
 pub mod iter;
