@@ -37,8 +37,8 @@ impl<I> HasTrackerType<I> for ProgressPhase {
 	}
 }
 
-/// Trait implemented on all parallel iterators that lets the user create a progress spinner in the shell to track them.
 #[allow(unused)]
+/// Trait implemented on all parallel iterators that lets the user create a progress spinner in the shell to track them.
 pub trait ParallelTrackAsPhase: Sized + ParallelIterator {
 	/// Add a spinner progress bar to the global shell that tracks this parallel iterator.
 	fn track_as_spinner_phase(self, name: impl Into<Arc<str>>) -> SpinnerPhaseTracker<Self> {

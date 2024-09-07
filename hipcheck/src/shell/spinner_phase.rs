@@ -5,7 +5,6 @@
 //! This can be useful for things like while-loops and iterators without a known size.
 
 use crate::shell::Title;
-
 use super::{verbosity::Verbosity, Shell, HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP};
 use console::style;
 use indicatif::{HumanDuration, ProgressBar, ProgressDrawTarget, ProgressStyle};
@@ -114,8 +113,8 @@ impl SpinnerPhase {
 		self.bar.finish_and_clear()
 	}
 
-	/// Finish this spinner, leaving it in the terminal with an updated "error" message and a red exclamation.
 	#[allow(unused)]
+	/// Finish this spinner, leaving it in the terminal with an updated "error" message and a red exclamation.
 	pub fn finish_error(&self) {
 		super::macros::println!(
 			"{:>LEFT_COL_WIDTH$} {} ({})",

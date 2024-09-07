@@ -647,7 +647,6 @@ pub struct AnalysisTree {
 	pub root: NodeId,
 }
 impl AnalysisTree {
-	#[allow(unused)] // Will be used once RFD4 impl lands
 	pub fn new(root_label: &str) -> Self {
 		let mut tree = Arena::new();
 		let root = tree.new_node(AnalysisTreeNode::category(
@@ -656,6 +655,7 @@ impl AnalysisTree {
 		));
 		AnalysisTree { tree, root }
 	}
+
 	pub fn get_analyses(&self) -> Vec<Analysis> {
 		visit_leaves(
 			self.root,
@@ -667,12 +667,12 @@ impl AnalysisTree {
 			},
 		)
 	}
-	#[allow(unused)] // Will be used once RFD4 impl lands
+
 	pub fn node_is_category(&self, id: NodeId) -> Result<bool> {
 		let node_ref = self.tree.get(id).ok_or(hc_error!("node not in tree"))?;
 		Ok(matches!(node_ref.get(), AnalysisTreeNode::Category { .. }))
 	}
-	#[allow(unused)] // Will be used once RFD4 impl lands
+
 	pub fn add_category(&mut self, under: NodeId, label: &str, weight: F64) -> Result<NodeId> {
 		if self.node_is_category(under)? {
 			let child = self
@@ -684,7 +684,7 @@ impl AnalysisTree {
 			Err(hc_error!("cannot append to analysis node"))
 		}
 	}
-	#[allow(unused)] // Will be used once RFD4 impl lands
+
 	pub fn add_analysis(
 		&mut self,
 		under: NodeId,
@@ -841,8 +841,7 @@ pub fn normalized_analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<Analys
 /// field is `String`, it is returned wrapped in an `Rc`.  This is
 /// done to keep Salsa's cloning cheap.
 
-#[allow(unused_variables)]
-fn risk_threshold(db: &dyn RiskConfigQuery) -> F64 {
+fn risk_threshold(_db: &dyn RiskConfigQuery) -> F64 {
 	// @Todo - change signature to return string representation of policy expr from policy file
 	F64::new(0.5).unwrap()
 }
@@ -938,7 +937,6 @@ fn orgs_file(db: &dyn CommitConfigQuery) -> Result<Rc<PathBuf>> {
 	Err(hc_error!("Cannot find path to orgs config file in policy file. This file is necessary for running the affiliation analysis."))
 }
 
-#[allow(unused)]
 fn contributor_trust_value_threshold(db: &dyn CommitConfigQuery) -> Result<u64> {
 	let policy_file = db.policy();
 	if let Some(trust_config) = policy_file.get_config("mitre/contributor-trust") {
@@ -950,7 +948,6 @@ fn contributor_trust_value_threshold(db: &dyn CommitConfigQuery) -> Result<u64> 
 	Err(hc_error!("Cannot find config for contributor trust value in policy file. This file is necessary for running the commit trust analysis."))
 }
 
-#[allow(unused)]
 fn contributor_trust_month_count_threshold(db: &dyn CommitConfigQuery) -> Result<u64> {
 	let policy_file = db.policy();
 	if let Some(trust_config) = policy_file.get_config("mitre/contributor-trust") {

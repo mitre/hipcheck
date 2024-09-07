@@ -9,8 +9,8 @@ use super::{
 };
 use std::{iter::FusedIterator, sync::Arc};
 
-/// Trait implemented on all iterators that lets the user create a progress spinner in the shell to track them.
 #[allow(unused)]
+/// Trait implemented on all iterators that lets the user create a progress spinner in the shell to track them.
 pub trait TrackAsPhase: Sized + Iterator {
 	/// Add a spinner progress bar to the global shell that tracks this iterator.
 	fn track_as_spinner_phase(self, name: impl Into<Arc<str>>) -> SpinnerPhaseTracker<Self> {

@@ -54,13 +54,16 @@ fn detect_npm_package_root(pkg_file: &Path) -> Result<PathBuf> {
 	}
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct RawModule {
 	pub file: String,
-	pub entry: bool,
-	pub expose: Option<String>,
 	pub deps: HashMap<String, String>,
+	// These two fields are part of the raw module data, so we include them here,
+	// but they're not used anywhere in the code.
+	#[allow(unused)]
+	pub entry: bool,
+	#[allow(unused)]
+	pub expose: Option<String>,
 }
 
 #[derive(Debug)]
