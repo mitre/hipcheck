@@ -207,6 +207,9 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 		}
 	};
 
+	// TODO: Add construction of all plugin results here.
+	// TODO: Add handling of auto-investigation-if-fail rules.
+
 	builder
 		.set_risk_score(scoring.score.total)
 		.set_risk_policy(session.risk_policy().as_ref().clone());
