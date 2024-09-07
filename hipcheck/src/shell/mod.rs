@@ -2,9 +2,9 @@
 
 #![deny(missing_docs)]
 
+use crate::cli::Format;
 use crate::error::Error;
 use crate::error::Result;
-use crate::report::Format;
 use crate::report::RecommendationKind;
 use crate::report::Report;
 use console::Emoji;
@@ -54,10 +54,6 @@ const EMPTY: &str = "";
 pub struct Shell {
 	/// Multi-progress bar object rendering all the different progress bars we're using.
 	multi_progress: MultiProgress,
-	// /// List of all the progress bars actively being rendered --
-	// /// we just store this so that we can hide them all if someone wants to.
-	// /// (when will [indicatif] add a `.set_hidden()`) to [MultiProgress]?
-	// progress_bars: RwLock<Vec<ProgressBar>>,
 	/// The verbosity of this shell.
 	verbosity: RwLock<Verbosity>,
 }
@@ -283,167 +279,168 @@ impl Shell {
 	/// Print the final repo report in the requested format to the standard output.
 	pub fn print_report(report: Report, format: Format) -> Result<()> {
 		match format {
-			// Print JSON report.
-			Format::Json => {
-				// Suspend the shell to print the JSON report.
-				Shell::in_suspend(|| {
-					let mut stdout = Term::stdout();
-					serde_json::to_writer_pretty(&mut stdout, &report)?;
-					stdout.flush()?;
-					Ok(())
-				})
-			}
-
-			// Human formatted report.
-			Format::Human => {
-				// Go through each part and print them individually.
-
-				//      Analyzed '<repo_name>' (<repo_head>)
-				//               using Hipcheck <hipcheck_version>
-				//               at <analyzed_at:pretty_print>
-				//
-				//       Passing
-				//            + no concerning contributors
-				//               0 found, 0 permitted
-				//            + no unusually large commits
-				//               0% of commits are unusually large, 2% permitted
-				//            + commits usually merged by someone other than the author
-				//               0% of commits merged by author, 20% permitted
-				//
-				//       Failing
-				//            - too many unusual-looking commits
-				//               1% of commits look unusual, 0% permitted
-				//               entropy scores over 3.0 are considered unusual
-				//
-				//              356828346723752 "fixing something" (entropy score: 5.4)
-				//              abab563268c3543 "adding a new block" (entropy score: 3.2)
-				//
-				//           - hasn't been updated in 136 weeks
-				//              require updates in the last 71 weeks
-				//
-				//        Errored
-				//           ? review analysis failed to get pull request reviews
-				//              cause: missing GitHub token with permissions for accessing public repository data in config
-				//           ? typo analysis failed to get dependencies
-				//              cause: can't identify a known language in the repository
-				//
-				// Recommendation
-				//           PASS risk rated as 0.4 (acceptable below 0.5)
-
-				/*===============================================================================
-				 * Header
-				 *
-				 * Says what we're analyzing, what version of Hipcheck we're using, and when
-				 * we're doing the analysis.
-				 */
-
-				// Start with an empty line.
-				macros::println!();
-				// What repo we analyzed.
-				macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Analyzed, report.analyzed());
-				// With what version of hipcheck.
-				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.using());
-				// At what time.
-				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.at_time());
-				// Space between this and analyses.
-				macros::println!();
-
-				/*===============================================================================
-				 * Passing analyses
-				 *
-				 * Says what analyses passed and why.
-				 */
-
-				if report.has_passing_analyses() {
-					macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Passing"));
-
-					for analysis in report.passing_analyses() {
-						macros::println!(
-							"{:>LEFT_COL_WIDTH$} {}",
-							Title::Passed,
-							analysis.statement()
-						);
-						macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
-						// Empty line at end to space out analyses.
-						macros::println!();
-					}
-				}
-
-				/*===============================================================================
-				 * Failing analyses
-				 *
-				 * Says what analyses failed, why, and what information might be relevant to
-				 * check in detail.
-				 */
-
-				if report.has_failing_analyses() {
-					macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Failing"));
-
-					for failing_analysis in report.failing_analyses() {
-						let analysis = failing_analysis.analysis();
-
-						macros::println!(
-							"{:>LEFT_COL_WIDTH$} {}",
-							Title::Failed,
-							analysis.statement()
-						);
-						macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
-
-						for concern in failing_analysis.concerns() {
-							macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", concern.description());
-						}
-
-						// Newline at the end for spacing.
-						macros::println!();
-					}
-				}
-
-				/*===============================================================================
-				 * Errored analyses
-				 *
-				 * Says what analyses encountered errors and what those errors were.
-				 */
-
-				if report.has_errored_analyses() {
-					macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Errored"));
-
-					for errored_analysis in report.errored_analyses() {
-						macros::println!(
-							"{:>LEFT_COL_WIDTH$} {}",
-							Title::Errored,
-							errored_analysis.top_msg()
-						);
-
-						for msg in &errored_analysis.source_msgs() {
-							macros::println!("{EMPTY:LEFT_COL_WIDTH$} {msg}");
-						}
-
-						// Newline for spacing.
-						macros::println!();
-					}
-				}
-
-				/*===============================================================================
-				 * Recommendation
-				 *
-				 * Says what Hipcheck's final recommendation is for the target of analysis.
-				 */
-
-				let recommendation = report.recommendation();
-
-				macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Recommendation"));
-				macros::println!(
-					"{:>LEFT_COL_WIDTH$} {}",
-					Title::from(recommendation.kind),
-					recommendation.statement()
-				);
-				// Newline for spacing.
-				macros::println!();
-
-				Ok(())
-			}
+			Format::Json => print_json(report),
+			Format::Human => print_human(report),
 		}
 	}
+}
+
+fn print_json(report: Report) -> Result<()> {
+	// Suspend the shell to print the JSON report.
+	Shell::in_suspend(|| {
+		let mut stdout = Term::stdout();
+		serde_json::to_writer_pretty(&mut stdout, &report)?;
+		stdout.flush()?;
+		Ok(())
+	})
+}
+
+fn print_human(report: Report) -> Result<()> {
+	// Go through each part and print them individually.
+
+	//      Analyzed '<repo_name>' (<repo_head>)
+	//               using Hipcheck <hipcheck_version>
+	//               at <analyzed_at:pretty_print>
+	//
+	//       Passing
+	//            + no concerning contributors
+	//               0 found, 0 permitted
+	//            + no unusually large commits
+	//               0% of commits are unusually large, 2% permitted
+	//            + commits usually merged by someone other than the author
+	//               0% of commits merged by author, 20% permitted
+	//
+	//       Failing
+	//            - too many unusual-looking commits
+	//               1% of commits look unusual, 0% permitted
+	//               entropy scores over 3.0 are considered unusual
+	//
+	//              356828346723752 "fixing something" (entropy score: 5.4)
+	//              abab563268c3543 "adding a new block" (entropy score: 3.2)
+	//
+	//           - hasn't been updated in 136 weeks
+	//              require updates in the last 71 weeks
+	//
+	//        Errored
+	//           ? review analysis failed to get pull request reviews
+	//              cause: missing GitHub token with permissions for accessing public repository data in config
+	//           ? typo analysis failed to get dependencies
+	//              cause: can't identify a known language in the repository
+	//
+	// Recommendation
+	//           PASS risk rated as 0.4 (acceptable below 0.5)
+
+	/*===============================================================================
+	 * Header
+	 *
+	 * Says what we're analyzing, what version of Hipcheck we're using, and when
+	 * we're doing the analysis.
+	 */
+
+	// Start with an empty line.
+	macros::println!();
+	// What repo we analyzed.
+	macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Analyzed, report.analyzed());
+	// With what version of hipcheck.
+	macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.using());
+	// At what time.
+	macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.at_time());
+	// Space between this and analyses.
+	macros::println!();
+
+	/*===============================================================================
+	 * Passing analyses
+	 *
+	 * Says what analyses passed and why.
+	 */
+
+	if report.has_passing_analyses() {
+		macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Passing"));
+
+		for analysis in report.passing_analyses() {
+			macros::println!(
+				"{:>LEFT_COL_WIDTH$} {}",
+				Title::Passed,
+				analysis.statement()
+			);
+			macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
+			// Empty line at end to space out analyses.
+			macros::println!();
+		}
+	}
+
+	/*===============================================================================
+	 * Failing analyses
+	 *
+	 * Says what analyses failed, why, and what information might be relevant to
+	 * check in detail.
+	 */
+
+	if report.has_failing_analyses() {
+		macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Failing"));
+
+		for failing_analysis in report.failing_analyses() {
+			let analysis = failing_analysis.analysis();
+
+			macros::println!(
+				"{:>LEFT_COL_WIDTH$} {}",
+				Title::Failed,
+				analysis.statement()
+			);
+			macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
+
+			for concern in failing_analysis.concerns() {
+				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", concern.description());
+			}
+
+			// Newline at the end for spacing.
+			macros::println!();
+		}
+	}
+
+	/*===============================================================================
+	 * Errored analyses
+	 *
+	 * Says what analyses encountered errors and what those errors were.
+	 */
+
+	if report.has_errored_analyses() {
+		macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Errored"));
+
+		for errored_analysis in report.errored_analyses() {
+			macros::println!(
+				"{:>LEFT_COL_WIDTH$} {}",
+				Title::Errored,
+				errored_analysis.top_msg()
+			);
+
+			for msg in &errored_analysis.source_msgs() {
+				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {msg}");
+			}
+
+			// Newline for spacing.
+			macros::println!();
+		}
+	}
+
+	/*===============================================================================
+	 * Recommendation
+	 *
+	 * Says what Hipcheck's final recommendation is for the target of analysis.
+	 */
+
+	let recommendation = report.recommendation();
+
+	macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Recommendation"));
+	macros::println!(
+		"{:>LEFT_COL_WIDTH$} {}",
+		Title::from(recommendation.kind),
+		recommendation.statement()
+	);
+	// Newline for spacing.
+	macros::println!();
+
+	Ok(())
 }
 
 /// The "title" of a message; may be accompanied by a timestamp or outcome.

@@ -6,7 +6,6 @@ use crate::cache::repo_cache::{RepoCacheDeleteScope, RepoCacheListScope, RepoCac
 use crate::context::Context;
 use crate::error::Result;
 use crate::hc_error;
-use crate::report::Format;
 use crate::session::pm;
 use crate::shell::{color_choice::ColorChoice, verbosity::Verbosity};
 use crate::source;
@@ -968,6 +967,26 @@ impl TryFrom<Vec<String>> for RepoCacheDeleteScope {
 pub struct PluginArgs {
 	#[arg(long = "async")]
 	pub asynch: bool,
+}
+
+/// The format to report results in.
+#[derive(Debug, Default, Clone, Copy, clap::ValueEnum)]
+pub enum Format {
+	/// JSON format.
+	Json,
+	/// Human-readable format.
+	#[default]
+	Human,
+}
+
+impl Format {
+	pub fn use_json(json: bool) -> Format {
+		if json {
+			Format::Json
+		} else {
+			Format::Human
+		}
+	}
 }
 
 /// Test CLI commands

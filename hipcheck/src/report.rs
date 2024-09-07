@@ -9,6 +9,7 @@
 // The report serves double-duty, because it's both the thing used to print user-friendly
 // results on the CLI, and the type that's serialized out to JSON for machine-friendly output.
 
+use crate::cli::Format;
 use crate::error::Error;
 use crate::error::Result;
 use crate::hc_error;
@@ -28,31 +29,6 @@ use std::iter::Iterator;
 use std::ops::Not as _;
 use std::result::Result as StdResult;
 use std::sync::Arc;
-
-/// The format to report results in.
-#[derive(Debug, Default, Clone, Copy, clap::ValueEnum)]
-pub enum Format {
-	/// JSON format.
-	Json,
-	/// Human-readable format.
-	#[default]
-	Human,
-}
-
-impl Format {
-	pub fn use_json(json: bool) -> Format {
-		if json {
-			Format::Json
-		} else {
-			Format::Human
-		}
-	}
-}
-
-#[derive(Debug)]
-pub enum AnyReport {
-	Report(Report),
-}
 
 /// The report output to the user.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -84,42 +60,52 @@ pub struct Report {
 }
 
 impl Report {
+	/// Get the repository that was analyzed.
 	pub fn analyzed(&self) -> String {
 		format!("{} ({})", self.repo_name, self.repo_head)
 	}
 
+	/// Get the version of Hipcheck used for the analysis.
 	pub fn using(&self) -> String {
 		format!("using Hipcheck {}", self.hipcheck_version)
 	}
 
+	// Get the time that the analysis occured.
 	pub fn at_time(&self) -> String {
 		format!("on {}", self.analyzed_at)
 	}
 
+	/// Check if there are passing analyses.
 	pub fn has_passing_analyses(&self) -> bool {
 		self.passing.is_empty().not()
 	}
 
+	/// Check if there are failing analyses.
 	pub fn has_failing_analyses(&self) -> bool {
 		self.failing.is_empty().not()
 	}
 
+	/// Check if there are errored analyses.
 	pub fn has_errored_analyses(&self) -> bool {
 		self.errored.is_empty().not()
 	}
 
+	/// Get an iterator over all passing analyses.
 	pub fn passing_analyses(&self) -> impl Iterator<Item = &Analysis> {
 		self.passing.iter().map(|a| &a.0)
 	}
 
+	/// Get an iterator over all failing analyses.
 	pub fn failing_analyses(&self) -> impl Iterator<Item = &FailingAnalysis> {
 		self.failing.iter()
 	}
 
+	/// Get an iterator over all errored analyses.
 	pub fn errored_analyses(&self) -> impl Iterator<Item = &ErroredAnalysis> {
 		self.errored.iter()
 	}
 
+	/// Get the final recommendation.
 	pub fn recommendation(&self) -> &Recommendation {
 		&self.recommendation
 	}
@@ -679,6 +665,12 @@ pub enum Concern {
 	},
 	/// Commits with typos.
 	Typo { dependency_name: String },
+	/// A concern arising from a plugin.
+	///
+	/// These concerns are always unstructured, as the plugin is expected to
+	/// handle the creation of the concern string in a way that is friendly to
+	/// the end-user.
+	Plugin(String),
 }
 
 impl Concern {
@@ -705,6 +697,11 @@ impl Concern {
 	/// Check if a concern is a typo concern.
 	fn is_typo_concern(&self) -> bool {
 		matches!(self, Concern::Typo { .. })
+	}
+
+	/// Check if the concern is from a plugin.
+	fn is_plugin_concern(&self) -> bool {
+		matches!(self, Concern::Plugin(..))
 	}
 
 	pub fn description(&self) -> String {
@@ -734,6 +731,7 @@ impl Concern {
 				commit_hash, score, threshold
 			),
 			Typo { dependency_name } => format!("Dependency '{}' may be a typo", dependency_name),
+			Plugin(msg) => msg.clone(),
 		}
 	}
 }
@@ -746,6 +744,7 @@ impl Hash for Concern {
 			Concern::Churn { commit_hash, .. } => commit_hash.hash(state),
 			Concern::Entropy { commit_hash, .. } => commit_hash.hash(state),
 			Concern::Typo { dependency_name } => dependency_name.hash(state),
+			Concern::Plugin(msg) => msg.hash(state),
 		}
 	}
 }
@@ -779,7 +778,7 @@ impl PartialEq for Concern {
 					dependency_name: other_dependency_name,
 				},
 			) => dependency_name == other_dependency_name,
-
+			(Concern::Plugin(msg), Concern::Plugin(other_msg)) => msg == other_msg,
 			_ => false,
 		}
 	}
