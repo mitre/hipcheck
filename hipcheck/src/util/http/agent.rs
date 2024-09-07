@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Globally defined agent containing system TLS Certs.
 
 use rustls::{ClientConfig, RootCertStore};

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Custom lib[git2] transport that uses [rustls] over the operating systems's transport.
 //!
 //! This should accurately implement the spec described at

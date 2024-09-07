@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 mod transport;
 mod proto {
 	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
@@ -14,8 +16,8 @@ use crate::{
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use proto::{
-	GetDefaultPolicyExpressionResponse, GetQuerySchemasResponse, InitiateQueryProtocolRequest,
-	InitiateQueryProtocolResponse,
+	ExplainDefaultQueryRequest, ExplainDefaultQueryResponse, GetDefaultPolicyExpressionResponse,
+	GetQuerySchemasResponse, InitiateQueryProtocolRequest, InitiateQueryProtocolResponse,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -166,6 +168,15 @@ impl PluginService for Sha256Plugin {
 	) -> Result<Response<GetDefaultPolicyExpressionResponse>, Status> {
 		Ok(Response::new(GetDefaultPolicyExpressionResponse {
 			policy_expression: "".to_owned(),
+		}))
+	}
+
+	async fn explain_default_query(
+		&self,
+		_request: Request<ExplainDefaultQueryRequest>,
+	) -> Result<Response<ExplainDefaultQueryResponse>, Status> {
+		Ok(Response::new(ExplainDefaultQueryResponse {
+			explanation: "perform SHA-256 hashing of the input".to_owned(),
 		}))
 	}
 

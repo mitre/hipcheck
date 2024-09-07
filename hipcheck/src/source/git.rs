@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Git related types and implementations for pulling/cloning source repos.
 
 use crate::error::{Error as HcError, Result as HcResult};

@@ -33,7 +33,6 @@ pub mod color_choice;
 pub mod iter;
 pub mod macros;
 pub mod par_iter;
-pub mod prelude;
 pub mod progress_phase;
 pub mod spinner_phase;
 pub mod verbosity;
@@ -92,7 +91,7 @@ impl Shell {
 		Self::try_get().expect("global shell needs to be initialized.")
 	}
 
-	/// Update the verbosity of the global shell.  
+	/// Update the verbosity of the global shell.
 	pub fn set_verbosity(verbosity: Verbosity) {
 		// If the new verbosity is "silent", hide all progress bars.
 		if verbosity == Verbosity::Silent {

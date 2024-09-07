@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Macros that mirror/replace those from the standard library using the global [`Shell`][crate::shell::Shell].
 
 macro_rules! println {

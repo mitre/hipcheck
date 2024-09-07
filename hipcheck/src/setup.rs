@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::cli::SetupArgs;
 use crate::error::Result;
 use crate::hc_error;

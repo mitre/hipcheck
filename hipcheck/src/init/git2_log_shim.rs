@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Log shim function to redirect [git2] trace messages to [log].
 
 /// Shim the [git2] crate's tracing infrastructure with calls to the [log] crate which we use.

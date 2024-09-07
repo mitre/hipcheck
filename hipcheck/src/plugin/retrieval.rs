@@ -1,16 +1,6 @@
-use std::{
-	collections::HashSet,
-	fs::File,
-	io::{Read, Seek, Write},
-	path::{Path, PathBuf},
-};
+// SPDX-License-Identifier: Apache-2.0
 
-use flate2::read::GzDecoder;
-use tar::Archive;
-use url::Url;
-use xz2::read::XzDecoder;
-use zip_extensions::{zip_extract, ZipArchiveExtensions};
-
+use super::{DownloadManifest, PluginId, PluginName};
 use crate::{cache::plugin_cache::HcPluginCache, hc_error};
 use crate::{config::MITRE_PUBLISHER, util::http::agent::agent};
 use crate::{error::Error, policy::policy_file::PolicyPlugin};
@@ -18,8 +8,17 @@ use crate::{
 	plugin::{ArchiveFormat, HashAlgorithm, HashWithDigest},
 	policy::policy_file::PolicyPluginName,
 };
-
-use super::{DownloadManifest, PluginId, PluginName};
+use flate2::read::GzDecoder;
+use std::{
+	collections::HashSet,
+	fs::File,
+	io::{Read, Seek, Write},
+	path::{Path, PathBuf},
+};
+use tar::Archive;
+use url::Url;
+use xz2::read::XzDecoder;
+use zip_extensions::{zip_extract, ZipArchiveExtensions};
 
 /// download, verify and unpack all of the plugins specified in a Policy file, as well as all of their dependencies
 pub fn retrieve_plugins(

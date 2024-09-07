@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Utilities for managing and controlling the verbosity of hipcheck.
 
 use super::Shell;

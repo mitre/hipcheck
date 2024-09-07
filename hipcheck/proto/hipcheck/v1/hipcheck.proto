@@ -31,6 +31,17 @@ service PluginService {
         returns (GetDefaultPolicyExpressionResponse);
 
     /**
+     * Get an explanation of what the default query returns, to use when
+     * reporting analysis results to users.
+     *
+     * Note that, because users can specify their own policy expression, this
+     * explanation *should not* assume the user has used the default policy
+     * expression, if one is provided by the plugin.
+     */
+    rpc ExplainDefaultQuery (ExplainDefaultQueryRequest)
+        returns (ExplainDefaultQueryResponse);
+
+    /**
      * Open a bidirectional streaming RPC to enable a request/response
      * protocol between Hipcheck and a plugin, where Hipcheck can issue
      * queries to the plugin, and the plugin may issue queries to _other_
@@ -115,6 +126,17 @@ message GetDefaultPolicyExpressionResponse {
     string policy_expression = 1;
 }
 
+/*===========================================================================
+ * ExplainDefaultQuery RPC Types
+ */
+
+message ExplainDefaultQueryRequest {
+    Empty empty = 1;
+}
+
+message ExplainDefaultQueryResponse {
+    string explanation = 1;
+}
 
 /*===========================================================================
  * Query Protocol RPC Types
@@ -182,7 +204,6 @@ enum QueryState {
     // have been received.
     QUERY_STATE_REPLY_COMPLETE = 3;
 }
-
 
 /*===========================================================================
  * Helper Types

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 #![allow(unused)]
 
 use crate::cache::plugin_cache::HcPluginCache;
