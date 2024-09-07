@@ -212,6 +212,7 @@ impl HCPredicate for ThresholdPredicate {
 		}
 	}
 }
+
 impl Display for ThresholdPredicate {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		use Ordering::*;

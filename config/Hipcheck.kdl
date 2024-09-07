@@ -14,12 +14,12 @@ analyze {
     investigate-if-fail "mitre/typo" "mitre/binary"
 
     category "practices" {
-        analysis "mitre/activity" policy="(lte 52 $)" weight=3
+        analysis "mitre/activity" policy="(lte $ 52)" weight=3
         analysis "mitre/binary" policy="(eq 0 (count $))" {
 			binary-file "./config/Binary.toml"
 		}
         analysis "mitre/fuzz" policy="(eq #t $)"
-        analysis "mitre/review" policy="(lte 0.05 $)"
+        analysis "mitre/review" policy="(lte $ 0.05)"
     }
 
     category "attacks" {

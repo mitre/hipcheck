@@ -9,6 +9,7 @@ use crate::{
 	error::Result,
 	hc_error,
 	plugin::QueryResult,
+	policy_exprs::Executor,
 	report::Concern,
 	shell::spinner_phase::SpinnerPhase,
 };
@@ -17,33 +18,33 @@ use num_traits::identities::Zero;
 use serde_json::Value;
 use std::{collections::HashMap, default::Default, sync::Arc};
 
-#[allow(unused)]
-pub const RISK_PHASE: &str = "risk";
-#[allow(unused)]
+#[cfg(test)]
 pub const PRACTICES_PHASE: &str = "practices";
+#[cfg(test)]
+pub const ATTACKS_PHASE: &str = "attacks";
+#[cfg(test)]
+pub const COMMITS_PHASE: &str = "commits";
+
 pub const REVIEW_PHASE: &str = "review";
 pub const IDENTITY_PHASE: &str = "identity";
 pub const BINARY_PHASE: &str = "binary";
 pub const ACTIVITY_PHASE: &str = "activity";
 pub const FUZZ_PHASE: &str = "fuzz";
-#[allow(unused)]
-pub const COMMITS_PHASE: &str = "high risk commits";
 pub const TYPO_PHASE: &str = "typo";
-#[allow(unused)]
-pub const ATTACKS_PHASE: &str = "attacks";
 pub const AFFILIATION_PHASE: &str = "affiliation";
 pub const CHURN_PHASE: &str = "churn";
 pub const ENTROPY_PHASE: &str = "entropy";
 
 #[derive(Debug, Default)]
 pub struct ScoringResults {
-	pub results: AnalysisResults,
+	pub results: PluginAnalysisResults,
 	pub score: Score,
 }
 
 #[derive(Debug, Clone)]
 pub struct HCStoredResult {
 	pub result: Result<Arc<Predicate>>,
+	#[allow(unused)]
 	pub concerns: Vec<Concern>,
 }
 impl HCStoredResult {
@@ -74,16 +75,80 @@ impl HCStoredResult {
 	}
 }
 
+#[derive(Debug, Clone)]
+pub struct PluginAnalysisResult {
+	pub response: Result<QueryResult>,
+	pub policy: String,
+	pub passed: bool,
+}
+
 #[derive(Debug, Default)]
 pub struct PluginAnalysisResults {
-	pub table: HashMap<Analysis, Result<QueryResult>>,
+	pub table: HashMap<Analysis, PluginAnalysisResult>,
+}
+
+impl PluginAnalysisResults {
+	pub fn get_legacy(&self, analysis: &str) -> Option<&PluginAnalysisResult> {
+		let key = Analysis::legacy(analysis);
+		self.table.get(&key)
+	}
+	/// Get all results from non-legacy analyses.
+	pub fn plugin_results(&self) -> impl Iterator<Item = (&Analysis, &PluginAnalysisResult)> {
+		self.table.iter().filter_map(|(analysis, result)| {
+			if [
+				REVIEW_PHASE,
+				IDENTITY_PHASE,
+				BINARY_PHASE,
+				ACTIVITY_PHASE,
+				FUZZ_PHASE,
+				TYPO_PHASE,
+				AFFILIATION_PHASE,
+				CHURN_PHASE,
+				ENTROPY_PHASE,
+			]
+			// Horrifying conversion, but necessary.
+			.contains(&(analysis.plugin).as_ref())
+				&& analysis.publisher == MITRE_PUBLISHER
+			{
+				None
+			} else {
+				Some((analysis, result))
+			}
+		})
+	}
 }
 
 #[derive(Debug, Default)]
 pub struct AnalysisResults {
 	pub table: HashMap<String, HCStoredResult>,
 }
+
 impl AnalysisResults {
+	#[allow(unused)]
+	/// Get all results from plugin-based analyses.
+	pub fn plugin_results(&self) -> impl Iterator<Item = (String, &HCStoredResult)> {
+		self.table.iter().filter_map(|(name, result)| {
+			if [
+				REVIEW_PHASE,
+				IDENTITY_PHASE,
+				BINARY_PHASE,
+				ACTIVITY_PHASE,
+				FUZZ_PHASE,
+				TYPO_PHASE,
+				AFFILIATION_PHASE,
+				CHURN_PHASE,
+				ENTROPY_PHASE,
+			]
+			// Horrifying conversion, but necessary.
+			.contains(&(*name).as_ref())
+			{
+				None
+			} else {
+				Some((name.to_owned(), result))
+			}
+		})
+	}
+
 	#[allow(unused)]
 	pub fn add(
 		&mut self,
@@ -402,151 +467,65 @@ fn wrapped_query(
 }
 
 pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
-	/*
-	Scoring should be performed by the construction of a "score tree" where scores are the
-	nodes and weights are the edges. The leaves are the analyses themselves, which either
-	pass (a score of 0) or fail (a score of 1). These are then combined with the other
-	children of their parent according to their weights, repeating until the final score is
-	reached.
-	generate the tree
-	traverse and score using recursion of node children
-	*/
-	// Values set with -1.0 are reseved for parent nodes whose score comes always from children nodes with a score set by hc_analysis algorithms
+	// Scoring should be performed by the construction of a "score tree" where scores are the
+	// nodes and weights are the edges. The leaves are the analyses themselves, which either
+	// pass (a score of 0) or fail (a score of 1). These are then combined with the other
+	// children of their parent according to their weights, repeating until the final score is
+	// reached.
+	//
+	// Values set with -1.0 are reseved for parent nodes whose score comes always
+	// from children nodes with a score set by hc_analysis algorithms
 
 	let analysis_tree = db.normalized_analysis_tree()?;
-	let target = db.target();
-	let target_json = serde_json::to_value(target.as_ref())?;
-	let mut plug_results = PluginAnalysisResults::default();
-
-	// @FollowUp - remove this once we implement policy expr calculation
-	let results = AnalysisResults::default();
-
-	let mut score = Score::default();
+	let mut plugin_results = PluginAnalysisResults::default();
 
 	// RFD4 analysis style - get all "leaf" analyses and call through plugin architecture
-	let analyses = analysis_tree.get_analyses();
-	for a in analyses {
-		let result = db.wrapped_query(
-			a.publisher.clone(),
-			a.plugin.clone(),
-			a.query.clone(),
-			target_json.clone(),
-		);
-		plug_results.table.insert(a.clone(), result);
-	}
+	let plugin_score_tree = {
+		let target_json = serde_json::to_value(db.target().as_ref())?;
 
-	/*
-	/* PRACTICES NODE ADDITION */
-	/*===NEW_PHASE===*/
-	let spec = ThresholdSpec {
-		threshold: HCBasicValue::from(db.activity_week_count_threshold()),
-		units: Some("weeks inactivity".to_owned()),
-		ordering: Ordering::Less,
+		for analysis in analysis_tree.get_analyses() {
+			// Perform query, passing target in JSON
+			let response = db.wrapped_query(
+				analysis.0.publisher.clone(),
+				analysis.0.plugin.clone(),
+				analysis.0.query.clone(),
+				target_json.clone(),
+			);
+			// Determine if analysis passed by evaluating policy expr
+			let passed = {
+				if let Ok(output) = &response {
+					match Executor::std().run(analysis.1.as_str(), &output.value) {
+						Ok(r) => r,
+						Err(e) => {
+							panic!("policy evaluation failed: {e}");
+						}
+					}
+				} else {
+					false
+				}
+			};
+			// Record in output map
+			plugin_results.table.insert(
+				analysis.0.clone(),
+				PluginAnalysisResult {
+					response,
+					policy: analysis.1.clone(),
+					passed,
+				},
+			);
+		}
+
+		ScoreTree::synthesize_plugin(&analysis_tree, &plugin_results)?
 	};
-	score.activity = run_and_score_threshold_analysis!(
-		results,
-		phase,
-		ACTIVITY_PHASE,
-		db.activity_analysis(),
-		spec
-	);
 
-	/*===REVIEW PHASE===*/
-	let spec = ThresholdSpec {
-		threshold: HCBasicValue::from(db.review_percent_threshold()),
-		units: Some("% pull requests without review".to_owned()),
-		ordering: Ordering::Less,
-	};
-	score.review =
-		run_and_score_threshold_analysis!(results, phase, REVIEW_PHASE, db.review_analysis(), spec);
-
-	/*===BINARY PHASE===*/
-	let spec = ThresholdSpec {
-		threshold: HCBasicValue::from(db.binary_count_threshold()),
-		units: Some("binary files found".to_owned()),
-		ordering: Ordering::Less,
-	};
-	score.binary =
-		run_and_score_threshold_analysis!(results, phase, BINARY_PHASE, db.binary_analysis(), spec);
-
-	/*===IDENTITY PHASE===*/
-	let spec = ThresholdSpec {
-		threshold: HCBasicValue::from(db.identity_percent_threshold()),
-		units: Some("% identity match".to_owned()),
-		ordering: Ordering::Less,
-	};
-	score.identity = run_and_score_threshold_analysis!(
-		results,
-		phase,
-		IDENTITY_PHASE,
-		db.identity_analysis(),
-		spec
-	);
-
-	/*===FUZZ PHASE===*/
-	let spec = ThresholdSpec {
-		threshold: HCBasicValue::from(true),
-		units: None,
-		ordering: Ordering::Equal,
-	};
-	score.fuzz =
-		run_and_score_threshold_analysis!(results, phase, FUZZ_PHASE, db.fuzz_analysis(), spec);
-
-	/* ATTACKS NODE ADDITION */
-	/*===TYPO PHASE===*/
-	let spec = ThresholdSpec {
-		threshold: HCBasicValue::from(db.typo_count_threshold()),
-		units: Some("possible typos".to_owned()),
-		ordering: Ordering::Less,
-	};
-	score.typo =
-		run_and_score_threshold_analysis!(results, phase, TYPO_PHASE, db.typo_analysis(), spec);
-
-	/*High risk commits node addition*/
-	/*===NEW_PHASE===*/
-	let spec = ThresholdSpec {
-		threshold: HCBasicValue::from(db.affiliation_count_threshold()),
-		units: Some("affiliated".to_owned()),
-		ordering: Ordering::Less,
-	};
-	score.affiliation = run_and_score_threshold_analysis!(
-		results,
-		phase,
-		AFFILIATION_PHASE,
-		db.affiliation_analysis(),
-		spec
-	);
-
-	/*===NEW_PHASE===*/
-	let spec = ThresholdSpec {
-		threshold: HCBasicValue::from(db.churn_percent_threshold()),
-		units: Some("% over churn threshold".to_owned()),
-		ordering: Ordering::Less,
-	};
-	score.churn =
-		run_and_score_threshold_analysis!(results, phase, CHURN_PHASE, db.churn_analysis(), spec);
-
-	/*===NEW_PHASE===*/
-	let spec = ThresholdSpec {
-		threshold: HCBasicValue::from(db.entropy_percent_threshold()),
-		units: Some("% over entropy threshold".to_owned()),
-		ordering: Ordering::Less,
-	};
-	score.entropy = run_and_score_threshold_analysis!(
-		results,
-		phase,
-		ENTROPY_PHASE,
-		db.entropy_analysis(),
-		spec
-	);
-	*/
-
-	let plug_score_tree = ScoreTree::synthesize_plugin(&analysis_tree, &plug_results)?;
-	// let alt_score_tree = ScoreTree::synthesize(&analysis_tree, &results)?;
-
-	score.total = plug_score_tree.score();
-
-	Ok(ScoringResults { results, score })
+	Ok(ScoringResults {
+		results: plugin_results,
+		score: {
+			let mut score = Score::default();
+			score.total = plugin_score_tree.score();
+			score
+		},
+	})
 }
 
 fn decimal_truncate(score: f64) -> f64 {

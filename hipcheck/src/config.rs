@@ -7,12 +7,10 @@ use crate::{
 	engine::HcEngine,
 	error::{Context, Result},
 	hc_error,
-	plugin::QueryResult,
 	policy::{
 		policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild},
 		PolicyFile,
 	},
-	policy_exprs::Executor,
 	util::fs as file,
 	BINARY_CONFIG_FILE, F64, LANGS_FILE, ORGS_FILE, TYPO_FILE,
 };
@@ -518,6 +516,19 @@ pub struct Analysis {
 	pub plugin: String,
 	pub query: String,
 }
+impl Analysis {
+	pub fn new(publisher: &str, plugin: &str, query: &str) -> Analysis {
+		Analysis {
+			publisher: publisher.to_owned(),
+			plugin: plugin.to_owned(),
+			query: query.to_owned(),
+		}
+	}
+
+	pub fn legacy(analysis: &str) -> Analysis {
+		Analysis::new(MITRE_PUBLISHER, analysis, DEFAULT_QUERY)
+	}
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PoliciedAnalysis(pub Analysis, pub String);
@@ -594,7 +605,7 @@ impl AnalysisTreeNode {
 	}
 	pub fn augment_plugin(
 		&self,
-		metrics: &HashMap<Analysis, Result<QueryResult>>,
+		metrics: &HashMap<Analysis, PluginAnalysisResult>,
 	) -> ScoreTreeNode {
 		match self {
 			AnalysisTreeNode::Category { label, weight } => ScoreTreeNode {
@@ -611,29 +622,14 @@ impl AnalysisTreeNode {
 				};
 				let label = self.get_print_label();
 				let weight = (*weight).into();
-				match analysis_res {
-					Ok(output) => {
-						let score = match Executor::std().run(analysis.1.as_str(), &output.value) {
-							Ok(true) => 0.0,
-							Ok(false) => 1.0,
-							Err(e) => {
-								panic!("policy evaluation failed: {e}");
-							}
-						};
-						ScoreTreeNode {
-							label,
-							score,
-							weight,
-						}
-					}
-					Err(e) => {
-						println!("Analysis error: {e}");
-						ScoreTreeNode {
-							label,
-							score: 1f64,
-							weight,
-						}
-					}
+				let score = match analysis_res.passed {
+					true => 0.0,
+					false => 1.0,
+				};
+				ScoreTreeNode {
+					label,
+					score,
+					weight,
 				}
 			}
 		}
@@ -655,13 +651,13 @@ impl AnalysisTree {
 		AnalysisTree { tree, root }
 	}
 
-	pub fn get_analyses(&self) -> Vec<Analysis> {
+	pub fn get_analyses(&self) -> Vec<PoliciedAnalysis> {
 		visit_leaves(
 			self.root,
 			&self.tree,
 			|_n| false,
 			|_a, n| match n {
-				AnalysisTreeNode::Analysis { analysis, .. } => analysis.0.clone(),
+				AnalysisTreeNode::Analysis { analysis, .. } => analysis.clone(),
 				AnalysisTreeNode::Category { .. } => unreachable!(),
 			},
 		)

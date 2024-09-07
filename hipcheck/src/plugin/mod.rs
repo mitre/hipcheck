@@ -56,6 +56,10 @@ impl ActivePlugin {
 		self.channel.opt_default_policy_expr.as_ref()
 	}
 
+	pub fn get_default_query_explanation(&self) -> Option<&String> {
+		self.channel.opt_explain_default_query.as_ref()
+	}
+
 	async fn get_unique_id(&self) -> usize {
 		let mut id_lock = self.next_id.lock().await;
 		let res: usize = *id_lock;
