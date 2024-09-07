@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context;
-use crate::error::Result;
+use crate::{context::Context, error::Result};
 use semver::Version;
 use std::rc::Rc;
 

@@ -2,16 +2,18 @@
 
 //! Data structures for Hipcheck's main CLI.
 
-use crate::cache::repo_cache::{RepoCacheDeleteScope, RepoCacheListScope, RepoCacheSort};
-use crate::context::Context;
-use crate::error::Result;
-use crate::hc_error;
-use crate::session::pm;
-use crate::shell::{color_choice::ColorChoice, verbosity::Verbosity};
-use crate::source;
-use crate::target::{
-	LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, TargetSeed,
-	TargetSeedKind, TargetType, ToTargetSeed, ToTargetSeedKind,
+use crate::{
+	cache::repo_cache::{RepoCacheDeleteScope, RepoCacheListScope, RepoCacheSort},
+	context::Context,
+	error::Result,
+	hc_error,
+	session::pm,
+	shell::{color_choice::ColorChoice, verbosity::Verbosity},
+	source,
+	target::{
+		LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, TargetSeed,
+		TargetSeedKind, TargetType, ToTargetSeed, ToTargetSeedKind,
+	},
 };
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
@@ -993,8 +995,7 @@ impl Format {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::cli::CliConfig;
-	use crate::util::test::with_env_vars;
+	use crate::{cli::CliConfig, util::test::with_env_vars};
 	use clap::CommandFactory;
 	use tempfile::TempDir;
 

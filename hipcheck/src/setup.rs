@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::cli::SetupArgs;
-use crate::error::Result;
-use crate::hc_error;
-use crate::util::http::agent;
+use crate::{cli::SetupArgs, error::Result, hc_error, util::http::agent};
 use regex::Regex;
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::{
+	fs::File,
+	path::{Path, PathBuf},
+	sync::OnceLock,
+};
 use tar::Archive;
 use xz2::read::XzDecoder;
 

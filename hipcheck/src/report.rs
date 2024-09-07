@@ -9,26 +9,26 @@
 // The report serves double-duty, because it's both the thing used to print user-friendly
 // results on the CLI, and the type that's serialized out to JSON for machine-friendly output.
 
-use crate::cli::Format;
-use crate::error::Error;
-use crate::error::Result;
-use crate::hc_error;
-use crate::version::VersionQuery;
+use crate::{
+	cli::Format,
+	error::{Error, Result},
+	hc_error,
+	version::VersionQuery,
+};
 use chrono::prelude::*;
 use paste::paste;
 use schemars::JsonSchema;
-use serde::Serialize;
-use serde::Serializer;
-use std::default::Default;
-use std::fmt;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::hash::Hash;
-use std::hash::Hasher;
-use std::iter::Iterator;
-use std::ops::Not as _;
-use std::result::Result as StdResult;
-use std::sync::Arc;
+use serde::{Serialize, Serializer};
+use std::{
+	default::Default,
+	fmt,
+	fmt::{Display, Formatter},
+	hash::{Hash, Hasher},
+	iter::Iterator,
+	ops::Not as _,
+	result::Result as StdResult,
+	sync::Arc,
+};
 
 /// The report output to the user.
 #[derive(Debug, Serialize, JsonSchema)]

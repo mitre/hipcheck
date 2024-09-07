@@ -2,12 +2,15 @@
 
 //! Query group for dependencies information.
 
-use crate::data::npm::get_package_file;
-use crate::data::npm::PackageFile;
-use crate::data::Dependencies;
-use crate::error::Result;
-use crate::source::SourceQuery;
-use crate::version::VersionQuery;
+use crate::{
+	data::{
+		npm::{get_package_file, PackageFile},
+		Dependencies,
+	},
+	error::Result,
+	source::SourceQuery,
+	version::VersionQuery,
+};
 use std::sync::Arc;
 
 /// Queries about dependencies

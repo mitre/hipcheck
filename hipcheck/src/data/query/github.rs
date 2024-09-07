@@ -2,10 +2,11 @@
 
 //! Query group for data pertaining to a remote GitHub source.
 
-use crate::error::Error;
-use crate::error::Result;
-use crate::source::SourceQuery;
-use crate::target::KnownRemote;
+use crate::{
+	error::{Error, Result},
+	source::SourceQuery,
+	target::KnownRemote,
+};
 use std::sync::Arc;
 
 /// Queries about a remote GitHub source

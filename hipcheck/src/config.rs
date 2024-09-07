@@ -2,32 +2,32 @@
 
 //! Defines the configuration file format.
 
-use crate::analysis::score::*;
-use crate::context::Context;
-use crate::engine::HcEngine;
-use crate::error::Result;
-use crate::hc_error;
-use crate::plugin::QueryResult;
-use crate::policy::policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild};
-use crate::policy::PolicyFile;
-use crate::policy_exprs::Executor;
-use crate::util::fs as file;
-use crate::BINARY_CONFIG_FILE;
-use crate::F64;
-use crate::LANGS_FILE;
-use crate::ORGS_FILE;
-use crate::TYPO_FILE;
+use crate::{
+	analysis::score::*,
+	context::Context,
+	engine::HcEngine,
+	error::Result,
+	hc_error,
+	plugin::QueryResult,
+	policy::{
+		policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild},
+		PolicyFile,
+	},
+	policy_exprs::Executor,
+	util::fs as file,
+	BINARY_CONFIG_FILE, F64, LANGS_FILE, ORGS_FILE, TYPO_FILE,
+};
 use indextree::{Arena, NodeEdge, NodeId};
 use num_traits::identities::Zero;
 use pathbuf::pathbuf;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
-use std::collections::HashMap;
-use std::default::Default;
-use std::path::Path;
-use std::path::PathBuf;
-use std::rc::Rc;
+use std::{
+	collections::HashMap,
+	default::Default,
+	path::{Path, PathBuf},
+	rc::Rc,
+};
 
 impl Config {
 	/// Load configuration from the given directory.
@@ -399,11 +399,11 @@ pub struct FuzzConfig {
 /// Inner module for deserialization helpers.
 mod de {
 	use super::F64;
-	use serde::de;
-	use serde::de::Deserializer;
-	use serde::de::Visitor;
-	use std::fmt;
-	use std::fmt::Formatter;
+	use serde::{
+		de,
+		de::{Deserializer, Visitor},
+	};
+	use std::{fmt, fmt::Formatter};
 
 	/// Deserialize a float, ensuring it's between 0.0 and 1.0 inclusive.
 	pub(super) fn percent<'de, D>(deserializer: D) -> Result<F64, D::Error>

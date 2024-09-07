@@ -4,11 +4,9 @@ mod git2_log_shim;
 mod git2_rustls_transport;
 mod indicatif_log_bridge;
 
-use crate::shell::verbosity::Verbosity;
-use crate::shell::Shell;
+use crate::shell::{verbosity::Verbosity, Shell};
 use env_logger::Env;
-use rustls::crypto::ring;
-use rustls::crypto::CryptoProvider;
+use rustls::crypto::{ring, CryptoProvider};
 
 /// Initialize global state for the program.
 ///

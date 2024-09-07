@@ -16,28 +16,21 @@ pub mod module;
 pub mod review;
 pub mod typo;
 
-use crate::config::AttacksConfigQuery;
-use crate::config::CommitConfigQuery;
-use crate::data::git::GitProvider;
-use crate::data::DependenciesProvider;
-use crate::data::FuzzProvider;
-use crate::data::ModuleProvider;
-use crate::data::PullRequestReviewProvider;
-use crate::error::Result;
-use crate::metric::activity::ActivityOutput;
-use crate::metric::affiliation::AffiliationOutput;
-use crate::metric::binary::BinaryOutput;
-use crate::metric::binary_detector::BinaryFile;
-use crate::metric::churn::ChurnOutput;
-use crate::metric::commit_trust::CommitTrustOutput;
-use crate::metric::contributor_trust::ContributorTrustOutput;
-use crate::metric::entropy::EntropyOutput;
-use crate::metric::fuzz::FuzzOutput;
-use crate::metric::identity::IdentityOutput;
-use crate::metric::linguist::Linguist;
-use crate::metric::module::ModuleOutput;
-use crate::metric::review::ReviewOutput;
-use crate::metric::typo::TypoOutput;
+use crate::{
+	config::{AttacksConfigQuery, CommitConfigQuery},
+	data::{
+		git::GitProvider, DependenciesProvider, FuzzProvider, ModuleProvider,
+		PullRequestReviewProvider,
+	},
+	error::Result,
+	metric::{
+		activity::ActivityOutput, affiliation::AffiliationOutput, binary::BinaryOutput,
+		binary_detector::BinaryFile, churn::ChurnOutput, commit_trust::CommitTrustOutput,
+		contributor_trust::ContributorTrustOutput, entropy::EntropyOutput, fuzz::FuzzOutput,
+		identity::IdentityOutput, linguist::Linguist, module::ModuleOutput, review::ReviewOutput,
+		typo::TypoOutput,
+	},
+};
 use std::sync::Arc;
 
 /// Queries about metrics

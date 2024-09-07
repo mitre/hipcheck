@@ -2,13 +2,13 @@
 
 //! Utilities for unit testing.
 
-use std::env;
-use std::env::VarError;
-use std::panic;
-use std::panic::RefUnwindSafe;
-use std::panic::UnwindSafe;
-use std::sync::Mutex;
-use std::sync::OnceLock;
+use std::{
+	env,
+	env::VarError,
+	panic,
+	panic::{RefUnwindSafe, UnwindSafe},
+	sync::{Mutex, OnceLock},
+};
 
 static SERIAL_TEST: OnceLock<Mutex<()>> = OnceLock::new();
 

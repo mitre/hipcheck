@@ -2,16 +2,16 @@
 
 //! Data types and functions for use in parsing policy KDL files
 
-use crate::error::Result;
-use crate::hc_error;
-use crate::kdl_helper::{extract_data, ParseKdlNode};
-use crate::plugin::{PluginName, PluginPublisher, PluginVersion};
-use crate::string_newtype_parse_kdl_node;
+use crate::{
+	error::Result,
+	hc_error,
+	kdl_helper::{extract_data, ParseKdlNode},
+	plugin::{PluginName, PluginPublisher, PluginVersion},
+	string_newtype_parse_kdl_node,
+};
 
 use kdl::KdlNode;
-use std::collections::HashMap;
-use std::fmt;
-use std::fmt::Display;
+use std::{collections::HashMap, fmt, fmt::Display};
 use url::Url;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

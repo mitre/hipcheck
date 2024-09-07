@@ -3,8 +3,7 @@
 //! A duplicate of the `anyhow::Context` extension trait intended to
 //! make error propagation less verbose.
 
-use crate::error::Error;
-use crate::error::Introspect;
+use crate::error::{Error, Introspect};
 use std::error::Error as StdError;
 
 /// Functions for adding context to an error result
@@ -70,8 +69,7 @@ where
 // Restricts implementations of `Context` only to those contained in
 // this module
 mod sealed {
-	use super::Error;
-	use super::StdError;
+	use super::{Error, StdError};
 
 	pub trait Sealed {}
 
@@ -85,8 +83,7 @@ mod tests {
 	//! Tests to ensure `Context` produces output correctly.
 
 	use crate::error::Error;
-	use std::io;
-	use std::io::ErrorKind;
+	use std::{io, io::ErrorKind};
 
 	// Message source root error with no context
 	#[test]

@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context as _;
-use crate::data::git::Commit;
-use crate::error::Result;
-use crate::hc_error;
-use crate::metric::math::mean;
-use crate::metric::math::std_dev;
-use crate::metric::MetricProvider;
-use crate::TryAny;
-use crate::TryFilter;
-use crate::F64;
+use crate::{
+	context::Context as _,
+	data::git::Commit,
+	error::Result,
+	hc_error,
+	metric::{
+		math::{mean, std_dev},
+		MetricProvider,
+	},
+	TryAny, TryFilter, F64,
+};
 use serde::Serialize;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct ChurnOutput {

@@ -3,20 +3,19 @@
 pub mod git;
 pub mod query;
 
-use crate::context::Context;
-use crate::data::git_command::GitCommand;
-use crate::error::Error;
-use crate::error::Result;
-use crate::hc_error;
-use crate::shell::spinner_phase::SpinnerPhase;
 pub use crate::source::query::*;
-use crate::target::{KnownRemote, LocalGitRepo, RemoteGitRepo, Target};
+use crate::{
+	context::Context,
+	data::git_command::GitCommand,
+	error::{Error, Result},
+	hc_error,
+	shell::spinner_phase::SpinnerPhase,
+	target::{KnownRemote, LocalGitRepo, RemoteGitRepo, Target},
+};
 use log::debug;
 use pathbuf::pathbuf;
-use std::path::Path;
-use std::path::PathBuf;
-use url::Host;
-use url::Url;
+use std::path::{Path, PathBuf};
+use url::{Host, Url};
 
 /// Resolving is how we ensure we have a valid, ready-to-go source of Git data
 /// for the rest of Hipcheck's analysis. The below functions handle the resolution

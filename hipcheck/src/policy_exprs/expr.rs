@@ -1,22 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::policy_exprs::env::Binding;
-use crate::policy_exprs::env::Env;
-use crate::policy_exprs::token::Token;
-use crate::policy_exprs::Error;
-use crate::policy_exprs::Result;
-use crate::policy_exprs::Tokens;
+use crate::policy_exprs::{
+	env::{Binding, Env},
+	token::Token,
+	Error, Result, Tokens,
+};
 use itertools::Itertools;
-use nom::branch::alt;
-use nom::combinator::all_consuming;
-use nom::combinator::map;
-use nom::multi::many0;
-use nom::sequence::tuple;
-use nom::Finish as _;
-use nom::IResult;
+use nom::{
+	branch::alt,
+	combinator::{all_consuming, map},
+	multi::many0,
+	sequence::tuple,
+	Finish as _, IResult,
+};
 use ordered_float::NotNan;
-use std::fmt::Display;
-use std::ops::Deref;
+use std::{fmt::Display, ops::Deref};
 
 /// A `deke` expression to evaluate.
 #[derive(Debug, PartialEq, Eq, Clone)]

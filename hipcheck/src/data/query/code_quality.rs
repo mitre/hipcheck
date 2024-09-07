@@ -4,11 +4,12 @@
 
 use std::rc::Rc;
 
-use crate::data::code_quality::get_eslint_report;
-use crate::data::code_quality::CodeQualityReport;
-use crate::error::Result;
-use crate::source::SourceQuery;
-use crate::version::VersionQuery;
+use crate::{
+	data::code_quality::{get_eslint_report, CodeQualityReport},
+	error::Result,
+	source::SourceQuery,
+	version::VersionQuery,
+};
 
 /// Queries about code quality
 #[salsa::query_group(CodeQualityProviderStorage)]

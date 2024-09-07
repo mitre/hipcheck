@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ffi::OsStr;
-use std::process::Command;
+use std::{ffi::OsStr, process::Command};
 
-use crate::command_util::log_args;
-use crate::command_util::DependentProgram;
-use crate::context::Context as _;
-use crate::error::Result;
-use crate::hc_error;
+use crate::{
+	command_util::{log_args, DependentProgram},
+	context::Context as _,
+	error::Result,
+	hc_error,
+};
 
 #[derive(Debug)]
 pub struct ESLintCommand {

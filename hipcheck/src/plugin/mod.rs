@@ -8,13 +8,13 @@ mod retrieval;
 mod supported_arch;
 mod types;
 
-use crate::context::Context;
-use crate::kdl_helper::{extract_data, ParseKdlNode};
-pub use crate::plugin::manager::*;
-pub use crate::plugin::plugin_id::PluginId;
-pub use crate::plugin::types::*;
-use crate::policy::policy_file::PolicyPluginName;
-use crate::Result;
+pub use crate::plugin::{manager::*, plugin_id::PluginId, types::*};
+use crate::{
+	context::Context,
+	kdl_helper::{extract_data, ParseKdlNode},
+	policy::policy_file::PolicyPluginName,
+	Result,
+};
 pub use download_manifest::{
 	ArchiveFormat, DownloadManifest, DownloadManifestEntry, HashAlgorithm, HashWithDigest,
 };

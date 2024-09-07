@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::policy_exprs::error;
-use crate::policy_exprs::error::Error;
-use crate::policy_exprs::error::Result;
-use crate::policy_exprs::expr::Expr;
-use crate::policy_exprs::expr::Primitive;
+use crate::policy_exprs::{
+	error,
+	error::{Error, Result},
+	expr::{Expr, Primitive},
+};
 use ordered_float::NotNan;
-use regex::Captures;
-use regex::Regex;
-use regex::RegexBuilder;
+use regex::{Captures, Regex, RegexBuilder};
 use serde_json::Value;
 
 /// Preprocess a Policy Expr source string by replacing JSON Pointer syntax with

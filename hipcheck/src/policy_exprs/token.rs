@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::F64;
-use logos::Lexer;
-use logos::Logos;
+use logos::{Lexer, Logos};
 use ordered_float::FloatIsNan;
-use std::fmt::Display;
-use std::num::ParseFloatError;
-use std::num::ParseIntError;
+use std::{
+	fmt::Display,
+	num::{ParseFloatError, ParseIntError},
+};
 
 type Result<T> = std::result::Result<T, LexingError>;
 
@@ -108,9 +108,7 @@ pub enum LexingError {
 
 #[cfg(test)]
 mod tests {
-	use crate::policy_exprs::token::Token;
-	use crate::policy_exprs::Result;
-	use crate::policy_exprs::F64;
+	use crate::policy_exprs::{token::Token, Result, F64};
 	use logos::Logos as _;
 	use test_log::test;
 

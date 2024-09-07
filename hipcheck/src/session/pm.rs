@@ -1,22 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(dead_code)]
-use crate::context::Context as _;
-use crate::error::Error;
-use crate::error::Result;
-use crate::hc_error;
-use crate::target::{Package, PackageHost};
-use crate::util::http::agent;
-use crate::CheckKind;
-use crate::EXIT_FAILURE;
+use crate::{
+	context::Context as _,
+	error::{Error, Result},
+	hc_error,
+	target::{Package, PackageHost},
+	util::http::agent,
+	CheckKind, EXIT_FAILURE,
+};
 use serde_json::Value;
-use std::cmp::max;
-use std::cmp::Ordering;
-use std::process::exit;
-use url::Host;
-use url::Url;
-use xml::reader::EventReader;
-use xml::reader::XmlEvent;
+use std::{
+	cmp::{max, Ordering},
+	process::exit,
+};
+use url::{Host, Url};
+use xml::reader::{EventReader, XmlEvent};
 
 const MAVEN: &str = CheckKind::Maven.name();
 const NPM: &str = CheckKind::Npm.name();

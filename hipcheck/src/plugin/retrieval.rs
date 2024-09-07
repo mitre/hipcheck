@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{DownloadManifest, PluginId, PluginName};
-use crate::{cache::plugin_cache::HcPluginCache, hc_error};
-use crate::{config::MITRE_PUBLISHER, util::http::agent::agent};
-use crate::{error::Error, policy::policy_file::PolicyPlugin};
 use crate::{
+	cache::plugin_cache::HcPluginCache,
+	config::MITRE_PUBLISHER,
+	error::Error,
+	hc_error,
 	plugin::{ArchiveFormat, HashAlgorithm, HashWithDigest},
-	policy::policy_file::PolicyPluginName,
+	policy::policy_file::{PolicyPlugin, PolicyPluginName},
+	util::http::agent::agent,
 };
 use flate2::read::GzDecoder;
 use std::{

@@ -1,23 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::result::*;
-use crate::analysis::AnalysisOutcome;
-use crate::analysis::AnalysisProvider;
-use crate::config::{
-	visit_leaves, Analysis, AnalysisTree, WeightTreeProvider, DEFAULT_QUERY, MITRE_PUBLISHER,
+use crate::{
+	analysis::{result::*, AnalysisOutcome, AnalysisProvider},
+	config::{
+		visit_leaves, Analysis, AnalysisTree, WeightTreeProvider, DEFAULT_QUERY, MITRE_PUBLISHER,
+	},
+	engine::HcEngine,
+	error::Result,
+	hc_error,
+	plugin::QueryResult,
+	report::Concern,
+	shell::spinner_phase::SpinnerPhase,
 };
-use crate::engine::HcEngine;
-use crate::error::Result;
-use crate::hc_error;
-use crate::plugin::QueryResult;
-use crate::report::Concern;
-use crate::shell::spinner_phase::SpinnerPhase;
 use indextree::{Arena, NodeId};
 use num_traits::identities::Zero;
 use serde_json::Value;
-use std::collections::HashMap;
-use std::default::Default;
-use std::sync::Arc;
+use std::{collections::HashMap, default::Default, sync::Arc};
 
 #[allow(unused)]
 pub const RISK_PHASE: &str = "risk";

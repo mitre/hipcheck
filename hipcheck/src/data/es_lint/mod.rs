@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ffi::OsStr;
-use std::path::Path;
+use std::{ffi::OsStr, path::Path};
 
-use crate::context::Context as _;
-use crate::error::Result;
+use crate::{context::Context as _, error::Result};
 use command::ESLintCommand;
 use data::ESLintReports;
 
@@ -35,8 +33,7 @@ mod test {
 	use super::*;
 
 	use crate::command_util::DependentProgram;
-	use std::fs::File;
-	use std::io::Write;
+	use std::{fs::File, io::Write};
 	use tempfile::tempdir;
 
 	#[test]

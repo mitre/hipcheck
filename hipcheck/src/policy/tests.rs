@@ -3,17 +3,16 @@
 //! Tests of policy file parsing functions
 #[cfg(test)]
 mod test {
-	use crate::config::Config;
-	use crate::kdl_helper::ParseKdlNode;
-	use crate::plugin::PluginVersion;
-	use crate::policy::config_to_policy::config_to_policy;
-	use crate::policy::policy_file::*;
-	use crate::policy::PolicyFile;
+	use crate::{
+		config::Config,
+		kdl_helper::ParseKdlNode,
+		plugin::PluginVersion,
+		policy::{config_to_policy::config_to_policy, policy_file::*, PolicyFile},
+	};
 
 	use kdl::KdlNode;
 	use pathbuf::pathbuf;
-	use std::env;
-	use std::str::FromStr;
+	use std::{env, str::FromStr};
 	use url::Url;
 
 	#[test]

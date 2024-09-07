@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::Result;
-use crate::hc_error;
+use crate::{error::Result, hc_error};
 use dialoguer::Confirm;
 use git2::Repository;
 use pathbuf::pathbuf;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
-use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::result::Result as StdResult;
-use std::time::SystemTime;
+use std::{
+	borrow::Borrow,
+	collections::HashMap,
+	fs,
+	path::{Path, PathBuf},
+	result::Result as StdResult,
+	time::SystemTime,
+};
 use tabled::{Table, Tabled};
 use walkdir::{DirEntry, WalkDir};
 

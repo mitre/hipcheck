@@ -1,15 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::command_util::log_git_args;
-use crate::context::Context as _;
-use crate::error::Result;
-use crate::hc_error;
-use std::convert::AsRef;
-use std::ffi::OsStr;
-use std::iter::IntoIterator;
-use std::ops::Not as _;
-use std::path::Path;
-use std::process::Command;
+use crate::{command_util::log_git_args, context::Context as _, error::Result, hc_error};
+use std::{
+	convert::AsRef, ffi::OsStr, iter::IntoIterator, ops::Not as _, path::Path, process::Command,
+};
 
 #[derive(Debug)]
 pub struct GitCommand {

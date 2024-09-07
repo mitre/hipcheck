@@ -3,26 +3,15 @@
 //! Derived query implementations for the `GitProvider` query group.
 
 use super::GitProvider;
-use crate::context::Context;
-use crate::data::git::get_commits;
-use crate::data::git::get_commits_from_date;
-use crate::data::git::get_diffs;
-use crate::data::git::Commit;
-use crate::data::git::CommitContributor;
-use crate::data::git::CommitContributorView;
-use crate::data::git::CommitDiff;
-use crate::data::git::CommitSigner;
-use crate::data::git::CommitSignerView;
-use crate::data::git::Contributor;
-use crate::data::git::ContributorView;
-use crate::data::git::Diff;
-use crate::data::git::GitCommand;
-use crate::data::git::RawCommit;
-use crate::data::git::SignerKeyView;
-use crate::data::git::SignerNameView;
-use crate::data::git::SignerView;
-use crate::error::Error;
-use crate::error::Result;
+use crate::{
+	context::Context,
+	data::git::{
+		get_commits, get_commits_from_date, get_diffs, Commit, CommitContributor,
+		CommitContributorView, CommitDiff, CommitSigner, CommitSignerView, Contributor,
+		ContributorView, Diff, GitCommand, RawCommit, SignerKeyView, SignerNameView, SignerView,
+	},
+	error::{Error, Result},
+};
 use chrono::prelude::*;
 use std::sync::Arc;
 

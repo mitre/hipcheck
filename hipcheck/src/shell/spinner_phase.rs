@@ -4,8 +4,8 @@
 //!
 //! This can be useful for things like while-loops and iterators without a known size.
 
-use crate::shell::Title;
 use super::{verbosity::Verbosity, Shell, HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP};
+use crate::shell::Title;
 use console::style;
 use indicatif::{HumanDuration, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::{

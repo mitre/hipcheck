@@ -4,22 +4,16 @@
 
 mod impls;
 
-use crate::data::git::Commit;
-use crate::data::git::CommitContributor;
-use crate::data::git::CommitContributorView;
-use crate::data::git::CommitDiff;
-use crate::data::git::CommitSigner;
-use crate::data::git::CommitSignerView;
-use crate::data::git::Contributor;
-use crate::data::git::ContributorView;
-use crate::data::git::Diff;
-use crate::data::git::RawCommit;
-use crate::data::git::SignerKeyView;
-use crate::data::git::SignerNameView;
-use crate::data::git::SignerView;
-use crate::error::Result;
-use crate::source::SourceQuery;
-use crate::version::VersionQuery;
+use crate::{
+	data::git::{
+		Commit, CommitContributor, CommitContributorView, CommitDiff, CommitSigner,
+		CommitSignerView, Contributor, ContributorView, Diff, RawCommit, SignerKeyView,
+		SignerNameView, SignerView,
+	},
+	error::Result,
+	source::SourceQuery,
+	version::VersionQuery,
+};
 use chrono::prelude::*;
 use std::sync::Arc;
 

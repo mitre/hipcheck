@@ -6,8 +6,7 @@
 pub fn git2_set_trace_log_shim() {
 	git2::trace_set(git2::TraceLevel::Trace, |level, msg| {
 		use git2::TraceLevel;
-		use log::Level;
-		use log::RecordBuilder;
+		use log::{Level, RecordBuilder};
 
 		// Coerce fatal down to error since there's no trivial equivalent.
 		let log_level = match level {

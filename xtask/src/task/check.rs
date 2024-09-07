@@ -3,25 +3,20 @@
 //! Validate the configuration of all Hipcheck crates.
 
 use crate::workspace;
-use anyhow::anyhow;
-use anyhow::Context as _;
-use anyhow::Result;
+use anyhow::{anyhow, Context as _, Result};
 use glob::glob;
 use pathbuf::pathbuf;
-use serde::de::DeserializeOwned;
-use serde::Deserialize;
-use std::collections::BTreeSet;
-use std::fmt;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::fs;
-use std::fs::File;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::ops::Not as _;
-use std::path::Path;
-use std::path::PathBuf;
+use serde::{de::DeserializeOwned, Deserialize};
+use std::{
+	collections::BTreeSet,
+	fmt,
+	fmt::{Debug, Display, Formatter},
+	fs,
+	fs::File,
+	io::{BufRead, BufReader},
+	ops::Not as _,
+	path::{Path, PathBuf},
+};
 
 /// Print list of validation failures for crates in the workspace.
 pub fn run() -> Result<()> {

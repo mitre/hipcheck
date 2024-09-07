@@ -1,15 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context as _;
-use crate::error::Result;
-use crate::metric::MetricProvider;
-use chrono::prelude::*;
-use chrono::Duration;
-use serde::ser::SerializeStruct;
-use serde::Serialize;
-use serde::Serializer;
-use std::result::Result as StdResult;
-use std::sync::Arc;
+use crate::{context::Context as _, error::Result, metric::MetricProvider};
+use chrono::{prelude::*, Duration};
+use serde::{ser::SerializeStruct, Serialize, Serializer};
+use std::{result::Result as StdResult, sync::Arc};
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct ActivityOutput {

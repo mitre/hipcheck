@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::score::HCStoredResult;
-use crate::hc_error;
-use crate::report::Concern;
-use crate::Result;
-use crate::F64;
-use std::cmp::Ordering;
-use std::fmt::{self, Display};
-use std::sync::Arc;
+use crate::{analysis::score::HCStoredResult, hc_error, report::Concern, Result, F64};
+use std::{
+	cmp::Ordering,
+	fmt::{self, Display},
+	sync::Arc,
+};
 
 /// Represents the enhanced result of a hipcheck analysis. Contains the actual outcome
 /// of the analysis, plus additional meta-information the analysis wants to provide to

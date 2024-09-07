@@ -1,24 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context as _;
-use crate::data::git::Commit;
-use crate::data::git::CommitDiff;
-use crate::data::git::FileDiff;
-use crate::error::Result;
-use crate::hc_error;
-use crate::metric::math::mean;
-use crate::metric::math::std_dev;
-use crate::metric::MetricProvider;
-use crate::TryAny;
-use crate::TryFilter;
-use crate::F64;
+use crate::{
+	context::Context as _,
+	data::git::{Commit, CommitDiff, FileDiff},
+	error::Result,
+	hc_error,
+	metric::{
+		math::{mean, std_dev},
+		MetricProvider,
+	},
+	TryAny, TryFilter, F64,
+};
 use dashmap::DashMap;
 use finl_unicode::grapheme_clusters::Graphemes;
 use rayon::prelude::*;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::iter::Iterator;
-use std::sync::Arc;
+use std::{collections::HashMap, iter::Iterator, sync::Arc};
 use unicode_normalization::UnicodeNormalization;
 
 /// Analyze a source to produce a set of entropy scores for its commits.

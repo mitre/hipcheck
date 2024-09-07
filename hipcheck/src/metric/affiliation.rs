@@ -1,27 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context as _;
-use crate::data::git::Commit;
-use crate::data::git::CommitContributorView;
-use crate::error::Error;
-use crate::error::Result;
-use crate::hc_error;
-use crate::metric::MetricProvider;
-use crate::util::fs as file;
-use serde::de::Error as SerdeError;
-use serde::de::Visitor;
-use serde::Deserialize;
-use serde::Deserializer;
-use serde::Serialize;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::convert::TryInto;
-use std::fmt;
-use std::ops::Not as _;
-use std::path::Path;
-use std::result::Result as StdResult;
-use std::sync::Arc;
+use crate::{
+	context::Context as _,
+	data::git::{Commit, CommitContributorView},
+	error::{Error, Result},
+	hc_error,
+	metric::MetricProvider,
+	util::fs as file,
+};
+use serde::{
+	de::{Error as SerdeError, Visitor},
+	Deserialize, Deserializer, Serialize,
+};
+use std::{
+	cell::RefCell,
+	collections::HashMap,
+	convert::{TryFrom, TryInto},
+	fmt,
+	ops::Not as _,
+	path::Path,
+	result::Result as StdResult,
+	sync::Arc,
+};
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct AffiliationOutput {

@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::analysis::result::{HCBasicValue, HCPredicate, Predicate};
-use crate::analysis::score::*;
-use crate::config::RiskConfigQuery;
-use crate::error::Error;
-use crate::error::Result;
-use crate::hc_error;
-use crate::report::Concern;
 pub use crate::report::*;
-use crate::session::Session;
-use crate::source::SourceQuery;
-use crate::version::VersionQuery;
-use std::default::Default;
-use std::result::Result as StdResult;
+use crate::{
+	analysis::{
+		result::{HCBasicValue, HCPredicate, Predicate},
+		score::*,
+	},
+	config::RiskConfigQuery,
+	error::{Error, Result},
+	hc_error,
+	report::Concern,
+	session::Session,
+	source::SourceQuery,
+	version::VersionQuery,
+};
+use std::{default::Default, result::Result as StdResult};
 
 /// Print the final report of a Hipcheck run.
 pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Report> {

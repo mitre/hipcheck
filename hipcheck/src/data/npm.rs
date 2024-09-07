@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::command_util::log_args;
-use crate::command_util::DependentProgram;
-use crate::context::Context;
-use crate::error::Result;
-use crate::hc_error;
-use crate::util::fs as file;
+use crate::{
+	command_util::{log_args, DependentProgram},
+	context::Context,
+	error::Result,
+	hc_error,
+	util::fs as file,
+};
 use pathbuf::pathbuf;
 use serde::Deserialize;
-use std::collections::HashMap;
-use std::convert::AsRef;
-use std::ffi::OsStr;
-use std::iter::IntoIterator;
-use std::ops::Not;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Child;
-use std::process::Command;
-use std::process::Stdio;
+use std::{
+	collections::HashMap,
+	convert::AsRef,
+	ffi::OsStr,
+	iter::IntoIterator,
+	ops::Not,
+	path::{Path, PathBuf},
+	process::{Child, Command, Stdio},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct PackageFile {

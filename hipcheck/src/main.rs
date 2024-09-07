@@ -31,52 +31,44 @@ pub mod hipcheck {
 	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
 }
 
-use crate::analysis::report_builder::build_report;
-use crate::analysis::report_builder::Report;
-use crate::analysis::score::score_results;
-use crate::cache::repo_cache::HcRepoCache;
-use crate::cli::Format;
-use crate::config::WeightTreeProvider;
-use crate::context::Context as _;
-use crate::error::Error;
-use crate::error::Result;
-use crate::plugin::{Plugin, PluginExecutor, PluginWithConfig};
-use crate::session::Session;
-use crate::setup::{resolve_and_transform_source, SourceType};
-use crate::shell::Shell;
-use crate::util::iter::TryAny;
-use crate::util::iter::TryFilter;
-use cli::CacheArgs;
-use cli::CacheOp;
-use cli::CheckArgs;
-use cli::CliConfig;
-use cli::FullCommands;
-use cli::PluginArgs;
-use cli::SchemaArgs;
-use cli::SchemaCommand;
-use cli::SetupArgs;
-use cli::UpdateArgs;
+use crate::{
+	analysis::{
+		report_builder::{build_report, Report},
+		score::score_results,
+	},
+	cache::repo_cache::HcRepoCache,
+	cli::Format,
+	config::WeightTreeProvider,
+	context::Context as _,
+	error::{Error, Result},
+	plugin::{Plugin, PluginExecutor, PluginWithConfig},
+	session::Session,
+	setup::{resolve_and_transform_source, SourceType},
+	shell::Shell,
+	util::iter::{TryAny, TryFilter},
+};
+use cli::{
+	CacheArgs, CacheOp, CheckArgs, CliConfig, FullCommands, PluginArgs, SchemaArgs, SchemaCommand,
+	SetupArgs, UpdateArgs,
+};
 use command_util::DependentProgram;
 use config::AnalysisTreeNode;
 use core::fmt;
-use indextree::Arena;
-use indextree::NodeId;
+use indextree::{Arena, NodeId};
 use ordered_float::NotNan;
 use pathbuf::pathbuf;
 use schemars::schema_for;
-use shell::color_choice::ColorChoice;
-use shell::spinner_phase::SpinnerPhase;
-use std::env;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::io::Write;
-use std::ops::Not as _;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Command;
-use std::process::ExitCode;
-use std::result::Result as StdResult;
-use std::time::Duration;
+use shell::{color_choice::ColorChoice, spinner_phase::SpinnerPhase};
+use std::{
+	env,
+	fmt::{Display, Formatter},
+	io::Write,
+	ops::Not as _,
+	path::{Path, PathBuf},
+	process::{Command, ExitCode},
+	result::Result as StdResult,
+	time::Duration,
+};
 use target::{RemoteGitRepo, TargetSeed, TargetSeedKind, ToTargetSeed};
 use util::fs::create_dir_all;
 use which::which;

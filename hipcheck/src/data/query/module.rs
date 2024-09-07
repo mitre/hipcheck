@@ -2,16 +2,16 @@
 
 //! Query group for module information.
 
-use crate::data::associate_modules_and_commits;
-use crate::data::git::Commit;
-use crate::data::git::GitProvider;
-use crate::data::Module;
-use crate::data::ModuleGraph;
-use crate::error::Error;
-use crate::error::Result;
+use crate::{
+	data::{
+		associate_modules_and_commits,
+		git::{Commit, GitProvider},
+		Module, ModuleGraph,
+	},
+	error::{Error, Result},
+};
 use pathbuf::pathbuf;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 /// A module and an associated commit
 pub type ModuleCommitMap = Arc<Vec<(Arc<Module>, Arc<Commit>)>>;

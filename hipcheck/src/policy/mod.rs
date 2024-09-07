@@ -6,14 +6,15 @@ pub mod config_to_policy;
 pub mod policy_file;
 mod tests;
 
-use crate::kdl_helper::extract_data;
-use crate::policy::policy_file::{PolicyAnalyze, PolicyPluginList};
-use crate::util::fs as file;
-use crate::{error::Result, hc_error};
+use crate::{
+	error::Result,
+	hc_error,
+	kdl_helper::extract_data,
+	policy::policy_file::{PolicyAnalyze, PolicyPluginList},
+	util::fs as file,
+};
 use kdl::KdlDocument;
-use std::collections::HashMap;
-use std::path::Path;
-use std::str::FromStr;
+use std::{collections::HashMap, path::Path, str::FromStr};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyFile {

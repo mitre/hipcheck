@@ -2,9 +2,7 @@
 
 //! Utility type for hiding data from the user when printed in a debug message.
 
-use std::fmt::Debug;
-use std::fmt::Formatter;
-use std::fmt::Result as FmtResult;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 /// Helper container to ensure a value isn't printed.
 pub struct Redacted<T>(T);
