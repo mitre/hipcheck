@@ -10,27 +10,28 @@ use crate::engine::HcEngine;
 use crate::error::Result;
 use crate::hc_error;
 use crate::plugin::QueryResult;
-use crate::policy::PolicyFile;
 use crate::report::Concern;
 use crate::shell::spinner_phase::SpinnerPhase;
-use crate::F64;
+use indextree::{Arena, NodeId};
 use num_traits::identities::Zero;
 use serde_json::Value;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::default::Default;
 use std::sync::Arc;
-use indextree::{Arena, NodeId};
 
+#[allow(unused)]
 pub const RISK_PHASE: &str = "risk";
+#[allow(unused)]
 pub const PRACTICES_PHASE: &str = "practices";
 pub const REVIEW_PHASE: &str = "review";
 pub const IDENTITY_PHASE: &str = "identity";
 pub const BINARY_PHASE: &str = "binary";
 pub const ACTIVITY_PHASE: &str = "activity";
 pub const FUZZ_PHASE: &str = "fuzz";
+#[allow(unused)]
 pub const COMMITS_PHASE: &str = "high risk commits";
 pub const TYPO_PHASE: &str = "typo";
+#[allow(unused)]
 pub const ATTACKS_PHASE: &str = "attacks";
 pub const AFFILIATION_PHASE: &str = "affiliation";
 pub const CHURN_PHASE: &str = "churn";
@@ -51,6 +52,7 @@ impl HCStoredResult {
 	// Score the analysis by invoking predicate's impl of `pass()`. Errored
 	// analyses treated as failures.
 	// @FollowUp - remove AnalysisOutcome once scoring refactor complete
+	#[allow(unused)]
 	pub fn score(&self) -> (u64, AnalysisOutcome) {
 		match &self.result {
 			Err(e) => (1, AnalysisOutcome::Error(e.clone())),
@@ -84,6 +86,7 @@ pub struct AnalysisResults {
 	pub table: HashMap<String, HCStoredResult>,
 }
 impl AnalysisResults {
+	#[allow(unused)]
 	pub fn add(
 		&mut self,
 		key: &str,
@@ -104,14 +107,23 @@ impl AnalysisResults {
 #[derive(Debug, Default)]
 pub struct Score {
 	pub total: f64,
+	#[allow(unused)]
 	pub activity: AnalysisOutcome,
+	#[allow(unused)]
 	pub affiliation: AnalysisOutcome,
+	#[allow(unused)]
 	pub binary: AnalysisOutcome,
+	#[allow(unused)]
 	pub churn: AnalysisOutcome,
+	#[allow(unused)]
 	pub entropy: AnalysisOutcome,
+	#[allow(unused)]
 	pub identity: AnalysisOutcome,
+	#[allow(unused)]
 	pub fuzz: AnalysisOutcome,
+	#[allow(unused)]
 	pub review: AnalysisOutcome,
+	#[allow(unused)]
 	pub typo: AnalysisOutcome,
 }
 
@@ -147,6 +159,7 @@ impl Default for ScoreResult {
 	}
 }
 
+#[allow(unused)]
 fn normalize_st_internal(node: NodeId, tree: &mut Arena<ScoreTreeNode>) -> f64 {
 	let children: Vec<NodeId> = node.children(tree).collect();
 	let weight_sum: f64 = children
@@ -169,6 +182,7 @@ pub struct ScoreTree {
 }
 
 impl ScoreTree {
+	#[allow(unused)]
 	pub fn new(root_label: &str) -> Self {
 		let mut tree = Arena::<ScoreTreeNode>::new();
 		let root = tree.new_node(ScoreTreeNode {
@@ -179,6 +193,7 @@ impl ScoreTree {
 		ScoreTree { tree, root }
 	}
 
+	#[allow(unused)]
 	pub fn add_child(&mut self, under: NodeId, label: &str, score: f64, weight: f64) -> NodeId {
 		let child = self.tree.new_node(ScoreTreeNode {
 			label: label.to_owned(),
@@ -189,6 +204,7 @@ impl ScoreTree {
 		child
 	}
 
+	#[allow(unused)]
 	pub fn normalize(mut self) -> Self {
 		let _ = normalize_st_internal(self.root, &mut self.tree);
 		self
@@ -243,6 +259,7 @@ impl ScoreTree {
 	// Given an analysis tree and set of analysis results, produce an AltScoreTree by creating
 	// ScoreTreeNode objects for each analysis that was not skipped, and composing them into
 	// a tree structure matching that of the WeightTree
+	#[allow(unused)]
 	pub fn synthesize(analysis_tree: &AnalysisTree, scores: &AnalysisResults) -> Result<Self> {
 		use indextree::NodeEdge::*;
 		let mut tree = Arena::<ScoreTreeNode>::new();
@@ -305,6 +322,7 @@ impl ScoreTree {
 //the tree does not need to know what sections it is scoring
 #[derive(Debug, Clone)]
 pub struct ScoreTreeNode {
+	#[allow(unused)]
 	pub label: String,
 	pub score: f64,
 	pub weight: f64,
@@ -345,6 +363,7 @@ pub fn phase_outcome<P: AsRef<String>>(
 	}
 }
 
+#[allow(unused)]
 macro_rules! run_and_score_threshold_analysis {
 	($res:ident, $p:ident, $phase:ident, $a:expr, $spec:ident) => {{
 		$p.update_status($phase);
@@ -377,14 +396,14 @@ fn wrapped_query(
 			FUZZ_PHASE => db.fuzz_analysis(),
 			REVIEW_PHASE => db.review_analysis(),
 			TYPO_PHASE => db.typo_analysis(),
-			other => Err(hc_error!("Unrecognized legacy analysis '{other}'")),
+			error => Err(hc_error!("Unrecognized legacy analysis '{}'", error)),
 		}
 	} else {
 		db.query(publisher, plugin, query, key)
 	}
 }
 
-pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
+pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
 	/*
 	Scoring should be performed by the construction of a "score tree" where scores are the
 	nodes and weights are the edges. The leaves are the analyses themselves, which either
@@ -402,7 +421,7 @@ pub fn score_results(phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<S
 	let mut plug_results = PluginAnalysisResults::default();
 
 	// @FollowUp - remove this once we implement policy expr calculation
-	let mut results = AnalysisResults::default();
+	let results = AnalysisResults::default();
 
 	let mut score = Score::default();
 
@@ -561,15 +580,15 @@ mod test {
 		let mut score_tree = ScoreTree::new("risk");
 		let core = score_tree.root;
 		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 10.0);
-		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 5.0);
-		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 0.0, 4.0);
+		let _review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 5.0);
+		let _activity = score_tree.add_child(practices, ACTIVITY_PHASE, 0.0, 4.0);
 		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 20.0);
 		let commits = score_tree.add_child(attacks, COMMITS_PHASE, -1.0, 5.0);
-		let trust = score_tree.add_child(commits, "trust", 1.0, 4.0);
-		let code_review = score_tree.add_child(commits, "code_review", 0.0, 3.0);
-		let entropy = score_tree.add_child(commits, ENTROPY_PHASE, 0.0, 2.0);
-		let churn = score_tree.add_child(commits, CHURN_PHASE, 1.0, 10.0);
-		let typo = score_tree.add_child(attacks, TYPO_PHASE, 1.0, 5.0);
+		let _trust = score_tree.add_child(commits, "trust", 1.0, 4.0);
+		let _code_review = score_tree.add_child(commits, "code_review", 0.0, 3.0);
+		let _entropy = score_tree.add_child(commits, ENTROPY_PHASE, 0.0, 2.0);
+		let _churn = score_tree.add_child(commits, CHURN_PHASE, 1.0, 10.0);
+		let _typo = score_tree.add_child(attacks, TYPO_PHASE, 1.0, 5.0);
 		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
@@ -591,11 +610,11 @@ mod test {
 		let mut score_tree = ScoreTree::new("risk");
 		let core = score_tree.root;
 		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 10.0);
-		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 4.0);
-		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 5.0);
+		let _review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 4.0);
+		let _activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 5.0);
 		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 15.0);
-		let code_review = score_tree.add_child(attacks, "code_review", 0.0, 6.0);
-		let entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 0.0, 7.0);
+		let _code_review = score_tree.add_child(attacks, "code_review", 0.0, 6.0);
+		let _entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 0.0, 7.0);
 		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
@@ -617,11 +636,11 @@ mod test {
 		let mut score_tree = ScoreTree::new("risk");
 		let core = score_tree.root;
 		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 33.0);
-		let review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 10.0);
-		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 5.0);
+		let _review = score_tree.add_child(practices, REVIEW_PHASE, 1.0, 10.0);
+		let _activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 5.0);
 		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 15.0);
-		let code_review = score_tree.add_child(attacks, "code_review", 1.0, 6.0);
-		let entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 1.0, 15.0);
+		let _code_review = score_tree.add_child(attacks, "code_review", 1.0, 6.0);
+		let _entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 1.0, 15.0);
 		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 
@@ -644,11 +663,11 @@ mod test {
 		let mut score_tree = ScoreTree::new("risk");
 		let core = score_tree.root;
 		let practices = score_tree.add_child(core, PRACTICES_PHASE, -1.0, 40.0);
-		let review = score_tree.add_child(practices, REVIEW_PHASE, 0.0, 12.0);
-		let activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 6.0);
+		let _review = score_tree.add_child(practices, REVIEW_PHASE, 0.0, 12.0);
+		let _activity = score_tree.add_child(practices, ACTIVITY_PHASE, 1.0, 6.0);
 		let attacks = score_tree.add_child(core, ATTACKS_PHASE, -1.0, 15.0);
-		let code_review = score_tree.add_child(attacks, "code_review", 0.0, 9.0);
-		let entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 1.0, 13.0);
+		let _code_review = score_tree.add_child(attacks, "code_review", 0.0, 9.0);
+		let _entropy = score_tree.add_child(attacks, ENTROPY_PHASE, 1.0, 13.0);
 		let final_score = score_tree.normalize().score();
 		println!("final score {}", final_score);
 

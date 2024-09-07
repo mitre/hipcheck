@@ -216,6 +216,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	Ok(report)
 }
 
+#[allow(unused)]
 fn extract_results<O, E, P, F>(
 	builder: &mut ReportBuilder,
 	result: &Option<StdResult<O, E>>,
