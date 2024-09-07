@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	command_util::{log_args, DependentProgram},
 	error::{Context as _, Error, Result},
 	hc_error,
+	util::command::{log_args, DependentProgram},
 };
 use pathbuf::pathbuf;
 use serde::Deserialize;

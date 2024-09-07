@@ -8,7 +8,6 @@ use crate::{
 	analysis::{score::ScoringProviderStorage, AnalysisProviderStorage},
 	cache::plugin_cache::HcPluginCache,
 	cli::Format,
-	command_util::DependentProgram,
 	config::{
 		AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource,
 		ConfigSourceStorage, LanguagesConfigQueryStorage, PracticesConfigQueryStorage,
@@ -38,6 +37,7 @@ use crate::{
 	source,
 	source::{SourceQuery, SourceQueryStorage},
 	target::{SbomStandard, Target, TargetSeed, TargetSeedKind},
+	util::command::DependentProgram,
 	version::{VersionQuery, VersionQueryStorage},
 };
 use chrono::prelude::*;

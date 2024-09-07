@@ -5,7 +5,6 @@ mod analysis;
 mod benchmarking;
 mod cache;
 mod cli;
-mod command_util;
 mod config;
 mod data;
 mod engine;
@@ -47,7 +46,6 @@ use cli::{
 	CacheArgs, CacheOp, CheckArgs, CliConfig, FullCommands, PluginArgs, SchemaArgs, SchemaCommand,
 	SetupArgs, UpdateArgs,
 };
-use command_util::DependentProgram;
 use config::AnalysisTreeNode;
 use core::fmt;
 use indextree::{Arena, NodeId};
@@ -66,6 +64,7 @@ use std::{
 	time::Duration,
 };
 use target::{RemoteGitRepo, TargetSeed, TargetSeedKind, ToTargetSeed};
+use util::command::DependentProgram;
 use util::fs::create_dir_all;
 use which::which;
 

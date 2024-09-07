@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	command_util::log_git_args,
 	error::{Context as _, Result},
 	hc_error,
+	util::command::log_git_args,
 };
 use std::{
 	convert::AsRef, ffi::OsStr, iter::IntoIterator, ops::Not as _, path::Path, process::Command,
