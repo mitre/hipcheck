@@ -6,15 +6,18 @@ use crate::{
 		result::{HCBasicValue, HCPredicate, Predicate},
 		score::*,
 	},
+	config::ConfigSource,
 	config::RiskConfigQuery,
 	error::{Error, Result},
 	hc_error,
+	plugin::{PluginName, PluginPublisher},
+	policy::policy_file::PolicyPluginName,
 	report::Concern,
 	session::Session,
 	source::SourceQuery,
 	version::VersionQuery,
 };
-use std::{default::Default, result::Result as StdResult};
+use std::{collections::HashSet, default::Default, result::Result as StdResult};
 
 /// Print the final report of a Hipcheck run.
 pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Report> {
@@ -247,6 +250,9 @@ pub struct ReportBuilder<'sess> {
 	/// The `Session`, containing general data from the run.
 	session: &'sess Session,
 
+	/// A lookup of which failed analyses warrant an immediate investigation
+	investigate_if_failed: HashSet<PolicyPluginName>,
+
 	/// What analyses passed.
 	passing: Vec<PassingAnalysis>,
 
@@ -266,8 +272,17 @@ pub struct ReportBuilder<'sess> {
 impl<'sess> ReportBuilder<'sess> {
 	/// Initiate building a new `Report`.
 	pub fn for_session(session: &'sess Session) -> ReportBuilder<'sess> {
+		// Get investigate_if_failed hashset from policy
+		let policy = session.policy();
+		let investigate_if_failed = policy
+			.analyze
+			.if_fail
+			.as_ref()
+			.map_or(HashSet::new(), |x| HashSet::from_iter(x.0.iter().cloned()));
+
 		ReportBuilder {
 			session,
+			investigate_if_failed,
 			passing: Default::default(),
 			failing: Default::default(),
 			errored: Default::default(),
@@ -346,7 +361,34 @@ impl<'sess> ReportBuilder<'sess> {
 				.ok_or_else(|| hc_error!("no risk threshold set for report"))
 				.map(RiskPolicy)?;
 
-			Recommendation::is(score, policy)?
+			// Determine recommendation based on score and investigate policy expr
+			let mut rec = Recommendation::is(score, policy)?;
+
+			// Override base recommendation if any `investigate-if-fail` analyses failed
+			for failed in failing.iter() {
+				let (publisher, name) = match &failed.analysis {
+					Analysis::Activity { .. } => ("mitre", "activity"),
+					Analysis::Affiliation { .. } => ("mitre", "affiliation"),
+					Analysis::Binary { .. } => ("mitre", "binary"),
+					Analysis::Churn { .. } => ("mitre", "churn"),
+					Analysis::Entropy { .. } => ("mitre", "entropy"),
+					Analysis::Identity { .. } => ("mitre", "identity"),
+					Analysis::Fuzz { .. } => ("mitre", "fuzz"),
+					Analysis::Review { .. } => ("mitre", "review"),
+					Analysis::Typo { .. } => ("mitre", "typo"),
+					Analysis::Plugin { name, .. } => name.as_str().split_once('/').unwrap(),
+				};
+				let policy_plugin_name = PolicyPluginName {
+					publisher: PluginPublisher(publisher.to_owned()),
+					name: PluginName(name.to_owned()),
+				};
+				if self.investigate_if_failed.contains(&policy_plugin_name) {
+					rec.kind = RecommendationKind::Investigate;
+					break;
+				}
+			}
+
+			rec
 		};
 
 		let report = Report {
