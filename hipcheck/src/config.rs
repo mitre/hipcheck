@@ -464,8 +464,8 @@ pub trait ConfigSource: salsa::Database {
 /// Query for accessing the risk threshold config
 #[salsa::query_group(RiskConfigQueryStorage)]
 pub trait RiskConfigQuery: ConfigSource {
-	/// Returns the risk threshold
-	fn risk_threshold(&self) -> F64;
+	/// Returns the risk policy expr
+	fn risk_policy(&self) -> Rc<String>;
 }
 
 /// Query for accessing the languages analysis config
@@ -840,9 +840,9 @@ pub fn normalized_analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<Analys
 /// field is `String`, it is returned wrapped in an `Rc`.  This is
 /// done to keep Salsa's cloning cheap.
 
-fn risk_threshold(_db: &dyn RiskConfigQuery) -> F64 {
-	// @Todo - change signature to return string representation of policy expr from policy file
-	F64::new(0.5).unwrap()
+fn risk_policy(db: &dyn RiskConfigQuery) -> Rc<String> {
+	let policy = db.policy();
+	Rc::new(policy.analyze.investigate_policy.0.clone())
 }
 
 fn langs_file_rel(_db: &dyn LanguagesConfigQuery) -> Rc<String> {

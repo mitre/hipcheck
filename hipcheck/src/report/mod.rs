@@ -13,8 +13,9 @@ pub mod report_builder;
 
 use crate::{
 	cli::Format,
-	error::{Error, Result},
+	error::{Context, Error, Result},
 	hc_error,
+	policy_exprs::Executor,
 	version::VersionQuery,
 };
 use chrono::prelude::*;
@@ -831,30 +832,30 @@ pub struct Percent {
 
 /// A final recommendation of whether to use or investigate a piece of software,
 /// including the risk threshold associated with that decision.
-#[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
+#[derive(Debug, Serialize, JsonSchema, Clone)]
 #[schemars(crate = "schemars")]
 pub struct Recommendation {
 	pub kind: RecommendationKind,
 	risk_score: RiskScore,
-	risk_threshold: RiskThreshold,
+	risk_policy: RiskPolicy,
 }
 
 impl Recommendation {
 	/// Make a recommendation.
-	pub fn is(risk_score: RiskScore, risk_threshold: RiskThreshold) -> Recommendation {
-		let kind = RecommendationKind::is(risk_score, risk_threshold);
+	pub fn is(risk_score: RiskScore, risk_policy: RiskPolicy) -> Result<Recommendation> {
+		let kind = RecommendationKind::is(risk_score, risk_policy.clone())?;
 
-		Recommendation {
+		Ok(Recommendation {
 			kind,
 			risk_score,
-			risk_threshold,
-		}
+			risk_policy,
+		})
 	}
 
 	pub fn statement(&self) -> String {
 		format!(
-			"risk rated as {:.2}, acceptable below or equal to {:.2}",
-			self.risk_score.0, self.risk_threshold.0
+			"risk rated as {:.2}, policy was {}",
+			self.risk_score.0, self.risk_policy.0
 		)
 	}
 }
@@ -868,12 +869,18 @@ pub enum RecommendationKind {
 }
 
 impl RecommendationKind {
-	fn is(risk_score: RiskScore, risk_threshold: RiskThreshold) -> RecommendationKind {
-		if risk_score.0 > risk_threshold.0 {
-			RecommendationKind::Investigate
-		} else {
-			RecommendationKind::Pass
-		}
+	fn is(risk_score: RiskScore, risk_policy: RiskPolicy) -> Result<RecommendationKind> {
+		let value = serde_json::to_value(risk_score.0).unwrap();
+		Ok(
+			if Executor::std()
+				.run(&risk_policy.0, &value)
+				.context("investigate policy expression execution failed")?
+			{
+				RecommendationKind::Pass
+			} else {
+				RecommendationKind::Investigate
+			},
+		)
 	}
 }
 
@@ -884,10 +891,10 @@ impl RecommendationKind {
 pub struct RiskScore(pub f64);
 
 /// The risk threshold configured for the Hipcheck session.
-#[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
+#[derive(Debug, Serialize, JsonSchema, Clone)]
 #[serde(transparent)]
 #[schemars(crate = "schemars")]
-pub struct RiskThreshold(pub f64);
+pub struct RiskPolicy(pub String);
 
 /// A serializable and printable wrapper around a datetime with the local timezone.
 #[derive(Debug, JsonSchema)]
