@@ -414,8 +414,8 @@ impl ParseKdlNode for InvestigateIfFail {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyAnalyze {
-	investigate_policy: InvestigatePolicy,
-	if_fail: Option<InvestigateIfFail>,
+	pub investigate_policy: InvestigatePolicy,
+	pub if_fail: Option<InvestigateIfFail>,
 	pub categories: Vec<PolicyCategory>,
 }
 
