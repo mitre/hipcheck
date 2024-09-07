@@ -357,7 +357,7 @@ pub struct InvestigatePolicy(pub String);
 string_newtype_parse_kdl_node!(InvestigatePolicy, "investigate");
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct InvestigateIfFail(Vec<PolicyPluginName>);
+pub struct InvestigateIfFail(pub Vec<PolicyPluginName>);
 
 impl InvestigateIfFail {
 	#[allow(dead_code)]
