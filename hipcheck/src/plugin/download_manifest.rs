@@ -1,19 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-	plugin_manifest, Plugin, PluginId, PluginManifest, PluginName, PluginPublisher, PluginVersion,
-};
+use super::{PluginId, PluginManifest, PluginName, PluginPublisher, PluginVersion};
 use crate::{
 	cache::plugin_cache::HcPluginCache,
-	error::{Context, Error},
+	error::Error,
 	hc_error,
 	plugin::{
 		retrieval::{download_plugin, extract_plugin},
 		supported_arch::SupportedArch,
 		CURRENT_ARCH,
 	},
-	policy::policy_file::PolicyPluginName,
-	string_newtype_parse_kdl_node,
 	util::kdl::{extract_data, ParseKdlNode},
 	util::{
 		fs::{find_file_by_name, read_string},
@@ -22,15 +18,7 @@ use crate::{
 };
 use fs_extra::dir::remove;
 use kdl::{KdlDocument, KdlNode, KdlValue};
-use std::{
-	collections::HashSet,
-	fmt::Display,
-	fs::File,
-	hash::Hash,
-	io::{self, Read, Write},
-	path::{Path, PathBuf},
-	str::FromStr,
-};
+use std::{collections::HashSet, fmt::Display, io::Read, str::FromStr};
 use url::Url;
 
 // NOTE: the implementation in this crate was largely derived from RFD #0004
@@ -157,6 +145,7 @@ pub struct Compress {
 }
 
 impl Compress {
+	#[allow(unused)]
 	pub fn new(archive_format: ArchiveFormat) -> Self {
 		Self {
 			format: archive_format,
@@ -187,6 +176,7 @@ pub struct Size {
 }
 
 impl Size {
+	#[allow(unused)]
 	pub fn new(bytes: u64) -> Self {
 		Self { bytes }
 	}
@@ -296,7 +286,7 @@ impl DownloadManifestEntry {
 		publisher: &PluginPublisher,
 		name: &PluginName,
 		version: &PluginVersion,
-		mut downloaded_plugins: &'a mut HashSet<PluginId>,
+		downloaded_plugins: &'a mut HashSet<PluginId>,
 	) -> Result<&'a HashSet<PluginId>, Error> {
 		let plugin_id = PluginId::new(publisher.clone(), name.clone(), version.clone());
 
@@ -335,7 +325,7 @@ impl DownloadManifestEntry {
 				version.0,
 				CURRENT_ARCH
 			)
-		});
+		})?;
 
 		// locate the plugin manfiest for this plugin, read its contents and serialize to PluginManifest
 		let plugin_manifest_path = find_file_by_name(download_dir.as_path(), "plugin.kdl")?;
@@ -377,10 +367,12 @@ pub struct DownloadManifest {
 }
 
 impl DownloadManifest {
+	#[allow(unused)]
 	pub fn iter(&self) -> impl Iterator<Item = &DownloadManifestEntry> {
 		self.entries.iter()
 	}
 
+	#[allow(unused)]
 	pub fn len(&self) -> usize {
 		self.entries.len()
 	}
@@ -423,7 +415,7 @@ impl DownloadManifest {
 		publisher: &PluginPublisher,
 		name: &PluginName,
 		version: &PluginVersion,
-		mut downloaded_plugins: &'a mut HashSet<PluginId>,
+		downloaded_plugins: &'a mut HashSet<PluginId>,
 	) -> Result<&'a HashSet<PluginId>, Error> {
 		for entry in self.entries.iter() {
 			entry.download_and_unpack_plugin(
@@ -460,7 +452,6 @@ impl FromStr for DownloadManifest {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use kdl::KdlDocument;
 	use std::str::FromStr;
 
 	#[test]
