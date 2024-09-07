@@ -3,8 +3,7 @@
 //! A query group for accessing Git repository data.
 
 use crate::target::{RemoteGitRepo, Target};
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 /// Queries for accessing info about a Git source
 #[salsa::query_group(SourceQueryStorage)]

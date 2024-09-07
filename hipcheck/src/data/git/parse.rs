@@ -2,37 +2,22 @@
 
 #![allow(dead_code)]
 
-use crate::context::Context as _;
-use crate::data::git::Contributor;
-use crate::data::git::Diff;
-use crate::data::git::FileDiff;
-use crate::data::git::RawCommit;
-use crate::error::Error;
-use crate::error::Result;
-use chrono::DateTime;
-use chrono::FixedOffset;
-use nom::branch::alt;
-use nom::character::complete::char as character;
-use nom::character::complete::digit1;
-use nom::character::complete::not_line_ending;
-use nom::character::complete::one_of;
-use nom::character::complete::space1;
-use nom::combinator::opt;
-use nom::combinator::peek;
-use nom::combinator::recognize;
-use nom::error::Error as NomError;
-use nom::error::ErrorKind;
-use nom::multi::fold_many0;
-use nom::multi::many0;
-use nom::multi::many1;
-use nom::multi::many_m_n;
-use nom::sequence::preceded;
-use nom::sequence::terminated;
-use nom::sequence::tuple;
-use nom::IResult;
-use std::iter::Iterator;
-use std::result::Result as StdResult;
-use std::sync::Arc;
+use crate::{
+	context::Context as _,
+	data::git::{Contributor, Diff, FileDiff, RawCommit},
+	error::{Error, Result},
+};
+use chrono::{DateTime, FixedOffset};
+use nom::{
+	branch::alt,
+	character::complete::{char as character, digit1, not_line_ending, one_of, space1},
+	combinator::{opt, peek, recognize},
+	error::{Error as NomError, ErrorKind},
+	multi::{fold_many0, many0, many1, many_m_n},
+	sequence::{preceded, terminated, tuple},
+	IResult,
+};
+use std::{iter::Iterator, result::Result as StdResult, sync::Arc};
 
 const HEX_CHARS: &str = "0123456789abcdef";
 const GIT_HASH_MIN_LEN: usize = 5;

@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::cache::plugin_cache::HcPluginCache;
-use crate::plugin::{
-	retrieve_plugins, Plugin, PluginManifest, PluginResponse, QueryResult,
-	CURRENT_ARCH,
-};
 pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
-use crate::policy::PolicyFile;
-use crate::util::fs::{find_file_by_name, read_string};
-use crate::{hc_error, Result};
+use crate::{
+	cache::plugin_cache::HcPluginCache,
+	hc_error,
+	plugin::{retrieve_plugins, Plugin, PluginManifest, PluginResponse, QueryResult, CURRENT_ARCH},
+	policy::PolicyFile,
+	util::fs::{find_file_by_name, read_string},
+	Result,
+};
 use futures::future::{BoxFuture, FutureExt};
 use serde_json::Value;
-use std::str::FromStr;
-use std::sync::{Arc, LazyLock};
+use std::{
+	str::FromStr,
+	sync::{Arc, LazyLock},
+};
 use tokio::runtime::{Handle, Runtime};
 
 // Salsa doesn't natively support async functions, so our recursive `query()` function that

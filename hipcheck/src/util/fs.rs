@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context as _;
-use crate::error::Result;
-use crate::hc_error;
+use crate::{context::Context as _, error::Result, hc_error};
 use serde::de::DeserializeOwned;
-use std::fs::{self, read_dir};
-use std::ops::Not;
-use std::path::{Path, PathBuf};
+use std::{
+	fs::{self, read_dir},
+	ops::Not,
+	path::{Path, PathBuf},
+};
 
 /// Read a file to a string.
 pub fn read_string<P: AsRef<Path>>(path: P) -> Result<String> {

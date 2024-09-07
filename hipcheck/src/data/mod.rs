@@ -15,24 +15,18 @@ mod query;
 
 pub use query::*;
 
-use crate::context::Context;
-use crate::error::Error;
-use crate::error::Result;
-use crate::hc_error;
-use git::get_commits_for_file;
-use git::Commit;
-use git::CommitContributor;
-use git::Contributor;
-use git::Diff;
+use crate::{
+	context::Context,
+	error::{Error, Result},
+	hc_error,
+};
+use git::{get_commits_for_file, Commit, CommitContributor, Contributor, Diff};
 use github::*;
 use modules::RawModule;
 use pathbuf::pathbuf;
-use petgraph::visit::Dfs;
-use petgraph::Graph;
+use petgraph::{visit::Dfs, Graph};
 use serde::Serialize;
-use std::collections::HashSet;
-use std::path::Path;
-use std::sync::Arc;
+use std::{collections::HashSet, path::Path, sync::Arc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dependencies {

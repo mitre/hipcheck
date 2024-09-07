@@ -2,26 +2,20 @@
 
 #![deny(missing_docs)]
 
-use crate::cli::Format;
-use crate::error::Error;
-use crate::error::Result;
-use crate::report::RecommendationKind;
-use crate::report::Report;
-use console::Emoji;
-use console::Style;
-use console::Term;
-use indicatif::MultiProgress;
-use indicatif::ProgressDrawTarget;
-use std::fmt;
-use std::fmt::Alignment;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::io::Write;
-use std::sync::OnceLock;
-use std::sync::RwLock;
-use verbosity::SilenceGuard;
-use verbosity::Verbosity;
+use crate::{
+	cli::Format,
+	error::{Error, Result},
+	report::{RecommendationKind, Report},
+};
+use console::{Emoji, Style, Term};
+use indicatif::{MultiProgress, ProgressDrawTarget};
+use std::{
+	fmt,
+	fmt::{Alignment, Debug, Display, Formatter},
+	io::Write,
+	sync::{OnceLock, RwLock},
+};
+use verbosity::{SilenceGuard, Verbosity};
 
 #[cfg(feature = "print-timings")]
 use console::style;

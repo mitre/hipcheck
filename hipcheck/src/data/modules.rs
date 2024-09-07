@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::command_util::log_args;
-use crate::command_util::DependentProgram;
-use crate::context::Context as _;
-use crate::error::Error;
-use crate::error::Result;
-use crate::hc_error;
+use crate::{
+	command_util::{log_args, DependentProgram},
+	context::Context as _,
+	error::{Error, Result},
+	hc_error,
+};
 use pathbuf::pathbuf;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
-use std::collections::HashMap;
-use std::convert::AsRef;
-use std::ffi::OsStr;
-use std::fs;
-use std::iter::IntoIterator;
-use std::ops::Not as _;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Command;
+use std::{
+	collections::HashMap,
+	convert::AsRef,
+	ffi::OsStr,
+	fs,
+	iter::IntoIterator,
+	ops::Not as _,
+	path::{Path, PathBuf},
+	process::Command,
+};
 
 pub fn generate_module_model(repo_dir: &Path, module_deps: &Path) -> Result<Vec<RawModule>> {
 	let root = detect_npm_package_root(&pathbuf![repo_dir, "package.json"])?;

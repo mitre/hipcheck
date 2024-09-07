@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
-use anyhow::Result;
-use std::path::Path;
-use std::path::PathBuf;
+use anyhow::{anyhow, Result};
+use std::path::{Path, PathBuf};
 
 /// Get the root directory of the workspace.
 pub fn root() -> Result<PathBuf> {

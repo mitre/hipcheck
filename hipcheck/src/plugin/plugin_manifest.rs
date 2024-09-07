@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::kdl_helper::{extract_data, ParseKdlNode};
-use crate::plugin::supported_arch::SupportedArch;
-use crate::string_newtype_parse_kdl_node;
-use crate::{error::Error, hc_error};
+use crate::{
+	error::Error,
+	hc_error,
+	kdl_helper::{extract_data, ParseKdlNode},
+	plugin::supported_arch::SupportedArch,
+	string_newtype_parse_kdl_node,
+};
 use core::panic;
 use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};
 use petgraph::graphmap::NeighborsDirected;
-use std::collections::HashMap;
-use std::fmt::write;
-use std::{fmt::Display, str::FromStr};
+use std::{
+	collections::HashMap,
+	fmt::{write, Display},
+	str::FromStr,
+};
 
 // NOTE: the implementation in this crate was largely derived from RFD #4
 

@@ -5,14 +5,16 @@ mod data;
 mod graphql;
 mod graphql_pr;
 
-use crate::context::Context as _;
-use crate::data::code_search::search_code_request;
-use crate::data::git::parse::github_diff;
-use crate::data::github::data::*;
-use crate::data::github::graphql::get_all_reviews;
-use crate::data::github::graphql_pr::get_all_pr_reviews;
-use crate::error::Result;
-use crate::util::http::authenticated_agent::AuthenticatedAgent;
+use crate::{
+	context::Context as _,
+	data::{
+		code_search::search_code_request,
+		git::parse::github_diff,
+		github::{data::*, graphql::get_all_reviews, graphql_pr::get_all_pr_reviews},
+	},
+	error::Result,
+	util::http::authenticated_agent::AuthenticatedAgent,
+};
 use std::sync::Arc;
 
 pub struct GitHub<'a> {

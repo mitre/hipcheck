@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::hipcheck::plugin_service_client::PluginServiceClient;
-use crate::plugin::{HcPluginClient, Plugin, PluginContext};
-use crate::{hc_error, Result, F64};
-use futures::future::join_all;
-use futures::Future;
+use crate::{
+	hc_error,
+	hipcheck::plugin_service_client::PluginServiceClient,
+	plugin::{HcPluginClient, Plugin, PluginContext},
+	Result, F64,
+};
+use futures::{future::join_all, Future};
 use rand::Rng;
-use std::collections::HashSet;
-use std::ops::Range;
-use std::process::{Command, Stdio};
+use std::{
+	collections::HashSet,
+	ops::Range,
+	process::{Command, Stdio},
+};
 use tokio::time::{sleep_until, Duration, Instant};
 
 #[derive(Clone, Debug)]

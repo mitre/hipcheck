@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::workspace;
-use crate::SiteEnvironment;
-use crate::SiteServeArgs;
-use anyhow::anyhow;
-use anyhow::Context;
-use anyhow::Result;
+use crate::{workspace, SiteEnvironment, SiteServeArgs};
+use anyhow::{anyhow, Context, Result};
 use pathbuf::pathbuf;
 use std::thread::spawn;
 use xshell::Shell;

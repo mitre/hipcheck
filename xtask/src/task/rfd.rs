@@ -2,17 +2,12 @@
 
 //! Tasks to list or create RFDs
 
-use crate::NewRfdArgs;
-use crate::RfdArgs;
-use anyhow::anyhow;
-use anyhow::Result;
-use convert_case::Case;
-use convert_case::Casing as _;
-use glob::glob;
-use glob::Paths;
+use crate::{NewRfdArgs, RfdArgs};
+use anyhow::{anyhow, Result};
+use convert_case::{Case, Casing as _};
+use glob::{glob, Paths};
 use pathbuf::pathbuf;
-use std::fs::File;
-use std::path::PathBuf;
+use std::{fs::File, path::PathBuf};
 
 /// Run the `rfd` command.
 pub fn run(args: RfdArgs) -> Result<()> {

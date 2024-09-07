@@ -9,17 +9,15 @@ pub mod expr;
 mod json_pointer;
 mod token;
 
-pub(crate) use crate::policy_exprs::bridge::Tokens;
 use crate::policy_exprs::env::Env;
-pub use crate::policy_exprs::error::Error;
-pub use crate::policy_exprs::error::Result;
-pub use crate::policy_exprs::expr::Expr;
-pub use crate::policy_exprs::expr::Ident;
-pub(crate) use crate::policy_exprs::expr::F64;
-pub use crate::policy_exprs::token::LexingError;
+pub(crate) use crate::policy_exprs::{bridge::Tokens, expr::F64};
+pub use crate::policy_exprs::{
+	error::{Error, Result},
+	expr::{Expr, Ident},
+	token::LexingError,
+};
 use env::Binding;
-pub use expr::parse;
-pub use expr::Primitive;
+pub use expr::{parse, Primitive};
 use json_pointer::process_json_pointers;
 use serde_json::Value;
 use std::ops::Deref;

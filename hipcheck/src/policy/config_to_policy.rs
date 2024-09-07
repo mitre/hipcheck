@@ -4,16 +4,17 @@
 //! This code will eventually be removed once Hipcheck no longer accepts TOML files in lieu of KDL policy files
 //! In the meantime, this code exists so Hipcheck can still run using the older configuration format
 
-use super::policy_file::*;
-use super::PolicyFile;
-use crate::config::{
-	ActivityConfig, AffiliationConfig, AttacksConfig, BinaryConfig, ChurnConfig, CommitConfig,
-	Config, EntropyConfig, FuzzConfig, IdentityConfig, PracticesConfig, ReviewConfig, RiskConfig,
-	TypoConfig,
+use super::{policy_file::*, PolicyFile};
+use crate::{
+	config::{
+		ActivityConfig, AffiliationConfig, AttacksConfig, BinaryConfig, ChurnConfig, CommitConfig,
+		Config, EntropyConfig, FuzzConfig, IdentityConfig, PracticesConfig, ReviewConfig,
+		RiskConfig, TypoConfig,
+	},
+	error::Result,
+	hc_error,
+	plugin::PluginVersion,
 };
-use crate::error::Result;
-use crate::hc_error;
-use crate::plugin::PluginVersion;
 
 use url::Url;
 

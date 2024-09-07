@@ -2,10 +2,11 @@
 
 use crate::error::Error;
 use serde::Serialize;
-use std::fmt;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::path::PathBuf;
+use std::{
+	fmt,
+	fmt::{Display, Formatter},
+	path::PathBuf,
+};
 use url::Url;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

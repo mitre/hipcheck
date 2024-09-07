@@ -1,22 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context as _;
-use crate::data::Dependencies;
-use crate::data::Lang;
-use crate::error::Result;
-use crate::metric::MetricProvider;
-use crate::util::fs as file;
+use crate::{
+	context::Context as _,
+	data::{Dependencies, Lang},
+	error::Result,
+	metric::MetricProvider,
+	util::fs as file,
+};
 use maplit::hashmap;
-use serde::Deserialize;
-use serde::Serialize;
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::convert::AsRef;
-use std::fmt;
-use std::fmt::Display;
-use std::path::Path;
-use std::str;
-use std::sync::Arc;
+use serde::{Deserialize, Serialize};
+use std::{
+	cmp::Ordering, collections::HashMap, convert::AsRef, fmt, fmt::Display, path::Path, str,
+	sync::Arc,
+};
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
 pub struct TypoOutput {
@@ -728,8 +724,7 @@ impl KeyboardLayout {
 
 #[cfg(test)]
 mod test {
-	use super::NameFuzzer;
-	use super::Typo;
+	use super::{NameFuzzer, Typo};
 
 	macro_rules! test_typos {
         ( from: $name:ident, to: $to:literal, expected: [ $( $expected:ident ),* ] ) => {

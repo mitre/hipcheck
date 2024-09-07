@@ -3,25 +3,35 @@
 use super::{
 	plugin_manifest, Plugin, PluginId, PluginManifest, PluginName, PluginPublisher, PluginVersion,
 };
-use crate::cache::plugin_cache::HcPluginCache;
-use crate::context::Context;
-use crate::kdl_helper::{extract_data, ParseKdlNode};
-use crate::plugin::retrieval::{download_plugin, extract_plugin};
-use crate::plugin::supported_arch::SupportedArch;
-use crate::plugin::CURRENT_ARCH;
-use crate::policy::policy_file::PolicyPluginName;
-use crate::string_newtype_parse_kdl_node;
-use crate::util::fs::{find_file_by_name, read_string};
-use crate::util::http::agent::agent;
-use crate::{error::Error, hc_error};
+use crate::{
+	cache::plugin_cache::HcPluginCache,
+	context::Context,
+	error::Error,
+	hc_error,
+	kdl_helper::{extract_data, ParseKdlNode},
+	plugin::{
+		retrieval::{download_plugin, extract_plugin},
+		supported_arch::SupportedArch,
+		CURRENT_ARCH,
+	},
+	policy::policy_file::PolicyPluginName,
+	string_newtype_parse_kdl_node,
+	util::{
+		fs::{find_file_by_name, read_string},
+		http::agent::agent,
+	},
+};
 use fs_extra::dir::remove;
 use kdl::{KdlDocument, KdlNode, KdlValue};
-use std::collections::HashSet;
-use std::fs::File;
-use std::hash::Hash;
-use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
-use std::{fmt::Display, str::FromStr};
+use std::{
+	collections::HashSet,
+	fmt::Display,
+	fs::File,
+	hash::Hash,
+	io::{self, Read, Write},
+	path::{Path, PathBuf},
+	str::FromStr,
+};
 use url::Url;
 
 // NOTE: the implementation in this crate was largely derived from RFD #0004

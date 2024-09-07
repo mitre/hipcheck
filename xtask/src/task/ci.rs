@@ -2,13 +2,9 @@
 
 //! A task to simulate a CI run locally.
 
-use anyhow::anyhow;
-use anyhow::Error;
-use anyhow::Result;
-use std::mem::drop;
-use std::ops::Not as _;
-use xshell::cmd;
-use xshell::Shell;
+use anyhow::{anyhow, Error, Result};
+use std::{mem::drop, ops::Not as _};
+use xshell::{cmd, Shell};
 
 /// Helper type for tasks.
 type Task = (&'static str, fn(&Shell) -> Result<()>);

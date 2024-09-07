@@ -2,19 +2,15 @@
 
 use std::convert::TryInto;
 
-use self::reviews::ResponseData;
-use self::reviews::ReviewsRepositoryPullRequestsNodes as RawPull;
-use self::reviews::Variables;
-use crate::data::github::data::*;
-use crate::error::Error;
-use crate::error::Result;
-use crate::hc_error;
-use crate::util::http::authenticated_agent::AuthenticatedAgent;
-use graphql_client::GraphQLQuery;
-use graphql_client::QueryBody;
-use graphql_client::Response;
-use serde_json::from_value as from_json_value;
-use serde_json::to_value as to_json_value;
+use self::reviews::{ResponseData, ReviewsRepositoryPullRequestsNodes as RawPull, Variables};
+use crate::{
+	data::github::data::*,
+	error::{Error, Result},
+	hc_error,
+	util::http::authenticated_agent::AuthenticatedAgent,
+};
+use graphql_client::{GraphQLQuery, QueryBody, Response};
+use serde_json::{from_value as from_json_value, to_value as to_json_value};
 
 /// The URL of the GitHub GraphQL API.
 const GH_API_V4: &str = "https://api.github.com/graphql";

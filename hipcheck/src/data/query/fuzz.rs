@@ -3,11 +3,11 @@
 //! Query group for fuzzing checks.
 
 use super::github::GitHubProvider;
-use crate::config::ConfigSource;
-use crate::data::get_fuzz_check;
-use crate::data::Fuzz;
-use crate::error::Error;
-use crate::error::Result;
+use crate::{
+	config::ConfigSource,
+	data::{get_fuzz_check, Fuzz},
+	error::{Error, Result},
+};
 
 /// A query that provides a fuzz check
 #[salsa::query_group(FuzzProviderStorage)]

@@ -23,9 +23,10 @@ macro_rules! hash {
 #[cfg(test)]
 mod tests {
 	use crate::hash;
-	use std::collections::hash_map::DefaultHasher;
-	use std::hash::Hash;
-	use std::hash::Hasher;
+	use std::{
+		collections::hash_map::DefaultHasher,
+		hash::{Hash, Hasher},
+	};
 
 	#[test]
 	fn it_works() {

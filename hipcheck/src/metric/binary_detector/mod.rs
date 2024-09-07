@@ -4,25 +4,19 @@ mod query;
 
 pub use query::*;
 
-use crate::context::Context;
-use crate::error::Result;
-use crate::hc_error;
-use crate::util::fs::read_toml;
-use content_inspector::inspect;
-use content_inspector::ContentType;
-use serde::de::Visitor;
-use serde::Deserialize;
-use serde::Deserializer;
-use std::fmt;
-use std::fmt::Formatter;
-use std::fs::File;
-use std::io::prelude::Read;
-use std::io::BufReader;
-use std::path::Path;
-use std::result::Result as StdResult;
-use std::sync::Arc;
-use walkdir::DirEntry;
-use walkdir::WalkDir;
+use crate::{context::Context, error::Result, hc_error, util::fs::read_toml};
+use content_inspector::{inspect, ContentType};
+use serde::{de::Visitor, Deserialize, Deserializer};
+use std::{
+	fmt,
+	fmt::Formatter,
+	fs::File,
+	io::{prelude::Read, BufReader},
+	path::Path,
+	result::Result as StdResult,
+	sync::Arc,
+};
+use walkdir::{DirEntry, WalkDir};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct BinaryFileDetector {

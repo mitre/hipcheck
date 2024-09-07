@@ -1,23 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use self::review::ResponseData;
-use self::review::ReviewRepositoryPullRequest as RawPull;
-use self::review::ReviewRepositoryPullRequestCommitsNodes as RawPullCommit;
-use self::review::Variables;
-use crate::context::Context;
-use crate::data::git::Contributor;
-use crate::data::git::RawCommit;
-use crate::data::github::data::*;
-use crate::error::Error;
-use crate::error::Result;
-use crate::hc_error;
-use crate::util::http::authenticated_agent::AuthenticatedAgent;
+use self::review::{
+	ResponseData, ReviewRepositoryPullRequest as RawPull,
+	ReviewRepositoryPullRequestCommitsNodes as RawPullCommit, Variables,
+};
+use crate::{
+	context::Context,
+	data::{
+		git::{Contributor, RawCommit},
+		github::data::*,
+	},
+	error::{Error, Result},
+	hc_error,
+	util::http::authenticated_agent::AuthenticatedAgent,
+};
 use chrono::DateTime;
-use graphql_client::GraphQLQuery;
-use graphql_client::QueryBody;
-use graphql_client::Response;
-use serde_json::from_value as from_json_value;
-use serde_json::to_value as to_json_value;
+use graphql_client::{GraphQLQuery, QueryBody, Response};
+use serde_json::{from_value as from_json_value, to_value as to_json_value};
 use std::convert::TryFrom;
 
 /// The URL of the GitHub GraphQL API.

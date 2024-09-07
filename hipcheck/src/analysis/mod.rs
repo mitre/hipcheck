@@ -4,25 +4,23 @@ pub mod report_builder;
 pub mod result;
 pub mod score;
 
-use crate::config::AttacksConfigQuery;
-use crate::config::CommitConfigQuery;
-use crate::config::PracticesConfigQuery;
-use crate::data::git::GitProvider;
-use crate::error::Error;
-use crate::error::Result;
-use crate::metric::affiliation::AffiliatedType;
-use crate::metric::MetricProvider;
-use crate::plugin::QueryResult;
-use crate::report::Concern;
-use crate::F64;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::default::Default;
-use std::fmt;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::ops::Not;
-use std::sync::Arc;
+use crate::{
+	config::{AttacksConfigQuery, CommitConfigQuery, PracticesConfigQuery},
+	data::git::GitProvider,
+	error::{Error, Result},
+	metric::{affiliation::AffiliatedType, MetricProvider},
+	plugin::QueryResult,
+	report::Concern,
+	F64,
+};
+use std::{
+	collections::{HashMap, HashSet},
+	default::Default,
+	fmt,
+	fmt::{Display, Formatter},
+	ops::Not,
+	sync::Arc,
+};
 
 /// Queries about analyses
 #[salsa::query_group(AnalysisProviderStorage)]

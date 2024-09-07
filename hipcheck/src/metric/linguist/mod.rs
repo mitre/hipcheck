@@ -4,17 +4,9 @@ mod query;
 
 pub use query::*;
 
-use crate::context::Context as _;
-use crate::error::Result;
-use crate::util::fs::read_toml;
-use serde::de::Visitor;
-use serde::Deserialize;
-use serde::Deserializer;
-use std::convert::AsRef;
-use std::fmt;
-use std::fmt::Formatter;
-use std::path::Path;
-use std::result::Result as StdResult;
+use crate::{context::Context as _, error::Result, util::fs::read_toml};
+use serde::{de::Visitor, Deserialize, Deserializer};
+use std::{convert::AsRef, fmt, fmt::Formatter, path::Path, result::Result as StdResult};
 
 /// Detects whether a file name is a likely source code file.
 #[derive(Debug, PartialEq, Eq)]

@@ -3,19 +3,16 @@
 //! Query group for GitHub pull request reviews.
 
 use super::github::GitHubProvider;
-use crate::config::ConfigSource;
-use crate::context::Context;
-use crate::data::get_pull_request_reviews_from_github;
-use crate::data::get_single_pull_request_review_from_github;
-use crate::data::git::Commit;
-use crate::data::git::CommitContributorView;
-use crate::data::git::CommitDiff;
-use crate::data::git::Contributor;
-use crate::data::git::ContributorView;
-use crate::data::PullRequest;
-use crate::data::SinglePullRequest;
-use crate::error::Error;
-use crate::error::Result;
+use crate::{
+	config::ConfigSource,
+	context::Context,
+	data::{
+		get_pull_request_reviews_from_github, get_single_pull_request_review_from_github,
+		git::{Commit, CommitContributorView, CommitDiff, Contributor, ContributorView},
+		PullRequest, SinglePullRequest,
+	},
+	error::{Error, Result},
+};
 use std::sync::Arc;
 
 /// A query that provides GitHub pull request reviews

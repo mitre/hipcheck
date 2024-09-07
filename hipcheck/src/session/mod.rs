@@ -4,65 +4,53 @@ pub mod cyclone_dx;
 pub mod pm;
 pub mod spdx;
 
-use crate::analysis::score::ScoringProviderStorage;
-use crate::analysis::AnalysisProviderStorage;
-use crate::cache::plugin_cache::HcPluginCache;
-use crate::cli::Format;
-use crate::command_util::DependentProgram;
-use crate::config::AttacksConfigQueryStorage;
-use crate::config::CommitConfigQueryStorage;
-use crate::config::Config;
-use crate::config::ConfigSource;
-use crate::config::ConfigSourceStorage;
-use crate::config::LanguagesConfigQueryStorage;
-use crate::config::PracticesConfigQueryStorage;
-use crate::config::RiskConfigQueryStorage;
-use crate::config::WeightTreeQueryStorage;
-use crate::context::Context as _;
-use crate::data::git::get_git_version;
-use crate::data::git::GitProviderStorage;
-use crate::data::npm::get_npm_version;
-use crate::data::CodeQualityProviderStorage;
-use crate::data::DependenciesProviderStorage;
-use crate::data::FuzzProviderStorage;
-use crate::data::GitHubProviderStorage;
-use crate::data::ModuleProvider;
-use crate::data::ModuleProviderStorage;
-use crate::data::PullRequestReviewProviderStorage;
-use crate::engine::start_plugins;
-use crate::engine::HcEngine;
-use crate::engine::HcEngineStorage;
-use crate::error::Error;
-use crate::error::Result;
-use crate::hc_error;
-use crate::metric::binary_detector::BinaryFileStorage;
-use crate::metric::linguist::LinguistStorage;
-use crate::metric::MetricProviderStorage;
-use crate::policy::{config_to_policy::config_to_policy, PolicyFile};
-use crate::report::ReportParams;
-use crate::report::ReportParamsStorage;
-use crate::session::cyclone_dx::extract_cyclonedx_download_url;
-use crate::session::pm::detect_and_extract;
-use crate::session::pm::extract_repo_for_maven;
-use crate::session::spdx::extract_spdx_download_url;
-use crate::shell::spinner_phase::SpinnerPhase;
-use crate::shell::Shell;
-use crate::source;
-use crate::source::SourceQuery;
-use crate::source::SourceQueryStorage;
-use crate::target::SbomStandard;
-use crate::target::{Target, TargetSeed, TargetSeedKind};
-use crate::version::VersionQuery;
-use crate::version::VersionQueryStorage;
+use crate::{
+	analysis::{score::ScoringProviderStorage, AnalysisProviderStorage},
+	cache::plugin_cache::HcPluginCache,
+	cli::Format,
+	command_util::DependentProgram,
+	config::{
+		AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource,
+		ConfigSourceStorage, LanguagesConfigQueryStorage, PracticesConfigQueryStorage,
+		RiskConfigQueryStorage, WeightTreeQueryStorage,
+	},
+	context::Context as _,
+	data::{
+		git::{get_git_version, GitProviderStorage},
+		npm::get_npm_version,
+		CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
+		GitHubProviderStorage, ModuleProvider, ModuleProviderStorage,
+		PullRequestReviewProviderStorage,
+	},
+	engine::{start_plugins, HcEngine, HcEngineStorage},
+	error::{Error, Result},
+	hc_error,
+	metric::{
+		binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,
+	},
+	policy::{config_to_policy::config_to_policy, PolicyFile},
+	report::{ReportParams, ReportParamsStorage},
+	session::{
+		cyclone_dx::extract_cyclonedx_download_url,
+		pm::{detect_and_extract, extract_repo_for_maven},
+		spdx::extract_spdx_download_url,
+	},
+	shell::{spinner_phase::SpinnerPhase, Shell},
+	source,
+	source::{SourceQuery, SourceQueryStorage},
+	target::{SbomStandard, Target, TargetSeed, TargetSeedKind},
+	version::{VersionQuery, VersionQueryStorage},
+};
 use chrono::prelude::*;
 use dotenv::var;
-use std::fmt;
-use std::path::Path;
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::result::Result as StdResult;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+	fmt,
+	path::{Path, PathBuf},
+	rc::Rc,
+	result::Result as StdResult,
+	sync::Arc,
+	time::Duration,
+};
 use url::Url;
 
 /// Immutable configuration and base data for a run of Hipcheck.

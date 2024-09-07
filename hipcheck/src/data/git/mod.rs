@@ -8,9 +8,8 @@ pub use data::*;
 use parse::*;
 pub use query::*;
 
-use crate::context::Context as _;
 pub use crate::data::git_command::*;
-use crate::error::Result;
+use crate::{context::Context as _, error::Result};
 use std::path::Path;
 
 pub fn get_git_version() -> Result<String> {

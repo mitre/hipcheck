@@ -2,19 +2,17 @@
 
 //! Git related types and implementations for pulling/cloning source repos.
 
-use crate::error::{Error as HcError, Result as HcResult};
-use crate::shell::verbosity::Verbosity;
 use crate::{
 	context::Context,
-	shell::{progress_phase::ProgressPhase, Shell},
+	error::{Error as HcError, Result as HcResult},
+	shell::{progress_phase::ProgressPhase, verbosity::Verbosity, Shell},
 };
 use console::Term;
 use git2::{
 	build::{CheckoutBuilder, RepoBuilder},
 	AnnotatedCommit, Branch, FetchOptions, Progress, Reference, RemoteCallbacks, Repository,
 };
-use std::io::Write;
-use std::{cell::OnceCell, path::Path};
+use std::{cell::OnceCell, io::Write, path::Path};
 use url::Url;
 
 /// Construct the remote callbacks object uesd when making callinging into [git2].

@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::hipcheck::ExplainDefaultQueryRequest;
-use crate::plugin::PluginName;
-use crate::policy::policy_file::PolicyPluginName;
 use crate::{
 	hc_error,
 	hipcheck::{
 		plugin_service_client::PluginServiceClient, ConfigurationStatus, Empty,
-		GetDefaultPolicyExpressionRequest, GetQuerySchemasRequest,
+		ExplainDefaultQueryRequest, GetDefaultPolicyExpressionRequest, GetQuerySchemasRequest,
 		GetQuerySchemasResponse as PluginSchema, InitiateQueryProtocolRequest,
 		InitiateQueryProtocolResponse, Query as PluginQuery, QueryState, SetConfigurationRequest,
 		SetConfigurationResponse as PluginConfigResult,
 	},
+	plugin::PluginName,
+	policy::policy_file::PolicyPluginName,
 	Error, Result,
 };
 use futures::{Stream, StreamExt};

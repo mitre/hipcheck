@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context as _;
-use crate::data::ModuleGraph;
-use crate::error::Result;
-use crate::metric::MetricProvider;
+use crate::{context::Context as _, data::ModuleGraph, error::Result, metric::MetricProvider};
 use serde::Serialize;
 use std::sync::Arc;
 

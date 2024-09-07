@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context as _;
-use crate::error::Result;
-use crate::hc_error;
+use crate::{context::Context as _, error::Result, hc_error};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use semver::Version;
-use std::collections::HashMap;
-use std::convert::AsRef;
-use std::env;
-use std::ffi::OsStr;
-use std::fmt;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::iter::IntoIterator;
+use std::{
+	collections::HashMap,
+	convert::AsRef,
+	env,
+	ffi::OsStr,
+	fmt,
+	fmt::{Display, Formatter},
+	iter::IntoIterator,
+};
 
 use DependentProgram::*;
 

@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use crate::data::es_lint::data::ESLintMessage;
-use crate::data::es_lint::data::ESLintReports;
-use crate::data::es_lint::get_eslint_reports;
-use crate::error::Result;
-use crate::hc_error;
+use crate::{
+	data::es_lint::{
+		data::{ESLintMessage, ESLintReports},
+		get_eslint_reports,
+	},
+	error::Result,
+	hc_error,
+};
 
 pub type CodeQualityReport = Vec<FileFindings>;
 

@@ -1,16 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::policy_exprs::eval;
-use crate::policy_exprs::Error;
-use crate::policy_exprs::Expr;
-use crate::policy_exprs::Ident;
-use crate::policy_exprs::Primitive;
-use crate::policy_exprs::Result;
-use crate::policy_exprs::F64;
+use crate::policy_exprs::{eval, Error, Expr, Ident, Primitive, Result, F64};
 use itertools::Itertools as _;
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::ops::Not as _;
+use std::{cmp::Ordering, collections::HashMap, ops::Not as _};
 use Expr::*;
 use Primitive::*;
 

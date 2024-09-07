@@ -10,12 +10,13 @@
 //! which error out aren't retried, as it always compares as equal to
 //! any other error.
 
-use std::borrow::Cow;
-use std::error::Error as StdError;
-use std::fmt;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::sync::Arc;
+use std::{
+	borrow::Cow,
+	error::Error as StdError,
+	fmt,
+	fmt::{Debug, Display},
+	sync::Arc,
+};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

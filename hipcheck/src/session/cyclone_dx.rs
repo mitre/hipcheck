@@ -4,10 +4,12 @@
 
 use std::str::FromStr;
 
-use crate::context::Context as _;
-use crate::error::Result;
-use crate::hc_error;
-use crate::session::pm::{extract_repo_for_maven, extract_repo_for_npm, extract_repo_for_pypi};
+use crate::{
+	context::Context as _,
+	error::Result,
+	hc_error,
+	session::pm::{extract_repo_for_maven, extract_repo_for_npm, extract_repo_for_pypi},
+};
 use cyclonedx_bom::prelude::*;
 use packageurl::PackageUrl;
 use url::Url;

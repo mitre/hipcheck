@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use chrono::DateTime;
-use chrono::FixedOffset;
-use serde::Deserialize;
-use serde::Serialize;
-use std::fmt;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::sync::Arc;
+use chrono::{DateTime, FixedOffset};
+use serde::{Deserialize, Serialize};
+use std::{
+	fmt,
+	fmt::{Display, Formatter},
+	sync::Arc,
+};
 
 /// Commits as they come directly out of `git log`.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]

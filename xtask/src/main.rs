@@ -4,8 +4,7 @@ mod task;
 mod workspace;
 
 use clap::Parser as _;
-use clap_verbosity_flag::InfoLevel;
-use clap_verbosity_flag::Verbosity;
+use clap_verbosity_flag::{InfoLevel, Verbosity};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
