@@ -187,6 +187,13 @@ impl FailingAnalysis {
 					return Err(hc_error!("typo analysis results include non-typo concerns"));
 				}
 			}
+			Analysis::Plugin { .. } => {
+				if concerns.iter().all(Concern::is_plugin_concern).not() {
+					return Err(hc_error!(
+						"plugin analysis results include non-plugin concerns",
+					));
+				}
+			}
 		}
 
 		Ok(FailingAnalysis { analysis, concerns })
@@ -335,7 +342,7 @@ impl From<&(dyn std::error::Error + 'static)> for ErrorReport {
 }
 
 /// An analysis, with score and threshold.
-#[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
+#[derive(Debug, Serialize, JsonSchema, Clone)]
 #[serde(tag = "analysis")]
 #[schemars(crate = "schemars")]
 pub enum Analysis {
@@ -383,6 +390,24 @@ pub enum Analysis {
 	Typo {
 		#[serde(flatten)]
 		scoring: Count,
+	},
+	#[allow(unused)]
+	/// Plugin analysis.
+	Plugin {
+		/// The name of the plugin.
+		name: String,
+		/// If the analysis is passing or not.
+		///
+		/// Same as with the message, this is computed eagerly in the case of
+		/// plugin analyses.
+		is_passing: bool,
+		/// The policy expression used for the plugin.
+		///
+		/// We use this when printing the result to help explain to the user
+		/// *why* an analysis failed.
+		policy_expr: String,
+		/// The default query explanation pulled from RPC with the plugin.
+		message: String,
 	},
 }
 
@@ -436,7 +461,7 @@ impl Analysis {
 	percent_constructor!(review);
 
 	/// Get the name of the analysis, for printing.
-	pub fn name(&self) -> &'static str {
+	pub fn name(&self) -> &str {
 		match self {
 			Analysis::Activity { .. } => "activity",
 			Analysis::Affiliation { .. } => "affiliation",
@@ -447,6 +472,7 @@ impl Analysis {
 			Analysis::Review { .. } => "review",
 			Analysis::Fuzz { .. } => "fuzz",
 			Analysis::Typo { .. } => "typo",
+			Analysis::Plugin { name, .. } => name,
 		}
 	}
 
@@ -481,9 +507,14 @@ impl Analysis {
 			| Review {
 				scoring: Percent { value, threshold },
 			} => value <= threshold,
+			Plugin { is_passing, .. } => *is_passing,
 		}
 	}
 
+	/// Indicates if the analysis will print concerns.
+	///
+	/// Currently, we suppress concerns if an analysis passes,
+	/// and this is the method that implements that suppression.
 	pub fn permits_some_concerns(&self) -> bool {
 		use Analysis::*;
 
@@ -513,72 +544,75 @@ impl Analysis {
 			| Review {
 				scoring: Percent { threshold, .. },
 			} => *threshold != 0.0,
+			// Don't suppress concerns for plugins.
+			Plugin { .. } => true,
 		}
 	}
 
 	pub fn statement(&self) -> String {
 		use Analysis::*;
 
-		String::from(match self {
+		match self {
 			Activity { .. } => {
 				if self.is_passing() {
-					"has been updated recently"
+					"has been updated recently".to_string()
 				} else {
-					"hasn't been updated recently"
+					"hasn't been updated recently".to_string()
 				}
 			}
 			Affiliation { .. } => match (self.is_passing(), self.permits_some_concerns()) {
-				(true, true) => "few concerning contributors",
-				(true, false) => "no concerning contributors",
-				(false, true) => "too many concerning contributors",
-				(false, false) => "has concerning contributors",
+				(true, true) => "few concerning contributors".to_string(),
+				(true, false) => "no concerning contributors".to_string(),
+				(false, true) => "too many concerning contributors".to_string(),
+				(false, false) => "has concerning contributors".to_string(),
 			},
 			Binary { .. } => match (self.is_passing(), self.permits_some_concerns()) {
-				(true, true) => "few concerning binary files",
-				(true, false) => "no concerning binary files",
-				(false, true) => "too many concerning binary files",
-				(false, false) => "has concerning binary files",
+				(true, true) => "few concerning binary files".to_string(),
+				(true, false) => "no concerning binary files".to_string(),
+				(false, true) => "too many concerning binary files".to_string(),
+				(false, false) => "has concerning binary files".to_string(),
 			},
 			Churn { .. } => match (self.is_passing(), self.permits_some_concerns()) {
-				(true, true) => "few unusually large commits",
-				(true, false) => "no unusually large commits",
-				(false, true) => "too many unusually large commits",
-				(false, false) => "has unusually large commits",
+				(true, true) => "few unusually large commits".to_string(),
+				(true, false) => "no unusually large commits".to_string(),
+				(false, true) => "too many unusually large commits".to_string(),
+				(false, false) => "has unusually large commits".to_string(),
 			},
 			Entropy { .. } => match (self.is_passing(), self.permits_some_concerns()) {
-				(true, true) => "few unusual-looking commits",
-				(true, false) => "no unusual-looking commits",
-				(false, true) => "too many unusual-looking commits",
-				(false, false) => "has unusual-looking commits",
+				(true, true) => "few unusual-looking commits".to_string(),
+				(true, false) => "no unusual-looking commits".to_string(),
+				(false, true) => "too many unusual-looking commits".to_string(),
+				(false, false) => "has unusual-looking commits".to_string(),
 			},
 			Identity { .. } => {
 				if self.is_passing() {
-					"commits often applied by person besides the author"
+					"commits often applied by person besides the author".to_string()
 				} else {
-					"commits too often applied by the author"
+					"commits too often applied by the author".to_string()
 				}
 			}
 			Fuzz { .. } => {
 				if self.is_passing() {
-					"repository receives regular fuzz testing"
+					"repository receives regular fuzz testing".to_string()
 				} else {
-					"repository does not receive regular fuzz testing"
+					"repository does not receive regular fuzz testing".to_string()
 				}
 			}
 			Review { .. } => {
 				if self.is_passing() {
-					"change requests often receive approving review prior to merge"
+					"change requests often receive approving review prior to merge".to_string()
 				} else {
-					"change requests often lack approving review prior to merge"
+					"change requests often lack approving review prior to merge".to_string()
 				}
 			}
 			Typo { .. } => match (self.is_passing(), self.permits_some_concerns()) {
-				(true, true) => "few concerning dependency names",
-				(true, false) => "no concerning dependency names",
-				(false, true) => "too many concerning dependency names",
-				(false, false) => "has concerning dependency names",
+				(true, true) => "few concerning dependency names".to_string(),
+				(true, false) => "no concerning dependency names".to_string(),
+				(false, true) => "too many concerning dependency names".to_string(),
+				(false, false) => "has concerning dependency names".to_string(),
 			},
-		})
+			Plugin { policy_expr, .. } => format!("failed to meet policy: ({policy_expr})"),
+		}
 	}
 
 	pub fn explanation(&self) -> String {
@@ -634,6 +668,7 @@ impl Analysis {
 				"{} concerning dependencies found, {} permitted",
 				value, threshold
 			),
+			Plugin { message, .. } => message.clone(),
 		}
 	}
 }
