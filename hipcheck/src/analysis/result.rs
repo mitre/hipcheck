@@ -18,6 +18,7 @@ pub struct HCAnalysisReport {
 	pub concerns: Vec<Concern>,
 }
 impl HCAnalysisReport {
+	#[allow(unused)]
 	pub fn generic_error(error: crate::error::Error, concerns: Vec<Concern>) -> Self {
 		HCAnalysisReport {
 			outcome: HCAnalysisOutcome::Error(HCAnalysisError::Generic(error)),
@@ -26,6 +27,7 @@ impl HCAnalysisReport {
 	}
 }
 
+#[allow(unused)]
 /// Represents the result of a hipcheck analysis. Either the analysis encountered
 /// an error, or it completed and returned a value.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -49,6 +51,7 @@ impl From<HCAnalysisError> for crate::error::Error {
 	}
 }
 
+#[allow(unused)]
 /// A Hipcheck analysis may return a basic or composite value. By splitting the types
 /// into two sub-enums under this one, we can eschew a recursive enum definition and
 /// ensure composite types only have a depth of one.
@@ -112,6 +115,7 @@ impl Display for HCBasicValue {
 	}
 }
 
+#[allow(unused)]
 /// Composite Hipcheck analysis return types
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HCCompositeValue {
@@ -124,6 +128,7 @@ pub trait HCPredicate: Display + std::fmt::Debug {
 	fn pass(&self) -> Result<bool>;
 }
 
+#[allow(unused)]
 pub struct ThresholdSpec {
 	pub threshold: HCBasicValue,
 	pub units: Option<String>,
@@ -139,7 +144,9 @@ pub struct ThresholdPredicate {
 	units: String,
 	pub ordering: Ordering,
 }
+
 impl ThresholdPredicate {
+	#[allow(unused)]
 	pub fn new(
 		value: HCBasicValue,
 		threshold: HCBasicValue,
@@ -166,6 +173,7 @@ fn pass_threshold<T: Ord>(a: &T, b: &T, ord: Ordering) -> bool {
 }
 
 impl ThresholdPredicate {
+	#[allow(unused)]
 	pub fn from_analysis(
 		report: &HCAnalysisReport,
 		threshold: HCBasicValue,

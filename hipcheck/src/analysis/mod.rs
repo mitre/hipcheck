@@ -4,7 +4,6 @@ pub mod report_builder;
 pub mod result;
 pub mod score;
 
-use crate::analysis::result::*;
 use crate::config::AttacksConfigQuery;
 use crate::config::CommitConfigQuery;
 use crate::config::PracticesConfigQuery;
@@ -12,12 +11,10 @@ use crate::data::git::GitProvider;
 use crate::error::Error;
 use crate::error::Result;
 use crate::metric::affiliation::AffiliatedType;
-use crate::metric::affiliation::Affiliation;
 use crate::metric::MetricProvider;
 use crate::plugin::QueryResult;
 use crate::report::Concern;
 use crate::F64;
-use serde::Serialize;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::default::Default;
@@ -60,6 +57,7 @@ pub trait AnalysisProvider:
 	fn typo_analysis(&self) -> Result<QueryResult>;
 }
 
+#[allow(unused)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum AnalysisReport {
 	/// Affiliation analysis result.
@@ -129,6 +127,7 @@ impl Default for AnalysisReport {
 	}
 }
 
+#[allow(unused)]
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub enum AnalysisOutcome {
 	#[default]
@@ -297,8 +296,6 @@ pub fn typo_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
 	// @Note - policy expr json injection does not support string/obj as array elts
 	let value = results.typos.iter().map(|_| true).collect::<Vec<bool>>();
 
-	let num_flagged = results.typos.len() as u64;
-
 	let concerns: Vec<String> = results
 		.typos
 		.iter()
@@ -313,6 +310,7 @@ pub fn typo_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
 	})
 }
 
+#[allow(unused)]
 fn score_by_threshold<T: PartialOrd>(value: T, threshold: T) -> i64 {
 	if value > threshold {
 		1
@@ -321,6 +319,7 @@ fn score_by_threshold<T: PartialOrd>(value: T, threshold: T) -> i64 {
 	}
 }
 
+#[allow(unused)]
 fn score_by_threshold_reversed<T: PartialOrd>(value: T, threshold: T) -> i64 {
 	if value >= threshold {
 		0

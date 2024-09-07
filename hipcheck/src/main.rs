@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#[allow(unused)]
 mod analysis;
 #[cfg(feature = "benchmarking")]
 mod benchmarking;

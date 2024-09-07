@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::hipcheck::ExplainDefaultQueryRequest;
 use crate::plugin::PluginName;
 use crate::policy::policy_file::PolicyPluginName;
 use crate::{
@@ -198,6 +199,21 @@ impl PluginContext {
 		} else {
 			Some(raw_expr)
 		})
+	}
+
+	pub async fn explain_default_query(&mut self) -> Result<Option<String>> {
+		let req = ExplainDefaultQueryRequest {
+			empty: Some(Empty {}),
+		};
+
+		let res = &self.grpc.explain_default_query(req).await?;
+		let explanation = &res.get_ref().explanation;
+
+		if explanation.is_empty() {
+			Ok(None)
+		} else {
+			Ok(Some(explanation.clone()))
+		}
 	}
 
 	pub async fn initiate_query_protocol(
