@@ -3,9 +3,9 @@
 use crate::{
 	error::Error,
 	hc_error,
-	kdl_helper::{extract_data, ParseKdlNode},
 	plugin::supported_arch::SupportedArch,
 	string_newtype_parse_kdl_node,
+	util::kdl::{extract_data, ParseKdlNode},
 };
 use core::panic;
 use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};

@@ -11,8 +11,8 @@ mod types;
 pub use crate::plugin::{manager::*, plugin_id::PluginId, types::*};
 use crate::{
 	error::{Context, Result},
-	kdl_helper::{extract_data, ParseKdlNode},
 	policy::policy_file::PolicyPluginName,
+	util::kdl::{extract_data, ParseKdlNode},
 };
 pub use download_manifest::{
 	ArchiveFormat, DownloadManifest, DownloadManifestEntry, HashAlgorithm, HashWithDigest,

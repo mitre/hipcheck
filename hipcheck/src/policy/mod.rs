@@ -9,9 +9,9 @@ mod tests;
 use crate::{
 	error::Result,
 	hc_error,
-	kdl_helper::extract_data,
 	policy::policy_file::{PolicyAnalyze, PolicyPluginList},
 	util::fs as file,
+	util::kdl::extract_data,
 };
 use kdl::KdlDocument;
 use std::{collections::HashMap, path::Path, str::FromStr};

@@ -7,7 +7,6 @@ use crate::{
 	cache::plugin_cache::HcPluginCache,
 	error::{Context, Error},
 	hc_error,
-	kdl_helper::{extract_data, ParseKdlNode},
 	plugin::{
 		retrieval::{download_plugin, extract_plugin},
 		supported_arch::SupportedArch,
@@ -15,6 +14,7 @@ use crate::{
 	},
 	policy::policy_file::PolicyPluginName,
 	string_newtype_parse_kdl_node,
+	util::kdl::{extract_data, ParseKdlNode},
 	util::{
 		fs::{find_file_by_name, read_string},
 		http::agent::agent,
