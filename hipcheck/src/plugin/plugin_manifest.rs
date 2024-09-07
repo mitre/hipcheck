@@ -7,14 +7,8 @@ use crate::{
 	string_newtype_parse_kdl_node,
 	util::kdl::{extract_data, ParseKdlNode},
 };
-use core::panic;
-use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};
-use petgraph::graphmap::NeighborsDirected;
-use std::{
-	collections::HashMap,
-	fmt::{write, Display},
-	str::FromStr,
-};
+use kdl::{KdlDocument, KdlNode};
+use std::{collections::HashMap, str::FromStr};
 
 // NOTE: the implementation in this crate was largely derived from RFD #4
 
@@ -49,6 +43,7 @@ impl Entrypoints {
 		}
 	}
 
+	#[allow(unused)]
 	pub fn iter(&self) -> impl Iterator<Item = (&SupportedArch, &String)> {
 		self.0.iter()
 	}
@@ -76,7 +71,7 @@ impl ParseKdlNode for Entrypoints {
 				.value()
 				.as_string()?
 				.to_string();
-			if let Err(e) = entrypoints.insert(arch, entrypoint) {
+			if let Err(_e) = entrypoints.insert(arch, entrypoint) {
 				log::error!("Duplicate entrypoint detected for [{}]", arch);
 				return None;
 			}
@@ -95,6 +90,7 @@ pub struct PluginDependency {
 }
 
 impl PluginDependency {
+	#[allow(unused)]
 	pub fn new(
 		publisher: PluginPublisher,
 		name: PluginName,
@@ -156,6 +152,7 @@ impl PluginDependencyList {
 		Self(Vec::new())
 	}
 
+	#[allow(unused)]
 	pub fn with_capacity(capacity: usize) -> Self {
 		Self(Vec::with_capacity(capacity))
 	}
@@ -164,6 +161,7 @@ impl PluginDependencyList {
 		self.0.push(dependency);
 	}
 
+	#[allow(unused)]
 	pub fn pop(&mut self) -> Option<PluginDependency> {
 		self.0.pop()
 	}
@@ -212,7 +210,7 @@ impl FromStr for PluginManifest {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let document = KdlDocument::from_str(s)
-			.map_err(|e| hc_error!("Error parsing plugin manifest file: {e}"))?;
+			.map_err(|e| hc_error!("Error parsing plugin manifest file: {}", e))?;
 		let nodes = document.nodes();
 
 		let publisher: PluginPublisher =
@@ -323,22 +321,30 @@ mod test {
 }"#;
 		let node = KdlNode::from_str(multiple_entrypoint).unwrap();
 		let mut expected = Entrypoints::new();
-		expected.insert(
-			SupportedArch::Aarch64AppleDarwin,
-			"./hc-mitre-affiliation".to_owned(),
-		);
-		expected.insert(
-			SupportedArch::X86_64AppleDarwin,
-			"./hc-mitre-affiliation".to_owned(),
-		);
-		expected.insert(
-			SupportedArch::X86_64UnknownLinuxGnu,
-			"./hc-mitre-affiliation".to_owned(),
-		);
-		expected.insert(
-			SupportedArch::X86_64PcWindowsMsvc,
-			"./hc-mitre-affiliation".to_owned(),
-		);
+		expected
+			.insert(
+				SupportedArch::Aarch64AppleDarwin,
+				"./hc-mitre-affiliation".to_owned(),
+			)
+			.unwrap();
+		expected
+			.insert(
+				SupportedArch::X86_64AppleDarwin,
+				"./hc-mitre-affiliation".to_owned(),
+			)
+			.unwrap();
+		expected
+			.insert(
+				SupportedArch::X86_64UnknownLinuxGnu,
+				"./hc-mitre-affiliation".to_owned(),
+			)
+			.unwrap();
+		expected
+			.insert(
+				SupportedArch::X86_64PcWindowsMsvc,
+				"./hc-mitre-affiliation".to_owned(),
+			)
+			.unwrap();
 		assert_eq!(Entrypoints::parse_node(&node).unwrap(), expected)
 	}
 
@@ -415,22 +421,30 @@ dependencies {
 		let plugin_manifest = PluginManifest::from_str(file_contents).unwrap();
 
 		let mut entrypoints = Entrypoints::new();
-		entrypoints.insert(
-			SupportedArch::Aarch64AppleDarwin,
-			"./hc-mitre-affiliation".to_owned(),
-		);
-		entrypoints.insert(
-			SupportedArch::X86_64AppleDarwin,
-			"./hc-mitre-affiliation".to_owned(),
-		);
-		entrypoints.insert(
-			SupportedArch::X86_64UnknownLinuxGnu,
-			"./hc-mitre-affiliation".to_owned(),
-		);
-		entrypoints.insert(
-			SupportedArch::X86_64PcWindowsMsvc,
-			"./hc-mitre-affiliation".to_owned(),
-		);
+		entrypoints
+			.insert(
+				SupportedArch::Aarch64AppleDarwin,
+				"./hc-mitre-affiliation".to_owned(),
+			)
+			.unwrap();
+		entrypoints
+			.insert(
+				SupportedArch::X86_64AppleDarwin,
+				"./hc-mitre-affiliation".to_owned(),
+			)
+			.unwrap();
+		entrypoints
+			.insert(
+				SupportedArch::X86_64UnknownLinuxGnu,
+				"./hc-mitre-affiliation".to_owned(),
+			)
+			.unwrap();
+		entrypoints
+			.insert(
+				SupportedArch::X86_64PcWindowsMsvc,
+				"./hc-mitre-affiliation".to_owned(),
+			)
+			.unwrap();
 
 		let mut dependencies = PluginDependencyList::new();
 		dependencies.push(PluginDependency::new(

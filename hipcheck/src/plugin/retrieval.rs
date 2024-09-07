@@ -1,26 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{DownloadManifest, PluginId, PluginName};
+use super::{DownloadManifest, PluginId};
 use crate::{
 	cache::plugin_cache::HcPluginCache,
 	config::MITRE_PUBLISHER,
 	error::Error,
 	hc_error,
 	plugin::{ArchiveFormat, HashAlgorithm, HashWithDigest},
-	policy::policy_file::{PolicyPlugin, PolicyPluginName},
+	policy::policy_file::PolicyPlugin,
 	util::http::agent::agent,
 };
 use flate2::read::GzDecoder;
 use std::{
 	collections::HashSet,
 	fs::File,
-	io::{Read, Seek, Write},
+	io::{Read, Write},
 	path::{Path, PathBuf},
 };
 use tar::Archive;
 use url::Url;
 use xz2::read::XzDecoder;
-use zip_extensions::{zip_extract, ZipArchiveExtensions};
 
 /// download, verify and unpack all of the plugins specified in a Policy file, as well as all of their dependencies
 pub fn retrieve_plugins(
@@ -30,7 +29,7 @@ pub fn retrieve_plugins(
 	let mut download_plugins = HashSet::new();
 
 	for policy_plugin in policy_plugins.iter() {
-		/// TODO: while the legacy passes are still integrated in the main codebase, we skip downloading them!
+		// TODO: while the legacy passes are still integrated in the main codebase, we skip downloading them!
 		if policy_plugin.name.publisher.0.as_str() == MITRE_PUBLISHER {
 			continue;
 		}

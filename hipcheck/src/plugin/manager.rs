@@ -4,15 +4,11 @@ use crate::{
 	hc_error,
 	hipcheck::plugin_service_client::PluginServiceClient,
 	plugin::{HcPluginClient, Plugin, PluginContext},
-	Result, F64,
+	Result,
 };
-use futures::{future::join_all, Future};
+use futures::future::join_all;
 use rand::Rng;
-use std::{
-	collections::HashSet,
-	ops::Range,
-	process::{Command, Stdio},
-};
+use std::{ops::Range, process::Command};
 use tokio::time::{sleep_until, Duration, Instant};
 
 #[derive(Clone, Debug)]
@@ -47,7 +43,7 @@ impl PluginExecutor {
 		})
 	}
 	fn get_available_port(&self) -> Result<u16> {
-		for i in self.port_range.start..self.port_range.end {
+		for _i in self.port_range.start..self.port_range.end {
 			// @Todo - either TcpListener::bind returns Ok even if port is bound
 			// or we have a race condition. For now just have OS assign a port
 			// if std::net::TcpListener::bind(format!("127.0.0.1:{i}")).is_ok() {
@@ -106,7 +102,7 @@ impl PluginExecutor {
 					panic!("Math error! We should have better guardrails around PluginExecutor field values.");
 				}
 				// sleep_duration = (backoff * conn_attempts) * (1.0 +/- jitter_percent)
-				let mut sleep_duration: Duration = self
+				let sleep_duration: Duration = self
 					.backoff_interval
 					.saturating_mul(conn_attempts as u32)
 					.mul_f64(jitter_percent);

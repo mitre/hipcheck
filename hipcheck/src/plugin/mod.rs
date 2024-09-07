@@ -8,37 +8,15 @@ mod retrieval;
 mod supported_arch;
 mod types;
 
+use crate::error::Result;
 pub use crate::plugin::{manager::*, plugin_id::PluginId, types::*};
-use crate::{
-	error::{Context, Result},
-	policy::policy_file::PolicyPluginName,
-	util::kdl::{extract_data, ParseKdlNode},
-};
-pub use download_manifest::{
-	ArchiveFormat, DownloadManifest, DownloadManifestEntry, HashAlgorithm, HashWithDigest,
-};
-use futures::future::join_all;
+pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
 pub use plugin_manifest::{PluginManifest, PluginName, PluginPublisher, PluginVersion};
 pub use retrieval::retrieve_plugins;
 use serde_json::Value;
 use std::collections::HashMap;
-pub use supported_arch::{SupportedArch, CURRENT_ARCH};
-use tokio::sync::{mpsc, Mutex};
-
-pub fn dummy() {
-	let plugin = Plugin {
-		name: "dummy".to_owned(),
-		entrypoint: "./dummy".to_owned(),
-	};
-
-	let manager = PluginExecutor::new(
-		/* max_spawn_attempts */ 3,
-		/* max_conn_attempts */ 5,
-		/* port_range */ 40000..u16::MAX,
-		/* backoff_interval_micros */ 1000,
-		/* jitter_percent */ 10,
-	);
-}
+pub use supported_arch::CURRENT_ARCH;
+use tokio::sync::Mutex;
 
 pub async fn initialize_plugins(
 	plugins: Vec<PluginContextWithConfig>,
@@ -127,6 +105,7 @@ impl ActivePlugin {
 
 #[derive(Debug)]
 pub struct HcPluginCore {
+	#[allow(unused)]
 	executor: PluginExecutor,
 	pub plugins: HashMap<String, ActivePlugin>,
 }
@@ -134,7 +113,7 @@ pub struct HcPluginCore {
 impl HcPluginCore {
 	// When this object is returned, the plugins are all connected but the
 	// initialization protocol over the gRPC still needs to be completed
-	pub async fn new(executor: PluginExecutor, plugins: Vec<(PluginWithConfig)>) -> Result<Self> {
+	pub async fn new(executor: PluginExecutor, plugins: Vec<PluginWithConfig>) -> Result<Self> {
 		// Separate plugins and configs so we can start plugins async
 		let mut conf_map = HashMap::<String, Value>::new();
 

@@ -6,11 +6,9 @@ use crate::{
 		plugin_service_client::PluginServiceClient, ConfigurationStatus, Empty,
 		ExplainDefaultQueryRequest, GetDefaultPolicyExpressionRequest, GetQuerySchemasRequest,
 		GetQuerySchemasResponse as PluginSchema, InitiateQueryProtocolRequest,
-		InitiateQueryProtocolResponse, Query as PluginQuery, QueryState, SetConfigurationRequest,
+		Query as PluginQuery, QueryState, SetConfigurationRequest,
 		SetConfigurationResponse as PluginConfigResult,
 	},
-	plugin::PluginName,
-	policy::policy_file::PolicyPluginName,
 	Error, Result,
 };
 use futures::{Stream, StreamExt};
@@ -18,7 +16,7 @@ use serde_json::Value;
 use std::{
 	collections::{HashMap, VecDeque},
 	convert::TryFrom,
-	future::{self, poll_fn},
+	future::poll_fn,
 	ops::Not as _,
 	pin::Pin,
 	process::Child,
@@ -26,7 +24,7 @@ use std::{
 };
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::{codec::Streaming, transport::Channel, Code, Status};
+use tonic::{transport::Channel, Code, Status};
 
 pub type HcPluginClient = PluginServiceClient<Channel>;
 
@@ -242,7 +240,7 @@ impl PluginContext {
 	/// streaming RPC in which we run our "query protocol" as defined in RFD #4.
 	pub async fn initiate_query_protocol(
 		&mut self,
-		mut rx: mpsc::Receiver<PluginQuery>,
+		rx: mpsc::Receiver<PluginQuery>,
 	) -> Result<QueryStream> {
 		// Convert the receiver into a stream.
 		let stream = ReceiverStream::new(rx)
@@ -292,7 +290,7 @@ impl PluginContext {
 		let opt_default_policy_expr = self.get_default_policy_expression().await?;
 
 		// TODO: Make the size of this channel configurable.
-		let (tx, mut out_rx) = mpsc::channel::<PluginQuery>(10);
+		let (tx, out_rx) = mpsc::channel::<PluginQuery>(10);
 		let rx = self.initiate_query_protocol(out_rx).await?;
 
 		Ok(PluginTransport {
@@ -312,6 +310,7 @@ impl Drop for PluginContext {
 	}
 }
 
+#[allow(unused)]
 pub enum HcQueryResult {
 	Ok(Value),
 	Needs(String, String, String, Value),

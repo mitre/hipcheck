@@ -11,7 +11,6 @@ mod engine;
 mod error;
 mod init;
 mod metric;
-#[allow(unused)]
 mod plugin;
 mod policy;
 mod policy_exprs;
