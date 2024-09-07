@@ -5,9 +5,9 @@
 use crate::{
 	error::Result,
 	hc_error,
-	kdl_helper::{extract_data, ParseKdlNode},
 	plugin::{PluginName, PluginPublisher, PluginVersion},
 	string_newtype_parse_kdl_node,
+	util::kdl::{extract_data, ParseKdlNode},
 };
 
 use kdl::KdlNode;

@@ -6,6 +6,7 @@ pub mod command;
 pub mod fs;
 pub mod http;
 pub mod iter;
+pub mod kdl;
 pub mod redacted;
 #[cfg(test)]
 pub mod test;

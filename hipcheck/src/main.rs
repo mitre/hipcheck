@@ -10,7 +10,6 @@ mod data;
 mod engine;
 mod error;
 mod init;
-mod kdl_helper;
 mod metric;
 #[allow(unused)]
 mod plugin;

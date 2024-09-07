@@ -5,9 +5,9 @@
 mod test {
 	use crate::{
 		config::Config,
-		kdl_helper::ParseKdlNode,
 		plugin::PluginVersion,
 		policy::{config_to_policy::config_to_policy, policy_file::*, PolicyFile},
+		util::kdl::ParseKdlNode,
 	};
 
 	use kdl::KdlNode;
