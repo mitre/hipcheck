@@ -30,6 +30,12 @@ pub trait HcEngine: salsa::Database {
 
 	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<String>>;
 
+	fn default_query_explanation(
+		&self,
+		publisher: String,
+		plugin: String,
+	) -> Result<Option<String>>;
+
 	fn query(
 		&self,
 		publisher: String,
@@ -50,6 +56,19 @@ fn default_policy_expr(
 		return Err(hc_error!("No such plugin {}::{}", publisher, plugin));
 	};
 	Ok(p_handle.get_default_policy_expr().cloned())
+}
+
+fn default_query_explanation(
+	db: &dyn HcEngine,
+	publisher: String,
+	plugin: String,
+) -> Result<Option<String>> {
+	let core = db.core();
+	// @Todo - plugins map should be keyed on publisher too
+	let Some(p_handle) = core.plugins.get(&plugin) else {
+		return Err(hc_error!("No such plugin {}::{}", publisher, plugin));
+	};
+	Ok(p_handle.get_default_query_explanation().cloned())
 }
 
 fn query(

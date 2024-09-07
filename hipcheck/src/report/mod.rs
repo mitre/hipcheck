@@ -139,20 +139,13 @@ pub struct FailingAnalysis {
 
 	/// Any concerns the analysis identified.
 	#[serde(skip_serializing_if = "no_concerns")]
-	concerns: Vec<Concern>,
+	concerns: Vec<String>,
 }
 
 impl FailingAnalysis {
 	/// Construct a new failing analysis, verifying that concerns are appropriate.
-	pub fn new(analysis: Analysis, concerns: Vec<Concern>) -> Result<FailingAnalysis> {
+	pub fn new(analysis: Analysis, concerns: Vec<String>) -> Result<FailingAnalysis> {
 		match analysis {
-			Analysis::Activity { .. } | Analysis::Affiliation { .. } => {
-				if concerns.iter().all(Concern::is_affiliation_concern).not() {
-					return Err(hc_error!(
-						"affiliation analysis results include non-affiliation concerns"
-					));
-				}
-			}
 			Analysis::Fuzz { .. } | Analysis::Identity { .. } | Analysis::Review { .. } => {
 				if concerns.is_empty().not() {
 					return Err(hc_error!(
@@ -161,40 +154,8 @@ impl FailingAnalysis {
 					));
 				}
 			}
-			Analysis::Binary { .. } => {
-				if concerns.iter().all(Concern::is_binary_file_concern).not() {
-					return Err(hc_error!(
-						"binary file analysis results include non-binary file concerns"
-					));
-				}
-			}
-			Analysis::Churn { .. } => {
-				if concerns.iter().all(Concern::is_churn_concern).not() {
-					return Err(hc_error!(
-						"churn analysis results include non-churn concerns"
-					));
-				}
-			}
-			Analysis::Entropy { .. } => {
-				if concerns.iter().all(Concern::is_entropy_concern).not() {
-					return Err(hc_error!(
-						"entropy analysis results include non-entropy concerns"
-					));
-				}
-			}
-			Analysis::Typo { .. } => {
-				if concerns.iter().all(Concern::is_typo_concern).not() {
-					return Err(hc_error!("typo analysis results include non-typo concerns"));
-				}
-			}
-			Analysis::Plugin { .. } => {
-				if concerns.iter().all(Concern::is_plugin_concern).not() {
-					return Err(hc_error!(
-						"plugin analysis results include non-plugin concerns",
-					));
-				}
-			}
-		}
+			_ => (),
+		};
 
 		Ok(FailingAnalysis { analysis, concerns })
 	}
@@ -203,7 +164,7 @@ impl FailingAnalysis {
 		&self.analysis
 	}
 
-	pub fn concerns(&self) -> impl Iterator<Item = &Concern> {
+	pub fn concerns(&self) -> impl Iterator<Item = &String> {
 		self.concerns.iter()
 	}
 }
@@ -211,7 +172,7 @@ impl FailingAnalysis {
 /// Is the concern list empty?
 ///
 /// This is a helper function for serialization of `FailedAnalysis`.
-fn no_concerns(concerns: &[Concern]) -> bool {
+fn no_concerns(concerns: &[String]) -> bool {
 	concerns.is_empty()
 }
 
@@ -265,6 +226,7 @@ pub enum AnalysisIdent {
 	Fuzz,
 	Review,
 	Typo,
+	Plugin(String),
 }
 
 impl Display for AnalysisIdent {
@@ -281,6 +243,7 @@ impl Display for AnalysisIdent {
 			Fuzz => "fuzz",
 			Review => "review",
 			Typo => "typo",
+			Plugin(name) => name,
 		};
 
 		write!(f, "{}", name)
@@ -350,46 +313,64 @@ pub enum Analysis {
 	Activity {
 		#[serde(flatten)]
 		scoring: Count,
+		#[serde(skip)]
+		passed: bool,
 	},
 	/// Affiliation analysis.
 	Affiliation {
 		#[serde(flatten)]
 		scoring: Count,
+		#[serde(skip)]
+		passed: bool,
 	},
 	/// Binary file analysis
 	Binary {
 		#[serde(flatten)]
 		scoring: Count,
+		#[serde(skip)]
+		passed: bool,
 	},
 	/// Churn analysis.
 	Churn {
 		#[serde(flatten)]
-		scoring: Percent,
+		scoring: Count,
+		#[serde(skip)]
+		passed: bool,
 	},
 	/// Entropy analysis.
 	Entropy {
 		#[serde(flatten)]
-		scoring: Percent,
+		scoring: Count,
+		#[serde(skip)]
+		passed: bool,
 	},
 	/// Identity analysis.
 	Identity {
 		#[serde(flatten)]
 		scoring: Percent,
+		#[serde(skip)]
+		passed: bool,
 	},
 	/// Fuzz repo analysis
 	Fuzz {
 		#[serde(flatten)]
 		scoring: Exists,
+		#[serde(skip)]
+		passed: bool,
 	},
 	/// Review analysis.
 	Review {
 		#[serde(flatten)]
 		scoring: Percent,
+		#[serde(skip)]
+		passed: bool,
 	},
 	/// Typo analysis.
 	Typo {
 		#[serde(flatten)]
 		scoring: Count,
+		#[serde(skip)]
+		passed: bool,
 	},
 	#[allow(unused)]
 	/// Plugin analysis.
@@ -414,8 +395,8 @@ pub enum Analysis {
 macro_rules! constructor {
 	( $name:tt($type:ty), $container:ident ) => {
 		paste! {
-			pub fn $name(value: $type, threshold: $type) -> Analysis {
-				Analysis::[<$name:camel>] { scoring: $container { value, threshold }}
+			pub fn $name(value: $type, policy: String, passed: bool) -> Analysis {
+				Analysis::[<$name:camel>] { scoring: $container { value, policy }, passed }
 			}
 		}
 	};
@@ -424,8 +405,8 @@ macro_rules! constructor {
 macro_rules! exists_constructor_paste {
 	( $name:tt($type:ty), $container:ident ) => {
 		paste! {
-			pub fn $name(value: $type) -> Analysis {
-				Analysis::[<$name:camel>] { scoring: $container { value }}
+			pub fn $name(value: $type, policy: String, passed: bool) -> Analysis {
+				Analysis::[<$name:camel>] { scoring: $container { value, policy }, passed }
 			}
 		}
 	};
@@ -455,10 +436,19 @@ impl Analysis {
 	count_constructor!(affiliation);
 	count_constructor!(binary);
 	count_constructor!(typo);
-	percent_constructor!(churn);
-	percent_constructor!(entropy);
+	count_constructor!(churn);
+	count_constructor!(entropy);
 	percent_constructor!(identity);
 	percent_constructor!(review);
+
+	pub fn plugin(name: String, is_passing: bool, policy_expr: String, message: String) -> Self {
+		Analysis::Plugin {
+			name,
+			is_passing,
+			policy_expr,
+			message,
+		}
+	}
 
 	/// Get the name of the analysis, for printing.
 	pub fn name(&self) -> &str {
@@ -480,34 +470,18 @@ impl Analysis {
 		use Analysis::*;
 
 		match self {
-			Fuzz {
-				scoring: Exists { value },
-			} => *value,
-			Activity {
-				scoring: Count { value, threshold },
-			}
-			| Affiliation {
-				scoring: Count { value, threshold },
-			}
-			| Binary {
-				scoring: Count { value, threshold },
-			}
-			| Typo {
-				scoring: Count { value, threshold },
-			} => value <= threshold,
-			Churn {
-				scoring: Percent { value, threshold },
-			}
-			| Entropy {
-				scoring: Percent { value, threshold },
-			}
-			| Identity {
-				scoring: Percent { value, threshold },
-			}
-			| Review {
-				scoring: Percent { value, threshold },
-			} => value <= threshold,
-			Plugin { is_passing, .. } => *is_passing,
+			Fuzz { passed, .. }
+			| Activity { passed, .. }
+			| Affiliation { passed, .. }
+			| Binary { passed, .. }
+			| Typo { passed, .. }
+			| Churn { passed, .. }
+			| Entropy { passed, .. }
+			| Identity { passed, .. }
+			| Review { passed, .. }
+			| Plugin {
+				is_passing: passed, ..
+			} => *passed,
 		}
 	}
 
@@ -516,96 +490,66 @@ impl Analysis {
 	/// Currently, we suppress concerns if an analysis passes,
 	/// and this is the method that implements that suppression.
 	pub fn permits_some_concerns(&self) -> bool {
-		use Analysis::*;
-
-		match self {
-			Fuzz { scoring: _ } => true,
-			Activity {
-				scoring: Count { threshold, .. },
-			}
-			| Affiliation {
-				scoring: Count { threshold, .. },
-			}
-			| Binary {
-				scoring: Count { threshold, .. },
-			}
-			| Typo {
-				scoring: Count { threshold, .. },
-			} => *threshold != 0,
-			Churn {
-				scoring: Percent { threshold, .. },
-			}
-			| Entropy {
-				scoring: Percent { threshold, .. },
-			}
-			| Identity {
-				scoring: Percent { threshold, .. },
-			}
-			| Review {
-				scoring: Percent { threshold, .. },
-			} => *threshold != 0.0,
-			// Don't suppress concerns for plugins.
-			Plugin { .. } => true,
-		}
+		true
 	}
 
 	pub fn statement(&self) -> String {
 		use Analysis::*;
 
 		match self {
-			Activity { .. } => {
-				if self.is_passing() {
+			Activity { passed, .. } => {
+				if *passed {
 					"has been updated recently".to_string()
 				} else {
 					"hasn't been updated recently".to_string()
 				}
 			}
-			Affiliation { .. } => match (self.is_passing(), self.permits_some_concerns()) {
+			Affiliation { passed, .. } => match (*passed, self.permits_some_concerns()) {
 				(true, true) => "few concerning contributors".to_string(),
 				(true, false) => "no concerning contributors".to_string(),
 				(false, true) => "too many concerning contributors".to_string(),
 				(false, false) => "has concerning contributors".to_string(),
 			},
-			Binary { .. } => match (self.is_passing(), self.permits_some_concerns()) {
+			Binary { passed, .. } => match (*passed, self.permits_some_concerns()) {
 				(true, true) => "few concerning binary files".to_string(),
 				(true, false) => "no concerning binary files".to_string(),
 				(false, true) => "too many concerning binary files".to_string(),
 				(false, false) => "has concerning binary files".to_string(),
 			},
-			Churn { .. } => match (self.is_passing(), self.permits_some_concerns()) {
+			Churn { passed, .. } => match (*passed, self.permits_some_concerns()) {
 				(true, true) => "few unusually large commits".to_string(),
 				(true, false) => "no unusually large commits".to_string(),
 				(false, true) => "too many unusually large commits".to_string(),
 				(false, false) => "has unusually large commits".to_string(),
 			},
-			Entropy { .. } => match (self.is_passing(), self.permits_some_concerns()) {
+			Entropy { passed, .. } => match (*passed, self.permits_some_concerns()) {
 				(true, true) => "few unusual-looking commits".to_string(),
 				(true, false) => "no unusual-looking commits".to_string(),
 				(false, true) => "too many unusual-looking commits".to_string(),
 				(false, false) => "has unusual-looking commits".to_string(),
 			},
-			Identity { .. } => {
-				if self.is_passing() {
+			Identity { passed, .. } => {
+				if *passed {
 					"commits often applied by person besides the author".to_string()
 				} else {
 					"commits too often applied by the author".to_string()
 				}
 			}
-			Fuzz { .. } => {
-				if self.is_passing() {
+			Fuzz { passed, .. } => {
+				if *passed {
 					"repository receives regular fuzz testing".to_string()
 				} else {
 					"repository does not receive regular fuzz testing".to_string()
 				}
 			}
-			Review { .. } => {
-				if self.is_passing() {
+			Review { passed, .. } => {
+				if *passed {
 					"change requests often receive approving review prior to merge".to_string()
 				} else {
 					"change requests often lack approving review prior to merge".to_string()
 				}
 			}
-			Typo { .. } => match (self.is_passing(), self.permits_some_concerns()) {
+			Typo { passed, .. } => match (passed, self.permits_some_concerns()) {
 				(true, true) => "few concerning dependency names".to_string(),
 				(true, false) => "no concerning dependency names".to_string(),
 				(false, true) => "too many concerning dependency names".to_string(),
@@ -620,53 +564,54 @@ impl Analysis {
 
 		match self {
 			Activity {
-				scoring: Count { value, threshold },
-			} => format!(
-				"updated {} weeks ago, required in the last {} weeks",
-				value, threshold
-			),
+				scoring: Count { value, policy },
+				..
+			} => format!("updated {} weeks ago, policy was {}", value, policy),
 			Affiliation {
-				scoring: Count { value, threshold },
-			} => format!("{} found, {} permitted", value, threshold),
+				scoring: Count { value, policy },
+				..
+			} => format!("{} found, policy was {}", value, policy),
 			Binary {
-				scoring: Count { value, threshold },
-			} => format!("{} found, {} permitted", value, threshold),
+				scoring: Count { value, policy },
+				..
+			} => format!("{} found, policy was {}", value, policy),
 			Churn {
-				scoring: Percent { value, threshold },
-			} => format!(
-				"{:.2}% of commits are unusually large, {:.2}% permitted",
-				value * 100.0,
-				threshold * 100.0
-			),
+				scoring: Count { value, policy },
+				..
+			} => format!("examined {} commits, policy was {}", value, policy),
 			Entropy {
-				scoring: Percent { value, threshold },
-			} => format!(
-				"{:.2}% of commits are unusual-looking, {:.2}% permitted",
-				value * 100.0,
-				threshold * 100.0
-			),
+				scoring: Count { value, policy },
+				..
+			} => format!("examined {} commits, policy was {}", value, policy),
 			Identity {
-				scoring: Percent { value, threshold },
+				scoring: Percent { value, policy },
+				..
 			} => format!(
-				"{:.2}% of commits merged by author, {:.2}% permitted",
+				"{:.2}% of commits merged by author, policy was {}",
 				value * 100.0,
-				threshold * 100.0
+				policy
 			),
 			Fuzz {
-				scoring: Exists { value, .. },
-			} => format!("fuzzing integration found: {}", value),
-			Review {
-				scoring: Percent { value, threshold },
+				scoring: Exists { value, policy },
+				..
 			} => format!(
-				"{:.2}% did not receive review, {:.2}% permitted",
+				"fuzzing integration found: {}, policy was {}",
+				value, policy
+			),
+			Review {
+				scoring: Percent { value, policy },
+				..
+			} => format!(
+				"{:.2}% did not receive review, policy was {}",
 				value * 100.0,
-				threshold * 100.0,
+				policy
 			),
 			Typo {
-				scoring: Count { value, threshold },
+				scoring: Count { value, policy },
+				..
 			} => format!(
-				"{} concerning dependencies found, {} permitted",
-				value, threshold
+				"{} concerning dependencies found, policy was {}",
+				value, policy
 			),
 			Plugin { message, .. } => message.clone(),
 		}
@@ -712,26 +657,31 @@ pub enum Concern {
 }
 
 impl Concern {
+	#[allow(unused)]
 	/// Check if a concern is an affiliation concern.
 	fn is_affiliation_concern(&self) -> bool {
 		matches!(self, Concern::Affiliation { .. })
 	}
 
+	#[allow(unused)]
 	/// Check if a concern is a binary file concern.
 	fn is_binary_file_concern(&self) -> bool {
 		matches!(self, Concern::Binary { .. })
 	}
 
+	#[allow(unused)]
 	/// Check if a concern is a churn concern.
 	fn is_churn_concern(&self) -> bool {
 		matches!(self, Concern::Churn { .. })
 	}
 
+	#[allow(unused)]
 	/// Check if a concern is an entropy concern.
 	fn is_entropy_concern(&self) -> bool {
 		matches!(self, Concern::Entropy { .. })
 	}
 
+	#[allow(unused)]
 	/// Check if a concern is a typo concern.
 	fn is_typo_concern(&self) -> bool {
 		matches!(self, Concern::Typo { .. })
@@ -743,6 +693,7 @@ impl Concern {
 		matches!(self, Concern::Plugin(..))
 	}
 
+	#[allow(unused)]
 	pub fn description(&self) -> String {
 		use Concern::*;
 
@@ -843,26 +794,27 @@ impl<'opt, T, E> From<&'opt Option<StdResult<T, E>>> for AnalysisResult<&'opt T,
 }
 
 /// Value and threshold for counting-based analyses.
-#[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
+#[derive(Debug, Serialize, JsonSchema, Clone)]
 #[schemars(crate = "schemars")]
 pub struct Count {
 	value: u64,
-	threshold: u64,
+	policy: String,
 }
 
 /// Value for binary-based analyses.
-#[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
+#[derive(Debug, Serialize, JsonSchema, Clone)]
 #[schemars(crate = "schemars")]
 pub struct Exists {
 	value: bool,
+	policy: String,
 }
 
 /// Value and threshold for percentage-based analyses.
-#[derive(Debug, Serialize, JsonSchema, Clone, Copy)]
+#[derive(Debug, Serialize, JsonSchema, Clone)]
 #[schemars(crate = "schemars")]
 pub struct Percent {
 	value: f64,
-	threshold: f64,
+	policy: String,
 }
 
 /// A final recommendation of whether to use or investigate a piece of software,

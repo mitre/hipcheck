@@ -384,7 +384,7 @@ fn print_human(report: Report) -> Result<()> {
 			macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
 
 			for concern in failing_analysis.concerns() {
-				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", concern.description());
+				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", concern);
 			}
 
 			// Newline at the end for spacing.

@@ -289,6 +289,8 @@ impl PluginContext {
 
 		let opt_default_policy_expr = self.get_default_policy_expression().await?;
 
+		let opt_explain_default_query = self.explain_default_query().await?;
+
 		// TODO: Make the size of this channel configurable.
 		let (tx, out_rx) = mpsc::channel::<PluginQuery>(10);
 		let rx = self.initiate_query_protocol(out_rx).await?;
@@ -296,6 +298,7 @@ impl PluginContext {
 		Ok(PluginTransport {
 			schemas,
 			opt_default_policy_expr,
+			opt_explain_default_query,
 			ctx: self,
 			tx,
 			rx: Mutex::new(MultiplexedQueryReceiver::new(rx)),
@@ -466,6 +469,7 @@ impl MultiplexedQueryReceiver {
 pub struct PluginTransport {
 	pub schemas: HashMap<String, Schema>,
 	pub opt_default_policy_expr: Option<String>,
+	pub opt_explain_default_query: Option<String>,
 	ctx: PluginContext,
 	tx: mpsc::Sender<PluginQuery>,
 	rx: Mutex<MultiplexedQueryReceiver>,

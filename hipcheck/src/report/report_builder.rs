@@ -2,21 +2,18 @@
 
 pub use crate::report::*;
 use crate::{
-	analysis::{
-		result::{HCBasicValue, HCPredicate, Predicate},
-		score::*,
-	},
-	config::ConfigSource,
-	config::RiskConfigQuery,
+	analysis::score::*,
+	config::{ConfigSource, RiskConfigQuery},
+	engine::HcEngine,
 	error::{Error, Result},
 	hc_error,
 	plugin::{PluginName, PluginPublisher},
 	policy::policy_file::PolicyPluginName,
-	report::Concern,
 	session::Session,
 	source::SourceQuery,
 	version::VersionQuery,
 };
+use serde_json::Value;
 use std::{collections::HashSet, default::Default, result::Result as StdResult};
 
 /// Print the final report of a Hipcheck run.
@@ -31,17 +28,19 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	let mut builder = ReportBuilder::for_session(session);
 
 	// Activity analysis.
-	if let Some(stored) = &scoring.results.table.get(ACTIVITY_PHASE) {
-		match &stored.result {
-			Ok(analysis) => {
-				let Predicate::Threshold(pred) = analysis.as_ref();
-				let HCBasicValue::Unsigned(value) = pred.value else {
-					return Err(hc_error!("activity analysis has a non-u64 value"));
+	if let Some(stored) = &scoring.results.get_legacy(ACTIVITY_PHASE) {
+		match &stored.response {
+			Ok(res) => {
+				let weeks = {
+					let Value::Number(opt_weeks) = &res.value else {
+						return Err(hc_error!("activity analysis has a non-numeric value"));
+					};
+					opt_weeks
+						.as_u64()
+						.ok_or(hc_error!("activity analysis has a non-u64 value"))?
 				};
-				let HCBasicValue::Unsigned(thresh) = pred.threshold else {
-					return Err(hc_error!("activity analysis has a non-u64 value"));
-				};
-				builder.add_analysis(Analysis::activity(value, thresh), stored.concerns.clone())?;
+				let analysis = Analysis::activity(weeks, stored.policy.clone(), stored.passed);
+				builder.add_analysis(analysis, res.concerns.clone())?;
 			}
 			Err(error) => {
 				builder.add_errored_analysis(AnalysisIdent::Activity, error);
@@ -50,20 +49,21 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Affiliation analysis.
-	if let Some(stored) = &scoring.results.table.get(AFFILIATION_PHASE) {
-		match &stored.result {
-			Ok(analysis) => {
-				let Predicate::Threshold(pred) = analysis.as_ref();
-				let HCBasicValue::Unsigned(value) = pred.value else {
-					return Err(hc_error!("affiliation analysis has a non-u64 value"));
+	if let Some(stored) = &scoring.results.get_legacy(AFFILIATION_PHASE) {
+		match &stored.response {
+			Ok(res) => {
+				let length = {
+					let Value::Array(arr) = &res.value else {
+						return Err(hc_error!("affiliation analysis has a non-array value"));
+					};
+					arr.len() as u64
 				};
-				let HCBasicValue::Unsigned(thresh) = pred.threshold else {
-					return Err(hc_error!("affiliation analysis has a non-u64 value"));
-				};
-				builder.add_analysis(
-					Analysis::affiliation(value, thresh),
-					stored.concerns.clone(),
-				)?;
+				let analysis = Analysis::affiliation(length, stored.policy.clone(), stored.passed);
+				if stored.passed {
+					builder.add_passing_analysis(analysis);
+				} else {
+					builder.add_failing_analysis(analysis, res.concerns.clone())?;
+				}
 			}
 			Err(error) => {
 				builder.add_errored_analysis(AnalysisIdent::Affiliation, error);
@@ -72,17 +72,21 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Binary analysis
-	if let Some(stored) = &scoring.results.table.get(BINARY_PHASE) {
-		match &stored.result {
-			Ok(analysis) => {
-				let Predicate::Threshold(pred) = analysis.as_ref();
-				let HCBasicValue::Unsigned(value) = pred.value else {
-					return Err(hc_error!("binary analysis has a non-u64 value"));
+	if let Some(stored) = &scoring.results.get_legacy(BINARY_PHASE) {
+		match &stored.response {
+			Ok(res) => {
+				let length = {
+					let Value::Array(arr) = &res.value else {
+						return Err(hc_error!("binary analysis has a non-array value"));
+					};
+					arr.len() as u64
 				};
-				let HCBasicValue::Unsigned(thresh) = pred.threshold else {
-					return Err(hc_error!("binary analysis has a non-u64 value"));
-				};
-				builder.add_analysis(Analysis::binary(value, thresh), stored.concerns.clone())?;
+				let analysis = Analysis::binary(length, stored.policy.clone(), stored.passed);
+				if stored.passed {
+					builder.add_passing_analysis(analysis);
+				} else {
+					builder.add_failing_analysis(analysis, res.concerns.clone())?;
+				}
 			}
 			Err(error) => {
 				builder.add_errored_analysis(AnalysisIdent::Binary, error);
@@ -91,20 +95,21 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Churn analysis.
-	if let Some(stored) = &scoring.results.table.get(CHURN_PHASE) {
-		match &stored.result {
-			Ok(analysis) => {
-				let Predicate::Threshold(pred) = analysis.as_ref();
-				let HCBasicValue::Float(value) = pred.value else {
-					return Err(hc_error!("churn analysis has a non-f64 value"));
+	if let Some(stored) = &scoring.results.get_legacy(CHURN_PHASE) {
+		match &stored.response {
+			Ok(res) => {
+				let length = {
+					let Value::Array(arr) = &res.value else {
+						return Err(hc_error!("churn analysis has a non-array value"));
+					};
+					arr.len() as u64
 				};
-				let HCBasicValue::Float(thresh) = pred.threshold else {
-					return Err(hc_error!("churn analysis has a non-f64 value"));
-				};
-				builder.add_analysis(
-					Analysis::churn(value.into(), thresh.into()),
-					stored.concerns.clone(),
-				)?;
+				let analysis = Analysis::churn(length, stored.policy.clone(), stored.passed);
+				if stored.passed {
+					builder.add_passing_analysis(analysis);
+				} else {
+					builder.add_failing_analysis(analysis, res.concerns.clone())?;
+				}
 			}
 			Err(error) => {
 				builder.add_errored_analysis(AnalysisIdent::Churn, error);
@@ -113,20 +118,21 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Entropy analysis.
-	if let Some(stored) = &scoring.results.table.get(ENTROPY_PHASE) {
-		match &stored.result {
-			Ok(analysis) => {
-				let Predicate::Threshold(pred) = analysis.as_ref();
-				let HCBasicValue::Float(value) = pred.value else {
-					return Err(hc_error!("entropy analysis has a non-f64 value"));
+	if let Some(stored) = &scoring.results.get_legacy(ENTROPY_PHASE) {
+		match &stored.response {
+			Ok(res) => {
+				let length = {
+					let Value::Array(arr) = &res.value else {
+						return Err(hc_error!("entropy analysis has a non-array value"));
+					};
+					arr.len() as u64
 				};
-				let HCBasicValue::Float(thresh) = pred.threshold else {
-					return Err(hc_error!("entropy analysis has a non-f64 value"));
-				};
-				builder.add_analysis(
-					Analysis::entropy(value.into(), thresh.into()),
-					stored.concerns.clone(),
-				)?;
+				let analysis = Analysis::entropy(length, stored.policy.clone(), stored.passed);
+				if stored.passed {
+					builder.add_passing_analysis(analysis);
+				} else {
+					builder.add_failing_analysis(analysis, res.concerns.clone())?;
+				}
 			}
 			Err(error) => {
 				builder.add_errored_analysis(AnalysisIdent::Entropy, error);
@@ -135,20 +141,24 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Identity analysis.
-	if let Some(stored) = &scoring.results.table.get(IDENTITY_PHASE) {
-		match &stored.result {
-			Ok(analysis) => {
-				let Predicate::Threshold(pred) = analysis.as_ref();
-				let HCBasicValue::Float(value) = pred.value else {
-					return Err(hc_error!("identity analysis has a non-f64 value"));
+	if let Some(stored) = &scoring.results.get_legacy(IDENTITY_PHASE) {
+		match &stored.response {
+			Ok(res) => {
+				let pct_identity = {
+					let Value::Number(opt_identity) = &res.value else {
+						return Err(hc_error!("identity analysis has a non-numeric value"));
+					};
+					opt_identity
+						.as_f64()
+						.ok_or(hc_error!("activity analysis has a non-float value"))?
 				};
-				let HCBasicValue::Float(thresh) = pred.threshold else {
-					return Err(hc_error!("identity analysis has a non-f64 value"));
-				};
-				builder.add_analysis(
-					Analysis::identity(value.into(), thresh.into()),
-					stored.concerns.clone(),
-				)?;
+				let analysis =
+					Analysis::identity(pct_identity, stored.policy.clone(), stored.passed);
+				if stored.passed {
+					builder.add_passing_analysis(analysis);
+				} else {
+					builder.add_failing_analysis(analysis, res.concerns.clone())?;
+				}
 			}
 			Err(error) => {
 				builder.add_errored_analysis(AnalysisIdent::Identity, error);
@@ -157,11 +167,18 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Fuzz analysis.
-	if let Some(stored) = &scoring.results.table.get(FUZZ_PHASE) {
-		match &stored.result {
-			Ok(analysis) => {
-				let Predicate::Threshold(pred) = analysis.as_ref();
-				builder.add_analysis(Analysis::fuzz(pred.pass()?), stored.concerns.clone())?;
+	if let Some(stored) = &scoring.results.get_legacy(FUZZ_PHASE) {
+		match &stored.response {
+			Ok(res) => {
+				let Value::Bool(doing_fuzz) = &res.value else {
+					return Err(hc_error!("identity analysis has a non-numeric value"));
+				};
+				let analysis = Analysis::fuzz(*doing_fuzz, stored.policy.clone(), stored.passed);
+				if stored.passed {
+					builder.add_passing_analysis(analysis);
+				} else {
+					builder.add_failing_analysis(analysis, res.concerns.clone())?;
+				}
 			}
 			Err(error) => {
 				builder.add_errored_analysis(AnalysisIdent::Fuzz, error);
@@ -170,20 +187,23 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Review analysis.
-	if let Some(stored) = &scoring.results.table.get(REVIEW_PHASE) {
-		match &stored.result {
-			Ok(analysis) => {
-				let Predicate::Threshold(pred) = analysis.as_ref();
-				let HCBasicValue::Float(value) = pred.value else {
-					return Err(hc_error!("review analysis has a non-f64 value"));
+	if let Some(stored) = &scoring.results.get_legacy(REVIEW_PHASE) {
+		match &stored.response {
+			Ok(res) => {
+				let pct_review = {
+					let Value::Number(opt_review) = &res.value else {
+						return Err(hc_error!("review analysis has a non-numeric value"));
+					};
+					opt_review
+						.as_f64()
+						.ok_or(hc_error!("review analysis has a non-float value"))?
 				};
-				let HCBasicValue::Float(thresh) = pred.threshold else {
-					return Err(hc_error!("review analysis has a non-f64 value"));
-				};
-				builder.add_analysis(
-					Analysis::review(value.into(), thresh.into()),
-					stored.concerns.clone(),
-				)?;
+				let analysis = Analysis::review(pct_review, stored.policy.clone(), stored.passed);
+				if stored.passed {
+					builder.add_passing_analysis(analysis);
+				} else {
+					builder.add_failing_analysis(analysis, res.concerns.clone())?;
+				}
 			}
 			Err(error) => {
 				builder.add_errored_analysis(AnalysisIdent::Review, error);
@@ -192,17 +212,19 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	};
 
 	// Typo analysis.
-	if let Some(stored) = &scoring.results.table.get(TYPO_PHASE) {
-		match &stored.result {
-			Ok(analysis) => {
-				let Predicate::Threshold(pred) = analysis.as_ref();
-				let HCBasicValue::Unsigned(value) = pred.value else {
-					return Err(hc_error!("typo analysis has a non-u64 value"));
+	if let Some(stored) = &scoring.results.get_legacy(TYPO_PHASE) {
+		match &stored.response {
+			Ok(res) => {
+				let deps = {
+					let Value::Number(opt_deps) = &res.value else {
+						return Err(hc_error!("typo analysis has a non-numeric value"));
+					};
+					opt_deps
+						.as_u64()
+						.ok_or(hc_error!("typo analysis has a non-u64 value"))?
 				};
-				let HCBasicValue::Unsigned(thresh) = pred.threshold else {
-					return Err(hc_error!("typo analysis has a non-u64 value"));
-				};
-				builder.add_analysis(Analysis::typo(value, thresh), stored.concerns.clone())?;
+				let analysis = Analysis::typo(deps, stored.policy.clone(), stored.passed);
+				builder.add_analysis(analysis, res.concerns.clone())?;
 			}
 			Err(error) => {
 				builder.add_errored_analysis(AnalysisIdent::Typo, error);
@@ -210,7 +232,31 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 		}
 	};
 
-	// TODO: Add construction of all plugin results here.
+	for (analysis, stored) in scoring.results.plugin_results() {
+		let name = format!(
+			"{}/{}",
+			analysis.publisher.as_str(),
+			analysis.plugin.as_str()
+		);
+
+		match &stored.response {
+			Ok(res) => {
+				// This is the "explanation" pulled from the new gRPC call.
+				let message = session
+					.default_query_explanation(analysis.publisher.clone(), analysis.plugin.clone())?
+					.unwrap_or("no query explanation provided".to_owned());
+
+				builder.add_analysis(
+					Analysis::plugin(name, stored.passed, stored.policy.clone(), message),
+					res.concerns.clone(),
+				)?;
+			}
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Plugin(name), error);
+			}
+		}
+	}
+
 	// TODO: Add handling of auto-investigation-if-fail rules.
 
 	builder
@@ -292,11 +338,7 @@ impl<'sess> ReportBuilder<'sess> {
 	}
 
 	/// Add an analysis.
-	pub fn add_analysis(
-		&mut self,
-		analysis: Analysis,
-		concerns: Vec<Concern>,
-	) -> Result<&mut Self> {
+	pub fn add_analysis(&mut self, analysis: Analysis, concerns: Vec<String>) -> Result<&mut Self> {
 		if analysis.is_passing() {
 			Ok(self.add_passing_analysis(analysis))
 		} else {
@@ -320,7 +362,7 @@ impl<'sess> ReportBuilder<'sess> {
 	fn add_failing_analysis(
 		&mut self,
 		analysis: Analysis,
-		concerns: Vec<Concern>,
+		concerns: Vec<String>,
 	) -> Result<&mut Self> {
 		self.failing.push(FailingAnalysis::new(analysis, concerns)?);
 		Ok(self)
