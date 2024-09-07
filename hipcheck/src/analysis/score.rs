@@ -372,44 +372,18 @@ fn wrapped_query(
 		if query != *DEFAULT_QUERY {
 			return Err(hc_error!("legacy analyses only have a default query"));
 		}
-		// @Todo - revise metric functions to return QueryResult
-		let value = match plugin.as_str() {
-			ACTIVITY_PHASE => {
-				return db.activity_analysis();
-			}
-			AFFILIATION_PHASE => {
-				return db.affiliation_analysis();
-			}
-			BINARY_PHASE => {
-				return db.binary_analysis();
-			}
-			CHURN_PHASE => {
-				return db.churn_analysis();
-			}
-			ENTROPY_PHASE => {
-				return db.entropy_analysis();
-			}
-			IDENTITY_PHASE => {
-				return db.identity_analysis();
-			}
-			FUZZ_PHASE => {
-				return db.fuzz_analysis();
-			}
-			REVIEW_PHASE => {
-				return db.review_analysis();
-			}
-			TYPO_PHASE => {
-				let raw = db.typo_metric()?;
-				serde_json::to_value(&raw.typos)?
-			}
-			other => {
-				return Err(hc_error!("Unrecognized legacy analysis '{other}'"));
-			}
-		};
-		Ok(QueryResult {
-			value,
-			concerns: vec![],
-		})
+		match plugin.as_str() {
+			ACTIVITY_PHASE => db.activity_analysis(),
+			AFFILIATION_PHASE => db.affiliation_analysis(),
+			BINARY_PHASE => db.binary_analysis(),
+			CHURN_PHASE => db.churn_analysis(),
+			ENTROPY_PHASE => db.entropy_analysis(),
+			IDENTITY_PHASE => db.identity_analysis(),
+			FUZZ_PHASE => db.fuzz_analysis(),
+			REVIEW_PHASE => db.review_analysis(),
+			TYPO_PHASE => db.typo_analysis(),
+			other => Err(hc_error!("Unrecognized legacy analysis '{other}'")),
+		}
 	} else {
 		db.query(publisher, plugin, query, key)
 	}

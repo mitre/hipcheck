@@ -56,10 +56,8 @@ pub trait AnalysisProvider:
 	/// Returns result of review analysis
 	fn review_analysis(&self) -> Result<QueryResult>;
 
-	/*
 	/// Returns result of typo analysis
-	fn typo_analysis(&self) -> Arc<HCAnalysisReport>;
-	*/
+	fn typo_analysis(&self) -> Result<QueryResult>;
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -293,30 +291,27 @@ pub fn review_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
 	})
 }
 
-/*
-pub fn typo_analysis(db: &dyn AnalysisProvider) -> Arc<HCAnalysisReport> {
-	let results = match db.typo_metric() {
-		Err(err) => return Arc::new(HCAnalysisReport::generic_error(err, vec![])),
-		Ok(results) => results,
-	};
+pub fn typo_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
+	let results = db.typo_metric()?;
+
+	// @Note - policy expr json injection does not support string/obj as array elts
+	let value = results.typos.iter().map(|_| true).collect::<Vec<bool>>();
+
 	let num_flagged = results.typos.len() as u64;
 
-	let concerns: Vec<_> = results
+	let concerns: Vec<String> = results
 		.typos
 		.iter()
-		.map(|typodep| Concern::Typo {
-			dependency_name: typodep.dependency.to_string(),
-		})
+		.map(|typodep| format!("{}", typodep.dependency.to_string(),))
 		.collect::<HashSet<_>>()
 		.into_iter()
 		.collect();
 
-	Arc::new(HCAnalysisReport {
-		outcome: HCAnalysisOutcome::Completed(HCAnalysisValue::Basic(num_flagged.into())),
+	Ok(QueryResult {
+		value: serde_json::to_value(value)?,
 		concerns,
 	})
 }
-*/
 
 fn score_by_threshold<T: PartialOrd>(value: T, threshold: T) -> i64 {
 	if value > threshold {
