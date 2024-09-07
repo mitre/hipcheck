@@ -17,20 +17,19 @@ use num_traits::identities::Zero;
 use serde_json::Value;
 use std::{collections::HashMap, default::Default, sync::Arc};
 
-#[allow(unused)]
-pub const RISK_PHASE: &str = "risk";
-#[allow(unused)]
+#[cfg(test)]
 pub const PRACTICES_PHASE: &str = "practices";
+#[cfg(test)]
+pub const ATTACKS_PHASE: &str = "attacks";
+#[cfg(test)]
+pub const COMMITS_PHASE: &str = "commits";
+
 pub const REVIEW_PHASE: &str = "review";
 pub const IDENTITY_PHASE: &str = "identity";
 pub const BINARY_PHASE: &str = "binary";
 pub const ACTIVITY_PHASE: &str = "activity";
 pub const FUZZ_PHASE: &str = "fuzz";
-#[allow(unused)]
-pub const COMMITS_PHASE: &str = "high risk commits";
 pub const TYPO_PHASE: &str = "typo";
-#[allow(unused)]
-pub const ATTACKS_PHASE: &str = "attacks";
 pub const AFFILIATION_PHASE: &str = "affiliation";
 pub const CHURN_PHASE: &str = "churn";
 pub const ENTROPY_PHASE: &str = "entropy";
@@ -83,7 +82,32 @@ pub struct PluginAnalysisResults {
 pub struct AnalysisResults {
 	pub table: HashMap<String, HCStoredResult>,
 }
+
 impl AnalysisResults {
+	/// Get all results from plugin-based analyses.
+	pub fn plugin_results(&self) -> impl Iterator<Item = (String, &HCStoredResult)> {
+		self.table.iter().filter_map(|(name, result)| {
+			if [
+				REVIEW_PHASE,
+				IDENTITY_PHASE,
+				BINARY_PHASE,
+				ACTIVITY_PHASE,
+				FUZZ_PHASE,
+				TYPO_PHASE,
+				AFFILIATION_PHASE,
+				CHURN_PHASE,
+				ENTROPY_PHASE,
+			]
+			// Horrifying conversion, but necessary.
+			.contains(&&(*name).as_ref())
+			{
+				None
+			} else {
+				Some((name.to_owned(), result))
+			}
+		})
+	}
+
 	#[allow(unused)]
 	pub fn add(
 		&mut self,

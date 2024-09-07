@@ -265,6 +265,7 @@ pub enum AnalysisIdent {
 	Fuzz,
 	Review,
 	Typo,
+	Plugin(String),
 }
 
 impl Display for AnalysisIdent {
@@ -281,6 +282,7 @@ impl Display for AnalysisIdent {
 			Fuzz => "fuzz",
 			Review => "review",
 			Typo => "typo",
+			Plugin(name) => name,
 		};
 
 		write!(f, "{}", name)
@@ -459,6 +461,15 @@ impl Analysis {
 	percent_constructor!(entropy);
 	percent_constructor!(identity);
 	percent_constructor!(review);
+
+	pub fn plugin(name: String, is_passing: bool, policy_expr: String, message: String) -> Self {
+		Analysis::Plugin {
+			name,
+			is_passing,
+			policy_expr,
+			message,
+		}
+	}
 
 	/// Get the name of the analysis, for printing.
 	pub fn name(&self) -> &str {

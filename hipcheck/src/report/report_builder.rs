@@ -210,6 +210,27 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 		}
 	};
 
+	for (name, stored) in scoring.results.plugin_results() {
+		match &stored.result {
+			Ok(analysis) => {
+				let predicate = analysis.as_ref();
+				let is_passing = predicate.pass()?;
+				// This is the policy expression for the analysis, either the default one
+				// provided by the plugin or one the user has set.
+				let policy_expr = todo!();
+				// This is the "explanation" pulled from the new gRPC call.
+				let message = todo!();
+				builder.add_analysis(
+					Analysis::plugin(name, is_passing, policy_expr, message),
+					stored.concerns.clone(),
+				)?;
+			}
+			Err(error) => {
+				builder.add_errored_analysis(AnalysisIdent::Plugin(name), error);
+			}
+		}
+	}
+
 	// TODO: Add construction of all plugin results here.
 	// TODO: Add handling of auto-investigation-if-fail rules.
 
