@@ -192,7 +192,6 @@ impl CliConfig {
 	}
 
 	/// Get the configured color.
-	#[allow(unused)]
 	pub fn color(&self) -> ColorChoice {
 		self.output_args.color.unwrap_or_default()
 	}

@@ -1,33 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(unused)]
-
 use crate::cache::plugin_cache::HcPluginCache;
-use crate::metric::{review::PullReview, MetricProvider};
 use crate::plugin::{
-	retrieve_plugins, ActivePlugin, Plugin, PluginManifest, PluginResponse, QueryResult,
+	retrieve_plugins, Plugin, PluginManifest, PluginResponse, QueryResult,
 	CURRENT_ARCH,
 };
 pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
 use crate::policy::PolicyFile;
-use crate::policy_exprs::Expr;
-use crate::session::Session;
 use crate::util::fs::{find_file_by_name, read_string};
-use crate::{
-	analysis::{
-		score::{
-			ACTIVITY_PHASE, AFFILIATION_PHASE, BINARY_PHASE, CHURN_PHASE, ENTROPY_PHASE,
-			FUZZ_PHASE, IDENTITY_PHASE, REVIEW_PHASE, TYPO_PHASE,
-		},
-		AnalysisProvider,
-	},
-	shell,
-};
 use crate::{hc_error, Result};
 use futures::future::{BoxFuture, FutureExt};
-use serde::Serialize;
 use serde_json::Value;
-use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
 use tokio::runtime::{Handle, Runtime};
@@ -187,7 +170,7 @@ impl HcEngineImpl {
 	// has an async constructor. If we can manipulate salsa to accept async functions, we
 	// could consider merging the two structs. Although maybe its wise to keep HcPluginCore
 	// independent of Salsa.
-	pub fn new(executor: PluginExecutor, plugins: Vec<(PluginWithConfig)>) -> Result<Self> {
+	pub fn new(executor: PluginExecutor, plugins: Vec<PluginWithConfig>) -> Result<Self> {
 		let runtime = RUNTIME.handle();
 		println!("Starting HcPluginCore");
 		let core = runtime.block_on(HcPluginCore::new(executor, plugins))?;
@@ -258,7 +241,7 @@ pub fn start_plugins(
 					plugin_id.version.0
 				)
 			})?;
-		let config = serde_json::to_value(&config).map_err(|e| {
+		let config = serde_json::to_value(&config).map_err(|_e| {
 			hc_error!(
 				"Error serializing config for {}",
 				plugin_id.to_policy_file_plugin_identifier()

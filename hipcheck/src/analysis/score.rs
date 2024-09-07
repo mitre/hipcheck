@@ -20,18 +20,15 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::default::Default;
 use std::sync::Arc;
-
 use indextree::{Arena, NodeId};
 
 pub const RISK_PHASE: &str = "risk";
-
 pub const PRACTICES_PHASE: &str = "practices";
 pub const REVIEW_PHASE: &str = "review";
 pub const IDENTITY_PHASE: &str = "identity";
 pub const BINARY_PHASE: &str = "binary";
 pub const ACTIVITY_PHASE: &str = "activity";
 pub const FUZZ_PHASE: &str = "fuzz";
-
 pub const COMMITS_PHASE: &str = "high risk commits";
 pub const TYPO_PHASE: &str = "typo";
 pub const ATTACKS_PHASE: &str = "attacks";
@@ -104,7 +101,6 @@ impl AnalysisResults {
 	}
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct Score {
 	pub total: f64,
@@ -307,7 +303,6 @@ impl ScoreTree {
 
 //stores the score tree using petgraph
 //the tree does not need to know what sections it is scoring
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ScoreTreeNode {
 	pub label: String,

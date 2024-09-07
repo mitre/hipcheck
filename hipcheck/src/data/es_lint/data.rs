@@ -13,34 +13,44 @@ use serde::Deserialize;
 
 pub type ESLintReports = Vec<ESLintReport>;
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct ESLintReport {
 	#[serde(rename = "filePath")]
 	pub file_path: String,
 	pub messages: Vec<ESLintMessage>,
+	// These fields are present in the ESLint output, but we don't use them.
+	#[allow(unused)]
 	#[serde(rename = "errorCount")]
 	pub error_count: u64,
+	#[allow(unused)]
 	#[serde(rename = "warningCount")]
 	pub warning_count: u64,
+	#[allow(unused)]
 	#[serde(rename = "fixableErrorCount")]
 	pub fixable_error_count: u64,
+	#[allow(unused)]
 	#[serde(rename = "fixableWarningCount")]
 	pub fixable_warning_count: u64,
+	#[allow(unused)]
 	pub source: Option<String>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct ESLintMessage {
 	#[serde(rename = "ruleId")]
 	pub rule_id: String,
-	pub severity: u64,
-	pub message: String,
 	pub line: u64,
 	pub column: u64,
+	// These fields are present in the ESlint output, but aren't used internally.
+	// We still include them here, but ignore that they're unused.
+	#[allow(unused)]
+	pub severity: u64,
+	#[allow(unused)]
+	pub message: String,
+	#[allow(unused)]
 	#[serde(rename = "endLine")]
 	pub end_line: u64,
+	#[allow(unused)]
 	#[serde(rename = "endColumn")]
 	pub end_column: u64,
 }

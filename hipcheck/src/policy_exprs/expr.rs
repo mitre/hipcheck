@@ -221,7 +221,6 @@ mod tests {
 		Primitive::Float(F64::new(val).unwrap())
 	}
 
-	#[allow(unused)]
 	fn boolean(val: bool) -> Primitive {
 		Primitive::Bool(val)
 	}
