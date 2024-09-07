@@ -4,7 +4,7 @@
 
 use crate::{
 	cache::repo_cache::{RepoCacheDeleteScope, RepoCacheListScope, RepoCacheSort},
-	context::Context,
+	error::Context,
 	error::Result,
 	hc_error,
 	session::pm,

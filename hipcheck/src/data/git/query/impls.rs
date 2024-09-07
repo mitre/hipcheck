@@ -4,13 +4,12 @@
 
 use super::GitProvider;
 use crate::{
-	context::Context,
 	data::git::{
 		get_commits, get_commits_from_date, get_diffs, Commit, CommitContributor,
 		CommitContributorView, CommitDiff, CommitSigner, CommitSignerView, Contributor,
 		ContributorView, Diff, GitCommand, RawCommit, SignerKeyView, SignerNameView, SignerView,
 	},
-	error::{Error, Result},
+	error::{Context, Error, Result},
 };
 use chrono::prelude::*;
 use std::sync::Arc;

@@ -14,7 +14,6 @@ use crate::{
 		ConfigSourceStorage, LanguagesConfigQueryStorage, PracticesConfigQueryStorage,
 		RiskConfigQueryStorage, WeightTreeQueryStorage,
 	},
-	context::Context as _,
 	data::{
 		git::{get_git_version, GitProviderStorage},
 		npm::get_npm_version,
@@ -23,7 +22,7 @@ use crate::{
 		PullRequestReviewProviderStorage,
 	},
 	engine::{start_plugins, HcEngine, HcEngineStorage},
-	error::{Error, Result},
+	error::{Context as _, Error, Result},
 	hc_error,
 	metric::{
 		binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,

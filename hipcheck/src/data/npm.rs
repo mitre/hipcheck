@@ -2,8 +2,7 @@
 
 use crate::{
 	command_util::{log_args, DependentProgram},
-	context::Context,
-	error::Result,
+	error::{Context, Result},
 	hc_error,
 	util::fs as file,
 };

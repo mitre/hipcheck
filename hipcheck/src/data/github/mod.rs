@@ -6,13 +6,12 @@ mod graphql;
 mod graphql_pr;
 
 use crate::{
-	context::Context as _,
 	data::{
 		code_search::search_code_request,
 		git::parse::github_diff,
 		github::{data::*, graphql::get_all_reviews, graphql_pr::get_all_pr_reviews},
 	},
-	error::Result,
+	error::{Context as _, Result},
 	util::http::authenticated_agent::AuthenticatedAgent,
 };
 use std::sync::Arc;

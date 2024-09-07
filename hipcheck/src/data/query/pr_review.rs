@@ -5,13 +5,12 @@
 use super::github::GitHubProvider;
 use crate::{
 	config::ConfigSource,
-	context::Context,
 	data::{
 		get_pull_request_reviews_from_github, get_single_pull_request_review_from_github,
 		git::{Commit, CommitContributorView, CommitDiff, Contributor, ContributorView},
 		PullRequest, SinglePullRequest,
 	},
-	error::{Error, Result},
+	error::{Context, Error, Result},
 };
 use std::sync::Arc;
 

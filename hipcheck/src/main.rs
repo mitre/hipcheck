@@ -7,7 +7,6 @@ mod cache;
 mod cli;
 mod command_util;
 mod config;
-mod context;
 mod data;
 mod engine;
 mod error;
@@ -32,16 +31,13 @@ pub mod hipcheck {
 }
 
 use crate::{
-	analysis::{
-		report_builder::{build_report, Report},
-		score::score_results,
-	},
+	analysis::score::score_results,
 	cache::repo_cache::HcRepoCache,
 	cli::Format,
 	config::WeightTreeProvider,
-	context::Context as _,
-	error::{Error, Result},
+	error::{Context as _, Error, Result},
 	plugin::{Plugin, PluginExecutor, PluginWithConfig},
+	report::report_builder::{build_report, Report},
 	session::Session,
 	setup::{resolve_and_transform_source, SourceType},
 	shell::Shell,

@@ -16,8 +16,7 @@ mod query;
 pub use query::*;
 
 use crate::{
-	context::Context,
-	error::{Error, Result},
+	error::{Context, Error, Result},
 	hc_error,
 };
 use git::{get_commits_for_file, Commit, CommitContributor, Contributor, Diff};

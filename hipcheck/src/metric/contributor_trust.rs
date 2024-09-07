@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context as _, error::Result, metric::MetricProvider};
+use crate::{
+	error::{Context as _, Result},
+	metric::MetricProvider,
+};
 use std::{collections::HashMap, sync::Arc};
 
 pub const TRUST_PHASE: &str = "contributor trust";

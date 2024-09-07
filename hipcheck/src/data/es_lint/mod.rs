@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{ffi::OsStr, path::Path};
-
-use crate::{context::Context as _, error::Result};
+use crate::error::{Context as _, Result};
 use command::ESLintCommand;
 use data::ESLintReports;
+use std::{ffi::OsStr, path::Path};
 
 pub mod command;
 pub mod data;

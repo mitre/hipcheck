@@ -9,6 +9,8 @@
 // The report serves double-duty, because it's both the thing used to print user-friendly
 // results on the CLI, and the type that's serialized out to JSON for machine-friendly output.
 
+pub mod report_builder;
+
 use crate::{
 	cli::Format,
 	error::{Error, Result},
@@ -699,6 +701,7 @@ impl Concern {
 		matches!(self, Concern::Typo { .. })
 	}
 
+	#[allow(unused)]
 	/// Check if the concern is from a plugin.
 	fn is_plugin_concern(&self) -> bool {
 		matches!(self, Concern::Plugin(..))

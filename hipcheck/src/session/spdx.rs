@@ -2,7 +2,10 @@
 
 //! Utilities for extracting repository info from SPDX documents.
 
-use crate::{context::Context as _, error::Result, hc_error};
+use crate::{
+	error::{Context as _, Result},
+	hc_error,
+};
 use spdx_rs::models::SPDX;
 use url::Url;
 

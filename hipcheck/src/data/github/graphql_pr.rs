@@ -5,12 +5,11 @@ use self::review::{
 	ReviewRepositoryPullRequestCommitsNodes as RawPullCommit, Variables,
 };
 use crate::{
-	context::Context,
 	data::{
 		git::{Contributor, RawCommit},
 		github::data::*,
 	},
-	error::{Error, Result},
+	error::{Context, Error, Result},
 	hc_error,
 	util::http::authenticated_agent::AuthenticatedAgent,
 };

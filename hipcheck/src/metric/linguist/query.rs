@@ -3,7 +3,8 @@
 //! A query group for source file language detection queries.
 
 use crate::{
-	config::LanguagesConfigQuery, context::Context, error::Result,
+	config::LanguagesConfigQuery,
+	error::{Context, Result},
 	metric::linguist::SourceFileDetector,
 };
 use std::sync::Arc;
