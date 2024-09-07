@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::hipcheck::plugin_service_client::PluginServiceClient;
 use crate::plugin::{HcPluginClient, Plugin, PluginContext};
 use crate::{hc_error, Result, F64};

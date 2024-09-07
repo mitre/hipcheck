@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // The following code is copied from the `logos-nom-bridge` crate, which uses
 // an outdated version of `logos` and thus can't be used directly here.
 //

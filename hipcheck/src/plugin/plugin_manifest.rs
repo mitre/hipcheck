@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::kdl_helper::{extract_data, ParseKdlNode};
 use crate::plugin::supported_arch::SupportedArch;
 use crate::string_newtype_parse_kdl_node;
@@ -9,7 +11,7 @@ use std::collections::HashMap;
 use std::fmt::write;
 use std::{fmt::Display, str::FromStr};
 
-// NOTE: the implementation in this crate was largely derived from RFD #0004
+// NOTE: the implementation in this crate was largely derived from RFD #4
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PluginPublisher(pub String);
@@ -113,7 +115,7 @@ impl ParseKdlNode for PluginDependency {
 			return None;
 		}
 
-		// per RFD #0004, the name is the first positional entry and has type String and is of the format `<publisher>/<name>`
+		// per RFD #4, the name is the first positional entry and has type String and is of the format `<publisher>/<name>`
 		let publisher_and_name = node.entries().first()?.value().as_string()?;
 		let (publisher, name) = match publisher_and_name.split_once('/') {
 			Some((publisher, name)) => (

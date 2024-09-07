@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! A progress phase is a phase in hipcheck that makes progress with a known length.
 //!
 //! This can be useful for things like like file download, where the number of bytes is known.
@@ -19,11 +21,11 @@ static STYLES: OnceLock<[ProgressStyle; 2]> = OnceLock::new();
 /// Get the global static spinner style.
 fn get_styles() -> &'static [ProgressStyle] {
 	STYLES.get_or_init(|| [
-		// Unit agnostic progress style. 
+		// Unit agnostic progress style.
         ProgressStyle::with_template("{prefix:.bold.dim} {msg} {wide_bar} [{pos}/{len}] ({percent:>3.bold}%) {elapsed:.italic}/{duration:.italic}")
             .expect("valid style"),
 
-		// Bytes/file transfer prgress style. 
+		// Bytes/file transfer prgress style.
 		ProgressStyle::with_template("{prefix:.bold.dim} {msg} {wide_bar} \
 			[{decimal_bytes}/{decimal_total_bytes}: {decimal_bytes_per_sec:.bold}] ({percent:>3.bold}%) {elapsed:.italic}/{duration:.italic}")
 			.expect("valid style"),

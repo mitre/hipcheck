@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 mod git2_log_shim;
 mod git2_rustls_transport;
 mod indicatif_log_bridge;

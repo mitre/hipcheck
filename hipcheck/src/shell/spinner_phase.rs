@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! A spinner phase is a phase in hipcheck that makes progress without a pre-determined length.
 //!
 //! This can be useful for things like while-loops and iterators without a known size.
@@ -91,7 +93,7 @@ impl SpinnerPhase {
 	/// It is best practice to call [SpinnerPhase::inc] first to update the bar state to "running...".
 	///
 	/// This will cause the spinner to rotate indefinitely until finished, which is useful for processes
-	/// that don't report meainingful progress info (like external commands).  
+	/// that don't report meainingful progress info (like external commands).
 	pub fn enable_steady_tick(&self, interval: Duration) {
 		self.bar.enable_steady_tick(interval);
 	}

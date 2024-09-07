@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use super::{
 	plugin_manifest, Plugin, PluginId, PluginManifest, PluginName, PluginPublisher, PluginVersion,
 };

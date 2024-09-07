@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! The majority of this module is adapted from indicatif's parallel iter impl.
 //! See: https://github.com/console-rs/indicatif/blob/main/src/rayon.rs
 

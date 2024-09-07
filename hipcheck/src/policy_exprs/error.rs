@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::policy_exprs::{Expr, Ident, LexingError};
 use nom::{error::ErrorKind, Needed};
 use ordered_float::FloatIsNan;

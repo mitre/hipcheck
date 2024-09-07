@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::plugin::PluginName;
 use crate::policy::policy_file::PolicyPluginName;
 use crate::{

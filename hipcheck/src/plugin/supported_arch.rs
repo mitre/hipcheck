@@ -1,6 +1,7 @@
-use std::{fmt::Display, str::FromStr};
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::hc_error;
+use std::{fmt::Display, str::FromStr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 /// Officially supported target triples, as of RFD #0004

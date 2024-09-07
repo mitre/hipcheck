@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Special tools/utilities for benchmarking.
 //!
 //! The way this is intended to work is that when the "print-timings" feature is enabled,

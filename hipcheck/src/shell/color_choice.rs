@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Utilities for handling whether or not to use color while printing output.
 
 use crate::error::{Error, Result};

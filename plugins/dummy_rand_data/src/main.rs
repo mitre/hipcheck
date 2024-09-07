@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 mod transport;
 mod proto {
 	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
@@ -14,6 +16,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use clap::Parser;
+use proto::{ExplainDefaultQueryRequest, ExplainDefaultQueryResponse};
 use serde_json::{json, Value};
 use std::pin::Pin;
 use tokio::sync::mpsc;
@@ -184,6 +187,15 @@ impl PluginService for RandDataPlugin {
 	) -> Result<Response<GetDefaultPolicyExpressionResponse>, Status> {
 		Ok(Response::new(GetDefaultPolicyExpressionResponse {
 			policy_expression: "".to_owned(),
+		}))
+	}
+
+	async fn explain_default_query(
+		&self,
+		_request: Request<ExplainDefaultQueryRequest>,
+	) -> Result<Response<ExplainDefaultQueryResponse>, Status> {
+		Ok(Response::new(ExplainDefaultQueryResponse {
+			explanation: "get random data".to_owned(),
 		}))
 	}
 
