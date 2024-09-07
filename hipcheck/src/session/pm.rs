@@ -2,8 +2,7 @@
 
 #![allow(dead_code)]
 use crate::{
-	context::Context as _,
-	error::{Error, Result},
+	error::{Context as _, Error, Result},
 	hc_error,
 	target::{Package, PackageHost},
 	util::http::agent,

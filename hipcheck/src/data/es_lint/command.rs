@@ -4,8 +4,7 @@ use std::{ffi::OsStr, process::Command};
 
 use crate::{
 	command_util::{log_args, DependentProgram},
-	context::Context as _,
-	error::Result,
+	error::{Context as _, Result},
 	hc_error,
 };
 

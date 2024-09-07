@@ -4,7 +4,11 @@ mod query;
 
 pub use query::*;
 
-use crate::{context::Context, error::Result, hc_error, util::fs::read_toml};
+use crate::{
+	error::{Context, Result},
+	hc_error,
+	util::fs::read_toml,
+};
 use content_inspector::{inspect, ContentType};
 use serde::{de::Visitor, Deserialize, Deserializer};
 use std::{

@@ -10,6 +10,8 @@
 //!
 //! A macro is provided to automatically tag timings with the file and line number that they were created on.
 
+use crate::shell::Shell;
+pub use print_scope_time;
 use std::time::Instant;
 
 /// Structure used to track timing that will print its location and elapsed time when dropped.
@@ -55,7 +57,3 @@ macro_rules! print_scope_time {
 		))
 	};
 }
-
-pub(crate) use print_scope_time;
-
-use crate::shell::Shell;

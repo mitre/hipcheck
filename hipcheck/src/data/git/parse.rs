@@ -3,9 +3,8 @@
 #![allow(dead_code)]
 
 use crate::{
-	context::Context as _,
 	data::git::{Contributor, Diff, FileDiff, RawCommit},
-	error::{Error, Result},
+	error::{Context as _, Error, Result},
 };
 use chrono::{DateTime, FixedOffset};
 use nom::{

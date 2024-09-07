@@ -2,16 +2,14 @@
 
 //! Utilities for extracting repository info from CycloneDX documents.
 
-use std::str::FromStr;
-
 use crate::{
-	context::Context as _,
-	error::Result,
+	error::{Context as _, Result},
 	hc_error,
 	session::pm::{extract_repo_for_maven, extract_repo_for_npm, extract_repo_for_pypi},
 };
 use cyclonedx_bom::prelude::*;
 use packageurl::PackageUrl;
+use std::str::FromStr;
 use url::Url;
 
 /// Extract the first compatible package download location from a

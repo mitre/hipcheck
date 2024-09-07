@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	context::Context as _,
 	data::{Dependencies, Lang},
-	error::Result,
+	error::{Context as _, Result},
 	metric::MetricProvider,
 	util::fs as file,
 };

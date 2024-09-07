@@ -5,8 +5,7 @@ use super::{
 };
 use crate::{
 	cache::plugin_cache::HcPluginCache,
-	context::Context,
-	error::Error,
+	error::{Context, Error},
 	hc_error,
 	kdl_helper::{extract_data, ParseKdlNode},
 	plugin::{

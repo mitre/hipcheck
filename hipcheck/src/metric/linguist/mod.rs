@@ -4,7 +4,10 @@ mod query;
 
 pub use query::*;
 
-use crate::{context::Context as _, error::Result, util::fs::read_toml};
+use crate::{
+	error::{Context as _, Result},
+	util::fs::read_toml,
+};
 use serde::{de::Visitor, Deserialize, Deserializer};
 use std::{convert::AsRef, fmt, fmt::Formatter, path::Path, result::Result as StdResult};
 

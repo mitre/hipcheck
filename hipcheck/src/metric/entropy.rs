@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	context::Context as _,
 	data::git::{Commit, CommitDiff, FileDiff},
-	error::Result,
+	error::{Context as _, Result},
 	hc_error,
 	metric::{
 		math::{mean, std_dev},

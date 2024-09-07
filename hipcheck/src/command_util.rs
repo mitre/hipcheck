@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context as _, error::Result, hc_error};
+use crate::{
+	error::{Context as _, Result},
+	hc_error,
+};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use semver::Version;

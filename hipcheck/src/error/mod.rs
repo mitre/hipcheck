@@ -10,6 +10,9 @@
 //! which error out aren't retried, as it always compares as equal to
 //! any other error.
 
+mod context;
+
+pub use crate::error::context::Context;
 use std::{
 	borrow::Cow,
 	error::Error as StdError,

@@ -4,9 +4,8 @@
 
 use crate::{
 	analysis::score::*,
-	context::Context,
 	engine::HcEngine,
-	error::Result,
+	error::{Context, Result},
 	hc_error,
 	plugin::QueryResult,
 	policy::{

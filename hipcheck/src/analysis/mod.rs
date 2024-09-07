@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod report_builder;
 pub mod result;
 pub mod score;
 

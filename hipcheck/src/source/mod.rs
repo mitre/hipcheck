@@ -5,9 +5,8 @@ pub mod query;
 
 pub use crate::source::query::*;
 use crate::{
-	context::Context,
 	data::git_command::GitCommand,
-	error::{Error, Result},
+	error::{Context, Error, Result},
 	hc_error,
 	shell::spinner_phase::SpinnerPhase,
 	target::{KnownRemote, LocalGitRepo, RemoteGitRepo, Target},

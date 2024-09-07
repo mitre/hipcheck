@@ -3,8 +3,7 @@
 //! Git related types and implementations for pulling/cloning source repos.
 
 use crate::{
-	context::Context,
-	error::{Error as HcError, Result as HcResult},
+	error::{Context, Error as HcError, Result as HcResult},
 	shell::{progress_phase::ProgressPhase, verbosity::Verbosity, Shell},
 };
 use console::Term;

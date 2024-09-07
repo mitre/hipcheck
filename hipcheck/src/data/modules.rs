@@ -2,8 +2,7 @@
 
 use crate::{
 	command_util::{log_args, DependentProgram},
-	context::Context as _,
-	error::{Error, Result},
+	error::{Context as _, Error, Result},
 	hc_error,
 };
 use pathbuf::pathbuf;

@@ -3,7 +3,8 @@
 //! A query group for binary file detection queries.
 
 use crate::{
-	config::PracticesConfigQuery, context::Context as _, error::Result,
+	config::PracticesConfigQuery,
+	error::{Context as _, Result},
 	metric::binary_detector::BinaryFileDetector,
 };
 use std::sync::Arc;

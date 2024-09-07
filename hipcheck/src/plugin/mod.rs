@@ -10,10 +10,9 @@ mod types;
 
 pub use crate::plugin::{manager::*, plugin_id::PluginId, types::*};
 use crate::{
-	context::Context,
+	error::{Context, Result},
 	kdl_helper::{extract_data, ParseKdlNode},
 	policy::policy_file::PolicyPluginName,
-	Result,
 };
 pub use download_manifest::{
 	ArchiveFormat, DownloadManifest, DownloadManifestEntry, HashAlgorithm, HashWithDigest,
