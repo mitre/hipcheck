@@ -142,18 +142,30 @@ impl std::fmt::Display for ConfigError {
 	}
 }
 
-// State for managing an actively running plugin process
+/// State for managing an actively running plugin process
+///
+/// Note that `PluginContext` is basically a builder for `PluginTransport`, which
+/// runs the startup RPCs, launches the query protocol, and then hands off management
+/// of that protocol to `PluginTransport`.
 #[derive(Debug)]
 pub struct PluginContext {
+	/// The plugin being wrapped.
 	pub plugin: Plugin,
+
+	/// The port that plugin is listening on.
 	pub port: u16,
+
+	/// A gRPC client for interacting with the plugin.
 	pub grpc: HcPluginClient,
+
+	/// The child process in which the plugin is running.
 	pub proc: Child,
 }
 
 // Redefinition of `grpc` field's functions with more useful types, additional
 // error & sanity checking
 impl PluginContext {
+	/// Get schemas for all queries supported by the plugin.
 	pub async fn get_query_schemas(&mut self) -> Result<Vec<Schema>> {
 		let mut res = self
 			.grpc
@@ -161,46 +173,55 @@ impl PluginContext {
 				empty: Some(Empty {}),
 			})
 			.await?;
-		let stream = res.get_mut();
-		let mut schema_builder: HashMap<String, PluginSchema> = HashMap::new();
-		while let Some(msg) = stream.message().await? {
+
+		let mut schemas: HashMap<_, PluginSchema> = HashMap::new();
+		while let Some(msg) = res.get_mut().message().await? {
 			// If we received a PluginSchema msg with this query name before,
 			// treat as a chunked msg and append its strings to existing entry
-			if let Some(existing) = schema_builder.get_mut(&msg.query_name) {
-				existing.key_schema.push_str(msg.key_schema.as_str());
-				existing.output_schema.push_str(msg.output_schema.as_str());
-			} else {
-				schema_builder.insert(msg.query_name.clone(), msg);
-			}
+			schemas
+				.entry(msg.query_name.clone())
+				.and_modify(|existing| {
+					existing.key_schema.push_str(&msg.key_schema);
+					existing.output_schema.push_str(&msg.output_schema);
+				})
+				.or_insert(msg);
 		}
+
 		// Convert the aggregated PluginSchemas to Schema objects
-		schema_builder
-			.into_values()
-			.map(TryInto::try_into)
-			.collect()
+		schemas.into_values().map(TryInto::try_into).collect()
 	}
 
+	/// Set configuration on the plugin.
+	///
+	/// Plugins are expected to do error handling on their side for the various ways that
+	/// configuration may be wrong, and we report that if configuration is wrong.
 	pub async fn set_configuration(&mut self, conf: &Value) -> Result<ConfigurationResult> {
-		let req = SetConfigurationRequest {
-			configuration: serde_json::to_string(&conf)?,
-		};
-		let res = self.grpc.set_configuration(req).await?;
-		res.into_inner().try_into()
+		self.grpc
+			.set_configuration(SetConfigurationRequest {
+				configuration: serde_json::to_string(&conf)?,
+			})
+			.await?
+			.into_inner()
+			.try_into()
 	}
 
+	/// Get the default policy expression from a plugin, if one is defined.
 	pub async fn get_default_policy_expression(&mut self) -> Result<Option<String>> {
 		let req = GetDefaultPolicyExpressionRequest {
 			empty: Some(Empty {}),
 		};
-		let mut res = self.grpc.get_default_policy_expression(req).await?;
-		let raw_expr = res.get_ref().policy_expression.clone();
-		Ok(if raw_expr.is_empty() {
-			None
+
+		let res = self.grpc.get_default_policy_expression(req).await?;
+		let expression = &res.get_ref().policy_expression;
+
+		if expression.is_empty() {
+			Ok(None)
 		} else {
-			Some(raw_expr)
-		})
+			Ok(Some(expression.clone()))
+		}
 	}
 
+	/// Get an explanation of the default query, to use when reporting results.
 	pub async fn explain_default_query(&mut self) -> Result<Option<String>> {
 		let req = ExplainDefaultQueryRequest {
 			empty: Some(Empty {}),
@@ -216,6 +237,10 @@ impl PluginContext {
 		}
 	}
 
+	/// Initiate the query protocol.
+	///
+	/// This is the most complex RPC call by far, as it initiates a bidirectional
+	/// streaming RPC in which we run our "query protocol" as defined in RFD #4.
 	pub async fn initiate_query_protocol(
 		&mut self,
 		mut rx: mpsc::Receiver<PluginQuery>,
@@ -247,24 +272,36 @@ impl PluginContext {
 		Ok(Box::new(stream))
 	}
 
+	/// Consume the builder and run the query protocol.
+	///
+	/// Consume self and produce a `PluginTransport` which will handle
+	/// execution of the query protocol over the still-open bidirectional
+	/// `InitiateQueryProtocol` RPC.
 	pub async fn initialize(mut self, config: Value) -> Result<PluginTransport> {
-		let schemas = HashMap::<String, Schema>::from_iter(
+		// NOTE: The order of these operations is purposeful, and they should _not_
+		// be re-ordered.
+
+		let schemas = HashMap::from_iter(
 			self.get_query_schemas()
 				.await?
 				.into_iter()
-				.map(|s| (s.query_name.clone(), s)),
+				.map(|schema| (schema.query_name.clone(), schema)),
 		);
+
 		self.set_configuration(&config).await?.as_result()?;
+
 		let opt_default_policy_expr = self.get_default_policy_expression().await?;
+
+		// TODO: Make the size of this channel configurable.
 		let (tx, mut out_rx) = mpsc::channel::<PluginQuery>(10);
 		let rx = self.initiate_query_protocol(out_rx).await?;
-		let rx = Mutex::new(MultiplexedQueryReceiver::new(rx));
+
 		Ok(PluginTransport {
 			schemas,
 			opt_default_policy_expr,
 			ctx: self,
 			tx,
-			rx,
+			rx: Mutex::new(MultiplexedQueryReceiver::new(rx)),
 		})
 	}
 }

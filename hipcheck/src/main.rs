@@ -32,11 +32,10 @@ pub mod hipcheck {
 }
 
 use crate::analysis::report_builder::build_report;
-use crate::analysis::report_builder::AnyReport;
-use crate::analysis::report_builder::Format;
 use crate::analysis::report_builder::Report;
 use crate::analysis::score::score_results;
 use crate::cache::repo_cache::HcRepoCache;
+use crate::cli::Format;
 use crate::config::WeightTreeProvider;
 use crate::context::Context as _;
 use crate::error::Error;
@@ -153,7 +152,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	);
 
 	match report {
-		Ok(AnyReport::Report(report)) => Shell::print_report(report, config.format())
+		Ok(report) => Shell::print_report(report, config.format())
 			.map(|()| ExitCode::SUCCESS)
 			.unwrap_or_else(|err| {
 				Shell::print_error(&err, Format::Human);
@@ -926,7 +925,6 @@ impl CheckKind {
 // This is for testing purposes.
 /// Now that we're fully-initialized, run Hipcheck's analyses.
 #[allow(clippy::too_many_arguments)]
-#[doc(hidden)]
 fn run(
 	target: TargetSeed,
 	config_path: Option<PathBuf>,
@@ -934,7 +932,7 @@ fn run(
 	home_dir: Option<PathBuf>,
 	policy_path: Option<PathBuf>,
 	format: Format,
-) -> Result<AnyReport> {
+) -> Result<Report> {
 	// Initialize the session.
 	let session = match Session::new(
 		&target,
@@ -955,10 +953,11 @@ fn run(
 	phase.enable_steady_tick(Duration::from_millis(250));
 
 	let scoring = score_results(&phase, &session)?;
+
 	phase.finish_successful();
 
 	// Build the final report.
 	let report = build_report(&session, &scoring).context("failed to build final report")?;
 
-	Ok(AnyReport::Report(report))
+	Ok(report)
 }
