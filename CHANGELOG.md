@@ -3,6 +3,80 @@
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+## [3.6.1] - 2024-09-09
+
+`3.6.1` is a patch release, but it features one exciting new,
+still-experimental feature: _support for plugins_! Previously, if you wanted
+to add a new source of data or a new form of analsis to Hipcheck, you needed
+to modify Hipcheck itself. This placed some limitations on our ability to grow
+Hipcheck, and more importantly it conflicted with a core design philosophy
+of Hipcheck: that it should *empower* uses to express their policies about
+using open source software (this is one of our Product Values, as expressed in
+[RFD #2](https://mitre.github.io/hipcheck/rfds/0002/)).
+
+With `3.6.1` users can now define custom plugins to provide new sources of
+data and new analyses. There's a lot more for us to do with this, including
+a lot of user experience polish, releasing our first SDK to make developing
+plugins easier, creating and publishing documentation on how to create,
+distribute, and use plugins, and more! For now though, this launch is our
+official starting point where users _can_ create, distribute, and run plugins.
+
+For more details on the design of the new plugin system, check out
+[RFD #4](https://mitre.github.io/hipcheck/rfds/0004/). If you have questions
+on how to work with plugins, you can always ask us in our [GitHub Discussions
+forum](https://github.com/mitre/hipcheck/discussions)!
+
+### Completion of the Plugin Minimum Viable Product
+
+* introduce plugin-based query infrastructure to scoring by [@j-lanson](https://github.com/j-lanson) in [#327](https://github.com/mitre/hipcheck/pull/327)
+* Adds structures and functions to parse policy files by [@mchernicoff](https://github.com/mchernicoff) in [#330](https://github.com/mitre/hipcheck/pull/330)
+* implement PolicyFile --> AnalysisTree conversion, remove use of WeightTree in scoring by [@j-lanson](https://github.com/j-lanson) in [#334](https://github.com/mitre/hipcheck/pull/334)
+* Converts a provided config TOML file to a policy file struct if no policy file is provided by [@mchernicoff](https://github.com/mchernicoff) in [#336](https://github.com/mitre/hipcheck/pull/336)
+* Fix formatting for Rust 1.81.0, rustfmt 1.7.1-stable by [@cstepanian](https://github.com/cstepanian) in [#337](https://github.com/mitre/hipcheck/pull/337)
+* Add JSON Pointer Preprocessor by [@cstepanian](https://github.com/cstepanian) in [#315](https://github.com/mitre/hipcheck/pull/315)
+* Deprecates the config arg by [@mchernicoff](https://github.com/mchernicoff) in [#339](https://github.com/mitre/hipcheck/pull/339)
+* Implement large portion of the plugin system by [@j-lanson](https://github.com/j-lanson) in [#349](https://github.com/mitre/hipcheck/pull/349)
+* Fixup `cargo xtask check` issues by [@alilleybrinker](https://github.com/alilleybrinker)
+* Reduce dead code "allow"s by [@alilleybrinker](https://github.com/alilleybrinker)
+* Impl PluginContext::explain_default_query by [@alilleybrinker](https://github.com/alilleybrinker)
+* Cleanup and add comments to PluginContext by [@alilleybrinker](https://github.com/alilleybrinker)
+* Group imports at crate level by [@alilleybrinker](https://github.com/alilleybrinker)
+* Move "Context" under "error" module by [@alilleybrinker](https://github.com/alilleybrinker) in [#351](https://github.com/mitre/hipcheck/pull/351)
+* update report to use investigate policy expression by [@j-lanson](https://github.com/j-lanson) in [#352](https://github.com/mitre/hipcheck/pull/352)
+* Move "command_util" to "util/command" by [@alilleybrinker](https://github.com/alilleybrinker)
+* Move "kdl_helper" to "util/kdl" by [@alilleybrinker](https://github.com/alilleybrinker)
+* Fix warnings in plugin code by [@alilleybrinker](https://github.com/alilleybrinker)
+* Add `Analysis::Plugin` variant by [@alilleybrinker](https://github.com/alilleybrinker)
+* Added TODOs in ReportBuilder by [@alilleybrinker](https://github.com/alilleybrinker) in [#353](https://github.com/mitre/hipcheck/pull/353)
+* implement suggesting investigation if certain analyses fail by [@j-lanson](https://github.com/j-lanson) in [#355](https://github.com/mitre/hipcheck/pull/355)
+* Add support for reporting plugin results by [@alilleybrinker](https://github.com/alilleybrinker) in [#361](https://github.com/mitre/hipcheck/pull/361)
+* Adds weight field to policy file categories by [@mchernicoff](https://github.com/mchernicoff) in [#333](https://github.com/mitre/hipcheck/pull/333)
+* Update hardcoded policy expressions with new JSON pointer syntax by [@cstepanian](https://github.com/cstepanian) in [#338](https://github.com/mitre/hipcheck/pull/338)
+* make HcEngine plugin lookup use {publisher}/{plugin} as key by [@j-lanson](https://github.com/j-lanson) in [#362](https://github.com/mitre/hipcheck/pull/362)
+
+### Automation Fixes & Improvements
+
+* Install the protobuf compiler in release CI by [@alilleybrinker](https://github.com/alilleybrinker) in [#328](https://github.com/mitre/hipcheck/pull/328)
+* Copy plugins into containerfile build step by [@alilleybrinker](https://github.com/alilleybrinker) in [#331](https://github.com/mitre/hipcheck/pull/331)
+* More CI jobs by [@alilleybrinker](https://github.com/alilleybrinker) in [#332](https://github.com/mitre/hipcheck/pull/332)
+
+### Dependency Version Bumps
+
+* Bump prost from 0.13.1 to 0.13.2 by [@dependabot[bot]](https://github.com/dependabot) in [#323](https://github.com/mitre/hipcheck/pull/323)
+* Bump tonic from 0.12.1 to 0.12.2 by [@dependabot[bot]](https://github.com/dependabot) in [#322](https://github.com/mitre/hipcheck/pull/322)
+* Bump tokio from 1.39.3 to 1.40.0 by [@dependabot[bot]](https://github.com/dependabot) in [#321](https://github.com/mitre/hipcheck/pull/321)
+* Bump ureq from 2.10.0 to 2.10.1 by [@dependabot[bot]](https://github.com/dependabot) in [#319](https://github.com/mitre/hipcheck/pull/319)
+* Bump xml-rs from 0.8.21 to 0.8.22 by [@dependabot[bot]](https://github.com/dependabot) in [#356](https://github.com/mitre/hipcheck/pull/356)
+* Bump dashmap from 6.0.1 to 6.1.0 by [@dependabot[bot]](https://github.com/dependabot) in [#357](https://github.com/mitre/hipcheck/pull/357)
+* Bump tonic-build from 0.12.1 to 0.12.2 by [@dependabot[bot]](https://github.com/dependabot) in [#358](https://github.com/mitre/hipcheck/pull/358)
+* Bump rustls-native-certs from 0.7.1 to 0.8.0 by [@dependabot[bot]](https://github.com/dependabot) in [#360](https://github.com/mitre/hipcheck/pull/360)
+* Bump anyhow from 1.0.86 to 1.0.87 by [@dependabot[bot]](https://github.com/dependabot) in [#359](https://github.com/mitre/hipcheck/pull/359)
+
+__Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.6.0...hipcheck-v3.6.1>
+
+
+[3.6.1]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.6.0..hipcheck-v3.6.1
+
 ## [3.6.0] - 2024-08-30
 
 This is a relatively small release, as we work on the initial implementation
