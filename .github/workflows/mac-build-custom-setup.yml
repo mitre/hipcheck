@@ -1,0 +1,3 @@
+- name: Install protobuf on mac
+  if: runner.os == 'macOS'
+  run: brew install protobuf
