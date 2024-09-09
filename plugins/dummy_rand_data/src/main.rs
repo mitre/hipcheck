@@ -37,7 +37,7 @@ pub async fn handle_rand_data(mut session: QuerySession, key: u64) -> Result<()>
 
 	let sha_req = Query {
 		direction: QueryDirection::Request,
-		publisher: "MITRE".to_owned(),
+		publisher: "dummy".to_owned(),
 		plugin: "sha256".to_owned(),
 		query: "sha256".to_owned(),
 		key: json!(vec![sha_input]),

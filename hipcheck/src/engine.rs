@@ -4,7 +4,10 @@ pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
 use crate::{
 	cache::plugin_cache::HcPluginCache,
 	hc_error,
-	plugin::{retrieve_plugins, Plugin, PluginManifest, PluginResponse, QueryResult, CURRENT_ARCH},
+	plugin::{
+		get_plugin_key, retrieve_plugins, Plugin, PluginManifest, PluginResponse, QueryResult,
+		CURRENT_ARCH,
+	},
 	policy::PolicyFile,
 	util::fs::{find_file_by_name, read_string},
 	Result,
@@ -51,9 +54,9 @@ fn default_policy_expr(
 	plugin: String,
 ) -> Result<Option<String>> {
 	let core = db.core();
-	// @Todo - plugins map should be keyed on publisher too
-	let Some(p_handle) = core.plugins.get(&plugin) else {
-		return Err(hc_error!("No such plugin {}::{}", publisher, plugin));
+	let key = get_plugin_key(publisher.as_str(), plugin.as_str());
+	let Some(p_handle) = core.plugins.get(&key) else {
+		return Err(hc_error!("No such plugin {}", key));
 	};
 	Ok(p_handle.get_default_policy_expr().cloned())
 }
@@ -64,9 +67,9 @@ fn default_query_explanation(
 	plugin: String,
 ) -> Result<Option<String>> {
 	let core = db.core();
-	// @Todo - plugins map should be keyed on publisher too
+	let key = get_plugin_key(publisher.as_str(), plugin.as_str());
 	let Some(p_handle) = core.plugins.get(&plugin) else {
-		return Err(hc_error!("No such plugin {}::{}", publisher, plugin));
+		return Err(hc_error!("No such plugin {}", key));
 	};
 	Ok(p_handle.get_default_query_explanation().cloned())
 }
@@ -80,9 +83,10 @@ fn query(
 ) -> Result<QueryResult> {
 	let runtime = RUNTIME.handle();
 	let core = db.core();
+	let hash_key = get_plugin_key(publisher.as_str(), plugin.as_str());
 	// Find the plugin
-	let Some(p_handle) = core.plugins.get(&plugin) else {
-		return Err(hc_error!("No such plugin {}::{}", publisher, plugin));
+	let Some(p_handle) = core.plugins.get(&hash_key) else {
+		return Err(hc_error!("No such plugin {}", hash_key));
 	};
 	// Initiate the query. If remote closed or we got our response immediately,
 	// return
@@ -128,8 +132,9 @@ pub fn async_query(
 ) -> BoxFuture<'static, Result<QueryResult>> {
 	async move {
 		// Find the plugin
-		let Some(p_handle) = core.plugins.get(&plugin) else {
-			return Err(hc_error!("No such plugin {}::{}", publisher, plugin));
+		let hash_key = get_plugin_key(publisher.as_str(), plugin.as_str());
+		let Some(p_handle) = core.plugins.get(&hash_key) else {
+			return Err(hc_error!("No such plugin {}", hash_key));
 		};
 		// Initiate the query. If remote closed or we got our response immediately,
 		// return
@@ -248,7 +253,7 @@ pub fn start_plugins(
 			})?;
 
 		let plugin = Plugin {
-			name: plugin_id.name.0.clone(),
+			name: plugin_id.to_policy_file_plugin_identifier(),
 			entrypoint,
 		};
 

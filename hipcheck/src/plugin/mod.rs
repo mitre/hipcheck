@@ -9,7 +9,7 @@ mod supported_arch;
 mod types;
 
 use crate::error::Result;
-pub use crate::plugin::{manager::*, plugin_id::PluginId, types::*};
+pub use crate::plugin::{get_plugin_key, manager::*, plugin_id::PluginId, types::*};
 pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
 pub use plugin_manifest::{PluginManifest, PluginName, PluginPublisher, PluginVersion};
 pub use retrieval::retrieve_plugins;
