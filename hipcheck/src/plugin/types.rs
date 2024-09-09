@@ -620,3 +620,7 @@ impl From<Query> for PluginResponse {
 		}
 	}
 }
+
+pub fn get_plugin_key(publisher: &str, plugin: &str) -> String {
+	format!("{publisher}/{plugin}")
+}

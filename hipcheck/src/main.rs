@@ -588,11 +588,11 @@ fn cmd_plugin(args: PluginArgs) {
 	let entrypoint1 = pathbuf![tgt_dir, "dummy_rand_data"];
 	let entrypoint2 = pathbuf![tgt_dir, "dummy_sha256"];
 	let plugin1 = Plugin {
-		name: "rand_data".to_owned(),
+		name: "dummy/rand_data".to_owned(),
 		entrypoint: entrypoint1.display().to_string(),
 	};
 	let plugin2 = Plugin {
-		name: "sha256".to_owned(),
+		name: "dummy/sha256".to_owned(),
 		entrypoint: entrypoint2.display().to_string(),
 	};
 	let plugin_executor = PluginExecutor::new(
@@ -627,7 +627,7 @@ fn cmd_plugin(args: PluginArgs) {
 				println!("Spawning");
 				futs.spawn(async_query(
 					arc_core,
-					"MITRE".to_owned(),
+					"dummy".to_owned(),
 					"rand_data".to_owned(),
 					"rand_data".to_owned(),
 					serde_json::json!(i),
@@ -639,7 +639,7 @@ fn cmd_plugin(args: PluginArgs) {
 		});
 	} else {
 		let res = engine.query(
-			"MITRE".to_owned(),
+			"dummy".to_owned(),
 			"rand_data".to_owned(),
 			"rand_data".to_owned(),
 			serde_json::json!(1),
