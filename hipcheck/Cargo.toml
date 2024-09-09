@@ -142,7 +142,7 @@ zstd = "0.13.2"
 
 anyhow = "1.0.86"
 pathbuf = "1.0.0"
-tonic-build = "0.12.1"
+tonic-build = "0.12.2"
 which = { version = "6.0.3", default-features = false }
 
 [dev-dependencies]
