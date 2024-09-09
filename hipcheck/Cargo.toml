@@ -97,7 +97,7 @@ rustls = { version = "0.23.10", default-features = false, features = [
     "tls12",
     "ring",
 ] }
-rustls-native-certs = "0.7.1"
+rustls-native-certs = "0.8.0"
 salsa = "0.16.1"
 schemars = { version = "0.8.21", default-features = false, features = [
     "derive",
