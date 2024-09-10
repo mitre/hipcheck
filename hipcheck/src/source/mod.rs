@@ -11,7 +11,6 @@ use crate::{
 	shell::spinner_phase::SpinnerPhase,
 	target::{KnownRemote, LocalGitRepo, RemoteGitRepo, Target},
 };
-use log::debug;
 use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};
 use url::{Host, Url};
@@ -214,38 +213,6 @@ pub fn get_github_owner_and_repo(url: &Url) -> Result<(String, String)> {
 		.to_owned();
 
 	Ok((owner, repo))
-}
-
-#[allow(dead_code)]
-fn get_github_owner_repo_and_pull_request(url: &Url) -> Result<(String, String, u64)> {
-	let mut segments = url.path_segments().ok_or_else(|| {
-		Error::msg("GitHub URL missing path for owner, repository, and pull request number")
-	})?;
-
-	let owner = segments
-		.next()
-		.ok_or_else(|| Error::msg("GitHub URL missing owner"))?
-		.to_owned();
-
-	let repo = segments
-		.next()
-		.ok_or_else(|| Error::msg("GitHub URL missing repository"))?
-		.to_owned();
-
-	let test_pull = segments.next();
-
-	if test_pull == Some("pull") {
-		let pull_request = segments
-			.next()
-			.ok_or_else(|| Error::msg("GitHub URL missing pull request number"))?
-			.to_owned();
-		let pull_request_number: u64 = pull_request.parse().unwrap();
-		debug!("Pull request number: {}", pull_request_number);
-
-		Ok((owner, repo, pull_request_number))
-	} else {
-		Err(Error::msg("GitHub URL not a pull request"))
-	}
 }
 
 fn build_unknown_remote_clone_dir(url: &Url) -> Result<String> {

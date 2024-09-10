@@ -820,24 +820,16 @@ const EXIT_FAILURE: i32 = 1;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum CheckKind {
-	#[allow(dead_code)]
-	Repo,
-	Maven,
 	Npm,
 	Pypi,
-	#[allow(dead_code)]
-	Spdx,
 }
 
 impl CheckKind {
 	/// Get the name of the check.
 	const fn name(&self) -> &'static str {
 		match self {
-			CheckKind::Repo => "repo",
-			CheckKind::Maven => "maven",
 			CheckKind::Npm => "npm",
 			CheckKind::Pypi => "pypi",
-			CheckKind::Spdx => "spdx",
 		}
 	}
 }

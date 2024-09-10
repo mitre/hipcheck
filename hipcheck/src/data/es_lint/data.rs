@@ -18,21 +18,6 @@ pub struct ESLintReport {
 	#[serde(rename = "filePath")]
 	pub file_path: String,
 	pub messages: Vec<ESLintMessage>,
-	// These fields are present in the ESLint output, but we don't use them.
-	#[allow(unused)]
-	#[serde(rename = "errorCount")]
-	pub error_count: u64,
-	#[allow(unused)]
-	#[serde(rename = "warningCount")]
-	pub warning_count: u64,
-	#[allow(unused)]
-	#[serde(rename = "fixableErrorCount")]
-	pub fixable_error_count: u64,
-	#[allow(unused)]
-	#[serde(rename = "fixableWarningCount")]
-	pub fixable_warning_count: u64,
-	#[allow(unused)]
-	pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -41,18 +26,6 @@ pub struct ESLintMessage {
 	pub rule_id: String,
 	pub line: u64,
 	pub column: u64,
-	// These fields are present in the ESlint output, but aren't used internally.
-	// We still include them here, but ignore that they're unused.
-	#[allow(unused)]
-	pub severity: u64,
-	#[allow(unused)]
-	pub message: String,
-	#[allow(unused)]
-	#[serde(rename = "endLine")]
-	pub end_line: u64,
-	#[allow(unused)]
-	#[serde(rename = "endColumn")]
-	pub end_column: u64,
 }
 
 #[cfg(test)]
@@ -75,7 +48,6 @@ mod test {
 
 		let msg: ESLintMessage = serde_json::from_str(json).unwrap();
 		assert_eq!(msg.rule_id, "no-eval");
-		assert_eq!(msg.severity, 2);
 	}
 
 	#[test]
@@ -92,7 +64,6 @@ mod test {
 
 		let report: ESLintReport = serde_json::from_str(json).unwrap();
 		assert_eq!(report.file_path, "src/hello.js");
-		assert_eq!(report.error_count, 0);
 	}
 
 	#[test]
@@ -155,10 +126,8 @@ mod test {
 
 		assert_eq!(reports[0].file_path, "no_issues.js");
 		assert_eq!(reports[0].messages.len(), 0);
-		assert_eq!(reports[0].source, None);
 
 		assert_eq!(reports[1].file_path, "problems.js");
 		assert_eq!(reports[1].messages.len(), 2);
-		assert!(reports[1].source.is_some());
 	}
 }

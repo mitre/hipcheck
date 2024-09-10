@@ -42,11 +42,6 @@ impl Entrypoints {
 			None => Ok(()),
 		}
 	}
-
-	#[allow(unused)]
-	pub fn iter(&self) -> impl Iterator<Item = (&SupportedArch, &String)> {
-		self.0.iter()
-	}
 }
 
 impl ParseKdlNode for Entrypoints {
@@ -90,7 +85,7 @@ pub struct PluginDependency {
 }
 
 impl PluginDependency {
-	#[allow(unused)]
+	#[cfg(test)]
 	pub fn new(
 		publisher: PluginPublisher,
 		name: PluginName,
@@ -152,18 +147,8 @@ impl PluginDependencyList {
 		Self(Vec::new())
 	}
 
-	#[allow(unused)]
-	pub fn with_capacity(capacity: usize) -> Self {
-		Self(Vec::with_capacity(capacity))
-	}
-
 	pub fn push(&mut self, dependency: PluginDependency) {
 		self.0.push(dependency);
-	}
-
-	#[allow(unused)]
-	pub fn pop(&mut self) -> Option<PluginDependency> {
-		self.0.pop()
 	}
 }
 
