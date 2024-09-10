@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+## [3.6.2] - 2024-09-10
+
+This is a small release to fix a bug in the release automation for `3.6.1`.
+For more information on the key content for this release, check out `3.6.1`.
+
+Huge thanks to Ashley and the rest of the Axo team for their quick action
+to figure out this bug and get a workaround implemented!
+
+### Fixed
+
+* temporarily shift mac sys deps to custom build setup by [@ashleygwilliams](https://github.com/ashleygwilliams) in [#367](https://github.com/mitre/hipcheck/pull/367)
+
+### New Contributors
+
+* [@ashleygwilliams](https://github.com/ashleygwilliams) made their first contribution in [#367](https://github.com/mitre/hipcheck/pull/367)
+
+__Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.6.1...hipcheck-v3.6.2>
+
+[3.6.2]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.6.1..hipcheck-v3.6.2
+
 ## [3.6.1] - 2024-09-09
 
 `3.6.1` is a patch release, but it features one exciting new,
