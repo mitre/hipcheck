@@ -43,11 +43,14 @@ install-updater = true
 include = ["config/", "scripts/"]
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
-github-build-setup = "mac-build-custom-setup.yml"
 
 # Ubuntu build dependencies for `cargo-dist`
 [workspace.metadata.dist.dependencies.apt]
 protobuf-compiler = "*"
+
+# macOS build dependencies for 'cargo-dist'
+[workspace.metadata.dist.dependencies.homebrew]
+protobuf = "*"
 
 # Windows build dependencies for `cargo-dist`
 [workspace.metadata.dist.dependencies.chocolatey]
