@@ -491,19 +491,18 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 				analysis.0.query.clone(),
 				target_json.clone(),
 			);
+
 			// Determine if analysis passed by evaluating policy expr
 			let passed = {
 				if let Ok(output) = &response {
-					match Executor::std().run(analysis.1.as_str(), &output.value) {
-						Ok(r) => r,
-						Err(e) => {
-							panic!("policy evaluation failed: {e}");
-						}
-					}
+					Executor::std()
+						.run(analysis.1.as_str(), &output.value)
+						.map_err(|e| hc_error!("{}", e))?
 				} else {
 					false
 				}
 			};
+
 			// Record in output map
 			plugin_results.table.insert(
 				analysis.0.clone(),
