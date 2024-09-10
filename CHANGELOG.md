@@ -3,6 +3,34 @@
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+## [3.6.3] - 2024-09-10
+
+This release includes:
+
+- A new `divz` function for policy expressions, which implements with
+  division and returns `0` when dividing by `0`.
+- Two `hc` bugfixes:
+  - Removed a possible panic when failing to evaluate policy expressions
+  - Fixed broken policy expression policies when converting an older-style
+    config file to the new "policy file" structure in memory
+- Two automation bugfixes:
+  - Removal of a release deployment workaround
+  - Fixing our broken `Containerfile`
+- Removal of unused code and files for "scripts" previously used for
+  pull request analysis. We'd removed the code to support pull request analysis
+  a while ago, but hadn't removed all of it. This completes that removal,
+  and also means we no longer need to distribute a "scripts" folder.
+
+* Revert 'cargo-dist' workaround by [@alilleybrinker](https://github.com/alilleybrinker) in [#372](https://github.com/mitre/hipcheck/pull/372)
+* Remove scoring panic by [@alilleybrinker](https://github.com/alilleybrinker) in [#373](https://github.com/mitre/hipcheck/pull/373)
+* Removes unused module analysis and the unncessary data location and scripts folder by [@mchernicoff](https://github.com/mchernicoff) in [#374](https://github.com/mitre/hipcheck/pull/374)
+* Add divz policy-expr func and fix some policies in legacy config file conversion by [@j-lanson](https://github.com/j-lanson) in [#375](https://github.com/mitre/hipcheck/pull/375)
+* Fix issue building Docker image by [@patrickjcasey](https://github.com/patrickjcasey) in [#377](https://github.com/mitre/hipcheck/pull/377)
+
+__Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.6.2...hipcheck-v3.6.3>
+
+[3.6.3]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.6.2..hipcheck-v3.6.3
+
 ## [3.6.2] - 2024-09-10
 
 This is a small release to fix a bug in the release automation for `3.6.1`.
