@@ -40,7 +40,7 @@ pr-run-mode = "plan"
 # Whether to install an updater program
 install-updater = true
 # Extra static files to include in each App (path relative to this Cargo.toml's dir)
-include = ["config/", "scripts/"]
+include = ["config/"]
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 

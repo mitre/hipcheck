@@ -75,19 +75,6 @@ pub fn get_diffs(repo: &Path) -> Result<Vec<Diff>> {
 	git_diff(&output)
 }
 
-pub fn get_commits_for_file(repo_path: &Path, file: &str) -> Result<String> {
-	log::debug!("getting commits for file [file = '{}']", file);
-
-	let output = GitCommand::for_repo(
-		repo_path,
-		["log", "--follow", "--pretty=tformat:%H%n", "--", file],
-	)?
-	.output()
-	.context("git log hash command failed")?;
-
-	Ok(output)
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;

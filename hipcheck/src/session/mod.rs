@@ -17,8 +17,7 @@ use crate::{
 		git::{get_git_version, GitProviderStorage},
 		npm::get_npm_version,
 		CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
-		GitHubProviderStorage, ModuleProvider, ModuleProviderStorage,
-		PullRequestReviewProviderStorage,
+		GitHubProviderStorage, PullRequestReviewProviderStorage,
 	},
 	engine::{start_plugins, HcEngine, HcEngineStorage},
 	error::{Context as _, Error, Result},
@@ -67,7 +66,6 @@ use url::Url;
 	LanguagesConfigQueryStorage,
 	LinguistStorage,
 	MetricProviderStorage,
-	ModuleProviderStorage,
 	FuzzProviderStorage,
 	PracticesConfigQueryStorage,
 	PullRequestReviewProviderStorage,
@@ -111,7 +109,6 @@ impl Session {
 	pub fn new(
 		target: &TargetSeed,
 		config_path: Option<PathBuf>,
-		data_path: Option<PathBuf>,
 		home_dir: Option<PathBuf>,
 		policy_path: Option<PathBuf>,
 		format: Format,
@@ -150,8 +147,8 @@ impl Session {
 
 		// Check if a policy file was provided, otherwise convert a deprecated config file to a policy file. If neither was provided, error out.
 		if policy_path.is_some() {
-			let (policy, policy_path, data_dir, hc_github_token) =
-				match load_policy_and_data(policy_path.as_deref(), data_path.as_deref()) {
+			let (policy, policy_path, hc_github_token) =
+				match load_policy_and_data(policy_path.as_deref()) {
 					Ok(results) => results,
 					Err(err) => return Err(err),
 				};
@@ -163,14 +160,11 @@ impl Session {
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(Some(Rc::new(policy_path)));
 
-			// Set data folder location for module analysis
-			session.set_data_dir(Arc::new(data_dir));
-
 			// Set github token in salsa
 			session.set_github_api_token(Some(Rc::new(hc_github_token)));
 		} else if config_path.is_some() {
-			let (policy, config_dir, data_dir, hc_github_token) =
-				match load_config_and_data(config_path.as_deref(), data_path.as_deref()) {
+			let (policy, config_dir, hc_github_token) =
+				match load_config_and_data(config_path.as_deref()) {
 					Ok(results) => results,
 					Err(err) => return Err(err),
 				};
@@ -181,9 +175,6 @@ impl Session {
 			// Set policy file, with no location to represent that none was given
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(None);
-
-			// Set data folder location for module analysis
-			session.set_data_dir(Arc::new(data_dir));
 
 			// Set github token in salsa
 			session.set_github_api_token(Some(Rc::new(hc_github_token)));
@@ -262,10 +253,7 @@ fn load_software_versions() -> Result<(String, String)> {
 	Ok((git_version, npm_version))
 }
 
-fn load_config_and_data(
-	config_path: Option<&Path>,
-	data_path: Option<&Path>,
-) -> Result<(PolicyFile, PathBuf, PathBuf, String)> {
+fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, PathBuf, String)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("Loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.");
 	// Increment the phase into the "running" stage.
@@ -284,28 +272,15 @@ fn load_config_and_data(
 	// Convert the Config struct to a PolicyFile struct
 	let policy = config_to_policy(config)?;
 
-	// Get the directory the data file is in.
-	let data_dir = data_path
-	   .ok_or_else(|| hc_error!("Failed to load data files. Please make sure the path set by the hc_data env variable exists."))?
-		.to_owned();
-
 	// Resolve the github token file.
 	let hc_github_token = resolve_token()?;
 
 	phase.finish_successful();
 
-	Ok((
-		policy,
-		valid_config_path.to_path_buf(),
-		data_dir,
-		hc_github_token,
-	))
+	Ok((policy, valid_config_path.to_path_buf(), hc_github_token))
 }
 
-fn load_policy_and_data(
-	policy_path: Option<&Path>,
-	data_path: Option<&Path>,
-) -> Result<(PolicyFile, PathBuf, PathBuf, String)> {
+fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathBuf, String)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("loading policy and data files");
 	// Increment the phase into the "running" stage.
@@ -324,22 +299,12 @@ fn load_policy_and_data(
 	let policy = PolicyFile::load_from(valid_policy_path)
 		.context("Failed to load policy. Plase make sure the policy file is in the proidved location and is formatted correctly.")?;
 
-	// Get the directory the data file is in.
-	let data_dir = data_path
-	   .ok_or_else(|| hc_error!("Failed to load data files. Please make sure the path set by the hc_data env variable exists."))?
-		.to_owned();
-
 	// Resolve the github token file.
 	let hc_github_token = resolve_token()?;
 
 	phase.finish_successful();
 
-	Ok((
-		policy,
-		valid_policy_path.to_path_buf(),
-		data_dir,
-		hc_github_token,
-	))
+	Ok((policy, valid_policy_path.to_path_buf(), hc_github_token))
 }
 
 fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {

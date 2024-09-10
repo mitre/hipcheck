@@ -17,7 +17,6 @@ on:
       - "config/**"
       - "hipcheck/**"
       - "plugins/**"
-      - "scripts/**"
       - "xtask/**"
   pull_request:
     branches: [main]
@@ -25,7 +24,6 @@ on:
       - "config/**"
       - "hipcheck/**"
       - "plugins/**"
-      - "scripts/**"
       - "xtask/**"
 
 permissions:

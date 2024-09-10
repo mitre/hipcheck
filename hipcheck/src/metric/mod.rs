@@ -12,23 +12,18 @@ pub mod fuzz;
 pub mod identity;
 pub mod linguist;
 mod math;
-pub mod module;
 pub mod review;
 pub mod typo;
 
 use crate::{
 	config::{AttacksConfigQuery, CommitConfigQuery},
-	data::{
-		git::GitProvider, DependenciesProvider, FuzzProvider, ModuleProvider,
-		PullRequestReviewProvider,
-	},
+	data::{git::GitProvider, DependenciesProvider, FuzzProvider, PullRequestReviewProvider},
 	error::Result,
 	metric::{
 		activity::ActivityOutput, affiliation::AffiliationOutput, binary::BinaryOutput,
 		binary_detector::BinaryFile, churn::ChurnOutput, commit_trust::CommitTrustOutput,
 		contributor_trust::ContributorTrustOutput, entropy::EntropyOutput, fuzz::FuzzOutput,
-		identity::IdentityOutput, linguist::Linguist, module::ModuleOutput, review::ReviewOutput,
-		typo::TypoOutput,
+		identity::IdentityOutput, linguist::Linguist, review::ReviewOutput, typo::TypoOutput,
 	},
 };
 use std::sync::Arc;
@@ -42,7 +37,6 @@ pub trait MetricProvider:
 	+ DependenciesProvider
 	+ GitProvider
 	+ Linguist
-	+ ModuleProvider
 	+ FuzzProvider
 	+ PullRequestReviewProvider
 {
@@ -77,10 +71,6 @@ pub trait MetricProvider:
 	/// Returns result of identity metric
 	#[salsa::invoke(identity::identity_metric)]
 	fn identity_metric(&self) -> Result<Arc<IdentityOutput>>;
-
-	/// Returns result of module analysis.
-	#[salsa::invoke(module::module_analysis)]
-	fn module_analysis(&self) -> Result<Arc<ModuleOutput>>;
 
 	/// Returns result of fuzz metric
 	#[salsa::invoke(fuzz::fuzz_metric)]

@@ -81,16 +81,6 @@ struct OutputArgs {
 /// Arguments configuring paths for Hipcheck to use.
 #[derive(Debug, Default, clap::Args, hc::Update)]
 struct PathArgs {
-	/// Path to the data folder.
-	#[arg(
-		short = 'd',
-		long = "data",
-		global = true,
-		help_heading = "Path Flags",
-		long_help = "Path to the data folder. Can also be set with the `HC_DATA` environment variable"
-	)]
-	data: Option<PathBuf>,
-
 	/// Path to the cache folder.
 	#[arg(
 		short = 'C',
@@ -131,10 +121,6 @@ struct DeprecatedArgs {
 	#[arg(long = "print-config", hide = true, global = true)]
 	print_config: Option<bool>,
 
-	/// Print the data folder path for Hipcheck.
-	#[arg(long = "print-data", hide = true, global = true)]
-	print_data: Option<bool>,
-
 	/// Path to the configuration folder.
 	#[arg(short = 'c', long = "config", hide = true, global = true)]
 	config: Option<PathBuf>,
@@ -164,10 +150,6 @@ impl CliConfig {
 
 	/// Get the selected subcommand, if any.
 	pub fn subcommand(&self) -> Option<FullCommands> {
-		if self.print_data() {
-			return Some(FullCommands::PrintData);
-		}
-
 		if self.print_home() {
 			return Some(FullCommands::PrintCache);
 		}
@@ -212,11 +194,6 @@ impl CliConfig {
 		}
 	}
 
-	/// Get the path to the data directory.
-	pub fn data(&self) -> Option<&Path> {
-		self.path_args.data.as_deref()
-	}
-
 	/// Get the path to the cache directory.
 	pub fn cache(&self) -> Option<&Path> {
 		match (&self.path_args.cache, &self.deprecated_args.home) {
@@ -250,11 +227,6 @@ impl CliConfig {
 		self.deprecated_args.print_config.unwrap_or(false)
 	}
 
-	/// Check if the `--print-data` flag was used.
-	pub fn print_data(&self) -> bool {
-		self.deprecated_args.print_data.unwrap_or(false)
-	}
-
 	/// Get an empty configuration object with nothing set.
 	///
 	/// This is just an alias for `default()`.
@@ -280,7 +252,6 @@ impl CliConfig {
 				format: hc_env_var_value_enum("format"),
 			},
 			path_args: PathArgs {
-				data: hc_env_var("data"),
 				cache: hc_env_var("cache"),
 				// For now, we do not get this from the environment, so pass a None to never update this field
 				policy: None,
@@ -302,7 +273,6 @@ impl CliConfig {
 		CliConfig {
 			path_args: PathArgs {
 				cache: platform_cache(),
-				data: platform_data(),
 				// There is no central per-user or per-system location for the policy file, so pass a None to never update this field
 				policy: None,
 			},
@@ -318,7 +288,6 @@ impl CliConfig {
 	fn backups() -> CliConfig {
 		CliConfig {
 			path_args: PathArgs {
-				data: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "data"]),
 				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
 				// TODO: currently if this is set, then when running `hc check`, it errors out
 				// because policy files are not yet supported
@@ -347,25 +316,10 @@ fn platform_cache() -> Option<PathBuf> {
 fn platform_config() -> Option<PathBuf> {
 	let base = dirs::config_dir().map(|dir| pathbuf![&dir, "hipcheck"]);
 
-	// Config and data paths aren't differentiated on MacOS or Windows,
+	// Config and (now unused) data paths aren't differentiated on MacOS or Windows,
 	// so on those platforms we differentiate them ourselves.
 	if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
 		base.map(|dir| pathbuf![&dir, "config"])
-	} else {
-		base
-	}
-}
-
-/// Get the platform data directory.
-///
-/// See: https://docs.rs/dirs/latest/dirs/fn.data_dir.html
-fn platform_data() -> Option<PathBuf> {
-	let base = dirs::data_dir().map(|dir| pathbuf![&dir, "hipcheck"]);
-
-	// Config and data paths aren't differentiated on MacOS or Windows,
-	// so on those platforms we differentiate them ourselves.
-	if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
-		base.map(|dir| pathbuf![&dir, "data"])
 	} else {
 		base
 	}
@@ -400,7 +354,6 @@ pub enum FullCommands {
 	Cache(CacheArgs),
 	Plugin(PluginArgs),
 	PrintConfig,
-	PrintData,
 	PrintCache,
 	Scoring,
 }
@@ -428,13 +381,13 @@ pub enum Commands {
 	Schema(SchemaArgs),
 	/// Initialize Hipcheck config file and script file locations.
 	///
-	/// The "destination" directories for configuration and data files
+	/// The "destination" directories for configuration files
 	/// Hipcheck needs are determined with the following methods, in
 	/// increasing precedence:
 	///
 	/// 1. Platform-specific defaults
-	/// 2. `HC_CONFIG` and `HC_DATA` environment variables
-	/// 3. `--config` and `--data` command line flags
+	/// 2. `HC_CONFIG` environment variable
+	/// 3. `--config` command line flag
 	Setup(SetupArgs),
 	/// Check if Hipcheck is ready to run.
 	Ready,
@@ -1155,82 +1108,6 @@ mod tests {
 			};
 
 			assert_eq!(config.config().unwrap(), expected);
-		});
-	}
-
-	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-	#[test]
-	fn resolve_data_with_platform() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HOME", Some(tempdir.path().to_str().unwrap())),
-			("XDG_DATA_HOME", None),
-			("HC_DATA", None),
-		];
-
-		with_env_vars(vars, || {
-			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
-				temp
-			};
-
-			assert_eq!(config.data().unwrap(), platform_data().unwrap());
-		});
-	}
-
-	#[test]
-	fn resolve_data_with_env_var() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HOME", None),
-			("XDG_DATA_HOME", None),
-			("HC_DATA", Some(tempdir.path().to_str().unwrap())),
-		];
-
-		with_env_vars(vars, || {
-			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
-				temp
-			};
-
-			assert_eq!(config.data().unwrap(), tempdir.path());
-		});
-	}
-
-	#[test]
-	fn resolve_data_with_flag() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HOME", Some(tempdir.path().to_str().unwrap())),
-			("XDG_DATA_HOME", None),
-			("HC_DATA", None),
-		];
-
-		with_env_vars(vars, || {
-			let expected = pathbuf![tempdir.path(), "hipcheck"];
-
-			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
-				temp.update(&CliConfig {
-					path_args: PathArgs {
-						data: Some(expected.clone()),
-						..Default::default()
-					},
-					..Default::default()
-				});
-				temp
-			};
-
-			assert_eq!(config.data().unwrap(), expected);
 		});
 	}
 

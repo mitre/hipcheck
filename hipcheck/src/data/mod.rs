@@ -10,22 +10,16 @@ mod code_quality;
 mod es_lint;
 mod github;
 mod hash;
-mod modules;
 mod query;
 
 pub use query::*;
 
-use crate::{
-	error::{Context, Error, Result},
-	hc_error,
-};
-use git::{get_commits_for_file, Commit, CommitContributor, Contributor, Diff};
+use crate::error::{Context, Error, Result};
+use git::{Commit, CommitContributor, Contributor, Diff};
 use github::*;
-use modules::RawModule;
 use pathbuf::pathbuf;
-use petgraph::{visit::Dfs, Graph};
 use serde::Serialize;
-use std::{collections::HashSet, path::Path, sync::Arc};
+use std::{path::Path, sync::Arc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dependencies {
@@ -201,123 +195,4 @@ pub fn get_single_pull_request_review_from_github(
 	};
 
 	Ok(result)
-}
-
-// Module structs/enums
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize)]
-pub enum Relationship {
-	Child,
-}
-
-#[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize)]
-pub struct Module {
-	pub file: String,
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub struct ModuleGraph {
-	pub connections: Graph<Module, Relationship>,
-}
-
-// For a given ModuleGraph representation of repository files, associate each module with the file's commit hashes
-pub fn associate_modules_and_commits(
-	repo_path: &Path,
-	module_graph: Arc<ModuleGraph>,
-	commits: Arc<Vec<Arc<Commit>>>,
-) -> Result<ModuleCommitMap> {
-	// Vector containing pairings between module and associated commits
-	let mut modules_commits: Vec<(Arc<Module>, Arc<Commit>)> = Vec::new();
-
-	// Graph traversal, depth-first
-	let start = module_graph
-		.connections
-		.node_indices()
-		.next()
-		.ok_or_else(|| hc_error!("no nodes in the module graph"))?;
-	let mut dfs = Dfs::new(&module_graph.connections, start);
-
-	// Loop through adjoining nodes in graph
-	while let Some(visited) = dfs.next(&module_graph.connections) {
-		let hashes_raw = get_commits_for_file(repo_path, &module_graph.connections[visited].file)?;
-
-		// Get hashes associated with this file
-		let hashes = hashes_raw.lines().collect::<HashSet<_>>();
-
-		// Get all commits referencing the hashes for current module in loop
-		let commit_vec = commits
-			.iter()
-			.filter_map(|commit| {
-				if hashes.contains(&commit.hash.as_ref()) {
-					Some(Arc::clone(commit))
-				} else {
-					None
-				}
-			})
-			.collect::<Vec<_>>();
-
-		// Add entry to vec for each commit e.g. <Module, Commit>
-		for commit in commit_vec {
-			modules_commits.push((
-				Arc::new(module_graph.connections[visited].clone()),
-				Arc::clone(&commit),
-			));
-		}
-	}
-
-	Ok(Arc::new(modules_commits))
-}
-
-impl ModuleGraph {
-	// Calls node library module-deps, converts json to graph model of modules for analysis
-	pub fn get_module_graph_from_repo(repo: &Path, module_deps: &Path) -> Result<ModuleGraph> {
-		let raw_modules = modules::generate_module_model(repo, module_deps)
-			.context("Unable to generate module model")?;
-		module_graph_from_raw(raw_modules)
-	}
-}
-
-// Implement a crude Eq and PartialEq trait (should revisit this as we evolve the module functionality)
-impl Eq for ModuleGraph {}
-
-impl PartialEq for ModuleGraph {
-	fn eq(&self, _other: &Self) -> bool {
-		false
-	}
-}
-
-fn module_graph_from_raw(raw_modules: Vec<RawModule>) -> Result<ModuleGraph> {
-	let mut graph = Graph::new();
-	let mut node_idxs = Vec::new();
-
-	for raw_module in raw_modules {
-		let node = Module {
-			file: raw_module.file,
-		};
-
-		let node_idx = graph.add_node(node);
-
-		// Record the node index.
-		node_idxs.push(node_idx);
-
-		for (_, dep) in raw_module.deps {
-			// Check if `dep` is a node already. Add if it isn't, get
-			// index to it.
-			let node = Module { file: dep };
-
-			let mut known_idx = None;
-
-			for idx in &node_idxs {
-				if graph[*idx] == node {
-					known_idx = Some(*idx);
-				}
-			}
-
-			let dep_idx = known_idx.unwrap_or_else(|| graph.add_node(node));
-
-			graph.add_edge(node_idx, dep_idx, Relationship::Child);
-		}
-	}
-
-	Ok(ModuleGraph { connections: graph })
 }
