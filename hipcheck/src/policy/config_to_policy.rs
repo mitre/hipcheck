@@ -122,7 +122,7 @@ fn parse_activity(
 		// Cap the weight at 65,533
 		let weight = activity.weight.try_into().unwrap_or(u16::MAX);
 		let threshold = activity.week_count_threshold;
-		let expression = format!("(lte {} $/weeks)", threshold);
+		let expression = format!("(lte $ {})", threshold);
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
@@ -228,7 +228,7 @@ fn parse_identity(
 		// Cap the weight at 65,533
 		let weight = identity.weight.try_into().unwrap_or(u16::MAX);
 		let threshold = identity.percent_threshold;
-		let expression = format!("(lte {} $/pct_match)", threshold);
+		let expression = format!("(lte $ {})", threshold);
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
@@ -265,7 +265,7 @@ fn parse_review(
 		// Cap the weight at 65,533
 		let weight = review.weight.try_into().unwrap_or(u16::MAX);
 		let threshold = review.percent_threshold;
-		let expression = format!("(lte {} $/pct_reviewed)", threshold);
+		let expression = format!("(lte $ {})", threshold);
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
@@ -380,8 +380,8 @@ fn parse_churn(plugins: &mut PolicyPluginList, commit: &mut PolicyCategory, chur
 		let value_threshold = churn.value_threshold;
 		let percent_threshold = churn.percent_threshold;
 		let expression = format!(
-			"(eq {} (count (filter (gt {}) $)))",
-			percent_threshold, value_threshold
+			"(lte (divz (count (filter (gt {}) $)) (count $)) {})",
+			value_threshold, percent_threshold,
 		);
 
 		// Add the plugin
