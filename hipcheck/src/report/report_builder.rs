@@ -216,12 +216,10 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 		match &stored.response {
 			Ok(res) => {
 				let deps = {
-					let Value::Number(opt_deps) = &res.value else {
+					let Value::Array(opt_deps) = &res.value else {
 						return Err(hc_error!("typo analysis has a non-numeric value"));
 					};
-					opt_deps
-						.as_u64()
-						.ok_or(hc_error!("typo analysis has a non-u64 value"))?
+					opt_deps.len() as u64
 				};
 				let analysis = Analysis::typo(deps, stored.policy.clone(), stored.passed);
 				builder.add_analysis(analysis, res.concerns.clone())?;

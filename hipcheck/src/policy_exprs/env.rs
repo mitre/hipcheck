@@ -52,6 +52,7 @@ impl<'parent> Env<'parent> {
 		// Math functions.
 		env.add_fn("add", add);
 		env.add_fn("sub", sub);
+		env.add_fn("divz", divz);
 
 		// Logical functions.
 		env.add_fn("and", and);
@@ -389,6 +390,31 @@ fn sub(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
 		(Int(arg_1), Int(arg_2)) => Ok(Int(arg_1 - arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Float(arg_1 - arg_2)),
+		(Bool(_), Bool(_)) => Err(Error::BadType(name)),
+		_ => unreachable!(),
+	};
+
+	binary_primitive_op(name, env, args, op)
+}
+
+// Attempts to divide the numbers, returning a float. If
+// the divisor is zero, returns 0 instead
+fn divz(env: &Env, args: &[Expr]) -> Result<Expr> {
+	let name = "divz";
+
+	let op = |arg_1, arg_2| match (arg_1, arg_2) {
+		(Int(arg_1), Int(arg_2)) => Ok(if arg_2 == 0 {
+			Float(F64::new(0.0)?)
+		} else {
+			let f_arg_1 = arg_1 as f64;
+			let f_arg_2 = arg_2 as f64;
+			Float(F64::new(f_arg_1 / f_arg_2)?)
+		}),
+		(Float(arg_1), Float(arg_2)) => Ok(if arg_2 == 0.0 {
+			Float(arg_2)
+		} else {
+			Float(arg_1 / arg_2)
+		}),
 		(Bool(_), Bool(_)) => Err(Error::BadType(name)),
 		_ => unreachable!(),
 	};

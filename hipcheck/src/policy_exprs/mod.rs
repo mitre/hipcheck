@@ -96,6 +96,50 @@ mod tests {
 	}
 
 	#[test]
+	fn eval_divz_int_zero() {
+		let program = "(divz 1 0)";
+		let context = Value::Null;
+		let result = Executor::std().parse_and_eval(program, &context).unwrap();
+		assert_eq!(
+			result,
+			Expr::Primitive(Primitive::Float(F64::new(0.0).unwrap()))
+		);
+	}
+
+	#[test]
+	fn eval_divz_int() {
+		let program = "(divz 1 2)";
+		let context = Value::Null;
+		let result = Executor::std().parse_and_eval(program, &context).unwrap();
+		assert_eq!(
+			result,
+			Expr::Primitive(Primitive::Float(F64::new(0.5).unwrap()))
+		);
+	}
+
+	#[test]
+	fn eval_divz_float() {
+		let program = "(divz 1.0 2.0)";
+		let context = Value::Null;
+		let result = Executor::std().parse_and_eval(program, &context).unwrap();
+		assert_eq!(
+			result,
+			Expr::Primitive(Primitive::Float(F64::new(0.5).unwrap()))
+		);
+	}
+
+	#[test]
+	fn eval_divz_float_zero() {
+		let program = "(divz 1.0 0.0)";
+		let context = Value::Null;
+		let result = Executor::std().parse_and_eval(program, &context).unwrap();
+		assert_eq!(
+			result,
+			Expr::Primitive(Primitive::Float(F64::new(0.0).unwrap()))
+		);
+	}
+
+	#[test]
 	fn eval_bools() {
 		let program = "(neq 1 2)";
 		let context = Value::Null;
