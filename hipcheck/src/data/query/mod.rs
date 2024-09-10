@@ -7,12 +7,10 @@ mod code_quality;
 mod dependencies;
 mod fuzz;
 mod github;
-mod module;
 mod pr_review;
 
 pub use code_quality::CodeQualityProviderStorage;
 pub use dependencies::{DependenciesProvider, DependenciesProviderStorage};
 pub use fuzz::{FuzzProvider, FuzzProviderStorage};
 pub use github::{GitHubProvider, GitHubProviderStorage};
-pub use module::{ModuleCommitMap, ModuleProvider, ModuleProviderStorage};
 pub use pr_review::{PullRequestReviewProvider, PullRequestReviewProviderStorage};

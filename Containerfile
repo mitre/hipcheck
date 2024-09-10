@@ -26,7 +26,6 @@ WORKDIR /app
 
 COPY --from=builder /build/target/release/hc ./hc
 COPY config/ config/
-COPY scripts/ scripts/
 
 RUN set -eux && \
     apt-get update && \
@@ -39,7 +38,6 @@ RUN set -eux && \
 USER hc_user
 
 ENV HC_CONFIG=./config
-ENV HC_DATA=./scripts
 
 ENTRYPOINT ["./hc"]
 

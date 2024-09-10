@@ -99,7 +99,6 @@ fn main() -> ExitCode {
 		Some(FullCommands::Cache(args)) => return cmd_cache(args, &config),
 		Some(FullCommands::Plugin(args)) => cmd_plugin(args),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
-		Some(FullCommands::PrintData) => cmd_print_data(config.data()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
 		Some(FullCommands::Scoring) => {
 			return cmd_print_weights(&config)
@@ -130,7 +129,6 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	let report = run(
 		target,
 		config.config().map(ToOwned::to_owned),
-		config.data().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
 		config.policy().map(ToOwned::to_owned),
 		config.format(),
@@ -176,7 +174,6 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 			refspec: Some("HEAD".to_owned()),
 		},
 		config.config().map(ToOwned::to_owned),
-		config.data().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
 		config.policy().map(ToOwned::to_owned),
 		config.format(),
@@ -300,12 +297,9 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 		Ok(x) => x,
 	};
 
-	// Derive the config/scripts paths from the source path
-	let (src_conf_path, src_data_path) = match &source.path {
-		SourceType::Dir(p) => (
-			pathbuf![p.as_path(), "config"],
-			pathbuf![p.as_path(), "scripts"],
-		),
+	// Derive the config path from the source path
+	let src_conf_path = match &source.path {
+		SourceType::Dir(p) => pathbuf![p.as_path(), "config"],
 		_ => {
 			Shell::print_error(
 				&hc_error!("expected source to be a directory"),
@@ -337,36 +331,10 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 		return ExitCode::FAILURE;
 	};
 
-	// Make data dir if not exist
-	let Some(tgt_data_path) = config.data() else {
-		Shell::print_error(&hc_error!("target data dir not specified"), Format::Human);
-		return ExitCode::FAILURE;
-	};
-	if !tgt_data_path.exists() && create_dir_all(tgt_data_path).is_err() {
-		Shell::print_error(
-			&hc_error!("failed to create missing target data dir"),
-			Format::Human,
-		);
-	}
-	let Ok(abs_data_path) = tgt_data_path.canonicalize() else {
-		Shell::print_error(
-			&hc_error!("failed to canonicalize HC_DATA path"),
-			Format::Human,
-		);
-		return ExitCode::FAILURE;
-	};
-
 	// Copy local config/data dirs to target locations
 	if let Err(e) = copy_dir_contents(src_conf_path, &abs_conf_path) {
 		Shell::print_error(
 			&hc_error!("failed to copy config dir contents: {}", e),
-			Format::Human,
-		);
-		return ExitCode::FAILURE;
-	}
-	if let Err(e) = copy_dir_contents(src_data_path, &abs_data_path) {
-		Shell::print_error(
-			&hc_error!("failed to copy data dir contents: {}", e),
 			Format::Human,
 		);
 		return ExitCode::FAILURE;
@@ -386,7 +354,6 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 		shell_profile
 	);
 	println!("\texport HC_CONFIG={:?}", abs_conf_path);
-	println!("\texport HC_DATA={:?}", abs_data_path);
 
 	println!("Run `hc help` to get started");
 
@@ -400,7 +367,6 @@ struct ReadyChecks {
 	hipcheck_version_check: StdResult<String, VersionCheckError>,
 	git_version_check: StdResult<String, VersionCheckError>,
 	npm_version_check: StdResult<String, VersionCheckError>,
-	data_path_check: StdResult<PathBuf, PathCheckError>,
 	cache_path_check: StdResult<PathBuf, PathCheckError>,
 	policy_path_check: StdResult<PathBuf, PathCheckError>,
 	github_token_check: StdResult<(), EnvVarCheckError>,
@@ -414,7 +380,6 @@ impl ReadyChecks {
 		self.hipcheck_version_check.is_ok()
 			&& self.git_version_check.is_ok()
 			&& self.npm_version_check.is_ok()
-			&& self.data_path_check.is_ok()
 			&& self.cache_path_check.is_ok()
 			&& self.policy_path_check.is_ok()
 	}
@@ -539,16 +504,6 @@ fn check_cache_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	// Try to create the cache directory if it doesn't exist.
 	if path.exists().not() {
 		create_dir_all(path).map_err(|_| PathCheckError::PathNotFound)?;
-	}
-
-	Ok(path.to_owned())
-}
-
-fn check_data_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
-	let path = config.data().ok_or(PathCheckError::PathNotFound)?;
-
-	if path.exists().not() {
-		return Err(PathCheckError::PathNotFound);
 	}
 
 	Ok(path.to_owned())
@@ -679,7 +634,6 @@ fn cmd_ready(config: &CliConfig) {
 		hipcheck_version_check: check_hipcheck_version(),
 		git_version_check: check_git_version(),
 		npm_version_check: check_npm_version(),
-		data_path_check: check_data_path(config),
 		cache_path_check: check_cache_path(config),
 		policy_path_check: check_policy_path(config),
 		github_token_check: check_github_token(),
@@ -703,11 +657,6 @@ fn cmd_ready(config: &CliConfig) {
 	match &ready.cache_path_check {
 		Ok(path) => println!("{:<17} {}", "Cache Path:", path.display()),
 		Err(e) => println!("{:<17} {}", "Cache Path:", e),
-	}
-
-	match &ready.data_path_check {
-		Ok(path) => println!("{:<17} {}", "Data Path:", path.display()),
-		Err(e) => println!("{:<17} {}", "Data Path:", e),
 	}
 
 	match &ready.policy_path_check {
@@ -829,20 +778,6 @@ fn cmd_print_config(config_path: Option<&Path>) {
 	}
 }
 
-/// Print the current data folder path for Hipcheck.
-///
-/// Exits `Ok` if config path is specified, `Err` otherwise.
-fn cmd_print_data(data_path: Option<&Path>) {
-	match data_path.ok_or_else(|| hc_error!("can't find data directory")) {
-		Ok(path_buffer) => {
-			println!("{}", path_buffer.display());
-		}
-		Err(err) => {
-			Shell::print_error(&err, Format::Human);
-		}
-	}
-}
-
 /// Print the JSON schema of the report.
 fn print_report_schema() {
 	let schema = schema_for!(Report);
@@ -913,20 +848,12 @@ impl CheckKind {
 fn run(
 	target: TargetSeed,
 	config_path: Option<PathBuf>,
-	data_path: Option<PathBuf>,
 	home_dir: Option<PathBuf>,
 	policy_path: Option<PathBuf>,
 	format: Format,
 ) -> Result<Report> {
 	// Initialize the session.
-	let session = match Session::new(
-		&target,
-		config_path,
-		data_path,
-		home_dir,
-		policy_path,
-		format,
-	) {
+	let session = match Session::new(&target, config_path, home_dir, policy_path, format) {
 		Ok(session) => session,
 		Err(err) => return Err(err),
 	};
