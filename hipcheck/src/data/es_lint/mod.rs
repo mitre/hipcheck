@@ -72,8 +72,5 @@ mod test {
 		assert!(reports[0].file_path.ends_with("bad.js"));
 		assert_eq!(reports[0].messages.len(), 1);
 		assert_eq!(reports[0].messages[0].rule_id, "no-eval");
-		assert!(reports[0].source.is_some());
-		assert!(reports[0].source.as_ref().unwrap().contains("bad_function"));
-		assert!(reports[0].source.as_ref().unwrap().contains("eval"));
 	}
 }

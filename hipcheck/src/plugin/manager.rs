@@ -33,7 +33,9 @@ impl PluginExecutor {
 				jitter_percent
 			));
 		}
+
 		let backoff_interval = Duration::from_micros(backoff_interval_micros);
+
 		Ok(PluginExecutor {
 			max_spawn_attempts,
 			max_conn_attempts,
@@ -42,6 +44,7 @@ impl PluginExecutor {
 			jitter_percent,
 		})
 	}
+
 	fn get_available_port(&self) -> Result<u16> {
 		for _i in self.port_range.start..self.port_range.end {
 			// @Todo - either TcpListener::bind returns Ok even if port is bound
@@ -55,14 +58,17 @@ impl PluginExecutor {
 				}
 			}
 		}
+
 		Err(hc_error!("Failed to find available port"))
 	}
+
 	pub async fn start_plugins(&self, plugins: Vec<Plugin>) -> Result<Vec<PluginContext>> {
 		join_all(plugins.into_iter().map(|p| self.start_plugin(p)))
 			.await
 			.into_iter()
 			.collect()
 	}
+
 	pub async fn start_plugin(&self, plugin: Plugin) -> Result<PluginContext> {
 		// Plugin startup design has inherent TOCTOU flaws since we tell the plugin
 		// which port we expect it to bind to. We can try to ensure the port we pass

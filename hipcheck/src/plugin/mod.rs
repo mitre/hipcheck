@@ -109,8 +109,6 @@ impl ActivePlugin {
 
 #[derive(Debug)]
 pub struct HcPluginCore {
-	#[allow(unused)]
-	executor: PluginExecutor,
 	pub plugins: HashMap<String, ActivePlugin>,
 }
 
@@ -150,6 +148,6 @@ impl HcPluginCore {
 		);
 
 		// Now we have a set of started and initialized plugins to interact with
-		Ok(HcPluginCore { executor, plugins })
+		Ok(HcPluginCore { plugins })
 	}
 }

@@ -145,7 +145,7 @@ pub struct Compress {
 }
 
 impl Compress {
-	#[allow(unused)]
+	#[cfg(test)]
 	pub fn new(archive_format: ArchiveFormat) -> Self {
 		Self {
 			format: archive_format,
@@ -176,7 +176,7 @@ pub struct Size {
 }
 
 impl Size {
-	#[allow(unused)]
+	#[cfg(test)]
 	pub fn new(bytes: u64) -> Self {
 		Self { bytes }
 	}
@@ -367,12 +367,12 @@ pub struct DownloadManifest {
 }
 
 impl DownloadManifest {
-	#[allow(unused)]
+	#[cfg(test)]
 	pub fn iter(&self) -> impl Iterator<Item = &DownloadManifestEntry> {
 		self.entries.iter()
 	}
 
-	#[allow(unused)]
+	#[cfg(test)]
 	pub fn len(&self) -> usize {
 		self.entries.len()
 	}

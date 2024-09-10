@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(dead_code)]
 use crate::{
 	error::{Context as _, Error, Result},
 	hc_error,
@@ -16,7 +15,6 @@ use std::{
 use url::{Host, Url};
 use xml::reader::{EventReader, XmlEvent};
 
-const MAVEN: &str = CheckKind::Maven.name();
 const NPM: &str = CheckKind::Npm.name();
 const PYPI: &str = CheckKind::Pypi.name();
 
