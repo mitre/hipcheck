@@ -14,7 +14,7 @@ COPY Cargo.toml Cargo.lock ./
 
 RUN set -eux && \
     apt-get update && \
-    apt-get install -y build-essential perl-base && \
+    apt-get install -y build-essential perl-base protobuf-compiler && \
     cargo build --release
 
 #============================================================================
@@ -29,7 +29,7 @@ COPY config/ config/
 
 RUN set -eux && \
     apt-get update && \
-    apt-get install -y npm git protobuf-compiler && \
+    apt-get install -y npm git && \
     apt-get clean && \
     npm install -g module-deps@6.2 --no-audit --no-fund && \
     adduser --disabled-password hc_user && \
