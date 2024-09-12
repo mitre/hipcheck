@@ -1,0 +1,69 @@
+error: unexpected token
+ --> tests/compile-fail/tracked_impl_incompatibles.rs:6:18
+  |
+6 | #[salsa::tracked(return_ref)]
+  |                  ^^^^^^^^^^
+
+error: unexpected token
+  --> tests/compile-fail/tracked_impl_incompatibles.rs:11:18
+   |
+11 | #[salsa::tracked(specify)]
+   |                  ^^^^^^^
+
+error: unexpected token
+  --> tests/compile-fail/tracked_impl_incompatibles.rs:16:18
+   |
+16 | #[salsa::tracked(no_eq)]
+   |                  ^^^^^
+
+error: unexpected token
+  --> tests/compile-fail/tracked_impl_incompatibles.rs:21:18
+   |
+21 | #[salsa::tracked(data = Data)]
+   |                  ^^^^
+
+error: unexpected token
+  --> tests/compile-fail/tracked_impl_incompatibles.rs:26:18
+   |
+26 | #[salsa::tracked(db = Db)]
+   |                  ^^
+
+error: unexpected token
+  --> tests/compile-fail/tracked_impl_incompatibles.rs:31:18
+   |
+31 | #[salsa::tracked(recover_fn = recover)]
+   |                  ^^^^^^^^^^
+
+error: unexpected token
+  --> tests/compile-fail/tracked_impl_incompatibles.rs:36:18
+   |
+36 | #[salsa::tracked(lru = 32)]
+   |                  ^^^
+
+error: unexpected token
+  --> tests/compile-fail/tracked_impl_incompatibles.rs:41:18
+   |
+41 | #[salsa::tracked(constructor = Constructor)]
+   |                  ^^^^^^^^^^^
+
+error[E0117]: only traits defined in the current crate can be implemented for arbitrary types
+  --> tests/compile-fail/tracked_impl_incompatibles.rs:47:1
+   |
+47 | impl<'db> std::default::Default for [MyTracked<'db>; 12] {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^--------------------
+   | |                                   |
+   | |                                   this is not defined in the current crate because arrays are always foreign
+   | impl doesn't use only types from inside the current crate
+   |
+   = note: define and implement a trait or new type instead
+
+error[E0308]: mismatched types
+  --> tests/compile-fail/tracked_impl_incompatibles.rs:48:21
+   |
+48 |     fn default() -> Self {}
+   |        -------      ^^^^ expected `[MyTracked<'_>; 12]`, found `()`
+   |        |
+   |        implicitly returns `()` as its body has no tail or `return` expression
+   |
+   = note:  expected array `[MyTracked<'db>; 12]`
+           found unit type `()`

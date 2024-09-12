@@ -1,0 +1,11 @@
+error: `singleton` option not allowed here
+  --> tests/compile-fail/singleton_only_for_input.rs:15:18
+   |
+15 | #[salsa::tracked(singleton)]
+   |                  ^^^^^^^^^
+
+error: `singleton` option not allowed here
+  --> tests/compile-fail/singleton_only_for_input.rs:22:22
+   |
+22 | #[salsa::accumulator(singleton)]
+   |                      ^^^^^^^^^
