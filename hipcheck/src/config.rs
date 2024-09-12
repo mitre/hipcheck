@@ -581,28 +581,6 @@ impl AnalysisTreeNode {
 			weight,
 		}
 	}
-	pub fn augment(&self, scores: &AnalysisResults) -> Result<ScoreTreeNode> {
-		match self {
-			AnalysisTreeNode::Category { label, weight } => Ok(ScoreTreeNode {
-				label: label.clone(),
-				score: 0f64,
-				weight: (*weight).into(),
-			}),
-			AnalysisTreeNode::Analysis { analysis, weight } => {
-				let label = analysis.0.query.clone();
-				let stored_res = scores.table.get(&label).ok_or(hc_error!(
-					"missing expected analysis results {}",
-					analysis.0.query
-				))?;
-				let score = stored_res.score().0;
-				Ok(ScoreTreeNode {
-					label,
-					score: score as f64,
-					weight: (*weight).into(),
-				})
-			}
-		}
-	}
 	pub fn augment_plugin(
 		&self,
 		metrics: &HashMap<Analysis, PluginAnalysisResult>,

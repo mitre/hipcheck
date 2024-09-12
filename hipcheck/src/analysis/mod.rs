@@ -1,22 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod result;
 pub mod score;
 
 use crate::{
 	config::{AttacksConfigQuery, CommitConfigQuery, PracticesConfigQuery},
 	data::git::GitProvider,
-	error::{Error, Result},
+	error::Result,
 	metric::{affiliation::AffiliatedType, MetricProvider},
 	plugin::QueryResult,
-	report::Concern,
 	F64,
 };
 use std::{
 	collections::{HashMap, HashSet},
 	default::Default,
-	fmt,
-	fmt::{Display, Formatter},
 	ops::Not,
 	sync::Arc,
 };
@@ -52,97 +48,6 @@ pub trait AnalysisProvider:
 
 	/// Returns result of typo analysis
 	fn typo_analysis(&self) -> Result<QueryResult>;
-}
-
-#[allow(unused)]
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum AnalysisReport {
-	/// Affiliation analysis result.
-	Affiliation {
-		value: u64,
-		threshold: u64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<Concern>,
-	},
-	/// Binary file analysis result.
-	Binary {
-		value: u64,
-		threshold: u64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<Concern>,
-	},
-	/// Churn analysis result.
-	Churn {
-		value: F64,
-		threshold: F64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<Concern>,
-	},
-	/// Entropy analysis result.
-	Entropy {
-		value: F64,
-		threshold: F64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<Concern>,
-	},
-	/// Identity analysis result.
-	Identity {
-		value: F64,
-		threshold: F64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<Concern>,
-	},
-	/// Fuzz repo analysis result.
-	Fuzz {
-		value: bool,
-		outcome: AnalysisOutcome,
-		concerns: Vec<Concern>,
-	},
-	/// Review analysis result.
-	Review {
-		value: F64,
-		threshold: F64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<Concern>,
-	},
-	/// Typo analysis result.
-	Typo {
-		value: u64,
-		threshold: u64,
-		outcome: AnalysisOutcome,
-		concerns: Vec<Concern>,
-	},
-	/// "Result" for a skipped or errored analysis
-	None { outcome: AnalysisOutcome },
-}
-
-impl Default for AnalysisReport {
-	fn default() -> AnalysisReport {
-		AnalysisReport::None {
-			outcome: AnalysisOutcome::Skipped,
-		}
-	}
-}
-
-#[allow(unused)]
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
-pub enum AnalysisOutcome {
-	#[default]
-	Skipped,
-	Error(Error),
-	Pass(String),
-	Fail(String),
-}
-
-impl Display for AnalysisOutcome {
-	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		match self {
-			AnalysisOutcome::Skipped => write!(f, "SKIPPED"),
-			AnalysisOutcome::Error(msg) => write!(f, "ERROR   {}", msg),
-			AnalysisOutcome::Pass(msg) => write!(f, "PASS   {}", msg),
-			AnalysisOutcome::Fail(msg) => write!(f, "FAIL   {}", msg),
-		}
-	}
 }
 
 pub fn activity_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
