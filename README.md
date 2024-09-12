@@ -68,9 +68,10 @@ found in the [`LICENSE`](LICENSE) file in this repository.
 > Number 22-2145.
 >
 > Portions of this software were produced for the U.S. Government under
-> Contract No. FA8702-19-C-0001 and W56KGU-18-D-0004, and is subject to the
-> [Rights in Noncommercial Computer Software and Noncommercial Computer
-> Software Documentation Clause DFARS 252.227-7014 (FEB 2014)][dfars].
+> Contract No. FA8702-19-C-0001, W56KGU-18-D-0004, and 70RSAT20D00000001
+> and is subject to the [Rights in Noncommercial Computer Software and
+> Noncommercial Computer Software Documentation Clause DFARS 252.227-7014
+> (FEB 2014)][dfars].
 
 [dfars]: https://www.acquisition.gov/dfars/252.227-7014-rights-other-commercial-computer-software-and-other-commercial-computer-software-documentation.
 [quickstart]: https://mitre.github.io/hipcheck/docs/quickstart/
