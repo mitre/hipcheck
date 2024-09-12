@@ -146,6 +146,11 @@ crate::data_variant_parser! {
 	pattern = Token::Ident(s) => s.to_owned();
 }
 
+crate::data_variant_parser! {
+	fn parse_json_pointer(input) -> Result<Expr>;
+	pattern = Token::JSONPointer(s) => Expr::JsonPointer(JsonPointer { pointer: s.to_owned(), value: None });
+}
+
 // Helper type for token parsing.
 pub type Input<'source> = Tokens<'source, Token>;
 
@@ -164,7 +169,7 @@ fn parse_array(input: Input<'_>) -> IResult<Input<'_>, Expr> {
 /// Parse an expression.
 fn parse_expr(input: Input<'_>) -> IResult<Input<'_>, Expr> {
 	let primitive = map(parse_primitive, Expr::Primitive);
-	alt((primitive, parse_array, parse_function))(input)
+	alt((primitive, parse_array, parse_function, parse_json_pointer))(input)
 }
 
 /// Parse a function call.
@@ -238,6 +243,13 @@ mod tests {
 		Expr::Array(vals)
 	}
 
+	fn json_ptr(name: &str) -> Expr {
+		Expr::JsonPointer(JsonPointer {
+			pointer: String::from(name),
+			value: None,
+		})
+	}
+
 	#[test]
 	fn parse_bool() {
 		let input = "#t";
@@ -292,6 +304,22 @@ mod tests {
 			],
 		);
 
+		let result = parse(input).unwrap();
+		assert_eq!(result, expected);
+	}
+
+	#[test]
+	fn parse_json_pointer_empty() {
+		let input = "$";
+		let expected = json_ptr("");
+		let result = parse(input).unwrap();
+		assert_eq!(result, expected);
+	}
+
+	#[test]
+	fn parse_json_pointer_basic() {
+		let input = "$/alpha";
+		let expected = json_ptr("/alpha");
 		let result = parse(input).unwrap();
 		assert_eq!(result, expected);
 	}
