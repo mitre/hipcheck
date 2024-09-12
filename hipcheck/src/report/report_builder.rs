@@ -14,7 +14,7 @@ use crate::{
 	version::VersionQuery,
 };
 use serde_json::Value;
-use std::{collections::HashSet, default::Default, result::Result as StdResult};
+use std::{collections::HashSet, default::Default};
 
 /// Print the final report of a Hipcheck run.
 pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Report> {
@@ -266,27 +266,6 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	log::info!("built final report");
 
 	Ok(report)
-}
-
-#[allow(unused)]
-fn extract_results<O, E, P, F>(
-	builder: &mut ReportBuilder,
-	result: &Option<StdResult<O, E>>,
-	pass: P,
-	fail: F,
-) -> Result<()>
-where
-	P: Fn(&mut ReportBuilder, &O) -> Result<()>,
-	F: Fn(&mut ReportBuilder, &E) -> Result<()>,
-{
-	match AnalysisResult::from(result) {
-		// Handle successes.
-		AnalysisResult::Ran(output) => pass(builder, output),
-		// Handle errors.
-		AnalysisResult::Error(error) => fail(builder, error),
-		// Do nothing if skipped.
-		AnalysisResult::Skip => Ok(()),
-	}
 }
 
 /// Builds a final `Report` of Hipcheck's results.

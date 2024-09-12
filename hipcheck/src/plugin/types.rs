@@ -313,13 +313,6 @@ impl Drop for PluginContext {
 	}
 }
 
-#[allow(unused)]
-pub enum HcQueryResult {
-	Ok(Value),
-	Needs(String, String, String, Value),
-	Err(Error),
-}
-
 #[derive(Debug)]
 pub struct Query {
 	pub id: usize,
