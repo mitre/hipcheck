@@ -22,6 +22,7 @@ by opening an issue on our [issue tracker](https://github.com/mitre/hipcheck/iss
 - [Why Hipcheck?](@/docs/guide/why.md)
 - [Key Concepts](@/docs/guide/concepts/index.md)
 - [How to use Hipcheck](@/docs/guide/how-to-use.md)
+- [Plugins](@/docs/guide/plugin/index.md)
 - [Analyses](@/docs/guide/analyses.md)
 - [Configuration](@/docs/guide/configuration.md)
 - [Debugging](@/docs/guide/debugging.md)
