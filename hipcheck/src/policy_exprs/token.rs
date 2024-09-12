@@ -36,6 +36,9 @@ pub enum Token {
 
 	#[regex("([a-zA-Z]+)", lex_ident)]
 	Ident(String),
+
+	#[regex(r"\$[/~_[:alnum:]]*", lex_json_pointer)]
+	JSONPointer(String),
 }
 
 /// Lex a single boolean.
@@ -70,6 +73,24 @@ fn lex_ident(input: &mut Lexer<'_, Token>) -> Result<String> {
 	Ok(input.slice().to_owned())
 }
 
+/// Lex a JSON Pointer.
+fn lex_json_pointer(input: &mut Lexer<'_, Token>) -> Result<String> {
+	let token = input.slice();
+	// Remove the initial '$' character.
+	let pointer = token.get(1..).ok_or(LexingError::InternalError(format!(
+		"JSON Pointer token missing mandatory initial '$': got '{}'",
+		token
+	)))?;
+	if let Some(chr) = pointer.chars().next() {
+		if chr != '/' {
+			return Err(LexingError::JSONPointerMissingInitialSlash(
+				pointer.to_owned(),
+			));
+		}
+	}
+	Ok(pointer.to_owned())
+}
+
 impl Display for Token {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
@@ -82,6 +103,7 @@ impl Display for Token {
 			Token::Integer(i) => write!(f, "{i}"),
 			Token::Float(fl) => write!(f, "{fl}"),
 			Token::Ident(i) => write!(f, "{i}"),
+			Token::JSONPointer(pointer) => write!(f, "${pointer}"),
 		}
 	}
 }
@@ -92,6 +114,9 @@ pub enum LexingError {
 	#[error("an unknown lexing error occured")]
 	#[default]
 	UnknownError,
+
+	#[error("internal error: '{0}'")]
+	InternalError(String),
 
 	#[error("failed to parse integer")]
 	InvalidInteger(String, ParseIntError),
@@ -104,11 +129,14 @@ pub enum LexingError {
 
 	#[error("invalid boolean, found '{0}'")]
 	InvalidBool(String),
+
+	#[error("invalid JSON Pointer, found '{0}'. JSON Pointers must be empty or start with '/'.")]
+	JSONPointerMissingInitialSlash(String),
 }
 
 #[cfg(test)]
 mod tests {
-	use crate::policy_exprs::{token::Token, Result, F64};
+	use crate::policy_exprs::{token::Token, Error::Lex, LexingError, Result, F64};
 	use logos::Logos as _;
 	use test_log::test;
 
@@ -156,6 +184,50 @@ mod tests {
 			Token::Ident(String::from("eq")),
 			Token::Bool(true),
 			Token::Bool(false),
+			Token::CloseParen,
+		];
+		let tokens = lex(raw_program).unwrap();
+		assert_eq!(tokens, expected);
+	}
+
+	#[test]
+	fn basic_lexing_with_jsonptr_empty() {
+		let raw_program = "$";
+		let expected = vec![
+			// Note that the initial '$' is not considered part of the pointer string.
+			Token::JSONPointer(String::from("")),
+		];
+		let tokens = lex(raw_program).unwrap();
+		assert_eq!(tokens, expected);
+	}
+
+	#[test]
+	fn basic_lexing_with_jsonptr_error_invalid() {
+		// This JSON Pointer is invalid because it doesn't start with a '/' character.
+		let raw_program = "$alpha";
+		let expected = Err(Lex(LexingError::JSONPointerMissingInitialSlash(
+			String::from("alpha"),
+		)));
+		let tokens = lex(raw_program);
+		assert_eq!(tokens, expected);
+	}
+
+	#[test]
+	fn basic_lexing_with_jsonptr_valid_chars() {
+		let raw_program = "$/alpha_bravo/~0/~1";
+		let expected = vec![Token::JSONPointer(String::from("/alpha_bravo/~0/~1"))];
+		let tokens = lex(raw_program).unwrap();
+		assert_eq!(tokens, expected);
+	}
+
+	#[test]
+	fn basic_lexing_with_jsonptr_in_expr() {
+		let raw_program = "(eq 1 $/data/one)";
+		let expected = vec![
+			Token::OpenParen,
+			Token::Ident(String::from("eq")),
+			Token::Integer(1),
+			Token::JSONPointer(String::from("/data/one")),
 			Token::CloseParen,
 		];
 		let tokens = lex(raw_program).unwrap();
