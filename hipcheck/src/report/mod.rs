@@ -371,7 +371,6 @@ pub enum Analysis {
 		#[serde(skip)]
 		passed: bool,
 	},
-	#[allow(unused)]
 	/// Plugin analysis.
 	Plugin {
 		/// The name of the plugin.
@@ -380,7 +379,7 @@ pub enum Analysis {
 		///
 		/// Same as with the message, this is computed eagerly in the case of
 		/// plugin analyses.
-		is_passing: bool,
+		passed: bool,
 		/// The policy expression used for the plugin.
 		///
 		/// We use this when printing the result to help explain to the user
@@ -440,10 +439,10 @@ impl Analysis {
 	percent_constructor!(identity);
 	percent_constructor!(review);
 
-	pub fn plugin(name: String, is_passing: bool, policy_expr: String, message: String) -> Self {
+	pub fn plugin(name: String, passed: bool, policy_expr: String, message: String) -> Self {
 		Analysis::Plugin {
 			name,
-			is_passing,
+			passed,
 			policy_expr,
 			message,
 		}
@@ -478,9 +477,7 @@ impl Analysis {
 			| Entropy { passed, .. }
 			| Identity { passed, .. }
 			| Review { passed, .. }
-			| Plugin {
-				is_passing: passed, ..
-			} => *passed,
+			| Plugin { passed, .. } => *passed,
 		}
 	}
 
@@ -554,7 +551,14 @@ impl Analysis {
 				(false, true) => "too many concerning dependency names".to_string(),
 				(false, false) => "has concerning dependency names".to_string(),
 			},
-			Plugin { policy_expr, .. } => format!("failed to meet policy: ({policy_expr})"),
+			Plugin {
+				policy_expr,
+				passed,
+				..
+			} => match passed {
+				true => "satisfied associated policy".to_owned(),
+				false => format!("failed to meet policy: ({policy_expr})"),
+			},
 		}
 	}
 

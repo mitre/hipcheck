@@ -2,7 +2,7 @@
 
 use super::{PluginId, PluginManifest, PluginName, PluginPublisher, PluginVersion};
 use crate::{
-	cache::plugin_cache::HcPluginCache,
+	cache::plugin::HcPluginCache,
 	error::Error,
 	hc_error,
 	plugin::{
