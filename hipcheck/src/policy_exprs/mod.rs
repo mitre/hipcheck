@@ -67,6 +67,7 @@ pub(crate) fn eval(env: &Env, program: &Expr) -> Result<Expr> {
 			}
 		}
 		Expr::Lambda(_, body) => Ok((**body).clone()),
+		Expr::JsonPointer(_) => unreachable!(),
 	};
 
 	log::debug!("input: {program:?}, output: {output:?}");
