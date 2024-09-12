@@ -75,7 +75,7 @@ impl PluginExecutor {
 		// on the cmdline is not already in use, but it is still possible for that
 		// port to become unavailable between our check and the plugin's bind attempt.
 		// Hence the need for subsequent attempts if we get unlucky
-		eprintln!("Starting plugin '{}'", plugin.name);
+		log::debug!("Starting plugin '{}'", plugin.name);
 		let mut spawn_attempts: usize = 0;
 		while spawn_attempts < self.max_spawn_attempts {
 			// Find free port for process. Don't retry if we fail since this means all
@@ -83,7 +83,7 @@ impl PluginExecutor {
 			let port = self.get_available_port()?;
 			let port_str = port.to_string();
 			// Spawn plugin process
-			eprintln!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
+			log::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
 			let Ok(mut proc) = Command::new(&plugin.entrypoint)
 				.args(["--port", port_str.as_str()])
 				// @Temporary - directly forward stdout/stderr from plugin to shell
