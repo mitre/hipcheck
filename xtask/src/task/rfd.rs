@@ -37,7 +37,7 @@ fn new(args: NewRfdArgs) -> Result<()> {
 
 	let title = args.title.to_case(Case::Kebab);
 	let file_name = format!("{:04}-{}.md", id, title);
-	let path = pathbuf![&root, "docs", "rfds", &file_name];
+	let path = pathbuf![&root, "site", "content", "rfds", &file_name];
 	let _ = File::create_new(path)?;
 	log::warn!(
 		"created draft RFD #{}: \"{}\", at '{}'",
