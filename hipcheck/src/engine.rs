@@ -2,7 +2,7 @@
 
 pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
 use crate::{
-	cache::plugin_cache::HcPluginCache,
+	cache::plugin::HcPluginCache,
 	hc_error,
 	plugin::{
 		get_plugin_key, retrieve_plugins, Plugin, PluginManifest, PluginResponse, QueryResult,

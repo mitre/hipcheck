@@ -6,7 +6,7 @@ pub mod spdx;
 
 use crate::{
 	analysis::{score::ScoringProviderStorage, AnalysisProviderStorage},
-	cache::plugin_cache::HcPluginCache,
+	cache::plugin::HcPluginCache,
 	cli::Format,
 	config::{
 		AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource,

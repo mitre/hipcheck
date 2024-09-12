@@ -2,7 +2,7 @@
 
 use super::{DownloadManifest, PluginId};
 use crate::{
-	cache::plugin_cache::HcPluginCache,
+	cache::plugin::HcPluginCache,
 	config::MITRE_PUBLISHER,
 	error::Error,
 	hc_error,

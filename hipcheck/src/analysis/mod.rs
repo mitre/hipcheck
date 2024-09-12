@@ -211,21 +211,3 @@ pub fn typo_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
 		concerns,
 	})
 }
-
-#[allow(unused)]
-fn score_by_threshold<T: PartialOrd>(value: T, threshold: T) -> i64 {
-	if value > threshold {
-		1
-	} else {
-		0
-	}
-}
-
-#[allow(unused)]
-fn score_by_threshold_reversed<T: PartialOrd>(value: T, threshold: T) -> i64 {
-	if value >= threshold {
-		0
-	} else {
-		1
-	}
-}

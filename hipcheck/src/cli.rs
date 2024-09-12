@@ -3,7 +3,7 @@
 //! Data structures for Hipcheck's main CLI.
 
 use crate::{
-	cache::repo_cache::{RepoCacheDeleteScope, RepoCacheListScope, RepoCacheSort},
+	cache::repo::{RepoCacheDeleteScope, RepoCacheListScope, RepoCacheSort},
 	error::Context,
 	error::Result,
 	hc_error,

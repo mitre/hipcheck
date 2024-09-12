@@ -29,7 +29,7 @@ pub mod hipcheck {
 
 use crate::{
 	analysis::score::score_results,
-	cache::repo_cache::HcRepoCache,
+	cache::repo::HcRepoCache,
 	cli::Format,
 	config::WeightTreeProvider,
 	error::{Context as _, Error, Result},
