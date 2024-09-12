@@ -14,6 +14,7 @@ resolver = "2"
 members = [
     "hipcheck",
     "hipcheck-macros",
+	"hipcheck-incremental",
     "xtask",
     "plugins/dummy_rand_data",
     "plugins/dummy_sha256",
