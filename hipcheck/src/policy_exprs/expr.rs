@@ -183,7 +183,7 @@ fn parse_function(input: Input<'_>) -> IResult<Input<'_>, Expr> {
 
 pub fn parse(input: &str) -> Result<Expr> {
 	let tokens = Tokens::new(input);
-	let mut parser = all_consuming(parse_function);
+	let mut parser = all_consuming(parse_expr);
 
 	match parser(tokens).finish() {
 		Ok((rest, expr)) if rest.is_empty() => Ok(expr),
@@ -236,6 +236,14 @@ mod tests {
 
 	fn array(vals: Vec<Primitive>) -> Expr {
 		Expr::Array(vals)
+	}
+
+	#[test]
+	fn parse_bool() {
+		let input = "#t";
+		let expected = boolean(true).into_expr();
+		let result = parse(input).unwrap();
+		assert_eq!(result, expected);
 	}
 
 	#[test]
