@@ -30,6 +30,9 @@ pub enum Expr {
 
 	/// Stores the name of the input variable, followed by the lambda body.
 	Lambda(Ident, Box<Expr>),
+
+	/// Stores a late-binding for a JSON value.
+	JsonPointer(JsonPointer),
 }
 
 /// Primitive data.
@@ -52,6 +55,13 @@ pub enum Primitive {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ident(pub String);
 
+/// A late-binding for a JSON pointer
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JsonPointer {
+	pointer: String,
+	value: Option<serde_json::Value>,
+}
+
 /// A non-NaN 64-bit floating point number.
 pub type F64 = NotNan<f64>;
 
@@ -67,6 +77,7 @@ impl Display for Expr {
 				write!(f, "({} {})", ident, args)
 			}
 			Expr::Lambda(arg, body) => write!(f, "(lambda ({}) {}", arg, body),
+			Expr::JsonPointer(pointer) => write!(f, "${}", pointer.pointer),
 		}
 	}
 }
