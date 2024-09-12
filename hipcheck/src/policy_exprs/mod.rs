@@ -81,6 +81,14 @@ mod tests {
 	use test_log::test;
 
 	#[test]
+	fn run_bool() {
+		let program = "#t";
+		let context = Value::Null;
+		let is_true = Executor::std().run(program, &context).unwrap();
+		assert!(is_true);
+	}
+
+	#[test]
 	fn run_basic() {
 		let program = "(eq (add 1 2) 3)";
 		let context = Value::Null;
