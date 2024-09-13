@@ -77,7 +77,7 @@ fn process_pointer(pointer: &str, context: &Value) -> Result<String> {
 }
 
 /// Wrap serde_json's `Value::pointer` method to provide better error handling.
-fn lookup_json_pointer<'val>(pointer: &str, context: &'val Value) -> Result<&'val Value> {
+pub fn lookup_json_pointer<'val>(pointer: &str, context: &'val Value) -> Result<&'val Value> {
 	// serde_json's JSON Pointer implementation does not distinguish between
 	// syntax errors and lookup errors, so we check the syntax ourselves.
 	// The only syntax error that serde_json currently recognizes is that a
@@ -101,11 +101,15 @@ fn lookup_json_pointer<'val>(pointer: &str, context: &'val Value) -> Result<&'va
 /// Attempt to interpret a JSON Value as a Policy Expression.
 /// `pointer` and `context` are only passed in to provide more context in the
 /// case of errors.
-fn json_to_policy_expr(val: &Value, pointer: &str, context: &Value) -> Result<Expr> {
+pub fn json_to_policy_expr(val: &Value, pointer: &str, context: &Value) -> Result<Expr> {
 	match val {
 		Value::Number(n) => {
-			let not_nan = NotNan::new(n.as_f64().unwrap()).unwrap();
-			Ok(Expr::Primitive(Primitive::Float(not_nan)))
+			if n.is_i64() {
+				Ok(Expr::Primitive(Primitive::Int(n.as_i64().unwrap())))
+			} else {
+				let not_nan = NotNan::new(n.as_f64().unwrap()).unwrap();
+				Ok(Expr::Primitive(Primitive::Float(not_nan)))
+			}
 		}
 		Value::Bool(b) => Ok(Expr::Primitive(Primitive::Bool(*b))),
 		Value::Array(a) => {

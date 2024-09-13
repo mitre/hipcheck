@@ -2,6 +2,7 @@
 
 use crate::policy_exprs::{eval, Error, Expr, Ident, Primitive, Result, F64};
 use itertools::Itertools as _;
+use serde_json::Value;
 use std::{cmp::Ordering, collections::HashMap, ops::Not as _};
 use Expr::*;
 use Primitive::*;
@@ -13,6 +14,8 @@ pub struct Env<'parent> {
 
 	/// Possible pointer to parent, for lexical scope.
 	parent: Option<&'parent Env<'parent>>,
+
+	pub context: Value,
 }
 
 /// A binding in the environment.
@@ -30,16 +33,17 @@ type Op = fn(&Env, &[Expr]) -> Result<Expr>;
 
 impl<'parent> Env<'parent> {
 	/// Create an empty environment.
-	fn empty() -> Self {
+	fn empty(context: Value) -> Self {
 		Env {
 			bindings: HashMap::new(),
 			parent: None,
+			context,
 		}
 	}
 
 	/// Create the standard environment.
-	pub fn std() -> Self {
-		let mut env = Env::empty();
+	pub fn std(context: Value) -> Self {
+		let mut env = Env::empty(context);
 
 		// Comparison functions.
 		env.add_fn("gt", gt);
@@ -87,6 +91,7 @@ impl<'parent> Env<'parent> {
 		Env {
 			bindings: HashMap::new(),
 			parent: Some(self),
+			context: self.context.clone(),
 		}
 	}
 
