@@ -1,7 +1,7 @@
 #============================================================================
 # Builder Layer
 
-FROM rust:1.79.0-slim-bookworm AS builder
+FROM rust:1.81.0-slim-bookworm AS builder
 
 WORKDIR /build
 
@@ -31,7 +31,6 @@ RUN set -eux && \
     apt-get update && \
     apt-get install -y npm git && \
     apt-get clean && \
-    npm install -g module-deps@6.2 --no-audit --no-fund && \
     adduser --disabled-password hc_user && \
     chown -R hc_user /app
 
