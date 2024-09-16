@@ -1910,9 +1910,9 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "packageurl"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fd2afe7e71d621b1771201bcdede645dd1a404012cdd6673b56d10be495f2a8"
+checksum = "d7eb30e191e775e11d76e54e8c7df6ccbf357001c16bb8d1252e8bf7a787ec5a"
 dependencies = [
  "percent-encoding",
  "thiserror",
