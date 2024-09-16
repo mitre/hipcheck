@@ -14,7 +14,7 @@ env_logger = "0.11.5"
 log = "0.4.22"
 glob = "0.3.0"
 pathbuf = "1.0.0"
-serde = { version = "1.0.206", features = ["derive"] }
+serde = { version = "1.0.210", features = ["derive"] }
 toml = "0.8.19"
 xshell = "0.2.6"
 which = "6.0.3"
