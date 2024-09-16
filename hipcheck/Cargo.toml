@@ -120,7 +120,7 @@ tokio = { version = "1.40.0", features = [
     "sync",
     "time",
 ] }
-tokio-stream = "0.1.15"
+tokio-stream = "0.1.16"
 toml = "0.8.19"
 tonic = "0.12.2"
 thiserror = "1.0.63"
