@@ -19,6 +19,7 @@ fn main() -> ExitCode {
 		.init();
 
 	let result = match args.command {
+		Commands::Buf => task::buf::run(),
 		Commands::Check => task::check::run(),
 		Commands::Ci => task::ci::run(),
 		Commands::Changelog(args) => task::changelog::run(args),
@@ -60,6 +61,8 @@ enum Commands {
 	Rfd(RfdArgs),
 	/// Work with the Hipcheck website.
 	Site(SiteArgs),
+	/// Lint the Hipcheck plugin gRPC definition.
+	Buf,
 }
 
 #[derive(Debug, clap::Args)]
