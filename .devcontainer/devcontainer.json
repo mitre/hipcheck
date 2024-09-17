@@ -8,7 +8,6 @@
     "ghcr.io/devcontainers/features/node:1": {}
   },
   "postCreateCommand": {
-    "module-deps": "npm install -g module-deps@6.2 --no-audit --no-fund",
-    "openssl": "sudo apt-get install libssl-dev"
+    "openssl": "sudo apt-get install libssl-dev protobuf-compiler"
   }
 }
