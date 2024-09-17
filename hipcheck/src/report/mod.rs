@@ -687,8 +687,8 @@ impl RecommendationKind {
 	fn is(risk_score: RiskScore, risk_policy: RiskPolicy) -> Result<RecommendationKind> {
 		let value = serde_json::to_value(risk_score.0).unwrap();
 		Ok(
-			if Executor::std()
-				.run(&risk_policy.0, &value)
+			if Executor::std(value)
+				.run(&risk_policy.0)
 				.context("investigate policy expression execution failed")?
 			{
 				RecommendationKind::Pass

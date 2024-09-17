@@ -279,8 +279,8 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 			// Determine if analysis passed by evaluating policy expr
 			let passed = {
 				if let Ok(output) = &response {
-					Executor::std()
-						.run(analysis.1.as_str(), &output.value)
+					Executor::std(output.value.clone())
+						.run(analysis.1.as_str())
 						.map_err(|e| hc_error!("{}", e))?
 				} else {
 					false

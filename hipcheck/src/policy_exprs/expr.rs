@@ -58,8 +58,8 @@ pub struct Ident(pub String);
 /// A late-binding for a JSON pointer
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsonPointer {
-	pointer: String,
-	value: Option<serde_json::Value>,
+	pub pointer: String,
+	pub value: Option<serde_json::Value>,
 }
 
 /// A non-NaN 64-bit floating point number.
