@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{Expr, Ident, LexingError};
+use jiff::Error as JError;
 use nom::{error::ErrorKind, Needed};
 use ordered_float::FloatIsNan;
+use std::fmt;
 
 /// `Result` which uses [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;
@@ -124,6 +126,26 @@ pub enum UnrepresentableJSONType {
 	JSONObject,
 	JSONString,
 	JSONNull,
+}
+
+// Custom error to handle jiff's native error not impl PartialEq
+// We exploit the fact that it *does* impl Display
+#[derive(Clone, Debug, thiserror::Error, PartialEq)]
+pub struct JiffError {
+	jiff_error: String,
+}
+
+impl JiffError {
+	pub fn new(err: JError) -> Self {
+		let msg = err.to_string();
+		JiffError { jiff_error: msg }
+	}
+}
+
+impl fmt::Display for JiffError {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.jiff_error)
+	}
 }
 
 fn needed_str(needed: &Needed) -> String {

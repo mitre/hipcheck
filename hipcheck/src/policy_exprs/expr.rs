@@ -6,6 +6,7 @@ use crate::policy_exprs::{
 	Error, Result, Tokens,
 };
 use itertools::Itertools;
+use jiff::{Span, Zoned};
 use nom::{
 	branch::alt,
 	combinator::{all_consuming, map},
@@ -49,6 +50,21 @@ pub enum Primitive {
 
 	/// Boolean.
 	Bool(bool),
+
+	/// Date-time value with timezone information using the [jiff] crate, which uses a modified version of ISO8601.
+	/// This must include a date in the format <YYYY>-<MM>-<DD>.
+	/// An optional time in the format T<HH>:[MM]:[SS] will be accepted after the date.
+	/// Decimal fractions of hours and minutes are not allowed; use smaller time units instead (e.g. T10:30 instead of T10.5). Decimal fractions of seconds are allowed.
+	/// The timezone is always set to UTC, but you can set an offeset from UTC by including +{HH}:[MM] or -{HH}:[MM]. The time will be adjusted to the correct UTC time during parsing.
+	DateTime(Zoned),
+
+	/// Span of time using the [jiff] crate, which uses a modified version of ISO8601.
+	/// Can include years, months, weeks, days, hours, minutes, and seconds (including decimal fractions of a second).
+	/// Spans are preceded by the letter "P" with any optional time units separated from optional date units by the letter "T".
+	/// All units of dates and times are represented by single case-agnostic letter abbreviations after the number.
+	/// For example, a span of one year, one month, one week, one day, one hour, one minute, and one-and-a-tenth seconds would be represented as
+	/// "P1y1m1w1dT1h1m1.1s"
+	Span(Span),
 }
 
 /// A variable or function identifier.
@@ -89,6 +105,8 @@ impl Display for Primitive {
 			Primitive::Int(i) => write!(f, "{}", i),
 			Primitive::Float(fl) => write!(f, "{}", fl),
 			Primitive::Bool(b) => write!(f, "{}", if *b { "#t" } else { "#f" }),
+			Primitive::DateTime(dt) => write!(f, "{}", dt),
+			Primitive::Span(span) => write!(f, "{}", span),
 		}
 	}
 }
@@ -142,6 +160,16 @@ crate::data_variant_parser! {
 }
 
 crate::data_variant_parser! {
+	fn parse_datetime(input) -> Result<Primitive>;
+	pattern = Token::DateTime(dt) => Primitive::DateTime(*dt);
+}
+
+crate::data_variant_parser! {
+	fn parse_span(input) -> Result<Primitive>;
+	pattern = Token::Span(span) => Primitive::Span(*span);
+}
+
+crate::data_variant_parser! {
 	fn parse_ident(input) -> Result<String>;
 	pattern = Token::Ident(s) => s.to_owned();
 }
@@ -156,7 +184,13 @@ pub type Input<'source> = Tokens<'source, Token>;
 
 /// Parse a single piece of primitive data.
 fn parse_primitive(input: Input<'_>) -> IResult<Input<'_>, Primitive> {
-	alt((parse_integer, parse_float, parse_bool))(input)
+	alt((
+		parse_integer,
+		parse_float,
+		parse_bool,
+		parse_datetime,
+		parse_span,
+	))(input)
 }
 
 /// Parse an array.

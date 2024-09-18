@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::policy_exprs::error::JiffError;
 use crate::policy_exprs::F64;
+use git2::Time;
+use jiff::{
+	civil::{Date, DateTime},
+	tz::{self, TimeZone},
+	Span, Timestamp, Zoned,
+};
 use logos::{Lexer, Logos};
 use ordered_float::FloatIsNan;
 use std::{
@@ -34,7 +41,16 @@ pub enum Token {
 	#[regex(r"([1-9]?[0-9]*)", lex_integer, priority = 20)]
 	Integer(i64),
 
-	#[regex("([a-zA-Z]+)", lex_ident)]
+	#[regex(r"[0-9]{3,4}-[^\s\)]+", lex_datetime)]
+	DateTime(Box<Zoned>),
+
+	// In the future this regex *could* be made more specific to reduce collision
+	// with Ident, or we could introduce a special prefix character like '@' or '#'
+	#[regex(r"PT?[0-9]+[a-zA-Z][^\s\)]*", lex_span)]
+	Span(Box<Span>),
+
+	// Prioritize over span regex, which starts with a 'P'
+	#[regex(r"([a-zA-Z]+)", lex_ident, priority = 10)]
 	Ident(String),
 
 	#[regex(r"\$[/~_[:alnum:]]*", lex_json_pointer)]
@@ -66,6 +82,42 @@ fn lex_float(input: &mut Lexer<'_, Token>) -> Result<F64> {
 		.parse::<f64>()
 		.map_err(|err| LexingError::InvalidFloat(s.to_string(), err))?;
 	Ok(F64::new(f)?)
+}
+
+/// Lex a single datetime value.
+fn lex_datetime(input: &mut Lexer<'_, Token>) -> Result<Box<Zoned>> {
+	let s = input.slice();
+	// Parse to a Zoned datetime value with as much detail as given
+	// If a UTC offset is provided, convert the datetime to the equivalent UTC datetime
+	if let Ok(timestamp) = s.parse::<Timestamp>() {
+		Ok(Box::new(timestamp.to_zoned(TimeZone::UTC)))
+	// If no offset is provided, assume the time is UTC
+	} else if let Ok(dt) = s.parse::<DateTime>() {
+		dt.to_zoned(TimeZone::UTC)
+			.map_err(|err| LexingError::InvalidDatetime(s.to_string(), JiffError::new(err)))
+			.map(Box::new)
+	} else {
+		match s.parse::<Date>() {
+			// If no time is provided, treat the time as midnight UTC on the given day
+			Ok(date) => date
+				.to_zoned(TimeZone::UTC)
+				.map_err(|err| LexingError::InvalidDatetime(s.to_string(), JiffError::new(err)))
+				.map(Box::new),
+			// If the string provided does not parse to a valid date or datetime, return an error
+			Err(err) => Err(LexingError::InvalidDatetime(
+				s.to_string(),
+				JiffError::new(err),
+			)),
+		}
+	}
+}
+
+/// Lex a time span
+fn lex_span(input: &mut Lexer<'_, Token>) -> Result<Box<Span>> {
+	let s = input.slice();
+	s.parse::<Span>()
+		.map_err(|err| LexingError::InvalidSpan(s.to_string(), JiffError::new(err)))
+		.map(Box::new)
 }
 
 /// Lex a single identifier.
@@ -102,6 +154,8 @@ impl Display for Token {
 			Token::Bool(false) => write!(f, "#f"),
 			Token::Integer(i) => write!(f, "{i}"),
 			Token::Float(fl) => write!(f, "{fl}"),
+			Token::DateTime(dt) => write!(f, "{dt}"),
+			Token::Span(span) => write!(f, "{span}"),
 			Token::Ident(i) => write!(f, "{i}"),
 			Token::JSONPointer(pointer) => write!(f, "${pointer}"),
 		}
@@ -132,11 +186,21 @@ pub enum LexingError {
 
 	#[error("invalid JSON Pointer, found '{0}'. JSON Pointers must be empty or start with '/'.")]
 	JSONPointerMissingInitialSlash(String),
+
+	#[error("failed to parse date or datetime")]
+	InvalidDatetime(String, JiffError),
+
+	#[error("failed to parse span")]
+	InvalidSpan(String, JiffError),
 }
 
 #[cfg(test)]
 mod tests {
 	use crate::policy_exprs::{token::Token, Error::Lex, LexingError, Result, F64};
+	use jiff::{
+		tz::{self, TimeZone},
+		Span, Timestamp, Zoned,
+	};
 	use logos::Logos as _;
 	use test_log::test;
 
@@ -230,6 +294,57 @@ mod tests {
 			Token::JSONPointer(String::from("/data/one")),
 			Token::CloseParen,
 		];
+
+		let tokens = lex(raw_program).unwrap();
+		assert_eq!(tokens, expected);
+	}
+
+	#[test]
+	fn basic_lexing_with_time() {
+		let raw_program = "(eq (sub 2024-09-17T09:00-05 2024-09-17T10:30-05) PT1H30M)";
+
+		let ts1: Timestamp = "2024-09-17T09:00-05".parse().unwrap();
+		let dt1 = Zoned::new(ts1, TimeZone::UTC);
+		let ts2: Timestamp = "2024-09-17T10:30-05".parse().unwrap();
+		let dt2 = Zoned::new(ts2, TimeZone::UTC);
+		let span: Span = "PT1H30M".parse().unwrap();
+
+		let expected = vec![
+			Token::OpenParen,
+			Token::Ident(String::from("eq")),
+			Token::OpenParen,
+			Token::Ident(String::from("sub")),
+			Token::DateTime(Box::new(dt1)),
+			Token::DateTime(Box::new(dt2)),
+			Token::CloseParen,
+			Token::Span(Box::new(span)),
+			Token::CloseParen,
+		];
+
+		let tokens = lex(raw_program).unwrap();
+		assert_eq!(tokens, expected);
+	}
+
+	// Ensure that idents with capital P are prioritized over being treated as spans
+	#[test]
+	fn regression_lex_span_and_ident() {
+		let raw_program = "Philip";
+		let expected = vec![Token::Ident(String::from("Philip"))];
+
+		let tokens = lex(raw_program).unwrap();
+		assert_eq!(tokens, expected);
+
+		let raw_program = "PT1H30M";
+		let span: Span = raw_program.parse().unwrap();
+
+		let expected = vec![Token::Span(Box::new(span))];
+
+		let tokens = lex(raw_program).unwrap();
+		assert_eq!(tokens, expected);
+
+		let raw_program = "PTBarnum";
+		let expected = vec![Token::Ident(String::from("PTBarnum"))];
+
 		let tokens = lex(raw_program).unwrap();
 		assert_eq!(tokens, expected);
 	}
