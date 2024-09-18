@@ -2,6 +2,7 @@
 
 use crate::policy_exprs::{eval, Error, Expr, Ident, Primitive, Result, F64};
 use itertools::Itertools as _;
+use jiff::{Span, Zoned};
 use std::{cmp::Ordering, collections::HashMap, ops::Not as _};
 use Expr::*;
 use Primitive::*;
@@ -228,6 +229,12 @@ enum ArrayType {
 	/// An array of bools.
 	Bool(Vec<bool>),
 
+	/// An array of datetimes.
+	DateTime(Vec<Zoned>),
+
+	/// An array of time spans.
+	Span(Vec<Span>),
+
 	/// An empty array (no type hints).
 	Empty,
 }
@@ -272,6 +279,29 @@ fn array_type(arr: &[Primitive]) -> Result<ArrayType> {
 			}
 			Ok(ArrayType::Bool(result))
 		}
+		DateTime(_) => {
+			let mut result: Vec<Zoned> = Vec::with_capacity(arr.len());
+			for elem in arr {
+				if let DateTime(val) = elem {
+					result.push(val.clone());
+				} else {
+					return Err(Error::InconsistentArrayTypes);
+				}
+			}
+			Ok(ArrayType::DateTime(result))
+		}
+		Span(_) => {
+			let mut result: Vec<Span> = Vec::with_capacity(arr.len());
+			for elem in arr {
+				if let Span(val) = elem {
+					result.push(*val);
+				} else {
+					return Err(Error::InconsistentArrayTypes);
+				}
+			}
+			Ok(ArrayType::Span(result))
+		}
+
 		Identifier(_) => unimplemented!("we don't currently support idents in arrays"),
 	}
 }
@@ -455,6 +485,8 @@ fn not(env: &Env, args: &[Expr]) -> Result<Expr> {
 		Int(_) => Err(Error::BadType(name)),
 		Float(_) => Err(Error::BadType(name)),
 		Bool(arg) => Ok(Primitive::Bool(arg.not())),
+		DateTime(_) => Err(Error::BadType(name)),
+		Span(_) => Err(Error::BadType(name)),
 		Identifier(_) => unreachable!("no idents should be here"),
 	};
 
@@ -480,6 +512,8 @@ fn max(env: &Env, args: &[Expr]) -> Result<Expr> {
 			.map(|m| Primitive(Float(m))),
 
 		ArrayType::Bool(_) => Err(Error::BadType(name)),
+		ArrayType::DateTime(_) => Err(Error::BadType(name)),
+		ArrayType::Span(_) => Err(Error::BadType(name)),
 		ArrayType::Empty => Err(Error::NoMax),
 	};
 
@@ -505,6 +539,8 @@ fn min(env: &Env, args: &[Expr]) -> Result<Expr> {
 			.map(|m| Primitive(Float(m))),
 
 		ArrayType::Bool(_) => Err(Error::BadType(name)),
+		ArrayType::DateTime(_) => Err(Error::BadType(name)),
+		ArrayType::Span(_) => Err(Error::BadType(name)),
 		ArrayType::Empty => Err(Error::NoMin),
 	};
 
@@ -528,6 +564,8 @@ fn avg(env: &Env, args: &[Expr]) -> Result<Expr> {
 		}
 
 		ArrayType::Bool(_) => Err(Error::BadType(name)),
+		ArrayType::DateTime(_) => Err(Error::BadType(name)),
+		ArrayType::Span(_) => Err(Error::BadType(name)),
 		ArrayType::Empty => Err(Error::NoAvg),
 	};
 
@@ -549,6 +587,8 @@ fn median(env: &Env, args: &[Expr]) -> Result<Expr> {
 			Ok(Primitive(Float(floats[mid])))
 		}
 		ArrayType::Bool(_) => Err(Error::BadType(name)),
+		ArrayType::DateTime(_) => Err(Error::BadType(name)),
+		ArrayType::Span(_) => Err(Error::BadType(name)),
 		ArrayType::Empty => Err(Error::NoMedian),
 	};
 
@@ -562,6 +602,8 @@ fn count(env: &Env, args: &[Expr]) -> Result<Expr> {
 		ArrayType::Int(ints) => Ok(Primitive(Int(ints.len() as i64))),
 		ArrayType::Float(floats) => Ok(Primitive(Int(floats.len() as i64))),
 		ArrayType::Bool(bools) => Ok(Primitive(Int(bools.len() as i64))),
+		ArrayType::DateTime(dts) => Ok(Primitive(Int(dts.len() as i64))),
+		ArrayType::Span(spans) => Ok(Primitive(Int(spans.len() as i64))),
 		ArrayType::Empty => Ok(Primitive(Int(0))),
 	};
 
@@ -588,6 +630,18 @@ fn all(env: &Env, args: &[Expr]) -> Result<Expr> {
 			ArrayType::Bool(bools) => bools
 				.iter()
 				.map(|val| eval_lambda(env, &ident, Bool(*val), (*body).clone()))
+				.process_results(|mut iter| {
+					iter.all(|expr| matches!(expr, Primitive(Bool(true))))
+				})?,
+			ArrayType::DateTime(dts) => dts
+				.iter()
+				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()))
+				.process_results(|mut iter| {
+					iter.all(|expr| matches!(expr, Primitive(Bool(true))))
+				})?,
+			ArrayType::Span(spans) => spans
+				.iter()
+				.map(|val| eval_lambda(env, &ident, Span(*val), (*body).clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
@@ -623,6 +677,18 @@ fn nall(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
+			ArrayType::DateTime(dts) => dts
+				.iter()
+				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()))
+				.process_results(|mut iter| {
+					iter.all(|expr| matches!(expr, Primitive(Bool(true)))).not()
+				})?,
+			ArrayType::Span(spans) => spans
+				.iter()
+				.map(|val| eval_lambda(env, &ident, Span(*val), (*body).clone()))
+				.process_results(|mut iter| {
+					iter.all(|expr| matches!(expr, Primitive(Bool(true)))).not()
+				})?,
 			ArrayType::Empty => false,
 		};
 
@@ -655,6 +721,18 @@ fn some(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
+			ArrayType::DateTime(dts) => dts
+				.iter()
+				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()))
+				.process_results(|mut iter| {
+					iter.any(|expr| matches!(expr, Primitive(Bool(true))))
+				})?,
+			ArrayType::Span(spans) => spans
+				.iter()
+				.map(|val| eval_lambda(env, &ident, Span(*val), (*body).clone()))
+				.process_results(|mut iter| {
+					iter.any(|expr| matches!(expr, Primitive(Bool(true))))
+				})?,
 			ArrayType::Empty => false,
 		};
 
@@ -684,6 +762,18 @@ fn none(env: &Env, args: &[Expr]) -> Result<Expr> {
 			ArrayType::Bool(bools) => bools
 				.iter()
 				.map(|val| eval_lambda(env, &ident, Bool(*val), (*body).clone()))
+				.process_results(|mut iter| {
+					iter.any(|expr| matches!(expr, Primitive(Bool(true)))).not()
+				})?,
+			ArrayType::DateTime(dts) => dts
+				.iter()
+				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()))
+				.process_results(|mut iter| {
+					iter.any(|expr| matches!(expr, Primitive(Bool(true)))).not()
+				})?,
+			ArrayType::Span(spans) => spans
+				.iter()
+				.map(|val| eval_lambda(env, &ident, Span(*val), (*body).clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
@@ -734,6 +824,33 @@ fn filter(env: &Env, args: &[Expr]) -> Result<Expr> {
 					}
 				})
 				.collect::<Result<Vec<_>>>()?,
+			ArrayType::DateTime(dts) => dts
+				.iter()
+				.map(|val| {
+					Ok((
+						val,
+						eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()),
+					))
+				})
+				.filter_map_ok(|(val, expr)| {
+					if let Ok(Primitive(Bool(true))) = expr {
+						Some(Primitive::DateTime(val.clone()))
+					} else {
+						None
+					}
+				})
+				.collect::<Result<Vec<_>>>()?,
+			ArrayType::Span(spans) => spans
+				.iter()
+				.map(|val| Ok((val, eval_lambda(env, &ident, Span(*val), (*body).clone()))))
+				.filter_map_ok(|(val, expr)| {
+					if let Ok(Primitive(Bool(true))) = expr {
+						Some(Primitive::Span(*val))
+					} else {
+						None
+					}
+				})
+				.collect::<Result<Vec<_>>>()?,
 			ArrayType::Empty => Vec::new(),
 		};
 
@@ -769,6 +886,24 @@ fn foreach(env: &Env, args: &[Expr]) -> Result<Expr> {
 			ArrayType::Bool(bools) => bools
 				.iter()
 				.map(|val| eval_lambda(env, &ident, Bool(*val), (*body).clone()))
+				.map(|expr| match expr {
+					Ok(Primitive(inner)) => Ok(inner),
+					Ok(_) => Err(Error::BadType(name)),
+					Err(err) => Err(err),
+				})
+				.collect::<Result<Vec<_>>>()?,
+			ArrayType::DateTime(dts) => dts
+				.iter()
+				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()))
+				.map(|expr| match expr {
+					Ok(Primitive(inner)) => Ok(inner),
+					Ok(_) => Err(Error::BadType(name)),
+					Err(err) => Err(err),
+				})
+				.collect::<Result<Vec<_>>>()?,
+			ArrayType::Span(spans) => spans
+				.iter()
+				.map(|val| eval_lambda(env, &ident, Span(*val), (*body).clone()))
 				.map(|expr| match expr {
 					Ok(Primitive(inner)) => Ok(inner),
 					Ok(_) => Err(Error::BadType(name)),
