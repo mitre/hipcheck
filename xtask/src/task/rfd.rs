@@ -3,11 +3,15 @@
 //! Tasks to list or create RFDs
 
 use crate::{NewRfdArgs, RfdArgs};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context as _, Result};
 use convert_case::{Case, Casing as _};
 use glob::{glob, Paths};
 use pathbuf::pathbuf;
-use std::{fs::File, path::PathBuf};
+use std::{
+	fs::File,
+	io::{BufWriter, Write as _},
+	path::PathBuf,
+};
 
 /// Run the `rfd` command.
 pub fn run(args: RfdArgs) -> Result<()> {
@@ -38,13 +42,25 @@ fn new(args: NewRfdArgs) -> Result<()> {
 	let title = args.title.to_case(Case::Kebab);
 	let file_name = format!("{:04}-{}.md", id, title);
 	let path = pathbuf![&root, "site", "content", "rfds", &file_name];
-	let _ = File::create_new(path)?;
+	let file = File::create_new(path).context("failed to create new RFD file")?;
+
+	let mut file = BufWriter::new(file);
+
+	writeln!(&mut file, "---")
+		.and_then(|_| writeln!(&mut file, "title: \"{}\"", args.title))
+		.and_then(|_| writeln!(&mut file, "---"))
+		.context("failed to write to new RFD file")?;
+
+	file.flush()
+		.context("failed to flush writes to RFD file to disk")?;
+
 	log::warn!(
 		"created draft RFD #{}: \"{}\", at '{}'",
 		id,
 		args.title,
 		pathbuf!["docs", "rfds", &file_name].display()
 	);
+
 	Ok(())
 }
 
