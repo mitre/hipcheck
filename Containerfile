@@ -1,43 +1,21 @@
-#============================================================================
-# Builder Layer
+# SPDX-License-Identifier: Apache-2.0
 
-FROM rust:1.81.0-slim-bookworm AS builder
+FROM node:bookworm-slim
 
-WORKDIR /build
-
-COPY .cargo/ .cargo/
-COPY hipcheck-macros/ hipcheck-macros/
-COPY hipcheck/ hipcheck/
-COPY plugins/ plugins/
-COPY xtask/ xtask/
-COPY Cargo.toml Cargo.lock ./
-
-RUN set -eux && \
-    apt-get update && \
-    apt-get install -y build-essential perl-base protobuf-compiler && \
-    cargo build --release
-
-#============================================================================
-# App Layer
-
-FROM debian:bookworm-slim AS app
+ARG HC_VERSION="3.6.3"
 
 WORKDIR /app
 
-COPY --from=builder /build/target/release/hc ./hc
-COPY config/ config/
-
-RUN set -eux && \
-    apt-get update && \
-    apt-get install -y npm git && \
-    apt-get clean && \
-    adduser --disabled-password hc_user && \
-    chown -R hc_user /app
+RUN set -eux \
+    && apt-get update \
+    && apt-get install -y git curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && adduser --disabled-password hc_user \
+    && chown -R hc_user /app \
+    && curl --proto '=https' --tlsv1.2 -LsSf https://github.com/mitre/hipcheck/releases/download/hipcheck-v${HC_VERSION}/hipcheck-installer.sh | sh
 
 USER hc_user
-
+COPY config/ config/
 ENV HC_CONFIG=./config
-
 ENTRYPOINT ["./hc"]
-
 CMD ["help"]
