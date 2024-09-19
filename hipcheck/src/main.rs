@@ -547,7 +547,15 @@ fn cmd_plugin(args: PluginArgs) {
 	use tokio::task::JoinSet;
 
 	let tgt_dir = "./target/debug";
-	let entrypoint1 = pathbuf![tgt_dir, "dummy_rand_data"];
+
+	let entrypoint1 = match args.sdk {
+		true => {
+			pathbuf![tgt_dir, "dummy_rand_data_sdk"]
+		}
+		false => {
+			pathbuf![tgt_dir, "dummy_rand_data"]
+		}
+	};
 	let entrypoint2 = pathbuf![tgt_dir, "dummy_sha256"];
 	let plugin1 = Plugin {
 		name: "dummy/rand_data".to_owned(),

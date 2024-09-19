@@ -1,0 +1,8 @@
+syntax = "proto3";
+package hipcheck.v1;
+
+message SetConfigRequest {
+    // JSON string containing configuration data expected by the plugin,
+    // pulled from the user's policy file.
+    string configuration = 1;
+}

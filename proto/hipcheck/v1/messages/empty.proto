@@ -1,0 +1,7 @@
+syntax = "proto3";
+package hipcheck.v1;
+
+/**
+ * An empty message.
+ */
+message Empty {}

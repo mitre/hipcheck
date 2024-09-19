@@ -71,17 +71,22 @@ impl ActivePlugin {
 
 	pub async fn query(&self, name: String, key: Value) -> Result<PluginResponse> {
 		let id = self.get_unique_id().await;
+
+		// TODO: remove this unwrap
+		let (publisher, plugin) = self.channel.name().split_once('/').unwrap();
+
 		// @Todo - check name+key valid for schema
 		let query = Query {
 			id,
 			request: true,
-			publisher: "".to_owned(),
-			plugin: self.channel.name().to_owned(),
+			publisher: publisher.to_owned(),
+			plugin: plugin.to_owned(),
 			query: name,
 			key,
 			output: serde_json::json!(null),
 			concerns: vec![],
 		};
+
 		Ok(self.channel.query(query).await?.into())
 	}
 
