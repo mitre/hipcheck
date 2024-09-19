@@ -36,10 +36,10 @@ fn sha256(content: &[u8]) -> Vec<u8> {
 }
 
 async fn handle_sha256(session: QuerySession, key: &[u8]) -> Result<()> {
-	println!("Key: {key:02x?}");
+	eprintln!("Key: {key:02x?}");
 	let res = sha256(key);
 
-	println!("Hash: {res:02x?}");
+	eprintln!("Hash: {res:02x?}");
 	let output = serde_json::to_value(res)?;
 
 	let resp = Query {

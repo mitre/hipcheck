@@ -478,6 +478,7 @@ impl PluginTransport {
 
 		// Send the query
 		let query: PluginQuery = query.try_into()?;
+
 		let id = query.id;
 		self.tx
 			.send(query)
@@ -499,6 +500,8 @@ impl PluginTransport {
 			while matches!(state, ReplyInProgress) {
 				// We expect another message. Pull it off the existing queue,
 				// or get a new one if we have run out
+				eprintln!("In progress");
+
 				let next = match msg_chunks.pop_front() {
 					Some(msg) => msg,
 					None => {

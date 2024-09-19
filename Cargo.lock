@@ -744,6 +744,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dummy_rand_data_sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "hipcheck-sdk",
+ "rand",
+ "tokio",
+]
+
+[[package]]
 name = "dummy_sha256"
 version = "0.1.0"
 dependencies = [
@@ -1237,6 +1248,24 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.75",
+]
+
+[[package]]
+name = "hipcheck-sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "indexmap 2.5.0",
+ "prost",
+ "rand",
+ "schemars",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
 ]
 
 [[package]]

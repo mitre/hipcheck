@@ -13,7 +13,7 @@ use std::{
 	pin::Pin,
 };
 use tokio::sync::mpsc::{self, error::TrySendError};
-use tonic::{Status, Streaming};
+use tonic::Status;
 
 #[derive(Debug)]
 pub struct Query {
@@ -109,7 +109,7 @@ impl QuerySession {
 	async fn recv_raw(&mut self) -> Result<Option<VecDeque<PluginQuery>>> {
 		let mut out = VecDeque::new();
 
-		eprintln!("RAND-session: awaiting raw rx recv");
+		eprintln!("SHA256-session: awaiting raw rx recv");
 
 		let opt_first = self
 			.rx
@@ -121,12 +121,12 @@ impl QuerySession {
 			// Underlying gRPC channel closed
 			return Ok(None);
 		};
-		eprintln!("RAND-session: got first msg");
+		eprintln!("SHA256-session: got first msg");
 		out.push_back(first);
 
 		// If more messages in the queue, opportunistically read more
 		loop {
-			eprintln!("RAND-session: trying to get additional msg");
+			eprintln!("SHA256-session: trying to get additional msg");
 
 			match self.rx.try_recv() {
 				Ok(Some(msg)) => {
@@ -143,12 +143,12 @@ impl QuerySession {
 			}
 		}
 
-		eprintln!("RAND-session: got {} msgs", out.len());
+		eprintln!("SHA256-session: got {} msgs", out.len());
 		Ok(Some(out))
 	}
 
 	pub async fn send(&self, query: Query) -> Result<()> {
-		eprintln!("RAND-session: sending query");
+		eprintln!("SHA256-session: sending query");
 
 		let query = InitiateQueryProtocolResponse {
 			query: Some(self.convert(query)?),
@@ -162,13 +162,13 @@ impl QuerySession {
 	pub async fn recv(&mut self) -> Result<Option<Query>> {
 		use QueryState::*;
 
-		eprintln!("RAND-session: calling recv_raw");
+		eprintln!("SHA256-session: calling recv_raw");
 		let Some(mut msg_chunks) = self.recv_raw().await? else {
 			return Ok(None);
 		};
 
 		let mut raw = msg_chunks.pop_front().unwrap();
-		eprintln!("RAND-session: recv got raw {raw:?}");
+		eprintln!("SHA256-session: recv got raw {raw:?}");
 
 		let mut state: QueryState = raw.state.try_into()?;
 
@@ -236,9 +236,12 @@ impl Drop for QuerySession {
 	}
 }
 
+type PluginQueryStream =
+	Box<dyn Stream<Item = Result<InitiateQueryProtocolRequest, Status>> + Send + Unpin + 'static>;
+
 pub struct HcSessionSocket {
 	tx: mpsc::Sender<Result<InitiateQueryProtocolResponse, Status>>,
-	rx: Streaming<InitiateQueryProtocolRequest>,
+	rx: PluginQueryStream,
 	drop_tx: mpsc::Sender<i32>,
 	drop_rx: mpsc::Receiver<i32>,
 	sessions: SessionTracker,
@@ -261,7 +264,7 @@ impl std::fmt::Debug for HcSessionSocket {
 impl HcSessionSocket {
 	pub fn new(
 		tx: mpsc::Sender<Result<InitiateQueryProtocolResponse, Status>>,
-		rx: Streaming<InitiateQueryProtocolRequest>,
+		rx: impl Stream<Item = Result<InitiateQueryProtocolRequest, Status>> + Send + Unpin + 'static,
 	) -> Self {
 		// channel for QuerySession objects to notify us they dropped
 		// @Todo - make this configurable
@@ -269,7 +272,7 @@ impl HcSessionSocket {
 
 		Self {
 			tx,
-			rx,
+			rx: Box::new(rx),
 			drop_tx,
 			drop_rx,
 			sessions: HashMap::new(),
@@ -289,7 +292,7 @@ impl HcSessionSocket {
 	}
 
 	async fn message(&mut self) -> Result<Option<PluginQuery>, Status> {
-		let fut = poll_fn(|cx| Pin::new(&mut self.rx).poll_next(cx));
+		let fut = poll_fn(|cx| Pin::new(&mut *self.rx).poll_next(cx));
 
 		match fut.await {
 			Some(Ok(m)) => Ok(m.query),
