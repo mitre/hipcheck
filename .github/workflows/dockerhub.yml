@@ -42,7 +42,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Containerfile
+          file: dist/Containerfile
           push: true
           platforms: "linux/amd64,linux/arm64"
           tags: mitre/hipcheck:latest,mitre/hipcheck:${{ steps.format-tag.outputs.replaced }}
