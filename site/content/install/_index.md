@@ -179,7 +179,7 @@ download the repository contents from GitHub without the Git history.
 ```sh
 $ git clone https://github.com/mitre/hipcheck
 $ cd hipcheck
-$ docker build -f Containerfile .
+$ docker build -f dist/Containerfile .
 ```
 
 This will build the image, which you can then use normally.
