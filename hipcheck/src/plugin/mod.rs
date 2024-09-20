@@ -15,7 +15,7 @@ pub use plugin_manifest::{PluginManifest, PluginName, PluginPublisher, PluginVer
 pub use retrieval::retrieve_plugins;
 use serde_json::Value;
 use std::collections::HashMap;
-pub use supported_arch::CURRENT_ARCH;
+pub use supported_arch::{try_get_current_arch, try_set_arch, SupportedArch};
 use tokio::sync::Mutex;
 
 pub async fn initialize_plugins(
