@@ -2,13 +2,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use hipcheck_sdk::{
-	deps::{async_trait, from_str, JsonSchema, Value},
-	error::Error,
-	plugin_engine::PluginEngine,
-	plugin_server::PluginServer,
-	NamedQuery, Plugin, Query,
-};
+use hipcheck_sdk::prelude::*;
 
 static GET_RAND_KEY_SCHEMA: &str = include_str!("../schema/query_schema_get_rand.json");
 static GET_RAND_OUTPUT_SCHEMA: &str = include_str!("../schema/query_schema_get_rand.json");

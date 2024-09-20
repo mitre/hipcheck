@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-mod proto {
-	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
-}
-
-pub mod error;
-pub mod plugin_engine;
-pub mod plugin_server;
-
 use crate::error::Error;
 use crate::error::Result;
 use error::ConfigError;
@@ -17,6 +9,22 @@ use serde_json::Value as JsonValue;
 use std::result::Result as StdResult;
 use std::str::FromStr;
 
+mod proto {
+	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
+}
+
+pub mod error;
+pub mod plugin_engine;
+pub mod plugin_server;
+
+// utility module, so users can write `use hipcheck_sdk::prelude::*` and have everything they need to write a plugin
+pub mod prelude {
+	pub use crate::deps::*;
+	pub use crate::error::{ConfigError, Error, Result};
+	pub use crate::plugin_engine::PluginEngine;
+	pub use crate::plugin_server::{PluginServer, QueryResult};
+	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
+}
 
 // re-export of user facing third party dependencies
 pub mod deps {
