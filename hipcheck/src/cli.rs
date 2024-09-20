@@ -7,6 +7,7 @@ use crate::{
 	error::Context,
 	error::Result,
 	hc_error,
+	plugin::SupportedArch,
 	session::pm,
 	shell::{color_choice::ColorChoice, verbosity::Verbosity},
 	source,
@@ -415,6 +416,9 @@ pub struct CheckArgs {
 
 	#[clap(subcommand)]
 	command: Option<CheckCommand>,
+
+	#[arg(long = "arch")]
+	pub arch: Option<SupportedArch>,
 
 	#[arg(short = 't', long = "target")]
 	pub target_type: Option<TargetType>,

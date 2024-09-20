@@ -8,7 +8,7 @@ use crate::{
 	plugin::{
 		retrieval::{download_plugin, extract_plugin},
 		supported_arch::SupportedArch,
-		CURRENT_ARCH,
+		try_get_current_arch,
 	},
 	util::kdl::{extract_data, ParseKdlNode},
 	util::{
@@ -288,6 +288,8 @@ impl DownloadManifestEntry {
 		version: &PluginVersion,
 		downloaded_plugins: &'a mut HashSet<PluginId>,
 	) -> Result<&'a HashSet<PluginId>, Error> {
+		let current_arch = try_get_current_arch()?;
+
 		let plugin_id = PluginId::new(publisher.clone(), name.clone(), version.clone());
 
 		if downloaded_plugins.contains(&plugin_id) {
@@ -323,7 +325,7 @@ impl DownloadManifestEntry {
 				publisher.0,
 				name.0,
 				version.0,
-				CURRENT_ARCH
+				current_arch,
 			)
 		})?;
 
