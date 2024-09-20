@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
+mod arch;
 mod download_manifest;
 mod manager;
 mod plugin_id;
 mod plugin_manifest;
 mod retrieval;
-mod supported_arch;
 mod types;
 
 use crate::error::Result;
 pub use crate::plugin::{get_plugin_key, manager::*, plugin_id::PluginId, types::*};
+pub use arch::{get_current_arch, try_set_arch, Arch};
 pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
 pub use plugin_manifest::{PluginManifest, PluginName, PluginPublisher, PluginVersion};
 pub use retrieval::retrieve_plugins;
 use serde_json::Value;
 use std::collections::HashMap;
-pub use supported_arch::{try_get_current_arch, try_set_arch, SupportedArch};
 use tokio::sync::Mutex;
 
 pub async fn initialize_plugins(

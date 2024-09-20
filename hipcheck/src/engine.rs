@@ -5,8 +5,8 @@ use crate::{
 	cache::plugin::HcPluginCache,
 	hc_error,
 	plugin::{
-		get_plugin_key, retrieve_plugins, try_get_current_arch, Plugin, PluginManifest,
-		PluginResponse, QueryResult,
+		get_current_arch, get_plugin_key, retrieve_plugins, Plugin, PluginManifest, PluginResponse,
+		QueryResult,
 	},
 	policy::PolicyFile,
 	util::fs::{find_file_by_name, read_string},
@@ -230,7 +230,8 @@ pub fn start_plugins(
 		/* jitter_percent */ 10,
 	)?;
 
-	let current_arch = try_get_current_arch()?;
+	let current_arch = get_current_arch();
+	println!("CURRENT ARCH: {}", current_arch);
 
 	// retrieve, verify and extract all required plugins
 	let required_plugin_names = retrieve_plugins(&policy_file.plugins.0, plugin_cache)?;
@@ -248,7 +249,7 @@ pub fn start_plugins(
 		let contents = read_string(&plugin_kdl)?;
 		let plugin_manifest = PluginManifest::from_str(contents.as_str())?;
 		let entrypoint = plugin_manifest
-			.get_entrypoint(current_arch)
+			.get_entrypoint(&current_arch)
 			.ok_or_else(|| {
 				hc_error!(
 					"Could not find {} entrypoint for {}/{} {}",

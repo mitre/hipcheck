@@ -7,7 +7,7 @@ use crate::{
 	error::Context,
 	error::Result,
 	hc_error,
-	plugin::SupportedArch,
+	plugin::Arch,
 	session::pm,
 	shell::{color_choice::ColorChoice, verbosity::Verbosity},
 	source,
@@ -19,7 +19,10 @@ use crate::{
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
-use std::path::{Path, PathBuf};
+use std::{
+	path::{Path, PathBuf},
+	str::FromStr,
+};
 use url::Url;
 
 /// Automatated supply chain risk assessment of software packages.
@@ -417,8 +420,8 @@ pub struct CheckArgs {
 	#[clap(subcommand)]
 	command: Option<CheckCommand>,
 
-	#[arg(long = "arch")]
-	pub arch: Option<SupportedArch>,
+	#[arg(long = "arch", value_parser = Arch::from_str)]
+	pub arch: Option<Arch>,
 
 	#[arg(short = 't', long = "target")]
 	pub target_type: Option<TargetType>,

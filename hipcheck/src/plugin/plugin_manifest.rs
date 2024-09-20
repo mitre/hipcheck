@@ -3,12 +3,15 @@
 use crate::{
 	error::Error,
 	hc_error,
-	plugin::supported_arch::SupportedArch,
+	plugin::Arch,
 	string_newtype_parse_kdl_node,
 	util::kdl::{extract_data, ParseKdlNode},
 };
 use kdl::{KdlDocument, KdlNode};
 use std::{collections::HashMap, str::FromStr};
+
+#[cfg(test)]
+use crate::plugin::arch::KnownArch;
 
 // NOTE: the implementation in this crate was largely derived from RFD #4
 
@@ -29,15 +32,15 @@ pub struct License(pub String);
 string_newtype_parse_kdl_node!(License, "license");
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Entrypoints(pub HashMap<SupportedArch, String>);
+pub struct Entrypoints(pub HashMap<Arch, String>);
 
 impl Entrypoints {
 	pub fn new() -> Self {
 		Self(HashMap::new())
 	}
 
-	pub fn insert(&mut self, arch: SupportedArch, entrypoint: String) -> Result<(), Error> {
-		match self.0.insert(arch, entrypoint) {
+	pub fn insert(&mut self, arch: Arch, entrypoint: String) -> Result<(), Error> {
+		match self.0.insert(arch.clone(), entrypoint) {
 			Some(_duplicate_key) => Err(hc_error!("Multiple entrypoints specified for {}", arch)),
 			None => Ok(()),
 		}
@@ -56,8 +59,7 @@ impl ParseKdlNode for Entrypoints {
 		let mut entrypoints = Entrypoints::new();
 		for entrypoint_spec in node.children()?.nodes() {
 			// per RFD #0004, the value for "arch" is of type String
-			let arch =
-				SupportedArch::from_str(entrypoint_spec.get("arch")?.value().as_string()?).ok()?;
+			let arch = Arch::from_str(entrypoint_spec.get("arch")?.value().as_string()?).ok()?;
 			// per RFD #0004, the actual entrypoint is the first positional arg after "arch" and is
 			// of type String
 			let entrypoint = entrypoint_spec
@@ -66,7 +68,7 @@ impl ParseKdlNode for Entrypoints {
 				.value()
 				.as_string()?
 				.to_string();
-			if let Err(_e) = entrypoints.insert(arch, entrypoint) {
+			if let Err(_e) = entrypoints.insert(arch.clone(), entrypoint) {
 				log::error!("Duplicate entrypoint detected for [{}]", arch);
 				return None;
 			}
@@ -185,8 +187,8 @@ pub struct PluginManifest {
 }
 
 impl PluginManifest {
-	pub fn get_entrypoint(&self, arch: SupportedArch) -> Option<String> {
-		self.entrypoints.0.get(&arch).cloned()
+	pub fn get_entrypoint(&self, arch: &Arch) -> Option<String> {
+		self.entrypoints.0.get(arch).cloned()
 	}
 }
 
@@ -278,7 +280,7 @@ mod test {
 		let mut expected = Entrypoints::new();
 		expected
 			.insert(
-				SupportedArch::Aarch64AppleDarwin,
+				Arch::Known(KnownArch::Aarch64AppleDarwin),
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();
@@ -308,25 +310,25 @@ mod test {
 		let mut expected = Entrypoints::new();
 		expected
 			.insert(
-				SupportedArch::Aarch64AppleDarwin,
+				Arch::Known(KnownArch::Aarch64AppleDarwin),
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();
 		expected
 			.insert(
-				SupportedArch::X86_64AppleDarwin,
+				Arch::Known(KnownArch::X86_64AppleDarwin),
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();
 		expected
 			.insert(
-				SupportedArch::X86_64UnknownLinuxGnu,
+				Arch::Known(KnownArch::X86_64UnknownLinuxGnu),
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();
 		expected
 			.insert(
-				SupportedArch::X86_64PcWindowsMsvc,
+				Arch::Known(KnownArch::X86_64PcWindowsMsvc),
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();
@@ -408,25 +410,25 @@ dependencies {
 		let mut entrypoints = Entrypoints::new();
 		entrypoints
 			.insert(
-				SupportedArch::Aarch64AppleDarwin,
+				Arch::Known(KnownArch::Aarch64AppleDarwin),
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();
 		entrypoints
 			.insert(
-				SupportedArch::X86_64AppleDarwin,
+				Arch::Known(KnownArch::X86_64AppleDarwin),
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();
 		entrypoints
 			.insert(
-				SupportedArch::X86_64UnknownLinuxGnu,
+				Arch::Known(KnownArch::X86_64UnknownLinuxGnu),
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();
 		entrypoints
 			.insert(
-				SupportedArch::X86_64PcWindowsMsvc,
+				Arch::Known(KnownArch::X86_64PcWindowsMsvc),
 				"./hc-mitre-affiliation".to_owned(),
 			)
 			.unwrap();

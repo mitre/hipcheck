@@ -119,7 +119,7 @@ fn main() -> ExitCode {
 /// Run the `check` command.
 fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 	// Before we do any analysis, set the user-provided arch
-	if let Some(arch) = args.arch {
+	if let Some(arch) = &args.arch {
 		if let Err(e) = try_set_arch(arch) {
 			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;
