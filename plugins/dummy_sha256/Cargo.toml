@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.89"
-clap = { version = "4.5.16", features = ["derive"] }
+clap = { version = "4.5.18", features = ["derive"] }
 indexmap = "2.5.0"
 futures = "0.3.30"
 prost = "0.13.2"
