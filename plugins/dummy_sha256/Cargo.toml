@@ -12,7 +12,7 @@ indexmap = "2.5.0"
 futures = "0.3.30"
 prost = "0.13.2"
 rand = "0.8.5"
-serde_json = "1.0.125"
+serde_json = "1.0.128"
 sha2 = "0.10.8"
 tokio = { version = "1.40.0", features = ["rt"] }
 tokio-stream = "0.1.16"
