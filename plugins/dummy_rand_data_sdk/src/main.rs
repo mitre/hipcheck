@@ -39,11 +39,11 @@ impl Query for RandDataPlugin {
 		input: Value,
 	) -> hipcheck_sdk::error::Result<Value> {
 		let Value::Number(num_size) = input else {
-			return Err(Error::UnexpectedPluginQueryDataFormat);
+			return Err(Error::UnexpectedPluginQueryInputFormat);
 		};
 
 		let Some(size) = num_size.as_u64() else {
-			return Err(Error::UnexpectedPluginQueryDataFormat);
+			return Err(Error::UnexpectedPluginQueryInputFormat);
 		};
 
 		let reduced_num = reduce(size);
@@ -53,17 +53,17 @@ impl Query for RandDataPlugin {
 			.await?;
 
 		let Value::Array(mut sha256) = value else {
-			return Err(Error::UnexpectedPluginQueryDataFormat);
+			return Err(Error::UnexpectedPluginQueryInputFormat);
 		};
 
 		let Value::Number(num) = sha256.pop().unwrap() else {
-			return Err(Error::UnexpectedPluginQueryDataFormat);
+			return Err(Error::UnexpectedPluginQueryInputFormat);
 		};
 
 		match num.as_u64() {
 			Some(val) => return Ok(Value::Number(val.into())),
 			None => {
-				return Err(Error::UnexpectedPluginQueryDataFormat);
+				return Err(Error::UnexpectedPluginQueryInputFormat);
 			}
 		}
 	}

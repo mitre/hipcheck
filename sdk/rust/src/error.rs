@@ -5,11 +5,14 @@ use std::{convert::Infallible, ops::Not, result::Result as StdResult};
 use tokio::sync::mpsc::error::SendError as TokioMpscSendError;
 use tonic::Status as TonicStatus;
 
+/// An enumeration of errors that can occur in a Hipcheck plugin
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+	/// An unknown error occurred, the query is in an unspecified state
 	#[error("unknown error; query is in an unspecified state")]
 	UnspecifiedQueryState,
 
+	/// The `PluginEngine` received a message with the unexpected status `ReplyInProgress`
 	#[error("unexpected ReplyInProgress state for query")]
 	UnexpectedReplyInProgress,
 
@@ -27,26 +30,31 @@ pub enum Error {
 		#[source] TokioMpscSendError<StdResult<InitiateQueryProtocolResponse, TonicStatus>>,
 	),
 
+	/// The `PluginEngine` received a message with a reply-type status when it expected a request
 	#[error("plugin sent QueryReply when server was expecting a request")]
 	ReceivedReplyWhenExpectingRequest,
 
+	/// The `PluginEngine` received a message with a request-type status when it expected a reply
 	#[error("plugin sent QuerySubmit when server was expecting a reply chunk")]
 	ReceivedSubmitWhenExpectingReplyChunk,
 
+	/// The `PluginEngine` received additional messages when it did not expect any
 	#[error("received additional message for ID '{id}' after query completion")]
 	MoreAfterQueryComplete { id: usize },
 
 	#[error("failed to start server")]
 	FailedToStartServer(#[source] tonic::transport::Error),
 
+	/// The `Query::run` function implementation received an incorrectly-typed JSON Value key
 	#[error("unexpected JSON value from plugin")]
-	UnexpectedPluginQueryDataFormat,
+	UnexpectedPluginQueryInputFormat,
 
+	/// The `PluginEngine` received a request for an unknown query endpoint
 	#[error("could not determine which plugin query to run")]
 	UnknownPluginQuery,
 
 	#[error("invalid format for QueryTarget")]
-	InvalidQueryTarget,
+	InvalidQueryTargetFormat,
 }
 
 // this will never happen, but is needed to enable passing QueryTarget to PluginEngine::query
@@ -58,29 +66,33 @@ impl From<Infallible> for Error {
 
 pub type Result<T> = StdResult<T, Error>;
 
+/// Errors specific to the execution of `Plugin::set_configuration()` to configure a Hipcheck
+/// plugin.
 #[derive(Debug)]
 pub enum ConfigError {
+	/// The config key was valid, but the associated value was invalid
 	InvalidConfigValue {
 		field_name: String,
 		value: String,
 		reason: String,
 	},
 
+	/// The config was missing an expected field
 	MissingRequiredConfig {
 		field_name: String,
 		field_type: String,
 		possible_values: Vec<String>,
 	},
 
+	/// The config included an unrecognized field
 	UnrecognizedConfig {
 		field_name: String,
 		field_value: String,
 		possible_confusables: Vec<String>,
 	},
 
-	Unspecified {
-		message: String,
-	},
+	/// An unspecified error
+	Unspecified { message: String },
 }
 
 impl From<ConfigError> for SetConfigurationResponse {

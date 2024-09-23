@@ -87,6 +87,8 @@ impl TryFrom<PluginQuery> for Query {
 
 type SessionTracker = HashMap<i32, mpsc::Sender<Option<PluginQuery>>>;
 
+/// The handle that a `Query::run()` function can use to request information from other Hipcheck
+/// plugins in order to fulfill a query.
 pub struct PluginEngine {
 	id: usize,
 	tx: mpsc::Sender<StdResult<InitiateQueryProtocolResponse, Status>>,
@@ -96,6 +98,11 @@ pub struct PluginEngine {
 }
 
 impl PluginEngine {
+	/// Query another Hipcheck plugin `target` with key `input`. On success, the JSONified result
+	/// of the query is returned. `target` will often be a string of the format
+	/// `"publisher/plugin[/query]"`, where the bracketed substring is optional if the plugin's
+	/// default query endpoint is desired. `input` must of a type implementing `Into<JsonValue>`,
+	/// which can be done by deriving or implementing `serde::Serialize`.
 	pub async fn query<T, V>(&mut self, target: T, input: V) -> Result<JsonValue>
 	where
 		T: TryInto<QueryTarget, Error: Into<Error>>,
@@ -184,7 +191,7 @@ impl PluginEngine {
 		Ok(Some(out))
 	}
 
-	/// Send a gRPC query from plugin to the hipcheck server
+	// Send a gRPC query from plugin to the hipcheck server
 	async fn send(&self, query: Query) -> Result<()> {
 		let query = InitiateQueryProtocolResponse {
 			query: Some(self.convert(query)?),

@@ -23,12 +23,9 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream as RecvStream;
 use tonic::{transport::Server, Code, Request as Req, Response as Resp, Status, Streaming};
 
-/// Runs the Hipcheck plugin protocol based on the user's plugin definition.
+/// Runs the Hipcheck plugin protocol based on the user's implementation of the `Plugin` trait.
 ///
-/// The key idea is that this implements the gRPC mechanics and handles all
-/// the details of the query protocol, so that the user doesn't need to do
-/// anything more than define queries as asynchronous functions with associated
-/// input and output schemas.
+/// This struct implements the underlying gRPC protocol that is not exposed to the plugin author.
 pub struct PluginServer<P> {
 	plugin: Arc<P>,
 }
@@ -56,7 +53,7 @@ impl<P: Plugin> PluginServer<P> {
 	}
 }
 
-/// The result of running a query.
+/// The result of running a query, where the error is of the type `tonic::Status`.
 pub type QueryResult<T> = StdResult<T, Status>;
 
 #[tonic::async_trait]
