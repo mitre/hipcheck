@@ -18,6 +18,7 @@ members = [
     "plugins/dummy_rand_data_sdk",
     "plugins/dummy_rand_data",
     "plugins/dummy_sha256",
+    "plugins/dummy_sha256_sdk",
     "sdk/rust",
 ]
 

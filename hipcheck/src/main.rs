@@ -548,15 +548,17 @@ fn cmd_plugin(args: PluginArgs) {
 
 	let tgt_dir = "./target/debug";
 
-	let entrypoint1 = match args.sdk {
-		true => {
-			pathbuf![tgt_dir, "dummy_rand_data_sdk"]
-		}
-		false => {
-			pathbuf![tgt_dir, "dummy_rand_data"]
-		}
+	let (entrypoint1, entrypoint2) = match args.sdk {
+		true => (
+			pathbuf![tgt_dir, "dummy_rand_data_sdk"],
+			pathbuf![tgt_dir, "dummy_sha256_sdk"],
+		),
+		false => (
+			pathbuf![tgt_dir, "dummy_rand_data"],
+			pathbuf![tgt_dir, "dummy_sha256"],
+		),
 	};
-	let entrypoint2 = pathbuf![tgt_dir, "dummy_sha256"];
+
 	let plugin1 = Plugin {
 		name: "dummy/rand_data".to_owned(),
 		entrypoint: entrypoint1.display().to_string(),
