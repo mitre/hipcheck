@@ -773,6 +773,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dummy_sha256_sdk"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "hipcheck-sdk",
+ "sha2",
+ "tokio",
+]
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
