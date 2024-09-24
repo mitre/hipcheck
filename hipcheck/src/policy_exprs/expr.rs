@@ -59,11 +59,18 @@ pub enum Primitive {
 	DateTime(Zoned),
 
 	/// Span of time using the [jiff] crate, which uses a modified version of ISO8601.
-	/// Can include years, months, weeks, days, hours, minutes, and seconds (including decimal fractions of a second).
+	///
+	/// Can include weeks, days, hours, minutes, and seconds (including decimal fractions of a second).
+	/// While spans with months, years, or both are valid under IS08601 and supported by [jiff] in general, we do not allow them in Hipcheck policy expressions.
+	/// This is because spans greater than a day require additional zoned datetime information in [jiff] (to determine e.g. how many days are in a year or month)
+	/// before we can do time arithematic with them.
+	/// We *do* allows spans with weeks, even though [jiff] has similar issues with those units.
+	/// We take care of this by converting a week to a period of seven 24-hour days that [jiff] can handle in arithematic without zoned datetime information.
+	///
 	/// Spans are preceded by the letter "P" with any optional time units separated from optional date units by the letter "T".
 	/// All units of dates and times are represented by single case-agnostic letter abbreviations after the number.
-	/// For example, a span of one year, one month, one week, one day, one hour, one minute, and one-and-a-tenth seconds would be represented as
-	/// "P1y1m1w1dT1h1m1.1s"
+	/// For example, a span of one week, one day, one hour, one minute, and one-and-a-tenth seconds would be represented as
+	/// "P1w1dT1h1m1.1s"
 	Span(Span),
 }
 
@@ -238,7 +245,13 @@ pub fn parse(input: &str) -> Result<Expr> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::policy_exprs::LexingError;
 	use test_log::test;
+
+	use jiff::{
+		tz::{self, TimeZone},
+		Span, Timestamp, Zoned,
+	};
 
 	trait IntoExpr {
 		fn into_expr(self) -> Expr;
@@ -273,6 +286,14 @@ mod tests {
 		Primitive::Bool(val)
 	}
 
+	fn datetime(val: Zoned) -> Primitive {
+		Primitive::DateTime(val)
+	}
+
+	fn span(val: Span) -> Primitive {
+		Primitive::Span(val)
+	}
+
 	fn array(vals: Vec<Primitive>) -> Expr {
 		Expr::Array(vals)
 	}
@@ -289,6 +310,29 @@ mod tests {
 		let input = "#t";
 		let expected = boolean(true).into_expr();
 		let result = parse(input).unwrap();
+		assert_eq!(result, expected);
+	}
+
+	#[test]
+	fn parse_datetime() {
+		let input = "2024-09-17T09:30:00-05";
+		let result = parse(input).unwrap();
+
+		let ts: Timestamp = "2024-09-17T09:30:00-05".parse().unwrap();
+		let dt = Zoned::new(ts, TimeZone::UTC);
+		let expected = datetime(dt).into_expr();
+
+		assert_eq!(result, expected);
+	}
+
+	#[test]
+	fn parse_span() {
+		let input = "P2W4DT1H30M";
+		let result = parse(input).unwrap();
+
+		let raw_span: Span = "P18DT1H30M".parse().unwrap();
+		let expected = span(raw_span).into_expr();
+
 		assert_eq!(result, expected);
 	}
 
