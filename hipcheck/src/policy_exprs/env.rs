@@ -55,6 +55,9 @@ impl<'parent> Env<'parent> {
 		env.add_fn("sub", sub);
 		env.add_fn("divz", divz);
 
+		// Additional datetime math functions
+		env.add_fn("duration", duration);
+
 		// Logical functions.
 		env.add_fn("and", and);
 		env.add_fn("or", or);
@@ -325,6 +328,13 @@ fn gt(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Int(arg_1), Int(arg_2)) => Ok(Bool(arg_1 > arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 > arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 > arg_2)),
+		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 > arg_2)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(
+			arg_1
+				.compare(arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?
+				.is_gt(),
+		)),
 		_ => unreachable!(),
 	};
 
@@ -339,6 +349,13 @@ fn lt(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Int(arg_1), Int(arg_2)) => Ok(Bool(arg_1 < arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 < arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 < arg_2)),
+		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 < arg_2)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(
+			arg_1
+				.compare(arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?
+				.is_lt(),
+		)),
 		_ => unreachable!(),
 	};
 
@@ -353,6 +370,13 @@ fn gte(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Int(arg_1), Int(arg_2)) => Ok(Bool(arg_1 >= arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 >= arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 >= arg_2)),
+		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 >= arg_2)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(
+			arg_1
+				.compare(arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?
+				.is_ge(),
+		)),
 		_ => unreachable!(),
 	};
 
@@ -367,6 +391,13 @@ fn lte(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Int(arg_1), Int(arg_2)) => Ok(Bool(arg_1 <= arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 <= arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 <= arg_2)),
+		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 <= arg_2)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(
+			arg_1
+				.compare(arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?
+				.is_le(),
+		)),
 		_ => unreachable!(),
 	};
 
@@ -381,6 +412,13 @@ fn eq(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Int(arg_1), Int(arg_2)) => Ok(Bool(arg_1 == arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 == arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 == arg_2)),
+		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 == arg_2)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(
+			arg_1
+				.compare(arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?
+				.is_eq(),
+		)),
 		_ => unreachable!(),
 	};
 
@@ -395,32 +433,64 @@ fn neq(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Int(arg_1), Int(arg_2)) => Ok(Bool(arg_1 != arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 != arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 != arg_2)),
+		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 != arg_2)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(
+			arg_1
+				.compare(arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?
+				.is_ne(),
+		)),
 		_ => unreachable!(),
 	};
 
 	binary_primitive_op(name, env, args, op)
 }
 
+// Adds numbers or adds a span of time to a datetime (the latter use case is *not* commutative)
+// Datetime addition will error for spans with units greater than days (which the parser should prevent)
 fn add(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "add";
 
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
 		(Int(arg_1), Int(arg_2)) => Ok(Int(arg_1 + arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Float(arg_1 + arg_2)),
-		(Bool(_), Bool(_)) => Err(Error::BadType(name)),
+		(DateTime(arg_1), Span(arg_2)) => Ok(DateTime(
+			arg_1
+				.checked_add(arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?,
+		)),
+		(Span(arg_1), Span(arg_2)) => Ok(Span(
+			arg_1
+				.checked_add(arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?,
+		)),
+		(_, _) => Err(Error::BadType(name)),
 		_ => unreachable!(),
 	};
 
 	binary_primitive_op(name, env, args, op)
 }
 
+// Subtracts numbers or subtracts a span of time from a datetime
+// Datetime addition will error for spans with units greater than days (which the parser should prevent)
+// Do not use for finding the difference between two dateimes. The correct operation for "subtracting" two datetimes is "duration."
 fn sub(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "sub";
 
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
 		(Int(arg_1), Int(arg_2)) => Ok(Int(arg_1 - arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Float(arg_1 - arg_2)),
-		(Bool(_), Bool(_)) => Err(Error::BadType(name)),
+		(DateTime(arg_1), Span(arg_2)) => Ok(DateTime(
+			arg_1
+				.checked_sub(arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?,
+		)),
+		(Span(arg_1), Span(arg_2)) => Ok(Span(
+			arg_1
+				.checked_sub(arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?,
+		)),
+		(_, _) => Err(Error::BadType(name)),
 		_ => unreachable!(),
 	};
 
@@ -445,7 +515,24 @@ fn divz(env: &Env, args: &[Expr]) -> Result<Expr> {
 		} else {
 			Float(arg_1 / arg_2)
 		}),
-		(Bool(_), Bool(_)) => Err(Error::BadType(name)),
+		(_, _) => Err(Error::BadType(name)),
+		_ => unreachable!(),
+	};
+
+	binary_primitive_op(name, env, args, op)
+}
+
+// Finds the difference in time between two datetimes, in units of hours (chosen for comparision safety)
+fn duration(env: &Env, args: &[Expr]) -> Result<Expr> {
+	let name = "duration";
+
+	let op = |arg_1, arg_2| match (arg_1, arg_2) {
+		(DateTime(arg_1), DateTime(arg_2)) => Ok(Span(
+			arg_1
+				.since(&arg_2)
+				.map_err(|err| Error::Datetime(err.to_string()))?,
+		)),
+		(_, _) => Err(Error::BadType(name)),
 		_ => unreachable!(),
 	};
 
@@ -456,9 +543,8 @@ fn and(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "and";
 
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
-		(Int(_), Int(_)) => Err(Error::BadType(name)),
-		(Float(_), Float(_)) => Err(Error::BadType(name)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 && arg_2)),
+		(_, _) => Err(Error::BadType(name)),
 		_ => unreachable!(),
 	};
 
@@ -469,9 +555,8 @@ fn or(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "or";
 
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
-		(Int(_), Int(_)) => Err(Error::BadType(name)),
-		(Float(_), Float(_)) => Err(Error::BadType(name)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 || arg_2)),
+		(_, _) => Err(Error::BadType(name)),
 		_ => unreachable!(),
 	};
 

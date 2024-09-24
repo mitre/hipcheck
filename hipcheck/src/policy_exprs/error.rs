@@ -118,6 +118,9 @@ pub enum Error {
 		value: serde_json::Value,
 		context: serde_json::Value,
 	},
+
+	#[error("Datetime error: {0}")]
+	Datetime(String),
 }
 
 #[derive(Debug, PartialEq)]

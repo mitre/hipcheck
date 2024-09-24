@@ -117,7 +117,27 @@ fn lex_span(input: &mut Lexer<'_, Token>) -> Result<Box<Span>> {
 	let s = input.slice();
 	s.parse::<Span>()
 		.map_err(|err| LexingError::InvalidSpan(s.to_string(), JiffError::new(err)))
+		.map(|x| span_to_days(&x))?
 		.map(Box::new)
+}
+
+// Error if the span contains years or months.
+// If the span contains weeks, convert the weeks to days by treating every week as 7 24-hour days.
+fn span_to_days(full_span: &Span) -> Result<Span> {
+	if full_span.get_years() != 0 || full_span.get_months() != 0 {
+		Err(LexingError::SpanWithBadUnits)
+	} else {
+		let weeks = full_span.get_weeks();
+		let days = full_span.get_days();
+		let total_days = weeks * 7 + days;
+
+		// Panic: The unwrap() on try_weeks will not panic when the argument is 0.
+		full_span
+			.try_weeks(0)
+			.unwrap()
+			.try_days(total_days)
+			.map_err(|err| LexingError::InvalidSpan(full_span.to_string(), JiffError::new(err)))
+	}
 }
 
 /// Lex a single identifier.
@@ -192,6 +212,9 @@ pub enum LexingError {
 
 	#[error("failed to parse span")]
 	InvalidSpan(String, JiffError),
+
+	#[error("span cannot contain units of years or months")]
+	SpanWithBadUnits,
 }
 
 #[cfg(test)]
@@ -301,7 +324,7 @@ mod tests {
 
 	#[test]
 	fn basic_lexing_with_time() {
-		let raw_program = "(eq (sub 2024-09-17T09:00-05 2024-09-17T10:30-05) PT1H30M)";
+		let raw_program = "(eq (duration 2024-09-17T09:00-05 2024-09-17T10:30-05) PT1H30M)";
 
 		let ts1: Timestamp = "2024-09-17T09:00-05".parse().unwrap();
 		let dt1 = Zoned::new(ts1, TimeZone::UTC);
@@ -313,7 +336,7 @@ mod tests {
 			Token::OpenParen,
 			Token::Ident(String::from("eq")),
 			Token::OpenParen,
-			Token::Ident(String::from("sub")),
+			Token::Ident(String::from("duration")),
 			Token::DateTime(Box::new(dt1)),
 			Token::DateTime(Box::new(dt2)),
 			Token::CloseParen,
@@ -322,6 +345,14 @@ mod tests {
 		];
 
 		let tokens = lex(raw_program).unwrap();
+		assert_eq!(tokens, expected);
+	}
+
+	#[test]
+	fn lexing_with_bad_span() {
+		let raw_program = "P4M2W4DT1H30M";
+		let expected = Err(Lex(LexingError::SpanWithBadUnits));
+		let tokens = lex(raw_program);
 		assert_eq!(tokens, expected);
 	}
 
