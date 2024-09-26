@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::Error;
+use schemars::JsonSchema;
 use serde::Serialize;
 use std::{
 	fmt,
@@ -9,7 +10,7 @@ use std::{
 };
 use url::Url;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Target {
 	/// The original specifier provided by the user.
 	pub specifier: String,
@@ -24,18 +25,18 @@ pub struct Target {
 	pub package: Option<Package>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct RemoteGitRepo {
 	pub url: Url,
 	pub known_remote: Option<KnownRemote>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub enum KnownRemote {
 	GitHub { owner: String, repo: String },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct LocalGitRepo {
 	/// The path to the repo.
 	pub path: PathBuf,
@@ -43,7 +44,7 @@ pub struct LocalGitRepo {
 	/// The Git ref we're referring to.
 	pub git_ref: String,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Package {
 	/// A package url for the package.
 	pub purl: Url,
@@ -66,13 +67,13 @@ impl Package {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct MavenPackage {
 	/// The Maven url
 	pub url: Url,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 // Maven as a possible host is ommitted because a MavenPackage is currently its own struct without a host field
 pub enum PackageHost {
 	Npm,
@@ -88,7 +89,7 @@ impl Display for PackageHost {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Sbom {
 	/// The path to the SBOM file
 	pub path: PathBuf,
@@ -97,7 +98,7 @@ pub struct Sbom {
 	pub standard: SbomStandard,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub enum SbomStandard {
 	Spdx,
 	CycloneDX,

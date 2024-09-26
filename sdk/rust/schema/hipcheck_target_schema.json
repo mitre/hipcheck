@@ -1,0 +1,153 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Target",
+  "type": "object",
+  "required": [
+    "local",
+    "specifier"
+  ],
+  "properties": {
+    "specifier": {
+      "description": "The original specifier provided by the user.",
+      "type": "string"
+    },
+    "local": {
+      "description": "The path to the local repository.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/LocalGitRepo"
+        }
+      ]
+    },
+    "remote": {
+      "description": "The url of the remote repository, if any.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RemoteGitRepo"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "package": {
+      "description": "The package associated with the target, if any.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Package"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "LocalGitRepo": {
+      "type": "object",
+      "required": [
+        "git_ref",
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "description": "The path to the repo.",
+          "type": "string"
+        },
+        "git_ref": {
+          "description": "The Git ref we're referring to.",
+          "type": "string"
+        }
+      }
+    },
+    "RemoteGitRepo": {
+      "type": "object",
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "known_remote": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/KnownRemote"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "KnownRemote": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "GitHub"
+          ],
+          "properties": {
+            "GitHub": {
+              "type": "object",
+              "required": [
+                "owner",
+                "repo"
+              ],
+              "properties": {
+                "owner": {
+                  "type": "string"
+                },
+                "repo": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Package": {
+      "type": "object",
+      "required": [
+        "host",
+        "name",
+        "purl",
+        "version"
+      ],
+      "properties": {
+        "purl": {
+          "description": "A package url for the package.",
+          "type": "string",
+          "format": "uri"
+        },
+        "name": {
+          "description": "The package name",
+          "type": "string"
+        },
+        "version": {
+          "description": "The package version",
+          "type": "string"
+        },
+        "host": {
+          "description": "What host the package is from.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/PackageHost"
+            }
+          ]
+        }
+      }
+    },
+    "PackageHost": {
+      "type": "string",
+      "enum": [
+        "Npm",
+        "PyPI"
+      ]
+    }
+  }
+}
