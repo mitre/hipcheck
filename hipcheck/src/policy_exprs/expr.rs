@@ -17,6 +17,9 @@ use nom::{
 use ordered_float::NotNan;
 use std::{fmt::Display, ops::Deref};
 
+#[cfg(test)]
+use jiff::civil::Date;
+
 /// A `deke` expression to evaluate.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
@@ -318,8 +321,20 @@ mod tests {
 		let input = "2024-09-17T09:30:00-05";
 		let result = parse(input).unwrap();
 
-		let ts: Timestamp = "2024-09-17T09:30:00-05".parse().unwrap();
+		let ts: Timestamp = input.parse().unwrap();
 		let dt = Zoned::new(ts, TimeZone::UTC);
+		let expected = datetime(dt).into_expr();
+
+		assert_eq!(result, expected);
+	}
+
+	#[test]
+	fn parse_simple_datetime() {
+		let input = "2024-09-17";
+		let result = parse(input).unwrap();
+
+		let ts: Date = input.parse().unwrap();
+		let dt = ts.to_zoned(TimeZone::UTC).unwrap();
 		let expected = datetime(dt).into_expr();
 
 		assert_eq!(result, expected);
@@ -331,6 +346,17 @@ mod tests {
 		let result = parse(input).unwrap();
 
 		let raw_span: Span = "P18DT1H30M".parse().unwrap();
+		let expected = span(raw_span).into_expr();
+
+		assert_eq!(result, expected);
+	}
+
+	#[test]
+	fn parse_simple_span() {
+		let input = "P2w";
+		let result = parse(input).unwrap();
+
+		let raw_span: Span = "P14d".parse().unwrap();
 		let expected = span(raw_span).into_expr();
 
 		assert_eq!(result, expected);

@@ -203,4 +203,37 @@ mod tests {
 			])
 		);
 	}
+
+	#[test]
+	fn eval_upcasted_int() {
+		let program_and_expected = vec![
+			("(lte 3 3.0)", Expr::Primitive(Primitive::Bool(true))),
+			(
+				"(add 3 5.5)",
+				Expr::Primitive(Primitive::Float(F64::new(8.5).unwrap())),
+			),
+		];
+		let context = Value::Null;
+		for (program, expected) in program_and_expected.into_iter() {
+			let result = Executor::std().parse_and_eval(program, &context).unwrap();
+			assert_eq!(result, expected);
+		}
+	}
+
+	#[test]
+	fn eval_datetime_span_add() {
+		let date = "2024-09-26";
+		let span = "P1w";
+		let eval_fmt = "(add {} {})";
+		let context = Value::Null;
+		let expected = parse("2024-10-03").unwrap();
+		let result1 = Executor::std()
+			.parse_and_eval(format!("(add {} {})", date, span).as_str(), &context)
+			.unwrap();
+		assert_eq!(expected, result1);
+		let result2 = Executor::std()
+			.parse_and_eval(format!("(add {} {})", span, date).as_str(), &context)
+			.unwrap();
+		assert_eq!(expected, result2);
+	}
 }
