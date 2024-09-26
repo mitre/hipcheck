@@ -231,7 +231,6 @@ pub fn start_plugins(
 	)?;
 
 	let current_arch = get_current_arch();
-	println!("CURRENT ARCH: {}", current_arch);
 
 	// retrieve, verify and extract all required plugins
 	let required_plugin_names = retrieve_plugins(&policy_file.plugins.0, plugin_cache)?;

@@ -142,6 +142,10 @@ fn partially_evaluate(fn_name: &'static str, arg: Expr) -> Result<Expr> {
 	Ok(lambda)
 }
 
+pub fn upcast(i: i64) -> Primitive {
+	Float(F64::new(i as f64).unwrap())
+}
+
 /// Define binary operations on primitives.
 fn binary_primitive_op<F>(name: &'static str, env: &Env, args: &[Expr], op: F) -> Result<Expr>
 where
@@ -164,8 +168,9 @@ where
 	};
 
 	let primitive = match (&arg_1, &arg_2) {
-		(Int(_), Int(_)) | (Float(_), Float(_)) | (Bool(_), Bool(_)) => op(arg_1, arg_2)?,
-		_ => return Err(Error::BadType(name)),
+		(Int(i), Float(_)) => op(upcast(*i), arg_2)?,
+		(Float(_), Int(i)) => op(arg_1, upcast(*i))?,
+		_ => op(arg_1, arg_2)?,
 	};
 
 	Ok(Primitive(primitive))
@@ -454,9 +459,9 @@ fn add(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
 		(Int(arg_1), Int(arg_2)) => Ok(Int(arg_1 + arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Float(arg_1 + arg_2)),
-		(DateTime(arg_1), Span(arg_2)) => Ok(DateTime(
-			arg_1
-				.checked_add(arg_2)
+		// Span or DateTime can come first
+		(DateTime(dt), Span(s)) | (Span(s), DateTime(dt)) => Ok(DateTime(
+			dt.checked_add(s)
 				.map_err(|err| Error::Datetime(err.to_string()))?,
 		)),
 		(Span(arg_1), Span(arg_2)) => Ok(Span(
