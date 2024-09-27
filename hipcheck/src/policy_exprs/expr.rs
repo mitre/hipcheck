@@ -15,7 +15,7 @@ use nom::{
 	Finish as _, IResult,
 };
 use ordered_float::NotNan;
-use std::{fmt::Display, ops::Deref};
+use std::{fmt::Display, mem::Discriminant, ops::Deref};
 
 /// A `deke` expression to evaluate.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -146,6 +146,34 @@ impl Deref for Ident {
 
 	fn deref(&self) -> &Self::Target {
 		self.0.deref()
+	}
+}
+
+type PrimitiveType = Discriminant<Primitive>;
+type ArrayType = Discriminant<Primitive>;
+struct FunctionType {
+	pub args: Vec<Box<Type>>,
+	pub output: Box<Type>,
+}
+enum Type {
+	Primitive(PrimitiveType),
+	Array(ArrayType),
+	Function(FunctionType),
+}
+trait Typed {
+	fn typ(&self) -> Type;
+}
+impl Typed for Primitive {
+	fn typ(&self) -> Type {
+		Type::Primitive(std::mem::discriminant(self))
+	}
+}
+impl Typed for Expr {
+	fn typ(&self) -> Type {
+		match self {
+			Expr::Primitive(p) => p.typ(),
+			_ => todo!(),
+		}
 	}
 }
 
