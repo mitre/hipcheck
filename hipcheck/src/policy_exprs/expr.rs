@@ -27,16 +27,66 @@ pub enum Expr {
 	Primitive(Primitive),
 
 	/// An array of primitive data.
-	Array(Vec<Primitive>),
+	Array(Array),
 
 	/// Stores the name of the function, followed by the args.
-	Function(Ident, Vec<Expr>),
+	Function(Function),
 
 	/// Stores the name of the input variable, followed by the lambda body.
-	Lambda(Ident, Box<Expr>),
+	Lambda(Lambda),
 
 	/// Stores a late-binding for a JSON value.
 	JsonPointer(JsonPointer),
+}
+
+/// An array of primitives.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Array {
+	pub elts: Vec<Primitive>,
+}
+impl Array {
+	pub fn new(elts: Vec<Primitive>) -> Self {
+		Array { elts }
+	}
+}
+impl From<Array> for Expr {
+	fn from(value: Array) -> Self {
+		Expr::Array(value)
+	}
+}
+
+/// A `deke` function to evaluate.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Function {
+	pub ident: Ident,
+	pub args: Vec<Expr>,
+}
+impl Function {
+	pub fn new(ident: Ident, args: Vec<Expr>) -> Self {
+		Function { ident, args }
+	}
+}
+impl From<Function> for Expr {
+	fn from(value: Function) -> Self {
+		Expr::Function(value)
+	}
+}
+
+/// Stores the name of the input variable, followed by the lambda body.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Lambda {
+	pub arg: Ident,
+	pub body: Box<Expr>,
+}
+impl Lambda {
+	pub fn new(arg: Ident, body: Box<Expr>) -> Self {
+		Lambda { arg, body }
+	}
+}
+impl From<Lambda> for Expr {
+	fn from(value: Lambda) -> Self {
+		Expr::Lambda(value)
+	}
 }
 
 /// Primitive data.
@@ -76,6 +126,11 @@ pub enum Primitive {
 	/// "P1w1dT1h1m1.1s"
 	Span(Span),
 }
+impl From<Primitive> for Expr {
+	fn from(value: Primitive) -> Self {
+		Expr::Primitive(value)
+	}
+}
 
 /// A variable or function identifier.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,6 +142,11 @@ pub struct JsonPointer {
 	pointer: String,
 	value: Option<serde_json::Value>,
 }
+impl From<JsonPointer> for Expr {
+	fn from(value: JsonPointer) -> Self {
+		Expr::JsonPointer(value)
+	}
+}
 
 /// A non-NaN 64-bit floating point number.
 pub type F64 = NotNan<f64>;
@@ -96,13 +156,17 @@ impl Display for Expr {
 		match self {
 			Expr::Primitive(primitive) => write!(f, "{}", primitive),
 			Expr::Array(array) => {
-				write!(f, "[{}]", array.iter().map(ToString::to_string).join(" "))
+				write!(
+					f,
+					"[{}]",
+					array.elts.iter().map(ToString::to_string).join(" ")
+				)
 			}
-			Expr::Function(ident, args) => {
-				let args = args.iter().map(ToString::to_string).join(" ");
-				write!(f, "({} {})", ident, args)
+			Expr::Function(func) => {
+				let args = func.args.iter().map(ToString::to_string).join(" ");
+				write!(f, "({} {})", func.ident, args)
 			}
-			Expr::Lambda(arg, body) => write!(f, "(lambda ({}) {}", arg, body),
+			Expr::Lambda(l) => write!(f, "(lambda ({}) {}", l.arg, l.body),
 			Expr::JsonPointer(pointer) => write!(f, "${}", pointer.pointer),
 		}
 	}
@@ -206,7 +270,7 @@ fn parse_primitive(input: Input<'_>) -> IResult<Input<'_>, Primitive> {
 /// Parse an array.
 fn parse_array(input: Input<'_>) -> IResult<Input<'_>, Expr> {
 	let parser = tuple((Token::OpenBrace, many0(parse_primitive), Token::CloseBrace));
-	let mut parser = map(parser, |(_, inner, _)| Expr::Array(inner));
+	let mut parser = map(parser, |(_, inner, _)| Array::new(inner).into());
 	parser(input)
 }
 
@@ -225,7 +289,7 @@ fn parse_function(input: Input<'_>) -> IResult<Input<'_>, Expr> {
 		Token::CloseParen,
 	));
 	let mut parser = map(parser, |(_, ident, args, _)| {
-		Expr::Function(Ident(ident), args)
+		Function::new(Ident(ident), args).into()
 	});
 	parser(input)
 }
@@ -274,7 +338,7 @@ mod tests {
 
 	fn func(name: &str, args: Vec<impl IntoExpr>) -> Expr {
 		let args = args.into_iter().map(|arg| arg.into_expr()).collect();
-		Expr::Function(Ident(String::from(name)), args)
+		Function::new(Ident(String::from(name)), args).into()
 	}
 
 	fn int(val: i64) -> Primitive {
@@ -298,7 +362,7 @@ mod tests {
 	}
 
 	fn array(vals: Vec<Primitive>) -> Expr {
-		Expr::Array(vals)
+		Array::new(vals).into()
 	}
 
 	fn json_ptr(name: &str) -> Expr {
