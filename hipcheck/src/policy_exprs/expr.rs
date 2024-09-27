@@ -63,10 +63,10 @@ pub enum Primitive {
 
 	/// Span of time using the [jiff] crate, which uses a modified version of ISO8601.
 	///
-	/// Can include weeks, days, hours, minutes, and seconds (including decimal fractions of a second).
+	/// Can include weeks, days, hours, minutes, and seconds. The smallest provided unit of time (but not weeks or days) can have a decimal fraction.
 	/// While spans with months, years, or both are valid under IS08601 and supported by [jiff] in general, we do not allow them in Hipcheck policy expressions.
 	/// This is because spans greater than a day require additional zoned datetime information in [jiff] (to determine e.g. how many days are in a year or month)
-	/// before we can do time arithematic with them.
+	/// before we can do time arithmetic with them.
 	/// We *do* allows spans with weeks, even though [jiff] has similar issues with those units.
 	/// We take care of this by converting a week to a period of seven 24-hour days that [jiff] can handle in arithematic without zoned datetime information.
 	///
@@ -342,10 +342,10 @@ mod tests {
 
 	#[test]
 	fn parse_span() {
-		let input = "P2W4DT1H30M";
+		let input = "P2W4DT1H30.5M";
 		let result = parse(input).unwrap();
 
-		let raw_span: Span = "P18DT1H30M".parse().unwrap();
+		let raw_span: Span = "P18DT1H30.5M".parse().unwrap();
 		let expected = span(raw_span).into_expr();
 
 		assert_eq!(result, expected);

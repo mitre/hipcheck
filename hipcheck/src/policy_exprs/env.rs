@@ -527,7 +527,7 @@ fn divz(env: &Env, args: &[Expr]) -> Result<Expr> {
 	binary_primitive_op(name, env, args, op)
 }
 
-// Finds the difference in time between two datetimes, in units of hours (chosen for comparision safety)
+// Finds the difference in time between two datetimes, in units no larger than hours (chosen for comparision safety)
 fn duration(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "duration";
 

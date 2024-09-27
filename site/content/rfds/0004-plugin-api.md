@@ -607,11 +607,15 @@ The policy expression language is limited. It does not permit user-defined
 functions, assignment to variables, or the retention of any state. Any
 policy expression which does _not_ result in a boolean output will produce
 an error. The primitive types accepted in policy expressions are only
-integers, floating point numbers, and booleans.
+integers, floating point numbers, booleans, datetimes, and spans of time.
 
 - `Integer`: 64-bit signed integers.
 - `Float`: 64-bit IEEE double-precision floating point numbers.
 - `Boolean`: True (`#t`) or false (`#f`).
+- `DateTime`: A datetime value with a date, optional time, and optional UTC
+  offset. This follows a modified version of ISO8601 (see below for details).
+- `Span`: A span of time, in some combination of weeks, days, hours, minutes,
+  seconds. This follows a modified version of ISO8601 (see below for details).
 
 Policy expressions also accept arrays, which are ordered sequences of
 values of the same type from the list of primitive types above. Arrays may
@@ -644,12 +648,17 @@ The following functions are currently defined for policy expressions:
   - __`neq`__: Not-equal comparison. Example: `(neq 1 1)` is `#f`. This
     function can be partially-evaluated when passed to a higher-order array function.
 - Mathematical Functions
-  - __`add`__: Adds two integers or floats together. This function can be
-    partially-evaluated when passed to a higher-order array function.
-  - __`sub`__: Subtracts one integer or float from another. This function
-    can be partially-evaluated when passed to `foreach`, in which case the
-    order of the parameters is switched to match the expected result. So
+  - __`add`__: Adds two integers, floats, or spans together. Adds a datetime and a
+   span to get new datetime. This function can be partially-evaluated when passed to
+   a higher-order array function.
+  - __`sub`__: Subtracts one integer, float, or span from another. Subtracts a
+    span from a datetime to get a new datetime. This function can be
+    partially-evaluated when passed to `foreach`, in which case the order of
+    the parameters is switched to match the expected result. So
     `(foreach (sub 1) [1 2 3 4 5])` becomes `[0 1 2 3 4]`.
+- DateTime Specific Function
+  - __`duration`__: Returns the span representing the difference between two
+    datetimes.
 - Logical Functions
   - __`and`__: Performs the logical "and" of two booleans. Example:
     `(and #t #f)` becomes `#f`.
@@ -701,6 +710,63 @@ object, and `/[index]` can be used to select any numbered index of an
 array. So `$/items/0`, for example, would select into the `items` field
 of the provided object, and then into the first (`0`-th) element of that
 array.
+
+#### DateTime format details
+The policy expression DateTime primitive uses a modified version of ISO8601.
+A given datetime must include a date in the format `<YYYY>-<MM>-<DD>`.
+
+An optional time in the format `T<HH>:[MM]:[SS]` can be provided after the date.
+**Decimal fractions of hours and minutes are not allowed**; use smaller time units
+instead (e.g. T10:30 instead of T10.5). Decimal fractions of seconds are allowed.
+
+The timezone is always set to UTC, but you can set an offeset from UTC by
+including `+{HH}:[MM]` or `-{HH}:[MM]` after the time. All datetimes are
+treated as offsets ofUTC and do not include other timezone information (e.g.
+daylight savings time adjustments).
+
+Example of valid datetimes are:
+- `2024-09-25`
+- `2024-09-25T08`
+- `2024-09-25T08:28:35`
+- `2024-09-25T08:30-05`
+- `2024-09-25T08:28:35-03:30`
+
+All comparison functions work on datetimes, with earlier datetimes
+considered to be "lesser than" later ones. A span can be added to or
+subtratced from a datetime to get a new datetime. The __`duration`__
+function is used to find the difference in time between two datetimes,
+returned as a span.
+
+#### Span format details
+The policy expression Span primitive uses a modified version of ISO8601. It can
+include weeks, days, hours, minutes, and seconds. The smallest provided unit of
+time (i.e. hours, minutes, or seconds) can have a decimal fraction.
+
+While spans with months, years, or both are valid under IS08601, we do not allow
+them in Hipcheck policy expressions. This is because spans greater than a day
+require additional zoned datetime information (to determine e.g. how many days
+are in a year or month) before we can do time arithmetic with them.
+Spans with weeks, days, or both **are** allowed. Hipcheck handles this by treating
+all days as periods of exactly 24 hours (without worrying about leap seconds)
+and converting a week to a period of seven 24-hour days.
+
+Spans are preceded by the letter "P" with any optional time units separated from
+optional date units by the letter "T" (not whitespace, as is also allowed under
+ISO8601). All units of dates and times are represented by single case-agnostic
+letter abbreviations after the number.
+
+Examples of valid spans are:
+- `P4w`
+- `P3d`
+- `P1W2D`
+- `PT4h15.25m`
+- `PT5s`
+- `P1w2dT3h4m5.6s`
+
+All comparison functions work on spans. This is handled the "smart way," with
+spans that have different representations but equalling the same amount of time
+considred to be equal. e.g. `(eq PT1h PT60m)` will return `#t`. Spans can be added
+to or subtracted from each other to return a new span.
 
 #### Limitations of JSON Pointer syntax relative to RFC
 
