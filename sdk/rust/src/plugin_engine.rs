@@ -8,7 +8,7 @@ use crate::{
 	},
 	QueryTarget,
 };
-use crate::{JsonValue, Plugin};
+use crate::{mock::MockResponses, JsonValue, Plugin};
 use futures::Stream;
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -95,9 +95,16 @@ pub struct PluginEngine {
 	rx: mpsc::Receiver<Option<PluginQuery>>,
 	// So that we can remove ourselves when we get dropped
 	drop_tx: mpsc::Sender<i32>,
+	/// when unit testing, this enables the user to mock plugin responses to various inputs
+	mock_responses: MockResponses,
 }
 
 impl PluginEngine {
+	#[cfg(feature = "mock_engine")]
+	pub fn mock(mock_responses: MockResponses) -> Self {
+		mock_responses.into()
+	}
+
 	/// Query another Hipcheck plugin `target` with key `input`. On success, the JSONified result
 	/// of the query is returned. `target` will often be a string of the format
 	/// `"publisher/plugin[/query]"`, where the bracketed substring is optional if the plugin's
@@ -108,31 +115,47 @@ impl PluginEngine {
 		T: TryInto<QueryTarget, Error: Into<Error>>,
 		V: Into<JsonValue>,
 	{
-		let input: JsonValue = input.into();
 		let query_target: QueryTarget = target.try_into().map_err(|e| e.into())?;
+		let input: JsonValue = input.into();
 
-		async fn query_inner(
-			engine: &mut PluginEngine,
-			target: QueryTarget,
-			input: JsonValue,
-		) -> Result<JsonValue> {
-			let query = Query {
-				direction: QueryDirection::Request,
-				publisher: target.publisher,
-				plugin: target.plugin,
-				query: target.query.unwrap_or_else(|| "".to_owned()),
-				key: input,
-				output: json!(Value::Null),
-				concerns: vec![],
-			};
-			engine.send(query).await?;
-			let response = engine.recv().await?;
-			match response {
-				Some(response) => Ok(response.output),
-				None => Err(Error::SessionChannelClosed),
+		// If doing a mock engine, look to the `mock_responses` field for the query answer
+		if cfg!(feature = "mock_engine") {
+			match self.mock_responses.0.get(&(query_target, input)) {
+				Some(res) => {
+					match res {
+						Ok(val) => Ok(val.clone()),
+						// TODO: since Error is not Clone, is there a better way to deal with this
+						Err(_) => Err(Error::UnexpectedPluginQueryInputFormat),
+					}
+				}
+				None => Err(Error::UnknownPluginQuery),
 			}
 		}
-		query_inner(self, query_target, input).await
+		// Normal execution, send messages to hipcheck core to query other plugin
+		else {
+			async fn query_inner(
+				engine: &mut PluginEngine,
+				target: QueryTarget,
+				input: JsonValue,
+			) -> Result<JsonValue> {
+				let query = Query {
+					direction: QueryDirection::Request,
+					publisher: target.publisher,
+					plugin: target.plugin,
+					query: target.query.unwrap_or_else(|| "".to_owned()),
+					key: input,
+					output: json!(Value::Null),
+					concerns: vec![],
+				};
+				engine.send(query).await?;
+				let response = engine.recv().await?;
+				match response {
+					Some(response) => Ok(response.output),
+					None => Err(Error::SessionChannelClosed),
+				}
+			}
+			query_inner(self, query_target, input).await
+		}
 	}
 
 	fn id(&self) -> usize {
@@ -308,15 +331,38 @@ impl PluginEngine {
 	}
 }
 
+#[cfg(feature = "mock_engine")]
+impl From<MockResponses> for PluginEngine {
+	fn from(value: MockResponses) -> Self {
+		let (tx, _) = mpsc::channel(1);
+		let (_, rx) = mpsc::channel(1);
+		let (drop_tx, _) = mpsc::channel(1);
+
+		Self {
+			id: 0,
+			tx,
+			rx,
+			drop_tx,
+			mock_responses: value,
+		}
+	}
+}
+
 impl Drop for PluginEngine {
 	// Notify to have self removed from session tracker
 	fn drop(&mut self) {
-		while let Err(e) = self.drop_tx.try_send(self.id as i32) {
-			match e {
-				TrySendError::Closed(_) => {
-					break;
+		if cfg!(feature = "mock_engine") {
+			// "use" drop_tx to prevent 'unused' warning. Less messy than trying to gate the
+			// existence of "drop_tx" var itself.
+			let _ = self.drop_tx.max_capacity();
+		} else {
+			while let Err(e) = self.drop_tx.try_send(self.id as i32) {
+				match e {
+					TrySendError::Closed(_) => {
+						break;
+					}
+					TrySendError::Full(_) => (),
 				}
-				TrySendError::Full(_) => (),
 			}
 		}
 	}
@@ -420,6 +466,7 @@ impl HcSessionSocket {
 						tx,
 						rx,
 						drop_tx: self.drop_tx.clone(),
+						mock_responses: MockResponses::new(),
 					};
 
 					in_tx.send(Some(raw)).await.expect(
