@@ -46,7 +46,7 @@ pub enum Token {
 
 	// In the future this regex *could* be made more specific to reduce collision
 	// with Ident, or we could introduce a special prefix character like '@' or '#'
-	#[regex(r"PT?[0-9]+[a-zA-Z][^\s\)]*", lex_span)]
+	#[regex(r"PT?[0-9.]+[a-zA-Z][^\s\)]*", lex_span)]
 	Span(Box<Span>),
 
 	// Prioritize over span regex, which starts with a 'P'
