@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::policy_exprs::{eval, Error, Expr, Ident, Primitive, Result, F64};
+use crate::policy_exprs::{
+	pass::ExprMutator, Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction,
+	Ident, Lambda as StructLambda, Primitive, Result, F64,
+};
 use itertools::Itertools as _;
 use jiff::{Span, Zoned};
 use std::{cmp::Ordering, collections::HashMap, ops::Not as _};
@@ -137,8 +140,8 @@ fn partially_evaluate(fn_name: &'static str, arg: Expr) -> Result<Expr> {
 	let var_name = "x";
 	let var = Ident(String::from(var_name));
 	let func = Ident(String::from(fn_name));
-	let op = Function(func, vec![Primitive(Identifier(var.clone())), arg]);
-	let lambda = Lambda(var, Box::new(op));
+	let op = StructFunction::new(func, vec![Primitive(Identifier(var.clone())), arg]).into();
+	let lambda = StructLambda::new(var, Box::new(op)).into();
 	Ok(lambda)
 }
 
@@ -157,12 +160,12 @@ where
 
 	check_num_args(name, args, 2)?;
 
-	let arg_1 = match eval(env, &args[0])? {
+	let arg_1 = match env.visit_expr(args[0].clone())? {
 		Primitive(p) => p,
 		_ => return Err(Error::BadType(name)),
 	};
 
-	let arg_2 = match eval(env, &args[1])? {
+	let arg_2 = match env.visit_expr(args[1].clone())? {
 		Primitive(p) => p,
 		_ => return Err(Error::BadType(name)),
 	};
@@ -183,7 +186,7 @@ where
 {
 	check_num_args(name, args, 1)?;
 
-	let primitive = match eval(env, &args[0])? {
+	let primitive = match env.visit_expr(args[0].clone())? {
 		Primitive(arg) => arg,
 		_ => return Err(Error::BadType(name)),
 	};
@@ -198,8 +201,8 @@ where
 {
 	check_num_args(name, args, 1)?;
 
-	let arr = match eval(env, &args[0])? {
-		Array(arg) => array_type(&arg[..])?,
+	let arr = match env.visit_expr(args[0].clone())? {
+		Array(a) => array_type(&a.elts[..])?,
 		_ => return Err(Error::BadType(name)),
 	};
 
@@ -213,13 +216,13 @@ where
 {
 	check_num_args(name, args, 2)?;
 
-	let (ident, body) = match eval(env, &args[0])? {
-		Lambda(ident, body) => (ident, body),
+	let (ident, body) = match env.visit_expr(args[0].clone())? {
+		Lambda(l) => (l.arg, l.body),
 		_ => return Err(Error::BadType(name)),
 	};
 
-	let arr = match eval(env, &args[1])? {
-		Array(arr) => array_type(&arr[..])?,
+	let arr = match env.visit_expr(args[1].clone())? {
+		Array(a) => array_type(&a.elts[..])?,
 		_ => return Err(Error::BadType(name)),
 	};
 
@@ -322,7 +325,7 @@ fn eval_lambda(env: &Env, ident: &Ident, val: Primitive, body: Expr) -> Result<E
 		return Err(Error::AlreadyBound);
 	}
 
-	eval(&child, &body)
+	child.visit_expr(body)
 }
 
 #[allow(clippy::bool_comparison)]
@@ -944,7 +947,7 @@ fn filter(env: &Env, args: &[Expr]) -> Result<Expr> {
 			ArrayType::Empty => Vec::new(),
 		};
 
-		Ok(Array(arr))
+		Ok(StructArray::new(arr).into())
 	};
 
 	higher_order_array_op(name, env, args, op)
@@ -1003,7 +1006,7 @@ fn foreach(env: &Env, args: &[Expr]) -> Result<Expr> {
 			ArrayType::Empty => Vec::new(),
 		};
 
-		Ok(Array(arr))
+		Ok(StructArray::new(arr).into())
 	};
 
 	higher_order_array_op(name, env, args, op)
@@ -1013,7 +1016,7 @@ fn dbg(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "dbg";
 	check_num_args(name, args, 1)?;
 	let arg = &args[0];
-	let result = eval(env, arg)?;
+	let result = env.visit_expr(arg.clone())?;
 	log::debug!("{arg} = {result}");
 	Ok(result)
 }
