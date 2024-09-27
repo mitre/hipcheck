@@ -9,6 +9,9 @@ use serde_json::Value as JsonValue;
 use std::result::Result as StdResult;
 use std::str::FromStr;
 
+#[cfg(feature = "macros")]
+extern crate hipcheck_sdk_macros;
+
 mod proto {
 	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
 }
@@ -25,12 +28,15 @@ pub mod prelude {
 	pub use crate::plugin_engine::PluginEngine;
 	pub use crate::plugin_server::{PluginServer, QueryResult};
 	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
+	// Re-export macros
+	#[cfg(feature = "macros")]
+	pub use hipcheck_sdk_macros::query;
 }
 
 /// re-export of user-facing third-party dependencies
 pub mod deps {
-	pub use schemars::schema::SchemaObject as JsonSchema;
-	pub use serde_json::{from_str, Value};
+	pub use schemars::{schema::SchemaObject as JsonSchema, schema_for};
+	pub use serde_json::{from_str, from_value, to_value, Value};
 	pub use tonic::async_trait;
 }
 

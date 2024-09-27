@@ -1266,6 +1266,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures",
+ "hipcheck-sdk-macros",
  "indexmap 2.5.0",
  "prost",
  "rand",
@@ -1276,6 +1277,17 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tonic-build",
+]
+
+[[package]]
+name = "hipcheck-sdk-macros"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "convert_case",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.77",
 ]
 
 [[package]]

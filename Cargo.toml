@@ -20,6 +20,7 @@ members = [
     "plugins/dummy_sha256",
     "plugins/dummy_sha256_sdk",
     "sdk/rust",
+    "hipcheck-sdk-macros",
 ]
 
 # Make sure Hipcheck is run with `cargo run`.
