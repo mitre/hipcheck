@@ -49,6 +49,10 @@ pub enum Error {
 	#[error("unexpected JSON value from plugin")]
 	UnexpectedPluginQueryInputFormat,
 
+	/// The `Query::run` function implementation produced an output that cannot be serialized to JSON
+	#[error("plugin output could not be serialized to JSON")]
+	UnexpectedPluginQueryOutputFormat,
+
 	/// The `PluginEngine` received a request for an unknown query endpoint
 	#[error("could not determine which plugin query to run")]
 	UnknownPluginQuery,
