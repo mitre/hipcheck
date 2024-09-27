@@ -3,7 +3,7 @@
 use crate::policy_exprs::{
 	error,
 	error::{Error, Result},
-	expr::{Expr, Primitive},
+	expr::{Array, Expr, Primitive},
 };
 use ordered_float::NotNan;
 use regex::{Captures, Regex, RegexBuilder};
@@ -116,7 +116,7 @@ fn json_to_policy_expr(val: &Value, pointer: &str, context: &Value) -> Result<Ex
 				.collect::<Result<Vec<Primitive>>>()?;
 			// NOTE that no checking is done to confirm that all Primitives are the same type.
 			// That would be a type error in the Policy Expr language.
-			Ok(Expr::Array(primitives))
+			Ok(Array::new(primitives).into())
 		}
 		// Strings cannot (currently) be represented in the Policy Expr language.
 		Value::String(_) => Err(Error::JSONPointerUnrepresentableType {

@@ -7,13 +7,15 @@ mod env;
 mod error;
 pub mod expr;
 mod json_pointer;
+mod pass;
 mod token;
 
 use crate::policy_exprs::env::Env;
 pub(crate) use crate::policy_exprs::{bridge::Tokens, expr::F64};
 pub use crate::policy_exprs::{
 	error::{Error, Result},
-	expr::{Expr, Ident},
+	expr::{Array, Expr, Function, Ident, JsonPointer, Lambda},
+	pass::{ExprMutator, ExprVisitor},
 	token::LexingError,
 };
 use env::Binding;
@@ -45,34 +47,27 @@ impl Executor {
 	pub fn parse_and_eval(&self, raw_program: &str, context: &Value) -> Result<Expr> {
 		let processed_program = process_json_pointers(raw_program, context)?;
 		let program = parse(&processed_program)?;
-		let expr = eval(&self.env, &program)?;
+		let expr = self.env.visit_expr(program)?;
 		Ok(expr)
 	}
 }
-
-/// Evaluate the `Expr`, returning a boolean.
-pub(crate) fn eval(env: &Env, program: &Expr) -> Result<Expr> {
-	let output = match program {
-		Expr::Primitive(primitive) => Ok(Expr::Primitive(primitive.resolve(env)?)),
-		Expr::Array(_) => Ok(program.clone()),
-		Expr::Function(name, args) => {
-			let binding = env
-				.get(name)
-				.ok_or_else(|| Error::UnknownFunction(name.deref().to_owned()))?;
-
-			if let Binding::Fn(op) = binding {
-				op(env, args)
-			} else {
-				Err(Error::FoundVarExpectedFunc(name.deref().to_owned()))
-			}
+impl ExprMutator for Env<'_> {
+	fn visit_primitive(&self, prim: Primitive) -> Result<Expr> {
+		Ok(prim.resolve(self)?.into())
+	}
+	fn visit_function(&self, f: Function) -> Result<Expr> {
+		let binding = self
+			.get(&f.ident)
+			.ok_or_else(|| Error::UnknownFunction(f.ident.deref().to_owned()))?;
+		if let Binding::Fn(op) = binding {
+			(op)(self, &f.args)
+		} else {
+			Err(Error::FoundVarExpectedFunc(f.ident.deref().to_owned()))
 		}
-		Expr::Lambda(_, body) => Ok((**body).clone()),
-		Expr::JsonPointer(_) => unreachable!(),
-	};
-
-	log::debug!("input: {program:?}, output: {output:?}");
-
-	output
+	}
+	fn visit_lambda(&self, l: Lambda) -> Result<Expr> {
+		Ok((*l.body).clone())
+	}
 }
 
 #[cfg(test)]
@@ -177,7 +172,7 @@ mod tests {
 		let program = "(eq 3 (count (filter (gt 8.0) [1.0 2.0 10.0 20.0 30.0])))";
 		let context = Value::Null;
 		let result = Executor::std().parse_and_eval(program, &context).unwrap();
-		assert_eq!(result, Expr::Primitive(Primitive::Bool(true)));
+		assert_eq!(result, Primitive::Bool(true).into());
 	}
 
 	#[test]
@@ -186,7 +181,7 @@ mod tests {
 			"(eq 3 (count (filter (gt 8.0) (foreach (sub 1.0) [1.0 2.0 10.0 20.0 30.0]))))";
 		let context = Value::Null;
 		let result = Executor::std().parse_and_eval(program, &context).unwrap();
-		assert_eq!(result, Expr::Primitive(Primitive::Bool(true)));
+		assert_eq!(result, Primitive::Bool(true).into());
 	}
 
 	#[test]
@@ -196,11 +191,12 @@ mod tests {
 		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(
 			result,
-			Expr::Array(vec![
+			Array::new(vec![
 				Primitive::Int(0),
 				Primitive::Int(0),
 				Primitive::Int(0)
 			])
+			.into()
 		);
 	}
 
