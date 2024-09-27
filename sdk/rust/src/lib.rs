@@ -17,6 +17,7 @@ mod proto {
 }
 
 pub mod error;
+mod mock;
 pub mod plugin_engine;
 pub mod plugin_server;
 
@@ -31,6 +32,9 @@ pub mod prelude {
 	// Re-export macros
 	#[cfg(feature = "macros")]
 	pub use hipcheck_sdk_macros::{queries, query};
+
+	#[cfg(feature = "mock_engine")]
+	pub use crate::mock::MockResponses;
 }
 
 /// re-export of user-facing third-party dependencies
@@ -45,7 +49,7 @@ pub mod deps {
 /// endpoint as the "default", hence why the `query` field is of type Option. QueryTarget
 /// implements `FromStr`, taking strings of the format `"publisher/plugin[/query]"` where the
 /// bracketed substring is optional.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct QueryTarget {
 	pub publisher: String,
 	pub plugin: String,

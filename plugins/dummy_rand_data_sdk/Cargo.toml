@@ -8,6 +8,9 @@ publish = false
 [dependencies]
 anyhow = "1.0.87"
 clap = { version = "4.5.18", features = ["derive"] }
-hipcheck-sdk = { path = "../../sdk/rust" }
+hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"] }
 rand = "0.8.5"
 tokio = { version = "1.40.0", features = ["rt"] }
+
+[dev-dependencies]
+hipcheck-sdk = { path = "../../sdk/rust", features = ["macros", "mock_engine"] }
