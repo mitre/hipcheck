@@ -14,8 +14,11 @@ use crate::policy_exprs::env::Env;
 pub(crate) use crate::policy_exprs::{bridge::Tokens, expr::F64};
 pub use crate::policy_exprs::{
 	error::{Error, Result},
-	expr::{Array, Expr, Function, Ident, JsonPointer, Lambda},
-	pass::{ExprMutator, ExprVisitor},
+	expr::{
+		Array, Expr, Function, Ident, JsonPointer, Lambda, PrimitiveType, ReturnableType, Type,
+		Typed,
+	},
+	pass::{ExprMutator, ExprVisitor, FunctionResolver, TypeChecker, TypeFixer},
 	token::LexingError,
 };
 use env::Binding;
@@ -57,17 +60,37 @@ impl ExprMutator for Env<'_> {
 		Ok(prim.resolve(self)?.into())
 	}
 	fn visit_function(&self, f: Function) -> Result<Expr> {
+		let mut f = f;
+		// first evaluate all the children
+		f.args = f
+			.args
+			.into_iter()
+			.map(|a| self.visit_expr(a))
+			.collect::<Result<Vec<Expr>>>()?;
 		let binding = self
 			.get(&f.ident)
 			.ok_or_else(|| Error::UnknownFunction(f.ident.deref().to_owned()))?;
-		if let Binding::Fn(op) = binding {
-			(op)(self, &f.args)
+		if let Binding::Fn(op_info) = binding {
+			// Doesn't use `execute` because currently allows Functions that haven't been changed
+			// to Lambdas
+			(op_info.op)(self, &f.args)
 		} else {
 			Err(Error::FoundVarExpectedFunc(f.ident.deref().to_owned()))
 		}
 	}
-	fn visit_lambda(&self, l: Lambda) -> Result<Expr> {
-		Ok((*l.body).clone())
+	fn visit_lambda(&self, mut l: Lambda) -> Result<Expr> {
+		// Eagerly evaluate the arguments to the lambda but not the func itself
+		// Visit args, but ignore lambda ident because not yet bound
+		l.body.args = l
+			.body
+			.args
+			.drain(..)
+			.map(|a| match a {
+				Expr::Primitive(Primitive::Identifier(_)) => Ok(a),
+				b => self.visit_expr(b),
+			})
+			.collect::<Result<Vec<Expr>>>()?;
+		Ok(l.into())
 	}
 	fn visit_json_pointer(&self, jp: JsonPointer) -> Result<Expr> {
 		let expr = &jp.value;
@@ -215,6 +238,11 @@ mod tests {
 		let program =
 			"(eq 3 (count (filter (gt 8.0) (foreach (sub 1.0) [1.0 2.0 10.0 20.0 30.0]))))";
 		let context = Value::Null;
+		let expr = parse(&program).unwrap();
+		println!("EXPR: {:?}", &expr);
+		let expr = FunctionResolver::std().run(expr).unwrap();
+		let expr = TypeFixer::std().run(expr).unwrap();
+		println!("RESOLVER RES: {:?}", expr);
 		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(result, Primitive::Bool(true).into());
 	}
@@ -266,5 +294,84 @@ mod tests {
 			.parse_and_eval(format!("(add {} {})", span, date).as_str(), &context)
 			.unwrap();
 		assert_eq!(expected, result2);
+	}
+
+	#[test]
+	fn type_lambda() {
+		let program = "(gt #t)";
+		let expr = parse(&program).unwrap();
+		let expr = FunctionResolver::std().run(expr).unwrap();
+		let expr = TypeFixer::std().run(expr).unwrap();
+		let res_ty = TypeChecker::default().run(&expr);
+		let Ok(Type::Lambda(l_ty)) = res_ty else {
+			assert!(false);
+			return;
+		};
+		let ret_ty = l_ty.get_return_type();
+		assert_eq!(ret_ty, Ok(ReturnableType::Primitive(PrimitiveType::Bool)));
+	}
+
+	#[test]
+	fn type_filter_bad_lambda_array() {
+		// Should fail because can't compare ints and bools
+		let program = "(filter (gt #t) [1 2])";
+		let expr = parse(&program).unwrap();
+		let expr = FunctionResolver::std().run(expr).unwrap();
+		let expr = TypeFixer::std().run(expr).unwrap();
+		let res_ty = TypeChecker::default().run(&expr);
+		assert!(matches!(
+			res_ty,
+			Err(Error::BadFuncArgType {
+				idx: 0,
+				got: Type::Primitive(PrimitiveType::Int),
+				..
+			})
+		));
+	}
+
+	#[test]
+	fn type_array_mixed_types() {
+		// Should fail because array elts must have one primitive type
+		let program = "(count [#t 2])";
+		let mut expr = parse(&program).unwrap();
+		expr = FunctionResolver::std().run(expr).unwrap();
+		let res_ty = TypeChecker::default().run(&expr);
+		assert_eq!(
+			res_ty,
+			Err(Error::BadArrayElt {
+				idx: 1,
+				expected: PrimitiveType::Bool,
+				got: PrimitiveType::Int
+			})
+		);
+	}
+
+	#[test]
+	fn type_propagate_unknown() {
+		// Type for array should be unknown because we can't know ident type
+		let program = "(max [])";
+		let mut expr = parse(&program).unwrap();
+		expr = FunctionResolver::std().run(expr).unwrap();
+		let res_ty = TypeChecker::default().run(&expr);
+		let Ok(Type::Function(f_ty)) = res_ty else {
+			assert!(false);
+			return;
+		};
+		assert_eq!(f_ty.get_return_type(), Ok(ReturnableType::Unknown));
+	}
+
+	#[test]
+	fn type_not() {
+		let program = "(not $)";
+		let mut expr = parse(&program).unwrap();
+		expr = FunctionResolver::std().run(expr).unwrap();
+		let res_ty = TypeChecker::default().run(&expr);
+		println!("RESTY: {res_ty:?}");
+		let Ok(Type::Function(f_ty)) = res_ty else {
+			assert!(false);
+			return;
+		};
+		let ret_ty = f_ty.get_return_type();
+		assert_eq!(ret_ty, Ok(ReturnableType::Primitive(PrimitiveType::Bool)));
 	}
 }
