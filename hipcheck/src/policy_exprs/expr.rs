@@ -15,7 +15,13 @@ use nom::{
 	Finish as _, IResult,
 };
 use ordered_float::NotNan;
-use std::{fmt::Display, ops::Deref};
+use std::{
+	cmp::Ordering,
+	fmt::Display,
+	mem::{discriminant, Discriminant},
+	ops::Deref,
+	sync::LazyLock,
+};
 
 #[cfg(test)]
 use jiff::civil::Date;
@@ -55,15 +61,90 @@ impl From<Array> for Expr {
 	}
 }
 
+/// Helper type for operation function pointer.
+pub type Op = fn(&Env, &[Expr]) -> Result<Expr>;
+
+#[derive(Clone, PartialEq, Debug, Eq)]
+pub struct OpInfo {
+	pub fn_ty: FuncReturnType,
+	pub expected_args: usize,
+	pub op: Op,
+}
+
+pub type TypeChecker = fn(&[Type]) -> Result<ReturnableType>;
+
+#[derive(Clone, PartialEq, Debug, Eq)]
+pub struct FunctionDef {
+	pub name: String,
+	pub expected_args: usize,
+	pub ty_checker: TypeChecker,
+	pub op: Op,
+}
+impl FunctionDef {
+	pub fn type_check(&self, args: &[Type]) -> Result<ReturnableType> {
+		match args.len().cmp(&self.expected_args) {
+			Ordering::Less => {
+				return Err(Error::NotEnoughArgs {
+					name: self.name.clone(),
+					expected: self.expected_args,
+					given: args.len(),
+				});
+			}
+			Ordering::Greater => {
+				return Err(Error::TooManyArgs {
+					name: self.name.clone(),
+					expected: self.expected_args,
+					given: args.len(),
+				});
+			}
+			_ => (),
+		}
+		let mut res = (self.ty_checker)(args);
+		// There's probably a better way to augment err with name
+		if let Err(Error::BadFuncArgType { name, .. }) = &mut res {
+			if name.is_empty() {
+				*name = self.name.clone();
+			}
+		};
+		res
+	}
+	pub fn execute(&self, env: &Env, args: &[Expr]) -> Result<Expr> {
+		let types = args
+			.iter()
+			.map(|a| a.get_type())
+			.collect::<Result<Vec<Type>>>()?;
+		self.type_check(types.as_slice());
+		(self.op)(env, args)
+	}
+}
+
 /// A `deke` function to evaluate.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function {
 	pub ident: Ident,
 	pub args: Vec<Expr>,
+	pub opt_def: Option<FunctionDef>,
 }
 impl Function {
 	pub fn new(ident: Ident, args: Vec<Expr>) -> Self {
-		Function { ident, args }
+		let opt_def = None;
+		Function {
+			ident,
+			args,
+			opt_def,
+		}
+	}
+	pub fn resolve(&self, env: &Env) -> Result<Self> {
+		let Some(Binding::Fn(op_info)) = env.get(&self.ident.0) else {
+			return Err(Error::UnknownFunction(self.ident.0.clone()));
+		};
+		let ident = self.ident.clone();
+		let args = self.args.clone();
+		Ok(Function {
+			ident,
+			args,
+			opt_def: Some(op_info),
+		})
 	}
 }
 impl From<Function> for Expr {
@@ -71,15 +152,20 @@ impl From<Function> for Expr {
 		Expr::Function(value)
 	}
 }
+impl From<FunctionType> for Type {
+	fn from(value: FunctionType) -> Self {
+		Type::Function(value)
+	}
+}
 
 /// Stores the name of the input variable, followed by the lambda body.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Lambda {
 	pub arg: Ident,
-	pub body: Box<Expr>,
+	pub body: Function,
 }
 impl Lambda {
-	pub fn new(arg: Ident, body: Box<Expr>) -> Self {
+	pub fn new(arg: Ident, body: Function) -> Self {
 		Lambda { arg, body }
 	}
 }
@@ -132,6 +218,208 @@ impl From<Primitive> for Expr {
 	}
 }
 
+// TYPING
+
+impl Primitive {
+	pub fn get_primitive_type(&self) -> PrimitiveType {
+		use PrimitiveType::*;
+		match self {
+			Primitive::Identifier(_) => Ident,
+			Primitive::Int(_) => Int,
+			Primitive::Float(_) => Float,
+			Primitive::Bool(_) => Bool,
+			Primitive::DateTime(_) => DateTime,
+			Primitive::Span(_) => Span,
+		}
+	}
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PrimitiveType {
+	Ident,
+	Int,
+	Float,
+	Bool,
+	DateTime,
+	Span,
+}
+
+pub type ArrayType = Option<PrimitiveType>;
+
+// A limited set of types that we allow a function to return
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum ReturnableType {
+	Primitive(PrimitiveType),
+	Array(ArrayType),
+	Unknown,
+}
+
+impl From<PrimitiveType> for ReturnableType {
+	fn from(value: PrimitiveType) -> ReturnableType {
+		ReturnableType::Primitive(value)
+	}
+}
+
+// We allow overloaded functions, such that the returned type is dependent on
+// the input operand types. This enum encapsulates both static and dynamically
+// determined return types.
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum FuncReturnType {
+	Dynamic(fn(&[Type]) -> Result<ReturnableType>),
+	Static(ReturnableType),
+}
+
+// A function signature is the combination of the return type and the arg types
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionType {
+	pub def: FunctionDef,
+	pub arg_tys: Vec<Type>,
+}
+
+impl FunctionType {
+	pub fn get_return_type(&self) -> Result<ReturnableType> {
+		self.def.type_check(&self.arg_tys)
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Type {
+	Primitive(PrimitiveType),
+	Function(FunctionType),
+	Lambda(FunctionType),
+	Array(ArrayType),
+	Unknown,
+}
+
+impl Type {
+	pub fn get_return_type(&self) -> Result<ReturnableType> {
+		self.try_into()
+	}
+}
+
+impl TryFrom<&Type> for ReturnableType {
+	type Error = crate::policy_exprs::Error;
+	fn try_from(value: &Type) -> Result<ReturnableType> {
+		Ok(match value {
+			Type::Function(fn_ty) | Type::Lambda(fn_ty) => fn_ty.get_return_type()?,
+			Type::Array(arr_ty) => ReturnableType::Array(*arr_ty),
+			Type::Primitive(PrimitiveType::Ident) => ReturnableType::Unknown,
+			Type::Primitive(p_ty) => ReturnableType::Primitive(*p_ty),
+			Type::Unknown => ReturnableType::Unknown,
+		})
+	}
+}
+
+impl Display for PrimitiveType {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "{:?}", self)
+	}
+}
+
+pub trait Typed {
+	fn get_type(&self) -> Result<Type>;
+}
+
+impl Typed for Primitive {
+	fn get_type(&self) -> Result<Type> {
+		Ok(Type::Primitive(self.get_primitive_type()))
+	}
+}
+
+impl Typed for Array {
+	// Treat first found elt type as the de-facto type of the array. Any subsequent elts that
+	// disagree are considered errors
+	fn get_type(&self) -> Result<Type> {
+		let mut ty: Option<PrimitiveType> = None;
+
+		for (idx, elt) in self.elts.iter().enumerate() {
+			let curr_ty = elt.get_primitive_type();
+
+			if let Some(expected_ty) = ty {
+				if expected_ty != curr_ty {
+					return Err(Error::BadArrayElt {
+						idx,
+						expected: expected_ty,
+						got: curr_ty,
+					});
+				}
+			} else {
+				ty = Some(elt.get_primitive_type());
+			}
+		}
+
+		Ok(Type::Array(ty))
+	}
+}
+
+impl Typed for Function {
+	fn get_type(&self) -> Result<Type> {
+		use FuncReturnType::*;
+
+		// Can't get a type if we haven't resolved the function
+		let Some(def) = self.opt_def.clone() else {
+			return Err(Error::UnknownFunction(self.ident.0.clone()));
+		};
+
+		// Get types of each argument
+		let arg_tys: Vec<Type> = self
+			.args
+			.iter()
+			.map(Typed::get_type)
+			.collect::<Result<Vec<_>>>()?;
+
+		let fn_type = FunctionType { def, arg_tys };
+
+		// If we are off by one, treat as a lambda
+		if fn_type.arg_tys.len() == fn_type.def.expected_args - 1 {
+			Ok(Type::Lambda(fn_type))
+		} else {
+			Ok(fn_type.into())
+		}
+	}
+}
+
+impl Typed for Lambda {
+	// @Todo - Lambda should be a FunctionType that takes 1 argument and
+	// contains an interior reference to the function it wraps.
+	// To get its return type, we should combine Unknown with the
+	// other typed args to the function and evaluate.
+	fn get_type(&self) -> Result<Type> {
+		let fty = match self.body.get_type()? {
+			Type::Function(f) => f,
+			other => {
+				return Err(Error::InternalError(format!("Body of a lambda expr should be a function with a placeholder var, got {other:?}")));
+			}
+		};
+
+		// we need a handle to the function to get a type
+		Ok(Type::Lambda(fty))
+	}
+}
+
+impl Typed for JsonPointer {
+	fn get_type(&self) -> Result<Type> {
+		if let Some(val) = self.value.as_ref() {
+			val.get_type()
+		} else {
+			Ok(Type::Unknown)
+		}
+	}
+}
+
+impl Typed for Expr {
+	fn get_type(&self) -> Result<Type> {
+		use Expr::*;
+		match self {
+			Primitive(p) => p.get_type(),
+			Array(a) => a.get_type(),
+			Function(f) => f.get_type(),
+			Lambda(l) => l.get_type(),
+			JsonPointer(j) => j.get_type(),
+		}
+	}
+}
+
 /// A variable or function identifier.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ident(pub String);
@@ -143,6 +431,7 @@ pub struct JsonPointer {
 	pub pointer: String,
 	pub value: Option<Box<Expr>>,
 }
+
 impl From<JsonPointer> for Expr {
 	fn from(value: JsonPointer) -> Self {
 		Expr::JsonPointer(value)
@@ -163,11 +452,8 @@ impl Display for Expr {
 					array.elts.iter().map(ToString::to_string).join(" ")
 				)
 			}
-			Expr::Function(func) => {
-				let args = func.args.iter().map(ToString::to_string).join(" ");
-				write!(f, "({} {})", func.ident, args)
-			}
-			Expr::Lambda(l) => write!(f, "(lambda ({}) {}", l.arg, l.body),
+			Expr::Function(func) => func.fmt(f),
+			Expr::Lambda(l) => write!(f, "(lambda ({}) {})", l.arg, l.body),
 			Expr::JsonPointer(pointer) => write!(f, "${}", pointer.pointer),
 		}
 	}
@@ -200,6 +486,13 @@ impl Primitive {
 			},
 			_ => Ok(self.clone()),
 		}
+	}
+}
+
+impl Display for Function {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let args = self.args.iter().map(ToString::to_string).join(" ");
+		write!(f, "({} {})", self.ident, args)
 	}
 }
 
