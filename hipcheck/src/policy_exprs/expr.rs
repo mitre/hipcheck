@@ -15,7 +15,12 @@ use nom::{
 	Finish as _, IResult,
 };
 use ordered_float::NotNan;
-use std::{fmt::Display, ops::Deref};
+use std::{
+	fmt::Display,
+	mem::{discriminant, Discriminant},
+	ops::Deref,
+	sync::LazyLock,
+};
 
 #[cfg(test)]
 use jiff::civil::Date;
@@ -129,6 +134,70 @@ pub enum Primitive {
 impl From<Primitive> for Expr {
 	fn from(value: Primitive) -> Self {
 		Expr::Primitive(value)
+	}
+}
+impl Primitive {
+	pub fn get_primitive_type(&self) -> PrimitiveType {
+		discriminant(self)
+	}
+}
+pub type PrimitiveType = Discriminant<Primitive>;
+pub const PTY_INT: PrimitiveType = discriminant(&Primitive::Int(0));
+pub static PTY_FLOAT: LazyLock<PrimitiveType> =
+	LazyLock::new(|| discriminant(&Primitive::Float(F64::new(0.0).unwrap())));
+pub const PTY_BOOL: PrimitiveType = discriminant(&Primitive::Bool(true));
+pub static PTY_DATETIME: LazyLock<PrimitiveType> = LazyLock::new(|| {
+	discriminant(&Primitive::DateTime(
+		"2024-06-19 15:22[America/New_York]".parse().unwrap(),
+	))
+});
+pub static PTY_SPAN: LazyLock<PrimitiveType> =
+	LazyLock::new(|| discriminant(&Primitive::Span("P1d".parse().unwrap())));
+
+pub type ArrayType = Option<PrimitiveType>;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FuncReturnType {
+	Overload(fn(&[Type]) -> Result<PrimitiveType>),
+	Static(PrimitiveType),
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionType {
+	return_ty: FuncReturnType,
+	arg_tys: Vec<Type>,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Type {
+	Primitive(PrimitiveType),
+	Function(FunctionType),
+	Array(ArrayType),
+	Unknown,
+}
+
+pub trait Typed {
+	fn get_type(&self) -> Result<Type>;
+}
+impl Typed for Primitive {
+	fn get_type(&self) -> Result<Type> {
+		Ok(Type::Primitive(self.get_primitive_type()))
+	}
+}
+impl Typed for Array {
+	fn get_type(&self) -> Result<Type> {
+		let mut ty: Option<PrimitiveType> = None;
+		for elt in self.elts.iter() {
+			let curr_ty = elt.get_primitive_type();
+			if let Some(expected_ty) = ty {
+				if expected_ty != curr_ty {
+					panic!(
+						"Current type {:?} did not match expected type {:?}",
+						curr_ty, expected_ty
+					)
+				}
+			} else {
+				ty = Some(elt.get_primitive_type());
+			}
+		}
+		Ok(Type::Array(ty))
 	}
 }
 
