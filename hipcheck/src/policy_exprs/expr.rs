@@ -155,15 +155,21 @@ pub static PTY_SPAN: LazyLock<PrimitiveType> =
 	LazyLock::new(|| discriminant(&Primitive::Span("P1d".parse().unwrap())));
 
 pub type ArrayType = Option<PrimitiveType>;
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum ReturnableType {
+	Primitive(PrimitiveType),
+	Array(ArrayType),
+	Unknown,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum FuncReturnType {
-	Overload(fn(&[Type]) -> Result<PrimitiveType>),
-	Static(PrimitiveType),
+	Overload(fn(&[Type]) -> Result<ReturnableType>),
+	Static(ReturnableType),
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionType {
-	return_ty: FuncReturnType,
-	arg_tys: Vec<Type>,
+	pub return_ty: FuncReturnType,
+	pub arg_tys: Vec<Type>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
@@ -171,6 +177,20 @@ pub enum Type {
 	Function(FunctionType),
 	Array(ArrayType),
 	Unknown,
+}
+impl TryFrom<&Type> for ReturnableType {
+	type Error = crate::policy_exprs::Error;
+	fn try_from(value: &Type) -> Result<ReturnableType> {
+		Ok(match value {
+			Type::Function(fn_ty) => match fn_ty.return_ty {
+				FuncReturnType::Overload(ret_fn) => (ret_fn)(&fn_ty.arg_tys)?,
+				FuncReturnType::Static(s) => s,
+			},
+			Type::Array(arr_ty) => ReturnableType::Array(*arr_ty),
+			Type::Primitive(p_ty) => ReturnableType::Primitive(*p_ty),
+			Type::Unknown => ReturnableType::Unknown,
+		})
+	}
 }
 
 pub trait Typed {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
+	expr::{FuncReturnType, ReturnableType, Type, PTY_BOOL, PTY_FLOAT, PTY_INT, PTY_SPAN},
 	Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction, Ident,
 	Lambda as StructLambda, Primitive, Result, F64,
 };
@@ -23,7 +24,7 @@ pub struct Env<'parent> {
 #[derive(Clone)]
 pub enum Binding {
 	/// A function.
-	Fn(Op),
+	Fn(OpInfo),
 
 	/// A primitive value.
 	Var(Primitive),
@@ -31,6 +32,40 @@ pub enum Binding {
 
 /// Helper type for operation function pointer.
 type Op = fn(&Env, &[Expr]) -> Result<Expr>;
+
+#[derive(Clone)]
+pub struct OpInfo {
+	pub fn_ty: FuncReturnType,
+	pub op: Op,
+}
+
+fn ty_filter(args: &[Type]) -> Result<ReturnableType> {
+	let Some(wrapped_arr_ty) = args.get(1) else {
+		return Err(Error::MissingArgs);
+	};
+	let Type::Array(arr_ty) = wrapped_arr_ty else {
+		return Err(Error::BadType("todo!"));
+	};
+	Ok(ReturnableType::Array(*arr_ty))
+}
+
+// Type of dynamic function is dependent on first arg
+fn ty_inherit_first(args: &[Type]) -> Result<ReturnableType> {
+	let Some(child_ty) = args.get(0) else {
+		return Err(Error::MissingArgs);
+	};
+	child_ty.try_into()
+}
+
+fn ty_from_first_arr(args: &[Type]) -> Result<ReturnableType> {
+    let Some(Type::Array(arr_ty)) = args.get(0) else {
+        return Err(Error::MissingArgs);
+    }
+    Ok(match arr_ty {
+        None => ReturnableType::Unknown,
+        Some(p_ty) => ReturnableType::Primitive(*p_ty)
+    })
+}
 
 impl<'parent> Env<'parent> {
 	/// Create an empty environment.
@@ -45,46 +80,51 @@ impl<'parent> Env<'parent> {
 	pub fn std() -> Self {
 		let mut env = Env::empty();
 
+		let ret_bool = FuncReturnType::Static(ReturnableType::Primitive(PTY_BOOL));
+		let ret_int = FuncReturnType::Static(ReturnableType::Primitive(PTY_INT));
+		let ret_span = FuncReturnType::Static(ReturnableType::Primitive(*PTY_SPAN));
+		let ret_float = FuncReturnType::Static(ReturnableType::Primitive(*PTY_FLOAT));
+
 		// Comparison functions.
-		env.add_fn("gt", gt);
-		env.add_fn("lt", lt);
-		env.add_fn("gte", gte);
-		env.add_fn("lte", lte);
-		env.add_fn("eq", eq);
-		env.add_fn("neq", neq);
+		env.add_fn("gt", gt, ret_bool);
+		env.add_fn("lt", lt, ret_bool);
+		env.add_fn("gte", gte, ret_bool);
+		env.add_fn("lte", lte, ret_bool);
+		env.add_fn("eq", eq, ret_bool);
+		env.add_fn("neq", neq, ret_bool);
 
 		// Math functions.
 		env.add_fn("add", add);
 		env.add_fn("sub", sub);
-		env.add_fn("divz", divz);
+		env.add_fn("divz", divz, ret_float);
 
 		// Additional datetime math functions
-		env.add_fn("duration", duration);
+		env.add_fn("duration", duration, ret_span);
 
 		// Logical functions.
-		env.add_fn("and", and);
-		env.add_fn("or", or);
-		env.add_fn("not", not);
+		env.add_fn("and", and, ret_bool);
+		env.add_fn("or", or, ret_bool);
+		env.add_fn("not", not, ret_bool);
 
 		// Array math functions.
-		env.add_fn("max", max);
-		env.add_fn("min", min);
-		env.add_fn("avg", avg);
-		env.add_fn("median", median);
-		env.add_fn("count", count);
+		env.add_fn("max", max, FuncReturnType::Overload(ty_from_first_arr));
+		env.add_fn("min", min, FuncReturnType::Overload(ty_from_first_arr));
+		env.add_fn("avg", avg, ret_float);
+		env.add_fn("median", median, FuncReturnType::Overload(ty_from_first_arr));
+		env.add_fn("count", count, ret_int);
 
 		// Array logic functions.
-		env.add_fn("all", all);
-		env.add_fn("nall", nall);
-		env.add_fn("some", some);
-		env.add_fn("none", none);
+		env.add_fn("all", all, ret_bool);
+		env.add_fn("nall", nall, ret_bool);
+		env.add_fn("some", some, ret_bool);
+		env.add_fn("none", none, ret_bool);
 
 		// Array higher-order functions.
-		env.add_fn("filter", filter);
+		env.add_fn("filter", filter, FuncReturnType::Overload(ty_filter));
 		env.add_fn("foreach", foreach);
 
 		// Debugging functions.
-		env.add_fn("dbg", dbg);
+		env.add_fn("dbg", dbg, FuncReturnType::Overload(ty_inherit_first));
 
 		env
 	}
@@ -103,8 +143,9 @@ impl<'parent> Env<'parent> {
 	}
 
 	/// Add a function to the environment.
-	pub fn add_fn(&mut self, name: &str, op: Op) -> Option<Binding> {
-		self.bindings.insert(name.to_owned(), Binding::Fn(op))
+	pub fn add_fn(&mut self, name: &str, op: Op, fn_ty: FuncReturnType) -> Option<Binding> {
+		self.bindings
+			.insert(name.to_owned(), Binding::Fn(OpInfo { fn_ty, op }))
 	}
 
 	/// Get a binding from the environment, walking up the scopes.
