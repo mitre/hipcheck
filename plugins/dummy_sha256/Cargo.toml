@@ -20,4 +20,4 @@ tonic = "0.12.2"
 
 [build-dependencies]
 anyhow = "1.0.89"
-tonic-build = "0.12.2"
+tonic-build = "0.12.3"

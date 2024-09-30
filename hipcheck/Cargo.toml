@@ -100,7 +100,12 @@ rustls = { version = "0.23.10", default-features = false, features = [
 ] }
 rustls-native-certs = "0.8.0"
 salsa = "0.16.1"
-schemars = { version = "0.8.21", default-features = false, features = ["derive", "preserve_order", "chrono", "url"] }
+schemars = { version = "0.8.21", default-features = false, features = [
+    "derive",
+    "preserve_order",
+    "chrono",
+    "url",
+] }
 semver = "1.0.9"
 serde = { version = "1.0.210", features = ["derive", "rc"] }
 serde_derive = "1.0.137"
@@ -119,7 +124,7 @@ tokio = { version = "1.40.0", features = [
 ] }
 tokio-stream = "0.1.16"
 toml = "0.8.19"
-tonic = "0.12.2"
+tonic = "0.12.3"
 thiserror = "1.0.64"
 unicode-normalization = "0.1.24"
 ureq = { version = "2.10.1", default-features = false, features = [
@@ -139,7 +144,7 @@ zstd = "0.13.2"
 
 anyhow = "1.0.89"
 pathbuf = "1.0.0"
-tonic-build = "0.12.2"
+tonic-build = "0.12.3"
 which = { version = "6.0.3", default-features = false }
 
 [dev-dependencies]

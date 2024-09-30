@@ -19,7 +19,7 @@ hipcheck-sdk-macros = { path = "../../hipcheck-sdk-macros", version = "0.1.0", o
 
 [build-dependencies]
 anyhow = "1.0.86"
-tonic-build = "0.12.1"
+tonic-build = "0.12.3"
 
 [features]
 macros = ["hipcheck-sdk-macros"]
