@@ -77,8 +77,8 @@ impl ExprVisitor<Result<Expr>> for Env<'_> {
 		let binding = self
 			.get(&f.ident)
 			.ok_or_else(|| Error::UnknownFunction(f.ident.deref().to_owned()))?;
-		if let Binding::Fn(op) = binding {
-			op(self, &f.args)
+		if let Binding::Fn(op_info) = binding {
+			(op_info.op)(self, &f.args)
 		} else {
 			Err(Error::FoundVarExpectedFunc(f.ident.deref().to_owned()))
 		}

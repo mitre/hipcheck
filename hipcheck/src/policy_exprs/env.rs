@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
-	expr::{FuncReturnType, ReturnableType, Type, PTY_BOOL, PTY_FLOAT, PTY_INT, PTY_SPAN},
+	expr::{
+		FuncReturnType, PrimitiveType, ReturnableType, Type, PTY_BOOL, PTY_DATETIME, PTY_FLOAT,
+		PTY_INT, PTY_SPAN,
+	},
 	Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction, Ident,
 	Lambda as StructLambda, Primitive, Result, F64,
 };
 use itertools::Itertools as _;
 use jiff::{Span, Zoned};
-use std::{cmp::Ordering, collections::HashMap, ops::Not as _};
+use std::{
+	cmp::{Ordering, PartialEq},
+	collections::HashMap,
+	ops::Not as _,
+};
 use Expr::*;
 use Primitive::*;
 
@@ -58,13 +65,74 @@ fn ty_inherit_first(args: &[Type]) -> Result<ReturnableType> {
 }
 
 fn ty_from_first_arr(args: &[Type]) -> Result<ReturnableType> {
-    let Some(Type::Array(arr_ty)) = args.get(0) else {
-        return Err(Error::MissingArgs);
-    }
-    Ok(match arr_ty {
-        None => ReturnableType::Unknown,
-        Some(p_ty) => ReturnableType::Primitive(*p_ty)
-    })
+	let Some(Type::Array(arr_ty)) = args.get(0) else {
+		return Err(Error::MissingArgs);
+	};
+	Ok(match arr_ty {
+		None => ReturnableType::Unknown,
+		Some(p_ty) => ReturnableType::Primitive(*p_ty),
+	})
+}
+
+// @Note - the logic would be a lot simpler if we received the
+// expressions themselves instead of the types. This is because
+// we can't `match` on our PTY constants
+fn ty_arithmetic_binary_op(args: &[Type]) -> Result<ReturnableType> {
+	// resolves the two operands
+	let Some(ty_1) = args.get(0) else {
+		return Err(Error::MissingArgs);
+	};
+	let Some(ty_2) = args.get(1) else {
+		return Err(Error::MissingArgs);
+	};
+	// ensure they both result in primitive types or unknown
+	let opt_ty_1: Option<PrimitiveType> = match ty_1.try_into()? {
+		ReturnableType::Primitive(p) => Some(p),
+		ReturnableType::Array(_) => {
+			return Err(Error::BadType("todo!"));
+		}
+		ReturnableType::Unknown => None,
+	};
+	let opt_ty_2: Option<PrimitiveType> = match ty_2.try_into()? {
+		ReturnableType::Primitive(p) => Some(p),
+		ReturnableType::Array(_) => {
+			return Err(Error::BadType("todo!"));
+		}
+		ReturnableType::Unknown => None,
+	};
+	// if both are unknown, then the result of this operation is unknown
+	if opt_ty_1.is_none() && opt_ty_2.is_none() {
+		Ok(ReturnableType::Unknown)
+	// if both are known, then we check the types match
+	} else if let (Some(ty_1), Some(ty_2)) = (opt_ty_1, opt_ty_2) {
+		todo!()
+	} else {
+		// Get the single type, and record if it was first or second
+		let (single_ty, first_op) = match (opt_ty_1, opt_ty_2) {
+			(Some(t), None) => (t, true),
+			(None, Some(t)) => (t, false),
+			_ => unreachable!(),
+		};
+		// if ops (unknown, span), expect datetime
+		let res_pty = if single_ty == *PTY_DATETIME && first_op {
+			*PTY_DATETIME
+		// if ops (datetime, unknown), expect span
+		} else if single_ty == *PTY_SPAN && !first_op {
+			*PTY_SPAN
+		// if op is float, expect float
+		} else if single_ty == *PTY_FLOAT {
+			*PTY_FLOAT
+		} else if single_ty == PTY_INT {
+			PTY_INT
+		} else {
+			return Err(Error::BadType("todo!"));
+		};
+		Ok(ReturnableType::Primitive(res_pty))
+	}
+}
+
+fn ty_foreach(args: &[Type]) -> Result<ReturnableType> {
+	todo!()
 }
 
 impl<'parent> Env<'parent> {
@@ -94,8 +162,8 @@ impl<'parent> Env<'parent> {
 		env.add_fn("neq", neq, ret_bool);
 
 		// Math functions.
-		env.add_fn("add", add);
-		env.add_fn("sub", sub);
+		env.add_fn("add", add, FuncReturnType::Dynamic(ty_arithmetic_binary_op));
+		env.add_fn("sub", sub, FuncReturnType::Dynamic(ty_arithmetic_binary_op));
 		env.add_fn("divz", divz, ret_float);
 
 		// Additional datetime math functions
@@ -107,10 +175,10 @@ impl<'parent> Env<'parent> {
 		env.add_fn("not", not, ret_bool);
 
 		// Array math functions.
-		env.add_fn("max", max, FuncReturnType::Overload(ty_from_first_arr));
-		env.add_fn("min", min, FuncReturnType::Overload(ty_from_first_arr));
+		env.add_fn("max", max, FuncReturnType::Dynamic(ty_from_first_arr));
+		env.add_fn("min", min, FuncReturnType::Dynamic(ty_from_first_arr));
 		env.add_fn("avg", avg, ret_float);
-		env.add_fn("median", median, FuncReturnType::Overload(ty_from_first_arr));
+		env.add_fn("median", median, FuncReturnType::Dynamic(ty_from_first_arr));
 		env.add_fn("count", count, ret_int);
 
 		// Array logic functions.
@@ -120,11 +188,11 @@ impl<'parent> Env<'parent> {
 		env.add_fn("none", none, ret_bool);
 
 		// Array higher-order functions.
-		env.add_fn("filter", filter, FuncReturnType::Overload(ty_filter));
-		env.add_fn("foreach", foreach);
+		env.add_fn("filter", filter, FuncReturnType::Dynamic(ty_filter));
+		env.add_fn("foreach", foreach, FuncReturnType::Dynamic(ty_foreach));
 
 		// Debugging functions.
-		env.add_fn("dbg", dbg, FuncReturnType::Overload(ty_inherit_first));
+		env.add_fn("dbg", dbg, FuncReturnType::Dynamic(ty_inherit_first));
 
 		env
 	}

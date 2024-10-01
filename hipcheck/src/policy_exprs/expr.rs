@@ -163,7 +163,7 @@ pub enum ReturnableType {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum FuncReturnType {
-	Overload(fn(&[Type]) -> Result<ReturnableType>),
+	Dynamic(fn(&[Type]) -> Result<ReturnableType>),
 	Static(ReturnableType),
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -183,7 +183,7 @@ impl TryFrom<&Type> for ReturnableType {
 	fn try_from(value: &Type) -> Result<ReturnableType> {
 		Ok(match value {
 			Type::Function(fn_ty) => match fn_ty.return_ty {
-				FuncReturnType::Overload(ret_fn) => (ret_fn)(&fn_ty.arg_tys)?,
+				FuncReturnType::Dynamic(ret_fn) => (ret_fn)(&fn_ty.arg_tys)?,
 				FuncReturnType::Static(s) => s,
 			},
 			Type::Array(arr_ty) => ReturnableType::Array(*arr_ty),
