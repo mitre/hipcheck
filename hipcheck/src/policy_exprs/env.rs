@@ -2,6 +2,7 @@
 
 use crate::policy_exprs::{
 	expr::{FuncReturnType, Op, OpInfo, PrimitiveType, ReturnableType, Type},
+	pass::ExprMutator,
 	Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction, Ident,
 	Lambda as StructLambda, Primitive, Result, F64,
 };
@@ -62,9 +63,6 @@ fn ty_from_first_arr(args: &[Type]) -> Result<ReturnableType> {
 	})
 }
 
-// @Note - the logic would be a lot simpler if we received the
-// expressions themselves instead of the types. This is because
-// we can't `match` on our PTY constants
 fn ty_arithmetic_binary_op(args: &[Type]) -> Result<ReturnableType> {
 	// resolves the two operands
 	let Some(ty_1) = args.get(0) else {
@@ -265,12 +263,12 @@ where
 
 	check_num_args(name, args, 2)?;
 
-	let arg_1 = match env.visit_expr(&args[0])? {
+	let arg_1 = match env.visit_expr(args[0].clone())? {
 		Primitive(p) => p,
 		_ => return Err(Error::BadType(name)),
 	};
 
-	let arg_2 = match env.visit_expr(&args[1])? {
+	let arg_2 = match env.visit_expr(args[1].clone())? {
 		Primitive(p) => p,
 		_ => return Err(Error::BadType(name)),
 	};
@@ -291,7 +289,7 @@ where
 {
 	check_num_args(name, args, 1)?;
 
-	let primitive = match env.visit_expr(&args[0])? {
+	let primitive = match env.visit_expr(args[0].clone())? {
 		Primitive(arg) => arg,
 		_ => return Err(Error::BadType(name)),
 	};
@@ -306,7 +304,7 @@ where
 {
 	check_num_args(name, args, 1)?;
 
-	let arr = match env.visit_expr(&args[0])? {
+	let arr = match env.visit_expr(args[0].clone())? {
 		Array(a) => array_type(&a.elts[..])?,
 		_ => return Err(Error::BadType(name)),
 	};
@@ -321,12 +319,12 @@ where
 {
 	check_num_args(name, args, 2)?;
 
-	let (ident, body) = match env.visit_expr(&args[0])? {
+	let (ident, body) = match env.visit_expr(args[0].clone())? {
 		Lambda(l) => (l.arg, l.body),
 		_ => return Err(Error::BadType(name)),
 	};
 
-	let arr = match env.visit_expr(&args[1])? {
+	let arr = match env.visit_expr(args[1].clone())? {
 		Array(a) => array_type(&a.elts[..])?,
 		_ => return Err(Error::BadType(name)),
 	};
@@ -430,7 +428,7 @@ fn eval_lambda(env: &Env, ident: &Ident, val: Primitive, body: Expr) -> Result<E
 		return Err(Error::AlreadyBound);
 	}
 
-	child.visit_expr(&body)
+	child.visit_expr(body)
 }
 
 #[allow(clippy::bool_comparison)]
@@ -1121,7 +1119,7 @@ fn dbg(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "dbg";
 	check_num_args(name, args, 1)?;
 	let arg = &args[0];
-	let result = env.visit_expr(arg)?;
+	let result = env.visit_expr(arg.clone())?;
 	log::debug!("{arg} = {result}");
 	Ok(result)
 }

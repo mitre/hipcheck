@@ -7,6 +7,7 @@ mod env;
 mod error;
 pub mod expr;
 mod json_pointer;
+mod pass;
 mod token;
 
 use crate::policy_exprs::env::Env;
@@ -14,6 +15,7 @@ pub(crate) use crate::policy_exprs::{bridge::Tokens, expr::F64};
 pub use crate::policy_exprs::{
 	error::{Error, Result},
 	expr::{Array, Expr, Function, Ident, JsonPointer, Lambda},
+	pass::{ExprMutator, ExprVisitor, FunctionResolver, TypeChecker},
 	token::LexingError,
 };
 use env::Binding;
@@ -21,23 +23,6 @@ pub use expr::{parse, Primitive};
 use json_pointer::process_json_pointers;
 use serde_json::Value;
 use std::ops::Deref;
-
-pub trait ExprVisitor<T> {
-	fn visit_primitive(&self, prim: &Primitive) -> T;
-	fn visit_array(&self, arr: &Array) -> T;
-	fn visit_function(&self, func: &Function) -> T;
-	fn visit_lambda(&self, func: &Lambda) -> T;
-	fn visit_json_pointer(&self, func: &JsonPointer) -> T;
-	fn visit_expr(&self, expr: &Expr) -> T {
-		match expr {
-			Expr::Primitive(a) => self.visit_primitive(a),
-			Expr::Array(a) => self.visit_array(a),
-			Expr::Function(a) => self.visit_function(a),
-			Expr::Lambda(a) => self.visit_lambda(a),
-			Expr::JsonPointer(a) => self.visit_json_pointer(a),
-		}
-	}
-}
 
 /// Evaluates `deke` expressions.
 pub struct Executor {
@@ -62,18 +47,15 @@ impl Executor {
 	pub fn parse_and_eval(&self, raw_program: &str, context: &Value) -> Result<Expr> {
 		let processed_program = process_json_pointers(raw_program, context)?;
 		let program = parse(&processed_program)?;
-		let expr = self.env.visit_expr(&program)?;
+		let expr = self.env.visit_expr(program)?;
 		Ok(expr)
 	}
 }
-impl ExprVisitor<Result<Expr>> for Env<'_> {
-	fn visit_primitive(&self, prim: &Primitive) -> Result<Expr> {
+impl ExprMutator for Env<'_> {
+	fn visit_primitive(&self, prim: Primitive) -> Result<Expr> {
 		Ok(prim.resolve(self)?.into())
 	}
-	fn visit_array(&self, array: &Array) -> Result<Expr> {
-		Ok(array.clone().into())
-	}
-	fn visit_function(&self, f: &Function) -> Result<Expr> {
+	fn visit_function(&self, f: Function) -> Result<Expr> {
 		let binding = self
 			.get(&f.ident)
 			.ok_or_else(|| Error::UnknownFunction(f.ident.deref().to_owned()))?;
@@ -83,11 +65,8 @@ impl ExprVisitor<Result<Expr>> for Env<'_> {
 			Err(Error::FoundVarExpectedFunc(f.ident.deref().to_owned()))
 		}
 	}
-	fn visit_lambda(&self, l: &Lambda) -> Result<Expr> {
+	fn visit_lambda(&self, l: Lambda) -> Result<Expr> {
 		Ok((*l.body).clone())
-	}
-	fn visit_json_pointer(&self, json_pointer: &JsonPointer) -> Result<Expr> {
-		Ok(json_pointer.clone().into())
 	}
 }
 
@@ -201,6 +180,11 @@ mod tests {
 		let program =
 			"(eq 3 (count (filter (gt 8.0) (foreach (sub 1.0) [1.0 2.0 10.0 20.0 30.0]))))";
 		let context = Value::Null;
+		let expr = parse(&program).unwrap();
+		println!("EXPR: {:?}", &expr);
+		let expr = FunctionResolver::std().run(expr).unwrap();
+		TypeChecker::default().run(&expr).unwrap();
+		println!("RESOLVER RES: {:?}", expr);
 		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(result, Primitive::Bool(true).into());
 	}
