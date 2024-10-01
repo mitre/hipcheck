@@ -60,15 +60,42 @@ impl From<Array> for Expr {
 	}
 }
 
+/// Helper type for operation function pointer.
+pub type Op = fn(&Env, &[Expr]) -> Result<Expr>;
+
+#[derive(Clone, PartialEq, Debug, Eq)]
+pub struct OpInfo {
+	pub fn_ty: FuncReturnType,
+	pub op: Op,
+}
+
 /// A `deke` function to evaluate.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function {
 	pub ident: Ident,
 	pub args: Vec<Expr>,
+	pub opt_op_info: Option<OpInfo>,
 }
 impl Function {
 	pub fn new(ident: Ident, args: Vec<Expr>) -> Self {
-		Function { ident, args }
+		let opt_op_info = None;
+		Function {
+			ident,
+			args,
+			opt_op_info,
+		}
+	}
+	pub fn resolve(&self, env: &Env) -> Result<Self> {
+		let Some(Binding::Fn(op_info)) = env.get(&self.ident.0) else {
+			return Err(Error::UnknownFunction(self.ident.0.clone()));
+		};
+		let ident = self.ident.clone();
+		let args = self.args.clone();
+		Ok(Function {
+			ident,
+			args,
+			opt_op_info: Some(op_info),
+		})
 	}
 }
 impl From<Function> for Expr {
@@ -138,39 +165,54 @@ impl From<Primitive> for Expr {
 }
 impl Primitive {
 	pub fn get_primitive_type(&self) -> PrimitiveType {
-		discriminant(self)
+		use PrimitiveType::*;
+		match self {
+			Primitive::Identifier(_) => Ident,
+			Primitive::Int(_) => Int,
+			Primitive::Float(_) => Float,
+			Primitive::Bool(_) => Bool,
+			Primitive::DateTime(_) => DateTime,
+			Primitive::Span(_) => Span,
+		}
 	}
 }
-pub type PrimitiveType = Discriminant<Primitive>;
-pub const PTY_INT: PrimitiveType = discriminant(&Primitive::Int(0));
-pub static PTY_FLOAT: LazyLock<PrimitiveType> =
-	LazyLock::new(|| discriminant(&Primitive::Float(F64::new(0.0).unwrap())));
-pub const PTY_BOOL: PrimitiveType = discriminant(&Primitive::Bool(true));
-pub static PTY_DATETIME: LazyLock<PrimitiveType> = LazyLock::new(|| {
-	discriminant(&Primitive::DateTime(
-		"2024-06-19 15:22[America/New_York]".parse().unwrap(),
-	))
-});
-pub static PTY_SPAN: LazyLock<PrimitiveType> =
-	LazyLock::new(|| discriminant(&Primitive::Span("P1d".parse().unwrap())));
-
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PrimitiveType {
+	Ident,
+	Int,
+	Float,
+	Bool,
+	DateTime,
+	Span,
+}
 pub type ArrayType = Option<PrimitiveType>;
+// A limited set of types that we allow a function to return
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum ReturnableType {
 	Primitive(PrimitiveType),
 	Array(ArrayType),
 	Unknown,
 }
+impl From<PrimitiveType> for ReturnableType {
+	fn from(value: PrimitiveType) -> ReturnableType {
+		ReturnableType::Primitive(value)
+	}
+}
+// We allow overloaded functions, such that the returned type is dependent on
+// the input operand types. This enum encapsulates both static and dynamically
+// determined return types.
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum FuncReturnType {
 	Dynamic(fn(&[Type]) -> Result<ReturnableType>),
 	Static(ReturnableType),
 }
+// A function signature is the combination of the return type and the arg types
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionType {
 	pub return_ty: FuncReturnType,
 	pub arg_tys: Vec<Type>,
 }
+// @Todo - handle lambdas
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
 	Primitive(PrimitiveType),

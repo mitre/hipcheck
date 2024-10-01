@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
-	expr::{
-		FuncReturnType, PrimitiveType, ReturnableType, Type, PTY_BOOL, PTY_DATETIME, PTY_FLOAT,
-		PTY_INT, PTY_SPAN,
-	},
+	expr::{FuncReturnType, Op, OpInfo, PrimitiveType, ReturnableType, Type},
 	Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction, Ident,
 	Lambda as StructLambda, Primitive, Result, F64,
 };
@@ -35,15 +32,6 @@ pub enum Binding {
 
 	/// A primitive value.
 	Var(Primitive),
-}
-
-/// Helper type for operation function pointer.
-type Op = fn(&Env, &[Expr]) -> Result<Expr>;
-
-#[derive(Clone)]
-pub struct OpInfo {
-	pub fn_ty: FuncReturnType,
-	pub op: Op,
 }
 
 fn ty_filter(args: &[Type]) -> Result<ReturnableType> {
@@ -100,38 +88,45 @@ fn ty_arithmetic_binary_op(args: &[Type]) -> Result<ReturnableType> {
 		}
 		ReturnableType::Unknown => None,
 	};
-	// if both are unknown, then the result of this operation is unknown
-	if opt_ty_1.is_none() && opt_ty_2.is_none() {
-		Ok(ReturnableType::Unknown)
-	// if both are known, then we check the types match
-	} else if let (Some(ty_1), Some(ty_2)) = (opt_ty_1, opt_ty_2) {
-		todo!()
-	} else {
-		// Get the single type, and record if it was first or second
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	if opt_ty_1.is_none() || opt_ty_2.is_none() {
 		let (single_ty, first_op) = match (opt_ty_1, opt_ty_2) {
+			// if both are unknown, return unknown
+			(None, None) => {
+				return Ok(Unknown);
+			}
 			(Some(t), None) => (t, true),
 			(None, Some(t)) => (t, false),
 			_ => unreachable!(),
 		};
-		// if ops (unknown, span), expect datetime
-		let res_pty = if single_ty == *PTY_DATETIME && first_op {
-			*PTY_DATETIME
-		// if ops (datetime, unknown), expect span
-		} else if single_ty == *PTY_SPAN && !first_op {
-			*PTY_SPAN
-		// if op is float, expect float
-		} else if single_ty == *PTY_FLOAT {
-			*PTY_FLOAT
-		} else if single_ty == PTY_INT {
-			PTY_INT
-		} else {
-			return Err(Error::BadType("todo!"));
-		};
-		Ok(ReturnableType::Primitive(res_pty))
+		Ok(match (single_ty, first_op) {
+			(Float, _) => Primitive(Float),
+			(Int, _) => Primitive(Int),
+			(Span, true) => Primitive(Span), // span in first position indicates span arithmetic
+			(Span, false) => Unknown,        // span in second position could be datetime or span arithmetic
+			(DateTime, true) => Primitive(DateTime), // expect a span in second position
+			_ => {
+				return Err(Error::BadType("todo!"));
+			}
+		})
+	} else {
+		let ty_1 = opt_ty_1.unwrap();
+		let ty_2 = opt_ty_2.unwrap();
+		Ok(match (ty_1, ty_2) {
+			(Float, _) | (_, Float) => Primitive(Float),
+			(Int, _) | (_, Int) => Primitive(Int),
+			(DateTime, Span) => Primitive(DateTime),
+			(Span, _) | (_, Span) => Primitive(Span),
+			_ => {
+				return Err(Error::BadType("todo!"));
+			}
+		})
 	}
 }
 
 fn ty_foreach(args: &[Type]) -> Result<ReturnableType> {
+	println!("args: {:?}", args);
 	todo!()
 }
 
@@ -146,12 +141,13 @@ impl<'parent> Env<'parent> {
 
 	/// Create the standard environment.
 	pub fn std() -> Self {
+		use PrimitiveType::*;
 		let mut env = Env::empty();
 
-		let ret_bool = FuncReturnType::Static(ReturnableType::Primitive(PTY_BOOL));
-		let ret_int = FuncReturnType::Static(ReturnableType::Primitive(PTY_INT));
-		let ret_span = FuncReturnType::Static(ReturnableType::Primitive(*PTY_SPAN));
-		let ret_float = FuncReturnType::Static(ReturnableType::Primitive(*PTY_FLOAT));
+		let ret_bool = FuncReturnType::Static(Bool.into());
+		let ret_int = FuncReturnType::Static(Int.into());
+		let ret_span = FuncReturnType::Static(Span.into());
+		let ret_float = FuncReturnType::Static(Float.into());
 
 		// Comparison functions.
 		env.add_fn("gt", gt, ret_bool);
