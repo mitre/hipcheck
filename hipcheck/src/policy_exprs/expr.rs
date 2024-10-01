@@ -103,6 +103,11 @@ impl From<Function> for Expr {
 		Expr::Function(value)
 	}
 }
+impl From<FunctionType> for Type {
+	fn from(value: FunctionType) -> Self {
+		Type::Function(value)
+	}
+}
 
 /// Stores the name of the input variable, followed by the lambda body.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -163,6 +168,9 @@ impl From<Primitive> for Expr {
 		Expr::Primitive(value)
 	}
 }
+
+// TYPING
+
 impl Primitive {
 	pub fn get_primitive_type(&self) -> PrimitiveType {
 		use PrimitiveType::*;
@@ -260,6 +268,43 @@ impl Typed for Array {
 			}
 		}
 		Ok(Type::Array(ty))
+	}
+}
+impl Typed for Function {
+	fn get_type(&self) -> Result<Type> {
+		use FuncReturnType::*;
+		let Some(op_info) = &self.opt_op_info else {
+			return Err(Error::BadType("func has not been resolved in env"));
+		};
+		let arg_tys: Vec<Type> = self
+			.args
+			.iter()
+			.map(Typed::get_type)
+			.collect::<Result<Vec<_>>>()?;
+		Ok(FunctionType {
+			return_ty: op_info.fn_ty,
+			arg_tys,
+		}
+		.into())
+	}
+}
+impl Typed for Lambda {
+	fn get_type(&self) -> Result<Type> {
+		println!("TYPING {:?}", self);
+		todo!()
+	}
+}
+
+impl Typed for Expr {
+	fn get_type(&self) -> Result<Type> {
+		use Expr::*;
+		match self {
+			Primitive(p) => p.get_type(),
+			Array(a) => a.get_type(),
+			Function(f) => f.get_type(),
+			Lambda(l) => l.get_type(),
+			JsonPointer(j) => todo!(),
+		}
 	}
 }
 
