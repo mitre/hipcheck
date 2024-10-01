@@ -1,5 +1,5 @@
 use crate::policy_exprs::{
-	env::Env,
+	env::{partially_evaluate, Env},
 	error::{Error, Result},
 	expr::*,
 };
@@ -120,7 +120,14 @@ impl ExprVisitor<Result<Type>> for TypeChecker {
 	}
 }
 
-pub struct TypeFixer {}
+pub struct TypeFixer {
+	env: Env<'static>,
+}
+impl TypeFixer {
+	pub fn std() -> Self {
+		TypeFixer { env: Env::std() }
+	}
+}
 impl ExprMutator for TypeFixer {
 	fn visit_function(&self, mut func: Function) -> Result<Expr> {
 		// @FollowUp - should the ExprMutator be combined into this?
@@ -130,17 +137,26 @@ impl ExprMutator for TypeFixer {
 			.map(|a| self.visit_expr(a))
 			.collect::<Result<Vec<Expr>>>()?;
 		let fn_ty = func.get_type()?;
+		// At this point we know it has info
+		let op_info = func.opt_op_info.as_ref().unwrap();
 		match fn_ty {
-			Type::Function(ft) => match ft.return_ty {
-				FuncReturnType::Static(_) => (),
-				FuncReturnType::Dynamic(fn_ty_fn) => {
-					if let Err(e) = (fn_ty_fn)(&ft.arg_tys) {
-						println!("Invalid type, e: {e:?}");
+			Type::Function(ft) => {
+				match ft.return_ty {
+					FuncReturnType::Static(_) => (),
+					FuncReturnType::Dynamic(fn_ty_fn) => {
+						(fn_ty_fn)(&ft.arg_tys);
 					}
-				}
-			},
-			_ => todo!(),
+				};
+				Ok(func.into())
+			}
+			Type::Lambda(lt) => {
+				// Have to feed the new expr through the current pass again
+				// for any additional transformations
+				let res = partially_evaluate(&self.env, &func.ident.0, func.args.remove(0))?;
+				self.visit_expr(res)
+			}
+
+			_ => unreachable!(),
 		}
-		Ok(func.into())
 	}
 }

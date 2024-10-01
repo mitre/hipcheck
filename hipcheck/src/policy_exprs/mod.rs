@@ -15,7 +15,7 @@ pub(crate) use crate::policy_exprs::{bridge::Tokens, expr::F64};
 pub use crate::policy_exprs::{
 	error::{Error, Result},
 	expr::{Array, Expr, Function, Ident, JsonPointer, Lambda},
-	pass::{ExprMutator, ExprVisitor, FunctionResolver, TypeChecker},
+	pass::{ExprMutator, ExprVisitor, FunctionResolver, TypeChecker, TypeFixer},
 	token::LexingError,
 };
 use env::Binding;
@@ -183,7 +183,7 @@ mod tests {
 		let expr = parse(&program).unwrap();
 		println!("EXPR: {:?}", &expr);
 		let expr = FunctionResolver::std().run(expr).unwrap();
-		TypeChecker::default().run(&expr).unwrap();
+		let expr = TypeFixer::std().run(expr).unwrap();
 		println!("RESOLVER RES: {:?}", expr);
 		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(result, Primitive::Bool(true).into());

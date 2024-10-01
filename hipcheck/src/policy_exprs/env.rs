@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
-	expr::{FuncReturnType, Op, OpInfo, PrimitiveType, ReturnableType, Type},
+	expr::{
+		ArrayType as ExprArrayType, FuncReturnType, Op, OpInfo, PrimitiveType, ReturnableType,
+		Type, Typed,
+	},
 	pass::ExprMutator,
 	Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction, Ident,
 	Lambda as StructLambda, Primitive, Result, F64,
@@ -124,8 +127,23 @@ fn ty_arithmetic_binary_op(args: &[Type]) -> Result<ReturnableType> {
 }
 
 fn ty_foreach(args: &[Type]) -> Result<ReturnableType> {
-	println!("args: {:?}", args);
-	todo!()
+	let Some(ty_2) = args.get(1) else {
+		return Err(Error::MissingArgs);
+	};
+	let opt_ty_2: Option<ExprArrayType> = match ty_2.try_into()? {
+		ReturnableType::Unknown => None,
+		ReturnableType::Primitive(p) => {
+			return Err(Error::BadType("foreach arg 2 should be array"));
+		}
+		ReturnableType::Array(a) => Some(a),
+	};
+	let Type::Lambda(fty) = args.get(0).unwrap() else {
+		return Err(Error::BadType("foreach arg must be lambda"));
+	}; // We checked above for 2 args, ok to unwrap
+	match fty.return_ty {
+		FuncReturnType::Static(x) => Ok(x),
+		FuncReturnType::Dynamic(ret_fn) => (ret_fn)(&fty.arg_tys),
+	}
 }
 
 impl<'parent> Env<'parent> {
@@ -139,54 +157,55 @@ impl<'parent> Env<'parent> {
 
 	/// Create the standard environment.
 	pub fn std() -> Self {
+		use FuncReturnType::*;
 		use PrimitiveType::*;
 		let mut env = Env::empty();
 
-		let ret_bool = FuncReturnType::Static(Bool.into());
-		let ret_int = FuncReturnType::Static(Int.into());
-		let ret_span = FuncReturnType::Static(Span.into());
-		let ret_float = FuncReturnType::Static(Float.into());
+		let ret_bool = Static(Bool.into());
+		let ret_int = Static(Int.into());
+		let ret_span = Static(Span.into());
+		let ret_float = Static(Float.into());
 
 		// Comparison functions.
-		env.add_fn("gt", gt, ret_bool);
-		env.add_fn("lt", lt, ret_bool);
-		env.add_fn("gte", gte, ret_bool);
-		env.add_fn("lte", lte, ret_bool);
-		env.add_fn("eq", eq, ret_bool);
-		env.add_fn("neq", neq, ret_bool);
+		env.add_fn("gt", gt, 2, ret_bool);
+		env.add_fn("lt", lt, 2, ret_bool);
+		env.add_fn("gte", gte, 2, ret_bool);
+		env.add_fn("lte", lte, 2, ret_bool);
+		env.add_fn("eq", eq, 2, ret_bool);
+		env.add_fn("neq", neq, 2, ret_bool);
 
 		// Math functions.
-		env.add_fn("add", add, FuncReturnType::Dynamic(ty_arithmetic_binary_op));
-		env.add_fn("sub", sub, FuncReturnType::Dynamic(ty_arithmetic_binary_op));
-		env.add_fn("divz", divz, ret_float);
+		env.add_fn("add", add, 2, Dynamic(ty_arithmetic_binary_op));
+		env.add_fn("sub", sub, 2, Dynamic(ty_arithmetic_binary_op));
+		env.add_fn("divz", divz, 2, ret_float);
 
 		// Additional datetime math functions
-		env.add_fn("duration", duration, ret_span);
+		env.add_fn("duration", duration, 2, ret_span);
 
 		// Logical functions.
-		env.add_fn("and", and, ret_bool);
-		env.add_fn("or", or, ret_bool);
-		env.add_fn("not", not, ret_bool);
+		env.add_fn("and", and, 2, ret_bool);
+		env.add_fn("or", or, 2, ret_bool);
+		env.add_fn("not", not, 1, ret_bool);
 
 		// Array math functions.
-		env.add_fn("max", max, FuncReturnType::Dynamic(ty_from_first_arr));
-		env.add_fn("min", min, FuncReturnType::Dynamic(ty_from_first_arr));
-		env.add_fn("avg", avg, ret_float);
-		env.add_fn("median", median, FuncReturnType::Dynamic(ty_from_first_arr));
-		env.add_fn("count", count, ret_int);
+		env.add_fn("max", max, 1, Dynamic(ty_from_first_arr));
+		env.add_fn("min", min, 1, Dynamic(ty_from_first_arr));
+		env.add_fn("avg", avg, 1, ret_float);
+		env.add_fn("median", median, 1, Dynamic(ty_from_first_arr));
+		env.add_fn("count", count, 1, ret_int);
 
 		// Array logic functions.
-		env.add_fn("all", all, ret_bool);
-		env.add_fn("nall", nall, ret_bool);
-		env.add_fn("some", some, ret_bool);
-		env.add_fn("none", none, ret_bool);
+		env.add_fn("all", all, 1, ret_bool);
+		env.add_fn("nall", nall, 1, ret_bool);
+		env.add_fn("some", some, 1, ret_bool);
+		env.add_fn("none", none, 1, ret_bool);
 
 		// Array higher-order functions.
-		env.add_fn("filter", filter, FuncReturnType::Dynamic(ty_filter));
-		env.add_fn("foreach", foreach, FuncReturnType::Dynamic(ty_foreach));
+		env.add_fn("filter", filter, 2, Dynamic(ty_filter));
+		env.add_fn("foreach", foreach, 2, Dynamic(ty_foreach));
 
 		// Debugging functions.
-		env.add_fn("dbg", dbg, FuncReturnType::Dynamic(ty_inherit_first));
+		env.add_fn("dbg", dbg, 1, Dynamic(ty_inherit_first));
 
 		env
 	}
@@ -205,9 +224,21 @@ impl<'parent> Env<'parent> {
 	}
 
 	/// Add a function to the environment.
-	pub fn add_fn(&mut self, name: &str, op: Op, fn_ty: FuncReturnType) -> Option<Binding> {
-		self.bindings
-			.insert(name.to_owned(), Binding::Fn(OpInfo { fn_ty, op }))
+	pub fn add_fn(
+		&mut self,
+		name: &str,
+		op: Op,
+		expected_args: usize,
+		fn_ty: FuncReturnType,
+	) -> Option<Binding> {
+		self.bindings.insert(
+			name.to_owned(),
+			Binding::Fn(OpInfo {
+				fn_ty,
+				expected_args,
+				op,
+			}),
+		)
 	}
 
 	/// Get a binding from the environment, walking up the scopes.
@@ -239,12 +270,15 @@ fn check_num_args(name: &str, args: &[Expr], expected: usize) -> Result<()> {
 }
 
 /// Partially evaluate a binary operation on primitives.
-fn partially_evaluate(fn_name: &'static str, arg: Expr) -> Result<Expr> {
+pub fn partially_evaluate(env: &Env, fn_name: &str, arg: Expr) -> Result<Expr> {
 	let var_name = "x";
 	let var = Ident(String::from(var_name));
 	let func = Ident(String::from(fn_name));
-	let op = StructFunction::new(func, vec![Primitive(Identifier(var.clone())), arg]).into();
-	let lambda = StructLambda::new(var, Box::new(op)).into();
+	let op = StructFunction::new(func, vec![Primitive(Identifier(var.clone())), arg])
+		.resolve(env)?
+		.into();
+	let lambda: Expr = StructLambda::new(var, Box::new(op)).into();
+	lambda.get_type()?;
 	Ok(lambda)
 }
 
@@ -258,7 +292,7 @@ where
 	F: FnOnce(Primitive, Primitive) -> Result<Primitive>,
 {
 	if args.len() == 1 {
-		return partially_evaluate(name, args[0].clone());
+		return partially_evaluate(env, name, args[0].clone());
 	}
 
 	check_num_args(name, args, 2)?;

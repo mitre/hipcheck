@@ -66,6 +66,7 @@ pub type Op = fn(&Env, &[Expr]) -> Result<Expr>;
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub struct OpInfo {
 	pub fn_ty: FuncReturnType,
+	pub expected_args: usize,
 	pub op: Op,
 }
 
@@ -225,8 +226,14 @@ pub struct FunctionType {
 pub enum Type {
 	Primitive(PrimitiveType),
 	Function(FunctionType),
+	Lambda(FunctionType),
 	Array(ArrayType),
 	Unknown,
+}
+impl Type {
+	pub fn get_return_type(&self) -> Result<ReturnableType> {
+		self.try_into()
+	}
 }
 impl TryFrom<&Type> for ReturnableType {
 	type Error = crate::policy_exprs::Error;
@@ -236,12 +243,26 @@ impl TryFrom<&Type> for ReturnableType {
 				FuncReturnType::Dynamic(ret_fn) => (ret_fn)(&fn_ty.arg_tys)?,
 				FuncReturnType::Static(s) => s,
 			},
+			// @Todo - add a Unknown to the end
+			Type::Lambda(lamb_ty) => {
+				todo!()
+				// let mut test_args = lamb_ty.fn_type.arg_tys.clone();
+				// test_args.push(ReturnableType::Unknown);
+				// ReturnableType::try_from(&lamb_ty.fn_type)?,
+			}
 			Type::Array(arr_ty) => ReturnableType::Array(*arr_ty),
+			Type::Primitive(PrimitiveType::Ident) => ReturnableType::Unknown,
 			Type::Primitive(p_ty) => ReturnableType::Primitive(*p_ty),
 			Type::Unknown => ReturnableType::Unknown,
 		})
 	}
 }
+
+// #[derive(Debug, Clone, PartialEq, Eq)]
+// pub struct LambdaType {
+// 	pub fn_type: FunctionType,
+// 	pub expected_arg_ty: ReturnableType,
+// }
 
 pub trait Typed {
 	fn get_type(&self) -> Result<Type>;
@@ -281,17 +302,36 @@ impl Typed for Function {
 			.iter()
 			.map(Typed::get_type)
 			.collect::<Result<Vec<_>>>()?;
-		Ok(FunctionType {
+		let fn_type = FunctionType {
 			return_ty: op_info.fn_ty,
 			arg_tys,
+		};
+		if fn_type.arg_tys.len() == op_info.expected_args {
+			Ok(fn_type.into())
+		} else if fn_type.arg_tys.len() == op_info.expected_args - 1 {
+			Ok(Type::Lambda(fn_type)) // @Todo - construct
+		} else {
+			Err(Error::BadType("missing multiple args to func"))
 		}
-		.into())
 	}
 }
+
 impl Typed for Lambda {
+	// @Todo - Lambda should be a FunctionType that takes 1 argument and
+	// contains an interior reference to the function it wraps.
+	// To get its return type, we should combine Unknown with the
+	// other typed args to the function and evaluate.
 	fn get_type(&self) -> Result<Type> {
-		println!("TYPING {:?}", self);
-		todo!()
+		let Expr::Function(func) = self.body.as_ref() else {
+			return Err(Error::BadType("Expected lambda to contain a func"));
+		};
+		let Type::Function(fty) = func.get_type()? else {
+			unreachable!()
+		};
+		let res = Ok(Type::Lambda(fty));
+		// we need a handle to the function to get a type
+		println!("TYPING {:?}", res);
+		res
 	}
 }
 
