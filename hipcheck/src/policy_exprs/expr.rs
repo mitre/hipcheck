@@ -70,12 +70,14 @@ pub struct OpInfo {
 	pub op: Op,
 }
 
+pub type TypeChecker = fn(&[Type]) -> Result<ReturnableType>;
+
 #[derive(Clone, PartialEq, Debug, Eq)]
-struct FunctionDef {
-	name: String,
-	expected_args: usize,
-	ty_checker: fn(&[Type]) -> Result<ReturnableType>,
-	op: Op,
+pub struct FunctionDef {
+	pub name: String,
+	pub expected_args: usize,
+	pub ty_checker: TypeChecker,
+	pub op: Op,
 }
 impl FunctionDef {
 	pub fn type_check(&self, args: &[Type]) -> Result<ReturnableType> {
@@ -117,15 +119,15 @@ impl FunctionDef {
 pub struct Function {
 	pub ident: Ident,
 	pub args: Vec<Expr>,
-	pub opt_op_info: Option<OpInfo>,
+	pub opt_def: Option<FunctionDef>,
 }
 impl Function {
 	pub fn new(ident: Ident, args: Vec<Expr>) -> Self {
-		let opt_op_info = None;
+		let opt_def = None;
 		Function {
 			ident,
 			args,
-			opt_op_info,
+			opt_def,
 		}
 	}
 	pub fn resolve(&self, env: &Env) -> Result<Self> {
@@ -137,7 +139,7 @@ impl Function {
 		Ok(Function {
 			ident,
 			args,
-			opt_op_info: Some(op_info),
+			opt_def: Some(op_info),
 		})
 	}
 }
@@ -260,15 +262,12 @@ pub enum FuncReturnType {
 // A function signature is the combination of the return type and the arg types
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionType {
-	pub return_ty: FuncReturnType,
+	pub def: FunctionDef,
 	pub arg_tys: Vec<Type>,
 }
 impl FunctionType {
 	pub fn get_return_type(&self) -> Result<ReturnableType> {
-		Ok(match self.return_ty {
-			FuncReturnType::Dynamic(ret_fn) => (ret_fn)(&self.arg_tys)?,
-			FuncReturnType::Static(s) => s,
-		})
+		self.def.type_check(&self.arg_tys)
 	}
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -337,7 +336,7 @@ impl Typed for Array {
 impl Typed for Function {
 	fn get_type(&self) -> Result<Type> {
 		use FuncReturnType::*;
-		let Some(op_info) = &self.opt_op_info else {
+		let Some(def) = self.opt_def.as_ref().map(Clone::clone) else {
 			return Err(Error::BadType("func has not been resolved in env"));
 		};
 		let arg_tys: Vec<Type> = self
@@ -345,18 +344,11 @@ impl Typed for Function {
 			.iter()
 			.map(Typed::get_type)
 			.collect::<Result<Vec<_>>>()?;
-		let fn_type = FunctionType {
-			return_ty: op_info.fn_ty,
-			arg_tys,
-		};
-		if fn_type.arg_tys.len() == op_info.expected_args {
-			Ok(fn_type.into())
-		}
-		// This is how we decide to change a Function to a Lambda node
-		else if fn_type.arg_tys.len() == op_info.expected_args - 1 {
+		let fn_type = FunctionType { def, arg_tys };
+		if fn_type.arg_tys.len() == fn_type.def.expected_args - 1 {
 			Ok(Type::Lambda(fn_type))
 		} else {
-			Err(Error::BadType("missing multiple args to func"))
+			Ok(fn_type.into())
 		}
 	}
 }

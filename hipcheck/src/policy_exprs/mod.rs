@@ -56,17 +56,39 @@ impl ExprMutator for Env<'_> {
 		Ok(prim.resolve(self)?.into())
 	}
 	fn visit_function(&self, f: Function) -> Result<Expr> {
+		let mut f = f;
+		// first evaluate all the children
+		f.args = f
+			.args
+			.into_iter()
+			.map(|a| self.visit_expr(a))
+			.collect::<Result<Vec<Expr>>>()?;
 		let binding = self
 			.get(&f.ident)
 			.ok_or_else(|| Error::UnknownFunction(f.ident.deref().to_owned()))?;
 		if let Binding::Fn(op_info) = binding {
+			// Doesn't use `execute` because currently allows Functions that haven't been changed
+			// to Lambdas
 			(op_info.op)(self, &f.args)
 		} else {
 			Err(Error::FoundVarExpectedFunc(f.ident.deref().to_owned()))
 		}
 	}
-	fn visit_lambda(&self, l: Lambda) -> Result<Expr> {
-		Ok((*l.body).clone())
+	fn visit_lambda(&self, mut l: Lambda) -> Result<Expr> {
+		// Eagerly evaluate the arguments to the lambda but not the func itself
+		let Expr::Function(f) = l.body.as_mut() else {
+			unreachable!();
+		};
+		// Visit args, but ignore lambda ident because not yet bound
+		f.args = f
+			.args
+			.drain(..)
+			.map(|a| match a {
+				Expr::Primitive(Primitive::Identifier(_)) => Ok(a),
+				b => self.visit_expr(b),
+			})
+			.collect::<Result<Vec<Expr>>>()?;
+		Ok(l.into())
 	}
 }
 

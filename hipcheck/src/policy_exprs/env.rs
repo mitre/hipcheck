@@ -2,8 +2,8 @@
 
 use crate::policy_exprs::{
 	expr::{
-		ArrayType as ExprArrayType, FuncReturnType, FunctionType, Op, OpInfo, PrimitiveType,
-		ReturnableType, Type, Typed,
+		ArrayType as ExprArrayType, FuncReturnType, FunctionDef, FunctionType, Op, OpInfo,
+		PrimitiveType, ReturnableType, Type, TypeChecker, Typed,
 	},
 	pass::ExprMutator,
 	Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction, Ident,
@@ -32,7 +32,7 @@ pub struct Env<'parent> {
 #[derive(Clone)]
 pub enum Binding {
 	/// A function.
-	Fn(OpInfo),
+	Fn(FunctionDef),
 
 	/// A primitive value.
 	Var(Primitive),
@@ -115,49 +115,50 @@ fn ty_from_first_arr(args: &[Type]) -> Result<ReturnableType> {
 	})
 }
 
+fn expect_primitive_at(args: &[Type], idx: usize) -> Result<Option<PrimitiveType>> {
+	match args.get(idx).unwrap().try_into()? {
+		ReturnableType::Primitive(p) => Ok(Some(p)),
+		ReturnableType::Array(a) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx,
+				expected: "a primitive type".to_owned(),
+				got: Type::Array(a),
+			});
+		}
+		ReturnableType::Unknown => Ok(None),
+	}
+}
+
 fn ty_arithmetic_binary_op(args: &[Type]) -> Result<ReturnableType> {
-	// resolves the two operands
-	let Some(ty_1) = args.get(0) else {
-		return Err(Error::MissingArgs);
-	};
-	let Some(ty_2) = args.get(1) else {
-		return Err(Error::MissingArgs);
-	};
-	// ensure they both result in primitive types or unknown
-	let opt_ty_1: Option<PrimitiveType> = match ty_1.try_into()? {
-		ReturnableType::Primitive(p) => Some(p),
-		ReturnableType::Array(_) => {
-			return Err(Error::BadType("todo!"));
-		}
-		ReturnableType::Unknown => None,
-	};
-	let opt_ty_2: Option<PrimitiveType> = match ty_2.try_into()? {
-		ReturnableType::Primitive(p) => Some(p),
-		ReturnableType::Array(_) => {
-			return Err(Error::BadType("todo!"));
-		}
-		ReturnableType::Unknown => None,
-	};
+	// ensure both ops result in primitive types or unknown
+	let opt_ty_1 = expect_primitive_at(args, 0)?;
+	let opt_ty_2 = expect_primitive_at(args, 1)?;
 	use PrimitiveType::*;
 	use ReturnableType::*;
 	if opt_ty_1.is_none() || opt_ty_2.is_none() {
-		let (single_ty, first_op) = match (opt_ty_1, opt_ty_2) {
+		let (single_ty, idx) = match (opt_ty_1, opt_ty_2) {
 			// if both are unknown, return unknown
 			(None, None) => {
 				return Ok(Unknown);
 			}
-			(Some(t), None) => (t, true),
-			(None, Some(t)) => (t, false),
+			(Some(t), None) => (t, 0),
+			(None, Some(t)) => (t, 1),
 			_ => unreachable!(),
 		};
-		Ok(match (single_ty, first_op) {
+		Ok(match (single_ty, idx) {
 			(Float, _) => Primitive(Float),
 			(Int, _) => Primitive(Int),
-			(Span, true) => Primitive(Span), // span in first position indicates span arithmetic
-			(Span, false) => Unknown,        // span in second position could be datetime or span arithmetic
-			(DateTime, true) => Primitive(DateTime), // expect a span in second position
-			_ => {
-				return Err(Error::BadType("todo!"));
+			(Span, 0) => Primitive(Span), // span in first position indicates span arithmetic
+			(Span, 1) => Unknown,         // span in second position could be datetime or span arithmetic
+			(DateTime, 1) => Primitive(DateTime), // expect a span in second position
+			(ty, _) => {
+				return Err(Error::BadFuncArgType {
+					name: "".to_owned(),
+					idx,
+					expected: "a float, int, span, or datetime".to_owned(),
+					got: Type::Primitive(ty),
+				});
 			}
 		})
 	} else {
@@ -168,8 +169,14 @@ fn ty_arithmetic_binary_op(args: &[Type]) -> Result<ReturnableType> {
 			(Int, _) | (_, Int) => Primitive(Int),
 			(DateTime, Span) => Primitive(DateTime),
 			(Span, _) | (_, Span) => Primitive(Span),
-			_ => {
-				return Err(Error::BadType("todo!"));
+			(p, _) => {
+				// Can't check second arg with current design
+				return Err(Error::BadFuncArgType {
+					name: "".to_owned(),
+					idx: 0,
+					expected: "a float, int, span, or datetime".to_owned(),
+					got: Type::Primitive(p),
+				});
 			}
 		})
 	}
@@ -189,22 +196,12 @@ fn ty_foreach(args: &[Type]) -> Result<ReturnableType> {
 	let Type::Lambda(fty) = args.get(0).unwrap() else {
 		return Err(Error::BadType("foreach arg must be lambda"));
 	}; // We checked above for 2 args, ok to unwrap
-	match fty.return_ty {
-		FuncReturnType::Static(x) => Ok(x),
-		FuncReturnType::Dynamic(ret_fn) => (ret_fn)(&fty.arg_tys),
-	}
+	fty.get_return_type()
 }
 
 fn ty_comp(args: &[Type]) -> Result<ReturnableType> {
 	let resp = Ok(Bool.into());
-	let Some(ty_2) = args.get(1) else {
-		return Err(Error::NotEnoughArgs {
-			name: "".to_owned(),
-			expected: 2,
-			given: args.len(),
-		});
-	};
-	let opt_ty_2: Option<PrimitiveType> = match ty_2.try_into()? {
+	let opt_ty_2: Option<PrimitiveType> = match args.get(1).unwrap().try_into()? {
 		ReturnableType::Unknown => None,
 		ReturnableType::Primitive(p) => Some(p),
 		ReturnableType::Array(a) => {
@@ -216,8 +213,7 @@ fn ty_comp(args: &[Type]) -> Result<ReturnableType> {
 			});
 		}
 	};
-	let ty_1 = args.get(0).unwrap();
-	let opt_ty_1: Option<PrimitiveType> = match ty_1.try_into()? {
+	let opt_ty_1: Option<PrimitiveType> = match args.get(0).unwrap().try_into()? {
 		ReturnableType::Unknown => None,
 		ReturnableType::Primitive(p) => Some(p),
 		ReturnableType::Array(a) => {
@@ -277,6 +273,22 @@ fn ty_comp(args: &[Type]) -> Result<ReturnableType> {
 	}
 }
 
+fn ty_tmp_ret_bool(args: &[Type]) -> Result<ReturnableType> {
+	Ok(PrimitiveType::Bool.into())
+}
+
+fn ty_tmp_ret_int(args: &[Type]) -> Result<ReturnableType> {
+	Ok(PrimitiveType::Int.into())
+}
+
+fn ty_tmp_ret_float(args: &[Type]) -> Result<ReturnableType> {
+	Ok(PrimitiveType::Float.into())
+}
+
+fn ty_tmp_ret_span(args: &[Type]) -> Result<ReturnableType> {
+	Ok(PrimitiveType::Span.into())
+}
+
 impl<'parent> Env<'parent> {
 	/// Create an empty environment.
 	fn empty() -> Self {
@@ -292,51 +304,46 @@ impl<'parent> Env<'parent> {
 		use PrimitiveType::*;
 		let mut env = Env::empty();
 
-		let ret_bool = Static(Bool.into());
-		let ret_int = Static(Int.into());
-		let ret_span = Static(Span.into());
-		let ret_float = Static(Float.into());
-
 		// Comparison functions.
-		env.add_fn("gt", gt, 2, Dynamic(ty_comp));
-		env.add_fn("lt", lt, 2, Dynamic(ty_comp));
-		env.add_fn("gte", gte, 2, Dynamic(ty_comp));
-		env.add_fn("lte", lte, 2, Dynamic(ty_comp));
-		env.add_fn("eq", eq, 2, Dynamic(ty_comp));
-		env.add_fn("neq", neq, 2, Dynamic(ty_comp));
+		env.add_fn("gt", gt, 2, ty_comp);
+		env.add_fn("lt", lt, 2, ty_comp);
+		env.add_fn("gte", gte, 2, ty_comp);
+		env.add_fn("lte", lte, 2, ty_comp);
+		env.add_fn("eq", eq, 2, ty_comp);
+		env.add_fn("neq", neq, 2, ty_comp);
 
 		// Math functions.
-		env.add_fn("add", add, 2, Dynamic(ty_arithmetic_binary_op));
-		env.add_fn("sub", sub, 2, Dynamic(ty_arithmetic_binary_op));
-		env.add_fn("divz", divz, 2, ret_float);
+		env.add_fn("add", add, 2, ty_arithmetic_binary_op);
+		env.add_fn("sub", sub, 2, ty_arithmetic_binary_op);
+		env.add_fn("divz", divz, 2, ty_tmp_ret_float);
 
 		// Additional datetime math functions
-		env.add_fn("duration", duration, 2, ret_span);
+		env.add_fn("duration", duration, 2, ty_tmp_ret_span);
 
 		// Logical functions.
-		env.add_fn("and", and, 2, ret_bool);
-		env.add_fn("or", or, 2, ret_bool);
-		env.add_fn("not", not, 1, ret_bool);
+		env.add_fn("and", and, 2, ty_tmp_ret_bool);
+		env.add_fn("or", or, 2, ty_tmp_ret_bool);
+		env.add_fn("not", not, 1, ty_tmp_ret_bool);
 
 		// Array math functions.
-		env.add_fn("max", max, 1, Dynamic(ty_from_first_arr));
-		env.add_fn("min", min, 1, Dynamic(ty_from_first_arr));
-		env.add_fn("avg", avg, 1, ret_float);
-		env.add_fn("median", median, 1, Dynamic(ty_from_first_arr));
-		env.add_fn("count", count, 1, ret_int);
+		env.add_fn("max", max, 1, ty_from_first_arr);
+		env.add_fn("min", min, 1, ty_from_first_arr);
+		env.add_fn("avg", avg, 1, ty_tmp_ret_float);
+		env.add_fn("median", median, 1, ty_from_first_arr);
+		env.add_fn("count", count, 1, ty_tmp_ret_int);
 
 		// Array logic functions.
-		env.add_fn("all", all, 1, ret_bool);
-		env.add_fn("nall", nall, 1, ret_bool);
-		env.add_fn("some", some, 1, ret_bool);
-		env.add_fn("none", none, 1, ret_bool);
+		env.add_fn("all", all, 1, ty_tmp_ret_bool);
+		env.add_fn("nall", nall, 1, ty_tmp_ret_bool);
+		env.add_fn("some", some, 1, ty_tmp_ret_bool);
+		env.add_fn("none", none, 1, ty_tmp_ret_bool);
 
 		// Array higher-order functions.
-		env.add_fn("filter", filter, 2, Dynamic(ty_filter));
-		env.add_fn("foreach", foreach, 2, Dynamic(ty_foreach));
+		env.add_fn("filter", filter, 2, ty_filter);
+		env.add_fn("foreach", foreach, 2, ty_foreach);
 
 		// Debugging functions.
-		env.add_fn("dbg", dbg, 1, Dynamic(ty_inherit_first));
+		env.add_fn("dbg", dbg, 1, ty_inherit_first);
 
 		env
 	}
@@ -360,13 +367,14 @@ impl<'parent> Env<'parent> {
 		name: &str,
 		op: Op,
 		expected_args: usize,
-		fn_ty: FuncReturnType,
+		ty_checker: TypeChecker,
 	) -> Option<Binding> {
 		self.bindings.insert(
 			name.to_owned(),
-			Binding::Fn(OpInfo {
-				fn_ty,
+			Binding::Fn(FunctionDef {
+				name: name.to_owned(),
 				expected_args,
+				ty_checker,
 				op,
 			}),
 		)
@@ -594,13 +602,6 @@ fn eval_lambda(env: &Env, ident: &Ident, val: Primitive, body: Expr) -> Result<E
 	}
 
 	child.visit_expr(body)
-}
-
-struct FunctionDef {
-	name: String,
-	expected_args: usize,
-	ty_checker: fn(&[Type]) -> Result<ReturnableType>,
-	op: Op,
 }
 
 #[allow(clippy::bool_comparison)]

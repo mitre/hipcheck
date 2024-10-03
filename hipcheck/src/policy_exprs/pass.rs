@@ -100,13 +100,12 @@ impl ExprVisitor<Result<Type>> for TypeChecker {
 			.iter()
 			.map(|a| self.visit_expr(a))
 			.collect::<Result<Vec<Type>>>()?;
-		let fn_ty = func.get_type()?;
-		let Type::Function(ft) = fn_ty else {
+
+		let Type::Function(ft) = func.get_type()? else {
 			return Err(Error::BadType("i don't know how we got here"));
 		};
-		if let FuncReturnType::Dynamic(fn_ty_fn) = ft.return_ty {
-			(fn_ty_fn)(&ft.arg_tys)?;
-		}
+		// Check that the arguments to the function are correct
+		ft.get_return_type()?;
 		Ok(ft.into())
 	}
 	fn visit_lambda(&self, lamb: &Lambda) -> Result<Type> {
@@ -136,17 +135,8 @@ impl ExprMutator for TypeFixer {
 			.collect::<Result<Vec<Expr>>>()?;
 		let fn_ty = func.get_type()?;
 		// At this point we know it has info
-		let op_info = func.opt_op_info.as_ref().unwrap();
 		match fn_ty {
-			Type::Function(ft) => {
-				match ft.return_ty {
-					FuncReturnType::Static(_) => (),
-					FuncReturnType::Dynamic(fn_ty_fn) => {
-						(fn_ty_fn)(&ft.arg_tys);
-					}
-				};
-				Ok(func.into())
-			}
+			Type::Function(ft) => Ok(func.into()),
 			Type::Lambda(lt) => {
 				// Have to feed the new expr through the current pass again
 				// for any additional transformations
