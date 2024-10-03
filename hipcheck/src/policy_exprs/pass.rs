@@ -105,15 +105,13 @@ impl ExprVisitor<Result<Type>> for TypeChecker {
 			return Err(Error::BadType("i don't know how we got here"));
 		};
 		if let FuncReturnType::Dynamic(fn_ty_fn) = ft.return_ty {
-			if let Err(e) = (fn_ty_fn)(&ft.arg_tys) {
-				println!("Invalid type, e: {e:?}");
-				return Err(e);
-			}
+			(fn_ty_fn)(&ft.arg_tys)?;
 		}
 		Ok(ft.into())
 	}
 	fn visit_lambda(&self, lamb: &Lambda) -> Result<Type> {
-		todo!()
+		self.visit_expr(lamb.body.as_ref())?;
+		lamb.get_type()
 	}
 	fn visit_json_pointer(&self, jp: &JsonPointer) -> Result<Type> {
 		return Err(Error::BadType("can't type JSON pointers"));
@@ -130,7 +128,7 @@ impl TypeFixer {
 }
 impl ExprMutator for TypeFixer {
 	fn visit_function(&self, mut func: Function) -> Result<Expr> {
-		// @FollowUp - should the ExprMutator be combined into this?
+		// @FollowUp - should the FunctionResolver be combined into this?
 		func.args = func
 			.args
 			.drain(..)

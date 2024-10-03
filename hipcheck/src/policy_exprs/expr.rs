@@ -70,6 +70,48 @@ pub struct OpInfo {
 	pub op: Op,
 }
 
+#[derive(Clone, PartialEq, Debug, Eq)]
+struct FunctionDef {
+	name: String,
+	expected_args: usize,
+	ty_checker: fn(&[Type]) -> Result<ReturnableType>,
+	op: Op,
+}
+impl FunctionDef {
+	pub fn type_check(&self, args: &[Type]) -> Result<ReturnableType> {
+		if args.len() < self.expected_args {
+			return Err(Error::NotEnoughArgs {
+				name: self.name.clone(),
+				expected: self.expected_args,
+				given: args.len(),
+			});
+		} else if args.len() > self.expected_args {
+			return Err(Error::TooManyArgs {
+				name: self.name.clone(),
+				expected: self.expected_args,
+				given: args.len(),
+			});
+		}
+		let mut res = (self.ty_checker)(args);
+		// There's probably a better way to augment err with name
+		match &mut res {
+			Err(Error::BadFuncArgType { name, .. }) => {
+				*name = self.name.clone();
+			}
+			_ => (),
+		};
+		res
+	}
+	pub fn execute(&self, env: &Env, args: &[Expr]) -> Result<Expr> {
+		let types = args
+			.iter()
+			.map(|a| a.get_type())
+			.collect::<Result<Vec<Type>>>()?;
+		self.type_check(types.as_slice());
+		(self.op)(env, args)
+	}
+}
+
 /// A `deke` function to evaluate.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function {
@@ -221,7 +263,14 @@ pub struct FunctionType {
 	pub return_ty: FuncReturnType,
 	pub arg_tys: Vec<Type>,
 }
-// @Todo - handle lambdas
+impl FunctionType {
+	pub fn get_return_type(&self) -> Result<ReturnableType> {
+		Ok(match self.return_ty {
+			FuncReturnType::Dynamic(ret_fn) => (ret_fn)(&self.arg_tys)?,
+			FuncReturnType::Static(s) => s,
+		})
+	}
+}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
 	Primitive(PrimitiveType),
@@ -239,17 +288,7 @@ impl TryFrom<&Type> for ReturnableType {
 	type Error = crate::policy_exprs::Error;
 	fn try_from(value: &Type) -> Result<ReturnableType> {
 		Ok(match value {
-			Type::Function(fn_ty) => match fn_ty.return_ty {
-				FuncReturnType::Dynamic(ret_fn) => (ret_fn)(&fn_ty.arg_tys)?,
-				FuncReturnType::Static(s) => s,
-			},
-			// @Todo - add a Unknown to the end
-			Type::Lambda(lamb_ty) => {
-				todo!()
-				// let mut test_args = lamb_ty.fn_type.arg_tys.clone();
-				// test_args.push(ReturnableType::Unknown);
-				// ReturnableType::try_from(&lamb_ty.fn_type)?,
-			}
+			Type::Function(fn_ty) | Type::Lambda(fn_ty) => fn_ty.get_return_type()?,
 			Type::Array(arr_ty) => ReturnableType::Array(*arr_ty),
 			Type::Primitive(PrimitiveType::Ident) => ReturnableType::Unknown,
 			Type::Primitive(p_ty) => ReturnableType::Primitive(*p_ty),
@@ -257,11 +296,15 @@ impl TryFrom<&Type> for ReturnableType {
 		})
 	}
 }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub struct LambdaType {
-// 	pub fn_type: FunctionType,
-// 	pub expected_arg_ty: ReturnableType,
+impl Display for PrimitiveType {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "{:?}", self)
+	}
+}
+// impl Display for ArrayType {
+// 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+// 		write!(f, "{:?}", self)
+// 	}
 // }
 
 pub trait Typed {
@@ -308,8 +351,10 @@ impl Typed for Function {
 		};
 		if fn_type.arg_tys.len() == op_info.expected_args {
 			Ok(fn_type.into())
-		} else if fn_type.arg_tys.len() == op_info.expected_args - 1 {
-			Ok(Type::Lambda(fn_type)) // @Todo - construct
+		}
+		// This is how we decide to change a Function to a Lambda node
+		else if fn_type.arg_tys.len() == op_info.expected_args - 1 {
+			Ok(Type::Lambda(fn_type))
 		} else {
 			Err(Error::BadType("missing multiple args to func"))
 		}
@@ -330,7 +375,6 @@ impl Typed for Lambda {
 		};
 		let res = Ok(Type::Lambda(fty));
 		// we need a handle to the function to get a type
-		println!("TYPING {:?}", res);
 		res
 	}
 }

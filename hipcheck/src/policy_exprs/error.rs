@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::policy_exprs::{Expr, Ident, LexingError};
+use crate::policy_exprs::{
+	expr::{ReturnableType, Type},
+	Expr, Ident, LexingError,
+};
 use jiff::Error as JError;
 use nom::{error::ErrorKind, Needed};
 use ordered_float::FloatIsNan;
@@ -67,6 +70,14 @@ pub enum Error {
 
 	#[error("called '{0}' with mismatched types")]
 	BadType(&'static str),
+
+	#[error("call to '{name}' with '{got:?}' as argument {idx}, expected {expected}")]
+	BadFuncArgType {
+		name: String,
+		idx: usize,
+		expected: String,
+		got: Type,
+	},
 
 	#[error("no max value found in array")]
 	NoMax,

@@ -2,8 +2,8 @@
 
 use crate::policy_exprs::{
 	expr::{
-		ArrayType as ExprArrayType, FuncReturnType, Op, OpInfo, PrimitiveType, ReturnableType,
-		Type, Typed,
+		ArrayType as ExprArrayType, FuncReturnType, FunctionType, Op, OpInfo, PrimitiveType,
+		ReturnableType, Type, Typed,
 	},
 	pass::ExprMutator,
 	Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction, Ident,
@@ -38,14 +38,63 @@ pub enum Binding {
 	Var(Primitive),
 }
 
+// Ensure that type of array elements is valid with a lambda
+fn ty_check_higher_order_lambda(
+	l_ty: &FunctionType,
+	arr_ty: &ExprArrayType,
+) -> Result<ReturnableType> {
+	if let Some(arr_elt_ty) = arr_ty {
+		// Copy the lambda function type, replace ident with arr_elt_ty
+		let mut try_l_ty = l_ty.clone();
+		let first_arg = try_l_ty.arg_tys.get_mut(0).ok_or(Error::NotEnoughArgs {
+			name: "".to_owned(),
+			expected: 1,
+			given: 0,
+		})?;
+		*first_arg = Type::Primitive(*arr_elt_ty);
+		// If this returns error, means array type was incorrect for lambda
+		try_l_ty.get_return_type()
+	} else {
+		Ok(ReturnableType::Unknown)
+	}
+}
+
 fn ty_filter(args: &[Type]) -> Result<ReturnableType> {
 	let Some(wrapped_arr_ty) = args.get(1) else {
-		return Err(Error::MissingArgs);
+		return Err(Error::NotEnoughArgs {
+			name: "".to_owned(),
+			expected: 2,
+			given: args.len(),
+		});
 	};
 	let Type::Array(arr_ty) = wrapped_arr_ty else {
-		return Err(Error::BadType("todo!"));
+		return Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 1,
+			expected: "an array".to_owned(),
+			got: wrapped_arr_ty.clone(),
+		});
 	};
-	Ok(ReturnableType::Array(*arr_ty))
+	let Type::Lambda(l_ty) = args.get(0).unwrap() else {
+		return Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "a lambda".to_owned(),
+			got: wrapped_arr_ty.clone(),
+		});
+	};
+	let res_ty = ty_check_higher_order_lambda(l_ty, arr_ty)?;
+	match res_ty {
+		ReturnableType::Primitive(PrimitiveType::Bool) | ReturnableType::Unknown => {
+			Ok(ReturnableType::Array(*arr_ty))
+		}
+		a => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "a bool-returning lambda".to_owned(),
+			got: Type::Lambda(l_ty.clone()),
+		}),
+	}
 }
 
 // Type of dynamic function is dependent on first arg
@@ -146,6 +195,88 @@ fn ty_foreach(args: &[Type]) -> Result<ReturnableType> {
 	}
 }
 
+fn ty_comp(args: &[Type]) -> Result<ReturnableType> {
+	let resp = Ok(Bool.into());
+	let Some(ty_2) = args.get(1) else {
+		return Err(Error::NotEnoughArgs {
+			name: "".to_owned(),
+			expected: 2,
+			given: args.len(),
+		});
+	};
+	let opt_ty_2: Option<PrimitiveType> = match ty_2.try_into()? {
+		ReturnableType::Unknown => None,
+		ReturnableType::Primitive(p) => Some(p),
+		ReturnableType::Array(a) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx: 1,
+				expected: "a primitive type".to_owned(),
+				got: Type::Array(a),
+			});
+		}
+	};
+	let ty_1 = args.get(0).unwrap();
+	let opt_ty_1: Option<PrimitiveType> = match ty_1.try_into()? {
+		ReturnableType::Unknown => None,
+		ReturnableType::Primitive(p) => Some(p),
+		ReturnableType::Array(a) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx: 1,
+				expected: "a primitive type".to_owned(),
+				got: Type::Array(a),
+			});
+		}
+	};
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	if opt_ty_1.is_none() || opt_ty_2.is_none() {
+		let (single_ty, idx) = match (opt_ty_1, opt_ty_2) {
+			// if both are unknown, return unknown
+			(None, None) => {
+				return resp;
+			}
+			(Some(t), None) => (t, 0),
+			(None, Some(t)) => (t, 1),
+			_ => unreachable!(),
+		};
+		match single_ty {
+			Float | Int | DateTime | Bool | Span => resp,
+			p => {
+				return Err(Error::BadType("todo!"));
+				return Err(Error::BadFuncArgType {
+					name: "".to_owned(),
+					idx,
+					expected: "a primitive type".to_owned(),
+					got: Type::Primitive(p),
+				});
+			}
+		}
+	} else {
+		let ty_1 = opt_ty_1.unwrap();
+		let ty_2 = opt_ty_2.unwrap();
+		match (ty_1, ty_2) {
+			(Float, Float)
+			| (Int, Float)
+			| (Float, Int)
+			| (Int, Int)
+			| (Bool, Bool)
+			| (Span, Span)
+			| (DateTime, DateTime) => resp,
+			p => {
+				return Err(Error::BadFuncArgType {
+					name: "".to_owned(),
+					idx: 0,
+					expected: "a float, int, bool, span, or datetime".to_owned(),
+					// @Note - no way to know if 1st/2nd arg is problem currently
+					got: Type::Primitive(p.0),
+				});
+			}
+		}
+	}
+}
+
 impl<'parent> Env<'parent> {
 	/// Create an empty environment.
 	fn empty() -> Self {
@@ -167,12 +298,12 @@ impl<'parent> Env<'parent> {
 		let ret_float = Static(Float.into());
 
 		// Comparison functions.
-		env.add_fn("gt", gt, 2, ret_bool);
-		env.add_fn("lt", lt, 2, ret_bool);
-		env.add_fn("gte", gte, 2, ret_bool);
-		env.add_fn("lte", lte, 2, ret_bool);
-		env.add_fn("eq", eq, 2, ret_bool);
-		env.add_fn("neq", neq, 2, ret_bool);
+		env.add_fn("gt", gt, 2, Dynamic(ty_comp));
+		env.add_fn("lt", lt, 2, Dynamic(ty_comp));
+		env.add_fn("gte", gte, 2, Dynamic(ty_comp));
+		env.add_fn("lte", lte, 2, Dynamic(ty_comp));
+		env.add_fn("eq", eq, 2, Dynamic(ty_comp));
+		env.add_fn("neq", neq, 2, Dynamic(ty_comp));
 
 		// Math functions.
 		env.add_fn("add", add, 2, Dynamic(ty_arithmetic_binary_op));
@@ -463,6 +594,13 @@ fn eval_lambda(env: &Env, ident: &Ident, val: Primitive, body: Expr) -> Result<E
 	}
 
 	child.visit_expr(body)
+}
+
+struct FunctionDef {
+	name: String,
+	expected_args: usize,
+	ty_checker: fn(&[Type]) -> Result<ReturnableType>,
+	op: Op,
 }
 
 #[allow(clippy::bool_comparison)]

@@ -14,7 +14,7 @@ use crate::policy_exprs::env::Env;
 pub(crate) use crate::policy_exprs::{bridge::Tokens, expr::F64};
 pub use crate::policy_exprs::{
 	error::{Error, Result},
-	expr::{Array, Expr, Function, Ident, JsonPointer, Lambda},
+	expr::{Array, Expr, Function, Ident, JsonPointer, Lambda, Typed},
 	pass::{ExprMutator, ExprVisitor, FunctionResolver, TypeChecker, TypeFixer},
 	token::LexingError,
 };
@@ -236,5 +236,29 @@ mod tests {
 			.parse_and_eval(format!("(add {} {})", span, date).as_str(), &context)
 			.unwrap();
 		assert_eq!(expected, result2);
+	}
+
+	#[test]
+	fn type_lambda() {
+		let program = "(gt #t)";
+		let expr = parse(&program).unwrap();
+		println!("EXPR: {:?}", &expr);
+		let expr = FunctionResolver::std().run(expr).unwrap();
+		let expr = TypeFixer::std().run(expr).unwrap();
+		println!("RESOLVER RES: {:?}", expr);
+		let res_ty = TypeChecker::default().run(&expr);
+		println!("TYPE: {:?}", res_ty);
+		println!("RETTYPE: {:?}", res_ty.unwrap().get_return_type());
+	}
+
+	#[test]
+	fn type_filter_bad_lambda_array() {
+		// Should fail because can't compare ints and bools
+		let program = "(filter (gt #t) [1 2])";
+		let expr = parse(&program).unwrap();
+		let expr = FunctionResolver::std().run(expr).unwrap();
+		let expr = TypeFixer::std().run(expr).unwrap();
+		let res_ty = TypeChecker::default().run(&expr);
+		assert!(matches!(res_ty, Err(Error::BadFuncArgType { .. })));
 	}
 }
