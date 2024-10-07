@@ -1,0 +1,60 @@
+
+query Reviews($owner:String!, $repo:String!, $cursor:String) {
+    repository(owner: $owner, name: $repo) {
+        pullRequests(first: 100, after: $cursor, states: MERGED) {
+            pageInfo {
+                hasNextPage,
+                endCursor
+            },
+            nodes {
+                number,
+                reviews(first: 100, states: APPROVED) {
+                    nodes {
+                        databaseId
+                    }
+                }
+            }
+        }
+    }
+}
+
+query Review($owner:String!, $repo:String!, $number:Int!, $cursor:String) {
+    repository(owner: $owner, name: $repo) {
+        pullRequest(number: $number) {
+            commits(first: 100, after: $cursor) {
+                pageInfo {
+                    hasNextPage,
+                    endCursor
+                }
+                nodes {
+                    commit {
+                        oid,
+                        author {
+                            name,
+                            email
+                        }
+                        authoredDate,
+                        committer {
+                            name,
+                            email
+                        },
+                        committedDate,
+                        signature {
+                            isValid,
+                            signature,
+                            signer {
+                                name
+                            }
+                        }
+                    }
+                }
+            }
+            number,
+            reviews {
+                nodes {
+                    databaseId
+                }
+            }
+        }
+    }
+}
