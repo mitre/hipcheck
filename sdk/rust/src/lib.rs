@@ -30,7 +30,7 @@ pub mod prelude {
 	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
 	// Re-export macros
 	#[cfg(feature = "macros")]
-	pub use hipcheck_sdk_macros::query;
+	pub use hipcheck_sdk_macros::{queries, query};
 }
 
 /// re-export of user-facing third-party dependencies

@@ -32,13 +32,7 @@ impl Plugin for Sha256Plugin {
 		Ok(Some("calculate sha256 of provided array".to_owned()))
 	}
 
-	fn queries(&self) -> impl Iterator<Item = NamedQuery> {
-		vec![NamedQuery {
-			name: "sha256",
-			inner: Box::new(QuerySha256 {}),
-		}]
-		.into_iter()
-	}
+	queries! {}
 }
 
 #[derive(Parser, Debug)]
