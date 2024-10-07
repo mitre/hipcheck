@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
-	expr::{ReturnableType, Type},
+	expr::{PrimitiveType, Type},
 	Expr, Ident, LexingError,
 };
 use jiff::Error as JError;
@@ -77,6 +77,13 @@ pub enum Error {
 		idx: usize,
 		expected: String,
 		got: Type,
+	},
+
+	#[error("array of {expected:?}s contains a {got:?} at idx {idx}")]
+	BadArrayElt {
+		idx: usize,
+		expected: PrimitiveType,
+		got: PrimitiveType,
 	},
 
 	#[error("no max value found in array")]

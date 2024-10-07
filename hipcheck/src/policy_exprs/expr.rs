@@ -98,7 +98,9 @@ impl FunctionDef {
 		// There's probably a better way to augment err with name
 		match &mut res {
 			Err(Error::BadFuncArgType { name, .. }) => {
-				*name = self.name.clone();
+				if name.len() == 0 {
+					*name = self.name.clone();
+				}
 			}
 			_ => (),
 		};
@@ -317,14 +319,15 @@ impl Typed for Primitive {
 impl Typed for Array {
 	fn get_type(&self) -> Result<Type> {
 		let mut ty: Option<PrimitiveType> = None;
-		for elt in self.elts.iter() {
+		for (idx, elt) in self.elts.iter().enumerate() {
 			let curr_ty = elt.get_primitive_type();
 			if let Some(expected_ty) = ty {
 				if expected_ty != curr_ty {
-					panic!(
-						"Current type {:?} did not match expected type {:?}",
-						curr_ty, expected_ty
-					)
+					return Err(Error::BadArrayElt {
+						idx,
+						expected: expected_ty,
+						got: curr_ty,
+					});
 				}
 			} else {
 				ty = Some(elt.get_primitive_type());
@@ -337,7 +340,7 @@ impl Typed for Function {
 	fn get_type(&self) -> Result<Type> {
 		use FuncReturnType::*;
 		let Some(def) = self.opt_def.as_ref().map(Clone::clone) else {
-			return Err(Error::BadType("func has not been resolved in env"));
+			return Err(Error::UnknownFunction(self.ident.0.clone()));
 		};
 		let arg_tys: Vec<Type> = self
 			.args
@@ -379,7 +382,7 @@ impl Typed for Expr {
 			Array(a) => a.get_type(),
 			Function(f) => f.get_type(),
 			Lambda(l) => l.get_type(),
-			JsonPointer(j) => todo!(),
+			JsonPointer(j) => Ok(Type::Unknown),
 		}
 	}
 }

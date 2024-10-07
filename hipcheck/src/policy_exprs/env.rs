@@ -60,33 +60,45 @@ fn ty_check_higher_order_lambda(
 }
 
 fn ty_filter(args: &[Type]) -> Result<ReturnableType> {
-	let Some(wrapped_arr_ty) = args.get(1) else {
-		return Err(Error::NotEnoughArgs {
-			name: "".to_owned(),
-			expected: 2,
-			given: args.len(),
-		});
-	};
-	let Type::Array(arr_ty) = wrapped_arr_ty else {
-		return Err(Error::BadFuncArgType {
-			name: "".to_owned(),
-			idx: 1,
-			expected: "an array".to_owned(),
-			got: wrapped_arr_ty.clone(),
-		});
-	};
-	let Type::Lambda(l_ty) = args.get(0).unwrap() else {
+	let arr_ty = expect_array_at(args, 1)?;
+	let wrapped_l_ty = args.get(0).unwrap();
+	let Type::Lambda(l_ty) = wrapped_l_ty else {
 		return Err(Error::BadFuncArgType {
 			name: "".to_owned(),
 			idx: 0,
 			expected: "a lambda".to_owned(),
-			got: wrapped_arr_ty.clone(),
+			got: wrapped_l_ty.clone(),
 		});
 	};
-	let res_ty = ty_check_higher_order_lambda(l_ty, arr_ty)?;
+	let res_ty = ty_check_higher_order_lambda(l_ty, &arr_ty)?;
 	match res_ty {
 		ReturnableType::Primitive(PrimitiveType::Bool) | ReturnableType::Unknown => {
-			Ok(ReturnableType::Array(*arr_ty))
+			Ok(ReturnableType::Array(arr_ty))
+		}
+		a => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "a bool-returning lambda".to_owned(),
+			got: Type::Lambda(l_ty.clone()),
+		}),
+	}
+}
+
+fn ty_higher_order_bool_fn(args: &[Type]) -> Result<ReturnableType> {
+	let arr_ty = expect_array_at(args, 1)?;
+	let wrapped_l_ty = args.get(0).unwrap();
+	let Type::Lambda(l_ty) = wrapped_l_ty else {
+		return Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "a lambda".to_owned(),
+			got: wrapped_l_ty.clone(),
+		});
+	};
+	let res_ty = ty_check_higher_order_lambda(l_ty, &arr_ty)?;
+	match res_ty {
+		ReturnableType::Primitive(PrimitiveType::Bool) | ReturnableType::Unknown => {
+			Ok(ReturnableType::Primitive(PrimitiveType::Bool))
 		}
 		a => Err(Error::BadFuncArgType {
 			name: "".to_owned(),
@@ -99,35 +111,59 @@ fn ty_filter(args: &[Type]) -> Result<ReturnableType> {
 
 // Type of dynamic function is dependent on first arg
 fn ty_inherit_first(args: &[Type]) -> Result<ReturnableType> {
-	let Some(child_ty) = args.get(0) else {
-		return Err(Error::MissingArgs);
-	};
-	child_ty.try_into()
+	args.get(0).unwrap().try_into()
 }
 
 fn ty_from_first_arr(args: &[Type]) -> Result<ReturnableType> {
-	let Some(Type::Array(arr_ty)) = args.get(0) else {
-		return Err(Error::MissingArgs);
-	};
+	let arr_ty = expect_array_at(args, 0)?;
 	Ok(match arr_ty {
 		None => ReturnableType::Unknown,
-		Some(p_ty) => ReturnableType::Primitive(*p_ty),
+		Some(p_ty) => ReturnableType::Primitive(p_ty),
 	})
 }
 
 fn expect_primitive_at(args: &[Type], idx: usize) -> Result<Option<PrimitiveType>> {
 	match args.get(idx).unwrap().try_into()? {
 		ReturnableType::Primitive(p) => Ok(Some(p)),
-		ReturnableType::Array(a) => {
-			return Err(Error::BadFuncArgType {
-				name: "".to_owned(),
-				idx,
-				expected: "a primitive type".to_owned(),
-				got: Type::Array(a),
-			});
-		}
+		ReturnableType::Array(a) => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx,
+			expected: "a primitive type".to_owned(),
+			got: Type::Array(a),
+		}),
 		ReturnableType::Unknown => Ok(None),
 	}
+}
+
+fn expect_array_at(args: &[Type], idx: usize) -> Result<ExprArrayType> {
+	match args.get(idx).unwrap().try_into()? {
+		ReturnableType::Array(a) => Ok(a),
+		ReturnableType::Unknown => Ok(None),
+		ReturnableType::Primitive(p) => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx,
+			expected: "an array".to_owned(),
+			got: Type::Primitive(p),
+		}),
+	}
+}
+
+fn ty_divz(args: &[Type]) -> Result<ReturnableType> {
+	let opt_ty_1 = expect_primitive_at(args, 0)?;
+	let opt_ty_2 = expect_primitive_at(args, 1)?;
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	let (bad, idx) = match (opt_ty_1, opt_ty_2) {
+		(None | Some(Int | Float), None | Some(Int | Float)) => return Ok(Float.into()),
+		(Some(x), None | Some(_)) => (x, 0),
+		(None, Some(x)) => (x, 1),
+	};
+	Err(Error::BadFuncArgType {
+		name: "".to_owned(),
+		idx,
+		expected: "an int or float".to_owned(),
+		got: Type::Primitive(bad),
+	})
 }
 
 fn ty_arithmetic_binary_op(args: &[Type]) -> Result<ReturnableType> {
@@ -136,63 +172,26 @@ fn ty_arithmetic_binary_op(args: &[Type]) -> Result<ReturnableType> {
 	let opt_ty_2 = expect_primitive_at(args, 1)?;
 	use PrimitiveType::*;
 	use ReturnableType::*;
-	if opt_ty_1.is_none() || opt_ty_2.is_none() {
-		let (single_ty, idx) = match (opt_ty_1, opt_ty_2) {
-			// if both are unknown, return unknown
-			(None, None) => {
-				return Ok(Unknown);
-			}
-			(Some(t), None) => (t, 0),
-			(None, Some(t)) => (t, 1),
-			_ => unreachable!(),
-		};
-		Ok(match (single_ty, idx) {
-			(Float, _) => Primitive(Float),
-			(Int, _) => Primitive(Int),
-			(Span, 0) => Primitive(Span), // span in first position indicates span arithmetic
-			(Span, 1) => Unknown,         // span in second position could be datetime or span arithmetic
-			(DateTime, 1) => Primitive(DateTime), // expect a span in second position
-			(ty, _) => {
-				return Err(Error::BadFuncArgType {
-					name: "".to_owned(),
-					idx,
-					expected: "a float, int, span, or datetime".to_owned(),
-					got: Type::Primitive(ty),
-				});
-			}
-		})
-	} else {
-		let ty_1 = opt_ty_1.unwrap();
-		let ty_2 = opt_ty_2.unwrap();
-		Ok(match (ty_1, ty_2) {
-			(Float, _) | (_, Float) => Primitive(Float),
-			(Int, _) | (_, Int) => Primitive(Int),
-			(DateTime, Span) => Primitive(DateTime),
-			(Span, _) | (_, Span) => Primitive(Span),
-			(p, _) => {
-				// Can't check second arg with current design
-				return Err(Error::BadFuncArgType {
-					name: "".to_owned(),
-					idx: 0,
-					expected: "a float, int, span, or datetime".to_owned(),
-					got: Type::Primitive(p),
-				});
-			}
-		})
-	}
+	let (bad, idx) = match (opt_ty_1, opt_ty_2) {
+		(None, None) => return Ok(Unknown),
+		(None | Some(Int), None | Some(Int)) => return Ok(Primitive(Int)),
+		(None | Some(Int | Float), None | Some(Int | Float)) => return Ok(Primitive(Float)),
+		(None, Some(Span)) => return Ok(Unknown),
+		(Some(Span), None | Some(Span)) => return Ok(Primitive(DateTime)),
+		(Some(DateTime), None | Some(Span)) => return Ok(Primitive(DateTime)),
+		(Some(x), _) => (x, 0),
+		(_, Some(x)) => (x, 1),
+	};
+	Err(Error::BadFuncArgType {
+		name: "".to_owned(),
+		idx,
+		expected: "a float, int, span, or datetime".to_owned(),
+		got: Type::Primitive(bad),
+	})
 }
 
 fn ty_foreach(args: &[Type]) -> Result<ReturnableType> {
-	let Some(ty_2) = args.get(1) else {
-		return Err(Error::MissingArgs);
-	};
-	let opt_ty_2: Option<ExprArrayType> = match ty_2.try_into()? {
-		ReturnableType::Unknown => None,
-		ReturnableType::Primitive(p) => {
-			return Err(Error::BadType("foreach arg 2 should be array"));
-		}
-		ReturnableType::Array(a) => Some(a),
-	};
+	expect_array_at(args, 1)?;
 	let Type::Lambda(fty) = args.get(0).unwrap() else {
 		return Err(Error::BadType("foreach arg must be lambda"));
 	}; // We checked above for 2 args, ok to unwrap
@@ -201,92 +200,105 @@ fn ty_foreach(args: &[Type]) -> Result<ReturnableType> {
 
 fn ty_comp(args: &[Type]) -> Result<ReturnableType> {
 	let resp = Ok(Bool.into());
-	let opt_ty_2: Option<PrimitiveType> = match args.get(1).unwrap().try_into()? {
-		ReturnableType::Unknown => None,
-		ReturnableType::Primitive(p) => Some(p),
-		ReturnableType::Array(a) => {
-			return Err(Error::BadFuncArgType {
-				name: "".to_owned(),
-				idx: 1,
-				expected: "a primitive type".to_owned(),
-				got: Type::Array(a),
-			});
-		}
-	};
-	let opt_ty_1: Option<PrimitiveType> = match args.get(0).unwrap().try_into()? {
-		ReturnableType::Unknown => None,
-		ReturnableType::Primitive(p) => Some(p),
-		ReturnableType::Array(a) => {
-			return Err(Error::BadFuncArgType {
-				name: "".to_owned(),
-				idx: 1,
-				expected: "a primitive type".to_owned(),
-				got: Type::Array(a),
-			});
-		}
-	};
+	let opt_ty_1: Option<PrimitiveType> = expect_primitive_at(args, 0)?;
+	let opt_ty_2: Option<PrimitiveType> = expect_primitive_at(args, 1)?;
 	use PrimitiveType::*;
 	use ReturnableType::*;
-	if opt_ty_1.is_none() || opt_ty_2.is_none() {
-		let (single_ty, idx) = match (opt_ty_1, opt_ty_2) {
-			// if both are unknown, return unknown
-			(None, None) => {
-				return resp;
-			}
-			(Some(t), None) => (t, 0),
-			(None, Some(t)) => (t, 1),
-			_ => unreachable!(),
-		};
-		match single_ty {
-			Float | Int | DateTime | Bool | Span => resp,
-			p => {
-				return Err(Error::BadType("todo!"));
-				return Err(Error::BadFuncArgType {
-					name: "".to_owned(),
-					idx,
-					expected: "a primitive type".to_owned(),
-					got: Type::Primitive(p),
-				});
-			}
-		}
-	} else {
-		let ty_1 = opt_ty_1.unwrap();
-		let ty_2 = opt_ty_2.unwrap();
-		match (ty_1, ty_2) {
-			(Float, Float)
-			| (Int, Float)
-			| (Float, Int)
-			| (Int, Int)
-			| (Bool, Bool)
-			| (Span, Span)
-			| (DateTime, DateTime) => resp,
-			p => {
-				return Err(Error::BadFuncArgType {
-					name: "".to_owned(),
-					idx: 0,
-					expected: "a float, int, bool, span, or datetime".to_owned(),
-					// @Note - no way to know if 1st/2nd arg is problem currently
-					got: Type::Primitive(p.0),
-				});
-			}
-		}
-	}
+	let (bad, idx) = match (opt_ty_1, opt_ty_2) {
+		(None, None) => return Ok(Primitive(Bool)),
+		(None | Some(Int), None | Some(Int)) => return resp,
+		(None | Some(Int | Float), None | Some(Int | Float)) => return resp,
+		(None | Some(Span), None | Some(Span)) => return resp,
+		(None | Some(Bool), None | Some(Bool)) => return resp,
+		(None | Some(DateTime), None | Some(DateTime)) => return resp,
+		(Some(x), _) => (x, 0),
+		(_, Some(x)) => (x, 1),
+	};
+	Err(Error::BadFuncArgType {
+		name: "".to_owned(),
+		idx,
+		expected: "a float, int, bool, span, or datetime".to_owned(),
+		got: Type::Primitive(bad),
+	})
 }
 
-fn ty_tmp_ret_bool(args: &[Type]) -> Result<ReturnableType> {
-	Ok(PrimitiveType::Bool.into())
-}
-
-fn ty_tmp_ret_int(args: &[Type]) -> Result<ReturnableType> {
+fn ty_count(args: &[Type]) -> Result<ReturnableType> {
 	Ok(PrimitiveType::Int.into())
 }
 
-fn ty_tmp_ret_float(args: &[Type]) -> Result<ReturnableType> {
-	Ok(PrimitiveType::Float.into())
+fn ty_avg(args: &[Type]) -> Result<ReturnableType> {
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	let arr_ty = expect_array_at(args, 0)?;
+	match arr_ty {
+		None | Some(Int) | Some(Float) => Ok(Float.into()),
+		Some(x) => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "array of ints or floats".to_owned(),
+			got: Type::Array(Some(x)),
+		}),
+	}
 }
 
-fn ty_tmp_ret_span(args: &[Type]) -> Result<ReturnableType> {
+fn ty_duration(args: &[Type]) -> Result<ReturnableType> {
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	let opt_ty_1 = expect_primitive_at(args, 0)?;
+	let opt_ty_2 = expect_primitive_at(args, 1)?;
+	match opt_ty_1 {
+		None | (Some(DateTime)) => (),
+		Some(got) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx: 0,
+				expected: "a datetime".to_owned(),
+				got: Type::Primitive(got),
+			});
+		}
+	}
+	match opt_ty_2 {
+		None | (Some(DateTime)) => (),
+		Some(got) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx: 1,
+				expected: "a datetime".to_owned(),
+				got: Type::Primitive(got),
+			});
+		}
+	}
 	Ok(PrimitiveType::Span.into())
+}
+
+fn ty_bool_ops(args: &[Type]) -> Result<ReturnableType> {
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	let opt_ty_1 = expect_primitive_at(args, 0)?;
+	let opt_ty_2 = expect_primitive_at(args, 1)?;
+	match opt_ty_1 {
+		None | (Some(Bool)) => (),
+		Some(got) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx: 0,
+				expected: "a bool".to_owned(),
+				got: Type::Primitive(got),
+			});
+		}
+	}
+	match opt_ty_2 {
+		None | (Some(Bool)) => (),
+		Some(got) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx: 1,
+				expected: "a bool".to_owned(),
+				got: Type::Primitive(got),
+			});
+		}
+	}
+	Ok(PrimitiveType::Bool.into())
 }
 
 impl<'parent> Env<'parent> {
@@ -315,28 +327,28 @@ impl<'parent> Env<'parent> {
 		// Math functions.
 		env.add_fn("add", add, 2, ty_arithmetic_binary_op);
 		env.add_fn("sub", sub, 2, ty_arithmetic_binary_op);
-		env.add_fn("divz", divz, 2, ty_tmp_ret_float);
+		env.add_fn("divz", divz, 2, ty_divz);
 
 		// Additional datetime math functions
-		env.add_fn("duration", duration, 2, ty_tmp_ret_span);
+		env.add_fn("duration", duration, 2, ty_duration);
 
 		// Logical functions.
-		env.add_fn("and", and, 2, ty_tmp_ret_bool);
-		env.add_fn("or", or, 2, ty_tmp_ret_bool);
-		env.add_fn("not", not, 1, ty_tmp_ret_bool);
+		env.add_fn("and", and, 2, ty_bool_ops);
+		env.add_fn("or", or, 2, ty_bool_ops);
+		env.add_fn("not", not, 1, ty_bool_ops);
 
 		// Array math functions.
 		env.add_fn("max", max, 1, ty_from_first_arr);
 		env.add_fn("min", min, 1, ty_from_first_arr);
-		env.add_fn("avg", avg, 1, ty_tmp_ret_float);
+		env.add_fn("avg", avg, 1, ty_avg);
 		env.add_fn("median", median, 1, ty_from_first_arr);
-		env.add_fn("count", count, 1, ty_tmp_ret_int);
+		env.add_fn("count", count, 1, ty_count);
 
 		// Array logic functions.
-		env.add_fn("all", all, 1, ty_tmp_ret_bool);
-		env.add_fn("nall", nall, 1, ty_tmp_ret_bool);
-		env.add_fn("some", some, 1, ty_tmp_ret_bool);
-		env.add_fn("none", none, 1, ty_tmp_ret_bool);
+		env.add_fn("all", all, 1, ty_higher_order_bool_fn);
+		env.add_fn("nall", nall, 1, ty_higher_order_bool_fn);
+		env.add_fn("some", some, 1, ty_higher_order_bool_fn);
+		env.add_fn("none", none, 1, ty_higher_order_bool_fn);
 
 		// Array higher-order functions.
 		env.add_fn("filter", filter, 2, ty_filter);

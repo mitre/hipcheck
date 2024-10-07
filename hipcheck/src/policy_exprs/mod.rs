@@ -14,7 +14,10 @@ use crate::policy_exprs::env::Env;
 pub(crate) use crate::policy_exprs::{bridge::Tokens, expr::F64};
 pub use crate::policy_exprs::{
 	error::{Error, Result},
-	expr::{Array, Expr, Function, Ident, JsonPointer, Lambda, Typed},
+	expr::{
+		Array, Expr, Function, Ident, JsonPointer, Lambda, PrimitiveType, ReturnableType, Type,
+		Typed,
+	},
 	pass::{ExprMutator, ExprVisitor, FunctionResolver, TypeChecker, TypeFixer},
 	token::LexingError,
 };
@@ -264,13 +267,18 @@ mod tests {
 	fn type_lambda() {
 		let program = "(gt #t)";
 		let expr = parse(&program).unwrap();
-		println!("EXPR: {:?}", &expr);
 		let expr = FunctionResolver::std().run(expr).unwrap();
 		let expr = TypeFixer::std().run(expr).unwrap();
-		println!("RESOLVER RES: {:?}", expr);
 		let res_ty = TypeChecker::default().run(&expr);
-		println!("TYPE: {:?}", res_ty);
-		println!("RETTYPE: {:?}", res_ty.unwrap().get_return_type());
+		let Ok(Type::Lambda(l_ty)) = res_ty else {
+			assert!(false);
+			return;
+		};
+		let ret_ty = l_ty.get_return_type();
+		assert!(matches!(
+			ret_ty,
+			Ok(ReturnableType::Primitive(PrimitiveType::Bool))
+		));
 	}
 
 	#[test]
@@ -281,6 +289,47 @@ mod tests {
 		let expr = FunctionResolver::std().run(expr).unwrap();
 		let expr = TypeFixer::std().run(expr).unwrap();
 		let res_ty = TypeChecker::default().run(&expr);
-		assert!(matches!(res_ty, Err(Error::BadFuncArgType { .. })));
+		assert!(matches!(
+			res_ty,
+			Err(Error::BadFuncArgType {
+				idx: 0,
+				got: Type::Primitive(PrimitiveType::Int),
+				..
+			})
+		));
+	}
+
+	#[test]
+	fn type_array_mixed_types() {
+		// Should fail because array elts must have one primitive type
+		let program = "(count [#t 2])";
+		let mut expr = parse(&program).unwrap();
+		expr = FunctionResolver::std().run(expr).unwrap();
+		let res_ty = TypeChecker::default().run(&expr);
+		assert!(matches!(
+			res_ty,
+			Err(Error::BadArrayElt {
+				idx: 1,
+				expected: PrimitiveType::Bool,
+				got: PrimitiveType::Int
+			})
+		));
+	}
+
+	#[test]
+	fn type_propagate_unknown() {
+		// Type for array should be unknown because we can't know ident type
+		let program = "(max [])";
+		let mut expr = parse(&program).unwrap();
+		expr = FunctionResolver::std().run(expr).unwrap();
+		let res_ty = TypeChecker::default().run(&expr);
+		let Ok(Type::Function(f_ty)) = res_ty else {
+			assert!(false);
+			return;
+		};
+		assert!(matches!(
+			f_ty.get_return_type(),
+			Ok(ReturnableType::Unknown)
+		));
 	}
 }
