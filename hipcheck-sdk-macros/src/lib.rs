@@ -181,6 +181,12 @@ fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<Que
 	})
 }
 
+/// An attribute on a function that creates an associated struct that implements
+/// the Hipcheck Rust SDK's `Query` trait. The function must have the signature
+/// `fn(&mut PluginEngine, content: impl serde::Deserialize) ->
+/// hipcheck_sdk::Result<impl serde::Serialize>`. The generated struct's name is
+/// the pascal-case version of the function name (e.g. `do_something()` ->
+/// `DoSomething`).
 #[proc_macro_attribute]
 pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
 	let mut to_return = proc_macro2::TokenStream::from(item.clone());
@@ -237,4 +243,37 @@ pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 	to_return.extend(to_follow);
 	proc_macro::TokenStream::from(to_return)
+}
+
+/// Generates an implementation of the `Plugin::queries()` trait function using
+/// all previously-expanded `#[query]` attribute macros. Due to Rust's macro
+/// expansion ordering, all `#[query]` functions must come before this macro
+/// to ensure they are seen and added.
+#[proc_macro]
+pub fn queries(_item: TokenStream) -> TokenStream {
+	let mut agg = proc_macro2::TokenStream::new();
+	let q_lock = QUERIES.lock().unwrap();
+	// Create a NamedQuery for each #query func we've seen
+	for q in q_lock.iter() {
+		let name = q.function.as_str();
+		let inner = Ident::new(q.struct_name.as_str(), Span::call_site());
+		let out = quote::quote! {
+			NamedQuery {
+				name: #name,
+				inner: Box::new(#inner {})
+			},
+		};
+		agg.extend(out);
+	}
+	eprintln!(
+		"Auto-generating Plugin::queries() with {} detected queries",
+		q_lock.len()
+	);
+	// Impl `Plugin::queries` as a vec of generated NamedQuery instances
+	let out = quote::quote! {
+		fn queries(&self) -> impl Iterator<Item = NamedQuery> {
+			vec![#agg].into_iter()
+		}
+	};
+	proc_macro::TokenStream::from(out)
 }
