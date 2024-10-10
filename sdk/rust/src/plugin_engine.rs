@@ -3,9 +3,7 @@
 use crate::proto::QueryState;
 use crate::{
 	error::{Error, Result},
-	proto::{
-		self, InitiateQueryProtocolRequest, InitiateQueryProtocolResponse, Query as PluginQuery,
-	},
+	proto::{self, Query as PluginQuery, QueryRequest, QueryResponse},
 	QueryTarget,
 };
 use crate::{mock::MockResponses, JsonValue, Plugin};
@@ -92,7 +90,7 @@ type SessionTracker = HashMap<i32, mpsc::Sender<Option<PluginQuery>>>;
 /// plugins in order to fulfill a query.
 pub struct PluginEngine {
 	id: usize,
-	tx: mpsc::Sender<StdResult<InitiateQueryProtocolResponse, Status>>,
+	tx: mpsc::Sender<StdResult<QueryResponse, Status>>,
 	rx: mpsc::Receiver<Option<PluginQuery>>,
 	// So that we can remove ourselves when we get dropped
 	drop_tx: mpsc::Sender<i32>,
@@ -217,7 +215,7 @@ impl PluginEngine {
 
 	// Send a gRPC query from plugin to the hipcheck server
 	async fn send(&self, query: Query) -> Result<()> {
-		let query = InitiateQueryProtocolResponse {
+		let query = QueryResponse {
 			query: Some(self.convert(query)?),
 		};
 		self.tx
@@ -324,7 +322,7 @@ impl PluginEngine {
 		};
 
 		self.tx
-			.send(Ok(InitiateQueryProtocolResponse { query: Some(query) }))
+			.send(Ok(QueryResponse { query: Some(query) }))
 			.await
 			.map_err(Error::FailedToSendQueryFromSessionToServer)?;
 
@@ -369,12 +367,11 @@ impl Drop for PluginEngine {
 	}
 }
 
-type PluginQueryStream = Box<
-	dyn Stream<Item = StdResult<InitiateQueryProtocolRequest, Status>> + Send + Unpin + 'static,
->;
+type PluginQueryStream =
+	Box<dyn Stream<Item = StdResult<QueryRequest, Status>> + Send + Unpin + 'static>;
 
 pub(crate) struct HcSessionSocket {
-	tx: mpsc::Sender<StdResult<InitiateQueryProtocolResponse, Status>>,
+	tx: mpsc::Sender<StdResult<QueryResponse, Status>>,
 	rx: PluginQueryStream,
 	drop_tx: mpsc::Sender<i32>,
 	drop_rx: mpsc::Receiver<i32>,
@@ -397,8 +394,8 @@ impl std::fmt::Debug for HcSessionSocket {
 
 impl HcSessionSocket {
 	pub(crate) fn new(
-		tx: mpsc::Sender<StdResult<InitiateQueryProtocolResponse, Status>>,
-		rx: impl Stream<Item = StdResult<InitiateQueryProtocolRequest, Status>> + Send + Unpin + 'static,
+		tx: mpsc::Sender<StdResult<QueryResponse, Status>>,
+		rx: impl Stream<Item = StdResult<QueryRequest, Status>> + Send + Unpin + 'static,
 	) -> Self {
 		// channel for QuerySession objects to notify us they dropped
 		// TODO: make this configurable

@@ -3,6 +3,7 @@ name = "hipcheck-sdk"
 license = "Apache-2.0"
 version = "0.1.0"
 edition = "2021"
+include = ["proto/**", "src/**", "schema/**", "build.rs"]
 
 [dependencies]
 thiserror = "1.0.64"
@@ -16,13 +17,13 @@ tokio = { version = "1.39.2", features = ["rt"] }
 tokio-stream = "0.1.15"
 tonic = "0.12.3"
 schemars = { version = "0.8.21", features = ["url"] }
-hipcheck-sdk-macros = { path = "../../hipcheck-sdk-macros", version = "0.1.0", optional = true }
+hipcheck-sdk-macros = { path = "../../libraries/hipcheck-sdk-macros", version = "0.1.0", optional = true }
 typify-macro = "0.2.0"
 url = { version = "2.5.2", features = ["serde"] }
 
-
 [build-dependencies]
 anyhow = "1.0.86"
+pathbuf = "1.0.0"
 tonic-build = "0.12.3"
 
 [features]

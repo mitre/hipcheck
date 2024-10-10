@@ -5,16 +5,9 @@ use crate::{
 	plugin_engine::HcSessionSocket,
 	proto::{
 		plugin_service_server::{PluginService, PluginServiceServer},
-		ConfigurationStatus, ExplainDefaultQueryRequest as ExplainDefaultQueryReq,
-		ExplainDefaultQueryResponse as ExplainDefaultQueryResp,
-		GetDefaultPolicyExpressionRequest as GetDefaultPolicyExpressionReq,
-		GetDefaultPolicyExpressionResponse as GetDefaultPolicyExpressionResp,
-		GetQuerySchemasRequest as GetQuerySchemasReq,
-		GetQuerySchemasResponse as GetQuerySchemasResp,
-		InitiateQueryProtocolRequest as InitiateQueryProtocolReq,
-		InitiateQueryProtocolResponse as InitiateQueryProtocolResp,
-		SetConfigurationRequest as SetConfigurationReq,
-		SetConfigurationResponse as SetConfigurationResp,
+		DefaultPolicyExprRequest, DefaultPolicyExprResponse, Empty, ExplainDefaultQueryRequest,
+		ExplainDefaultQueryResponse, QueryRequest, QueryResponse, QuerySchemasRequest,
+		QuerySchemasResponse, SetConfigRequest, SetConfigResponse,
 	},
 	Plugin, QuerySchema,
 };
@@ -58,33 +51,25 @@ pub type QueryResult<T> = StdResult<T, Status>;
 
 #[tonic::async_trait]
 impl<P: Plugin> PluginService for PluginServer<P> {
-	type GetQuerySchemasStream = RecvStream<QueryResult<GetQuerySchemasResp>>;
-	type InitiateQueryProtocolStream = RecvStream<QueryResult<InitiateQueryProtocolResp>>;
+	type QuerySchemasStream = RecvStream<QueryResult<QuerySchemasResponse>>;
+	type QueryStream = RecvStream<QueryResult<QueryResponse>>;
 
-	async fn set_configuration(
-		&self,
-		req: Req<SetConfigurationReq>,
-	) -> QueryResult<Resp<SetConfigurationResp>> {
+	async fn set_config(&self, req: Req<SetConfigRequest>) -> QueryResult<Resp<SetConfigResponse>> {
 		let config = serde_json::from_str(&req.into_inner().configuration)
 			.map_err(|e| Status::from_error(Box::new(e)))?;
-		match self.plugin.set_config(config) {
-			Ok(_) => Ok(Resp::new(SetConfigurationResp {
-				status: ConfigurationStatus::None as i32,
-				message: "".to_owned(),
-			})),
-			Err(e) => Ok(Resp::new(e.into())),
-		}
+		self.plugin.set_config(config)?;
+		Ok(Resp::new(SetConfigResponse {
+			empty: Some(Empty {}),
+		}))
 	}
 
-	async fn get_default_policy_expression(
+	async fn default_policy_expr(
 		&self,
-		_req: Req<GetDefaultPolicyExpressionReq>,
-	) -> QueryResult<Resp<GetDefaultPolicyExpressionResp>> {
+		_req: Req<DefaultPolicyExprRequest>,
+	) -> QueryResult<Resp<DefaultPolicyExprResponse>> {
 		// The request is empty, so we do nothing.
 		match self.plugin.default_policy_expr() {
-			Ok(policy_expression) => Ok(Resp::new(GetDefaultPolicyExpressionResp {
-				policy_expression,
-			})),
+			Ok(policy_expression) => Ok(Resp::new(DefaultPolicyExprResponse { policy_expression })),
 			Err(e) => Err(Status::new(
 				tonic::Code::NotFound,
 				format!(
@@ -99,10 +84,10 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 
 	async fn explain_default_query(
 		&self,
-		_req: Req<ExplainDefaultQueryReq>,
-	) -> QueryResult<Resp<ExplainDefaultQueryResp>> {
+		_req: Req<ExplainDefaultQueryRequest>,
+	) -> QueryResult<Resp<ExplainDefaultQueryResponse>> {
 		match self.plugin.default_policy_expr() {
-			Ok(explanation) => Ok(Resp::new(ExplainDefaultQueryResp { explanation })),
+			Ok(explanation) => Ok(Resp::new(ExplainDefaultQueryResponse { explanation })),
 			Err(e) => Err(Status::new(
 				tonic::Code::NotFound,
 				format!(
@@ -115,10 +100,10 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 		}
 	}
 
-	async fn get_query_schemas(
+	async fn query_schemas(
 		&self,
-		_req: Req<GetQuerySchemasReq>,
-	) -> QueryResult<Resp<Self::GetQuerySchemasStream>> {
+		_req: Req<QuerySchemasRequest>,
+	) -> QueryResult<Resp<Self::QuerySchemasStream>> {
 		// Ignore the input, it's empty.
 		let query_schemas = self.plugin.schemas().collect::<Vec<QuerySchema>>();
 		// TODO: does this need to be configurable?
@@ -129,7 +114,7 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 				let output_schema = serde_json::to_string(&x.output_schema);
 
 				let schema_resp = match (input_schema, output_schema) {
-					(Ok(input_schema), Ok(output_schema)) => Ok(GetQuerySchemasResp {
+					(Ok(input_schema), Ok(output_schema)) => Ok(QuerySchemasResponse {
 						query_name: x.query_name.to_string(),
 						key_schema: input_schema,
 						output_schema,
@@ -160,13 +145,13 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 		Ok(Resp::new(RecvStream::new(rx)))
 	}
 
-	async fn initiate_query_protocol(
+	async fn query(
 		&self,
-		req: Req<Streaming<InitiateQueryProtocolReq>>,
-	) -> QueryResult<Resp<Self::InitiateQueryProtocolStream>> {
+		req: Req<Streaming<QueryRequest>>,
+	) -> QueryResult<Resp<Self::QueryStream>> {
 		let rx = req.into_inner();
 		// TODO: - make channel size configurable
-		let (tx, out_rx) = mpsc::channel::<QueryResult<InitiateQueryProtocolResp>>(10);
+		let (tx, out_rx) = mpsc::channel::<QueryResult<QueryResponse>>(10);
 
 		let cloned_plugin = self.plugin.clone();
 

@@ -1,7 +1,7 @@
 syntax = "proto3";
 package hipcheck.v1;
 
-import "query_state.proto";
+import "messages/query_state.proto";
 
 message Query {
     // The ID of the request, used to associate requests and replies.

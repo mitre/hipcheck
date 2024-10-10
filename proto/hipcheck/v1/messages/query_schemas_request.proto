@@ -1,7 +1,7 @@
 syntax = "proto3";
 package hipcheck.v1;
 
-import "empty.proto";
+import "messages/empty.proto";
 
 message QuerySchemasRequest {
     Empty empty = 1;

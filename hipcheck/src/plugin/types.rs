@@ -3,11 +3,9 @@
 use crate::{
 	hc_error,
 	hipcheck::{
-		plugin_service_client::PluginServiceClient, ConfigurationStatus, Empty,
-		ExplainDefaultQueryRequest, GetDefaultPolicyExpressionRequest, GetQuerySchemasRequest,
-		GetQuerySchemasResponse as PluginSchema, InitiateQueryProtocolRequest,
-		Query as PluginQuery, QueryState, SetConfigurationRequest,
-		SetConfigurationResponse as PluginConfigResult,
+		plugin_service_client::PluginServiceClient, DefaultPolicyExprRequest, Empty,
+		ExplainDefaultQueryRequest, Query as PluginQuery, QueryRequest, QuerySchemasRequest,
+		QuerySchemasResponse as PluginSchema, QueryState, SetConfigRequest,
 	},
 	Error, Result,
 };
@@ -17,7 +15,6 @@ use std::{
 	collections::{HashMap, VecDeque},
 	convert::TryFrom,
 	future::poll_fn,
-	ops::Not as _,
 	pin::Pin,
 	process::Child,
 	result::Result as StdResult,
@@ -55,90 +52,6 @@ impl TryFrom<PluginSchema> for Schema {
 	}
 }
 
-// Hipcheck-facing version of struct from crate::hipcheck
-pub struct ConfigurationResult {
-	pub status: ConfigurationStatus,
-	pub message: Option<String>,
-}
-
-impl TryFrom<PluginConfigResult> for ConfigurationResult {
-	type Error = crate::error::Error;
-	fn try_from(value: PluginConfigResult) -> Result<Self> {
-		let status: ConfigurationStatus = value.status.try_into()?;
-		let message = value.message.is_empty().not().then_some(value.message);
-		Ok(ConfigurationResult { status, message })
-	}
-}
-
-// hipcheck::ConfigurationStatus has an enum that captures both error and success
-// scenarios. The below code allows interpreting the struct as a Rust Result. If
-// the success variant was the status, Ok(()) is returned, otherwise the code
-// is stuffed into a custom error type enum that equals the protoc-generated one
-// minus the success variant.
-impl ConfigurationResult {
-	pub fn as_result(&self) -> Result<()> {
-		let Ok(error) = self.status.try_into() else {
-			return Ok(());
-		};
-		Err(hc_error!(
-			"{}",
-			ConfigError::new(error, self.message.clone()).to_string()
-		))
-	}
-}
-
-pub enum ConfigErrorType {
-	Unknown = 0,
-	MissingRequiredConfig = 2,
-	UnrecognizedConfig = 3,
-	InvalidConfigValue = 4,
-}
-
-impl TryFrom<ConfigurationStatus> for ConfigErrorType {
-	type Error = crate::error::Error;
-	fn try_from(value: ConfigurationStatus) -> Result<Self> {
-		use ConfigErrorType::*;
-		use ConfigurationStatus::*;
-		Ok(match value as i32 {
-			x if x == Unspecified as i32 => Unknown,
-			x if x == MissingRequiredConfiguration as i32 => MissingRequiredConfig,
-			x if x == UnrecognizedConfiguration as i32 => UnrecognizedConfig,
-			x if x == InvalidConfigurationValue as i32 => InvalidConfigValue,
-			x => {
-				return Err(hc_error!("status value '{}' is not an error", x));
-			}
-		})
-	}
-}
-
-pub struct ConfigError {
-	error: ConfigErrorType,
-	message: Option<String>,
-}
-
-impl ConfigError {
-	pub fn new(error: ConfigErrorType, message: Option<String>) -> Self {
-		ConfigError { error, message }
-	}
-}
-
-impl std::fmt::Display for ConfigError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> StdResult<(), std::fmt::Error> {
-		use ConfigErrorType::*;
-		let msg = match &self.message {
-			Some(s) => format!(": {s}"),
-			None => "".to_owned(),
-		};
-		let err = match self.error {
-			Unknown => "unknown configuration error occurred",
-			MissingRequiredConfig => "configuration is missing requried fields",
-			UnrecognizedConfig => "configuration contains unrecognized fields",
-			InvalidConfigValue => "configuration contains invalid values",
-		};
-		write!(f, "{}{}", msg, err)
-	}
-}
-
 /// State for managing an actively running plugin process
 ///
 /// Note that `PluginContext` is basically a builder for `PluginTransport`, which
@@ -166,7 +79,7 @@ impl PluginContext {
 	pub async fn get_query_schemas(&mut self) -> Result<Vec<Schema>> {
 		let mut res = self
 			.grpc
-			.get_query_schemas(GetQuerySchemasRequest {
+			.query_schemas(QuerySchemasRequest {
 				empty: Some(Empty {}),
 			})
 			.await?;
@@ -192,23 +105,21 @@ impl PluginContext {
 	///
 	/// Plugins are expected to do error handling on their side for the various ways that
 	/// configuration may be wrong, and we report that if configuration is wrong.
-	pub async fn set_configuration(&mut self, conf: &Value) -> Result<ConfigurationResult> {
+	pub async fn set_configuration(&mut self, conf: &Value) -> Result<()> {
+		let configuration = serde_json::to_string(&conf)?;
 		self.grpc
-			.set_configuration(SetConfigurationRequest {
-				configuration: serde_json::to_string(&conf)?,
-			})
-			.await?
-			.into_inner()
-			.try_into()
+			.set_config(SetConfigRequest { configuration })
+			.await?;
+		Ok(())
 	}
 
 	/// Get the default policy expression from a plugin, if one is defined.
 	pub async fn get_default_policy_expression(&mut self) -> Result<Option<String>> {
-		let req = GetDefaultPolicyExpressionRequest {
+		let req = DefaultPolicyExprRequest {
 			empty: Some(Empty {}),
 		};
 
-		let res = self.grpc.get_default_policy_expression(req).await?;
+		let res = self.grpc.default_policy_expr(req).await?;
 		let expression = &res.get_ref().policy_expression;
 
 		if expression.is_empty() {
@@ -243,20 +154,15 @@ impl PluginContext {
 		rx: mpsc::Receiver<PluginQuery>,
 	) -> Result<QueryStream> {
 		// Convert the receiver into a stream.
-		let stream = ReceiverStream::new(rx)
-			.map(|query| InitiateQueryProtocolRequest { query: Some(query) });
+		let stream = ReceiverStream::new(rx).map(|query| QueryRequest { query: Some(query) });
 
 		// Make the gRPC request.
-		let resp = self
-			.grpc
-			.initiate_query_protocol(stream)
-			.await
-			.map_err(|err| {
-				hc_error!(
-					"query protocol initiation failed with tonic status code {}",
-					err
-				)
-			})?;
+		let resp = self.grpc.query(stream).await.map_err(|err| {
+			hc_error!(
+				"query protocol initiation failed with tonic status code {}",
+				err
+			)
+		})?;
 
 		// Pull out the inner query from the response.
 		let stream = resp.into_inner().map(|response| {
@@ -285,7 +191,7 @@ impl PluginContext {
 				.map(|schema| (schema.query_name.clone(), schema)),
 		);
 
-		self.set_configuration(&config).await?.as_result()?;
+		self.set_configuration(&config).await?;
 
 		let opt_default_policy_expr = self.get_default_policy_expression().await?;
 
@@ -330,17 +236,15 @@ impl TryFrom<PluginQuery> for Query {
 	type Error = Error;
 
 	fn try_from(value: PluginQuery) -> Result<Query> {
-		use QueryState::*;
-
 		let request = match TryInto::<QueryState>::try_into(value.state)? {
-			Unspecified => return Err(hc_error!("unspecified error from plugin")),
-			ReplyInProgress => {
+			QueryState::Unspecified => return Err(hc_error!("unspecified error from plugin")),
+			QueryState::ReplyInProgress => {
 				return Err(hc_error!(
 					"invalid state QueryReplyInProgress for conversion to Query"
 				))
 			}
-			ReplyComplete => false,
-			Submit => true,
+			QueryState::ReplyComplete => false,
+			QueryState::Submit => true,
 		};
 
 		let key: Value = serde_json::from_str(value.key.as_str())?;
@@ -474,8 +378,6 @@ impl PluginTransport {
 	}
 
 	pub async fn query(&self, query: Query) -> Result<Option<Query>> {
-		use QueryState::*;
-
 		// Send the query
 		let query: PluginQuery = query.try_into()?;
 
@@ -496,8 +398,8 @@ impl PluginTransport {
 		let mut state: QueryState = raw.state.try_into()?;
 
 		// If response is the first of a set of chunks, handle
-		if matches!(state, ReplyInProgress) {
-			while matches!(state, ReplyInProgress) {
+		if matches!(state, QueryState::ReplyInProgress) {
+			while matches!(state, QueryState::ReplyInProgress) {
 				// We expect another message. Pull it off the existing queue,
 				// or get a new one if we have run out
 				eprintln!("In progress");
@@ -522,13 +424,15 @@ impl PluginTransport {
 				// By now we have our "next" message
 				state = next.state.try_into()?;
 				match state {
-					Unspecified => return Err(hc_error!("unspecified error from plugin")),
-					Submit => {
+					QueryState::Unspecified => {
+						return Err(hc_error!("unspecified error from plugin"))
+					}
+					QueryState::Submit => {
 						return Err(hc_error!(
 							"plugin sent QuerySubmit state when reply chunk expected"
 						))
 					}
-					ReplyInProgress | ReplyComplete => {
+					QueryState::ReplyInProgress | QueryState::ReplyComplete => {
 						raw.output.push_str(next.output.as_str());
 						raw.concern.extend_from_slice(next.concern.as_slice());
 					}

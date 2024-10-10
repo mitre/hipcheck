@@ -3,6 +3,7 @@
 use convert_case::Casing;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
+use std::env::{self, VarError};
 use std::ops::Not;
 use std::sync::{LazyLock, Mutex};
 use syn::spanned::Spanned;
@@ -253,6 +254,7 @@ pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn queries(_item: TokenStream) -> TokenStream {
 	let mut agg = proc_macro2::TokenStream::new();
 	let q_lock = QUERIES.lock().unwrap();
+
 	// Create a NamedQuery for each #query func we've seen
 	for q in q_lock.iter() {
 		let name = q.function.as_str();
@@ -265,15 +267,24 @@ pub fn queries(_item: TokenStream) -> TokenStream {
 		};
 		agg.extend(out);
 	}
-	eprintln!(
-		"Auto-generating Plugin::queries() with {} detected queries",
-		q_lock.len()
-	);
+
+	if env_is_set("HC_DEBUG") {
+		eprintln!(
+			"Auto-generating Plugin::queries() with {} detected queries",
+			q_lock.len()
+		);
+	}
+
 	// Impl `Plugin::queries` as a vec of generated NamedQuery instances
 	let out = quote::quote! {
 		fn queries(&self) -> impl Iterator<Item = NamedQuery> {
 			vec![#agg].into_iter()
 		}
 	};
+
 	proc_macro::TokenStream::from(out)
+}
+
+fn env_is_set(var: &'static str) -> bool {
+	matches!(env::var(var), Err(VarError::NotPresent)).not()
 }
