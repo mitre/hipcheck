@@ -32,7 +32,7 @@ analyze {
             }
 
             analysis "mitre/churn" policy="(lte (divz (count (filter (gt 3) $)) (count $)) 0.02)" weight=1
-            analysis "mitre/entropy" policy="(eq 0 (count (filter (gt 10) $)))" weight=1
+            analysis "mitre/entropy" policy="(lte (divz (count (filter (gt 10) $)) (count $)) 0)" weight=1
         }
     }
 }

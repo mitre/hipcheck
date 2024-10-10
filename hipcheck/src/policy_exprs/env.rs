@@ -140,6 +140,10 @@ fn partially_evaluate(fn_name: &'static str, arg: Expr) -> Result<Expr> {
 	let var_name = "x";
 	let var = Ident(String::from(var_name));
 	let func = Ident(String::from(fn_name));
+	// @Note - we put a placeholder var in the first operand of the binary
+	// function lambda to make higher-order functions read better.
+	// e.g. `(filter (lt 3) [])` would actually check if array elements are
+	// greater than 3 if we put the placeholder var second
 	let op = StructFunction::new(func, vec![Primitive(Identifier(var.clone())), arg]).into();
 	let lambda = StructLambda::new(var, Box::new(op)).into();
 	Ok(lambda)
