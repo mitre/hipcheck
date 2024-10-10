@@ -20,6 +20,7 @@ pub mod error;
 mod mock;
 pub mod plugin_engine;
 pub mod plugin_server;
+pub mod types;
 
 /// A utility module, users can simply write `use hipcheck_sdk::prelude::*` to import everything
 /// they need to write a plugin

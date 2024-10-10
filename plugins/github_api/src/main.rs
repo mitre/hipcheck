@@ -6,7 +6,10 @@ mod util;
 
 use crate::data::GitHub;
 use clap::Parser;
-use hipcheck_sdk::prelude::*;
+use hipcheck_sdk::{
+	prelude::*,
+	types::{KnownRemote, RemoteGitRepo},
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
@@ -51,12 +54,6 @@ pub struct PullRequest {
 	pub reviews: u64,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct RemoteGitRepo {
-	pub url: url::Url,
-	pub known_remote: Option<KnownRemote>,
-}
-
 fn get_github_agent<'a>(owner: &'a str, repo: &'a str) -> Result<GitHub<'a>> {
 	GitHub::new(
 		owner,
@@ -74,11 +71,6 @@ fn get_github_agent<'a>(owner: &'a str, repo: &'a str) -> Result<GitHub<'a>> {
 		log::error!("{}", e);
 		Error::UnspecifiedQueryState
 	})
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub enum KnownRemote {
-	GitHub { owner: String, repo: String },
 }
 
 #[query]
