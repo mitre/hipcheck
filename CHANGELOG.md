@@ -3,6 +3,115 @@
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning].
 
+
+## [3.7.0] - 2024-10-10
+
+## UPCOMING: We Will No Longer Publish to Crates.io starting with 3.8.0
+
+We recently merged [RFD #7, "Simplified Release Procedures"](https://mitre.github.io/hipcheck/rfds/0007/),
+which explains that starting with version 3.8.0 (the next minor version), we'll
+no longer be publishing Hipcheck itself to Crates.io. The reasons for this are
+explained in the RFD, but essentially the need to publish to Crates.io has been
+placing constraints on our ability to evolve Hipcheck in ways that are becoming
+untenable.
+
+Starting in 3.8.0, users will no longer be able to use `cargo install` or
+`cargo binstall` to get the latest versions of Hipcheck.
+
+* Simplify Release Procedures RFD by [@alilleybrinker](https://github.com/alilleybrinker) in [#430](https://github.com/mitre/hipcheck/pull/430)
+
+### Introduction of a Plugin SDK for Rust
+
+With 3.7.0, we're introducing a new Plugin SDK for Rust, with the `hipcheck-sdk`
+crate! This crate is intended to make it easier to write Hipcheck plugins in
+Rust by handling the generation of proper gRPC handling code and of Hipcheck's
+"query protocol," which coordinates the interaction between `hc` and each
+plugin.
+
+* added prelude module to hipcheck_sdk by [@patrickjcasey](https://github.com/patrickjcasey) in [#427](https://github.com/mitre/hipcheck/pull/427)
+* add hipcheck::target::Target schema to Rust SDK by [@j-lanson](https://github.com/j-lanson) in [#450](https://github.com/mitre/hipcheck/pull/450)
+* add Rust SDK macro to auto-impl Plugin::queries() func by [@j-lanson](https://github.com/j-lanson) in [#473](https://github.com/mitre/hipcheck/pull/473)
+* Rust plugin SDK RFD by [@alilleybrinker](https://github.com/alilleybrinker) in [#402](https://github.com/mitre/hipcheck/pull/402)
+* extend API doc comments for Rust SDK by [@j-lanson](https://github.com/j-lanson) in [#440](https://github.com/mitre/hipcheck/pull/440)
+* Adds query sdk proc-macro  in [#452](https://github.com/mitre/hipcheck/pull/452)
+
+### Improvements to Policy Expressions
+
+Policy expressions are how Hipcheck users turn plugin output, which is JSON
+data, into "pass/fail" results which can be used for risk scoring. In this
+release, we added support for datetime and time span in policy expressions, and
+improved the handling of JSON pointers for destructuring data from plugin
+output. We also fixed some bugs associated with the handling of floating point
+data.
+
+* add placeholder for JSON pointer late-binding in policy expr by [@j-lanson](https://github.com/j-lanson) in [#399](https://github.com/mitre/hipcheck/pull/399)
+* Lex JSON Pointers in Policy Expressions by [@cstepanian](https://github.com/cstepanian) in [#403](https://github.com/mitre/hipcheck/pull/403)
+* Allow any `Expr` at the top level of a Policy Expression by [@cstepanian](https://github.com/cstepanian) in [#405](https://github.com/mitre/hipcheck/pull/405)
+* Parse JSON Pointers as Policy Expressions by [@cstepanian](https://github.com/cstepanian) in [#406](https://github.com/mitre/hipcheck/pull/406)
+* Adds datetime and span primitives to the policy expression syntax by [@mchernicoff](https://github.com/mchernicoff) in [#419](https://github.com/mitre/hipcheck/pull/419)
+* Adds operations for datetime and span policy expression primitives by [@mchernicoff](https://github.com/mchernicoff) in [#441](https://github.com/mitre/hipcheck/pull/441)
+* policy expr type errors due to ".0" floating points in JSON being treated as ints by [@j-lanson](https://github.com/j-lanson) in [#451](https://github.com/mitre/hipcheck/pull/451)
+
+### Improved Support for Other Architecture
+
+With the plugin system, Hipcheck needs to match the architecture you're running
+on with the architectures supported by plugins, to ensure that the plugins it
+downloads can run on your machine. Previously, this involved some compile-time
+checks which meant Hipcheck would fail to compile on architectures which were
+not explicitly supported. These changes loosen those constraints to instead
+permit the use of an `--arch` flag to specify the target triple to use.
+
+* add --arch flag to `hc check` subcommand to allow architecture detection override by [@j-lanson](https://github.com/j-lanson) in [#433](https://github.com/mitre/hipcheck/pull/433)
+* allow use of unknown arches through commandline by [@j-lanson](https://github.com/j-lanson) in [#434](https://github.com/mitre/hipcheck/pull/434)
+
+### Beginning to Split Existing Data Sources and Analyses into Plugins
+
+With the introduction of the plugin system, we left our existing data sources
+and analyses as built-ins. They pretend to be plugins in the interface exposed
+to users, but are still built into `hc` itself. We've now started the process
+of extracting these out into their own plugins. In the future we'd like to not
+have any built in data sources or analyses, and to instead let `hc` be the
+coordination and execution system which delegates the actual data collection
+and analysis to plugins exclusively.
+
+* created plugin version of github api queries by [@j-lanson](https://github.com/j-lanson) in [#475](https://github.com/mitre/hipcheck/pull/475)
+
+### Code Cleanup
+
+The changes to introduce the plugin system left a lot of cruft on the table to
+be removed, which we're now working on doing.
+
+* Removing dead code by [@alilleybrinker](https://github.com/alilleybrinker) in [#379](https://github.com/mitre/hipcheck/pull/379)
+* rename files in cache module by [@j-lanson](https://github.com/j-lanson)
+* replace eprintln calls with logging by [@j-lanson](https://github.com/j-lanson) in [#397](https://github.com/mitre/hipcheck/pull/397)
+* remove dead code, primarily around reporting by [@j-lanson](https://github.com/j-lanson)
+
+### Bumping Dependency Versions
+
+* Bump indexmap from 2.4.0 to 2.5.0 by [@dependabot[bot]](https://github.com/dependabot) in [#407](https://github.com/mitre/hipcheck/pull/407)
+* Bump anyhow from 1.0.87 to 1.0.89 by [@dependabot[bot]](https://github.com/dependabot) in [#411](https://github.com/mitre/hipcheck/pull/411)
+* Bump serde from 1.0.206 to 1.0.210 by [@dependabot[bot]](https://github.com/dependabot) in [#410](https://github.com/mitre/hipcheck/pull/410)
+* Bump packageurl from 0.4.0 to 0.4.1 by [@dependabot[bot]](https://github.com/dependabot) in [#408](https://github.com/mitre/hipcheck/pull/408)
+* Bump tokio-stream from 0.1.15 to 0.1.16 by [@dependabot[bot]](https://github.com/dependabot) in [#409](https://github.com/mitre/hipcheck/pull/409)
+* Bump syn from 2.0.75 to 2.0.77 by [@dependabot[bot]](https://github.com/dependabot) in [#435](https://github.com/mitre/hipcheck/pull/435)
+* Bump thiserror from 1.0.63 to 1.0.64 by [@dependabot[bot]](https://github.com/dependabot) in [#439](https://github.com/mitre/hipcheck/pull/439)
+* Bump clap from 4.5.16 to 4.5.18 by [@dependabot[bot]](https://github.com/dependabot) in [#436](https://github.com/mitre/hipcheck/pull/436)
+* Bump serde_json from 1.0.125 to 1.0.128 by [@dependabot[bot]](https://github.com/dependabot) in [#438](https://github.com/mitre/hipcheck/pull/438)
+* Bump unicode-normalization from 0.1.23 to 0.1.24 by [@dependabot[bot]](https://github.com/dependabot) in [#437](https://github.com/mitre/hipcheck/pull/437)
+* Bump tempfile from 3.12.0 to 3.13.0 by [@dependabot[bot]](https://github.com/dependabot) in [#459](https://github.com/mitre/hipcheck/pull/459)
+* Bump clap-verbosity-flag from 2.2.1 to 2.2.2 by [@dependabot[bot]](https://github.com/dependabot) in [#460](https://github.com/mitre/hipcheck/pull/460)
+* Bump regex from 1.10.6 to 1.11.0 by [@dependabot[bot]](https://github.com/dependabot) in [#461](https://github.com/mitre/hipcheck/pull/461)
+* Bump prost from 0.13.2 to 0.13.3 by [@dependabot[bot]](https://github.com/dependabot) in [#462](https://github.com/mitre/hipcheck/pull/462)
+* Bump tonic from 0.12.2 to 0.12.3 by [@dependabot[bot]](https://github.com/dependabot) in [#468](https://github.com/mitre/hipcheck/pull/468)
+* Bump logos from 0.14.1 to 0.14.2 by [@dependabot[bot]](https://github.com/dependabot) in [#466](https://github.com/mitre/hipcheck/pull/466)
+* Bump once_cell from 1.19.0 to 1.20.2 by [@dependabot[bot]](https://github.com/dependabot) in [#469](https://github.com/mitre/hipcheck/pull/469)
+* Bump ordered-float from 4.2.2 to 4.3.0 by [@dependabot[bot]](https://github.com/dependabot) in [#467](https://github.com/mitre/hipcheck/pull/467)
+* Bump tonic-build from 0.12.2 to 0.12.3 by [@dependabot[bot]](https://github.com/dependabot) in [#463](https://github.com/mitre/hipcheck/pull/463)
+
+__Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.6.3...hipcheck-v3.7.0>
+
+[3.7.0]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.6.3..hipcheck-v3.7.0
+
 ## [3.6.3] - 2024-09-10
 
 This release includes:
