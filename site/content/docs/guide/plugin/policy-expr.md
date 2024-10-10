@@ -127,8 +127,11 @@ function call. When we do the following:
 
 It will apply the lambda to each element of the float array, resulting in an
 array of three booleans that correspond to whether the element at that index in
-the float array was greater than `8.0` ("greater than" because the first operand
-of `lte` is `8.0`, not the array element).
+the float array was less than `8.0`.
+
+Note that for this to work, the array element is inserted as the first operand
+in a binary operand function.
+
 
 ##### Lambda Function Reference
 
@@ -189,7 +192,7 @@ pointers. As an example, this can be useful if you want to calculate the
 percentage of elements of an array that pass a filter:
 
 ```
-(lt (divz (count (filter (gt 10) $) (count $))) 0.5)
+(lt (divz (count (filter (lt 10) $) (count $))) 0.5)
 ```
 
 This policy expression will check that less than half of the elements in `$` are
