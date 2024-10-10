@@ -3,11 +3,21 @@
 pub mod types;
 pub use types::*;
 
+use crate::error::Error;
+
 use clap::ValueEnum;
 use packageurl::PackageUrl;
 use serde::Serialize;
 use std::str::FromStr;
 use url::Url;
+
+pub trait ToTargetSeedKind {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind, Error>;
+}
+
+pub trait ToTargetSeed {
+	fn to_target_seed(&self) -> Result<TargetSeed, Error>;
+}
 
 #[derive(Debug, Clone, ValueEnum, Serialize)]
 #[serde(rename_all = "snake_case")]

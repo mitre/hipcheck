@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::Error;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::{
@@ -157,12 +156,4 @@ impl Display for TargetSeed {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		self.kind.fmt(f)
 	}
-}
-
-pub trait ToTargetSeedKind {
-	fn to_target_seed_kind(&self) -> Result<TargetSeedKind, Error>;
-}
-
-pub trait ToTargetSeed {
-	fn to_target_seed(&self) -> Result<TargetSeed, Error>;
 }
