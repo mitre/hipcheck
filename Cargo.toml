@@ -23,6 +23,7 @@ members = [
     "hipcheck-sdk-macros",
     "plugins/git",
 	"plugins/github_api",
+    "plugins/npm_dependencies"
 ]
 
 # Make sure Hipcheck is run with `cargo run`.
