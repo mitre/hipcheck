@@ -21,7 +21,7 @@ members = [
     "plugins/dummy_sha256_sdk",
     "sdk/rust",
     "hipcheck-sdk-macros",
-	"plugins/github_api",
+    "plugins/github_api",
 ]
 
 # Make sure Hipcheck is run with `cargo run`.
@@ -125,11 +125,11 @@ body = """
     {% for commit in commits %}
         * \
             {{ commit.message | split(pat="\n") | first | trim | trim_end_matches(pat=".") }} \
-            {% if commit.github.username %}\
-                by [@{{ commit.github.username }}]({{ self::remote_user(name=commit.github.username) }}) \
+            {% if commit.remote.username %}\
+                by [@{{ commit.remote.username }}]({{ self::remote_user(name=commit.remote.username) }}) \
             {%- endif -%} \
-            {% if commit.github.pr_number %} \
-                in [#{{ commit.github.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.github.pr_number }})
+            {% if commit.remote.pr_number %} \
+                in [#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }})
             {%- endif %}
     {%- endfor %}
 {%- endfor %}
@@ -174,11 +174,15 @@ body = """
 {% endif -%}
 
 {%- macro remote_url() -%}
-  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+    https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
 
 {%- macro remote_user(name) -%}
-  https://github.com/{{ name | trim_end_matches(pat="[bot]") }}
+    {%- if name -%}
+        https://github.com/{{ name | trim_end_matches(pat="[bot]") }}
+    {%- else -%}
+        ERROR
+    {%- endif -%}
 {%- endmacro -%}
 """
 
