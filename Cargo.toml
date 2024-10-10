@@ -21,7 +21,8 @@ members = [
     "plugins/dummy_sha256_sdk",
     "sdk/rust",
     "hipcheck-sdk-macros",
-    "plugins/github_api",
+    "plugins/git",
+	"plugins/github_api",
 ]
 
 # Make sure Hipcheck is run with `cargo run`.

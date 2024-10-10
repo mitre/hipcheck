@@ -1041,6 +1041,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "git_sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "hipcheck-sdk",
+ "jiff",
+ "log",
+ "nom",
+ "once_cell",
+ "schemars",
+ "semver",
+ "serde",
+ "tokio",
+ "which",
+]
+
+[[package]]
 name = "github_api"
 version = "0.1.0"
 dependencies = [
@@ -1571,6 +1589,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a45489186a6123c128fdf6016183fcfab7113e1820eb813127e036e287233fb"
 dependencies = [
  "jiff-tzdb-platform",
+ "serde",
  "windows-sys 0.59.0",
 ]
 
