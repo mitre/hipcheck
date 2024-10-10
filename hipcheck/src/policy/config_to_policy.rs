@@ -434,8 +434,8 @@ fn parse_entropy(
 		let value_threshold = entropy.value_threshold;
 		let percent_threshold = entropy.percent_threshold;
 		let expression = format!(
-			"(eq {} (count (filter (gt {}) $)))",
-			percent_threshold, value_threshold
+			"(lte (divz (count (filter (gt {}) $)) (count $)) {})",
+			value_threshold, percent_threshold
 		);
 
 		// Add the plugin
