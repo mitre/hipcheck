@@ -118,26 +118,26 @@ impl PluginEngine {
 		let query_target: QueryTarget = target.try_into().map_err(|e| e.into())?;
 		let input: JsonValue = input.into();
 
-		// If doing a mock engine, look to the `mock_responses` field for the query answer
-		if cfg!(feature = "mock_engine") {
-			match self.mock_responses.0.get(&(query_target, input)) {
-				Some(res) => {
-					match res {
-						Ok(val) => Ok(val.clone()),
-						// TODO: since Error is not Clone, is there a better way to deal with this
-						Err(_) => Err(Error::UnexpectedPluginQueryInputFormat),
+		async fn query_inner(
+			engine: &mut PluginEngine,
+			target: QueryTarget,
+			input: JsonValue,
+		) -> Result<JsonValue> {
+			// If doing a mock engine, look to the `mock_responses` field for the query answer
+			if cfg!(feature = "mock_engine") {
+				match engine.mock_responses.0.get(&(target, input)) {
+					Some(res) => {
+						match res {
+							Ok(val) => Ok(val.clone()),
+							// TODO: since Error is not Clone, is there a better way to deal with this
+							Err(_) => Err(Error::UnexpectedPluginQueryInputFormat),
+						}
 					}
+					None => Err(Error::UnknownPluginQuery),
 				}
-				None => Err(Error::UnknownPluginQuery),
 			}
-		}
-		// Normal execution, send messages to hipcheck core to query other plugin
-		else {
-			async fn query_inner(
-				engine: &mut PluginEngine,
-				target: QueryTarget,
-				input: JsonValue,
-			) -> Result<JsonValue> {
+			// Normal execution, send messages to hipcheck core to query other plugin
+			else {
 				let query = Query {
 					direction: QueryDirection::Request,
 					publisher: target.publisher,
@@ -154,8 +154,8 @@ impl PluginEngine {
 					None => Err(Error::SessionChannelClosed),
 				}
 			}
-			query_inner(self, query_target, input).await
 		}
+		query_inner(self, query_target, input).await
 	}
 
 	fn id(&self) -> usize {
