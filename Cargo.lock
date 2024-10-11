@@ -851,6 +851,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
+name = "entropy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dashmap",
+ "finl_unicode",
+ "futures",
+ "hipcheck-sdk",
+ "ordered-float",
+ "pathbuf",
+ "rayon",
+ "salsa",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "env_filter"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1771,6 +1793,21 @@ dependencies = [
  "libc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "linguist"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "hipcheck-sdk",
+ "log",
+ "pathbuf",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
 ]
 
 [[package]]

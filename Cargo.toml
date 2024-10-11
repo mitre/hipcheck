@@ -26,7 +26,9 @@ members = [
     "plugins/npm_dependencies",
     "plugins/activity",
     "plugins/affiliation",
-    "plugins/fuzz"
+    "plugins/fuzz",
+    "plugins/entropy",
+    "plugins/linguist",
 ]
 
 # Make sure Hipcheck is run with `cargo run`.
