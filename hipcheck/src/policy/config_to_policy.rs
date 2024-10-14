@@ -16,6 +16,7 @@ use crate::{
 	plugin::PluginVersion,
 };
 
+use std::collections::HashMap;
 use url::Url;
 
 const PLUGIN_VERSION: &str = "0.1.0";
@@ -37,7 +38,19 @@ pub fn config_to_policy(config: Config) -> Result<PolicyFile> {
 		analyze.push(attacks);
 	}
 
-	Ok(PolicyFile { plugins, analyze })
+	let patch = PolicyPatchList(vec![PolicyPatch::new(
+		PolicyPluginName::new("mitre/github_api")?,
+		PolicyConfig(HashMap::from_iter(vec![(
+			"api-token-var".to_owned(),
+			"HC_GITHUB_TOKEN".to_owned(),
+		)])),
+	)]);
+
+	Ok(PolicyFile {
+		plugins,
+		patch,
+		analyze,
+	})
 }
 
 /// Converts the overal Config risk score into an overall PolicyFile investigate policy

@@ -8,7 +8,11 @@ plugins {
     plugin "mitre/entropy" version="0.1.0"
     plugin "mitre/churn" version="0.1.0"
 }
-
+patch {
+	plugin "mitre/github_api" {
+		api-token-var "HC_GITHUB_TOKEN"
+	}
+}
 analyze {
     investigate policy="(gt 0.5 $)"
     investigate-if-fail "mitre/typo" "mitre/binary"

@@ -9,7 +9,7 @@ mod tests;
 use crate::{
 	error::Result,
 	hc_error,
-	policy::policy_file::{PolicyAnalyze, PolicyPluginList},
+	policy::policy_file::{PolicyAnalyze, PolicyPatchList, PolicyPluginList, PolicyPluginName},
 	util::fs as file,
 	util::kdl::extract_data,
 };
@@ -19,6 +19,7 @@ use std::{collections::HashMap, path::Path, str::FromStr};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyFile {
 	pub plugins: PolicyPluginList,
+	pub patch: PolicyPatchList,
 	pub analyze: PolicyAnalyze,
 }
 
@@ -32,10 +33,16 @@ impl FromStr for PolicyFile {
 
 		let plugins: PolicyPluginList =
 			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'plugins'"))?;
+		// `patch` is an optional section
+		let patch: PolicyPatchList = extract_data(nodes).unwrap_or_default();
 		let analyze: PolicyAnalyze =
 			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'analyze'"))?;
 
-		Ok(Self { plugins, analyze })
+		Ok(Self {
+			plugins,
+			patch,
+			analyze,
+		})
 	}
 }
 
@@ -62,10 +69,31 @@ impl PolicyFile {
 	/// In the future we'd like to use an implementation of the KDL query language
 	/// directly on the KDL data, I think, but no such implementation exists today,
 	/// so this will have to do.
+	// @Todo - Revise this. Return `Result` not `Option`, take a `PluginPolicyName`,
+	// instead of searching through `analyze` every time we should have a function
+	// that returns plugin configs as a "view" of the combined analysis/patch
+	// sections
 	#[allow(unused)]
 	pub fn get_config(&self, analysis_name: &str) -> Option<HashMap<String, String>> {
-		self.analyze
+		let opt_conf = self
+			.analyze
 			.find_analysis_by_name(analysis_name)
-			.map(|analysis| analysis.config.map(|config| config.0).unwrap_or_default())
+			.map(|analysis| analysis.config.map(|config| config.0).unwrap_or_default());
+		// If plugin not listed in analyses, check `patch` section for config of dependencies
+		if let Some(conf) = opt_conf {
+			Some(conf)
+		} else {
+			let Ok(plugin_name) = PolicyPluginName::new(analysis_name) else {
+				return None;
+			};
+			Some(
+				self.patch
+					.0
+					.iter()
+					.find(|x| x.name == plugin_name)
+					.map(|p| p.config.0.clone())
+					.unwrap_or_default(),
+			)
+		}
 	}
 }
