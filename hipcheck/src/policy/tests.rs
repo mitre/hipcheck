@@ -6,7 +6,7 @@ mod test {
 	use crate::{
 		config::Config,
 		plugin::PluginVersion,
-		policy::{config_to_policy::config_to_policy, policy_file::*, PolicyFile},
+		policy::{config_to_policy::config_to_policy, policy_file::*, PolicyFile, PolicyPatchList},
 		util::kdl::ParseKdlNode,
 	};
 
@@ -312,7 +312,11 @@ mod test {
 		let mut analyze = PolicyAnalyze::new(investigate_policy, Some(if_fail));
 		analyze.push(practices);
 
-		let expected = PolicyFile { plugins, analyze };
+		let expected = PolicyFile {
+			plugins,
+			patch: PolicyPatchList::default(),
+			analyze,
+		};
 
 		assert_eq!(expected, PolicyFile::from_str(data).unwrap())
 	}
@@ -330,8 +334,6 @@ mod test {
 			"test_example.kdl"
 		];
 
-		// let expected_path =
-		// 	Path::new("/home/mchernicoff/hipcheck/hipcheck/src/policy/test_example.kdl");
 		let expected = PolicyFile::load_from(&expected_path).unwrap();
 
 		assert_eq!(expected, policy_file)

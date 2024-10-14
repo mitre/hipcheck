@@ -123,7 +123,7 @@ impl ParseKdlNode for PolicyPluginList {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct PolicyConfig(pub HashMap<String, String>);
 
 impl PolicyConfig {
@@ -517,5 +517,71 @@ impl PolicyPluginName {
 impl Display for PolicyPluginName {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write!(f, "{}/{}", self.publisher.0, self.name.0)
+	}
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PolicyPatch {
+	pub name: PolicyPluginName,
+	pub config: PolicyConfig,
+}
+
+impl PolicyPatch {
+	pub fn new(name: PolicyPluginName, config: PolicyConfig) -> Self {
+		PolicyPatch { name, config }
+	}
+}
+
+impl ParseKdlNode for PolicyPatch {
+	fn kdl_key() -> &'static str {
+		"plugin"
+	}
+	fn parse_node(node: &KdlNode) -> Option<Self> {
+		if node.name().to_string().as_str() != Self::kdl_key() {
+			return None;
+		}
+
+		let full_name = node.entries().first()?.value().as_string()?;
+		let name = match PolicyPluginName::new(full_name) {
+			Ok(name) => name,
+			Err(e) => {
+				log::error!("{}", e);
+				return None;
+			}
+		};
+		let config = match node.children() {
+			Some(_) => PolicyConfig::parse_node(node),
+			None => None,
+		};
+
+		Some(Self {
+			name,
+			config: config.unwrap_or_default(),
+		})
+	}
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct PolicyPatchList(pub Vec<PolicyPatch>);
+
+impl ParseKdlNode for PolicyPatchList {
+	fn kdl_key() -> &'static str {
+		"patch"
+	}
+
+	fn parse_node(node: &KdlNode) -> Option<Self> {
+		if node.name().to_string().as_str() != Self::kdl_key() {
+			return None;
+		}
+
+		let mut plugins = PolicyPatchList::default();
+
+		for node in node.children()?.nodes() {
+			if let Some(dep) = PolicyPatch::parse_node(node) {
+				plugins.0.push(dep);
+			}
+		}
+
+		Some(plugins)
 	}
 }
