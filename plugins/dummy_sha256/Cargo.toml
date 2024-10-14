@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 anyhow = "1.0.89"
 clap = { version = "4.5.18", features = ["derive"] }
-indexmap = "2.5.0"
+indexmap = "2.6.0"
 futures = "0.3.30"
 prost = "0.13.3"
 rand = "0.8.5"
