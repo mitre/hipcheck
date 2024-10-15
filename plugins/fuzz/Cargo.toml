@@ -1,0 +1,16 @@
+[package]
+name = "fuzz"
+version = "0.1.0"
+license = "Apache-2.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+clap = { version = "4.5.20", features = ["derive"] }
+hipcheck-sdk = { version = "0.1.0", path = "../../sdk/rust", features = ["macros"] }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+tokio = { version = "1.40.0", features = ["rt"] }
+
+[dev-dependencies]
+hipcheck-sdk = { path = "../../sdk/rust", features = ["macros", "mock_engine"] }
