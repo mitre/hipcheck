@@ -10,6 +10,7 @@ use crate::{
 };
 use crate::{mock::MockResponses, JsonValue, Plugin};
 use futures::Stream;
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use std::{
@@ -113,10 +114,10 @@ impl PluginEngine {
 	pub async fn query<T, V>(&mut self, target: T, input: V) -> Result<JsonValue>
 	where
 		T: TryInto<QueryTarget, Error: Into<Error>>,
-		V: Into<JsonValue>,
+		V: Serialize,
 	{
 		let query_target: QueryTarget = target.try_into().map_err(|e| e.into())?;
-		let input: JsonValue = input.into();
+		let input: JsonValue = serde_json::to_value(input).map_err(Error::InvalidJsonInQueryKey)?;
 
 		async fn query_inner(
 			engine: &mut PluginEngine,

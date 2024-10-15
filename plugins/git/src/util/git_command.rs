@@ -3,10 +3,6 @@
 use crate::data::*;
 use crate::parse::*;
 use crate::util::command::log_git_args;
-// use crate::{
-// 	error::{Context as _, Result},
-// 	anyhow,
-// };
 
 use anyhow::{anyhow, Context as _, Result};
 use std::{
@@ -73,9 +69,10 @@ impl GitCommand {
 	}
 }
 
-pub fn get_commits(repo: &Path) -> Result<Vec<RawCommit>> {
+pub fn get_commits(repo: &str) -> Result<Vec<RawCommit>> {
+	let path = Path::new(repo);
 	let raw_output = GitCommand::for_repo(
-		repo,
+		path,
 		[
 			"--no-pager",
 			"log",
@@ -90,11 +87,12 @@ pub fn get_commits(repo: &Path) -> Result<Vec<RawCommit>> {
 	git_log(&raw_output)
 }
 
-pub fn get_commits_from_date(repo: &Path, date: &str) -> Result<Vec<RawCommit>> {
+pub fn get_commits_from_date(repo: &str, date: &str) -> Result<Vec<RawCommit>> {
+	let path = Path::new(repo);
 	let since_date = format!("--since='{} month ago'", date);
 	let msg = format!("git log from date {} command failed", &date);
 	let raw_output = GitCommand::for_repo(
-		repo,
+		path,
 		[
 			"--no-pager",
 			"log",
@@ -111,9 +109,10 @@ pub fn get_commits_from_date(repo: &Path, date: &str) -> Result<Vec<RawCommit>> 
 	git_log(&raw_output)
 }
 
-pub fn get_diffs(repo: &Path) -> Result<Vec<Diff>> {
+pub fn get_diffs(repo: &str) -> Result<Vec<Diff>> {
+	let path = Path::new(repo);
 	let output = GitCommand::for_repo(
-		repo,
+		path,
 		[
 			"--no-pager",
 			"log",
