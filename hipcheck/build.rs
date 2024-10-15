@@ -20,7 +20,7 @@ fn generate_schemars_for_target_types(out_dir: &Path) -> Result<()> {
 fn main() -> Result<()> {
 	// Compile the Hipcheck gRPC protocol spec to an .rs file
 	let root = env!("CARGO_MANIFEST_DIR");
-	let path = pathbuf![root, "proto", "hipcheck", "v1", "hipcheck.proto"];
+	let path = pathbuf![root, "proto", "hipcheck", "v1", "plugin_service.proto"];
 	compile_protos(path)?;
 
 	generate_schemars_for_target_types(Path::new("../sdk/schema"))?;

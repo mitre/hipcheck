@@ -929,8 +929,6 @@ impl TryFrom<Vec<String>> for RepoCacheDeleteScope {
 pub struct PluginArgs {
 	#[arg(long = "async")]
 	pub asynch: bool,
-	#[arg(long = "sdk")]
-	pub sdk: bool,
 }
 
 /// The format to report results in.

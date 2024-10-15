@@ -30,40 +30,41 @@ pub mod hipcheck {
 use crate::{
 	analysis::score::score_results,
 	cache::repo::HcRepoCache,
-	cli::Format,
-	config::WeightTreeProvider,
+	cli::{
+		CacheArgs, CacheOp, CheckArgs, CliConfig, Format, FullCommands, PluginArgs, SchemaArgs,
+		SchemaCommand, SetupArgs, UpdateArgs,
+	},
+	config::{AnalysisTreeNode, WeightTreeProvider},
+	engine::{async_query, HcEngine, HcEngineImpl},
 	error::{Context as _, Error, Result},
 	plugin::{try_set_arch, Plugin, PluginExecutor, PluginWithConfig},
 	report::report_builder::{build_report, Report},
 	session::Session,
 	setup::{resolve_and_transform_source, SourceType},
-	shell::Shell,
-	util::iter::{TryAny, TryFilter},
+	shell::{color_choice::ColorChoice, spinner_phase::SpinnerPhase, Shell},
+	target::{RemoteGitRepo, TargetSeed, TargetSeedKind, ToTargetSeed},
+	util::{
+		command::DependentProgram,
+		fs::create_dir_all,
+		iter::{TryAny, TryFilter},
+	},
 };
-use cli::{
-	CacheArgs, CacheOp, CheckArgs, CliConfig, FullCommands, PluginArgs, SchemaArgs, SchemaCommand,
-	SetupArgs, UpdateArgs,
-};
-use config::AnalysisTreeNode;
-use core::fmt;
 use indextree::{Arena, NodeId};
 use ordered_float::NotNan;
 use pathbuf::pathbuf;
 use schemars::schema_for;
-use shell::{color_choice::ColorChoice, spinner_phase::SpinnerPhase};
 use std::{
 	env,
-	fmt::{Display, Formatter},
+	fmt::{self, Display, Formatter},
 	io::Write,
 	ops::Not as _,
 	path::{Path, PathBuf},
 	process::{Command, ExitCode},
 	result::Result as StdResult,
+	sync::Arc,
 	time::Duration,
 };
-use target::{RemoteGitRepo, TargetSeed, TargetSeedKind, ToTargetSeed};
-use util::command::DependentProgram;
-use util::fs::create_dir_all;
+use tokio::task::JoinSet;
 use which::which;
 
 /// Entry point for Hipcheck.
@@ -97,7 +98,7 @@ fn main() -> ExitCode {
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
 		Some(FullCommands::Cache(args)) => return cmd_cache(args, &config),
-		Some(FullCommands::Plugin(args)) => cmd_plugin(args),
+		Some(FullCommands::Plugin(args)) => return cmd_plugin(args),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
 		Some(FullCommands::Scoring) => {
@@ -541,32 +542,26 @@ fn check_github_token() -> StdResult<(), EnvVarCheckError> {
 		})
 }
 
-fn cmd_plugin(args: PluginArgs) {
-	use crate::engine::{async_query, HcEngine, HcEngineImpl};
-	use std::sync::Arc;
-	use tokio::task::JoinSet;
-
-	let tgt_dir = "./target/debug";
-
-	let (entrypoint1, entrypoint2) = match args.sdk {
-		true => (
-			pathbuf![tgt_dir, "dummy_rand_data_sdk"],
-			pathbuf![tgt_dir, "dummy_sha256_sdk"],
-		),
-		false => (
-			pathbuf![tgt_dir, "dummy_rand_data"],
-			pathbuf![tgt_dir, "dummy_sha256"],
-		),
-	};
+fn cmd_plugin(args: PluginArgs) -> ExitCode {
+	let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+	// TODO: Remove this once the `plugin` subcommand is real and not just
+	//       a hidden command for internal testing.
+	let root = root.parent().expect("manifest dir has parent directory");
 
 	let plugin1 = Plugin {
 		name: "dummy/rand_data".to_owned(),
-		entrypoint: entrypoint1.display().to_string(),
+		entrypoint: pathbuf![root, "target", "debug", "dummy_rand_data_sdk"]
+			.display()
+			.to_string(),
 	};
+
 	let plugin2 = Plugin {
 		name: "dummy/sha256".to_owned(),
-		entrypoint: entrypoint2.display().to_string(),
+		entrypoint: pathbuf![root, "target", "debug", "dummy_sha256_sdk"]
+			.display()
+			.to_string(),
 	};
+
 	let plugin_executor = PluginExecutor::new(
 		/* max_spawn_attempts */ 3,
 		/* max_conn_attempts */ 5,
@@ -575,6 +570,7 @@ fn cmd_plugin(args: PluginArgs) {
 		/* jitter_percent */ 10,
 	)
 	.unwrap();
+
 	let engine = match HcEngineImpl::new(
 		plugin_executor,
 		vec![
@@ -584,10 +580,11 @@ fn cmd_plugin(args: PluginArgs) {
 	) {
 		Ok(e) => e,
 		Err(e) => {
-			println!("Failed to create engine: {e}");
-			return;
+			eprintln!("Failed to create engine: {e}");
+			return ExitCode::FAILURE;
 		}
 	};
+
 	if args.asynch {
 		// @Note - how to initiate multiple queries with async calls
 		let core = engine.core();
@@ -609,41 +606,48 @@ fn cmd_plugin(args: PluginArgs) {
 				println!("res: {res:?}");
 			}
 		});
-	} else {
-		let res = engine.query(
-			"dummy".to_owned(),
-			"rand_data".to_owned(),
-			"rand_data".to_owned(),
-			serde_json::json!(1),
-		);
-		println!("res: {res:?}");
-		// @Note - how to initiate multiple queries with sync calls
-		// Currently does not work, compiler complains need Sync impl
-		// use std::thread;
-		// let conc: Vec<thread::JoinHandle<()>> = vec![];
-		// for i in 0..10 {
-		// 	let snapshot = engine.snapshot();
-		// 	let fut = thread::spawn(|| {
-		// 		let res = match snapshot.query(
-		// 			"MITRE".to_owned(),
-		// 			"rand_data".to_owned(),
-		// 			"rand_data".to_owned(),
-		// 			serde_json::json!(i),
-		// 		) {
-		// 			Ok(r) => r,
-		// 			Err(e) => {
-		// 				println!("{i}: Query failed: {e}");
-		// 				return;
-		// 			}
-		// 		};
-		// 		println!("{i}: Result: {res}");
-		// 	});
-		// 	conc.push(fut);
-		// }
-		// while let Some(x) = conc.pop() {
-		// 	x.join().unwrap();
-		// }
+
+		return ExitCode::SUCCESS;
 	}
+
+	let res = engine.query(
+		"dummy".to_owned(),
+		"rand_data".to_owned(),
+		"rand_data".to_owned(),
+		serde_json::json!(1),
+	);
+
+	println!("res: {res:?}");
+
+	// @Note - how to initiate multiple queries with sync calls
+	// Currently does not work, compiler complains need Sync impl
+	/*
+	let conc: Vec<thread::JoinHandle<()>> = vec![];
+	for i in 0..10 {
+		let snapshot = engine.snapshot();
+		let fut = thread::spawn(|| {
+			let res = match snapshot.query(
+				"MITRE".to_owned(),
+				"rand_data".to_owned(),
+				"rand_data".to_owned(),
+				serde_json::json!(i),
+			) {
+				Ok(r) => r,
+				Err(e) => {
+					println!("{i}: Query failed: {e}");
+					return;
+				}
+			};
+			println!("{i}: Result: {res}");
+		});
+		conc.push(fut);
+	}
+	while let Some(x) = conc.pop() {
+		x.join().unwrap();
+	}
+	*/
+
+	ExitCode::SUCCESS
 }
 
 fn cmd_ready(config: &CliConfig) {

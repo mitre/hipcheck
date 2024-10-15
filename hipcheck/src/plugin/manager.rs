@@ -8,7 +8,10 @@ use crate::{
 };
 use futures::future::join_all;
 use rand::Rng;
-use std::{ops::Range, process::Command};
+use std::{
+	ops::{Not, Range},
+	process::Command,
+};
 use tokio::time::{sleep_until, Duration, Instant};
 
 #[derive(Clone, Debug)]
@@ -76,52 +79,72 @@ impl PluginExecutor {
 		// port to become unavailable between our check and the plugin's bind attempt.
 		// Hence the need for subsequent attempts if we get unlucky
 		log::debug!("Starting plugin '{}'", plugin.name);
+		log::debug!("max spawn attempts: {}", self.max_spawn_attempts);
+
 		let mut spawn_attempts: usize = 0;
+
 		while spawn_attempts < self.max_spawn_attempts {
 			// Find free port for process. Don't retry if we fail since this means all
 			// ports in the desired range are already bound
 			let port = self.get_available_port()?;
 			let port_str = port.to_string();
+
 			// Spawn plugin process
 			log::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
-			let Ok(mut proc) = Command::new(&plugin.entrypoint)
+
+			let mut proc = match Command::new(&plugin.entrypoint)
 				.args(["--port", port_str.as_str()])
 				// @Temporary - directly forward stdout/stderr from plugin to shell
 				.stdout(std::io::stdout())
 				.stderr(std::io::stderr())
 				.spawn()
-			else {
-				spawn_attempts += 1;
-				continue;
+			{
+				Ok(proc) => proc,
+				Err(e) => {
+					log::debug!("error spawning: {}", e);
+					spawn_attempts += 1;
+					continue;
+				}
 			};
+
+			log::debug!("spawned plugin process with PID {}", proc.id());
+
 			// Attempt to connect to the plugin's gRPC server up to N times, using
 			// linear backoff with a percentage jitter.
 			let mut conn_attempts = 0;
 			let mut opt_grpc: Option<HcPluginClient> = None;
+
 			while conn_attempts < self.max_conn_attempts {
 				// Jitter could be positive or negative, so mult by 2 to cover both sides
 				let jitter: i32 = rand::thread_rng().gen_range(0..(2 * self.jitter_percent)) as i32;
+
 				// Then subtract by self.jitter_percent to center around 0, and add to 100%
 				let jitter_percent = 1.0 + ((jitter - (self.jitter_percent as i32)) as f64 / 100.0);
+
 				// Once we are confident this math works, we can remove this
-				if !(0.0..=2.0).contains(&jitter_percent) {
+				if (0.0..=2.0).contains(&jitter_percent).not() {
 					panic!("Math error! We should have better guardrails around PluginExecutor field values.");
 				}
+
 				// sleep_duration = (backoff * conn_attempts) * (1.0 +/- jitter_percent)
 				let sleep_duration: Duration = self
 					.backoff_interval
 					.saturating_mul(conn_attempts as u32)
 					.mul_f64(jitter_percent);
+
 				sleep_until(Instant::now() + sleep_duration).await;
+
 				if let Ok(grpc) =
 					PluginServiceClient::connect(format!("http://127.0.0.1:{port_str}")).await
 				{
+					log::debug!("connected to plugin over gRPC");
 					opt_grpc = Some(grpc);
 					break;
 				} else {
 					conn_attempts += 1;
 				}
 			}
+
 			// If opt_grpc is None, we did not manage to connect to the plugin. Kill it
 			// and try again
 			let Some(grpc) = opt_grpc else {
@@ -131,6 +154,7 @@ impl PluginExecutor {
 				spawn_attempts += 1;
 				continue;
 			};
+
 			// We now have an open gRPC connection to our plugin process
 			return Ok(PluginContext {
 				plugin: plugin.clone(),
@@ -139,6 +163,7 @@ impl PluginExecutor {
 				proc,
 			});
 		}
+
 		Err(hc_error!(
 			"Reached max spawn attempts for plugin {}",
 			plugin.name

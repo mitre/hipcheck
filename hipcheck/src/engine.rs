@@ -203,17 +203,23 @@ impl HcEngineImpl {
 	// independent of Salsa.
 	pub fn new(executor: PluginExecutor, plugins: Vec<PluginWithConfig>) -> Result<Self> {
 		let runtime = RUNTIME.handle();
-		eprintln!("Starting HcPluginCore");
+
+		log::debug!("Starting HcPluginCore");
+
 		let core = runtime.block_on(HcPluginCore::new(executor, plugins))?;
+
 		let mut engine = HcEngineImpl {
 			storage: Default::default(),
 		};
+
 		engine.set_core(Arc::new(core));
 		Ok(engine)
 	}
+
 	pub fn runtime() -> &'static Handle {
 		RUNTIME.handle()
 	}
+
 	// TODO - "run" function that takes analysis heirarchy and target, and queries each
 	// analysis plugin to kick off the execution
 }

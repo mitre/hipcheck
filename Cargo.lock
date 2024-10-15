@@ -759,23 +759,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dummy_rand_data"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "futures",
- "indexmap 2.6.0",
- "prost",
- "rand",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-build",
-]
-
-[[package]]
 name = "dummy_rand_data_sdk"
 version = "0.1.0"
 dependencies = [
@@ -784,24 +767,6 @@ dependencies = [
  "hipcheck-sdk",
  "rand",
  "tokio",
-]
-
-[[package]]
-name = "dummy_sha256"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "futures",
- "indexmap 2.6.0",
- "prost",
- "rand",
- "serde_json",
- "sha2",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-build",
 ]
 
 [[package]]
@@ -1324,6 +1289,7 @@ dependencies = [
  "walkdir",
  "which",
  "xml-rs",
+ "xshell",
  "xz2",
  "zip",
  "zip-extensions",
@@ -1347,6 +1313,7 @@ dependencies = [
  "futures",
  "hipcheck-sdk-macros",
  "indexmap 2.6.0",
+ "pathbuf",
  "prost",
  "rand",
  "schemars",

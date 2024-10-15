@@ -1,7 +1,7 @@
 syntax = "proto3";
 package hipcheck.v1;
 
-import "empty.proto";
+import "messages/empty.proto";
 
 /**
  * Getting the default policy expression has no params, so we just wrap

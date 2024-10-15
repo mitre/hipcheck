@@ -12,19 +12,26 @@ resolver = "2"
 
 # Members of the workspace.
 members = [
+    # The main `hc` binary.
     "hipcheck",
-    "hipcheck-macros",
-    "xtask",
+
+    # Plugins
     "plugins/dummy_rand_data_sdk",
-    "plugins/dummy_rand_data",
-    "plugins/dummy_sha256",
     "plugins/dummy_sha256_sdk",
-    "sdk/rust",
-    "hipcheck-sdk-macros",
     "plugins/git",
-	"plugins/github_api",
+    "plugins/github_api",
     "plugins/npm_dependencies",
     "plugins/activity",
+
+    # SDK
+    "sdk/rust",
+
+    # Libraries
+    "libraries/hipcheck-sdk-macros",
+    "libraries/hipcheck-macros",
+
+    # Project Tooling
+    "xtask",
 ]
 
 # Make sure Hipcheck is run with `cargo run`.

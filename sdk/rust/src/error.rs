@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proto::{ConfigurationStatus, InitiateQueryProtocolResponse, SetConfigurationResponse};
-use std::{convert::Infallible, ops::Not, result::Result as StdResult};
+use crate::proto::QueryResponse;
+use std::{convert::Infallible, result::Result as StdResult};
 use tokio::sync::mpsc::error::SendError as TokioMpscSendError;
 use tonic::Status as TonicStatus;
 
@@ -27,7 +27,7 @@ pub enum Error {
 
 	#[error("failed to send query from session to server")]
 	FailedToSendQueryFromSessionToServer(
-		#[source] TokioMpscSendError<StdResult<InitiateQueryProtocolResponse, TonicStatus>>,
+		#[source] TokioMpscSendError<StdResult<QueryResponse, TonicStatus>>,
 	),
 
 	/// The `PluginEngine` received a message with a reply-type status when it expected a request
@@ -99,58 +99,47 @@ pub enum ConfigError {
 	Unspecified { message: String },
 }
 
-impl From<ConfigError> for SetConfigurationResponse {
-	fn from(value: ConfigError) -> Self {
-		match value {
+impl From<ConfigError> for TonicStatus {
+	fn from(val: ConfigError) -> Self {
+		match val {
 			ConfigError::InvalidConfigValue {
 				field_name,
 				value,
 				reason,
-			} => SetConfigurationResponse {
-				status: ConfigurationStatus::InvalidConfigurationValue as i32,
-				message: format!("invalid value '{value}' for '{field_name}', reason: '{reason}'"),
-			},
+			} => {
+				let msg = format!(
+					"unknown '{}' config value '{}', reason: {}",
+					field_name, value, reason
+				);
+				TonicStatus::invalid_argument(msg)
+			}
 			ConfigError::MissingRequiredConfig {
 				field_name,
 				field_type,
 				possible_values,
-			} => SetConfigurationResponse {
-				status: ConfigurationStatus::MissingRequiredConfiguration as i32,
-				message: {
-					let mut message = format!(
-						"missing required config item '{field_name}' of type '{field_type}'"
-					);
-
-					if possible_values.is_empty().not() {
-						message.push_str("; possible values: ");
-						message.push_str(&possible_values.join(", "));
-					}
-
-					message
-				},
-			},
+			} => {
+				let msg = format!(
+					"missing required config item '{}' of type '{}', possible values: {}",
+					field_name,
+					field_type,
+					possible_values.join(", ")
+				);
+				TonicStatus::invalid_argument(msg)
+			}
 			ConfigError::UnrecognizedConfig {
 				field_name,
 				field_value,
 				possible_confusables,
-			} => SetConfigurationResponse {
-				status: ConfigurationStatus::UnrecognizedConfiguration as i32,
-				message: {
-					let mut message =
-						format!("unrecognized field '{field_name}' with value '{field_value}'");
-
-					if possible_confusables.is_empty().not() {
-						message.push_str("; possible field names: ");
-						message.push_str(&possible_confusables.join(", "));
-					}
-
-					message
-				},
-			},
-			ConfigError::Unspecified { message } => SetConfigurationResponse {
-				status: ConfigurationStatus::Unspecified as i32,
-				message: format!("unknown error; {message}"),
-			},
+			} => {
+				let msg = format!(
+					"unrecognized config item '{}' with value '{}', did you mean one of: {}",
+					field_name,
+					field_value,
+					possible_confusables.join(", ")
+				);
+				TonicStatus::invalid_argument(msg)
+			}
+			ConfigError::Unspecified { message } => TonicStatus::unknown(message),
 		}
 	}
 }
