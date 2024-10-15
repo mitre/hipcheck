@@ -23,7 +23,7 @@ impl<'a> GitHub<'a> {
 	}
 
 	pub fn fuzz_check(&self, repo_uri: Rc<String>) -> Result<bool> {
-		search_code_request(&self.agent, repo_uri).context("unable to search fuzzing information; please check the HC_GITHUB_TOKEN system environment variable")
+		search_code_request(&self.agent, repo_uri).context("unable to search fuzzing information; please ensure the provided system environment variable exists and contains a valid GitHub API token")
 	}
 
 	pub fn get_reviews_for_pr(&self) -> Result<Vec<GitHubPullRequest>> {

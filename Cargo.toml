@@ -22,9 +22,10 @@ members = [
     "sdk/rust",
     "hipcheck-sdk-macros",
     "plugins/git",
-	"plugins/github_api",
+    "plugins/github_api",
     "plugins/npm_dependencies",
     "plugins/activity",
+    "plugins/fuzz"
 ]
 
 # Make sure Hipcheck is run with `cargo run`.
