@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
+
+//! Plugin containing secondary queries that return information about a Git repo to another query
+
 mod data;
 mod parse;
 mod util;
@@ -11,20 +14,16 @@ use crate::{
 	util::git_command::{get_commits, get_commits_from_date, get_diffs},
 };
 use clap::Parser;
-use hipcheck_sdk::prelude::*;
+use hipcheck_sdk::{prelude::*, types::LocalGitRepo};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// A locally stored git repo, with optional additional details
 /// The details will vary based on the query (e.g. a date, a committer e-mail address, a commit hash)
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct GitRepo {
-	/// The path to the repo.
-	pub path: PathBuf,
-
-	/// The Git ref we're referring to.
-	pub git_ref: String,
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct DetailedGitRepo {
+	/// The local repo
+	local: LocalGitRepo,
 
 	/// Optional additional information for the query
 	pub details: Option<String>,
@@ -33,7 +32,7 @@ pub struct GitRepo {
 /// Returns the date of the most recent commit to a Git repo as `jiff:Timestamp` displayed as a String
 /// (Which means that anything expecting a `Timestamp` must parse the output of this query appropriately)
 #[query]
-async fn last_commit_date(_engine: &mut PluginEngine, repo: GitRepo) -> Result<String> {
+async fn last_commit_date(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<String> {
 	let path = &repo.path;
 	let commits = get_commits(path).map_err(|e| {
 		log::error!("failed to get raw commits: {}", e);
@@ -53,7 +52,7 @@ async fn last_commit_date(_engine: &mut PluginEngine, repo: GitRepo) -> Result<S
 
 /// Returns all diffs extracted from the repository
 #[query]
-async fn diffs(_engine: &mut PluginEngine, repo: GitRepo) -> Result<Vec<Diff>> {
+async fn diffs(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Diff>> {
 	let path = &repo.path;
 	let diffs = get_diffs(path).map_err(|e| {
 		log::error!("{}", e);
@@ -64,7 +63,7 @@ async fn diffs(_engine: &mut PluginEngine, repo: GitRepo) -> Result<Vec<Diff>> {
 
 /// Returns all commits extracted from the repository
 #[query]
-async fn commits(_engine: &mut PluginEngine, repo: GitRepo) -> Result<Vec<Commit>> {
+async fn commits(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Commit>> {
 	let path = &repo.path;
 	let raw_commits = get_commits(path).map_err(|e| {
 		log::error!("failed to get raw commits: {}", e);
@@ -85,8 +84,11 @@ async fn commits(_engine: &mut PluginEngine, repo: GitRepo) -> Result<Vec<Commit
 /// Returns all commits extracted from the repository for a date given in the `details` field
 /// The provided date must be of the form "YYYY-MM-DD"
 #[query]
-async fn commits_from_date(_engine: &mut PluginEngine, repo: GitRepo) -> Result<Vec<Commit>> {
-	let path = &repo.path;
+async fn commits_from_date(
+	_engine: &mut PluginEngine,
+	repo: DetailedGitRepo,
+) -> Result<Vec<Commit>> {
+	let path = &repo.local.path;
 	let date = match repo.details {
 		Some(date) => date,
 		None => {
@@ -113,7 +115,7 @@ async fn commits_from_date(_engine: &mut PluginEngine, repo: GitRepo) -> Result<
 
 /// Returns all contributors to the repository
 #[query]
-async fn contributors(_engine: &mut PluginEngine, repo: GitRepo) -> Result<Vec<Contributor>> {
+async fn contributors(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Contributor>> {
 	let path = &repo.path;
 	let raw_commits = get_commits(path).map_err(|e| {
 		log::error!("failed to get raw commits: {}", e);
@@ -133,7 +135,7 @@ async fn contributors(_engine: &mut PluginEngine, repo: GitRepo) -> Result<Vec<C
 
 /// Returns all commit-diff pairs
 #[query]
-async fn commit_diffs(engine: &mut PluginEngine, repo: GitRepo) -> Result<Vec<CommitDiff>> {
+async fn commit_diffs(engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<CommitDiff>> {
 	let commits = commits(engine, repo.clone()).await.map_err(|e| {
 		log::error!("failed to get commits: {}", e);
 		Error::UnspecifiedQueryState
@@ -157,8 +159,9 @@ async fn commit_diffs(engine: &mut PluginEngine, repo: GitRepo) -> Result<Vec<Co
 #[query]
 async fn commits_for_contributor(
 	engine: &mut PluginEngine,
-	repo: GitRepo,
+	repo: DetailedGitRepo,
 ) -> Result<ContributorView> {
+	let local = repo.local;
 	let email = match repo.details {
 		Some(ref email) => email.clone(),
 		None => {
@@ -167,15 +170,15 @@ async fn commits_for_contributor(
 		}
 	};
 
-	let all_commits = commits(engine, repo.clone()).await.map_err(|e| {
+	let all_commits = commits(engine, local.clone()).await.map_err(|e| {
 		log::error!("failed to get commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
-	let contributors = contributors(engine, repo.clone()).await.map_err(|e| {
+	let contributors = contributors(engine, local.clone()).await.map_err(|e| {
 		log::error!("failed to get contributors: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
-	let commit_contributors = commit_contributors(engine, repo.clone())
+	let commit_contributors = commit_contributors(engine, local.clone())
 		.await
 		.map_err(|e| {
 			log::error!("failed to get join table: {}", e);
@@ -219,8 +222,9 @@ async fn commits_for_contributor(
 #[query]
 async fn contributors_for_commit(
 	engine: &mut PluginEngine,
-	repo: GitRepo,
+	repo: DetailedGitRepo,
 ) -> Result<CommitContributorView> {
+	let local = repo.local;
 	let hash = match repo.details {
 		Some(ref hash) => hash.clone(),
 		None => {
@@ -229,15 +233,15 @@ async fn contributors_for_commit(
 		}
 	};
 
-	let commits = commits(engine, repo.clone()).await.map_err(|e| {
+	let commits = commits(engine, local.clone()).await.map_err(|e| {
 		log::error!("failed to get commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
-	let contributors = contributors(engine, repo.clone()).await.map_err(|e| {
+	let contributors = contributors(engine, local.clone()).await.map_err(|e| {
 		log::error!("failed to get contributors: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
-	let commit_contributors = commit_contributors(engine, repo.clone())
+	let commit_contributors = commit_contributors(engine, local.clone())
 		.await
 		.map_err(|e| {
 			log::error!("failed to get join table: {}", e);
@@ -279,7 +283,7 @@ async fn contributors_for_commit(
 /// Internal use function that returns a join table of contributors by commit
 async fn commit_contributors(
 	engine: &mut PluginEngine,
-	repo: GitRepo,
+	repo: LocalGitRepo,
 ) -> Result<Vec<CommitContributor>> {
 	let path = &repo.path;
 	let contributors = contributors(engine, repo.clone()).await.map_err(|e| {

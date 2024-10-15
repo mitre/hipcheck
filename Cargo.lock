@@ -3,6 +3,20 @@
 version = 3
 
 [[package]]
+name = "activity_sdk"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "hipcheck-sdk",
+ "jiff",
+ "log",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
