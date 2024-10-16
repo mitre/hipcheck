@@ -23,12 +23,12 @@ mod test {
 		let expected = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
 			PluginVersion::new("0.1.0".to_string()),
-			Some(
+			Some(ManifestLocation::Url(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
 				)
 				.unwrap(),
-			),
+			)),
 		);
 
 		assert_eq!(expected, PolicyPlugin::parse_node(&node).unwrap())
@@ -46,22 +46,22 @@ mod test {
 		expected.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
 			PluginVersion::new("0.1.0".to_string()),
-			Some(
+			Some(ManifestLocation::Url(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
 				)
 				.unwrap(),
-			),
+			)),
 		));
 		expected.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/binary").unwrap(),
 			PluginVersion::new("0.1.1".to_string()),
-			Some(
+			Some(ManifestLocation::Url(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl",
 				)
 				.unwrap(),
-			),
+			)),
 		));
 
 		assert_eq!(expected, PolicyPluginList::parse_node(&node).unwrap())
@@ -272,22 +272,22 @@ mod test {
 		plugins.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
 			PluginVersion::new("0.1.0".to_string()),
-			Some(
+			Some(ManifestLocation::Url(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
 				)
 				.unwrap(),
-			),
+			)),
 		));
 		plugins.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/binary").unwrap(),
 			PluginVersion::new("0.1.1".to_string()),
-			Some(
+			Some(ManifestLocation::Url(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl",
 				)
 				.unwrap(),
-			),
+			)),
 		));
 
 		let investigate_policy = InvestigatePolicy("(gt 0.5 $)".to_string());

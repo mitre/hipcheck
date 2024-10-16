@@ -27,7 +27,9 @@ async fn rand_data(engine: &mut PluginEngine, size: u64) -> Result<u64> {
 
 	engine.record_concern("this is a test");
 
-	let value = engine.query("dummy/sha256", vec![reduced_num]).await?;
+	let value = engine
+		.query("dummy/sha256/sha256", vec![reduced_num])
+		.await?;
 
 	let Value::Array(mut sha256) = value else {
 		return Err(Error::UnexpectedPluginQueryInputFormat);
@@ -84,13 +86,14 @@ mod test {
 
 	fn mock_responses() -> StdResult<MockResponses, Error> {
 		// when calling into query 1, Value::Array(vec![1]) gets passed to `sha256`, lets assume it returns 1
-		Ok(MockResponses::new().insert("dummy/sha256", vec![1], Ok(vec![1]))?)
+		MockResponses::new().insert("dummy/sha256/sha256", vec![1], Ok(vec![1]))
 	}
 
 	#[tokio::test]
 	async fn test_sha256() {
 		let mut engine = PluginEngine::mock(mock_responses().unwrap());
 		let output = rand_data(&mut engine, 8).await;
+		println!("{:?}", output);
 		// 8 % 7 = 1
 		assert!(matches!(output, Ok(1)));
 	}
