@@ -1,0 +1,17 @@
+strategy "independent: {
+    country "United States"
+    org "MITRE"
+}
+
+orgs {
+    org "HP" country="United States" {
+        host "hp.com"
+        host "hpe.com"
+    }
+    org "MITRE" country="United State" {
+        host "mitre.org"
+    }
+    org "RBC Royal Bank" country="Canada" {
+        host "rbcon.com"
+    }
+}
