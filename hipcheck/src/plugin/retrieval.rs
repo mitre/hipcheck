@@ -7,10 +7,11 @@ use crate::{
 	error::Error,
 	hc_error,
 	plugin::{ArchiveFormat, HashAlgorithm, HashWithDigest},
-	policy::policy_file::PolicyPlugin,
+	policy::policy_file::{ManifestLocation, PolicyPlugin},
 	util::http::agent::agent,
 };
 use flate2::read::GzDecoder;
+use pathbuf::pathbuf;
 use std::{
 	collections::HashSet,
 	fs::File,
@@ -20,6 +21,16 @@ use std::{
 use tar::Archive;
 use url::Url;
 use xz2::read::XzDecoder;
+
+pub const MITRE_LEGACY_PLUGINS: &[&str] = &[
+	"affiliation",
+	"binary",
+	"churn",
+	"entropy",
+	"identity",
+	"review",
+	"typo",
+];
 
 /// download, verify and unpack all of the plugins specified in a Policy file, as well as all of their dependencies
 pub fn retrieve_plugins(
@@ -31,11 +42,17 @@ pub fn retrieve_plugins(
 	for policy_plugin in policy_plugins.iter() {
 		// TODO: while the legacy passes are still integrated in the main codebase, we skip downloading them!
 		if policy_plugin.name.publisher.0.as_str() == MITRE_PUBLISHER {
-			continue;
+			if MITRE_LEGACY_PLUGINS
+				.iter()
+				.find(|x| *x == &policy_plugin.name.name.0.as_str())
+				.is_some()
+			{
+				continue;
+			}
 		}
 
 		match &policy_plugin.manifest {
-			Some(url) => {
+			Some(ManifestLocation::Url(url)) => {
 				let download_manifest = DownloadManifest::from_network(url).map_err(|e| {
 					hc_error!(
 						"Error [{}] retrieving plugin manifest for {}",
@@ -50,6 +67,30 @@ pub fn retrieve_plugins(
 					&policy_plugin.version,
 					&mut download_plugins,
 				)?;
+			}
+			Some(ManifestLocation::Local(path)) => {
+				let publisher = policy_plugin.name.publisher.clone();
+				let name = policy_plugin.name.name.clone();
+				let version = policy_plugin.version.clone();
+				let download_dir = plugin_cache.plugin_download_dir(&publisher, &name, &version);
+				std::fs::create_dir_all(download_dir.as_path()).map_err(|e| {
+					hc_error!(
+						"Error [{}] creating download directory {}",
+						e,
+						download_dir.to_string_lossy()
+					)
+				})?;
+				let tgt_path = pathbuf![download_dir.as_path(), "plugin.kdl"];
+				// @Note - sneaky potential for unexpected behavior if we write local plugin manifest
+				// to a cache dir that already included a remote download
+				std::fs::copy(path, tgt_path).map_err(|e| {
+					hc_error!(
+						"Error [{}] copying local plugin manifest for {} to cache",
+						e,
+						&policy_plugin.name
+					)
+				})?;
+				download_plugins.insert(PluginId::new(publisher, name, version));
 			}
 			None => return Err(hc_error!("No manifest provided for {}", policy_plugin.name)),
 		}

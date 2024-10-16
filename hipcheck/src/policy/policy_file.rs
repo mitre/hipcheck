@@ -11,19 +11,29 @@ use crate::{
 };
 
 use kdl::KdlNode;
-use std::{collections::HashMap, fmt, fmt::Display};
+use std::{collections::HashMap, fmt, fmt::Display, path::PathBuf};
 use url::Url;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ManifestLocation {
+	Url(Url),
+	Local(PathBuf),
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyPlugin {
 	pub name: PolicyPluginName,
 	pub version: PluginVersion,
-	pub manifest: Option<Url>,
+	pub manifest: Option<ManifestLocation>,
 }
 
 impl PolicyPlugin {
 	#[allow(dead_code)]
-	pub fn new(name: PolicyPluginName, version: PluginVersion, manifest: Option<Url>) -> Self {
+	pub fn new(
+		name: PolicyPluginName,
+		version: PluginVersion,
+		manifest: Option<ManifestLocation>,
+	) -> Self {
 		Self {
 			name,
 			version,
@@ -59,12 +69,18 @@ impl ParseKdlNode for PolicyPlugin {
 		let manifest = match node.get("manifest") {
 			Some(entry) => {
 				let raw_url = entry.value().as_string()?;
-				match Url::parse(raw_url) {
-					Ok(url) => Some(url),
-					Err(_) => {
-						log::error!("Unable to parse provided manifest URL {} for plugin {} in the policy file", raw_url, name.to_string());
-						return None;
-					}
+				let path = pathbuf::pathbuf![raw_url];
+				if let Ok(url) = Url::parse(raw_url) {
+					Some(ManifestLocation::Url(url))
+				} else if path.exists() {
+					Some(ManifestLocation::Local(path))
+				} else {
+					log::error!(
+						"Unable to parse provided manifest URL {} for plugin {} in the policy file",
+						raw_url,
+						name.to_string()
+					);
+					return None;
 				}
 			}
 			None => None,

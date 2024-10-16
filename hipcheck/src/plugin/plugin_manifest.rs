@@ -141,7 +141,7 @@ impl ParseKdlNode for PluginDependency {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct PluginDependencyList(pub Vec<PluginDependency>);
 
 impl PluginDependencyList {
@@ -210,8 +210,8 @@ impl FromStr for PluginManifest {
 			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'license'"))?;
 		let entrypoints: Entrypoints =
 			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'entrypoint'"))?;
-		let dependencies: PluginDependencyList =
-			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'dependencies'"))?;
+		// Not a required field
+		let dependencies: PluginDependencyList = extract_data(nodes).unwrap_or_default();
 
 		Ok(Self {
 			publisher,
