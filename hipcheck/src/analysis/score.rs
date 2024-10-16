@@ -8,7 +8,7 @@ use crate::{
 	engine::HcEngine,
 	error::Result,
 	hc_error,
-	plugin::QueryResult,
+	plugin::{QueryResult, MITRE_LEGACY_PLUGINS},
 	policy_exprs::Executor,
 	shell::spinner_phase::SpinnerPhase,
 };
@@ -61,19 +61,7 @@ impl PluginAnalysisResults {
 	/// Get all results from non-legacy analyses.
 	pub fn plugin_results(&self) -> impl Iterator<Item = (&Analysis, &PluginAnalysisResult)> {
 		self.table.iter().filter_map(|(analysis, result)| {
-			if [
-				REVIEW_PHASE,
-				IDENTITY_PHASE,
-				BINARY_PHASE,
-				ACTIVITY_PHASE,
-				FUZZ_PHASE,
-				TYPO_PHASE,
-				AFFILIATION_PHASE,
-				CHURN_PHASE,
-				ENTROPY_PHASE,
-			]
-			// Horrifying conversion, but necessary.
-			.contains(&(analysis.plugin).as_ref())
+			if MITRE_LEGACY_PLUGINS.contains(&(analysis.plugin).as_ref())
 				&& analysis.publisher == MITRE_PUBLISHER
 			{
 				None
@@ -229,18 +217,16 @@ fn wrapped_query(
 	query: String,
 	key: Value,
 ) -> Result<QueryResult> {
-	if publisher == *MITRE_PUBLISHER {
+	if publisher == *MITRE_PUBLISHER && MITRE_LEGACY_PLUGINS.contains(&plugin.as_str()) {
 		if query != *DEFAULT_QUERY {
 			return Err(hc_error!("legacy analyses only have a default query"));
 		}
 		match plugin.as_str() {
-			ACTIVITY_PHASE => db.activity_analysis(),
 			AFFILIATION_PHASE => db.affiliation_analysis(),
 			BINARY_PHASE => db.binary_analysis(),
 			CHURN_PHASE => db.churn_analysis(),
 			ENTROPY_PHASE => db.entropy_analysis(),
 			IDENTITY_PHASE => db.identity_analysis(),
-			FUZZ_PHASE => db.fuzz_analysis(),
 			REVIEW_PHASE => db.review_analysis(),
 			TYPO_PHASE => db.typo_analysis(),
 			error => Err(hc_error!("Unrecognized legacy analysis '{}'", error)),

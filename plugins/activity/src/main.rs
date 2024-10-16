@@ -127,7 +127,7 @@ mod test {
 		let output = "2024-06-19T19:22:45Z".to_string();
 
 		// when calling into query, the input repo gets passed to `last_commit_date`, lets assume it returns the datetime `output`
-		Ok(MockResponses::new().insert("mitre/git/last_commit_date", repo, Ok(output))?)
+		MockResponses::new().insert("mitre/git/last_commit_date", repo, Ok(output))
 	}
 
 	#[tokio::test]

@@ -13,7 +13,7 @@ pub use crate::plugin::{get_plugin_key, manager::*, plugin_id::PluginId, types::
 pub use arch::{get_current_arch, try_set_arch, Arch};
 pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
 pub use plugin_manifest::{PluginManifest, PluginName, PluginPublisher, PluginVersion};
-pub use retrieval::retrieve_plugins;
+pub use retrieval::{retrieve_plugins, MITRE_LEGACY_PLUGINS};
 use serde_json::Value;
 use std::collections::HashMap;
 use tokio::sync::Mutex;

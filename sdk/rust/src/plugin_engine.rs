@@ -474,7 +474,7 @@ impl HcSessionSocket {
 						"Failed sending message to newly created Session, should never happen",
 					);
 
-					eprintln!("RAND-listen: adding new session {id} to tracker");
+					eprintln!("SDK: adding new session {id} to tracker");
 					self.sessions.insert(id, in_tx);
 
 					return Ok(Some(session));
@@ -501,8 +501,6 @@ impl HcSessionSocket {
 		P: Plugin,
 	{
 		loop {
-			eprintln!("SHA256: Looping");
-
 			let Some(mut engine) = self
 				.listen()
 				.await
