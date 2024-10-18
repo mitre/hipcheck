@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 mod code_search;
 mod data;
 mod graphql;

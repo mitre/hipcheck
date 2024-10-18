@@ -82,7 +82,7 @@ mod test {
 
 	fn mock_responses() -> StdResult<MockResponses, Error> {
 		// when calling into query 1, Value::Array(vec![1]) gets passed to `sha256`, lets assume it returns 1
-		Ok(MockResponses::new().insert("dummy/sha256/sha256", vec![1], Ok(vec![1]))?)
+		MockResponses::new().insert("dummy/sha256/sha256", vec![1], Ok(vec![1]))
 	}
 
 	#[tokio::test]
