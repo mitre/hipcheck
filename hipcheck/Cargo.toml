@@ -31,7 +31,7 @@ benchmarking = []
 
 [dependencies]
 
-async-stream = "0.3.5"
+async-stream = "0.3.6"
 base64 = "0.22.1"
 blake3 = "1.5.4"
 content_inspector = "0.2.4"
