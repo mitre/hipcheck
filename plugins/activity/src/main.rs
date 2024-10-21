@@ -71,14 +71,11 @@ impl Plugin for ActivityPlugin {
 	}
 
 	fn default_policy_expr(&self) -> Result<String> {
-		match CONFIG
-			.get()
-			.ok_or_else(|| {
-				log::error!("tried to access config before set by Hipcheck core!");
-				Error::UnspecifiedQueryState
-			})?
-			.weeks
-		{
+		let Some(conf) = CONFIG.get() else {
+			log::error!("tried to access config before set by Hipcheck core!");
+			return Err(Error::UnspecifiedQueryState);
+		};
+		match conf.weeks {
 			Some(weeks) => Ok(format!("lte $ P{}w", weeks)),
 			None => Ok("".to_owned()),
 		}

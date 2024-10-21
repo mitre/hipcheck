@@ -255,7 +255,10 @@ pub fn queries(_item: TokenStream) -> TokenStream {
 	let q_lock = QUERIES.lock().unwrap();
 	// Create a NamedQuery for each #query func we've seen
 	for q in q_lock.iter() {
-		let name = q.function.as_str();
+		let name = match q.default {
+			true => "",
+			false => q.function.as_str(),
+		};
 		let inner = Ident::new(q.struct_name.as_str(), Span::call_site());
 		let out = quote::quote! {
 			NamedQuery {
