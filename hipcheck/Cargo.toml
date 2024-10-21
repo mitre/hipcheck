@@ -137,7 +137,7 @@ zstd = "0.13.2"
 
 [build-dependencies]
 
-anyhow = "1.0.89"
+anyhow = "1.0.90"
 pathbuf = "1.0.0"
 schemars = { version = "0.8.21", features = ["chrono", "url"] }
 serde = { version = "1.0.210", features = ["derive"] }
