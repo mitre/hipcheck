@@ -4,7 +4,7 @@ use clap::Parser;
 use hipcheck_sdk::prelude::*;
 use sha2::{Digest, Sha256};
 
-#[query(default = false)]
+#[query(default)]
 async fn query_sha256(_engine: &mut PluginEngine, content: Vec<u8>) -> Result<Vec<u8>> {
 	let mut hasher = Sha256::new();
 	hasher.update(content.as_slice());

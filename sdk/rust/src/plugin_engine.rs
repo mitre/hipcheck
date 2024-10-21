@@ -94,6 +94,7 @@ pub struct PluginEngine {
 	id: usize,
 	tx: mpsc::Sender<StdResult<InitiateQueryProtocolResponse, Status>>,
 	rx: mpsc::Receiver<Option<PluginQuery>>,
+	concerns: Vec<String>,
 	// So that we can remove ourselves when we get dropped
 	drop_tx: mpsc::Sender<i32>,
 	/// when unit testing, this enables the user to mock plugin responses to various inputs
@@ -305,7 +306,7 @@ impl PluginEngine {
 		// otherwise error out
 		let query = plugin
 			.queries()
-			.map(|x| x.inner)
+			.filter_map(|x| if x.name == name { Some(x.inner) } else { None })
 			.next()
 			.or_else(|| plugin.default_query())
 			.ok_or_else(|| Error::UnknownPluginQuery)?;
@@ -320,7 +321,7 @@ impl PluginEngine {
 			query_name: name,
 			key: json!(Value::Null).to_string(),
 			output: value.to_string(),
-			concern: vec![],
+			concern: self.take_concerns(),
 		};
 
 		self.tx
@@ -329,6 +330,17 @@ impl PluginEngine {
 			.map_err(Error::FailedToSendQueryFromSessionToServer)?;
 
 		Ok(())
+	}
+
+	pub fn record_concern<S: AsRef<str>>(&mut self, concern: S) {
+		fn inner(engine: &mut PluginEngine, concern: &str) {
+			engine.concerns.push(concern.to_owned());
+		}
+		inner(self, concern.as_ref())
+	}
+
+	pub(crate) fn take_concerns(&mut self) -> Vec<String> {
+		self.concerns.drain(..).collect()
 	}
 }
 
@@ -341,6 +353,7 @@ impl From<MockResponses> for PluginEngine {
 
 		Self {
 			id: 0,
+			concerns: vec![],
 			tx,
 			rx,
 			drop_tx,
@@ -464,6 +477,7 @@ impl HcSessionSocket {
 
 					let session = PluginEngine {
 						id: id as usize,
+						concerns: vec![],
 						tx,
 						rx,
 						drop_tx: self.drop_tx.clone(),
