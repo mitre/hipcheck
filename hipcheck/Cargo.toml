@@ -68,7 +68,7 @@ graphql_client = "0.14.0"
 hipcheck-macros = { path = "../hipcheck-macros", version = "0.3.1" }
 http = "1.1.0"
 indexmap = "2.6.0"
-indextree = "4.6.1"
+indextree = "4.7.3"
 indicatif = { version = "0.17.8", features = ["rayon"] }
 itertools = "0.13.0"
 jiff = "0.1.13"
