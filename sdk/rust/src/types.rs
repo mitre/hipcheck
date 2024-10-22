@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use typify_macro::import_types;
 
 import_types!(
