@@ -1,0 +1,23 @@
+[package]
+name = "affiliation_sdk"
+version = "0.1.0"
+license = "Apache-2.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+anyhow = "1.0.89"
+clap = { version = "4.5.18", features = ["derive"] }
+hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"]}
+kdl = "4.6.0"
+log = "0.4.22"
+pathbuf = "1.0.0"
+schemars = { version = "0.8.21", features = ["url"] }
+serde = { version = "1.0.210", features = ["derive", "rc"] }
+serde_json = "1.0.128"
+strum = { version = "0.26.3", features = ["derive"] }
+tokio = { version = "1.40.0", features = ["rt"] }
+
+[dev-dependencies]
+hipcheck-sdk = { path = "../../sdk/rust", features = ["macros", "mock_engine"]}
+test-log = "0.2.16"

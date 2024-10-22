@@ -339,7 +339,7 @@ impl PluginEngine {
 		inner(self, concern.as_ref())
 	}
 
-	pub(crate) fn take_concerns(&mut self) -> Vec<String> {
+	pub fn take_concerns(&mut self) -> Vec<String> {
 		self.concerns.drain(..).collect()
 	}
 }

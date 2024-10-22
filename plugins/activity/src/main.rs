@@ -124,14 +124,16 @@ mod test {
 		let output = "2024-06-19T19:22:45Z".to_string();
 
 		// when calling into query, the input repo gets passed to `last_commit_date`, lets assume it returns the datetime `output`
-		Ok(MockResponses::new().insert("mitre/git/last_commit_date", repo, Ok(output))?)
+		let mut mock_responses = MockResponses::new();
+		mock_responses.insert("mitre/git/last_commit_date", repo, Ok(output))?;
+		Ok(mock_responses)
 	}
 
 	#[tokio::test]
 	async fn test_activity() {
 		let repo = repo();
 		let target = Target {
-			specifier: "expressjs".to_string(),
+			specifier: "express".to_string(),
 			local: repo,
 			remote: None,
 			package: None,
