@@ -81,7 +81,9 @@ mod test {
 		let target = target();
 		let known_remote = target.remote.as_ref().unwrap().clone();
 		let output = true;
-		Ok(MockResponses::new().insert("mitre/github_api", known_remote, Ok(output))?)
+		let mut mock_reponses = MockResponses::new();
+		mock_reponses.insert("mitre/github_api", known_remote, Ok(output))?;
+		Ok(mock_reponses)
 	}
 
 	#[tokio::test]

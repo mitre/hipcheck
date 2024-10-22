@@ -1,7 +1,7 @@
 use crate::{JsonValue, QueryTarget, Result};
 use std::collections::HashMap;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MockResponses(pub(crate) HashMap<(QueryTarget, JsonValue), Result<JsonValue>>);
 
 impl MockResponses {
@@ -12,22 +12,12 @@ impl MockResponses {
 
 #[cfg(feature = "mock_engine")]
 impl MockResponses {
-	fn inner_insert(
-		mut self,
-		query_target: QueryTarget,
-		query_value: JsonValue,
-		query_response: Result<JsonValue>,
-	) -> Result<Self> {
-		self.0.insert((query_target, query_value), query_response);
-		Ok(self)
-	}
-
 	pub fn insert<T, V, W>(
-		self,
+		&mut self,
 		query_target: T,
 		query_value: V,
 		query_response: Result<W>,
-	) -> Result<Self>
+	) -> Result<()>
 	where
 		T: TryInto<QueryTarget, Error: Into<crate::Error>>,
 		V: serde::Serialize,
@@ -40,6 +30,7 @@ impl MockResponses {
 			Ok(v) => serde_json::to_value(v).map_err(crate::Error::InvalidJsonInQueryKey),
 			Err(e) => Err(e),
 		};
-		self.inner_insert(query_target, query_value, query_response)
+		self.0.insert((query_target, query_value), query_response);
+		Ok(())
 	}
 }

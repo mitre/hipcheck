@@ -25,6 +25,7 @@ members = [
     "plugins/github_api",
     "plugins/npm_dependencies",
     "plugins/activity",
+    "plugins/affiliation",
     "plugins/fuzz"
 ]
 
