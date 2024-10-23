@@ -139,8 +139,9 @@ pub struct Ident(pub String);
 /// A late-binding for a JSON pointer
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsonPointer {
-	pointer: String,
-	value: Option<serde_json::Value>,
+	/// The JSON Pointer source string, without the initial '$' character.
+	pub pointer: String,
+	pub value: Option<Box<Expr>>,
 }
 impl From<JsonPointer> for Expr {
 	fn from(value: JsonPointer) -> Self {
@@ -310,6 +311,14 @@ pub fn parse(input: &str) -> Result<Expr> {
 }
 
 #[cfg(test)]
+pub fn json_ptr(name: &str) -> Expr {
+	Expr::JsonPointer(JsonPointer {
+		pointer: String::from(name),
+		value: None,
+	})
+}
+
+#[cfg(test)]
 mod tests {
 	use super::*;
 	use crate::policy_exprs::LexingError;
@@ -363,13 +372,6 @@ mod tests {
 
 	fn array(vals: Vec<Primitive>) -> Expr {
 		Array::new(vals).into()
-	}
-
-	fn json_ptr(name: &str) -> Expr {
-		Expr::JsonPointer(JsonPointer {
-			pointer: String::from(name),
-			value: None,
-		})
 	}
 
 	#[test]
