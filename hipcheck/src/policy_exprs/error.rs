@@ -15,6 +15,10 @@ pub enum Error {
 	#[error("Multiple errors: {0:?}")]
 	MultipleErrors(Vec<Error>),
 
+	#[error("internal error: '{0}'")]
+	#[allow(clippy::enum_variant_names)]
+	InternalError(String),
+
 	#[error("missing close paren")]
 	MissingOpenParen,
 

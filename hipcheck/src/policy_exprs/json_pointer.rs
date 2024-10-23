@@ -1,79 +1,37 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#![deny(unused)]
+
 use crate::policy_exprs::{
 	error,
 	error::{Error, Result},
 	expr::{Array, Expr, Primitive},
+	ExprMutator, JsonPointer,
 };
 use ordered_float::NotNan;
-use regex::{Captures, Regex, RegexBuilder};
 use serde_json::Value;
 
-/// Preprocess a Policy Expr source string by replacing JSON Pointer syntax with
-/// values looked up from the `context` data.
-pub(crate) fn process_json_pointers(raw_program: &str, context: &Value) -> Result<String> {
-	let re = json_pointer_regex();
-	let mut any_error: bool = false;
-	let mut errors: Vec<Error> = Vec::new();
-	let result = re.replace_all(raw_program, |caps: &Captures| {
-		let pointer = &caps[1];
-		let res = process_pointer(pointer, context);
-		match res {
-			Ok(expr) => expr,
-			Err(e) => {
-				any_error = true;
-				errors.push(e);
-				// Return a bogus string from the closure for Regex.replace_all to use.
-				// The final string should never be used in that case.
-				"ERROR".into()
-			}
-		}
-	});
+/// Policy Expression stage that looks up JSON Pointers from the JSON `context`
+/// value.
+pub struct LookupJsonPointers<'ctx> {
+	context: &'ctx Value,
+}
 
-	if any_error {
-		if errors.len() > 1 {
-			Err(Error::MultipleErrors(errors))
-		} else {
-			Err(errors.remove(0))
-		}
-	} else {
-		Ok(result.into_owned())
+impl<'ctx> LookupJsonPointers<'ctx> {
+	pub fn with_context(context: &'ctx Value) -> Self {
+		LookupJsonPointers { context }
 	}
 }
 
-/// Return the Regex used for parsing JSON pointers embedded in a Policy Expression.
-/// Note that the initial $ is not captured.
-/// A valid JSON Pointer must be either empty or start with '/', but this regex
-/// still captures invalid syntax to provide better error handling.
-fn json_pointer_regex() -> Regex {
-	let pat = r"
-		# JSON pointers embedded in policy expressions are signified by $.
-		# It is not part of JSON pointer syntax, so it is not captured.
-		\$
-		(
-			[
-				/
-				~
-				_
-				[:alnum:]
-			]
-			*
-		)
-	";
-	// Panic safety: the regex is static and programmer-defined.
-	// It is considered a programmer error if the regex syntax is invalid.
-	RegexBuilder::new(pat)
-		.ignore_whitespace(true)
-		.build()
-		.unwrap()
-}
-
-/// Lookup a single JSON Pointer reference and convert it to Policy Expr syntax,
-/// if possible.
-fn process_pointer(pointer: &str, context: &Value) -> Result<String> {
-	let val = lookup_json_pointer(pointer, context)?;
-	let expr = json_to_policy_expr(val, pointer, context)?;
-	Ok(expr.to_string())
+impl<'ctx> ExprMutator for LookupJsonPointers<'ctx> {
+	fn visit_json_pointer(&self, mut jp: JsonPointer) -> Result<Expr> {
+		let pointer = &jp.pointer;
+		let context = self.context;
+		let val = lookup_json_pointer(pointer, context)?;
+		let expr = json_to_policy_expr(val, pointer, context)?;
+		jp.value = Some(Box::new(expr));
+		Ok(jp.into())
+	}
 }
 
 /// Wrap serde_json's `Value::pointer` method to provide better error handling.
@@ -160,68 +118,52 @@ fn json_array_item_to_policy_expr_primitive(
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::policy_exprs::expr::json_ptr;
+	use crate::policy_exprs::F64;
 	use test_log::test;
 
-	fn parse_json_pointer(src: &str) -> Option<(&str, &str)> {
-		json_pointer_regex().captures(src).map(|caps| {
-			let (whole, [cap]) = caps.extract();
-			(whole, cap)
-		})
-	}
-
 	#[test]
-	fn parse_basic_slashes() {
-		let src = "(eq 1 $/data/one)";
-		let matches = parse_json_pointer(src);
-		assert_eq!(matches, Some(("$/data/one", "/data/one")));
-	}
-
-	#[test]
-	fn basic_float() {
-		let program = "$";
-		let context = serde_json::json!(2.3);
-		let processed = process_json_pointers(program, &context).unwrap();
-		assert_eq!(processed, "2.3");
-	}
-
-	#[test]
-	fn basic_bool() {
-		let program = "$";
-		let context = serde_json::json!(true);
-		let processed = process_json_pointers(program, &context).unwrap();
-		assert_eq!(processed, "#t");
-	}
-
-	#[test]
-	fn underscore() {
-		let program = "(lte 0.05 $/pct_reviewed)";
-		let context = serde_json::json!({
-			"pct_reviewed": 0.15,
+	/// LookupJsonPointers writes to `value` in the JsonPointer Expr.
+	fn toplevel_bool_set() {
+		let expr = Expr::JsonPointer(JsonPointer {
+			pointer: "".to_owned(),
+			value: None,
 		});
-		let processed = process_json_pointers(program, &context).unwrap();
-		assert_eq!(processed, "(lte 0.05 0.15)");
+		let val = serde_json::json!(true);
+		let expected = Expr::JsonPointer(JsonPointer {
+			pointer: "".to_owned(),
+			value: Some(Box::new(Primitive::Bool(true).into())),
+		});
+
+		let result = LookupJsonPointers::with_context(&val).visit_expr(expr);
+		assert_eq!(result, Ok(expected))
 	}
 
 	#[test]
-	fn multiple() {
-		let program = "$/alpha $/bravo $/charlie";
-		let context = serde_json::json!({
-			"alpha": 4.5,
-			"bravo": false,
-			"charlie": [0, 1, 2, 3],
+	/// LookupJsonPointers writes to `value` in the JsonPointer Expr.
+	fn toplevel_f64_set() {
+		let expr = Expr::JsonPointer(JsonPointer {
+			pointer: "".to_owned(),
+			value: None,
 		});
-		let processed = process_json_pointers(program, &context).unwrap();
-		assert_eq!(processed, "4.5 #f [0 1 2 3]");
+		let val = serde_json::json!(1.23);
+		let expected = Expr::JsonPointer(JsonPointer {
+			pointer: "".to_owned(),
+			value: Some(Box::new(Primitive::Float(F64::new(1.23).unwrap()).into())),
+		});
+
+		let result = LookupJsonPointers::with_context(&val).visit_expr(expr);
+		assert_eq!(result, Ok(expected))
 	}
 
 	#[test]
 	fn error_lookup_failed() {
 		// Note spelling
-		let program = "$/alpa";
+		let expr = json_ptr("/alpa");
 		let context = serde_json::json!({
 			"alpha": 4.5,
 		});
-		let result = process_json_pointers(program, &context);
+		let result = LookupJsonPointers::with_context(&context).visit_expr(expr);
 		assert_eq!(
 			result,
 			Err(Error::JSONPointerLookupFailed {
@@ -232,51 +174,12 @@ mod tests {
 	}
 
 	#[test]
-	fn error_invalid_syntax() {
-		// Note missing '/' at beginning of pointer
-		let program = "$alpha";
-		let context = serde_json::json!({
-			"alpha": 4.5,
-		});
-		let result = process_json_pointers(program, &context);
-		assert_eq!(
-			result,
-			Err(Error::JSONPointerInvalidSyntax {
-				pointer: "alpha".into()
-			})
-		);
-	}
-
-	#[test]
-	fn multiple_errors() {
-		let program = "$/alpa $/brave";
-		let context = serde_json::json!({
-			"alpha": 4.5,
-			"bravo": false,
-		});
-		let result = process_json_pointers(program, &context);
-		assert_eq!(
-			result,
-			Err(Error::MultipleErrors(vec![
-				Error::JSONPointerLookupFailed {
-					pointer: "/alpa".into(),
-					context: context.clone(),
-				},
-				Error::JSONPointerLookupFailed {
-					pointer: "/brave".into(),
-					context: context.clone(),
-				},
-			]))
-		);
-	}
-
-	#[test]
 	fn error_unrepresentable_string() {
-		let program = "$/str";
+		let expr = json_ptr("/str");
 		let context = serde_json::json!({
 			"str": "Hello World!",
 		});
-		let result = process_json_pointers(program, &context);
+		let result = LookupJsonPointers::with_context(&context).visit_expr(expr);
 		assert_eq!(
 			result,
 			Err(Error::JSONPointerUnrepresentableType {
@@ -290,14 +193,14 @@ mod tests {
 
 	#[test]
 	fn error_unrepresentable_object() {
-		let program = "$/obj";
+		let expr = json_ptr("/obj");
 		let context = serde_json::json!({
 			"obj": {
 				"a": 4.5,
 				"b": true,
 			}
 		});
-		let result = process_json_pointers(program, &context);
+		let result = LookupJsonPointers::with_context(&context).visit_expr(expr);
 		assert_eq!(
 			result,
 			Err(Error::JSONPointerUnrepresentableType {
@@ -311,11 +214,11 @@ mod tests {
 
 	#[test]
 	fn error_unrepresentable_array_nonprimitive() {
-		let program = "$/array";
+		let expr = json_ptr("/array");
 		let context = serde_json::json!({
 			"array": [0, [5, 10], 100],
 		});
-		let result = process_json_pointers(program, &context);
+		let result = LookupJsonPointers::with_context(&context).visit_expr(expr);
 		assert_eq!(
 			result,
 			Err(Error::JSONPointerUnrepresentableType {
