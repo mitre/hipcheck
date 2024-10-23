@@ -139,8 +139,9 @@ pub struct Ident(pub String);
 /// A late-binding for a JSON pointer
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsonPointer {
-	pointer: String,
-	value: Option<serde_json::Value>,
+	/// The JSON Pointer source string, without the initial '$' character.
+	pub pointer: String,
+	pub value: Option<Box<Expr>>,
 }
 impl From<JsonPointer> for Expr {
 	fn from(value: JsonPointer) -> Self {

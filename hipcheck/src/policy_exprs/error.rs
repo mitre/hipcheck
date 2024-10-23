@@ -15,6 +15,9 @@ pub enum Error {
 	#[error("Multiple errors: {0:?}")]
 	MultipleErrors(Vec<Error>),
 
+	#[error("internal error")]
+	InternalError,
+
 	#[error("missing close paren")]
 	MissingOpenParen,
 

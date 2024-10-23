@@ -146,6 +146,7 @@ fn lex_ident(input: &mut Lexer<'_, Token>) -> Result<String> {
 }
 
 /// Lex a JSON Pointer.
+/// The initial '$' character is removed.
 fn lex_json_pointer(input: &mut Lexer<'_, Token>) -> Result<String> {
 	let token = input.slice();
 	// Remove the initial '$' character.

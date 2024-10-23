@@ -20,7 +20,7 @@ pub use crate::policy_exprs::{
 };
 use env::Binding;
 pub use expr::{parse, Primitive};
-use json_pointer::process_json_pointers;
+use json_pointer::LookupJsonPointers;
 use serde_json::Value;
 use std::ops::Deref;
 
@@ -45,9 +45,10 @@ impl Executor {
 
 	/// Run a `deke` program, but don't try to convert the result to a `bool`.
 	pub fn parse_and_eval(&self, raw_program: &str, context: &Value) -> Result<Expr> {
-		let processed_program = process_json_pointers(raw_program, context)?;
-		let program = parse(&processed_program)?;
-		let expr = self.env.visit_expr(program)?;
+		let program = parse(raw_program)?;
+		// JSON Pointer lookup failures happen on this line.
+		let processed_program = LookupJsonPointers::with_context(context).run(program)?;
+		let expr = self.env.visit_expr(processed_program)?;
 		Ok(expr)
 	}
 }
@@ -68,6 +69,34 @@ impl ExprMutator for Env<'_> {
 	fn visit_lambda(&self, l: Lambda) -> Result<Expr> {
 		Ok((*l.body).clone())
 	}
+	fn visit_json_pointer(&self, mut jp: JsonPointer) -> Result<Expr> {
+		let expr = jp.value;
+		match expr {
+			None => Err(Error::InternalError),
+			Some(expr) => Ok(*expr),
+		}
+	}
+}
+
+#[cfg(test)]
+mod visitor_tests {
+	use super::*;
+
+	#[test]
+	// TODO better test name?
+	fn toplevel_jsonptr_replaced() {
+		let expr = Expr::JsonPointer(
+			JsonPointer {
+				pointer: "".to_owned(),
+				value: Some(Box::new(Primitive::Bool(true).into())),
+		});
+		let expected = Primitive::Bool(true).into();
+
+		let result = Env::std().visit_expr(expr);
+		dbg!(&result);
+		//assert!(matches!(&result, Ok(Expr::JsonPointer(JsonPointer {value: Some(_), ..}))));
+		assert_eq!(result, Ok(expected))
+	}
 }
 
 #[cfg(test)]
@@ -79,6 +108,14 @@ mod tests {
 	fn run_bool() {
 		let program = "#t";
 		let context = Value::Null;
+		let is_true = Executor::std().run(program, &context).unwrap();
+		assert!(is_true);
+	}
+
+	#[test]
+	fn run_jsonptr_bool() {
+		let program = "$";
+		let context = Value::Bool(true);
 		let is_true = Executor::std().run(program, &context).unwrap();
 		assert!(is_true);
 	}

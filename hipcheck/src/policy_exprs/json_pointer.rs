@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//#![deny(unused)]
+
 use crate::policy_exprs::{
 	error,
 	error::{Error, Result},
 	expr::{Array, Expr, Primitive},
+	ExprMutator,
+	JsonPointer,
+	F64,
 };
 use ordered_float::NotNan;
 use regex::{Captures, Regex, RegexBuilder};
@@ -11,7 +16,7 @@ use serde_json::Value;
 
 /// Preprocess a Policy Expr source string by replacing JSON Pointer syntax with
 /// values looked up from the `context` data.
-pub(crate) fn process_json_pointers(raw_program: &str, context: &Value) -> Result<String> {
+fn process_json_pointers(raw_program: &str, context: &Value) -> Result<String> {
 	let re = json_pointer_regex();
 	let mut any_error: bool = false;
 	let mut errors: Vec<Error> = Vec::new();
@@ -154,6 +159,77 @@ fn json_array_item_to_policy_expr_primitive(
 			value: v.clone(),
 			context: context.clone(),
 		}),
+	}
+}
+
+/// Policy Expr stage that looks up JSON Pointers from the
+/// JSON `context` value.
+pub struct LookupJsonPointers<'val> {
+	val: &'val Value,
+}
+
+impl<'val> LookupJsonPointers<'val> {
+	pub fn with_context(val: &'val Value) -> Self {
+		LookupJsonPointers { val }
+	}
+
+}
+
+impl<'val> ExprMutator for LookupJsonPointers<'val> {
+	fn visit_json_pointer(&self, mut jp: JsonPointer) -> Result<Expr> {
+		let pointer = &jp.pointer;
+		let context = self.val;
+		let val = lookup_json_pointer(pointer, context)?;
+		let expr = json_to_policy_expr(val, pointer, context)?;
+		jp.value = Some(Box::new(expr));
+		Ok(jp.into())
+	}
+}
+
+#[cfg(test)]
+mod jpp_tests {
+	use super::*;
+
+	#[test]
+	// TODO better test name?
+	fn toplevel_bool_set() {
+		let expr = Expr::JsonPointer(
+			JsonPointer {
+				pointer: "".to_owned(),
+				value: None,
+		});
+		let val = serde_json::json!(true);
+		let expected = Expr::JsonPointer(
+			JsonPointer {
+				pointer: "".to_owned(),
+				value: Some(Box::new(Primitive::Bool(true).into())),
+		});
+
+		let result = LookupJsonPointers::with_context(&val).visit_expr(expr);
+		dbg!(&result);
+		assert!(matches!(&result, Ok(Expr::JsonPointer(JsonPointer {value: Some(_), ..}))));
+		assert_eq!(result, Ok(expected))
+	}
+
+	#[test]
+	// TODO better test name?
+	fn toplevel_f64_set() {
+		let expr = Expr::JsonPointer(
+			JsonPointer {
+				pointer: "".to_owned(),
+				value: None,
+		});
+		let val = serde_json::json!(1.23);
+		let expected = Expr::JsonPointer(
+			JsonPointer {
+				pointer: "".to_owned(),
+				value: Some(Box::new(Primitive::Float(F64::new(1.23).unwrap()).into())),
+		});
+
+		let result = LookupJsonPointers::with_context(&val).visit_expr(expr);
+		dbg!(&result);
+		assert!(matches!(&result, Ok(Expr::JsonPointer(JsonPointer {value: Some(_), ..}))));
+		assert_eq!(result, Ok(expected))
 	}
 }
 
