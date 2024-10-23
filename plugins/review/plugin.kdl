@@ -1,0 +1,14 @@
+publisher "mitre"
+name "review"
+version "0.1.0"
+license "Apache-2.0"
+entrypoint {
+  on arch="aarch64-apple-darwin" "./hc-mitre-review"
+  on arch="x86_64-apple-darwin" "./hc-mitre-review"
+  on arch="x86_64-unknown-linux-gnu" "./hc-mitre-review"
+  on arch="x86_64-pc-windows-msvc" "./hc-mitre-review"
+}
+
+dependencies {
+  plugin "mitre/github_api" version="0.1.0" manifest="./plugins/github_api/plugin.kdl"
+}
