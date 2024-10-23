@@ -30,8 +30,10 @@ members = [
     "plugins/entropy",
     "plugins/linguist",
     "plugins/review",
-    "plugins/binary"
-, "plugins/identity"]
+    "plugins/binary",
+    "plugins/identity",
+    "plugins/churn"
+]
 
 # Make sure Hipcheck is run with `cargo run`.
 #

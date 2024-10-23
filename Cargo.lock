@@ -444,6 +444,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "churn"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "hipcheck-sdk",
+ "log",
+ "pathbuf",
+ "salsa",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
