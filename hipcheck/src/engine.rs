@@ -65,10 +65,7 @@ fn default_query_explanation(
 	let core = db.core();
 	let key = get_plugin_key(publisher.as_str(), plugin.as_str());
 	let Some(p_handle) = core.plugins.get(&key) else {
-		return Err(hc_error!(
-			"Plugin '{}' not found",
-			key,
-		));
+		return Err(hc_error!("Plugin '{}' not found", key,));
 	};
 	Ok(p_handle.get_default_query_explanation().cloned())
 }
@@ -90,16 +87,12 @@ fn query(
 	};
 	// Initiate the query. If remote closed or we got our response immediately,
 	// return
-	eprintln!("Querying {plugin}::{query} with key {key:?}");
 	let mut ar = match runtime.block_on(p_handle.query(query, key))? {
 		PluginResponse::RemoteClosed => {
 			return Err(hc_error!("Plugin channel closed unexpected"));
 		}
 		PluginResponse::Completed(v) => return Ok(v),
-		PluginResponse::AwaitingResult(a) => {
-			eprintln!("awaiting result: {:?}", a);
-			a
-		}
+		PluginResponse::AwaitingResult(a) => a,
 	};
 	// Otherwise, the plugin needs more data to continue. Recursively query
 	// (with salsa memo-ization) to get the needed data, and resume our
@@ -114,7 +107,7 @@ fn query(
 				ar.key.clone(),
 			)?
 			.value;
-		eprintln!("Got answer {answer:?}, resuming");
+		eprintln!("Got answer, resuming");
 		ar = match runtime.block_on(p_handle.resume_query(ar, answer))? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));

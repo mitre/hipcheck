@@ -106,7 +106,7 @@ impl ActivePlugin {
 			concerns: vec![],
 		};
 
-		eprintln!("Resuming query with answer {query:?}");
+		eprintln!("Resuming query");
 
 		Ok(self.channel.query(query).await?.into())
 	}
