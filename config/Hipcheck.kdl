@@ -1,7 +1,7 @@
 plugins {
     plugin "mitre/activity" version="0.1.0"
     plugin "mitre/binary" version="0.1.0"
-    plugin "mitre/fuzz" version="0.1.0"
+    plugin "mitre/fuzz" version="0.1.0" manifest="./plugins/fuzz/plugin.kdl"
     plugin "mitre/review" version="0.1.0"
     plugin "mitre/typo" version="0.1.0"
     plugin "mitre/affiliation" version="0.1.0"

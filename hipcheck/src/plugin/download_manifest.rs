@@ -1,25 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{PluginId, PluginManifest, PluginName, PluginPublisher, PluginVersion};
 use crate::{
-	cache::plugin::HcPluginCache,
-	error::Error,
 	hc_error,
-	plugin::{
-		arch::Arch,
-		get_current_arch,
-		retrieval::{download_plugin, extract_plugin},
-	},
+	plugin::{arch::Arch, PluginVersion},
 	util::kdl::{extract_data, ParseKdlNode},
-	util::{
-		fs::{find_file_by_name, read_string},
-		http::agent::agent,
-	},
 };
-use fs_extra::dir::remove;
 use kdl::{KdlDocument, KdlNode, KdlValue};
-use std::{collections::HashSet, fmt::Display, io::Read, str::FromStr};
-use url::Url;
+use std::{fmt::Display, str::FromStr};
 
 #[cfg(test)]
 use crate::plugin::arch::KnownArch;
@@ -277,95 +264,6 @@ impl ParseKdlNode for DownloadManifestEntry {
 	}
 }
 
-impl DownloadManifestEntry {
-	/// This function does the following:
-	/// 1. Download specified plugin
-	/// 1. Verify its size and hash
-	/// 1. Extract plugin into plugin-specific folder
-	/// 1. Finds `plugin.kdl` inside plugin-specific folder and calls this recursively
-	pub fn download_and_unpack_plugin<'a>(
-		&self,
-		plugin_cache: &HcPluginCache,
-		publisher: &PluginPublisher,
-		name: &PluginName,
-		version: &PluginVersion,
-		downloaded_plugins: &'a mut HashSet<PluginId>,
-	) -> Result<&'a HashSet<PluginId>, Error> {
-		let current_arch = get_current_arch();
-
-		let plugin_id = PluginId::new(publisher.clone(), name.clone(), version.clone());
-
-		if downloaded_plugins.contains(&plugin_id) {
-			return Ok(downloaded_plugins);
-		}
-
-		// currently plugins are put in HC_CACHE/plugins/<publisher>/<name>/<version>
-		let download_dir = plugin_cache.plugin_download_dir(publisher, name, version);
-
-		let output_path = download_plugin(
-			&self.url,
-			download_dir.as_path(),
-			self.size.bytes,
-			&self.hash,
-		)
-		.map_err(|e| {
-			// delete any leftover remnants
-			let _ = remove(download_dir.as_path());
-			hc_error!("Error [{}] downloading '{}'", e, &self.url)
-		})?;
-
-		extract_plugin(
-			output_path.as_path(),
-			download_dir.as_path(),
-			self.compress.format,
-		)
-		.map_err(|e| {
-			// delete any leftover remnants
-			let _ = remove(download_dir.as_path());
-			hc_error!(
-				"Error [{}] extracting plugin '{}/{}' version {} for {}",
-				e,
-				publisher.0,
-				name.0,
-				version.0,
-				current_arch,
-			)
-		})?;
-
-		// locate the plugin manfiest for this plugin, read its contents and serialize to PluginManifest
-		let plugin_manifest_path = find_file_by_name(download_dir.as_path(), "plugin.kdl")?;
-		let contents = read_string(plugin_manifest_path)?;
-		let plugin_manifest = PluginManifest::from_str(contents.as_str())?;
-
-		downloaded_plugins.insert(plugin_id);
-
-		for dependency in plugin_manifest.dependencies.0.iter() {
-			let url = match &dependency.manifest {
-				Some(url) => url,
-				None => {
-					return Err(hc_error!(
-						"No manifest URL provided for {}/{} {}",
-						dependency.publisher.0,
-						dependency.name.0,
-						dependency.version.0
-					))
-				}
-			};
-
-			let download_manifest = DownloadManifest::from_network(url)?;
-
-			download_manifest.download_and_unpack_all_plugins(
-				plugin_cache,
-				&dependency.publisher,
-				&dependency.name,
-				&dependency.version,
-				downloaded_plugins,
-			)?;
-		}
-		Ok(downloaded_plugins)
-	}
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DownloadManifest {
 	pub entries: Vec<DownloadManifestEntry>,
@@ -380,59 +278,6 @@ impl DownloadManifest {
 	#[cfg(test)]
 	pub fn len(&self) -> usize {
 		self.entries.len()
-	}
-
-	/// fetch download manifest file from the network and parse it into a DownloadManifest
-	pub fn from_network(url: &Url) -> Result<Self, Error> {
-		let agent = agent();
-		let response = agent
-			.get(url.as_str())
-			.call()
-			.map_err(|e| hc_error!("Error [{}] retrieving download manifest {}", e, url))?;
-		let error_code = response.status();
-		if error_code != 200 {
-			return Err(hc_error!(
-				"HTTP error code {} when retrieving {}",
-				error_code,
-				url
-			));
-		}
-
-		// extract bytes from response
-		// preallocate 10 MB to cut down on number of allocations needed
-		let mut contents = Vec::with_capacity(10 * 1024 * 1024);
-		let amount_read = response
-			.into_reader()
-			.read_to_end(&mut contents)
-			.map_err(|e| hc_error!("Error [{}] reading download manifest into buffer", e))?;
-		contents.truncate(amount_read);
-		let contents = String::from_utf8_lossy(&contents);
-
-		// attempt to deserialize
-		let download_manifest = Self::from_str(&contents)?;
-		Ok(download_manifest)
-	}
-
-	/// Downloads all plugins specified in the download manifest file
-	pub fn download_and_unpack_all_plugins<'a>(
-		&self,
-		plugin_cache: &HcPluginCache,
-		publisher: &PluginPublisher,
-		name: &PluginName,
-		version: &PluginVersion,
-		downloaded_plugins: &'a mut HashSet<PluginId>,
-	) -> Result<&'a HashSet<PluginId>, Error> {
-		for entry in self.entries.iter() {
-			entry.download_and_unpack_plugin(
-				plugin_cache,
-				publisher,
-				name,
-				version,
-				downloaded_plugins,
-			)?;
-		}
-
-		Ok(downloaded_plugins)
 	}
 }
 
@@ -458,6 +303,7 @@ impl FromStr for DownloadManifest {
 mod test {
 	use super::*;
 	use std::str::FromStr;
+	use url::Url;
 
 	#[test]
 	fn test_parsing_hash_algorithm() {
@@ -536,7 +382,7 @@ mod test {
 		let raw_url = "https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz";
 		let node = KdlNode::from_str(format!(r#"url "{}""#, raw_url).as_str()).unwrap();
 		assert_eq!(
-			url::Url::parse_node(&node).unwrap(),
+			Url::parse_node(&node).unwrap(),
 			Url::parse(raw_url).unwrap()
 		);
 	}

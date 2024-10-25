@@ -47,7 +47,7 @@ impl Plugin for LinguistPlugin {
 			})?,
 			None => {
 				return Err(ConfigError::MissingRequiredConfig {
-					field_name: "langs_file".to_owned(),
+					field_name: "langs-file".to_owned(),
 					field_type: "string".to_owned(),
 					possible_values: vec![],
 				});
@@ -103,11 +103,11 @@ mod test {
 		let res = is_likely_source_file(&mut engine, source_path)
 			.await
 			.unwrap();
-		assert_eq!(true, res);
+		assert!(res);
 
 		let res = is_likely_source_file(&mut engine, not_source_path)
 			.await
 			.unwrap();
-		assert_eq!(false, res);
+		assert!(!res);
 	}
 }
