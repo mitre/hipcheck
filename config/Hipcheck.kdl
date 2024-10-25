@@ -19,8 +19,9 @@ analyze {
 
     category "practices" {
         analysis "mitre/activity" policy="(lte $ 52)" weight=3
-        analysis "mitre/binary" policy="(eq 0 (count $))" {
+        analysis "mitre/binary" {
 			binary-file "./config/Binary.toml"
+			binary-file-threshold "0"
 		}
         analysis "mitre/fuzz" policy="(eq #t $)"
         analysis "mitre/review" policy="(lte $ 0.05)"
