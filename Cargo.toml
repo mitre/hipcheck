@@ -29,7 +29,8 @@ members = [
     "plugins/fuzz",
     "plugins/entropy",
     "plugins/linguist",
-    "plugins/review"
+    "plugins/review",
+    "plugins/binary"
 ]
 
 # Make sure Hipcheck is run with `cargo run`.
