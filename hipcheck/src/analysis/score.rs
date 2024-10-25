@@ -8,7 +8,7 @@ use crate::{
 	engine::HcEngine,
 	error::Result,
 	hc_error,
-	plugin::QueryResult,
+	plugin::{QueryResult, MITRE_LEGACY_PLUGINS},
 	policy_exprs::Executor,
 	shell::spinner_phase::SpinnerPhase,
 };
@@ -61,19 +61,7 @@ impl PluginAnalysisResults {
 	/// Get all results from non-legacy analyses.
 	pub fn plugin_results(&self) -> impl Iterator<Item = (&Analysis, &PluginAnalysisResult)> {
 		self.table.iter().filter_map(|(analysis, result)| {
-			if [
-				REVIEW_PHASE,
-				IDENTITY_PHASE,
-				BINARY_PHASE,
-				ACTIVITY_PHASE,
-				FUZZ_PHASE,
-				TYPO_PHASE,
-				AFFILIATION_PHASE,
-				CHURN_PHASE,
-				ENTROPY_PHASE,
-			]
-			// Horrifying conversion, but necessary.
-			.contains(&(analysis.plugin).as_ref())
+			if MITRE_LEGACY_PLUGINS.contains(&analysis.plugin.as_str())
 				&& analysis.publisher == MITRE_PUBLISHER
 			{
 				None
@@ -229,7 +217,7 @@ fn wrapped_query(
 	query: String,
 	key: Value,
 ) -> Result<QueryResult> {
-	if publisher == *MITRE_PUBLISHER {
+	if publisher == *MITRE_PUBLISHER && MITRE_LEGACY_PLUGINS.contains(&plugin.as_str()) {
 		if query != *DEFAULT_QUERY {
 			return Err(hc_error!("legacy analyses only have a default query"));
 		}

@@ -3,8 +3,8 @@ name "github_api"
 version "0.1.0"
 license "Apache-2.0"
 entrypoint {
-  on arch="aarch64-apple-darwin" "./hc-mitre-github_api"
-  on arch="x86_64-apple-darwin" "./hc-mitre-github_api"
-  on arch="x86_64-unknown-linux-gnu" "./hc-mitre-github_api"
-  on arch="x86_64-pc-windows-msvc" "./hc-mitre-github_api"
+  on arch="aarch64-apple-darwin" "./target/debug/github_api"
+  on arch="x86_64-apple-darwin" "./target/debug/github_api"
+  on arch="x86_64-unknown-linux-gnu" "./target/debug/github_api"
+  on arch="x86_64-pc-windows-msvc" "./target/debug/github_api"
 }

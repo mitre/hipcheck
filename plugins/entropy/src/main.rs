@@ -20,6 +20,7 @@ use std::{
 
 #[derive(Deserialize)]
 struct Config {
+	#[serde(rename = "langs-file")]
 	langs_file: Option<PathBuf>,
 }
 
@@ -96,7 +97,7 @@ impl Plugin for EntropyPlugin {
 			})?,
 			None => {
 				return Err(ConfigError::MissingRequiredConfig {
-					field_name: "langs_file".to_owned(),
+					field_name: "langs-file".to_owned(),
 					field_type: "string".to_owned(),
 					possible_values: vec![],
 				});

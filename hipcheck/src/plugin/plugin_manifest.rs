@@ -3,12 +3,20 @@
 use crate::{
 	error::Error,
 	hc_error,
-	plugin::Arch,
+	plugin::{Arch, PluginId},
+	policy::policy_file::ManifestLocation,
 	string_newtype_parse_kdl_node,
-	util::kdl::{extract_data, ParseKdlNode},
+	util::{
+		fs::read_string,
+		kdl::{extract_data, ParseKdlNode},
+	},
 };
 use kdl::{KdlDocument, KdlNode};
-use std::{collections::HashMap, str::FromStr};
+use std::{
+	collections::HashMap,
+	path::{Path, PathBuf},
+	str::FromStr,
+};
 
 #[cfg(test)]
 use crate::plugin::arch::KnownArch;
@@ -79,27 +87,25 @@ impl ParseKdlNode for Entrypoints {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PluginDependency {
-	pub publisher: PluginPublisher,
-	pub name: PluginName,
-	pub version: PluginVersion,
+	/// identifier for this PluginDependency
+	pub plugin_id: PluginId,
 	// NOTE: until Hipcheck supports a registry, this is effectively required
-	pub manifest: Option<url::Url>,
+	pub manifest: Option<ManifestLocation>,
 }
 
 impl PluginDependency {
 	#[cfg(test)]
-	pub fn new(
-		publisher: PluginPublisher,
-		name: PluginName,
-		version: PluginVersion,
-		manifest: Option<url::Url>,
-	) -> Self {
+	pub fn new(plugin_id: PluginId, manifest: Option<ManifestLocation>) -> Self {
 		Self {
-			publisher,
-			name,
-			version,
+			plugin_id,
 			manifest,
 		}
+	}
+}
+
+impl AsRef<PluginId> for PluginDependency {
+	fn as_ref(&self) -> &PluginId {
+		&self.plugin_id
 	}
 }
 
@@ -126,22 +132,25 @@ impl ParseKdlNode for PluginDependency {
 		let version = PluginVersion(node.get("version")?.value().as_string()?.to_string());
 		let manifest = match node.get("manifest") {
 			Some(manifest) => {
-				let raw_url = manifest.value().as_string()?;
-				Some(url::Url::parse(raw_url).ok()?)
+				let manifest_location = manifest.value().as_string()?;
+				if let Ok(url) = url::Url::parse(manifest_location) {
+					Some(ManifestLocation::Url(url))
+				} else {
+					Some(ManifestLocation::Local(PathBuf::from(manifest_location)))
+				}
 			}
 			None => None,
 		};
+		let plugin_id = PluginId::new(publisher, name, version);
 
 		Some(Self {
-			name,
-			publisher,
-			version,
+			plugin_id,
 			manifest,
 		})
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct PluginDependencyList(pub Vec<PluginDependency>);
 
 impl PluginDependencyList {
@@ -190,6 +199,13 @@ impl PluginManifest {
 	pub fn get_entrypoint(&self, arch: &Arch) -> Option<String> {
 		self.entrypoints.0.get(arch).cloned()
 	}
+
+	pub fn from_file<P>(path: P) -> Result<Self, Error>
+	where
+		P: AsRef<Path>,
+	{
+		Self::from_str(read_string(path)?.as_str())
+	}
 }
 
 impl FromStr for PluginManifest {
@@ -210,8 +226,8 @@ impl FromStr for PluginManifest {
 			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'license'"))?;
 		let entrypoints: Entrypoints =
 			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'entrypoint'"))?;
-		let dependencies: PluginDependencyList =
-			extract_data(nodes).ok_or_else(|| hc_error!("Could not parse 'dependencies'"))?;
+		// Not a required field
+		let dependencies: PluginDependencyList = extract_data(nodes).unwrap_or_default();
 
 		Ok(Self {
 			publisher,
@@ -342,15 +358,17 @@ mod test {
 		assert_eq!(
 			PluginDependency::parse_node(&node).unwrap(),
 			PluginDependency::new(
-				PluginPublisher("mitre".to_string()),
-				PluginName("git".to_string()),
-				PluginVersion("0.1.0".to_string()),
-				Some(
+				PluginId::new(
+					PluginPublisher("mitre".to_string()),
+					PluginName("git".to_string()),
+					PluginVersion("0.1.0".to_string()),
+				),
+				Some(ManifestLocation::Url(
 					Url::parse(
 						"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl"
 					)
 					.unwrap()
-				)
+				))
 			)
 		);
 	}
@@ -364,27 +382,33 @@ mod test {
 		let node = KdlNode::from_str(dependencies).unwrap();
 		let mut expected = PluginDependencyList::new();
 		expected.push(PluginDependency::new(
-			PluginPublisher("mitre".to_string()),
-			PluginName("git".to_string()),
-			PluginVersion("0.1.0".to_string()),
+			PluginId::new(
+				PluginPublisher("mitre".to_string()),
+				PluginName("git".to_string()),
+				PluginVersion("0.1.0".to_string()),
+			),
 			Some(
-				url::Url::parse(
-					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl",
+				ManifestLocation::Url(
+					url::Url::parse(
+						"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl",
+					)
+					.unwrap(),
 				)
-				.unwrap(),
-			)
-			.to_owned(),
+				.to_owned(),
+			),
 		));
 		expected.push(PluginDependency::new(
-			PluginPublisher("mitre".to_string()),
-			PluginName("plugin2".to_string()),
-			PluginVersion("0.4.0".to_string()),
-			Some(
+			PluginId::new(
+				PluginPublisher("mitre".to_string()),
+				PluginName("plugin2".to_string()),
+				PluginVersion("0.4.0".to_string()),
+			),
+			Some(ManifestLocation::Url(
 				url::Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-plugin2.kdl",
 				)
 				.unwrap(),
-			),
+			)),
 		));
 		assert_eq!(PluginDependencyList::parse_node(&node).unwrap(), expected);
 	}
@@ -435,15 +459,17 @@ dependencies {
 
 		let mut dependencies = PluginDependencyList::new();
 		dependencies.push(PluginDependency::new(
-			PluginPublisher("mitre".to_string()),
-			PluginName("git".to_string()),
-			PluginVersion("0.1.0".to_string()),
-			Some(
+			PluginId::new(
+				PluginPublisher("mitre".to_string()),
+				PluginName("git".to_string()),
+				PluginVersion("0.1.0".to_string()),
+			),
+			Some(ManifestLocation::Url(
 				url::Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl",
 				)
 				.unwrap(),
-			),
+			)),
 		));
 
 		let expected_manifest = PluginManifest {

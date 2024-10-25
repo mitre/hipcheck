@@ -131,7 +131,7 @@ impl std::fmt::Display for ConfigError {
 		};
 		let err = match self.error {
 			Unknown => "unknown configuration error occurred",
-			MissingRequiredConfig => "configuration is missing requried fields",
+			MissingRequiredConfig => "configuration is missing required fields",
 			UnrecognizedConfig => "configuration contains unrecognized fields",
 			InvalidConfigValue => "configuration contains invalid values",
 		};

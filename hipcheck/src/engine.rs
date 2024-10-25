@@ -9,15 +9,11 @@ use crate::{
 		QueryResult,
 	},
 	policy::PolicyFile,
-	util::fs::{find_file_by_name, read_string},
 	Result,
 };
 use futures::future::{BoxFuture, FutureExt};
 use serde_json::Value;
-use std::{
-	str::FromStr,
-	sync::{Arc, LazyLock},
-};
+use std::sync::{Arc, LazyLock};
 use tokio::runtime::{Handle, Runtime};
 
 // Salsa doesn't natively support async functions, so our recursive `query()` function that
@@ -68,8 +64,11 @@ fn default_query_explanation(
 ) -> Result<Option<String>> {
 	let core = db.core();
 	let key = get_plugin_key(publisher.as_str(), plugin.as_str());
-	let Some(p_handle) = core.plugins.get(&plugin) else {
-		return Err(hc_error!("No such plugin {}", key));
+	let Some(p_handle) = core.plugins.get(&key) else {
+		return Err(hc_error!(
+			"Plugin '{}' not found",
+			key,
+		));
 	};
 	Ok(p_handle.get_default_query_explanation().cloned())
 }
@@ -84,6 +83,7 @@ fn query(
 	let runtime = RUNTIME.handle();
 	let core = db.core();
 	let hash_key = get_plugin_key(publisher.as_str(), plugin.as_str());
+
 	// Find the plugin
 	let Some(p_handle) = core.plugins.get(&hash_key) else {
 		return Err(hc_error!("No such plugin {}", hash_key));
@@ -237,25 +237,14 @@ pub fn start_plugins(
 
 	let mut plugins = vec![];
 	for plugin_id in required_plugin_names.iter() {
-		let plugin_dir = plugin_cache.plugin_download_dir(
-			&plugin_id.publisher,
-			&plugin_id.name,
-			&plugin_id.version,
-		);
-
-		// determine entrypoint for this plugin
-		let plugin_kdl = find_file_by_name(plugin_dir, "plugin.kdl")?;
-		let contents = read_string(&plugin_kdl)?;
-		let plugin_manifest = PluginManifest::from_str(contents.as_str())?;
+		let plugin_manifest = PluginManifest::from_file(plugin_cache.plugin_kdl(plugin_id))?;
 		let entrypoint = plugin_manifest
 			.get_entrypoint(&current_arch)
 			.ok_or_else(|| {
 				hc_error!(
-					"Could not find {} entrypoint for {}/{} {}",
+					"Could not find {} entrypoint for {}",
 					current_arch,
-					plugin_id.publisher.0,
-					plugin_id.name.0,
-					plugin_id.version.0
+					plugin_id
 				)
 			})?;
 
@@ -267,13 +256,7 @@ pub fn start_plugins(
 		// find and serialize config for plugin
 		let config = policy_file
 			.get_config(plugin_id.to_policy_file_plugin_identifier().as_str())
-			.ok_or_else(|| {
-				hc_error!(
-					"Could not find config for {} {}",
-					plugin_id.to_policy_file_plugin_identifier(),
-					plugin_id.version.0
-				)
-			})?;
+			.ok_or_else(|| hc_error!("Could not find config for {}", plugin_id))?;
 		let config = serde_json::to_value(&config).map_err(|_e| {
 			hc_error!(
 				"Error serializing config for {}",
