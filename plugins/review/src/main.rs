@@ -89,13 +89,13 @@ impl Plugin for ReviewPlugin {
 			log::error!("tried to access config before set by Hipcheck core!");
 			return Err(Error::UnspecifiedQueryState);
 		};
-		match conf.percent_threshold {
-			Some(threshold) => Ok(format!(
-				"(lte (divz (count (filter (eq #f) $)) (count $)) {})",
-				threshold
-			)),
-			None => Ok("".to_owned()),
-		}
+
+		let threshold = conf.percent_threshold.unwrap_or(0.05);
+
+		Ok(format!(
+			"(lte (divz (count (filter (eq #f) $)) (count $)) {})",
+			threshold
+		))
 	}
 
 	fn explain_default_query(&self) -> Result<Option<String>> {

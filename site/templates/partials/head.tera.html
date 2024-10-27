@@ -1,0 +1,34 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script rel="modulepreloaded" type="module" src="{{ get_url(path='js/header.mjs') }}"></script>
+
+<link rel="icon" href="{{ config.base_url }}/favicon.ico" sizes="any">
+<link rel="icon" href="{{ config.base_url }}/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{{ config.base_url }}/apple-touch-icon.png">
+<link rel="manifest" href="{{ config.base_url }}/manifest.webmanifest">
+
+{% if page and page.title %}
+    {% set title = page.title %}
+{% elif section and section.title %}
+    {% set title = section.title %}
+{% else %}
+    {% set title = config.extra.title %}
+{% endif %}
+
+{% if page and page.description %}
+    {% set description = page.description %}
+{% elif section and section.description %}
+    {% set description = section.description %}
+{% else %}
+    {% set description = config.extra.description %}
+{% endif %}
+
+<meta name="description" content="{{ description }}" />
+
+<meta property="og:title" content="{{ title }}" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="{{ current_url }}" />
+<meta property="og:description" content="{{ description }}" />
+
+<link href="https://rsms.me/inter/inter.css" rel="stylesheet">
+<link href="{{ get_url(path="main.css") }}" rel="stylesheet">

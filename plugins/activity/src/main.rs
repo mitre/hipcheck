@@ -75,10 +75,8 @@ impl Plugin for ActivityPlugin {
 			log::error!("tried to access config before set by Hipcheck core!");
 			return Err(Error::UnspecifiedQueryState);
 		};
-		match conf.weeks {
-			Some(weeks) => Ok(format!("lte $ P{}w", weeks)),
-			None => Ok("".to_owned()),
-		}
+
+		Ok(format!("lte $ P{}w", conf.weeks.unwrap_or(71)))
 	}
 
 	fn explain_default_query(&self) -> Result<Option<String>> {

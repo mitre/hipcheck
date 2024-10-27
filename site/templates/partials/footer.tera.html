@@ -1,19 +1,19 @@
 
-<div class="max-w-6xl mx-auto mt-32" id="footer">
+<div class="max-w-7xl mx-auto mt-24" id="footer">
     <div class="pb-16 px-4 lg:px-0">
-        <div class="lg:flex gap-8 dark:text-zinc-400 mb-10">
+        <div class="grid grid-cols-2 lg:grid-cols-8 gap-x-4 lg:gap-8 dark:text-neutral-400 mb-10">
 
-            <div class="lg:basis-1/4 text-lg my-8 lg:my-0">
+            <div class="col-span-2 lg:col-span-2 text-lg lg:my-0">
                 <a href="{{ get_url(path="@/_index.md") }}" class="hover:text-green-600 font-semibold">
                     Hipcheck <span class="leading-none font-extrabold text-green-600 text-2xl">✓</span>
                 </a>
-                <p class="text-sm text-zinc-500 mt-3 leading-6">
-                    Automated supply chain risk assessment for software packages.
+                <p class="text-sm text-neutral-500 mt-3 leading-6">
+                    Helping maintainers assess software packages for long term risk.
                 </p>
             </div>
 
             {% for list in config.extra.footer %}
-                <div class="lg:basis-1/4 text-sm lg:mt-[-1.75rem] my-8 lg:my-0">
+                <div class="col-span-1 lg:col-span-2 text-sm">
                     <ul>
                         {% for item in list %}
                             <li>
@@ -26,11 +26,13 @@
                                         {% set url = get_url(path=item.url) %}
                                     {% endif %}
 
-                                    <a href="{{ url }}" class="block mb-2 hover:text-blue-500">
-                                        {{ item.name }}
-                                        {% if item.external %}
-                                            <span class="text-xs text-zinc-500">↗</span>
-                                        {% endif %}
+                                    <a href="{{ url }}" class="group block mb-[6px]">
+                                        <span class="inlne-flex items-stretch -my-1 -mx-2 rounded-md py-1 px-2 group-hover:bg-blue-50 group-hover:text-blue-500">
+                                            {{ item.name }}
+                                            {% if item.external %}
+                                                <span class="text-xs text-neutral-500 group-hover:text-blue-500">↗</span>
+                                            {% endif %}
+                                        </span>
                                     </a>
                                 {% endif %}
                             </li>
@@ -39,8 +41,10 @@
                 </div>
             {% endfor %}
         </div>
-        <div class="lg:flex">
-            <p class="lg:basis-3/4 ml-auto pl-2 text-xs text-gray-400">Website served by GitHub Pages (<a class="underline hover:text-gray-500" href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">Privacy Policy</a>).</p>
+        <div class="lg:grid lg:grid-cols-8 lg:gap-8">
+            <div class="lg:col-span-6 lg:col-start-3">
+                <p class="ml-auto text-xs text-neutral-400">Website served by GitHub Pages (<a class="underline hover:text-neutral-500" href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">Privacy Policy</a>).</p>
+            </div>
         </div>
     </div>
 </div>

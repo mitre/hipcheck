@@ -124,13 +124,13 @@ impl Plugin for IdentityPlugin {
 	fn default_policy_expr(&self) -> Result<String> {
 		match self.policy_conf.get() {
 			None => Err(Error::UnspecifiedQueryState),
-			// If no policy vars, we have no default expr
-			Some(None) => Ok("".to_owned()),
-			// Use policy config vars to construct a default expr
-			Some(Some(percent_threshold)) => Ok(format!(
-				"(lte (divz (count (filter (eq #t) $)) (count $)) {})",
-				percent_threshold
-			)),
+			Some(config) => {
+				let percent_threshold = config.unwrap_or(0.2);
+				Ok(format!(
+					"(lte (divz (count (filter (eq #t) $)) (count $)) {})",
+					percent_threshold
+				))
+			}
 		}
 	}
 

@@ -1,26 +1,12 @@
 
 {% import "macros/icon.tera.html" as ic %}
 
-<nav class="
-        text-sm
-        py-4 px-1
-        lg:py-4 lg:px-8
-        ">
-    <ul class="
-            flex
-            justify-between lg:justify-start
-            gap-x-6
-            mx-4
-            ">
-        <li class="
-                block
-                lg:flex
-                lg:flex-1
-                items-stretch
-                ">
+<nav id="top" class="bg-white dark:bg-neutral-800 text-sm px-6 py-3 shadow-sm z-10 relative">
+    <ul class="flex justify-between lg:justify-start gap-x-8">
+        <li class="block lg:flex lg:flex-1 items-stretch">
             <a href="{{ get_url(path="@/_index.md") }}" class="
                     items-stretch content-center
-                    text-black dark:text-zinc-200 hover:text-green-600
+                    text-black dark:text-neutral-200 hover:text-green-600
                     text-xl
                     font-semibold
                     ">
@@ -30,17 +16,19 @@
             {% if config.extra.announce %}
                 <a href="{{ config.extra.announce.url }}" class="
                         hidden
-                        lg:inline
-                        rounded-3xl
-                        bg-sky-100 dark:bg-sky-900 hover:bg-sky-200 dark:hover:bg-sky-800
-                        text-sky-700 dark:text-sky-200 hover:text-sky-800 dark:hover:text-sky-100
-                        my-1
+                        lg:inline-flex
+                        items-center
+                        rounded-md
+                        border
+                        bg-sky-50 dark:bg-neutral-700 hover:bg-sky-100 dark:hover:bg-blue-800
+                        text-sky-700 dark:text-neutral-200 hover:text-sky-800 dark:hover:text-blue-100
+                        border-sky-200 hover:border-sky-400 dark:border-neutral-600
                         ml-8
                         px-3
                         leading-6
-                        text-xs
+                        text-sm
                         ">
-                    <span class="font-semibold">Announcement &middot;</span> {{ config.extra.announce.text }} ↗
+                    {{ ic::icon(name="star", classes="mr-2") }} {{ config.extra.announce.text }} ↗
                 </a>
             {% endif %}
         </li>
@@ -54,50 +42,123 @@
             <a href="#footer">{{ ic::icon(name=name, classes="mt-1 mr-2") }}</a>
         </li>
 
-        {% for item in config.extra.nav %}
-            <li class="
-                    hidden
-                    lg:flex
-                    items-stretch
-                    {% if item.sep %}
-                        border-r border-zinc-200 dark:border-zinc-700 border-solid
-                    {% endif %}
-                    ">
-                {% if not item.sep %}
-                    {% if item.url is starting_with("http") %}
-                        {% set url = item.url %}
-                    {% else %}
-                        {% set url = get_url(path=item.url) %}
-                    {% endif %}
+        <li class="hidden lg:flex">
+            <button id="search-button" class="
+                cursor-pointer
+                inline-flex
+                justify-between
+                group
+                hover:bg-blue-50
+                hover:border-blue-500
+                hover:outline
+                hover:outline-1
+                hover:outline-blue-500
+                dark:hover:bg-neutral-700
+                border
+                rounded-md
+                items-center
+                whitespace-nowrap
+                gap-2
+                h-9
+                px-4
+                text-xs
+                pl-2.5
+                pr-3
+                border-neutral-300
+                dark:border-neutral-700
+                shadow-sm
+                min-h-6
+                min-w-44">
+                    <span class="inline-flex items-center gap-2">
+                        {{ ic::icon(name="search", classes="group-hover:fill-blue-600 dark:fill-neutral-300") }}
+                        <span class="text-neutral-400 group-hover:text-blue-600 font-light text-sm leading-none -mb-[1px]">Search</span>
+                    </span>
+                    <span class="-mr-1 p-1 rounded-md bg-neutral-100 dark:bg-neutral-700 inline-flex items-center gap-1 text-neutral-600 dark:text-neutral-400 group-hover:bg-blue-100 group-hover:text-blue-600">{{ ic::icon(name="command") }} K</span>
+            </button>
+        </li>
 
-                    <a href="{{ url }}" {% if item.id %}id="{{ item.id }}"{% endif %} class="
-                            items-stretch
-                            text-black dark:text-zinc-200 hover:text-blue-500
-                            py-1.5
-                            font-normal
-                            {% if item.highlight %}
-                                font-semibold
-                                px-4
-                                bg-blue-600 hover:bg-green-500 hover:from-green-100
-                                text-blue-50 hover:text-green-50
-                                rounded-md
-                            {% else %}
-                                p-0
-                            {% endif %}
-                            ">
-                        {% if item.icon %}
-                            {% set name = item.icon %}
-                            {{ ic::icon(name=name, classes="mt-[-2px] ml-[-4px] mr-1") }}
-                        {% endif %}
-                        {% if not item.icononly %}
-                            {{ item.name }}
-                            {% if item.external %}
-                                ↗
-                            {% endif %}
-                        {% endif %}
-                    </a>
+        {% for item in config.extra.nav %}
+            <li class="hidden lg:flex items-center">
+                {% if item.url is starting_with("http") %}
+                    {% set url = item.url %}
+                {% else %}
+                    {% set url = get_url(path=item.url) %}
                 {% endif %}
+
+                <a href="{{ url }}" {% if item.id %}id="{{ item.id }}"{% endif %} class="
+                        items-stretch
+                        text-black dark:text-neutral-200 hover:text-blue-500
+                        py-1.5
+                        font-normal
+                        {% if item.highlight %}
+                            font-semibold
+                            px-4
+                            bg-blue-600 hover:bg-green-500 hover:from-green-100
+                            text-blue-50 hover:text-green-50
+                            rounded-md
+                        {% else %}
+                            p-0
+                        {% endif %}
+                        ">
+                    {% if item.icon %}
+                        {% set name = item.icon %}
+                        {{ ic::icon(name=name, classes="mt-[-2px] ml-[-4px] mr-1") }}
+                    {% endif %}
+                    {% if not item.icononly %}
+                        {{ item.name }}
+                        {% if item.external %}
+                            ↗
+                        {% endif %}
+                    {% endif %}
+                </a>
             </li>
         {% endfor %}
+
+        <li class="hidden lg:flex text-lg items-center -ml-3">
+            <div id="theme-selector" class="flex justify-stretch items-stretch bg-neutral-100 dark:bg-neutral-900 p-[2px] rounded-full w-9 hover:w-[6.25rem] transition-[width] ease-linear duration-75 delay-300 hover:delay-0 overflow-x-clip overflow-y-visible">
+                <a data-theme="light" class="
+                    theme-option
+                    data-[active]:bg-[radial-gradient(circle,_rgba(147,197,253,0.75)_0%,_rgba(147,197,253,0)_50%,_rgba(147,197,253,0)_100%)]
+                    dark:data-[active]:bg-[radial-gradient(circle,_rgba(147,197,253,0.25)_0%,_rgba(147,197,253,0)_50%,_rgba(147,197,253,0)_100%)]
+                    data-[active]:text-blue-600
+                    py-[2px] px-2
+                    rounded-full
+                    text-neutral-400
+                    hover:bg-blue-100
+                    dark:hover:bg-blue-500/25
+                    hover:text-blue-500
+                    " href="#">
+                    {{ ic::icon(name="sun", classes="mt-[-2px]") }}
+                </a>
+                <a data-theme="system" class="
+                    theme-option
+                    data-[active]:bg-[radial-gradient(circle,_rgba(147,197,253,0.75)_0%,_rgba(147,197,253,0)_50%,_rgba(147,197,253,0)_100%)]
+                    dark:data-[active]:bg-[radial-gradient(circle,_rgba(147,197,253,0.25)_0%,_rgba(147,197,253,0)_50%,_rgba(147,197,253,0)_100%)]
+                    data-[active]:text-blue-600
+                    py-[2px] px-2
+                    rounded-full
+                    text-neutral-400
+                    hover:bg-blue-100
+                    dark:hover:bg-blue-500/25
+                    hover:text-blue-500
+                    " href="#">
+                    {{ ic::icon(name="zap", classes="mt-[-2px]") }}
+                </a>
+                <a data-theme="dark" class="
+                    theme-option
+                    data-[active]:bg-[radial-gradient(circle,_rgba(147,197,253,0.75)_0%,_rgba(147,197,253,0)_50%,_rgba(147,197,253,0)_100%)]
+                    dark:data-[active]:bg-[radial-gradient(circle,_rgba(147,197,253,0.25)_0%,_rgba(147,197,253,0)_50%,_rgba(147,197,253,0)_100%)]
+                    data-[active]:text-blue-600
+                    py-[2px] px-2
+                    rounded-full
+                    text-neutral-400
+                    hover:bg-blue-100
+                    dark:hover:bg-blue-500/25
+                    hover:text-blue-500
+                    " href="#">
+                    {{ ic::icon(name="moon", classes="mt-[-2px]") }}
+                </a>
+            </div>
+        </li>
     </ul>
 </nav>

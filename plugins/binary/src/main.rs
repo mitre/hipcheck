@@ -5,7 +5,6 @@ mod error;
 mod fs;
 
 use crate::binary_detector::{detect_binary_files, BinaryFileDetector};
-
 use clap::Parser;
 use hipcheck_sdk::{
 	prelude::*,
@@ -13,7 +12,6 @@ use hipcheck_sdk::{
 };
 use pathbuf::pathbuf;
 use serde::Deserialize;
-
 use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
 pub static DETECTOR: OnceLock<BinaryFileDetector> = OnceLock::new();
@@ -109,10 +107,7 @@ impl Plugin for BinaryPlugin {
 	fn default_policy_expr(&self) -> Result<String> {
 		match self.policy_conf.get() {
 			None => Err(Error::UnspecifiedQueryState),
-			// If no policy vars, we have no default expr
-			Some(None) => Ok("".to_owned()),
-			// Use policy config vars to construct a default expr
-			Some(Some(policy_conf)) => Ok(format!("(lte $ {})", policy_conf)),
+			Some(policy_conf) => Ok(format!("(lte (count $) {})", policy_conf.unwrap_or(0))),
 		}
 	}
 

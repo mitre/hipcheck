@@ -2,8 +2,5 @@
 title: Blog
 sort_by: date
 template: blog.html
+page_template: blog_post.html
 ---
-
-# Hipcheck Development Blog
-
-Updates from the people building Hipcheck.
