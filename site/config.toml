@@ -1,56 +1,66 @@
 # The URL of the side.
 base_url = "https://mitre.github.io/hipcheck"
 
+# Generate an Atom feed for the blog.
+generate_feeds = true
+
 # Don't use Sass
 compile_sass = false
 
-# Build the search engine.
+# Build the search index.
 build_search_index = true
+
+[search]
+
+# Use the elasticlunr format for the search index.
+index_format = "elasticlunr_json"
 
 [markdown]
 
 # Use syntax highlighting.
 highlight_code = true
+highlight_theme = "ayu-light"
 
 [extra]
 
+# Backup title used in meta tags and social sharing cards.
+title = "Hipcheck"
+
+# Backup description used in meta tags and social sharing cards.
+description = "Helping maintainers assess software packages for long-term risk."
+
 # Define the site navigation.
 nav = [
-    { name = "Documentation", url = "@/docs/_index.md" },
-    { name = "Contribute", url = "@/contribute/_index.md" },
-    # TODO: Uncomment this when the blog is ready.
-    # { name = "Blog", url = "@/blog/_index.md" },
-    { sep = true },
+    { name = "Docs", url = "@/docs/_index.md" },
+    { name = "Contribute", url = "@/docs/contributing/_index.md" },
+    { name = "Blog", url = "@/blog/_index.md" },
     { name = "Get Help", url = "https://github.com/mitre/hipcheck/discussions", icon = "life-buoy", external = true },
-    { name = "Install", url = "@/install/_index.md", highlight = true, icon = "arrow-down" },
-    { sep = true },
+    { name = "Install", url = "@/docs/getting-started/install.md", highlight = true, icon = "arrow-down" },
     { url = "https://github.com/mitre/hipcheck", icon = "github", icononly = true },
-    { url = "#", icon = "sun", icononly = true, id = "toggle-darkmode" },
 ]
 
 # Define the site footer.
 footer = [
     [
         { name = "Documentation", title = true },
-        { name = "Quickstart", url = "@/docs/quickstart/_index.md" },
+        { name = "Getting Started", url = "@/docs/getting-started/_index.md" },
         { name = "Complete Guide", url = "@/docs/guide/_index.md" },
-        { name = "Requests for Discussion", url = "@/rfds/_index.md" },
-        # TODO: Uncomment this when the blog is ready.
-        # { name = "Development Blog", url = "@/blog/_index.md" },
+        { name = "Requests for Discussion", url = "@/docs/rfds/_index.md" },
+        { name = "Blog", url = "@/blog/_index.md" },
         { name = "Project", title = true },
-        { name = "Hipcheck Values", url = "@/rfds/0002-hipchecks-values.md" },
+        { name = "Hipcheck Values", url = "@/docs/rfds/0002-hipchecks-values.md" },
         { name = "Open Source License", url = "https://github.com/mitre/hipcheck/blob/main/LICENSE", external = true },
         { name = "Code of Conduct", url = "https://github.com/mitre/hipcheck/blob/main/CODE_OF_CONDUCT.md", external = true },
     ],
     [
         { name = "Install", title = true },
-        { name = "Installer", url = "@/install/_index.md" },
+        { name = "Installer", url = "@/docs/getting-started/install.md" },
         { name = "Container Image", url = "https://hub.docker.com/r/mitre/hipcheck", external = true },
         { name = "Release Notes", url = "https://github.com/mitre/hipcheck/releases", external = true },
         { name = "Changelog", url = "https://github.com/mitre/hipcheck/blob/main/CHANGELOG.md", external = true },
         { name = "Packages", title = true },
-        { name = "GitHub", url = "https://github.com/mitre/hipcheck", external = true },
-        { name = "Crates.io", url = "https://crates.io/crates/hipcheck", external = true },
+        { name = "Hipcheck", url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.7.0", external = true },
+        { name = "Rust Plugin SDK", url = "https://crates.io/crates/hipcheck-sdk", external = true },
     ],
     [
         { name = "Contribute", title = true },

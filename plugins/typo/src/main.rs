@@ -137,15 +137,9 @@ impl Plugin for TypoPlugin {
 	}
 
 	fn default_policy_expr(&self) -> Result<String> {
-		match self.policy_conf.get() {
-			None => Err(Error::UnspecifiedQueryState),
-			// If no policy vars, we have no default expr
-			Some(None) => Ok("".to_owned()),
-			// Use policy config vars to construct a default expr
-			Some(Some(policy_conf)) => {
-				Ok(format!("(lte (count (filter (eq #t) $)) {})", policy_conf))
-			}
-		}
+		let conf = self.policy_conf.get().ok_or(Error::UnspecifiedQueryState)?;
+		let threshold = conf.unwrap_or(0);
+		Ok(format!("(lte (count (filter (eq #t) $)) {})", threshold))
 	}
 
 	fn explain_default_query(&self) -> Result<Option<String>> {

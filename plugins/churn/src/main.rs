@@ -10,18 +10,16 @@ use crate::{
 	metric::*,
 	types::{CommitChurn, CommitChurnFreq, CommitDiff},
 };
-
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::Target};
 use serde::Deserialize;
-use tokio::sync::Mutex;
-
 use std::{
 	collections::HashMap,
 	path::PathBuf,
 	result::Result as StdResult,
 	sync::{Arc, OnceLock},
 };
+use tokio::sync::Mutex;
 
 #[derive(Deserialize)]
 struct RawConfig {
@@ -242,6 +240,7 @@ struct ChurnPlugin {
 impl Plugin for ChurnPlugin {
 	const PUBLISHER: &'static str = "mitre";
 	const NAME: &'static str = "churn";
+
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		// Deserialize and validate the config struct
 		let conf: Config = serde_json::from_value::<RawConfig>(config)
@@ -249,20 +248,24 @@ impl Plugin for ChurnPlugin {
 				message: e.to_string(),
 			})?
 			.try_into()?;
+
 		// Store the PolicyExprConf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
 			.set(conf.opt_policy)
 			.map_err(|_| ConfigError::Unspecified {
 				message: "plugin was already configured".to_string(),
 			})?;
+
 		// Use the langs file to create a SourceFileDetector and init the salsa db
 		let sfd =
 			SourceFileDetector::load(conf.langs_file).map_err(|e| ConfigError::Unspecified {
 				message: e.to_string(),
 			})?;
+
 		let mut database = Linguist::new();
 		database.set_source_file_detector(Arc::new(sfd));
 		let global_db = Arc::new(Mutex::new(database));
+
 		// Make the salsa db globally accessible
 		DATABASE
 			.set(global_db)
@@ -274,13 +277,22 @@ impl Plugin for ChurnPlugin {
 	fn default_policy_expr(&self) -> Result<String> {
 		match self.policy_conf.get() {
 			None => Err(Error::UnspecifiedQueryState),
-			// If no policy vars, we have no default expr
-			Some(None) => Ok("".to_owned()),
-			// Use policy config vars to construct a default expr
-			Some(Some(policy_conf)) => Ok(format!(
-				"(lte (divz (count (filter (gt {}) $)) (count $)) {})",
-				policy_conf.churn_freq, policy_conf.commit_percentage
-			)),
+			Some(policy_conf) => {
+				let churn_freq = policy_conf
+					.as_ref()
+					.map(|conf| conf.churn_freq)
+					.unwrap_or(3.0);
+
+				let commit_percentage = policy_conf
+					.as_ref()
+					.map(|conf| conf.commit_percentage)
+					.unwrap_or(0.02);
+
+				Ok(format!(
+					"(lte (divz (count (filter (gt {}) $)) (count $)) {})",
+					churn_freq, commit_percentage
+				))
+			}
 		}
 	}
 

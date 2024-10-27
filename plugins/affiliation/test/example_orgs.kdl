@@ -1,4 +1,5 @@
 strategy "independent"
+
 orgs {
     org "AT&T" country="United States" {
         host "att.com"

@@ -51,6 +51,12 @@ jobs:
           mv tailwindcss "${HOME}/.local/bin/tailwindcss"
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
+      # Install the latest major version of Deno.
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
       # Setup GitHub Pages
       #
       # Specifically, this sets some variables we can use in later steps that
@@ -70,6 +76,8 @@ jobs:
           cd site
           zola build
           tailwindcss -i styles/main.css -o public/main.css
+          cd scripts
+          deno task bundle
 
       # Upload the output of the build as an Actions artifact so the deploy
       # step can pick it up and use it.

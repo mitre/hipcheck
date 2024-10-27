@@ -154,6 +154,7 @@ struct EntropyPlugin {
 impl Plugin for EntropyPlugin {
 	const PUBLISHER: &'static str = "mitre";
 	const NAME: &'static str = "entropy";
+
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		// Deserialize and validate the config struct
 		let conf: Config = serde_json::from_value::<RawConfig>(config)
@@ -161,19 +162,23 @@ impl Plugin for EntropyPlugin {
 				message: e.to_string(),
 			})?
 			.try_into()?;
+
 		// Store the PolicyExprConf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
 			.set(conf.opt_policy)
 			.map_err(|_| ConfigError::Unspecified {
 				message: "plugin was already configured".to_string(),
 			})?;
+
 		let sfd =
 			SourceFileDetector::load(conf.langs_file).map_err(|e| ConfigError::Unspecified {
 				message: e.to_string(),
 			})?;
+
 		let mut database = Linguist::new();
 		database.set_source_file_detector(Arc::new(sfd));
 		let global_db = Arc::new(Mutex::new(database));
+
 		DATABASE
 			.set(global_db)
 			.map_err(|_e| ConfigError::Unspecified {
@@ -184,13 +189,22 @@ impl Plugin for EntropyPlugin {
 	fn default_policy_expr(&self) -> Result<String> {
 		match self.policy_conf.get() {
 			None => Err(Error::UnspecifiedQueryState),
-			// If no policy vars, we have no default expr
-			Some(None) => Ok("".to_owned()),
-			// Use policy config vars to construct a default expr
-			Some(Some(policy_conf)) => Ok(format!(
-				"(lte (divz (count (filter (gt {}) $)) (count $)) {})",
-				policy_conf.entropy_threshold, policy_conf.commit_percentage
-			)),
+			Some(policy_conf) => {
+				let entropy_threshold = policy_conf
+					.as_ref()
+					.map(|conf| conf.entropy_threshold)
+					.unwrap_or(10.0);
+
+				let commit_percentage = policy_conf
+					.as_ref()
+					.map(|conf| conf.commit_percentage)
+					.unwrap_or(0.0);
+
+				Ok(format!(
+					"(lte (divz (count (filter (gt {}) $)) (count $)) {})",
+					entropy_threshold, commit_percentage
+				))
+			}
 		}
 	}
 

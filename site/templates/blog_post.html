@@ -1,0 +1,39 @@
+{% extends "bases/blog.tera.html" %}
+
+{% block title %}
+    {% if section.title %}
+        {{ section.title }}
+    {% else %}
+        Hipcheck
+    {% endif %}
+{% endblock %}
+
+{% block blog_header %}
+<div class="grid grid-cols-1 lg:grid-cols-10 gap-8 mb-12 pt-24 pb-4">
+    <div class="lg:col-span-8 lg:col-start-2">
+        <h1 class="text-3xl lg:text-4xl font-bold text-center pb-6 dark:text-neutral-100">{{ page.title }}</h1>
+        <div class="flex gap-4 items-center w-fit mx-auto">
+            <div class="flex-initial">
+                <div class="bg-white dark:bg-neutral-700 rounded-full p-1 shadow-sm border border-neutral-300 dark:border-neutral-600">
+                    <img class="rounded-full w-10 h-10" src="{{ config.base_url }}/{{ page.extra.author_img }}">
+                </div>
+            </div>
+            <div class="flex-shrink text-neutral-500 group-hover:text-blue-500 text-sm leading-relaxed">
+                <p>Written by {{ page.authors.0 }}</p>
+                <p>Posted on {{ page.date | date(format="%B %-d, %Y") }}</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+    <div class="grid lg:grid-cols-10 lg:gap-8">
+        <div class="lg:col-span-8 lg:col-start-2">
+            <div class="prose lg:prose-lg mx-auto {% include 'partials/prose-config.tera.html' %}">
+                {{ page.content | safe }}
+            </div>
+        </div>
+    </div>
+{% endblock %}

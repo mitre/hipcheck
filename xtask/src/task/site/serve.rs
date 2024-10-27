@@ -15,6 +15,15 @@ macro_rules! cmd {
 			Ok::<(), anyhow::Error>(())
 		}
 	};
+
+	($cmd:literal, from: $path:literal) => {
+		move || {
+			let sh = Shell::new()?;
+			sh.change_dir(pathbuf![&workspace::root()?, "site", $path]);
+			xshell::cmd!(sh, $cmd).quiet().run()?;
+			Ok::<(), anyhow::Error>(())
+		}
+	};
 }
 
 /// Execute the `site serve` task.
@@ -22,6 +31,7 @@ pub fn run(args: SiteServeArgs) -> Result<()> {
 	// Check our dependencies.
 	which::which("tailwindcss").context("`site serve` requires `tailwindcss` to be installed")?;
 	which::which("zola").context("`site serve` requires `zola` to be installed")?;
+	which::which("deno").context("`site serve` requires `deno` to be installed")?;
 
 	// When building for a dev environment, specify the base_url explicitly.
 	// Otherwise use the default one from the Zola configuration.
@@ -39,6 +49,7 @@ pub fn run(args: SiteServeArgs) -> Result<()> {
 				"tailwindcss -i styles/main.css -o public/main.css --watch=always"
 			)),
 		),
+		("deno", spawn(cmd!("deno task dev", from: "scripts"))),
 	];
 
 	// Let the user know the site is up.

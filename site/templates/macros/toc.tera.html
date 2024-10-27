@@ -1,23 +1,39 @@
 
-{% macro toc_level(content) %}
+{% macro toc_level(content, level) %}
     <ol class="">
         {% for item in content %}
-            <li class="pl-4">
-                <a class="text-blue-500 block py-2 hover:underline" href="{{ item.permalink }}">{{ item.title }}</a>
+            <li class="text-neutral-500 dark:text-neutral-400 pl-2 ml-2 py-[2px] {% if level > 1 %} border-l border-neutral-200 dark:border-neutral-700 {% endif %}">
+                {% set prefix = config.base_url ~ current_path %}
+                {% set link = item.permalink | replace(from=prefix, to="") %}
+
+                <a class="block px-2 py-1 hover:bg-blue-50 hover:text-blue-500 rounded-md" href="{{ link }}">{{ item.title }}</a>
 
                 {% if item.children %}
                     {% set children = item.children %}
-                    {{ toc::toc_level(content=children) }}
+                    {{ toc::toc_level(content=children, level = level + 1) }}
                 {% endif %}
             </li>
+        {% else %}
+            {% if level == 1 %}
+                <div class="pl-6 text-neutral-500 text-sm">
+                    <p>No table of contents.</p>
+                </div>
+            {% endif %}
         {% endfor %}
     </ol>
 {% endmacro toc_level %}
 
-{% macro toc(content) %}
-    <div class="mt-16 text-sm dark:text-zinc-300 border border-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg pb-2">
-        <span class="font-semibold block p-4 pb-2">Table of Contents</span>
+{% macro toc(content, is_doc=false) %}
+    <div class="text-sm dark:text-neutral-300 {% if is_doc %} mt-14 -mx-4 {% else %} mt-24 border-l border-neutral-200 {% endif %}">
+        <span class="font-semibold pb-4 flex justify-between items-center">
+            On This Page
+            <a class="inline-flex justify-center items-center gap-1 text-xs font-normal text-neutral-500 dark:text-neutral-200 p-1 pl-2 bg-neutral-100 dark:bg-neutral-700 rounded-md hover:bg-blue-50 hover:text-blue-500" href="#top"><span>To Top</span> {{ ic::icon(name="arrow-up") }}</a>
+        </span>
 
-        {{ toc::toc_level(content=content) }}
+        <div class="-ml-6">
+            {% if content | length > 0 %}
+                {{ toc::toc_level(content=content[0].children, level=1) }}
+            {% endif %}
+        </div>
     </div>
 {% endmacro toc %}

@@ -41,9 +41,17 @@ jobs:
           mv tailwindcss "${HOME}/.local/bin/tailwindcss"
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
+      # Install the latest major version of Deno.
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
       # Build the actual site with Zola and Tailwind.
       - name: Build Hipcheck Website
         run: |
           cd site
           zola build
           tailwindcss -i styles/main.css -o public/main.css
+          cd scripts
+          deno task bundle
