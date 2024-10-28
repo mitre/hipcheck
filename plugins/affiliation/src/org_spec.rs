@@ -148,7 +148,7 @@ mod test {
 
 		let expected = OrgSpec { strategy, orgs };
 
-		let org_spec_path = pathbuf![&env::current_dir().unwrap(), "test", "example_orgs.kdl"];
+		let org_spec_path = pathbuf![&env::current_dir().unwrap(), "test", "test_orgs.kdl"];
 
 		let result = OrgSpec::load_from(&org_spec_path).unwrap();
 
