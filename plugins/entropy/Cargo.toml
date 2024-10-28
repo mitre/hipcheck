@@ -12,7 +12,7 @@ dashmap = { version = "6.1.0", features = ["inline", "rayon"] }
 finl_unicode = { version = "1.2.0", features = ["grapheme_clusters"] }
 futures = "0.3.31"
 hipcheck-sdk = { version = "0.1.0", path = "../../sdk/rust", features = ["macros"] }
-ordered-float = { version = "4.3.0", features = ["serde"] }
+ordered-float = { version = "4.4.0", features = ["serde"] }
 pathbuf = "1.0.0"
 rayon = "1.10.0"
 salsa = "0.16.1"
