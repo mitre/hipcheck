@@ -16,6 +16,7 @@ use crate::{
 	plugin::PluginVersion,
 };
 
+use serde_json::Value;
 use std::collections::HashMap;
 use url::Url;
 
@@ -42,7 +43,7 @@ pub fn config_to_policy(config: Config) -> Result<PolicyFile> {
 		PolicyPluginName::new("mitre/github_api")?,
 		PolicyConfig(HashMap::from_iter(vec![(
 			"api-token-var".to_owned(),
-			"HC_GITHUB_TOKEN".to_owned(),
+			Value::String("HC_GITHUB_TOKEN".to_owned()),
 		)])),
 	)]);
 
@@ -315,7 +316,10 @@ fn parse_typo(plugins: &mut PolicyPluginList, attacks: &mut PolicyCategory, typo
 		let file = typo.typo_file.clone();
 		let mut config = PolicyConfig::new();
 		config
-			.insert("typo-file".to_string(), format!("./config/{}", file))
+			.insert(
+				"typo-file".to_string(),
+				Value::String(format!("./config/{}", file)),
+			)
 			.unwrap();
 
 		// Add the plugin
@@ -357,7 +361,10 @@ fn parse_affiliation(
 		let file = affiliation.orgs_file.clone();
 		let mut config = PolicyConfig::new();
 		config
-			.insert("orgs-file".to_string(), format!("./config/{}", file))
+			.insert(
+				"orgs-file".to_string(),
+				Value::String(format!("./config/{}", file)),
+			)
 			.unwrap();
 
 		// Add the plugin

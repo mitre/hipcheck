@@ -11,6 +11,7 @@ use crate::{
 };
 
 use kdl::KdlNode;
+use serde_json::Value;
 use std::{collections::HashMap, fmt, fmt::Display, path::PathBuf};
 use url::Url;
 
@@ -149,15 +150,34 @@ impl ParseKdlNode for PolicyPluginList {
 	}
 }
 
+fn try_to_serde_json(value: &kdl::KdlValue) -> Result<Value> {
+	use kdl::KdlValue::*;
+	let value = value.clone();
+	Ok(match value {
+		RawString(s) => Value::String(s),
+		String(s) => Value::String(s),
+		Base2(i) | Base8(i) | Base10(i) | Base16(i) => Value::Number(
+			serde_json::Number::from_i128(i.into())
+				.ok_or_else(|| hc_error!("kdl value contained an extremely large int"))?,
+		),
+		Base10Float(f) => Value::Number(
+			serde_json::Number::from_f64(f)
+				.ok_or_else(|| hc_error!("kdl value contained infinite or NaN float"))?,
+		),
+		Bool(b) => Value::Bool(b),
+		Null => Value::Null,
+	})
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct PolicyConfig(pub HashMap<String, String>);
+pub struct PolicyConfig(pub HashMap<String, Value>);
 
 impl PolicyConfig {
 	pub fn new() -> Self {
 		Self(HashMap::new())
 	}
 
-	pub fn insert(&mut self, description: String, info: String) -> Result<()> {
+	pub fn insert(&mut self, description: String, info: Value) -> Result<()> {
 		match self.0.insert(description.clone(), info) {
 			Some(_duplicate_key) => Err(hc_error!(
 				"Duplicate configuration information specified for {}",
@@ -173,7 +193,7 @@ impl PolicyConfig {
 	}
 
 	#[allow(dead_code)]
-	pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> {
+	pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
 		self.0.iter()
 	}
 }
@@ -189,7 +209,13 @@ impl ParseKdlNode for PolicyConfig {
 			let description = node.name().to_string();
 			if let Some(info) = node.entries().first() {
 				if config
-					.insert(description.clone(), info.value().as_string()?.to_string())
+					.insert(
+						description.clone(),
+						try_to_serde_json(info.value()).unwrap_or_else(|e| {
+							log::error!("error converting KDL node to serde_json::Value: {e:?}");
+							Value::Null
+						}),
+					)
 					.is_err()
 				{
 					log::error!(
