@@ -120,7 +120,7 @@ tokio = { version = "1.40.0", features = [
 tokio-stream = "0.1.16"
 toml = "0.8.19"
 tonic = "0.12.3"
-thiserror = "1.0.64"
+thiserror = "1.0.65"
 unicode-normalization = "0.1.24"
 ureq = { version = "2.10.1", default-features = false, features = [
     "json",
