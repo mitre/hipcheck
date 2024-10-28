@@ -738,7 +738,7 @@ fn add_analysis(
 	};
 	let raw_policy = match analysis.policy_expression {
         Some(x) => x,
-        None => core.default_policy_expr(publisher.0.clone(), plugin.0.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file"))?
+        None => core.default_policy_expr(publisher.0.clone(), plugin.0.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file", publisher.0, plugin.0))?
     };
 	let analysis = Analysis {
 		publisher: publisher.0,

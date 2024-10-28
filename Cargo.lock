@@ -1588,6 +1588,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "identity"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "hipcheck-sdk",
+ "log",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "idna"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
