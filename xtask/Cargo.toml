@@ -7,7 +7,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = "1.0.90"
+anyhow = "1.0.91"
 clap = { version = "4.5.18", features = ["cargo", "derive"] }
 clap-verbosity-flag = "2.2.2"
 env_logger = "0.11.5"

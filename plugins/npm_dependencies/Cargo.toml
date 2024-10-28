@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = "1.0.90"
+anyhow = "1.0.91"
 clap = { version = "4.5.18", features = ["derive"] }
 hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"]}
 log = "0.4.22"
