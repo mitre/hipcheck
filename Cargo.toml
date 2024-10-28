@@ -31,7 +31,7 @@ members = [
     "plugins/linguist",
     "plugins/review",
     "plugins/binary"
-]
+, "plugins/identity"]
 
 # Make sure Hipcheck is run with `cargo run`.
 #
