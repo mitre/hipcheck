@@ -12,6 +12,7 @@ mod test {
 
 	use kdl::KdlNode;
 	use pathbuf::pathbuf;
+	use serde_json::Value;
 	use std::{env, str::FromStr};
 	use url::Url;
 
@@ -96,7 +97,10 @@ mod test {
 
 		let mut config = PolicyConfig::new();
 		config
-			.insert("typo-file".to_string(), "./config/typo.kdl".to_string())
+			.insert(
+				"typo-file".to_string(),
+				Value::String("./config/typo.kdl".to_string()),
+			)
 			.unwrap();
 
 		let expected = PolicyAnalysis::new(
@@ -118,7 +122,10 @@ mod test {
 
 		let mut config = PolicyConfig::new();
 		config
-			.insert("typo-file".to_string(), "./config/typo.kdl".to_string())
+			.insert(
+				"typo-file".to_string(),
+				Value::String("./config/typo.kdl".to_string()),
+			)
 			.unwrap();
 
 		let expected = PolicyAnalysis::new(
@@ -141,10 +148,16 @@ mod test {
 
 		let mut config = PolicyConfig::new();
 		config
-			.insert("typo-file".to_string(), "./config/typo.kdl".to_string())
+			.insert(
+				"typo-file".to_string(),
+				Value::String("./config/typo.kdl".to_string()),
+			)
 			.unwrap();
 		config
-			.insert("typo-file-2".to_string(), "./config/typo2.kdl".to_string())
+			.insert(
+				"typo-file-2".to_string(),
+				Value::String("./config/typo2.kdl".to_string()),
+			)
 			.unwrap();
 
 		let expected = PolicyAnalysis::new(
@@ -207,12 +220,18 @@ mod test {
 
 		let mut affiliation_config = PolicyConfig::new();
 		affiliation_config
-			.insert("orgs-file".to_string(), "./config/orgs.kdl".to_string())
+			.insert(
+				"orgs-file".to_string(),
+				Value::String("./config/orgs.kdl".to_string()),
+			)
 			.unwrap();
 
 		let mut typo_config = PolicyConfig::new();
 		typo_config
-			.insert("typo-file".to_string(), "./config/typo.kdl".to_string())
+			.insert(
+				"typo-file".to_string(),
+				Value::String("./config/typo.kdl".to_string()),
+			)
 			.unwrap();
 
 		let mut commit = PolicyCategory::new("commit".to_string(), None);

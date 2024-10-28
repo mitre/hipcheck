@@ -16,7 +16,7 @@ use std::{
 #[derive(Deserialize)]
 struct Config {
 	#[serde(rename = "percent-threshold")]
-	percent_threshold: Option<u64>,
+	percent_threshold: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize, JsonSchema)]
@@ -100,7 +100,7 @@ async fn identity(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
 
 #[derive(Clone, Debug, Default)]
 struct IdentityPlugin {
-	policy_conf: OnceLock<Option<u64>>,
+	policy_conf: OnceLock<Option<f64>>,
 }
 
 impl Plugin for IdentityPlugin {

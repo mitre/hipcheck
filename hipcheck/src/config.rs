@@ -18,6 +18,7 @@ use indextree::{Arena, NodeEdge, NodeId};
 use num_traits::identities::Zero;
 use pathbuf::pathbuf;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use smart_default::SmartDefault;
 use std::{
 	collections::HashMap,
@@ -835,7 +836,10 @@ fn langs_file(db: &dyn LanguagesConfigQuery) -> Result<Rc<PathBuf>> {
 	let policy_file = db.policy();
 	for opt in options {
 		if let Some(langs_config) = policy_file.get_config(opt) {
-			if let Some(filepath) = langs_config.get("langs-file") {
+			if let Some(v_filepath) = langs_config.get("langs-file") {
+				let Value::String(filepath) = v_filepath else {
+					return Err(hc_error!("'langs-file' was not a string"));
+				};
 				return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
 			}
 		};
@@ -858,7 +862,10 @@ fn binary_formats_file(db: &dyn PracticesConfigQuery) -> Result<Rc<PathBuf>> {
 
 	let policy_file = db.policy();
 	if let Some(binary_config) = policy_file.get_config("mitre/binary") {
-		if let Some(filepath) = binary_config.get("binary-file") {
+		if let Some(v_filepath) = binary_config.get("binary-file") {
+			let Value::String(filepath) = v_filepath else {
+				return Err(hc_error!("'binary-file' was not a string"));
+			};
 			return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
 		}
 	};
@@ -880,7 +887,10 @@ fn typo_file(db: &dyn AttacksConfigQuery) -> Result<Rc<PathBuf>> {
 
 	let policy_file = db.policy();
 	if let Some(typo_config) = policy_file.get_config("mitre/typo") {
-		if let Some(filepath) = typo_config.get("typo-file") {
+		if let Some(v_filepath) = typo_config.get("typo-file") {
+			let Value::String(filepath) = v_filepath else {
+				return Err(hc_error!("'typo-file' was not a string"));
+			};
 			return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
 		}
 	};
@@ -902,7 +912,10 @@ fn orgs_file(db: &dyn CommitConfigQuery) -> Result<Rc<PathBuf>> {
 
 	let policy_file = db.policy();
 	if let Some(affiliation_config) = policy_file.get_config("mitre/affiliation") {
-		if let Some(filepath) = affiliation_config.get("orgs-file") {
+		if let Some(v_filepath) = affiliation_config.get("orgs-file") {
+			let Value::String(filepath) = v_filepath else {
+				return Err(hc_error!("'orgs-file' was not a string"));
+			};
 			return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
 		}
 	};
@@ -913,8 +926,13 @@ fn orgs_file(db: &dyn CommitConfigQuery) -> Result<Rc<PathBuf>> {
 fn contributor_trust_value_threshold(db: &dyn CommitConfigQuery) -> Result<u64> {
 	let policy_file = db.policy();
 	if let Some(trust_config) = policy_file.get_config("mitre/contributor-trust") {
-		if let Some(str_threshold) = trust_config.get("value-threshold") {
-			return str_threshold.parse::<u64>().map_err(|e| hc_error!("{}", e));
+		if let Some(v_threshold) = trust_config.get("value-threshold") {
+			let Value::Number(threshold) = v_threshold else {
+				return Err(hc_error!("'value-threshold' was not a number"));
+			};
+			return threshold
+				.as_u64()
+				.ok_or_else(|| hc_error!("'value-threshold' was too large to be a u64"));
 		}
 	};
 
@@ -924,8 +942,13 @@ fn contributor_trust_value_threshold(db: &dyn CommitConfigQuery) -> Result<u64> 
 fn contributor_trust_month_count_threshold(db: &dyn CommitConfigQuery) -> Result<u64> {
 	let policy_file = db.policy();
 	if let Some(trust_config) = policy_file.get_config("mitre/contributor-trust") {
-		if let Some(str_threshold) = trust_config.get("month-count-threshold") {
-			return str_threshold.parse::<u64>().map_err(|e| hc_error!("{}", e));
+		if let Some(v_threshold) = trust_config.get("month-count-threshold") {
+			let Value::Number(threshold) = v_threshold else {
+				return Err(hc_error!("'month-count-threshold' was not a number"));
+			};
+			return threshold
+				.as_u64()
+				.ok_or_else(|| hc_error!("'month-count-threshold' was too large to be a u64"));
 		}
 	};
 

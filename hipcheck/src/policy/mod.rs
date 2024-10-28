@@ -14,6 +14,7 @@ use crate::{
 	util::kdl::extract_data,
 };
 use kdl::KdlDocument;
+use serde_json::Value;
 use std::{collections::HashMap, path::Path, str::FromStr};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -74,7 +75,7 @@ impl PolicyFile {
 	// that returns plugin configs as a "view" of the combined analysis/patch
 	// sections
 	#[allow(unused)]
-	pub fn get_config(&self, analysis_name: &str) -> Option<HashMap<String, String>> {
+	pub fn get_config(&self, analysis_name: &str) -> Option<HashMap<String, Value>> {
 		let opt_conf = self
 			.analyze
 			.find_analysis_by_name(analysis_name)

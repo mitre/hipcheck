@@ -55,8 +55,12 @@ pub struct PluginAnalysisResults {
 
 impl PluginAnalysisResults {
 	pub fn get_legacy(&self, analysis: &str) -> Option<&PluginAnalysisResult> {
-		let key = Analysis::legacy(analysis);
-		self.table.get(&key)
+		if MITRE_LEGACY_PLUGINS.contains(&analysis) {
+			let key = Analysis::legacy(analysis);
+			self.table.get(&key)
+		} else {
+			None
+		}
 	}
 	/// Get all results from non-legacy analyses.
 	pub fn plugin_results(&self) -> impl Iterator<Item = (&Analysis, &PluginAnalysisResult)> {

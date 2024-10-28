@@ -28,13 +28,12 @@ use xz2::read::XzDecoder;
 use super::get_current_arch;
 
 /// The plugins currently are not delegated via the `plugin` system and are still part of `hipcheck` core
-pub const MITRE_LEGACY_PLUGINS: [&str; 8] = [
+pub const MITRE_LEGACY_PLUGINS: [&str; 7] = [
 	"activity",
 	"entropy",
 	"affiliation",
 	"binary",
 	"churn",
-	"identity",
 	"review",
 	"typo",
 ];
