@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = "1.0.89"
+anyhow = "1.0.91"
 clap = { version = "4.5.20", features = ["derive"] }
 dashmap = { version = "6.1.0", features = ["inline", "rayon"] }
 finl_unicode = { version = "1.2.0", features = ["grapheme_clusters"] }
