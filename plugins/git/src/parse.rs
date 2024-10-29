@@ -74,6 +74,9 @@ fn commit(input: &str) -> IResult<&str, RawCommit> {
 	let (input, committer_name) = line(input)?;
 	let (input, committer_email) = line(input)?;
 	let (input, committed_on_str) = line(input)?;
+	// For now, we do not use a commit's signer information
+	let (input, _signer_name) = line(input)?;
+	let (input, _signer_key) = line(input)?;
 	// There is always an empty line here; ignore it
 	let (input, _empty_line) = line(input)?;
 
