@@ -10,6 +10,7 @@ use std::{result::Result as StdResult, sync::OnceLock};
 
 #[derive(Deserialize)]
 struct Config {
+	#[serde(rename = "percent-threshold")]
 	percent_threshold: Option<f64>,
 }
 
@@ -27,9 +28,9 @@ pub struct PullReview {
 	pub has_review: bool,
 }
 
-/// Returns the percentage of commits to the repo that were merged without review
-#[query]
-async fn review(engine: &mut PluginEngine, value: Target) -> Result<f64> {
+/// Returns whether each commit in a repo was merged with a review
+#[query(default)]
+async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	log::debug!("running review metric");
 
 	// Confirm that the target is a GitHub repo
@@ -62,28 +63,11 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<f64> {
 	// Create a Vec big enough to hold every single pull request
 	let mut pull_reviews = Vec::with_capacity(pull_requests.len());
 
-	// Create a list of pull requesets, with a boolean indicating if they have at least one review or not
-	for pull_request in pull_requests {
-		let has_review = pull_request.reviews > 0;
-		pull_reviews.push(PullReview {
-			pull_request,
-			has_review,
-		});
-	}
-
-	// Calculate the percentage of unreviewed pull requests out of the total
-	// If there are no pull requests, return 0.0 to avoid a divide-by-zero error
-	let num_flagged = pull_reviews.iter().filter(|p| !p.has_review).count() as u64;
-	let percent_flagged = match (num_flagged, pull_reviews.len()) {
-		(flagged, total) if flagged != 0 && total != 0 => {
-			num_flagged as f64 / pull_reviews.len() as f64
-		}
-		_ => 0.0,
-	};
+	pull_reviews.extend(pull_requests.into_iter().map(|pr| pr.reviews > 0));
 
 	log::info!("completed review query");
 
-	Ok(percent_flagged)
+	Ok(pull_reviews)
 }
 
 #[derive(Clone, Debug)]
@@ -95,6 +79,7 @@ impl Plugin for ReviewPlugin {
 	const NAME: &'static str = "review";
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
+		println!("config: {config:?}");
 		let conf =
 			serde_json::from_value::<Config>(config).map_err(|e| ConfigError::Unspecified {
 				message: e.to_string(),
@@ -110,7 +95,10 @@ impl Plugin for ReviewPlugin {
 			return Err(Error::UnspecifiedQueryState);
 		};
 		match conf.percent_threshold {
-			Some(threshold) => Ok(format!("lte $ {}", threshold)),
+			Some(threshold) => Ok(format!(
+				"(lte (divz (count (filter (eq #f) $)) (count $)) {})",
+				threshold
+			)),
 			None => Ok("".to_owned()),
 		}
 	}
@@ -186,7 +174,7 @@ mod test {
 		let mut engine = PluginEngine::mock(mock_responses().unwrap());
 		let result = review(&mut engine, target).await.unwrap();
 
-		let expected = 0.25;
+		let expected = vec![true, true, false, true];
 
 		assert_eq!(result, expected);
 	}
