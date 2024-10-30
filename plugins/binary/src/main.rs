@@ -17,7 +17,9 @@ pub static DETECTOR: OnceLock<BinaryFileDetector> = OnceLock::new();
 
 #[derive(Deserialize)]
 struct RawConfig {
+	#[serde(rename = "binary-file")]
 	binary_file: Option<PathBuf>,
+	#[serde(rename = "binary-file-threshold")]
 	binary_file_threshold: Option<u64>,
 }
 
@@ -101,7 +103,7 @@ impl Plugin for BinaryPlugin {
 			// If no policy vars, we have no default expr
 			Some(None) => Ok("".to_owned()),
 			// Use policy config vars to construct a default expr
-			Some(Some(policy_conf)) => Ok(format!("(lte $ {}))", policy_conf)),
+			Some(Some(policy_conf)) => Ok(format!("(lte (count $) {})", policy_conf)),
 		}
 	}
 
