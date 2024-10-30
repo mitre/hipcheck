@@ -228,6 +228,26 @@ impl PluginEngine {
 		Ok(())
 	}
 
+	async fn send_session_err<P>(&mut self) -> crate::error::Result<()>
+	where
+		P: Plugin,
+	{
+		let query = proto::Query {
+			id: self.id() as i32,
+			state: QueryState::Unspecified as i32,
+			publisher_name: P::PUBLISHER.to_owned(),
+			plugin_name: P::NAME.to_owned(),
+			query_name: "".to_owned(),
+			key: json!(Value::Null).to_string(),
+			output: json!(Value::Null).to_string(),
+			concern: self.take_concerns(),
+		};
+		self.tx
+			.send(Ok(InitiateQueryProtocolResponse { query: Some(query) }))
+			.await
+			.map_err(Error::FailedToSendQueryFromSessionToServer)
+	}
+
 	async fn recv(&mut self) -> Result<Option<Query>> {
 		let Some(mut msg_chunks) = self.recv_raw().await? else {
 			return Ok(None);
@@ -286,7 +306,7 @@ impl PluginEngine {
 		raw.try_into().map(Some)
 	}
 
-	async fn handle_session<P>(&mut self, plugin: Arc<P>) -> crate::error::Result<()>
+	async fn handle_session_fallible<P>(&mut self, plugin: Arc<P>) -> crate::error::Result<()>
 	where
 		P: Plugin,
 	{
@@ -330,6 +350,28 @@ impl PluginEngine {
 			.map_err(Error::FailedToSendQueryFromSessionToServer)?;
 
 		Ok(())
+	}
+
+	async fn handle_session<P>(&mut self, plugin: Arc<P>)
+	where
+		P: Plugin,
+	{
+		use crate::error::Error::*;
+		if let Err(e) = self.handle_session_fallible(plugin).await {
+			let res_err_send = match e {
+				FailedToSendQueryFromSessionToServer(_) => {
+					log::error!("Failed to send message to Hipcheck core, analysis will hang.");
+					return;
+				}
+				other => {
+					log::error!("{}", other);
+					self.send_session_err::<P>().await
+				}
+			};
+			if res_err_send.is_err() {
+				log::error!("Failed to send message to Hipcheck core, analysis will hang.");
+			}
+		}
 	}
 
 	pub fn record_concern<S: AsRef<str>>(&mut self, concern: S) {
@@ -526,9 +568,7 @@ impl HcSessionSocket {
 
 			let cloned_plugin = plugin.clone();
 			tokio::spawn(async move {
-				if let Err(e) = engine.handle_session(cloned_plugin).await {
-					panic!("handle_session failed: {e}");
-				};
+				engine.handle_session(cloned_plugin).await;
 			});
 		}
 

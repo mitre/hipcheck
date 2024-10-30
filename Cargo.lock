@@ -1415,6 +1415,7 @@ dependencies = [
  "futures",
  "hipcheck-sdk-macros",
  "indexmap 2.6.0",
+ "log",
  "prost",
  "rand",
  "schemars",
