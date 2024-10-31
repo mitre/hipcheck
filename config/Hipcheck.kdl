@@ -1,12 +1,12 @@
 plugins {
     plugin "mitre/activity" version="0.1.0"
-    plugin "mitre/binary" version="0.1.0"
+    plugin "mitre/binary" version="0.1.0" manifest="./plugins/binary/plugin.kdl"
     plugin "mitre/fuzz" version="0.1.0" manifest="./plugins/fuzz/plugin.kdl"
     plugin "mitre/review" version="0.1.0" manifest="./plugins/review/plugin.kdl"
     plugin "mitre/typo" version="0.1.0" manifest="./plugins/typo/plugin.kdl"
     plugin "mitre/affiliation" version="0.1.0"
     plugin "mitre/entropy" version="0.1.0"
-    plugin "mitre/churn" version="0.1.0"
+    plugin "mitre/churn" version="0.1.0" manifest="./plugins/churn/plugin.kdl"
 }
 patch {
 	plugin "mitre/github_api" {
@@ -24,7 +24,7 @@ analyze {
 			binary-file-threshold 0
 		}
         analysis "mitre/fuzz" policy="(eq #t $)"
-        analysis "mitre/review" policy="(lte $ 0.05)"
+        analysis "mitre/review" policy="(lte (divz (count (filter (eq #f) $)) (count $)) 0.05)"
     }
 
     category "attacks" {

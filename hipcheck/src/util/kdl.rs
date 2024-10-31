@@ -16,6 +16,11 @@ where
 	fn parse_node(node: &KdlNode) -> Option<Self>;
 }
 
+pub trait ToKdlNode {
+	/// convert self to a KdlNode
+	fn to_kdl_node(&self) -> KdlNode;
+}
+
 /// Returns the first successful node that can be parsed into T, if there is one
 pub fn extract_data<T>(nodes: &[KdlNode]) -> Option<T>
 where
@@ -33,8 +38,9 @@ where
 /// code is quite repetitive for this simple task.
 ///
 /// As a bonus, the following code is also generated:
-/// - AsRef<String>
-/// - new(value: String) -> Self
+/// - `AsRef<String>`
+/// - `new(value: String) -> Self`
+/// - `ToKdlNode`
 ///
 /// NOTE: This only works with newtype wrappers around String!
 ///
@@ -73,6 +79,15 @@ macro_rules! string_newtype_parse_kdl_node {
 		impl AsRef<String> for $type {
 			fn as_ref(&self) -> &String {
 				&self.0
+			}
+		}
+
+		impl ToKdlNode for $type {
+			#[allow(unused)]
+			fn to_kdl_node(&self) -> KdlNode {
+				let mut node = KdlNode::new(Self::kdl_key());
+				node.insert(0, self.0.clone());
+				node
 			}
 		}
 	};

@@ -13,7 +13,7 @@ use crate::{
 	util::http::agent::agent,
 };
 use flate2::read::GzDecoder;
-use fs_extra::dir::remove;
+use fs_extra::{dir::remove, file::write_all};
 use std::{
 	collections::HashSet,
 	fs::File,
@@ -115,33 +115,47 @@ fn retrieve_plugin_from_network(
 	))
 }
 
-/// retrieves a plugin from the local filesystem
+/// retrieves a plugin from the local filesystem by copying its `plugin.kdl` and `entrypoint` binary to the plugin_cache
 fn retrieve_local_plugin(
 	plugin_id: PluginId,
 	plugin_manifest_path: &PathBuf,
 	plugin_cache: &HcPluginCache,
 ) -> Result<PluginManifest, Error> {
 	let download_dir = plugin_cache.plugin_download_dir(&plugin_id);
-	std::fs::create_dir_all(download_dir.as_path()).map_err(|e| {
+	std::fs::create_dir_all(&download_dir).map_err(|e| {
 		hc_error!(
 			"Error [{}] creating download directory {}",
 			e,
 			download_dir.to_string_lossy()
 		)
 	})?;
-	let plugin_kdl_path = plugin_cache.plugin_kdl(&plugin_id);
+
+	let mut plugin_manifest = PluginManifest::from_file(plugin_manifest_path)?;
+	let current_arch = get_current_arch();
+
+	let original_entrypoint = plugin_manifest
+		.update_entrypoint(&current_arch, plugin_cache.plugin_download_dir(&plugin_id))?;
 
 	// @Note - sneaky potential for unexpected behavior if we write local plugin manifest
 	// to a cache dir that already included a remote download
-	std::fs::copy(plugin_manifest_path, &plugin_kdl_path).map_err(|e| {
+	std::fs::copy(
+		&original_entrypoint,
+		plugin_cache
+			.plugin_download_dir(&plugin_id)
+			// unwrap is safe here, we just updated the entrypoint for current arch
+			.join(plugin_manifest.get_entrypoint(&current_arch).unwrap()),
+	)?;
+
+	let plugin_kdl_path = plugin_cache.plugin_kdl(&plugin_id);
+	write_all(&plugin_kdl_path, &plugin_manifest.to_kdl_formatted_string()).map_err(|e| {
 		hc_error!(
-			"Error [{}] copying local plugin manifest for {} to cache",
+			"Error [{}] writing {}",
 			e,
-			plugin_id.to_policy_file_plugin_identifier()
+			plugin_kdl_path.to_string_lossy()
 		)
 	})?;
 
-	PluginManifest::from_file(plugin_kdl_path)
+	Ok(plugin_manifest)
 }
 
 /// This function does the following:

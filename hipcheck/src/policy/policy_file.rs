@@ -7,7 +7,7 @@ use crate::{
 	hc_error,
 	plugin::{PluginId, PluginName, PluginPublisher, PluginVersion},
 	string_newtype_parse_kdl_node,
-	util::kdl::{extract_data, ParseKdlNode},
+	util::kdl::{extract_data, ParseKdlNode, ToKdlNode},
 };
 
 use kdl::KdlNode;
@@ -21,6 +21,15 @@ pub enum ManifestLocation {
 	Url(Url),
 	/// local filepath to a PluginManifest
 	Local(PathBuf),
+}
+
+impl Display for ManifestLocation {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			ManifestLocation::Url(url) => write!(f, "{}", url.as_str()),
+			ManifestLocation::Local(path_buf) => write!(f, "{}", path_buf.to_string_lossy()),
+		}
+	}
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
