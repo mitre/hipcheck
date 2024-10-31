@@ -20,6 +20,7 @@ use std::{
 
 #[cfg(test)]
 use crate::plugin::arch::KnownArch;
+use crate::util::kdl::ToKdlNode;
 
 // NOTE: the implementation in this crate was largely derived from RFD #4
 
@@ -52,6 +53,22 @@ impl Entrypoints {
 			Some(_duplicate_key) => Err(hc_error!("Multiple entrypoints specified for {}", arch)),
 			None => Ok(()),
 		}
+	}
+}
+
+impl ToKdlNode for Entrypoints {
+	fn to_kdl_node(&self) -> KdlNode {
+		let mut entrypoint_parent = KdlNode::new("entrypoint");
+		let mut entrypoint_children = KdlDocument::new();
+		let entrypoint_children_nodes = entrypoint_children.nodes_mut();
+		for (arch, entrypoint) in self.0.iter() {
+			let mut entry = KdlNode::new("on");
+			entry.insert("arch", arch.to_string());
+			entry.insert(0, entrypoint.to_owned());
+			entrypoint_children_nodes.push(entry);
+		}
+		entrypoint_parent.set_children(entrypoint_children);
+		entrypoint_parent
 	}
 }
 
@@ -163,6 +180,25 @@ impl PluginDependencyList {
 	}
 }
 
+impl ToKdlNode for PluginDependencyList {
+	fn to_kdl_node(&self) -> KdlNode {
+		let mut dependency_parent = KdlNode::new("dependencies");
+		let mut dependency_children = KdlDocument::new();
+		let dependency_children_nodes = dependency_children.nodes_mut();
+		for dep in self.0.iter() {
+			let mut entry = KdlNode::new("plugin");
+			entry.insert(0, dep.plugin_id.to_policy_file_plugin_identifier());
+			entry.insert("version", dep.plugin_id.version().0.as_str());
+			if let Some(manifest) = &dep.manifest {
+				entry.insert("manifest", manifest.to_string());
+			}
+			dependency_children_nodes.push(entry);
+		}
+		dependency_parent.set_children(dependency_children);
+		dependency_parent
+	}
+}
+
 impl ParseKdlNode for PluginDependencyList {
 	fn kdl_key() -> &'static str {
 		"dependencies"
@@ -200,11 +236,62 @@ impl PluginManifest {
 		self.entrypoints.0.get(arch).cloned()
 	}
 
+	fn set_entrypoint(&mut self, arch: Arch, entrypoint: String) {
+		self.entrypoints.0.insert(arch, entrypoint);
+	}
+
 	pub fn from_file<P>(path: P) -> Result<Self, Error>
 	where
 		P: AsRef<Path>,
 	{
 		Self::from_str(read_string(path)?.as_str())
+	}
+
+	/// Update the directory that an entrypoint is stored in
+	///
+	/// Returns previous entrypoint
+	pub fn update_entrypoint<P>(&mut self, arch: &Arch, new_directory: P) -> Result<PathBuf, Error>
+	where
+		P: AsRef<Path>,
+	{
+		let current_entrypoint = self
+			.entrypoints
+			.0
+			.remove(arch)
+			.map(PathBuf::from)
+			.ok_or(hc_error!("No entrypoint for current arch ({})", arch))?;
+
+		fn new_path(new_directory: &Path, current_entrypoint: &Path) -> Result<PathBuf, Error> {
+			let entrypoint_filename =
+				new_directory.join(current_entrypoint.file_name().ok_or(hc_error!(
+					"'{}' entrypoint does not contain a valid filename",
+					current_entrypoint.to_string_lossy()
+				))?);
+			Ok(entrypoint_filename)
+		}
+
+		let new_entrypoint = new_path(new_directory.as_ref(), &current_entrypoint)?;
+		self.set_entrypoint(arch.clone(), new_entrypoint.to_string_lossy().to_string());
+		Ok(current_entrypoint)
+	}
+
+	/// convert a `PluginManifest` to a `KdlDocument`
+	fn to_kdl(&self) -> KdlDocument {
+		let mut document = KdlDocument::new();
+		document.nodes_mut().extend([
+			self.publisher.to_kdl_node(),
+			self.name.to_kdl_node(),
+			self.version.to_kdl_node(),
+			self.license.to_kdl_node(),
+			self.entrypoints.to_kdl_node(),
+			self.dependencies.to_kdl_node(),
+		]);
+		document
+	}
+
+	/// convert `PluginManifest` to a KDL-formatted String
+	pub fn to_kdl_formatted_string(&self) -> String {
+		self.to_kdl().to_string()
 	}
 }
 
@@ -481,5 +568,60 @@ dependencies {
 			dependencies,
 		};
 		assert_eq!(plugin_manifest, expected_manifest);
+	}
+
+	#[test]
+	fn test_to_kdl() {
+		let mut entrypoints = Entrypoints::new();
+		entrypoints
+			.insert(
+				Arch::Known(KnownArch::Aarch64AppleDarwin),
+				"./target/debug/activity_sdk".to_owned(),
+			)
+			.unwrap();
+		entrypoints
+			.insert(
+				Arch::Known(KnownArch::X86_64AppleDarwin),
+				"./target/debug/activity_sdk".to_owned(),
+			)
+			.unwrap();
+		entrypoints
+			.insert(
+				Arch::Known(KnownArch::X86_64UnknownLinuxGnu),
+				"./target/debug/activity_sdk".to_owned(),
+			)
+			.unwrap();
+		entrypoints
+			.insert(
+				Arch::Known(KnownArch::X86_64PcWindowsMsvc),
+				"./target/debug/activity_sdk".to_owned(),
+			)
+			.unwrap();
+
+		let mut dependencies = PluginDependencyList::new();
+		dependencies.push(PluginDependency::new(
+			PluginId::new(
+				PluginPublisher::new("mitre".to_owned()),
+				PluginName::new("git".to_owned()),
+				PluginVersion::new("0.1.0".to_owned()),
+			),
+			Some(ManifestLocation::Local("./plugins/git/plugin.kdl".into())),
+		));
+
+		let plugin_manifest = PluginManifest {
+			publisher: PluginPublisher::new("mitre".to_owned()),
+			name: PluginName::new("activity".to_owned()),
+			version: PluginVersion::new("0.1.0".to_owned()),
+			license: License::new("Apache-2.0".to_owned()),
+			entrypoints,
+			dependencies,
+		};
+
+		let plugin_manifest_string = plugin_manifest.to_kdl_formatted_string();
+
+		assert_eq!(
+			plugin_manifest,
+			PluginManifest::from_str(&plugin_manifest_string).unwrap()
+		)
 	}
 }

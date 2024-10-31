@@ -297,7 +297,7 @@ fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathB
 
 	// Load the policy file.
 	let policy = PolicyFile::load_from(valid_policy_path)
-		.context("Failed to load policy. Plase make sure the policy file is in the proidved location and is formatted correctly.")?;
+		.context("Failed to load policy. Plase make sure the policy file is in the provided location and is formatted correctly.")?;
 
 	// Resolve the github token file.
 	let hc_github_token = resolve_token()?;
