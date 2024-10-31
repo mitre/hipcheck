@@ -2,8 +2,8 @@ plugins {
     plugin "mitre/activity" version="0.1.0"
     plugin "mitre/binary" version="0.1.0"
     plugin "mitre/fuzz" version="0.1.0" manifest="./plugins/fuzz/plugin.kdl"
-    plugin "mitre/review" version="0.1.0"
-    plugin "mitre/typo" version="0.1.0"
+    plugin "mitre/review" version="0.1.0" manifest="./plugins/review/plugin.kdl"
+    plugin "mitre/typo" version="0.1.0" manifest="./plugins/typo/plugin.kdl"
     plugin "mitre/affiliation" version="0.1.0"
     plugin "mitre/entropy" version="0.1.0"
     plugin "mitre/churn" version="0.1.0"
@@ -21,15 +21,16 @@ analyze {
         analysis "mitre/activity" policy="(lte $ 52)" weight=3
         analysis "mitre/binary" {
 			binary-file "./config/Binary.toml"
-			binary-file-threshold "0"
+			binary-file-threshold 0
 		}
         analysis "mitre/fuzz" policy="(eq #t $)"
         analysis "mitre/review" policy="(lte $ 0.05)"
     }
 
     category "attacks" {
-        analysis "mitre/typo" policy="(eq 0 (count $))" {
-            typo-file "./config/Typos.toml"
+        analysis "mitre/typo" {
+            typo-file-path "./config/Typos.toml"
+            count-threshold 0
         }
 
         category "commit" {
