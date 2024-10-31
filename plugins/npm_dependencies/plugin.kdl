@@ -1,0 +1,10 @@
+publisher "mitre"
+name "npm_dependencies"
+version "0.1.0"
+license "Apache-2.0"
+entrypoint {
+  on arch="aarch64-apple-darwin" "./target/debug/npm_dependencies_sdk"
+  on arch="x86_64-apple-darwin" "./target/debug/npm_dependencies_sdk"
+  on arch="x86_64-unknown-linux-gnu" "./target/debug/npm_dependencies_sdk"
+  on arch="x86_64-pc-windows-msvc" "./target/debug/npm_dependencies_sdk"
+}

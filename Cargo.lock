@@ -62,7 +62,6 @@ dependencies = [
  "serde",
  "serde_json",
  "strum 0.26.3",
- "test-log",
  "tokio",
 ]
 
@@ -3593,6 +3592,23 @@ dependencies = [
  "serde_tokenstream",
  "syn 2.0.85",
  "typify-impl",
+]
+
+[[package]]
+name = "typo_sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "hipcheck-sdk",
+ "log",
+ "maplit",
+ "pathbuf",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
+ "url",
 ]
 
 [[package]]

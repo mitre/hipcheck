@@ -406,8 +406,6 @@ mod test {
 
 	use pathbuf::pathbuf;
 	use std::{env, result::Result as StdResult};
-	use test_log::test;
-
 	fn repo() -> LocalGitRepo {
 		LocalGitRepo {
 			path: "/home/users/me/.cache/hipcheck/clones/github/foo/bar/".to_string(),
@@ -547,7 +545,7 @@ mod test {
 		Ok(mock_responses)
 	}
 
-	#[test(tokio::test)]
+	#[tokio::test]
 	async fn test_affiliation() {
 		let orgs_file = pathbuf![&env::current_dir().unwrap(), "test", "example_orgs.kdl"];
 		let orgs_spec = OrgSpec::load_from(&orgs_file).unwrap();
