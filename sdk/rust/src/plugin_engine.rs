@@ -187,7 +187,7 @@ impl PluginEngine {
 	async fn recv_raw(&mut self) -> Result<Option<VecDeque<PluginQuery>>> {
 		let mut out = VecDeque::new();
 
-		eprintln!("SDK: awaiting raw rx recv");
+		log::trace!("SDK: awaiting raw rx recv");
 
 		let opt_first = self.rx.recv().await.ok_or(Error::SessionChannelClosed)?;
 
@@ -204,7 +204,7 @@ impl PluginEngine {
 					out.push_back(msg);
 				}
 				Ok(None) => {
-					eprintln!("warning: None received, gRPC channel closed. we may not close properly if None is not returned again");
+					log::warn!("None received, gRPC channel closed. we may not close properly if None is not returned again");
 					break;
 				}
 				// Whether empty or disconnected, we return what we have
@@ -254,7 +254,6 @@ impl PluginEngine {
 		};
 
 		let mut raw: PluginQuery = msg_chunks.pop_front().unwrap();
-		// eprintln!("SDK: recv got raw {raw:?}");
 
 		let mut state: QueryState = raw
 			.state
@@ -471,10 +470,10 @@ impl HcSessionSocket {
 	fn cleanup_sessions(&mut self) {
 		while let Ok(id) = self.drop_rx.try_recv() {
 			match self.sessions.remove(&id) {
-				Some(_) => eprintln!("Cleaned up session {id}"),
-				None => eprintln!(
-					"WARNING: HcSessionSocket got request to drop a session that does not exist"
-				),
+				Some(_) => log::trace!("Cleaned up session {id}"),
+				None => {
+					log::warn!("HcSessionSocket got request to drop a session that does not exist")
+				}
 			}
 		}
 	}
@@ -504,15 +503,15 @@ impl HcSessionSocket {
 
 			match self.decide_action(&raw) {
 				Ok(HandleAction::ForwardMsgToExistingSession(tx)) => {
-					eprintln!("SDK: forwarding message to session {id}");
+					log::trace!("SDK: forwarding message to session {id}");
 
 					if let Err(_e) = tx.send(Some(raw)).await {
-						eprintln!("Error forwarding msg to session {id}");
+						log::error!("Error forwarding msg to session {id}");
 						self.sessions.remove(&id);
 					};
 				}
 				Ok(HandleAction::CreateSession) => {
-					eprintln!("SDK: creating new session {id}");
+					log::trace!("SDK: creating new session {id}");
 
 					let (in_tx, rx) = mpsc::channel::<Option<PluginQuery>>(10);
 					let tx = self.tx.clone();
@@ -530,12 +529,12 @@ impl HcSessionSocket {
 						"Failed sending message to newly created Session, should never happen",
 					);
 
-					eprintln!("SDK: adding new session {id} to tracker");
+					log::trace!("SDK: adding new session {id} to tracker");
 					self.sessions.insert(id, in_tx);
 
 					return Ok(Some(session));
 				}
-				Err(e) => eprintln!("error: {}", e),
+				Err(e) => log::error!("{}", e),
 			}
 		}
 	}
@@ -562,7 +561,7 @@ impl HcSessionSocket {
 				.await
 				.map_err(|_| Error::SessionChannelClosed)?
 			else {
-				eprintln!("Channel closed by remote");
+				log::trace!("Channel closed by remote");
 				break;
 			};
 

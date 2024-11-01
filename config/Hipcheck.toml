@@ -12,7 +12,7 @@
 
 #==============================================================================
 # Risk
-# 
+#
 # Configuration related to the overall risk tolerance across all analyses.
 #==============================================================================
 
@@ -101,7 +101,7 @@ weight = 1
 
 # The threshold for the number of binary files present in the repository,
 # over which a repository will be marked as failing this analysis.
-# 
+#
 # Default: 0
 binary_file_threshold = 0
 
@@ -364,9 +364,9 @@ weight = 1
 value_threshold = 3
 
 # This is the month range in which the committer needs to have the above value_threshold
-# committer must have commits counts more or equal to X (value_threshold) commits 
+# committer must have commits counts more or equal to X (value_threshold) commits
 # since Y (trust_month_count_threshold) months ago
-# 
+#
 # Default: 3
 trust_month_count_threshold = 3
 
