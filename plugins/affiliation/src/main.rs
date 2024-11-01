@@ -27,53 +27,54 @@ use std::{
 	sync::OnceLock,
 };
 
+pub static ORGSSPEC: OnceLock<OrgSpec> = OnceLock::new();
+
 #[derive(Debug, Deserialize)]
 struct Config {
 	orgs_spec: OrgSpec,
-
 	// Maximum number of concerningly affilaited contributors permitted in a default query
-	count_threshold: Option<u16>,
+	count_threshold: Option<u64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct RawConfig {
-	orgs_file_var: Option<String>,
-	count_threshold_var: Option<u16>,
+	#[serde(rename = "orgs-file-path")]
+	orgs_file_path: Option<String>,
+	#[serde(rename = "count-threshold")]
+	count_threshold: Option<u64>,
 }
 
 impl TryFrom<RawConfig> for Config {
 	type Error = ConfigError;
 	fn try_from(value: RawConfig) -> StdResult<Config, ConfigError> {
-		if let Some(ofv) = value.orgs_file_var {
+		if let Some(ofv) = value.orgs_file_path {
 			// Get the Orgs file path and confirm it exists
 			let orgs_file = PathBuf::from(&ofv);
 			file::exists(&orgs_file).map_err(|_e| ConfigError::InvalidConfigValue {
-				field_name: "orgs_file_var".to_owned(),
+				field_name: "orgs_file_path".to_owned(),
 				value: ofv.clone(),
 				reason: "could not find an orgs file with that name".to_owned(),
 			})?;
 			// Parse the Orgs file and construct an OrgSpec.
 			let orgs_spec =
 				OrgSpec::load_from(&orgs_file).map_err(|e| ConfigError::InvalidConfigValue {
-					field_name: "orgs_file_var".to_owned(),
+					field_name: "orgs_file_path".to_owned(),
 					value: ofv.clone(),
 					reason: format!("Failed to load org spec: {}", e),
 				})?;
 			Ok(Config {
 				orgs_spec,
-				count_threshold: value.count_threshold_var,
+				count_threshold: value.count_threshold,
 			})
 		} else {
 			Err(ConfigError::MissingRequiredConfig {
-				field_name: "orgs_file_var".to_owned(),
-				field_type: "name of env var containing GitHub API token".to_owned(),
+				field_name: "orgs_file_path".to_owned(),
+				field_type: "string".to_owned(),
 				possible_values: vec![],
 			})
 		}
 	}
 }
-
-static CONFIG: OnceLock<Config> = OnceLock::new();
 
 /// A locally stored git repo, with optional additional details
 /// The details will vary based on the query (e.g. a date, a committer e-mail address, a commit hash)
@@ -84,6 +85,20 @@ pub struct DetailedGitRepo {
 
 	/// Optional additional information for the query
 	pub details: Option<String>,
+}
+
+/// A locally stored git repo, with a list of additional details
+/// The details will vary based on the query (e.g. a date, a committer e-mail address, a commit hash)
+///
+/// This struct exists for using the temproary "batch" queries until proper batching is implemented
+/// TODO: Remove this struct once batching works
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct BatchGitRepo {
+	/// The local repo
+	local: LocalGitRepo,
+
+	/// Optional additional information for the query
+	pub details: Vec<String>,
 }
 
 /// Commits as understood in Hipcheck's data model.
@@ -205,31 +220,29 @@ impl AffiliatedType {
 	}
 }
 
-/// Returns the number of commits that are flagged for having concerning contributors
-#[query]
-async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<i64> {
+/// Returns a boolean list with one entry per contributor to the repo
+/// A `true` entry corresponds to an affiliated contributor
+#[query(default)]
+async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
 	log::debug!("running affiliation query");
 
 	// Get the OrgSpec.
-	let org_spec = &CONFIG
-		.get()
-		.ok_or_else(|| {
-			log::error!("tried to access config before set by Hipcheck core!");
-			Error::UnspecifiedQueryState
-		})?
-		.orgs_spec;
+	let org_spec = &ORGSSPEC.get().ok_or_else(|| {
+		log::error!("tried to access config before set by Hipcheck core!");
+		Error::UnspecifiedQueryState
+	})?;
 
 	// Get the commits for the source.
 	let repo = key.local;
-	let value = engine
+	let commits_value = engine
 		.query("mitre/git/commits", repo.clone())
 		.await
 		.map_err(|e| {
 			log::error!("failed to get last commits for affiliation metric: {}", e);
 			Error::UnspecifiedQueryState
 		})?;
-	let commits: Vec<Commit> =
-		serde_json::from_value(value).map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
+	let commits: Vec<Commit> = serde_json::from_value(commits_value)
+		.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
 
 	// Use the OrgSpec to build an Affiliator.
 	let affiliator = Affiliator::from_spec(org_spec).map_err(|e| {
@@ -237,82 +250,150 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<i64> {
 		Error::UnspecifiedQueryState
 	})?;
 
-	// Construct a big enough Vec for the affiliation info.
-	let mut affiliations = Vec::with_capacity(commits.len());
+	// Temporary solution to retrieve afilliated commits until batching is implemented
+	// TODO: Once batching works, revert to using looped calls of contributors_to_commit() in the commented out code
 
-	for commit in commits.iter() {
-		// Check if a commit matches the affiliation rules.
-		let hash = commit.hash.clone();
-		let detailed_repo = DetailedGitRepo {
-			local: repo.clone(),
-			details: Some(hash.clone()),
-		};
-		let view_value = engine
-			.query("mitre/git/contributors_for_commit", detailed_repo)
-			.await
-			.map_err(|e| {
-				log::error!("failed to get contributors for commit {}: {}", hash, e);
-				Error::UnspecifiedQueryState
-			})?;
-		let commit_view: CommitContributorView = serde_json::from_value(view_value)
-			.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
-
-		let affiliated_type = AffiliatedType::is(&affiliator, &commit_view);
-
-		affiliations.push(AffiliationDetails {
-			commit: commit.clone(),
-			affiliated_type,
-		});
-	}
-
-	let affiliated_iter = affiliations
-		.into_iter()
-		.filter(|a| a.affiliated_type.is_affiliated());
+	// for commit in commits.iter() {
+	// 	// Check if a commit matches the affiliation rules.
+	// 	let hash = commit.hash.clone();
+	// 	let detailed_repo = DetailedGitRepo {
+	// 		local: repo.clone(),
+	// 		details: Some(hash.clone()),
+	// 	};
+	// 	let view_value = engine
+	// 		.query("mitre/git/contributors_for_commit", detailed_repo)
+	// 		.await
+	// 		.map_err(|e| {
+	// 			log::error!("failed to get contributors for commit {}: {}", hash, e);
+	// 			Error::UnspecifiedQueryState
+	// 		})?;
+	// 	let commit_view: CommitContributorView = serde_json::from_value(view_value)
+	// 		.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
+	// for commit_view in commit_views {
+	// Get the affiliation type for the commit
+	// affiliations.push(AffiliationDetails {
+	// 	commit: commit.clone(),
+	// 	affiliated_type,
+	// });
+	// }
+	// let affiliated_iter = affiliations
+	// 	.into_iter()
+	// 	.filter(|a| a.affiliated_type.is_affiliated())
 
 	let mut contributors = HashSet::new();
 	let mut contributor_freq_map = HashMap::new();
 
-	// Get the affiliated contributors from the commits
-	for affiliation in affiliated_iter {
-		let hash = affiliation.commit.hash;
-		let commit_repo = DetailedGitRepo {
-			local: repo.clone(),
-			details: Some(hash.clone()),
-		};
-		let view_value = engine
-			.query("mitre/git/contributors_for_commit", commit_repo)
-			.await
-			.map_err(|e| {
-				log::error!("failed to get contributors for commit {}: {}", hash, e);
-				Error::UnspecifiedQueryState
-			})?;
-		let commit_view: CommitContributorView = serde_json::from_value(view_value)
-			.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
+	// Get the hashes for each commit
+	let hashes = commits.iter().map(|c| c.hash.clone()).collect();
+	// Repo with the hash of every commit
+	let commit_batch_repo = BatchGitRepo {
+		local: repo.clone(),
+		details: hashes,
+	};
 
-		match affiliation.affiliated_type {
-			AffiliatedType::Author => {
-				contributors.insert((commit_view.author.name, commit_view.author.email));
-			}
-			AffiliatedType::Committer => {
-				contributors.insert((commit_view.committer.name, commit_view.committer.email));
-			}
-			AffiliatedType::Neither => (),
-			// Add both author and committer to the hash set if both are affiliated, in case they are distinct
-			AffiliatedType::Both => {
-				contributors.insert((commit_view.author.name, commit_view.author.email));
-				contributors.insert((commit_view.committer.name, commit_view.committer.email));
-			}
-		};
+	// Get a list of lookup structs for linking contributors to each commit
+	let commit_values = engine
+		.query("mitre/git/batch_contributors_for_commit", commit_batch_repo)
+		.await
+		.map_err(|e| {
+			log::error!("failed to get contributors for commits: {}", e);
+			Error::UnspecifiedQueryState
+		})?;
+	let commit_views: Vec<CommitContributorView> = serde_json::from_value(commit_values)
+		.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
+
+	// For each commit, collect contributors that fail the affiliation rules
+	for commit_view in commit_views {
+		// Get the affiliation type for the commit
+		let affiliated_type = AffiliatedType::is(&affiliator, &commit_view);
+
+		// If the contributors fail the rules, add them to the contributor hash set
+		if affiliated_type.is_affiliated() {
+			match affiliated_type {
+				AffiliatedType::Author => {
+					contributors.insert((commit_view.author.name, commit_view.author.email));
+				}
+				AffiliatedType::Committer => {
+					contributors.insert((commit_view.committer.name, commit_view.committer.email));
+				}
+				AffiliatedType::Neither => (),
+				// Add both author and committer to the hash set if both are affiliated, in case they are distinct
+				AffiliatedType::Both => {
+					contributors.insert((commit_view.author.name, commit_view.author.email));
+					contributors.insert((commit_view.committer.name, commit_view.committer.email));
+				}
+			};
+		}
 	}
 
-	// Add string representation of affiliated contributor with count of associated commits
-	for contributor in contributors.into_iter() {
-		let count = count_commits_for(engine, repo.clone(), contributor.1).await?;
-		contributor_freq_map.insert(contributor.0, count);
+	// Temporary solution to retrieve afilliated commits until batching is implemented
+	// TODO: Once batching works, revert to using looped calls of commits_for_contributor() in the commented out code
+
+	// let mut contributors = HashSet::new();
+	// let mut contributor_freq_map = HashMap::new();
+
+	// // Get the affiliated contributors from the commits
+	// for affiliation in affiliated_iter {
+	// 	let hash = affiliation.commit.hash;
+	// 	let commit_repo = DetailedGitRepo {
+	// 		local: repo.clone(),
+	// 		details: Some(hash.clone()),
+	// 	};
+	// 	let view_value = engine
+	// 		.query("mitre/git/contributors_for_commit", commit_repo)
+	// 		.await
+	// 		.map_err(|e| {
+	// 			log::error!("failed to get contributors for commit {}: {}", hash, e);
+	// 			Error::UnspecifiedQueryState
+	// 		})?;
+	// 	let commit_view: CommitContributorView = serde_json::from_value(view_value)
+	// 		.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
+
+	// Get the emails for each affiliated contributor
+	let emails = contributors.iter().map(|c| c.1.clone()).collect();
+	// Repo with the email of every affiliated contributor
+	let contributor_batch_repo = BatchGitRepo {
+		local: repo.clone(),
+		details: emails,
+	};
+
+	// Get a list of lookup structs for linking commits to each affiliated contributor
+	let contributor_values = engine
+		.query(
+			"mitre/git/batch_commits_for_contributor",
+			contributor_batch_repo,
+		)
+		.await
+		.map_err(|e| {
+			log::error!("failed to get commits for contributors: {}", e);
+			Error::UnspecifiedQueryState
+		})?;
+	let contributor_views: Vec<ContributorView> = serde_json::from_value(contributor_values)
+		.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
+
+	// For each affiliated contributor, count how many commits they contributed to,
+	// then add the contributor's name and its commit count to the contributor frequency hash map
+	for contributor_view in contributor_views {
+		let count = contributor_view.commits.len();
+		contributor_freq_map.insert(contributor_view.contributor.name, count);
 	}
 
-	// Get the total number of affiliated contributors
-	let count = contributor_freq_map.keys().count() as i64;
+	let all_contributors_value = engine
+		.query("mitre/git/contributors", repo.clone())
+		.await
+		.map_err(|e| {
+			log::error!("failed to get list of all contributors to repo: {}", e);
+			Error::UnspecifiedQueryState
+		})?;
+	let all_contributors: Vec<Contributor> = serde_json::from_value(all_contributors_value)
+		.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
+	let all_emails: Vec<String> = all_contributors.iter().map(|c| c.email.clone()).collect();
+
+	let affiliated_emails: Vec<String> = contributors.iter().map(|c| c.1.clone()).collect();
+	let affiliations = all_emails
+		.iter()
+		.map(|e| affiliated_emails.contains(e))
+		.collect();
 
 	// Add each contributor-count pair as a concern
 	for (contributor, count) in contributor_freq_map.into_iter() {
@@ -322,34 +403,13 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<i64> {
 
 	log::info!("completed affiliation metric");
 
-	Ok(count)
+	Ok(affiliations)
 }
 
-/// Gets the number of commits to a repo associated with a given contributor
-async fn count_commits_for(
-	engine: &mut PluginEngine,
-	repo: LocalGitRepo,
-	email: String,
-) -> Result<i64> {
-	let contributor_repo = DetailedGitRepo {
-		local: repo,
-		details: Some(email.clone()),
-	};
-	let contributor_value = engine
-		.query("mitre/git/commits_for_contributor", contributor_repo)
-		.await
-		.map_err(|e| {
-			log::error!("failed to get commits for contributor {}: {}", email, e);
-			Error::UnspecifiedQueryState
-		})?;
-
-	let contributor_view: ContributorView = serde_json::from_value(contributor_value)
-		.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
-	Ok(contributor_view.commits.len() as i64)
+#[derive(Clone, Debug, Default)]
+struct AffiliationPlugin {
+	policy_conf: OnceLock<Option<u64>>,
 }
-
-#[derive(Clone, Debug)]
-struct AffiliationPlugin;
 
 impl Plugin for AffiliationPlugin {
 	const PUBLISHER: &'static str = "mitre";
@@ -357,29 +417,42 @@ impl Plugin for AffiliationPlugin {
 	const NAME: &'static str = "affiliation";
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
-		let conf =
-			serde_json::from_value::<Config>(config).map_err(|e| ConfigError::Unspecified {
+		let conf: Config = serde_json::from_value::<RawConfig>(config)
+			.map_err(|e| ConfigError::Unspecified {
 				message: e.to_string(),
+			})?
+			.try_into()?;
+
+		// Store the policy conf to be accessed only in the `default_policy_expr()` impl
+		self.policy_conf
+			.set(conf.count_threshold)
+			.map_err(|_| ConfigError::Unspecified {
+				message: "plugin was already configured".to_string(),
 			})?;
-		CONFIG.set(conf).map_err(|_e| ConfigError::Unspecified {
-			message: "config was already set".to_owned(),
-		})
+
+		ORGSSPEC
+			.set(conf.orgs_spec)
+			.map_err(|_e| ConfigError::Unspecified {
+				message: "orgs spec was already set".to_owned(),
+			})
 	}
 
 	fn default_policy_expr(&self) -> Result<String> {
-		let Some(conf) = CONFIG.get() else {
-			log::error!("tried to access config before set by Hipcheck core!");
-			return Err(Error::UnspecifiedQueryState);
-		};
-		match conf.count_threshold {
-			Some(threshold) => Ok(format!("lte $ {}", threshold)),
-			None => Ok("".to_owned()),
+		match self.policy_conf.get() {
+			None => Err(Error::UnspecifiedQueryState),
+			// If no policy vars, we have no default expr
+			Some(None) => Ok("".to_owned()),
+			// Use policy config vars to construct a default expr
+			Some(Some(policy_conf)) => {
+				Ok(format!("(lte (count (filter (eq #t) $)) {})", policy_conf))
+			}
 		}
 	}
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"Number of affiliated committers to permit".to_string(),
+			"Returns whether each of the repository's contributors was flagged as affiliated or not"
+				.to_string(),
 		))
 	}
 
@@ -395,7 +468,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(AffiliationPlugin {})
+	PluginServer::register(AffiliationPlugin::default())
 		.listen(args.port)
 		.await
 }
@@ -472,29 +545,28 @@ mod test {
 			commits: vec![commit_2.clone(), commit_3.clone()],
 		};
 
-		let commit_1_repo = DetailedGitRepo {
+		let commits_repo = BatchGitRepo {
 			local: repo.clone(),
-			details: Some("abc-123".to_string()),
+			details: vec![
+				"abc-123".to_string(),
+				"def-456".to_string(),
+				"ghi-789".to_string(),
+			],
 		};
 
-		let commit_2_repo = DetailedGitRepo {
+		let contributors_repo = BatchGitRepo {
 			local: repo.clone(),
-			details: Some("def-456".to_string()),
+			details: vec!["jsmith@mitre.org".to_string(), "jdoe@gmail.com".to_string()],
 		};
 
-		let commit_3_repo = DetailedGitRepo {
+		let contributor_1_repo = BatchGitRepo {
 			local: repo.clone(),
-			details: Some("ghi-789".to_string()),
+			details: vec!["jsmith@mitre.org".to_string()],
 		};
 
-		let contributor_1_repo = DetailedGitRepo {
+		let contributor_2_repo = BatchGitRepo {
 			local: repo.clone(),
-			details: Some("jsmith@mitre.org".to_string()),
-		};
-
-		let contributor_2_repo = DetailedGitRepo {
-			local: repo.clone(),
-			details: Some("jdoe@gmail.com".to_string()),
+			details: vec!["jdoe@gmail.com".to_string()],
 		};
 
 		let mut mock_responses = MockResponses::new();
@@ -502,43 +574,43 @@ mod test {
 		mock_responses
 			.insert(
 				"mitre/git/commits",
-				repo,
+				repo.clone(),
 				Ok(vec![commit_1, commit_2, commit_3]),
 			)
 			.unwrap();
 		mock_responses
 			.insert(
-				"mitre/git/contributors_for_commit",
-				commit_1_repo,
-				Ok(commit_1_view),
+				"mitre/git/contributors",
+				repo,
+				Ok(vec![contributor_1, contributor_2]),
 			)
 			.unwrap();
 		mock_responses
 			.insert(
-				"mitre/git/contributors_for_commit",
-				commit_2_repo,
-				Ok(commit_2_view),
+				"mitre/git/batch_contributors_for_commit",
+				commits_repo,
+				Ok(vec![commit_1_view, commit_2_view, commit_3_view]),
 			)
 			.unwrap();
 		mock_responses
 			.insert(
-				"mitre/git/contributors_for_commit",
-				commit_3_repo,
-				Ok(commit_3_view),
+				"mitre/git/batch_commits_for_contributor",
+				contributors_repo,
+				Ok(vec![contributor_1_view.clone(), contributor_2_view.clone()]),
 			)
 			.unwrap();
 		mock_responses
 			.insert(
-				"mitre/git/commits_for_contributor",
+				"mitre/git/batch_commits_for_contributor",
 				contributor_1_repo,
-				Ok(contributor_1_view),
+				Ok(vec![contributor_1_view]),
 			)
 			.unwrap();
 		mock_responses
 			.insert(
-				"mitre/git/commits_for_contributor",
+				"mitre/git/batch_commits_for_contributor",
 				contributor_2_repo,
-				Ok(contributor_2_view),
+				Ok(vec![contributor_2_view]),
 			)
 			.unwrap();
 
@@ -547,13 +619,9 @@ mod test {
 
 	#[tokio::test]
 	async fn test_affiliation() {
-		let orgs_file = pathbuf![&env::current_dir().unwrap(), "test", "example_orgs.kdl"];
+		let orgs_file = pathbuf![&env::current_dir().unwrap(), "test", "test_orgs.kdl"];
 		let orgs_spec = OrgSpec::load_from(&orgs_file).unwrap();
-		let conf = Config {
-			orgs_spec,
-			count_threshold: None,
-		};
-		CONFIG.get_or_init(|| conf);
+		ORGSSPEC.get_or_init(|| orgs_spec);
 
 		let repo = repo();
 		let target = Target {
@@ -568,7 +636,9 @@ mod test {
 
 		let concerns = engine.take_concerns();
 
-		assert_eq!(output, 1);
+		assert_eq!(output.len(), 2);
+		let num_affiliated = output.iter().filter(|&n| *n).count();
+		assert_eq!(num_affiliated, 1);
 		assert_eq!(concerns[0], "Contributor Jane Doe has count 2")
 	}
 }
