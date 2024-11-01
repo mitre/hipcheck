@@ -2,20 +2,17 @@
 
 use crate::{
 	analysis::AnalysisProvider,
-	config::{
-		visit_leaves, Analysis, AnalysisTree, WeightTreeProvider, DEFAULT_QUERY, MITRE_PUBLISHER,
-	},
+	config::{visit_leaves, Analysis, AnalysisTree, WeightTreeProvider},
 	engine::HcEngine,
 	error::Result,
 	hc_error,
-	plugin::{QueryResult, MITRE_LEGACY_PLUGINS},
+	plugin::QueryResult,
 	policy_exprs::Executor,
 	shell::spinner_phase::SpinnerPhase,
 };
 use indextree::{Arena, NodeId};
 #[cfg(test)]
 use num_traits::identities::Zero;
-use serde_json::Value;
 use std::{collections::HashMap, default::Default};
 
 #[cfg(test)]
@@ -54,25 +51,12 @@ pub struct PluginAnalysisResults {
 }
 
 impl PluginAnalysisResults {
-	pub fn get_legacy(&self, analysis: &str) -> Option<&PluginAnalysisResult> {
-		if MITRE_LEGACY_PLUGINS.contains(&analysis) {
-			let key = Analysis::legacy(analysis);
-			self.table.get(&key)
-		} else {
-			None
-		}
+	pub fn get_legacy(&self, _analysis: &str) -> Option<&PluginAnalysisResult> {
+		None
 	}
 	/// Get all results from non-legacy analyses.
 	pub fn plugin_results(&self) -> impl Iterator<Item = (&Analysis, &PluginAnalysisResult)> {
-		self.table.iter().filter_map(|(analysis, result)| {
-			if MITRE_LEGACY_PLUGINS.contains(&analysis.plugin.as_str())
-				&& analysis.publisher == MITRE_PUBLISHER
-			{
-				None
-			} else {
-				Some((analysis, result))
-			}
-		})
+		self.table.iter()
 	}
 }
 
@@ -82,15 +66,7 @@ pub struct Score {
 }
 
 #[salsa::query_group(ScoringProviderStorage)]
-pub trait ScoringProvider: HcEngine + AnalysisProvider + WeightTreeProvider {
-	fn wrapped_query(
-		&self,
-		publisher: String,
-		plugin: String,
-		query: String,
-		key: Value,
-	) -> Result<QueryResult>;
-}
+pub trait ScoringProvider: HcEngine + AnalysisProvider + WeightTreeProvider {}
 
 #[cfg(test)]
 fn normalize_st_internal(node: NodeId, tree: &mut Arena<ScoreTreeNode>) -> f64 {
@@ -214,34 +190,6 @@ pub struct ScoreTreeNode {
 	pub weight: f64,
 }
 
-fn wrapped_query(
-	db: &dyn ScoringProvider,
-	publisher: String,
-	plugin: String,
-	query: String,
-	key: Value,
-) -> Result<QueryResult> {
-	if publisher == *MITRE_PUBLISHER && MITRE_LEGACY_PLUGINS.contains(&plugin.as_str()) {
-		if query != *DEFAULT_QUERY {
-			return Err(hc_error!("legacy analyses only have a default query"));
-		}
-		match plugin.as_str() {
-			ACTIVITY_PHASE => db.activity_analysis(),
-			AFFILIATION_PHASE => db.affiliation_analysis(),
-			BINARY_PHASE => db.binary_analysis(),
-			CHURN_PHASE => db.churn_analysis(),
-			ENTROPY_PHASE => db.entropy_analysis(),
-			IDENTITY_PHASE => db.identity_analysis(),
-			FUZZ_PHASE => db.fuzz_analysis(),
-			REVIEW_PHASE => db.review_analysis(),
-			TYPO_PHASE => db.typo_analysis(),
-			error => Err(hc_error!("Unrecognized legacy analysis '{}'", error)),
-		}
-	} else {
-		db.query(publisher, plugin, query, key)
-	}
-}
-
 pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
 	// Scoring should be performed by the construction of a "score tree" where scores are the
 	// nodes and weights are the edges. The leaves are the analyses themselves, which either
@@ -261,7 +209,7 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 
 		for analysis in analysis_tree.get_analyses() {
 			// Perform query, passing target in JSON
-			let response = db.wrapped_query(
+			let response = db.query(
 				analysis.0.publisher.clone(),
 				analysis.0.plugin.clone(),
 				analysis.0.query.clone(),

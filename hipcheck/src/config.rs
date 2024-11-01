@@ -508,7 +508,6 @@ pub trait CommitConfigQuery: ConfigSource {
 	fn contributor_trust_month_count_threshold(&self) -> Result<u64>;
 }
 
-pub static MITRE_PUBLISHER: &str = "mitre";
 pub static DEFAULT_QUERY: &str = "";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -516,19 +515,6 @@ pub struct Analysis {
 	pub publisher: String,
 	pub plugin: String,
 	pub query: String,
-}
-impl Analysis {
-	pub fn new(publisher: &str, plugin: &str, query: &str) -> Analysis {
-		Analysis {
-			publisher: publisher.to_owned(),
-			plugin: plugin.to_owned(),
-			query: query.to_owned(),
-		}
-	}
-
-	pub fn legacy(analysis: &str) -> Analysis {
-		Analysis::new(MITRE_PUBLISHER, analysis, DEFAULT_QUERY)
-	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

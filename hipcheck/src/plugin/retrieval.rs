@@ -2,7 +2,6 @@
 
 use crate::{
 	cache::plugin::HcPluginCache,
-	config::MITRE_PUBLISHER,
 	error::Error,
 	hc_error,
 	plugin::{
@@ -27,9 +26,6 @@ use xz2::read::XzDecoder;
 
 use super::get_current_arch;
 
-/// The plugins currently are not delegated via the `plugin` system and are still part of `hipcheck` core
-pub const MITRE_LEGACY_PLUGINS: [&str; 1] = ["entropy"];
-
 /// determine all of the plugins that need to be run and locate download them, if they do not exist
 pub fn retrieve_plugins(
 	policy_plugins: &[PolicyPlugin],
@@ -38,14 +34,6 @@ pub fn retrieve_plugins(
 	let mut required_plugins = HashSet::new();
 
 	for policy_plugin in policy_plugins.iter() {
-		// TODO: while the legacy passes are still integrated in the main codebase, we skip downloading them!
-		if policy_plugin.name.publisher.0.as_str() == MITRE_PUBLISHER
-			&& MITRE_LEGACY_PLUGINS
-				.iter()
-				.any(|x| *x == policy_plugin.name.name.0.as_str())
-		{
-			continue;
-		}
 		retrieve_plugin(
 			policy_plugin.get_plugin_id(),
 			&policy_plugin.manifest,

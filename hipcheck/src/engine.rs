@@ -98,7 +98,7 @@ fn query(
 	// (with salsa memo-ization) to get the needed data, and resume our
 	// current query by providing the plugin the answer.
 	loop {
-		eprintln!("Query needs more info, recursing...");
+		log::trace!("Query needs more info, recursing...");
 		let answer = db
 			.query(
 				ar.publisher.clone(),
@@ -107,7 +107,7 @@ fn query(
 				ar.key.clone(),
 			)?
 			.value;
-		eprintln!("Got answer, resuming");
+		log::trace!("Got answer, resuming");
 		ar = match runtime.block_on(p_handle.resume_query(ar, answer))? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));
@@ -134,7 +134,7 @@ pub fn async_query(
 		};
 		// Initiate the query. If remote closed or we got our response immediately,
 		// return
-		eprintln!("Querying: {query}, key: {key:?}");
+		log::trace!("Querying: {query}, key: {key:?}");
 		let mut ar = match p_handle.query(query, key).await? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));
@@ -148,7 +148,7 @@ pub fn async_query(
 		// (with salsa memo-ization) to get the needed data, and resume our
 		// current query by providing the plugin the answer.
 		loop {
-			eprintln!("Awaiting result, now recursing");
+			log::trace!("Awaiting result, now recursing");
 			let answer = async_query(
 				Arc::clone(&core),
 				ar.publisher.clone(),
@@ -158,7 +158,7 @@ pub fn async_query(
 			)
 			.await?
 			.value;
-			eprintln!("Resuming query with answer {answer:?}");
+			log::trace!("Resuming query with answer {answer:?}");
 			ar = match p_handle.resume_query(ar, answer).await? {
 				PluginResponse::RemoteClosed => {
 					return Err(hc_error!("Plugin channel closed unexpected"));
@@ -196,7 +196,7 @@ impl HcEngineImpl {
 	// independent of Salsa.
 	pub fn new(executor: PluginExecutor, plugins: Vec<PluginWithConfig>) -> Result<Self> {
 		let runtime = RUNTIME.handle();
-		eprintln!("Starting HcPluginCore");
+		log::info!("Starting HcPluginCore");
 		let core = runtime.block_on(HcPluginCore::new(executor, plugins))?;
 		let mut engine = HcEngineImpl {
 			storage: Default::default(),

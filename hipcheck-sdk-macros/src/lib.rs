@@ -268,7 +268,7 @@ pub fn queries(_item: TokenStream) -> TokenStream {
 		};
 		agg.extend(out);
 	}
-	eprintln!(
+	log::info!(
 		"Auto-generating Plugin::queries() with {} detected queries",
 		q_lock.len()
 	);
