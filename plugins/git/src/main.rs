@@ -3,13 +3,18 @@
 //! Plugin containing secondary queries that return information about a Git repo to another query
 
 mod data;
+mod local;
 mod parse;
 mod util;
 
 use crate::{
 	data::{
 		Commit, CommitContributor, CommitContributorView, CommitDiff, Contributor, ContributorView,
-		Diff,
+		DetailedGitRepo, Diff,
+	},
+	local::{
+		local_commit_contributors, local_commits, local_commits_for_contributor,
+		local_contributors, local_contributors_for_commit,
 	},
 	util::git_command::{get_commits, get_commits_from_date, get_diffs},
 };
@@ -18,15 +23,18 @@ use hipcheck_sdk::{prelude::*, types::LocalGitRepo};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// A locally stored git repo, with optional additional details
+/// A locally stored git repo, with a list of additional details
 /// The details will vary based on the query (e.g. a date, a committer e-mail address, a commit hash)
+///
+/// This struct exists for using the temproary "batch" queries until proper batching is implemented
+/// TODO: Remove this struct once batching works
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct DetailedGitRepo {
+pub struct BatchGitRepo {
 	/// The local repo
 	local: LocalGitRepo,
 
 	/// Optional additional information for the query
-	pub details: Option<String>,
+	pub details: Vec<String>,
 }
 
 /// Returns the date of the most recent commit to a Git repo as `jiff:Timestamp` displayed as a String
@@ -218,6 +226,44 @@ async fn commits_for_contributor(
 	})
 }
 
+// Temporary query to call multiple commits_for_contributors() queries until we implement batching
+// TODO: Remove this query once batching works
+#[query]
+async fn batch_commits_for_contributor(
+	_engine: &mut PluginEngine,
+	repo: BatchGitRepo,
+) -> Result<Vec<ContributorView>> {
+	let local = repo.local;
+	let emails = repo.details;
+
+	let mut views = Vec::new();
+
+	let commits = local_commits(local.clone()).map_err(|e| {
+		log::error!("failed to get commits: {}", e);
+		Error::UnspecifiedQueryState
+	})?;
+	let contributors = local_contributors(local.clone()).map_err(|e| {
+		log::error!("failed to get contributors: {}", e);
+		Error::UnspecifiedQueryState
+	})?;
+	let commit_contributors =
+		local_commit_contributors(local.clone(), &contributors).map_err(|e| {
+			log::error!("failed to get join table: {}", e);
+			Error::UnspecifiedQueryState
+		})?;
+
+	for email in emails {
+		views.push(local_commits_for_contributor(
+			&commits,
+			&contributors,
+			&commit_contributors,
+			&email,
+		)?);
+	}
+
+	Ok(views)
+}
+
 /// Returns the contributor view for a given commit (idenftied by hash in the `details` field)
 #[query]
 async fn contributors_for_commit(
@@ -278,6 +324,44 @@ async fn contributors_for_commit(
 			log::error!("failed to find contributor info");
 			Error::UnspecifiedQueryState
 		})
+}
+
+// Temporary query to call multiple contributors_for_commit() queries until we implement batching
+// TODO: Remove this query once batching works
+#[query]
+async fn batch_contributors_for_commit(
+	_engine: &mut PluginEngine,
+	repo: BatchGitRepo,
+) -> Result<Vec<CommitContributorView>> {
+	let local = repo.local;
+	let hashes = repo.details;
+
+	let commits = local_commits(local.clone()).map_err(|e| {
+		log::error!("failed to get commits: {}", e);
+		Error::UnspecifiedQueryState
+	})?;
+	let contributors = local_contributors(local.clone()).map_err(|e| {
+		log::error!("failed to get contributors: {}", e);
+		Error::UnspecifiedQueryState
+	})?;
+	let commit_contributors =
+		local_commit_contributors(local.clone(), &contributors).map_err(|e| {
+			log::error!("failed to get join table: {}", e);
+			Error::UnspecifiedQueryState
+		})?;
+
+	let mut views = Vec::new();
+
+	for hash in hashes {
+		views.push(local_contributors_for_commit(
+			&commits,
+			&contributors,
+			&commit_contributors,
+			&hash,
+		)?);
+	}
+
+	Ok(views)
 }
 
 /// Internal use function that returns a join table of contributors by commit
