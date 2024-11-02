@@ -33,7 +33,7 @@ impl TryFrom<RawConfig> for Config {
 	fn try_from(value: RawConfig) -> StdResult<Config, Self::Error> {
 		let Some(binary_file) = value.binary_file else {
 			return Err(ConfigError::MissingRequiredConfig {
-				field_name: "binary_file".to_owned(),
+				field_name: "binary-file".to_owned(),
 				field_type: "string".to_owned(),
 				possible_values: vec![],
 			});

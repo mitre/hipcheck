@@ -29,6 +29,7 @@ pub mod prelude {
 	pub use crate::error::{ConfigError, Error, Result};
 	pub use crate::plugin_engine::PluginEngine;
 	pub use crate::plugin_server::{PluginServer, QueryResult};
+	pub use crate::types::AnnotatedJSONValue;
 	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
 	// Re-export macros
 	#[cfg(feature = "macros")]
@@ -40,6 +41,7 @@ pub mod prelude {
 
 /// re-export of user-facing third-party dependencies
 pub mod deps {
+	pub use jiff::{Span, Zoned};
 	pub use schemars::{schema::SchemaObject as JsonSchema, schema_for};
 	pub use serde_json::{from_str, from_value, to_value, Value};
 	pub use tonic::async_trait;

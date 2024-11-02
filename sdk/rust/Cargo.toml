@@ -8,6 +8,7 @@ edition = "2021"
 thiserror = "1.0.65"
 futures = "0.3.31"
 indexmap = "2.6.0"
+jiff = { version = "0.1.13", features=["serde"]}
 prost = "0.13.3"
 rand = "0.8.5"
 serde = { version = "1.0.210", features = ["derive"] }
