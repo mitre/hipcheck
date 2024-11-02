@@ -1,5 +1,5 @@
 plugins {
-    plugin "mitre/activity" version="0.1.0"
+    plugin "mitre/activity" version="0.1.0" manifest="./plugins/activity/plugin.kdl"
     plugin "mitre/binary" version="0.1.0" manifest="./plugins/binary/plugin.kdl"
     plugin "mitre/fuzz" version="0.1.0" manifest="./plugins/fuzz/plugin.kdl"
     plugin "mitre/review" version="0.1.0" manifest="./plugins/review/plugin.kdl"
@@ -18,7 +18,7 @@ analyze {
     investigate-if-fail "mitre/typo" "mitre/binary"
 
     category "practices" {
-        analysis "mitre/activity" policy="(lte $ 52)" weight=3
+        analysis "mitre/activity" policy="(lte $ P52w)" weight=3
         analysis "mitre/binary" {
 			binary-file "./config/Binary.toml"
 			binary-file-threshold 0

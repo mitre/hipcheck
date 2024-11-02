@@ -17,8 +17,8 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 
 /// Returns the span of time since the most recent commit to a Git repo as `jiff:Span` displayed as a String
 /// (Which means that anything expecting a `Span` must parse the output of this query appropriately)
-#[query]
-async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
+#[query(default)]
+async fn activity(engine: &mut PluginEngine, target: Target) -> Result<AnnotatedJSONValue> {
 	log::debug!("running activity query");
 
 	let repo = target.local;
@@ -49,7 +49,7 @@ async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 		Error::UnspecifiedQueryState
 	})?;
 
-	Ok(time_since_last_commit.to_string())
+	Ok(AnnotatedJSONValue::from_span(time_since_last_commit))
 }
 
 #[derive(Clone, Debug)]
@@ -83,7 +83,7 @@ impl Plugin for ActivityPlugin {
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"Number of weeks since last activity in repo".to_string(),
+			"Span of time that has elapsed since last activity in repo".to_string(),
 		))
 	}
 
@@ -141,7 +141,7 @@ mod test {
 
 		let mut engine = PluginEngine::mock(mock_responses().unwrap());
 		let output = activity(&mut engine, target).await.unwrap();
-		let span: Span = output.parse().unwrap();
+		let span: Span = output.to_span().unwrap();
 		let result = span.round(SpanRound::new().smallest(Unit::Day)).unwrap();
 
 		let today = Timestamp::now();

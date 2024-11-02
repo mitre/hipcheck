@@ -28,7 +28,7 @@ use xz2::read::XzDecoder;
 use super::get_current_arch;
 
 /// The plugins currently are not delegated via the `plugin` system and are still part of `hipcheck` core
-pub const MITRE_LEGACY_PLUGINS: [&str; 2] = ["activity", "entropy"];
+pub const MITRE_LEGACY_PLUGINS: [&str; 1] = ["entropy"];
 
 /// determine all of the plugins that need to be run and locate download them, if they do not exist
 pub fn retrieve_plugins(
