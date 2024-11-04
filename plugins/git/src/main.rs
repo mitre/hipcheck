@@ -153,6 +153,15 @@ async fn commit_diffs(engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<V
 		Error::UnspecifiedQueryState
 	})?;
 
+	if commits.len() != diffs.len() {
+		log::error!(
+			"parsed {} diffs but there are {} commits",
+			diffs.len(),
+			commits.len()
+		);
+		return Err(Error::UnspecifiedQueryState);
+	}
+
 	let commit_diffs = Iterator::zip(commits.iter(), diffs.iter())
 		.map(|(commit, diff)| CommitDiff {
 			commit: commit.clone(),
@@ -435,4 +444,15 @@ struct Args {
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
 	PluginServer::register(GitPlugin {}).listen(args.port).await
+}
+
+#[cfg(test)]
+mod test {
+	#[test]
+	fn test_no_newline_before_end_of_chunk() {
+		let input = "diff --git a/plugins/review/plugin.kdl b/plugins/review/plugin.kdl\nindex 83f0355..9fa8e47 100644\n--- a/plugins/review/plugin.kdl\n+++ b/plugins/review/plugin.kdl\n@@ -6,4 +6,4 @@ entrypoint {\n-  on arch=\"aarch64-apple-darwin\" \"./hc-mitre-review\"\n-  on arch=\"x86_64-apple-darwin\" \"./hc-mitre-review\"\n-  on arch=\"x86_64-unknown-linux-gnu\" \"./hc-mitre-review\"\n-  on arch=\"x86_64-pc-windows-msvc\" \"./hc-mitre-review\"\n+  on arch=\"aarch64-apple-darwin\" \"./target/debug/review_sdk\"\n+  on arch=\"x86_64-apple-darwin\" \"./target/debug/review_sdk\"\n+  on arch=\"x86_64-unknown-linux-gnu\" \"./target/debug/review_sdk\"\n+  on arch=\"x86_64-pc-windows-msvc\" \"./target/debug/review_sdk\"\n@@ -14 +14 @@ dependencies {\n-}\n\\ No newline at end of file\n+}\n";
+
+		let (leftover, _parsed) = crate::parse::patch(input).unwrap();
+		assert!(leftover.is_empty());
+	}
 }
