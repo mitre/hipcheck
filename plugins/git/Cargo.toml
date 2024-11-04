@@ -17,4 +17,4 @@ schemars = { version = "0.8.21", features = ["url"] }
 semver = "1.0.9"
 serde = { version = "1.0.210", features = ["derive", "rc"] }
 tokio = { version = "1.40.0", features = ["rt"] }
-which = { version = "6.0.3", default-features = false }
+which = { version = "7.0.0", default-features = false }
