@@ -17,5 +17,5 @@ pathbuf = "1.0.0"
 serde = { version = "1.0.210", features = ["derive"] }
 toml = "0.8.19"
 xshell = "0.2.6"
-which = "6.0.3"
+which = "7.0.0"
 convert_case = "0.6.0"
