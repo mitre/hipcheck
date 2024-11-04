@@ -102,7 +102,7 @@ rustls-native-certs = "0.8.0"
 salsa = "0.16.1"
 schemars = { version = "0.8.21", default-features = false, features = ["derive", "preserve_order", "chrono", "url"] }
 semver = "1.0.9"
-serde = { version = "1.0.210", features = ["derive", "rc"] }
+serde = { version = "1.0.214", features = ["derive", "rc"] }
 serde_derive = "1.0.137"
 serde_json = "1.0.128"
 sha256 = { version = "1.5.0", default-features = false }
@@ -140,7 +140,7 @@ zstd = "0.13.2"
 anyhow = "1.0.91"
 pathbuf = "1.0.0"
 schemars = { version = "0.8.21", features = ["chrono", "url"] }
-serde = { version = "1.0.210", features = ["derive"] }
+serde = { version = "1.0.214", features = ["derive"] }
 serde_json = "1.0.128"
 tonic-build = "0.12.3"
 url = { version = "2.5.2", features = ["serde"] }
