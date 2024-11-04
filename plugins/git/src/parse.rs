@@ -265,8 +265,8 @@ fn patch_header(input: &str) -> IResult<&str, &str> {
 	recognize(tuple((metas, line, line)))(input)
 }
 
-fn plus_or_minus(input: &str) -> IResult<&str, &str> {
-	recognize(one_of("+-"))(input)
+fn chunk_prefix(input: &str) -> IResult<&str, &str> {
+	recognize(one_of("+-\\"))(input)
 }
 
 fn line_with_ending(input: &str) -> IResult<&str, &str> {
@@ -274,11 +274,15 @@ fn line_with_ending(input: &str) -> IResult<&str, &str> {
 }
 
 fn chunk_line(input: &str) -> IResult<&str, &str> {
-	preceded(plus_or_minus, line_with_ending)(input)
+	preceded(chunk_prefix, line_with_ending)(input)
 }
 
 fn chunk_body(input: &str) -> IResult<&str, String> {
 	fold_many0(chunk_line, String::new, |mut patch, line| {
+		if line == " No newline at end of file\n" {
+			return patch;
+		}
+
 		patch.push_str(line);
 		patch
 	})(input)
@@ -307,7 +311,7 @@ fn patch_footer(input: &str) -> IResult<&str, Option<&str>> {
 	opt(no_newline)(input)
 }
 
-fn patch(input: &str) -> IResult<&str, String> {
+pub(crate) fn patch(input: &str) -> IResult<&str, String> {
 	tuple((patch_header, chunks, patch_footer))(input).map(|(i, (_, chunks, _))| (i, chunks))
 }
 
@@ -612,13 +616,13 @@ use serde::{Serialize, Deserialize};\n";
 		let input_plus = "+";
 		let expected_plus = "+";
 
-		let (remaining, c) = plus_or_minus(input_plus).unwrap();
+		let (remaining, c) = chunk_prefix(input_plus).unwrap();
 		assert_eq!("", remaining);
 		assert_eq!(expected_plus, c);
 
 		let input_minus = "-";
 		let expected_minus = "-";
-		let (remaining, c) = plus_or_minus(input_minus).unwrap();
+		let (remaining, c) = chunk_prefix(input_minus).unwrap();
 		assert_eq!("", remaining);
 		assert_eq!(expected_minus, c);
 	}
