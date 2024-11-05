@@ -3,10 +3,10 @@ name "typo"
 version "0.1.0"
 license "Apache-2.0"
 entrypoint {
-    on arch="aarch64-apple-darwin" "./target/debug/typo_sdk"
-    on arch="x86_64-apple-darwin" "./target/debug/typo_sdk"
-    on arch="x86_64-unknown-linux-gnu" "./target/debug/typo_sdk"
-    on arch="x86_64-pc-windows-msvc" "./target/debug/typo_sdk"
+    on arch="aarch64-apple-darwin" "./target/debug/typo"
+    on arch="x86_64-apple-darwin" "./target/debug/typo"
+    on arch="x86_64-unknown-linux-gnu" "./target/debug/typo"
+    on arch="x86_64-pc-windows-msvc" "./target/debug/typo"
 }
 dependencies {
     plugin "mitre/npm" version="0.1.0" manifest="./plugins/npm/plugin.kdl"
