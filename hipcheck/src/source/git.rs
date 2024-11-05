@@ -4,6 +4,7 @@
 
 use crate::{
 	error::{Context, Error as HcError, Result as HcResult},
+	hc_error,
 	shell::{progress_phase::ProgressPhase, verbosity::Verbosity, Shell},
 };
 use console::Term;
@@ -151,8 +152,22 @@ pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<String> {
 	let ret_str: String;
 	if let Some(refspec_str) = refspec {
 		// Parse refspec as an annotated commit, and set HEAD based on that
-		let tgt_ref: AnnotatedCommit =
-			repo.find_annotated_commit(repo.revparse_single(&refspec_str)?.peel_to_commit()?.id())?;
+
+		// Try refspec as given
+		let tgt_ref: AnnotatedCommit = match repo.revparse_single(&refspec_str) {
+			Ok(object) => repo.find_annotated_commit(object.peel_to_commit()?.id())?,
+			// If that refspec is not found, try it again with a leading "v"
+			Err(e) => match repo.revparse_single(&format!("v{refspec_str}")) {
+				Ok(new_object) => repo.find_annotated_commit(new_object.peel_to_commit()?.id())?,
+				Err(_) => {
+					return Err(hc_error!(
+					"Could not find repo with provided refspec with or without a leading 'v': {}",
+					e
+				))
+				}
+			},
+		};
+		
 		repo.set_head_detached_from_annotated(tgt_ref)?;
 		ret_str = refspec_str;
 	} else {
