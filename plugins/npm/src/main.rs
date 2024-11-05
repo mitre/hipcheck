@@ -98,7 +98,7 @@ struct DependenciesPlugin;
 impl Plugin for DependenciesPlugin {
 	const PUBLISHER: &'static str = "mitre";
 
-	const NAME: &'static str = "npm_dependencies";
+	const NAME: &'static str = "npm";
 
 	fn set_config(&self, _config: Value) -> std::result::Result<(), ConfigError> {
 		Ok(())

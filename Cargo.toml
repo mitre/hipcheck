@@ -23,7 +23,7 @@ members = [
     "hipcheck-sdk-macros",
     "plugins/git",
     "plugins/github",
-    "plugins/npm_dependencies",
+    "plugins/npm",
     "plugins/activity",
     "plugins/affiliation",
     "plugins/binary",

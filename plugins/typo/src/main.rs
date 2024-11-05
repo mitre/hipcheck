@@ -73,7 +73,7 @@ async fn typo(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 
 	// Get the repo's dependencies
 	let value = engine
-		.query("mitre/npm_dependencies/dependencies", local)
+		.query("mitre/npm/dependencies", local)
 		.await
 		.map_err(|e| {
 			log::error!("failed to get dependencies for typo query: {}", e);
@@ -210,7 +210,7 @@ mod test {
 
 		let mut mock_responses = MockResponses::new();
 		mock_responses
-			.insert("mitre/npm_dependencies/dependencies", local, Ok(output))
+			.insert("mitre/npm/dependencies", local, Ok(output))
 			.unwrap();
 
 		Ok(mock_responses)
