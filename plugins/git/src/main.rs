@@ -458,7 +458,7 @@ mod test {
 
 	#[test]
 	fn test_hyphens_in_diff_stats() {
-		let input = "0\t4\tsite/content/_index.md\n136\t2\tsite/content/install/_index.md\n-\t-\tsite/static/images/homepage-bg.png\n2\t2\tsite/tailwind.config.js\n2\t0\tsite/templates/bases/base.tera.html\n82\t1\tsite/templates/index.html\n3\t3\tsite/templates/shortcodes/info.html\n15\t14\txtask/src/task/site/serve.rs";
+		let input = "0\t4\tsite/content/_index.md\n136\t2\tsite/content/install/_index.md\n-\t-\tsite/static/images/homepage-bg.png\n2\t2\tsite/tailwind.config.js\n2\t0\tsite/templates/bases/base.tera.html\n82\t1\tsite/templates/index.html\n3\t3\tsite/templates/shortcodes/info.html\n15\t14\txtask/src/task/site/serve.rs\n";
 		let (leftover, _) = crate::parse::stats(input).unwrap();
 		assert!(leftover.is_empty());
 	}

@@ -8,7 +8,7 @@ use jiff::Timestamp;
 use nom::{
 	branch::alt,
 	character::complete::{char as character, digit1, not_line_ending, one_of, space1},
-	combinator::{opt, peek, recognize},
+	combinator::{map, opt, peek, recognize},
 	error::{Error as NomError, ErrorKind},
 	multi::{fold_many0, many0, many1, many_m_n},
 	sequence::{preceded, terminated, tuple},
@@ -149,22 +149,38 @@ fn num(input: &str) -> IResult<&str, i64> {
 	})
 }
 
-fn stat(input: &str) -> IResult<&str, Stat<'_>> {
-	tuple((num, space1, num, space1, line))(input).map(
+fn num_or_dash(input: &str) -> IResult<&str, Option<i64>> {
+	let some_num = map(num, Some);
+	let dash = map(character('-'), |_| None);
+	alt((some_num, dash))(input)
+}
+
+fn stat(input: &str) -> IResult<&str, Option<Stat<'_>>> {
+	tuple((num_or_dash, space1, num_or_dash, space1, line))(input).map(
 		|(i, (lines_added, _, lines_deleted, _, file_name))| {
+			let Some(lines_added) = lines_added else {
+				return (i, None);
+			};
+
+			let Some(lines_deleted) = lines_deleted else {
+				return (i, None);
+			};
+
 			let stat = Stat {
 				lines_added,
 				lines_deleted,
 				file_name,
 			};
 
-			(i, stat)
+			(i, Some(stat))
 		},
 	)
 }
 
 pub(crate) fn stats(input: &str) -> IResult<&str, Vec<Stat<'_>>> {
-	many0(stat)(input)
+	map(many0(stat), |vec| {
+		vec.into_iter().flatten().collect::<Vec<_>>()
+	})(input)
 }
 
 pub(crate) fn diff(input: &str) -> IResult<&str, Diff> {
@@ -251,7 +267,7 @@ fn meta(input: &str) -> IResult<&str, &str> {
 	recognize(tuple((single_alpha, line)))(input)
 }
 
-fn metas(input: &str) -> IResult<&str, Vec<&str>> {
+pub(crate) fn metas(input: &str) -> IResult<&str, Vec<&str>> {
 	many1(meta)(input)
 }
 
@@ -261,8 +277,8 @@ fn single_alpha(input: &str) -> IResult<&str, &str> {
 	))(input)
 }
 
-fn patch_header(input: &str) -> IResult<&str, &str> {
-	recognize(tuple((metas, line, line)))(input)
+pub(crate) fn patch_header(input: &str) -> IResult<&str, &str> {
+	recognize(tuple((metas, opt(line), opt(line))))(input)
 }
 
 fn chunk_prefix(input: &str) -> IResult<&str, &str> {
@@ -312,7 +328,8 @@ fn patch_footer(input: &str) -> IResult<&str, Option<&str>> {
 }
 
 pub(crate) fn patch(input: &str) -> IResult<&str, String> {
-	tuple((patch_header, chunks, patch_footer))(input).map(|(i, (_, chunks, _))| (i, chunks))
+	tuple((patch_header, opt(chunks), patch_footer))(input)
+		.map(|(i, (_, chunks, _))| (i, chunks.unwrap_or_else(String::new)))
 }
 
 fn gh_meta(input: &str) -> IResult<&str, &str> {
@@ -416,6 +433,7 @@ mod test {
 		let line = "7       0       Cargo.toml\n";
 
 		let (remaining, stat) = stat(line).unwrap();
+		let stat = stat.unwrap();
 
 		assert_eq!("", remaining);
 		assert_eq!(7, stat.lines_added);
