@@ -3,7 +3,7 @@
 version = 3
 
 [[package]]
-name = "activity_sdk"
+name = "activity"
 version = "0.1.0"
 dependencies = [
  "clap",
@@ -49,7 +49,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "affiliation_sdk"
+name = "affiliation"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1106,22 +1106,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40ecd4077b5ae9fd2e9e169b102c6c330d0605168eb0e8bf79952b256dbefffd"
 
 [[package]]
-name = "git2"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b903b73e45dc0c6c596f2d37eccece7c1c8bb6e4407b001096387c63d0d93724"
-dependencies = [
- "bitflags 2.6.0",
- "libc",
- "libgit2-sys",
- "log",
- "openssl-probe",
- "openssl-sys",
- "url",
-]
-
-[[package]]
-name = "git_sdk"
+name = "git"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1136,6 +1121,21 @@ dependencies = [
  "serde",
  "tokio",
  "which",
+]
+
+[[package]]
+name = "git2"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b903b73e45dc0c6c596f2d37eccece7c1c8bb6e4407b001096387c63d0d93724"
+dependencies = [
+ "bitflags 2.6.0",
+ "libc",
+ "libgit2-sys",
+ "log",
+ "openssl-probe",
+ "openssl-sys",
+ "url",
 ]
 
 [[package]]
@@ -2590,7 +2590,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "review_sdk"
+name = "review"
 version = "0.1.0"
 dependencies = [
  "clap",
@@ -3561,7 +3561,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "typo_sdk"
+name = "typo"
 version = "0.1.0"
 dependencies = [
  "anyhow",

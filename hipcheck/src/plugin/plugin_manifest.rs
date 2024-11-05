@@ -576,25 +576,25 @@ dependencies {
 		entrypoints
 			.insert(
 				Arch::Known(KnownArch::Aarch64AppleDarwin),
-				"./target/debug/activity_sdk".to_owned(),
+				"./target/debug/activity".to_owned(),
 			)
 			.unwrap();
 		entrypoints
 			.insert(
 				Arch::Known(KnownArch::X86_64AppleDarwin),
-				"./target/debug/activity_sdk".to_owned(),
+				"./target/debug/activity".to_owned(),
 			)
 			.unwrap();
 		entrypoints
 			.insert(
 				Arch::Known(KnownArch::X86_64UnknownLinuxGnu),
-				"./target/debug/activity_sdk".to_owned(),
+				"./target/debug/activity".to_owned(),
 			)
 			.unwrap();
 		entrypoints
 			.insert(
 				Arch::Known(KnownArch::X86_64PcWindowsMsvc),
-				"./target/debug/activity_sdk".to_owned(),
+				"./target/debug/activity".to_owned(),
 			)
 			.unwrap();
 
