@@ -9,7 +9,7 @@ plugins {
     plugin "mitre/churn" version="0.1.0" manifest="./plugins/churn/plugin.kdl"
 }
 patch {
-	plugin "mitre/github_api" {
+	plugin "mitre/github" {
 		api-token-var "HC_GITHUB_TOKEN"
 	}
 }

@@ -40,7 +40,7 @@ pub fn config_to_policy(config: Config) -> Result<PolicyFile> {
 	}
 
 	let patch = PolicyPatchList(vec![PolicyPatch::new(
-		PolicyPluginName::new("mitre/github_api")?,
+		PolicyPluginName::new("mitre/github")?,
 		PolicyConfig(HashMap::from_iter(vec![(
 			"api-token-var".to_owned(),
 			Value::String("HC_GITHUB_TOKEN".to_owned()),

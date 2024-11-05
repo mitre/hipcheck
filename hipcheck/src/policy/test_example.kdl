@@ -10,7 +10,7 @@ plugins {
     plugin "mitre/entropy" version="0.1.0" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-entropy.kdl"
 }
 patch {
-	plugin "mitre/github_api" {
+	plugin "mitre/github" {
 		api-token-var "HC_GITHUB_TOKEN"
 	}
 }

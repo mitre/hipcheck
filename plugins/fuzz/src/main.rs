@@ -9,7 +9,7 @@ use std::result::Result as StdResult;
 #[query(default)]
 async fn fuzz(engine: &mut PluginEngine, key: Target) -> Result<Value> {
 	if let Some(remote) = &key.remote {
-		engine.query("mitre/github_api", remote.clone()).await
+		engine.query("mitre/github", remote.clone()).await
 	} else {
 		Err(Error::UnexpectedPluginQueryInputFormat)
 	}
@@ -82,7 +82,7 @@ mod test {
 		let known_remote = target.remote.as_ref().unwrap().clone();
 		let output = true;
 		let mut mock_reponses = MockResponses::new();
-		mock_reponses.insert("mitre/github_api", known_remote, Ok(output))?;
+		mock_reponses.insert("mitre/github", known_remote, Ok(output))?;
 		Ok(mock_reponses)
 	}
 

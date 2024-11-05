@@ -1174,7 +1174,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "github_api"
+name = "github"
 version = "0.1.0"
 dependencies = [
  "anyhow",

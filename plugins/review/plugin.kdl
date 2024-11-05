@@ -10,5 +10,5 @@ entrypoint {
 }
 
 dependencies {
-  plugin "mitre/github_api" version="0.1.0" manifest="./plugins/github_api/plugin.kdl"
+  plugin "mitre/github" version="0.1.0" manifest="./plugins/github/plugin.kdl"
 }
