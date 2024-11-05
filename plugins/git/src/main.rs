@@ -455,4 +455,18 @@ mod test {
 		let (leftover, _parsed) = crate::parse::patch(input).unwrap();
 		assert!(leftover.is_empty());
 	}
+
+	#[test]
+	fn test_hyphens_in_diff_stats() {
+		let input = "0\t4\tsite/content/_index.md\n136\t2\tsite/content/install/_index.md\n-\t-\tsite/static/images/homepage-bg.png\n2\t2\tsite/tailwind.config.js\n2\t0\tsite/templates/bases/base.tera.html\n82\t1\tsite/templates/index.html\n3\t3\tsite/templates/shortcodes/info.html\n15\t14\txtask/src/task/site/serve.rs";
+		let (leftover, _) = crate::parse::stats(input).unwrap();
+		assert!(leftover.is_empty());
+	}
+
+	#[test]
+	fn test_patch_with_only_meta() {
+		let input = "diff --git a/hipcheck/src/analysis/session/spdx.rs b/hipcheck/src/session/spdx.rs\nsimilarity index 100%\nrename from hipcheck/src/analysis/session/spdx.rs\nrename to hipcheck/src/session/spdx.rs\n";
+		let (leftover, _) = crate::parse::patch(input).unwrap();
+		assert!(leftover.is_empty());
+	}
 }
