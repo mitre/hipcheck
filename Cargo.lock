@@ -2049,7 +2049,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "npm_dependencies_sdk"
+name = "npm"
 version = "0.1.0"
 dependencies = [
  "anyhow",

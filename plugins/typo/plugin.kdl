@@ -9,5 +9,5 @@ entrypoint {
     on arch="x86_64-pc-windows-msvc" "./target/debug/typo_sdk"
 }
 dependencies {
-    plugin "mitre/npm_dependencies" version="0.1.0" manifest="./plugins/npm_dependencies/plugin.kdl"
+    plugin "mitre/npm" version="0.1.0" manifest="./plugins/npm/plugin.kdl"
 }
