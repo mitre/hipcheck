@@ -163,11 +163,11 @@ fn stat(input: &str) -> IResult<&str, Stat<'_>> {
 	)
 }
 
-fn stats(input: &str) -> IResult<&str, Vec<Stat<'_>>> {
+pub(crate) fn stats(input: &str) -> IResult<&str, Vec<Stat<'_>>> {
 	many0(stat)(input)
 }
 
-fn diff(input: &str) -> IResult<&str, Diff> {
+pub(crate) fn diff(input: &str) -> IResult<&str, Diff> {
 	log::trace!("input is {:#?}", input);
 	tuple((stats, line, patches))(input).map(|(i, (stats, _, patches))| {
 		log::trace!("patches are {:#?}", patches);
@@ -238,7 +238,7 @@ fn gh_diff(input: &str) -> IResult<&str, Diff> {
 	})
 }
 
-fn diffs(input: &str) -> IResult<&str, Vec<Diff>> {
+pub(crate) fn diffs(input: &str) -> IResult<&str, Vec<Diff>> {
 	many0(diff)(input)
 }
 
