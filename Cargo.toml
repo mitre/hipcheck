@@ -22,7 +22,7 @@ members = [
     "sdk/rust",
     "hipcheck-sdk-macros",
     "plugins/git",
-    "plugins/github_api",
+    "plugins/github",
     "plugins/npm_dependencies",
     "plugins/activity",
     "plugins/affiliation",

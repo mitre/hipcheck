@@ -117,11 +117,11 @@ struct Args {
 }
 
 #[derive(Clone, Debug)]
-struct GitlabAPIPlugin {}
+struct GithubAPIPlugin {}
 
-impl Plugin for GitlabAPIPlugin {
+impl Plugin for GithubAPIPlugin {
 	const PUBLISHER: &'static str = "mitre";
-	const NAME: &'static str = "gitlab_api";
+	const NAME: &'static str = "github";
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		let conf: Config = serde_json::from_value::<RawConfig>(config)
@@ -148,7 +148,7 @@ impl Plugin for GitlabAPIPlugin {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(GitlabAPIPlugin {})
+	PluginServer::register(GithubAPIPlugin {})
 		.listen(args.port)
 		.await
 }

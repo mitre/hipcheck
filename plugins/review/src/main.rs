@@ -45,7 +45,7 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 
 	// Get a list of all pull requests to the repo, with their corresponding number of reviews
 	let value = engine
-		.query("mitre/github_api/pr_reviews", known_remote)
+		.query("mitre/github/pr_reviews", known_remote)
 		.await
 		.map_err(|e| {
 			log::error!(
@@ -152,7 +152,7 @@ mod test {
 
 		// when calling into query, the input known_remote gets passed to `pr_reviews`, lets assume it returns the vec of PullRequests `prs`
 		let mut mock_responses = MockResponses::new();
-		mock_responses.insert("mitre/github_api/pr_reviews", known_remote, Ok(prs))?;
+		mock_responses.insert("mitre/github/pr_reviews", known_remote, Ok(prs))?;
 		Ok(mock_responses)
 	}
 
