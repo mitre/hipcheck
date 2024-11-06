@@ -384,6 +384,83 @@ impl TryFrom<Query> for PluginQuery {
 	}
 }
 
+const GRPC_MAX_SIZE: usize = 1024 * 1024 * 4; // 4MB
+const GRPC_EFFECTIVE_MAX_SIZE: usize = GRPC_MAX_SIZE - 1024; // Minus one KB
+
+fn estimate_size(msg: &PluginQuery) -> usize {
+	msg.key.bytes().len()
+		+ msg.output.bytes().len()
+		+ msg.concern.iter().map(|x| x.bytes().len()).sum::<usize>()
+}
+
+fn chunk(msg: PluginQuery) -> Result<Vec<PluginQuery>> {
+	// Chunking only does something on response objects, mostly because
+	// we don't have a state to represent "SubmitInProgress"
+	if msg.state == QueryState::Submit as i32 {
+		return Ok(vec![msg]);
+	}
+
+	let mut out: Vec<PluginQuery> = vec![];
+	let mut base: PluginQuery = msg;
+
+	// Track whether we did anything on each iteration to avoid infinite loop
+	let mut made_progress = true;
+	while estimate_size(&base) > GRPC_EFFECTIVE_MAX_SIZE {
+		log::trace!("Estimated size is too large, chunking");
+
+		if !made_progress {
+			log::error!("Message could not be chunked");
+			return Err(hc_error!("Message could not be chunked"));
+		}
+
+		made_progress = false;
+		// For this loop, we want to take at most MAX_SIZE bytes because that's
+		// all that can fit in a PluginQuery
+		let mut remaining = GRPC_EFFECTIVE_MAX_SIZE;
+		let mut query = PluginQuery {
+			id: base.id,
+			state: QueryState::ReplyInProgress as i32,
+			publisher_name: base.publisher_name.clone(),
+			plugin_name: base.plugin_name.clone(),
+			query_name: base.query_name.clone(),
+			key: String::new(),
+			output: String::new(),
+			concern: vec![],
+		};
+
+		let num_key_bytes = base.key.bytes().len();
+		if remaining > 0 && num_key_bytes > 0 {
+			// steal from key
+			let to_drain = std::cmp::min(num_key_bytes, remaining);
+			query.key = base.key.drain(0..to_drain).collect::<String>();
+			remaining -= to_drain;
+			made_progress = true;
+		}
+
+		let num_output_bytes = base.output.bytes().len();
+		if remaining > 0 && num_output_bytes > 0 {
+			// steal from output
+			let to_drain = std::cmp::min(num_output_bytes, remaining);
+			query.output = base.output.drain(0..to_drain).collect::<String>();
+			remaining -= to_drain;
+			made_progress = true;
+		}
+
+		while remaining > 0 && !base.concern.is_empty() {
+			// steal from concerns
+			let concern = base.concern.pop().unwrap();
+			let concern_len = concern.bytes().len();
+			query.concern.push(concern);
+			remaining -= std::cmp::min(concern_len, remaining);
+			made_progress = true;
+		}
+
+		out.push(query);
+	}
+	out.push(base);
+	Ok(out)
+}
+
 pub struct MultiplexedQueryReceiver {
 	rx: QueryStream,
 	backlog: HashMap<i32, VecDeque<PluginQuery>>,
@@ -478,12 +555,15 @@ impl PluginTransport {
 
 		// Send the query
 		let query: PluginQuery = query.try_into()?;
-
 		let id = query.id;
-		self.tx
-			.send(query)
-			.await
-			.map_err(|e| hc_error!("sending query failed: {}", e))?;
+		let queries = chunk(query)?;
+
+		for query in queries {
+			self.tx
+				.send(query)
+				.await
+				.map_err(|e| hc_error!("sending query failed: {}", e))?;
+		}
 
 		// Get initial response batch
 		let mut rx_handle = self.rx.lock().await;
@@ -500,7 +580,6 @@ impl PluginTransport {
 			while matches!(state, ReplyInProgress) {
 				// We expect another message. Pull it off the existing queue,
 				// or get a new one if we have run out
-				eprintln!("In progress");
 
 				let next = match msg_chunks.pop_front() {
 					Some(msg) => msg,
@@ -529,6 +608,10 @@ impl PluginTransport {
 						))
 					}
 					ReplyInProgress | ReplyComplete => {
+						if state == ReplyComplete {
+							raw.state = ReplyComplete.into();
+						}
+						raw.key.push_str(next.key.as_str());
 						raw.output.push_str(next.output.as_str());
 						raw.concern.extend_from_slice(next.concern.as_slice());
 					}
@@ -542,6 +625,7 @@ impl PluginTransport {
 				));
 			}
 		}
+
 		raw.try_into().map(Some)
 	}
 }

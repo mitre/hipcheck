@@ -23,6 +23,82 @@ use std::{
 use tokio::sync::mpsc::{self, error::TrySendError};
 use tonic::Status;
 
+const GRPC_MAX_SIZE: usize = 1024 * 1024 * 4; // 4MB
+const GRPC_EFFECTIVE_MAX_SIZE: usize = GRPC_MAX_SIZE - 1024; // Minus one KB
+
+fn estimate_size(msg: &PluginQuery) -> usize {
+	msg.key.bytes().len()
+		+ msg.output.bytes().len()
+		+ msg.concern.iter().map(|x| x.bytes().len()).sum::<usize>()
+}
+
+fn chunk(msg: PluginQuery) -> Result<Vec<PluginQuery>> {
+	// Chunking only does something on response objects, mostly because
+	// we don't have a state to represent "SubmitInProgress"
+	if msg.state == QueryState::Submit as i32 {
+		return Ok(vec![msg]);
+	}
+
+	let mut out: Vec<PluginQuery> = vec![];
+	let mut base: PluginQuery = msg;
+
+	// Track whether we did anything on each iteration to avoid infinite loop
+	let mut made_progress = true;
+	while estimate_size(&base) > GRPC_EFFECTIVE_MAX_SIZE {
+		log::trace!("Estimated size is too large, chunking");
+		if !made_progress {
+			log::error!("Message could not be chunked");
+			return Err(Error::UnspecifiedQueryState);
+		}
+
+		made_progress = false;
+		// For this loop, we want to take at most MAX_SIZE bytes because that's
+		// all that can fit in a PluginQuery
+		let mut remaining = GRPC_EFFECTIVE_MAX_SIZE;
+		let mut query = proto::Query {
+			id: base.id,
+			state: QueryState::ReplyInProgress as i32,
+			publisher_name: base.publisher_name.clone(),
+			plugin_name: base.plugin_name.clone(),
+			query_name: base.query_name.clone(),
+			key: String::new(),
+			output: String::new(),
+			concern: vec![],
+		};
+
+		let num_key_bytes = base.key.bytes().len();
+		if remaining > 0 && num_key_bytes > 0 {
+			// steal from key
+			let to_drain = std::cmp::min(num_key_bytes, remaining);
+			query.key = base.key.drain(0..to_drain).collect::<String>();
+			remaining -= to_drain;
+			made_progress = true;
+		}
+
+		let num_output_bytes = base.output.bytes().len();
+		if remaining > 0 && num_output_bytes > 0 {
+			// steal from output
+			let to_drain = std::cmp::min(num_output_bytes, remaining);
+			query.output = base.output.drain(0..to_drain).collect::<String>();
+			remaining -= to_drain;
+			made_progress = true;
+		}
+
+		while remaining > 0 && !base.concern.is_empty() {
+			// steal from concerns
+			let concern = base.concern.pop().unwrap();
+			let concern_len = concern.bytes().len();
+			query.concern.push(concern);
+			remaining -= std::cmp::min(concern_len, remaining);
+			made_progress = true;
+		}
+
+		out.push(query);
+	}
+	out.push(base);
+	Ok(out)
+}
+
 impl From<Status> for Error {
 	fn from(_value: Status) -> Error {
 		// TODO: higher-fidelity handling?
@@ -213,18 +289,20 @@ impl PluginEngine {
 				}
 			}
 		}
+
 		Ok(Some(out))
 	}
 
 	// Send a gRPC query from plugin to the hipcheck server
 	async fn send(&self, query: Query) -> Result<()> {
-		let query = InitiateQueryProtocolResponse {
-			query: Some(self.convert(query)?),
-		};
-		self.tx
-			.send(Ok(query))
-			.await
-			.map_err(Error::FailedToSendQueryFromSessionToServer)?;
+		let queries = chunk(self.convert(query)?)?;
+		for pq in queries {
+			let query = InitiateQueryProtocolResponse { query: Some(pq) };
+			self.tx
+				.send(Ok(query))
+				.await
+				.map_err(Error::FailedToSendQueryFromSessionToServer)?;
+		}
 		Ok(())
 	}
 
@@ -290,6 +368,10 @@ impl PluginEngine {
 					QueryState::Unspecified => return Err(Error::UnspecifiedQueryState),
 					QueryState::Submit => return Err(Error::ReceivedSubmitWhenExpectingReplyChunk),
 					QueryState::ReplyInProgress | QueryState::ReplyComplete => {
+						if state == QueryState::ReplyComplete {
+							raw.state = QueryState::ReplyComplete.into();
+						}
+						raw.key.push_str(next.key.as_str());
 						raw.output.push_str(next.output.as_str());
 						raw.concern.extend_from_slice(next.concern.as_slice());
 					}
@@ -332,23 +414,17 @@ impl PluginEngine {
 
 		let value = query.run(self, key).await?;
 
-		let query = proto::Query {
-			id: self.id() as i32,
-			state: QueryState::ReplyComplete as i32,
-			publisher_name: P::PUBLISHER.to_owned(),
-			plugin_name: P::NAME.to_owned(),
-			query_name: name,
-			key: json!(Value::Null).to_string(),
-			output: value.to_string(),
-			concern: self.take_concerns(),
+		let query = Query {
+			direction: QueryDirection::Response,
+			publisher: P::PUBLISHER.to_owned(),
+			plugin: P::NAME.to_owned(),
+			query: name.to_owned(),
+			key: json!(Value::Null),
+			output: value,
+			concerns: self.take_concerns(),
 		};
 
-		self.tx
-			.send(Ok(InitiateQueryProtocolResponse { query: Some(query) }))
-			.await
-			.map_err(Error::FailedToSendQueryFromSessionToServer)?;
-
-		Ok(())
+		self.send(query).await
 	}
 
 	async fn handle_session<P>(&mut self, plugin: Arc<P>)
