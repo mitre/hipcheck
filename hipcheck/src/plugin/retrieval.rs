@@ -60,9 +60,11 @@ fn retrieve_plugin(
 
 	let plugin_manifest = match manifest_location {
 		Some(ManifestLocation::Url(plugin_url)) => {
+			log::debug!("URL plugin: {plugin_url:?}");
 			retrieve_plugin_from_network(plugin_id.clone(), plugin_url, plugin_cache)?
 		}
 		Some(ManifestLocation::Local(plugin_manifest_path)) => {
+			log::debug!("Local plugin: {plugin_manifest_path:?}");
 			retrieve_local_plugin(plugin_id.clone(), plugin_manifest_path, plugin_cache)?
 		}
 		None => {
@@ -117,13 +119,21 @@ fn retrieve_local_plugin(
 			download_dir.to_string_lossy()
 		)
 	})?;
+	log::debug!("Successfully created download dir");
 
 	let mut plugin_manifest = PluginManifest::from_file(plugin_manifest_path)?;
 	let current_arch = get_current_arch();
 
+	log::debug!("Got plugin manifest");
 	let original_entrypoint = plugin_manifest
 		.update_entrypoint(&current_arch, plugin_cache.plugin_download_dir(&plugin_id))?;
+	log::debug!("Original entrypoint: {original_entrypoint:?}");
 
+	let tmp = plugin_cache
+		.plugin_download_dir(&plugin_id)
+		// unwrap is safe here, we just updated the entrypoint for current arch
+		.join(plugin_manifest.get_entrypoint(&current_arch).unwrap());
+	println!("TMP: {tmp:?}");
 	// @Note - sneaky potential for unexpected behavior if we write local plugin manifest
 	// to a cache dir that already included a remote download
 	std::fs::copy(
@@ -133,6 +143,7 @@ fn retrieve_local_plugin(
 			// unwrap is safe here, we just updated the entrypoint for current arch
 			.join(plugin_manifest.get_entrypoint(&current_arch).unwrap()),
 	)?;
+	log::debug!("Copy succeeded");
 
 	let plugin_kdl_path = plugin_cache.plugin_kdl(&plugin_id);
 	write_all(&plugin_kdl_path, &plugin_manifest.to_kdl_formatted_string()).map_err(|e| {
@@ -142,6 +153,7 @@ fn retrieve_local_plugin(
 			plugin_kdl_path.to_string_lossy()
 		)
 	})?;
+	log::debug!("Writing succeeded");
 
 	Ok(plugin_manifest)
 }
