@@ -3,35 +3,23 @@
 title: Flowchart for requesting another plugin
 ---
 ```mermaid
+flowchart LR
 
-   flowchart TB
-      start--The starting_plugin's 
-      query trait's run() function 
-      takes in a plugin engine and 
-      an input JSON value --> 
-      starting_plugin--
-      The plugin engine 
-      exposes the function 
-      query() which is defined by 
-      SDK. SDK is a library crate
-      with tools for simplifying 
-      plugin development. 
-      query() takes in the input 
-      value from run() and the 
-      target plugin/query 
-      endpoint 
-      as parameters--> 
-      SDK--The query function 
-      executes query_inner(). 
-      query_inner() sends a gRPC message 
-      from the plugin to the 
-      hipcheck server to 
-      request data from 
-      the target 
-      plugin/query endpoint --> 
-      grpc--> hipcheck_server--query_inner() 
-      returns the JSON result to 
-      the outer query function-->SDK--The outer function 
-      returns the JSON result 
-      to the starting plugin-->starting_plugin
+subgraph Z["SDK"]
+direction TB
+  start--query's() parameters are the input value and target plugin/query endpoint from the starting plugin's query trait's run() function.-->
+  query --The target plugin/query endpoint is converted from the generic T to a QueryTarget. The input is converted to a JSON value with an InvalidJSONInQuery Key error if not properly converted. The variables are named query_target and input. From there query's inner function, query_inner() is called with the  query_target and input as parameters--> query_inner-- During normal execution, when the engine is not a mock engine, the query() function creates a QueryTarget object and calls the send() function. The Query object is the send() function's parameter.-->send
+end
+
+subgraph ZA["Hipcheck Core"]
+direction TB
+    hipcheck_proto --Opens an rpc protocol so Hipcheck can request queries to the plugin and the plugins may issue queries to other plugins-->finishHipcheck
+end
+
+subgraph ZB["SDK"]
+direction TB
+  recv--creates a variable called msg_chunks that will get the result from recv_raw.-->recv_raw --returns a queue of messages returned from send function if the grpc channel is still open as a vector -->recv --reads the messages from recv_raw --> finishSDK
+end
+
+Z-- The send function sends a grpc query from the plugin to the hipcheck server. The query parameter is given the RPC type InitiateQueryProtocolResponse-->ZA --Control transfers back to SDK-->ZB
 ```
