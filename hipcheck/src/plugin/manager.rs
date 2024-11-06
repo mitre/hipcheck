@@ -84,15 +84,19 @@ impl PluginExecutor {
 			let port_str = port.to_string();
 			// Spawn plugin process
 			log::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
-			let Ok(mut proc) = Command::new(&plugin.entrypoint)
+			let mut proc = match Command::new(&plugin.entrypoint)
 				.args(["--port", port_str.as_str()])
 				// @Temporary - directly forward stdout/stderr from plugin to shell
 				.stdout(std::io::stdout())
 				.stderr(std::io::stderr())
 				.spawn()
-			else {
-				spawn_attempts += 1;
-				continue;
+			{
+				Ok(p) => p,
+				Err(e) => {
+					log::error!("Failed to spawn process: {e}");
+					spawn_attempts += 1;
+					continue;
+				}
 			};
 			// Attempt to connect to the plugin's gRPC server up to N times, using
 			// linear backoff with a percentage jitter.
@@ -126,7 +130,7 @@ impl PluginExecutor {
 			// and try again
 			let Some(grpc) = opt_grpc else {
 				if let Err(e) = proc.kill() {
-					println!("Failed to kill child process for plugin: {e}");
+					log::error!("Failed to kill child process for plugin: {e}");
 				}
 				spawn_attempts += 1;
 				continue;
