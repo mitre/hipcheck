@@ -6,7 +6,7 @@ entrypoint {
     on arch="aarch64-apple-darwin" "./target/debug/activity"
     on arch="x86_64-apple-darwin" "./target/debug/activity"
     on arch="x86_64-unknown-linux-gnu" "./target/debug/activity"
-    on arch="x86_64-pc-windows-msvc" "./target/debug/activity"
+    on arch="x86_64-pc-windows-msvc" "./target/debug/activity.exe"
 }
 dependencies {
     plugin "mitre/git" version="0.1.0" manifest="./plugins/git/plugin.kdl"

@@ -6,7 +6,7 @@ entrypoint {
     on arch="aarch64-apple-darwin" "./target/debug/entropy"
     on arch="x86_64-apple-darwin" "./target/debug/entropy"
     on arch="x86_64-unknown-linux-gnu" "./target/debug/entropy"
-    on arch="x86_64-pc-windows-msvc" "./target/debug/entropy"
+    on arch="x86_64-pc-windows-msvc" "./target/debug/entropy.exe"
 }
 dependencies {
     plugin "mitre/git" version="0.1.0" manifest="./plugins/git/plugin.kdl"
