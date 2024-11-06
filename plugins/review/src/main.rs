@@ -79,7 +79,6 @@ impl Plugin for ReviewPlugin {
 	const NAME: &'static str = "review";
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
-		println!("config: {config:?}");
 		let conf =
 			serde_json::from_value::<Config>(config).map_err(|e| ConfigError::Unspecified {
 				message: e.to_string(),
