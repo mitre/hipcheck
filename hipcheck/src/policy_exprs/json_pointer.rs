@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![deny(unused)]
-
 use crate::policy_exprs::{
 	error::{self, Error, JiffError, Result},
 	expr::{Array, Expr, Primitive},
 	ExprMutator, JsonPointer, LexingError,
 };
-use jiff::{tz::TimeZone, Span, Timestamp, Zoned};
+use jiff::{tz::TimeZone, Timestamp, Zoned};
 use ordered_float::NotNan;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Policy Expression stage that looks up JSON Pointers from the JSON `context`
@@ -57,61 +54,6 @@ fn lookup_json_pointer<'val>(pointer: &str, context: &'val Value) -> Result<&'va
 	}
 }
 
-/// An enum that represents data of a type that requires special type annotation
-/// in JSON to parse correctly.
-/// The data will be a string called "data", and the format of the data will be
-/// in "format".
-/// Format names taken from JSON Schema.
-/// Spec as of "Draft 2020-12":
-/// https://json-schema.org/draft/2020-12/json-schema-validation#name-defined-formats
-/// Prettier rendered docs of latest version:
-/// https://json-schema.org/understanding-json-schema/reference/string#built-in-formats
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "format", content = "data")]
-#[serde(rename_all = "lowercase")]
-enum AnnotatedJSONValue {
-	/// Contains a string representing a jiff::Zoned
-	/// According to JSON Schema, "format" = "date-time" refers to a timestamp
-	/// encoded as specified by RFC 3339 (a subset of ISO 8601):
-	/// https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
-	#[serde(rename = "date-time")]
-	DateTime(String),
-	/// Contains a string representing a jiff::Span
-	/// According to JSON Schema, "format" = "duration" refers to a time duration
-	/// encoded as specified by ISO 8601's ABNF:
-	/// https://datatracker.ietf.org/doc/html/rfc3339#appendix-A
-	Duration(String),
-}
-
-impl AnnotatedJSONValue {
-	fn as_expr(&self) -> Result<Expr> {
-		use AnnotatedJSONValue::*;
-		match self {
-			DateTime(ts_str) => {
-				let ts: Timestamp = ts_str.parse().map_err(|jiff_error| {
-					Error::Lex(LexingError::InvalidDatetime(
-						ts_str.clone(),
-						JiffError::new(jiff_error),
-					))
-				})?;
-				let zo = Zoned::new(ts, TimeZone::UTC);
-				let expr: Expr = Primitive::DateTime(zo).into();
-				Ok(expr)
-			}
-			Duration(dur_str) => {
-				let span: Span = dur_str.parse().map_err(|jiff_error| {
-					Error::Lex(LexingError::InvalidSpan(
-						dur_str.clone(),
-						JiffError::new(jiff_error),
-					))
-				})?;
-				let expr: Expr = Primitive::Span(span).into();
-				Ok(expr)
-			}
-		}
-	}
-}
-
 /// Attempt to interpret a JSON Value as a Policy Expression.
 /// `pointer` and `context` are only passed in to provide more context in the
 /// case of errors.
@@ -132,28 +74,30 @@ fn json_to_policy_expr(val: &Value, pointer: &str, context: &Value) -> Result<Ex
 			// That would be a type error in the Policy Expr language.
 			Ok(Array::new(primitives).into())
 		}
-		// Assume that a JSON object is data with annotation.
-		// See comments on `AnnotatedJSONValue` for the format.
-		// JSON objects that don't parse as that structure trigger an error.
-		Value::Object(_) => {
-			let res: serde_json::Result<AnnotatedJSONValue> = serde_json::from_value(val.clone());
-			match res {
-				Ok(json_data) => json_data.as_expr(),
-				Err(_) => Err(Error::JSONPointerUnrepresentableType {
-					json_type: error::UnrepresentableJSONType::JSONObject,
-					pointer: pointer.to_owned(),
-					value: val.clone(),
-					context: context.clone(),
-				}),
-			}
-		}
-		// Strings cannot (currently) be represented in the Policy Expr language.
-		Value::String(_) => Err(Error::JSONPointerUnrepresentableType {
-			json_type: error::UnrepresentableJSONType::JSONString,
+		Value::Object(_) => Err(Error::JSONPointerUnrepresentableType {
+			json_type: error::UnrepresentableJSONType::JSONObject,
 			pointer: pointer.to_owned(),
 			value: val.clone(),
 			context: context.clone(),
 		}),
+		// Attempt to parse a datetime or span, and only error out if both fail.
+		// TODO: Use JSON schema data to guide which of datetime or span to parse into.
+		Value::String(s) => {
+			if let Ok(date_time) = parse_datetime(s) {
+				return Ok(Expr::Primitive(Primitive::DateTime(date_time)));
+			}
+
+			if let Ok(span) = parse_span(s) {
+				return Ok(Expr::Primitive(Primitive::Span(span)));
+			}
+
+			Err(Error::JSONPointerUnrepresentableType {
+				json_type: error::UnrepresentableJSONType::JSONString,
+				pointer: pointer.to_owned(),
+				value: val.clone(),
+				context: context.clone(),
+			})
+		}
 		Value::Null => Err(Error::JSONPointerUnrepresentableType {
 			json_type: error::UnrepresentableJSONType::JSONNull,
 			pointer: pointer.to_owned(),
@@ -161,6 +105,25 @@ fn json_to_policy_expr(val: &Value, pointer: &str, context: &Value) -> Result<Ex
 			context: context.clone(),
 		}),
 	}
+}
+
+fn parse_datetime(s: &str) -> Result<jiff::Zoned> {
+	let ts: Timestamp = s.parse().map_err(|jiff_error| {
+		Error::Lex(LexingError::InvalidDatetime(
+			s.to_owned(),
+			JiffError::new(jiff_error),
+		))
+	})?;
+	Ok(Zoned::new(ts, TimeZone::UTC))
+}
+
+fn parse_span(s: &str) -> Result<jiff::Span> {
+	s.parse().map_err(|jiff_error| {
+		Error::Lex(LexingError::InvalidSpan(
+			s.to_owned(),
+			JiffError::new(jiff_error),
+		))
+	})
 }
 
 fn json_array_item_to_policy_expr_primitive(
@@ -188,34 +151,10 @@ mod tests {
 	use test_log::test;
 
 	#[test]
-	fn serialize_json_timestamp() {
-		let ts: Timestamp = "2001-02-03T04:05:06+00:00".parse().unwrap();
-		let zo = Zoned::new(ts, TimeZone::UTC);
-		let json_data = AnnotatedJSONValue::DateTime(zo.to_string());
-		let dval = serde_json::to_value(&json_data).unwrap();
-		let val = serde_json::json!({
-			"event_timestamp": dval,
-		});
-		let expected_json = serde_json::json!({
-			"event_timestamp": {
-				"format": "date-time",
-				"data": "2001-02-03T04:05:06+00:00[UTC]",
-			}
-		});
-		let expected = serde_json::to_string(&expected_json).unwrap();
-
-		let result = serde_json::to_string(&val).unwrap();
-		assert_eq!(result, expected);
-	}
-
-	#[test]
 	fn json_timestamp() {
 		let pointer = "/event_timestamp";
 		let context = serde_json::json!({
-			"event_timestamp": {
-				"format": "date-time",
-				"data": "2001-02-03T04:05:06+00:00",
-			}
+			"event_timestamp": "2001-02-03T04:05:06+00:00"
 		});
 		let ts = "2001-02-03T04:05:06+00:00".parse().unwrap();
 		let zo = Zoned::new(ts, TimeZone::UTC);
@@ -230,12 +169,9 @@ mod tests {
 	fn json_span() {
 		let pointer = "/event_duration";
 		let context = serde_json::json!({
-			"event_duration": {
-				"format": "duration",
-				"data": "P1y2dT3h4m",
-			}
+			"event_duration": "P1y2dT3h4m",
 		});
-		let span: Span = "P1y2dT3h4m".parse().unwrap();
+		let span: jiff::Span = "P1y2dT3h4m".parse().unwrap();
 		let expected = Primitive::Span(span).into();
 
 		let val = lookup_json_pointer(pointer, &context).unwrap();
