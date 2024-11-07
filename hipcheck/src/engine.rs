@@ -219,7 +219,7 @@ pub fn start_plugins(
 		/* max_spawn_attempts */ 3,
 		/* max_conn_attempts */ 5,
 		/* port_range */ 40000..u16::MAX,
-		/* backoff_interval_micros */ 1000,
+		/* backoff_interval_micros */ 100000,
 		/* jitter_percent */ 10,
 	)?;
 
