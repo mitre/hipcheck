@@ -7,7 +7,10 @@ mod fs;
 use crate::binary_detector::{detect_binary_files, BinaryFileDetector};
 
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target};
+use hipcheck_sdk::{
+	prelude::*,
+	types::{LocalGitRepo, Target},
+};
 use pathbuf::pathbuf;
 use serde::Deserialize;
 
@@ -46,19 +49,25 @@ impl TryFrom<RawConfig> for Config {
 	}
 }
 
-#[query(default)]
-async fn binary(engine: &mut PluginEngine, value: Target) -> Result<Vec<PathBuf>> {
+#[query]
+async fn files(_engine: &mut PluginEngine, value: LocalGitRepo) -> Result<Vec<PathBuf>> {
 	let bfd = DETECTOR.get().ok_or(Error::UnspecifiedQueryState)?;
-	let repo = pathbuf![&value.local.path];
+	let repo = pathbuf![&value.path];
 	let out: Vec<PathBuf> = detect_binary_files(&repo)
 		.map_err(|_| Error::UnspecifiedQueryState)?
 		.into_iter()
 		.filter(|f| bfd.is_likely_binary_file(f))
 		.collect();
-	out.iter().for_each(|f| {
+	Ok(out)
+}
+
+#[query(default)]
+async fn binary(engine: &mut PluginEngine, value: Target) -> Result<usize> {
+	let paths = files(engine, value.local).await?;
+	paths.iter().for_each(|f| {
 		engine.record_concern(format!("Found binary file at '{}'", f.to_string_lossy()))
 	});
-	Ok(out)
+	Ok(paths.len())
 }
 
 #[derive(Clone, Debug, Default)]
@@ -103,7 +112,7 @@ impl Plugin for BinaryPlugin {
 			// If no policy vars, we have no default expr
 			Some(None) => Ok("".to_owned()),
 			// Use policy config vars to construct a default expr
-			Some(Some(policy_conf)) => Ok(format!("(lte (count $) {})", policy_conf)),
+			Some(Some(policy_conf)) => Ok(format!("(lte $ {})", policy_conf)),
 		}
 	}
 

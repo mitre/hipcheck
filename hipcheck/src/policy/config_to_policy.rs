@@ -173,7 +173,7 @@ fn parse_binary(
 		// Cap the weight at 65,533
 		let weight = binary.weight.try_into().unwrap_or(u16::MAX);
 		let threshold = binary.binary_file_threshold;
-		let expression = format!("(eq {} (count $))", threshold);
+		let expression = format!("(lte $ {})", threshold);
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
