@@ -19,7 +19,7 @@ analyze {
 
     category "practices" weight=1 {
         analysis "mitre/activity" policy="(lte $ 71)" weight=1
-        analysis "mitre/binary" policy="(eq 0 (count $))" weight=1
+        analysis "mitre/binary" policy="(lte $ 0)" weight=1
         analysis "mitre/fuzz" policy="(eq #t $)" weight=1
         analysis "mitre/identity" policy="(lte $ 0.2)" weight=1
         analysis "mitre/review" policy="(lte $ 0.05)" weight=1
