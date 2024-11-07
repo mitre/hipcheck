@@ -46,19 +46,31 @@ impl TryFrom<RawConfig> for Config {
 	}
 }
 
+/// Returns a boolean list with one entry per possible binary file in the repo
+/// A `true` entry corresponds to a binary file that matches a known file extension
 #[query(default)]
-async fn binary(engine: &mut PluginEngine, value: Target) -> Result<Vec<PathBuf>> {
+async fn binary(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
+	// get binary detector
 	let bfd = DETECTOR.get().ok_or(Error::UnspecifiedQueryState)?;
+	// Get the paths of all possible binary files in the repo
 	let repo = pathbuf![&value.local.path];
-	let out: Vec<PathBuf> = detect_binary_files(&repo)
-		.map_err(|_| Error::UnspecifiedQueryState)?
+	let files = detect_binary_files(&repo).map_err(|_| Error::UnspecifiedQueryState)?;
+	// Get the subset of those files that match a known binary file extension
+	let out: Vec<PathBuf> = files
+		.clone()
 		.into_iter()
 		.filter(|f| bfd.is_likely_binary_file(f))
 		.collect();
+
+	// Generate a boolean list of possible binary files, with true indicating a match for a known extension
+	let binaries = files.iter().map(|d| out.contains(d)).collect();
+
+	// Add each matched binary file as a concern
 	out.iter().for_each(|f| {
 		engine.record_concern(format!("Found binary file at '{}'", f.to_string_lossy()))
 	});
-	Ok(out)
+
+	Ok(binaries)
 }
 
 #[derive(Clone, Debug, Default)]
@@ -103,7 +115,9 @@ impl Plugin for BinaryPlugin {
 			// If no policy vars, we have no default expr
 			Some(None) => Ok("".to_owned()),
 			// Use policy config vars to construct a default expr
-			Some(Some(policy_conf)) => Ok(format!("(lte (count $) {})", policy_conf)),
+			Some(Some(policy_conf)) => {
+				Ok(format!("(lte (count (filter (eq #t) $)) {})", policy_conf))
+			}
 		}
 	}
 
