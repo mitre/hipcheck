@@ -262,7 +262,7 @@ impl HcRepoCache {
 		let (to_keep, to_del): (Vec<RepoCacheEntry>, Vec<RepoCacheEntry>) = match scope {
 			RepoCacheDeleteScope::All => self.entries.drain(0..).partition(|e| match &opt_pat {
 				Some(pat) => !pat.is_match(e.name.as_str()),
-				None => true,
+				None => false,
 			}),
 			RepoCacheDeleteScope::Group { sort, invert, n } => {
 				// First sort entries in-place in self.entries
@@ -348,8 +348,19 @@ impl HcRepoCache {
 	}
 	/// Internal helper that performs the actual dir deletion
 	fn internal_delete(&mut self, entry: &RepoCacheEntry) -> Result<()> {
-		let path = pathbuf![self.path.as_path(), entry.parent.as_path(), &entry.name];
+		// @Todo - probably should have an enum that categorizes entries as in
+		// `github`, `local`, `unknown` and add as field in `RepoCacheEntry`.
+		let is_github = entry.parent.as_path().starts_with("github");
+
+		let parent_path = pathbuf![self.path.as_path(), entry.parent.as_path()];
+		let path = pathbuf![&parent_path, &entry.name];
 		std::fs::remove_dir_all(path)?;
+
+		// Clear owner/org dir if deleting this entry from 'github' made it empty
+		if is_github && parent_path.read_dir()?.next().is_none() {
+			std::fs::remove_dir_all(parent_path)?;
+		}
+
 		Ok(())
 	}
 	/// Internal helper for list functions
