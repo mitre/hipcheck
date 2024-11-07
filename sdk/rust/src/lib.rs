@@ -29,7 +29,6 @@ pub mod prelude {
 	pub use crate::error::{ConfigError, Error, Result};
 	pub use crate::plugin_engine::PluginEngine;
 	pub use crate::plugin_server::{PluginServer, QueryResult};
-	pub use crate::types::AnnotatedJSONValue;
 	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
 	// Re-export macros
 	#[cfg(feature = "macros")]
