@@ -4,6 +4,7 @@ pub use crate::report::*;
 use crate::{
 	analysis::score::*,
 	config::{ConfigSource, RiskConfigQuery},
+	engine::HcEngine,
 	error::{Error, Result},
 	hc_error,
 	plugin::{PluginName, PluginPublisher},
@@ -34,8 +35,13 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 
 		match &stored.response {
 			Ok(res) => {
+				// This is the "explanation" pulled from the new gRPC call.
+				let message = session
+					.default_query_explanation(analysis.publisher.clone(), analysis.plugin.clone())?
+					.unwrap_or("no query explanation provided".to_owned());
+
 				builder.add_analysis(
-					Analysis::plugin(name, stored.passed, stored.policy.clone()),
+					Analysis::plugin(name, stored.passed, stored.policy.clone(), message),
 					res.concerns.clone(),
 				)?;
 			}

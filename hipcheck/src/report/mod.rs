@@ -282,14 +282,18 @@ pub struct Analysis {
 	/// We use this when printing the result to help explain to the user
 	/// *why* an analysis failed.
 	policy_expr: String,
+
+	/// The default query explanation pulled from RPC with the plugin.
+	message: String,
 }
 
 impl Analysis {
-	pub fn plugin(name: String, passed: bool, policy_expr: String) -> Self {
+	pub fn plugin(name: String, passed: bool, policy_expr: String, message: String) -> Self {
 		Analysis {
 			name,
 			passed,
 			policy_expr,
+			message,
 		}
 	}
 
@@ -305,11 +309,8 @@ impl Analysis {
 		}
 	}
 
-	#[allow(unused)]
 	pub fn explanation(&self) -> String {
-		// @Todo - create subsystem that takes an Expr and explains in
-		// English why the policy did or did not fail
-		"".to_owned()
+		self.message.clone()
 	}
 }
 
