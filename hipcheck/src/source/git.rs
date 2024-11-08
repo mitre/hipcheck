@@ -167,7 +167,7 @@ pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<String> {
 				}
 			},
 		};
-		
+
 		repo.set_head_detached_from_annotated(tgt_ref)?;
 		ret_str = refspec_str;
 	} else {

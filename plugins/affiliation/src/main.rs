@@ -375,7 +375,13 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 	// then add the contributor's name and its commit count to the contributor frequency hash map
 	for contributor_view in contributor_views {
 		let count = contributor_view.commits.len();
-		contributor_freq_map.insert(contributor_view.contributor.name, count);
+		contributor_freq_map.insert(
+			format!(
+				"{} ({})",
+				contributor_view.contributor.name, contributor_view.contributor.email
+			),
+			count,
+		);
 	}
 
 	let all_contributors_value = engine
@@ -639,6 +645,9 @@ mod test {
 		assert_eq!(output.len(), 2);
 		let num_affiliated = output.iter().filter(|&n| *n).count();
 		assert_eq!(num_affiliated, 1);
-		assert_eq!(concerns[0], "Contributor Jane Doe has count 2")
+		assert_eq!(
+			concerns[0],
+			"Contributor Jane Doe (jdoe@gmail.com) has count 2"
+		)
 	}
 }
