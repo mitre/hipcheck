@@ -357,7 +357,6 @@ fn print_human(report: Report) -> Result<()> {
 				Title::Passed,
 				analysis.statement()
 			);
-			macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
 			// Empty line at end to space out analyses.
 			macros::println!();
 		}
@@ -381,7 +380,6 @@ fn print_human(report: Report) -> Result<()> {
 				Title::Failed,
 				analysis.statement()
 			);
-			macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
 
 			for concern in failing_analysis.concerns() {
 				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", concern);
