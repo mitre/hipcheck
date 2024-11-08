@@ -3,12 +3,13 @@ name = "affiliation"
 version = "0.1.0"
 license = "Apache-2.0"
 edition = "2021"
+repository = "https://github.com/mitre/hipcheck"
 publish = false
 
 [dependencies]
 anyhow = "1.0.91"
 clap = { version = "4.5.21", features = ["derive"] }
-hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"]}
+hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"] }
 kdl = "4.6.0"
 log = "0.4.22"
 pathbuf = "1.0.0"
@@ -19,4 +20,4 @@ strum = { version = "0.26.3", features = ["derive"] }
 tokio = { version = "1.41.1", features = ["rt"] }
 
 [dev-dependencies]
-hipcheck-sdk = { path = "../../sdk/rust", features = ["macros", "mock_engine"]}
+hipcheck-sdk = { path = "../../sdk/rust", features = ["macros", "mock_engine"] }

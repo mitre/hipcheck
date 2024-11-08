@@ -2,12 +2,14 @@ publisher "mitre"
 name "typo"
 version "0.1.0"
 license "Apache-2.0"
+
 entrypoint {
-    on arch="aarch64-apple-darwin" "./target/debug/typo"
-    on arch="x86_64-apple-darwin" "./target/debug/typo"
-    on arch="x86_64-unknown-linux-gnu" "./target/debug/typo"
-    on arch="x86_64-pc-windows-msvc" "./target/debug/typo.exe"
+  on arch="aarch64-apple-darwin" "typo"
+  on arch="x86_64-apple-darwin" "typo"
+  on arch="x86_64-unknown-linux-gnu" "typo"
+  on arch="x86_64-pc-windows-msvc" "typo.exe"
 }
+
 dependencies {
-    plugin "mitre/npm" version="0.1.0" manifest="./plugins/npm/plugin.kdl"
+  plugin "mitre/npm" version="0.1.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/npm.kdl"
 }

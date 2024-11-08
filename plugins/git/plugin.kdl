@@ -2,9 +2,10 @@ publisher "mitre"
 name "git"
 version "0.1.0"
 license "Apache-2.0"
+
 entrypoint {
-  on arch="aarch64-apple-darwin" "./target/debug/git"
-  on arch="x86_64-apple-darwin" "./target/debug/git"
-  on arch="x86_64-unknown-linux-gnu" "./target/debug/git"
-  on arch="x86_64-pc-windows-msvc" "./target/debug/git.exe"
+  on arch="aarch64-apple-darwin" "git"
+  on arch="x86_64-apple-darwin" "git"
+  on arch="x86_64-unknown-linux-gnu" "git"
+  on arch="x86_64-pc-windows-msvc" "git.exe"
 }

@@ -3,12 +3,13 @@ name = "npm"
 version = "0.1.0"
 license = "Apache-2.0"
 edition = "2021"
+repository = "https://github.com/mitre/hipcheck"
 publish = false
 
 [dependencies]
 anyhow = "1.0.91"
 clap = { version = "4.5.21", features = ["derive"] }
-hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"]}
+hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"] }
 log = "0.4.22"
 pathbuf = "1.0.0"
 regex = "1.11.1"

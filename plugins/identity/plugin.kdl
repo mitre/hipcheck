@@ -2,12 +2,14 @@ publisher "mitre"
 name "identity"
 version "0.1.0"
 license "Apache-2.0"
+
 entrypoint {
-    on arch="aarch64-apple-darwin" "./target/debug/identity"
-    on arch="x86_64-apple-darwin" "./target/debug/identity"
-    on arch="x86_64-unknown-linux-gnu" "./target/debug/identity"
-    on arch="x86_64-pc-windows-msvc" "./target/debug/identity.exe"
+    on arch="aarch64-apple-darwin" "identity"
+    on arch="x86_64-apple-darwin" "identity"
+    on arch="x86_64-unknown-linux-gnu" "identity"
+    on arch="x86_64-pc-windows-msvc" "identity.exe"
 }
+
 dependencies {
-    plugin "mitre/git" version="0.1.0" manifest="./plugins/git/plugin.kdl"
+    plugin "mitre/git" version="0.1.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/git.kdl"
 }
