@@ -13,7 +13,6 @@ use crate::{
 	source::SourceQuery,
 	version::VersionQuery,
 };
-use serde_json::Value;
 use std::{collections::HashSet, default::Default};
 
 /// Print the final report of a Hipcheck run.
@@ -26,209 +25,6 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	// 2. Print that report.
 
 	let mut builder = ReportBuilder::for_session(session);
-
-	// Activity analysis.
-	if let Some(stored) = &scoring.results.get_legacy(ACTIVITY_PHASE) {
-		match &stored.response {
-			Ok(res) => {
-				let weeks = {
-					let Value::Number(opt_weeks) = &res.value else {
-						return Err(hc_error!("activity analysis has a non-numeric value"));
-					};
-					opt_weeks
-						.as_u64()
-						.ok_or(hc_error!("activity analysis has a non-u64 value"))?
-				};
-				let analysis = Analysis::activity(weeks, stored.policy.clone(), stored.passed);
-				builder.add_analysis(analysis, res.concerns.clone())?;
-			}
-			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Activity, error);
-			}
-		}
-	};
-
-	// Affiliation analysis.
-	if let Some(stored) = &scoring.results.get_legacy(AFFILIATION_PHASE) {
-		match &stored.response {
-			Ok(res) => {
-				let length = {
-					let Value::Array(arr) = &res.value else {
-						return Err(hc_error!("affiliation analysis has a non-array value"));
-					};
-					arr.len() as u64
-				};
-				let analysis = Analysis::affiliation(length, stored.policy.clone(), stored.passed);
-				if stored.passed {
-					builder.add_passing_analysis(analysis);
-				} else {
-					builder.add_failing_analysis(analysis, res.concerns.clone())?;
-				}
-			}
-			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Affiliation, error);
-			}
-		}
-	};
-
-	// Binary analysis
-	if let Some(stored) = &scoring.results.get_legacy(BINARY_PHASE) {
-		match &stored.response {
-			Ok(res) => {
-				let length = {
-					let Value::Array(arr) = &res.value else {
-						return Err(hc_error!("binary analysis has a non-array value"));
-					};
-					arr.len() as u64
-				};
-				let analysis = Analysis::binary(length, stored.policy.clone(), stored.passed);
-				if stored.passed {
-					builder.add_passing_analysis(analysis);
-				} else {
-					builder.add_failing_analysis(analysis, res.concerns.clone())?;
-				}
-			}
-			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Binary, error);
-			}
-		}
-	};
-
-	// Churn analysis.
-	if let Some(stored) = &scoring.results.get_legacy(CHURN_PHASE) {
-		match &stored.response {
-			Ok(res) => {
-				let length = {
-					let Value::Array(arr) = &res.value else {
-						return Err(hc_error!("churn analysis has a non-array value"));
-					};
-					arr.len() as u64
-				};
-				let analysis = Analysis::churn(length, stored.policy.clone(), stored.passed);
-				if stored.passed {
-					builder.add_passing_analysis(analysis);
-				} else {
-					builder.add_failing_analysis(analysis, res.concerns.clone())?;
-				}
-			}
-			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Churn, error);
-			}
-		}
-	};
-
-	// Entropy analysis.
-	if let Some(stored) = &scoring.results.get_legacy(ENTROPY_PHASE) {
-		match &stored.response {
-			Ok(res) => {
-				let length = {
-					let Value::Array(arr) = &res.value else {
-						return Err(hc_error!("entropy analysis has a non-array value"));
-					};
-					arr.len() as u64
-				};
-				let analysis = Analysis::entropy(length, stored.policy.clone(), stored.passed);
-				if stored.passed {
-					builder.add_passing_analysis(analysis);
-				} else {
-					builder.add_failing_analysis(analysis, res.concerns.clone())?;
-				}
-			}
-			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Entropy, error);
-			}
-		}
-	};
-
-	// Identity analysis.
-	if let Some(stored) = &scoring.results.get_legacy(IDENTITY_PHASE) {
-		match &stored.response {
-			Ok(res) => {
-				let pct_identity = {
-					let Value::Number(opt_identity) = &res.value else {
-						return Err(hc_error!("identity analysis has a non-numeric value"));
-					};
-					opt_identity
-						.as_f64()
-						.ok_or(hc_error!("activity analysis has a non-float value"))?
-				};
-				let analysis =
-					Analysis::identity(pct_identity, stored.policy.clone(), stored.passed);
-				if stored.passed {
-					builder.add_passing_analysis(analysis);
-				} else {
-					builder.add_failing_analysis(analysis, res.concerns.clone())?;
-				}
-			}
-			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Identity, error);
-			}
-		}
-	};
-
-	// Fuzz analysis.
-	if let Some(stored) = &scoring.results.get_legacy(FUZZ_PHASE) {
-		match &stored.response {
-			Ok(res) => {
-				let Value::Bool(doing_fuzz) = &res.value else {
-					return Err(hc_error!("identity analysis has a non-numeric value"));
-				};
-				let analysis = Analysis::fuzz(*doing_fuzz, stored.policy.clone(), stored.passed);
-				if stored.passed {
-					builder.add_passing_analysis(analysis);
-				} else {
-					builder.add_failing_analysis(analysis, res.concerns.clone())?;
-				}
-			}
-			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Fuzz, error);
-			}
-		}
-	};
-
-	// Review analysis.
-	if let Some(stored) = &scoring.results.get_legacy(REVIEW_PHASE) {
-		match &stored.response {
-			Ok(res) => {
-				let pct_review = {
-					let Value::Number(opt_review) = &res.value else {
-						return Err(hc_error!("review analysis has a non-numeric value"));
-					};
-					opt_review
-						.as_f64()
-						.ok_or(hc_error!("review analysis has a non-float value"))?
-				};
-				let analysis = Analysis::review(pct_review, stored.policy.clone(), stored.passed);
-				if stored.passed {
-					builder.add_passing_analysis(analysis);
-				} else {
-					builder.add_failing_analysis(analysis, res.concerns.clone())?;
-				}
-			}
-			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Review, error);
-			}
-		}
-	};
-
-	// Typo analysis.
-	if let Some(stored) = &scoring.results.get_legacy(TYPO_PHASE) {
-		match &stored.response {
-			Ok(res) => {
-				let deps = {
-					let Value::Array(opt_deps) = &res.value else {
-						return Err(hc_error!("typo analysis has a non-numeric value"));
-					};
-					opt_deps.len() as u64
-				};
-				let analysis = Analysis::typo(deps, stored.policy.clone(), stored.passed);
-				builder.add_analysis(analysis, res.concerns.clone())?;
-			}
-			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Typo, error);
-			}
-		}
-	};
 
 	for (analysis, stored) in scoring.results.plugin_results() {
 		let name = format!(
@@ -250,7 +46,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				)?;
 			}
 			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent::Plugin(name), error);
+				builder.add_errored_analysis(AnalysisIdent(name), error);
 			}
 		}
 	}
@@ -385,18 +181,7 @@ impl<'sess> ReportBuilder<'sess> {
 
 			// Override base recommendation if any `investigate-if-fail` analyses failed
 			for failed in failing.iter() {
-				let (publisher, name) = match &failed.analysis {
-					Analysis::Activity { .. } => ("mitre", "activity"),
-					Analysis::Affiliation { .. } => ("mitre", "affiliation"),
-					Analysis::Binary { .. } => ("mitre", "binary"),
-					Analysis::Churn { .. } => ("mitre", "churn"),
-					Analysis::Entropy { .. } => ("mitre", "entropy"),
-					Analysis::Identity { .. } => ("mitre", "identity"),
-					Analysis::Fuzz { .. } => ("mitre", "fuzz"),
-					Analysis::Review { .. } => ("mitre", "review"),
-					Analysis::Typo { .. } => ("mitre", "typo"),
-					Analysis::Plugin { name, .. } => name.as_str().split_once('/').unwrap(),
-				};
+				let (publisher, name) = failed.analysis.name.as_str().split_once('/').unwrap();
 				let policy_plugin_name = PolicyPluginName {
 					publisher: PluginPublisher(publisher.to_owned()),
 					name: PluginName(name.to_owned()),

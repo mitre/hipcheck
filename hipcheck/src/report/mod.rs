@@ -14,12 +14,10 @@ pub mod report_builder;
 use crate::{
 	cli::Format,
 	error::{Context, Error, Result},
-	hc_error,
 	policy_exprs::Executor,
 	version::VersionQuery,
 };
 use chrono::prelude::*;
-use paste::paste;
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 use std::{
@@ -144,18 +142,6 @@ pub struct FailingAnalysis {
 impl FailingAnalysis {
 	/// Construct a new failing analysis, verifying that concerns are appropriate.
 	pub fn new(analysis: Analysis, concerns: Vec<String>) -> Result<FailingAnalysis> {
-		match analysis {
-			Analysis::Fuzz { .. } | Analysis::Identity { .. } | Analysis::Review { .. } => {
-				if concerns.is_empty().not() {
-					return Err(hc_error!(
-						"{} analysis doesn't support attaching concerns",
-						analysis.name()
-					));
-				}
-			}
-			_ => (),
-		};
-
 		Ok(FailingAnalysis { analysis, concerns })
 	}
 
@@ -215,37 +201,11 @@ fn try_add_msg(msgs: &mut Vec<String>, error_report: &Option<Box<ErrorReport>>) 
 /// The name of the analyses.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(crate = "schemars")]
-pub enum AnalysisIdent {
-	Activity,
-	Affiliation,
-	Binary,
-	Churn,
-	Entropy,
-	Identity,
-	Fuzz,
-	Review,
-	Typo,
-	Plugin(String),
-}
+pub struct AnalysisIdent(String);
 
 impl Display for AnalysisIdent {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		use AnalysisIdent::*;
-
-		let name = match self {
-			Activity => "activity",
-			Affiliation => "affiliation",
-			Binary => "binary",
-			Churn => "churn",
-			Entropy => "entropy",
-			Identity => "identity",
-			Fuzz => "fuzz",
-			Review => "review",
-			Typo => "typo",
-			Plugin(name) => name,
-		};
-
-		write!(f, "{}", name)
+		write!(f, "{}", self.0)
 	}
 }
 
@@ -307,140 +267,29 @@ impl From<&(dyn std::error::Error + 'static)> for ErrorReport {
 #[derive(Debug, Serialize, JsonSchema, Clone)]
 #[serde(tag = "analysis")]
 #[schemars(crate = "schemars")]
-pub enum Analysis {
-	/// Activity analysis.
-	Activity {
-		#[serde(flatten)]
-		scoring: Count,
-		#[serde(skip)]
-		passed: bool,
-	},
-	/// Affiliation analysis.
-	Affiliation {
-		#[serde(flatten)]
-		scoring: Count,
-		#[serde(skip)]
-		passed: bool,
-	},
-	/// Binary file analysis
-	Binary {
-		#[serde(flatten)]
-		scoring: Count,
-		#[serde(skip)]
-		passed: bool,
-	},
-	/// Churn analysis.
-	Churn {
-		#[serde(flatten)]
-		scoring: Count,
-		#[serde(skip)]
-		passed: bool,
-	},
-	/// Entropy analysis.
-	Entropy {
-		#[serde(flatten)]
-		scoring: Count,
-		#[serde(skip)]
-		passed: bool,
-	},
-	/// Identity analysis.
-	Identity {
-		#[serde(flatten)]
-		scoring: Percent,
-		#[serde(skip)]
-		passed: bool,
-	},
-	/// Fuzz repo analysis
-	Fuzz {
-		#[serde(flatten)]
-		scoring: Exists,
-		#[serde(skip)]
-		passed: bool,
-	},
-	/// Review analysis.
-	Review {
-		#[serde(flatten)]
-		scoring: Percent,
-		#[serde(skip)]
-		passed: bool,
-	},
-	/// Typo analysis.
-	Typo {
-		#[serde(flatten)]
-		scoring: Count,
-		#[serde(skip)]
-		passed: bool,
-	},
-	/// Plugin analysis.
-	Plugin {
-		/// The name of the plugin.
-		name: String,
-		/// If the analysis is passing or not.
-		///
-		/// Same as with the message, this is computed eagerly in the case of
-		/// plugin analyses.
-		passed: bool,
-		/// The policy expression used for the plugin.
-		///
-		/// We use this when printing the result to help explain to the user
-		/// *why* an analysis failed.
-		policy_expr: String,
-		/// The default query explanation pulled from RPC with the plugin.
-		message: String,
-	},
-}
+pub struct Analysis {
+	/// The name of the plugin.
+	name: String,
 
-macro_rules! constructor {
-	( $name:tt($type:ty), $container:ident ) => {
-		paste! {
-			pub fn $name(value: $type, policy: String, passed: bool) -> Analysis {
-				Analysis::[<$name:camel>] { scoring: $container { value, policy }, passed }
-			}
-		}
-	};
-}
+	/// If the analysis is passing or not.
+	///
+	/// Same as with the message, this is computed eagerly in the case of
+	/// plugin analyses.
+	passed: bool,
 
-macro_rules! exists_constructor_paste {
-	( $name:tt($type:ty), $container:ident ) => {
-		paste! {
-			pub fn $name(value: $type, policy: String, passed: bool) -> Analysis {
-				Analysis::[<$name:camel>] { scoring: $container { value, policy }, passed }
-			}
-		}
-	};
-}
+	/// The policy expression used for the plugin.
+	///
+	/// We use this when printing the result to help explain to the user
+	/// *why* an analysis failed.
+	policy_expr: String,
 
-macro_rules! exists_constructor {
-	( $name:tt ) => {
-		exists_constructor_paste!($name(bool), Exists);
-	};
-}
-
-macro_rules! count_constructor {
-	( $name:tt ) => {
-		constructor!($name(u64), Count);
-	};
-}
-
-macro_rules! percent_constructor {
-	( $name:tt ) => {
-		constructor!($name(f64), Percent);
-	};
+	/// The default query explanation pulled from RPC with the plugin.
+	message: String,
 }
 
 impl Analysis {
-	exists_constructor!(fuzz);
-	count_constructor!(activity);
-	count_constructor!(affiliation);
-	count_constructor!(binary);
-	count_constructor!(typo);
-	count_constructor!(churn);
-	count_constructor!(entropy);
-	percent_constructor!(identity);
-	percent_constructor!(review);
-
 	pub fn plugin(name: String, passed: bool, policy_expr: String, message: String) -> Self {
-		Analysis::Plugin {
+		Analysis {
 			name,
 			passed,
 			policy_expr,
@@ -448,176 +297,20 @@ impl Analysis {
 		}
 	}
 
-	/// Get the name of the analysis, for printing.
-	pub fn name(&self) -> &str {
-		match self {
-			Analysis::Activity { .. } => "activity",
-			Analysis::Affiliation { .. } => "affiliation",
-			Analysis::Binary { .. } => "binary",
-			Analysis::Churn { .. } => "churn",
-			Analysis::Entropy { .. } => "entropy",
-			Analysis::Identity { .. } => "identity",
-			Analysis::Review { .. } => "review",
-			Analysis::Fuzz { .. } => "fuzz",
-			Analysis::Typo { .. } => "typo",
-			Analysis::Plugin { name, .. } => name,
-		}
-	}
-
 	pub fn is_passing(&self) -> bool {
-		use Analysis::*;
-
-		match self {
-			Fuzz { passed, .. }
-			| Activity { passed, .. }
-			| Affiliation { passed, .. }
-			| Binary { passed, .. }
-			| Typo { passed, .. }
-			| Churn { passed, .. }
-			| Entropy { passed, .. }
-			| Identity { passed, .. }
-			| Review { passed, .. }
-			| Plugin { passed, .. } => *passed,
-		}
-	}
-
-	/// Indicates if the analysis will print concerns.
-	///
-	/// Currently, we suppress concerns if an analysis passes,
-	/// and this is the method that implements that suppression.
-	pub fn permits_some_concerns(&self) -> bool {
-		true
+		self.passed
 	}
 
 	pub fn statement(&self) -> String {
-		use Analysis::*;
-
-		match self {
-			Activity { passed, .. } => {
-				if *passed {
-					"has been updated recently".to_string()
-				} else {
-					"hasn't been updated recently".to_string()
-				}
-			}
-			Affiliation { passed, .. } => match (*passed, self.permits_some_concerns()) {
-				(true, true) => "few concerning contributors".to_string(),
-				(true, false) => "no concerning contributors".to_string(),
-				(false, true) => "too many concerning contributors".to_string(),
-				(false, false) => "has concerning contributors".to_string(),
-			},
-			Binary { passed, .. } => match (*passed, self.permits_some_concerns()) {
-				(true, true) => "few concerning binary files".to_string(),
-				(true, false) => "no concerning binary files".to_string(),
-				(false, true) => "too many concerning binary files".to_string(),
-				(false, false) => "has concerning binary files".to_string(),
-			},
-			Churn { passed, .. } => match (*passed, self.permits_some_concerns()) {
-				(true, true) => "few unusually large commits".to_string(),
-				(true, false) => "no unusually large commits".to_string(),
-				(false, true) => "too many unusually large commits".to_string(),
-				(false, false) => "has unusually large commits".to_string(),
-			},
-			Entropy { passed, .. } => match (*passed, self.permits_some_concerns()) {
-				(true, true) => "few unusual-looking commits".to_string(),
-				(true, false) => "no unusual-looking commits".to_string(),
-				(false, true) => "too many unusual-looking commits".to_string(),
-				(false, false) => "has unusual-looking commits".to_string(),
-			},
-			Identity { passed, .. } => {
-				if *passed {
-					"commits often applied by person besides the author".to_string()
-				} else {
-					"commits too often applied by the author".to_string()
-				}
-			}
-			Fuzz { passed, .. } => {
-				if *passed {
-					"repository receives regular fuzz testing".to_string()
-				} else {
-					"repository does not receive regular fuzz testing".to_string()
-				}
-			}
-			Review { passed, .. } => {
-				if *passed {
-					"change requests often receive approving review prior to merge".to_string()
-				} else {
-					"change requests often lack approving review prior to merge".to_string()
-				}
-			}
-			Typo { passed, .. } => match (passed, self.permits_some_concerns()) {
-				(true, true) => "few concerning dependency names".to_string(),
-				(true, false) => "no concerning dependency names".to_string(),
-				(false, true) => "too many concerning dependency names".to_string(),
-				(false, false) => "has concerning dependency names".to_string(),
-			},
-			Plugin {
-				policy_expr,
-				passed,
-				..
-			} => match passed {
-				true => "satisfied associated policy".to_owned(),
-				false => format!("failed to meet policy: ({policy_expr})"),
-			},
+		if self.is_passing() {
+			format!("'{}' passed, {}", self.name, self.policy_expr)
+		} else {
+			format!("'{}' failed, {}", self.name, self.policy_expr)
 		}
 	}
 
 	pub fn explanation(&self) -> String {
-		use Analysis::*;
-
-		match self {
-			Activity {
-				scoring: Count { value, policy },
-				..
-			} => format!("updated {} weeks ago, policy was {}", value, policy),
-			Affiliation {
-				scoring: Count { value, policy },
-				..
-			} => format!("{} found, policy was {}", value, policy),
-			Binary {
-				scoring: Count { value, policy },
-				..
-			} => format!("{} found, policy was {}", value, policy),
-			Churn {
-				scoring: Count { value, policy },
-				..
-			} => format!("examined {} commits, policy was {}", value, policy),
-			Entropy {
-				scoring: Count { value, policy },
-				..
-			} => format!("examined {} commits, policy was {}", value, policy),
-			Identity {
-				scoring: Percent { value, policy },
-				..
-			} => format!(
-				"{:.2}% of commits merged by author, policy was {}",
-				value * 100.0,
-				policy
-			),
-			Fuzz {
-				scoring: Exists { value, policy },
-				..
-			} => format!(
-				"fuzzing integration found: {}, policy was {}",
-				value, policy
-			),
-			Review {
-				scoring: Percent { value, policy },
-				..
-			} => format!(
-				"{:.2}% did not receive review, policy was {}",
-				value * 100.0,
-				policy
-			),
-			Typo {
-				scoring: Count { value, policy },
-				..
-			} => format!(
-				"{} concerning dependencies found, policy was {}",
-				value, policy
-			),
-			Plugin { message, .. } => message.clone(),
-		}
+		self.message.clone()
 	}
 }
 
