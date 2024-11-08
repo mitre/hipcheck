@@ -2,6 +2,7 @@
 
 //! Plugin for querying what percentage of pull requests were merged without review
 
+use anyhow::Context as _;
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::Target};
 use schemars::JsonSchema;
@@ -38,6 +39,7 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 		log::error!("target repository does not have a remote repository URL");
 		return Err(Error::UnexpectedPluginQueryInputFormat);
 	};
+
 	let Some(known_remote) = remote.known_remote else {
 		log::error!("target repository is not a GitHub repository or else is missing GitHub repo information");
 		return Err(Error::UnexpectedPluginQueryInputFormat);
@@ -47,13 +49,7 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	let value = engine
 		.query("mitre/github/pr_reviews", known_remote)
 		.await
-		.map_err(|e| {
-			log::error!(
-				"failed to get pull request reviews from GitHub for review query: {}",
-				e
-			);
-			Error::UnspecifiedQueryState
-		})?;
+		.context("failed to get pull request reviews from GitHub")?;
 
 	let pull_requests: Vec<PullRequest> =
 		serde_json::from_value(value).map_err(Error::InvalidJsonInQueryOutput)?;
