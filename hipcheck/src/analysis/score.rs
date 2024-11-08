@@ -21,15 +21,15 @@ pub const PRACTICES_PHASE: &str = "practices";
 pub const ATTACKS_PHASE: &str = "attacks";
 #[cfg(test)]
 pub const COMMITS_PHASE: &str = "commits";
-
+#[cfg(test)]
 pub const REVIEW_PHASE: &str = "review";
-pub const IDENTITY_PHASE: &str = "identity";
-pub const BINARY_PHASE: &str = "binary";
+#[cfg(test)]
 pub const ACTIVITY_PHASE: &str = "activity";
-pub const FUZZ_PHASE: &str = "fuzz";
+#[cfg(test)]
 pub const TYPO_PHASE: &str = "typo";
-pub const AFFILIATION_PHASE: &str = "affiliation";
+#[cfg(test)]
 pub const CHURN_PHASE: &str = "churn";
+#[cfg(test)]
 pub const ENTROPY_PHASE: &str = "entropy";
 
 #[derive(Debug, Default)]
@@ -51,9 +51,6 @@ pub struct PluginAnalysisResults {
 }
 
 impl PluginAnalysisResults {
-	pub fn get_legacy(&self, _analysis: &str) -> Option<&PluginAnalysisResult> {
-		None
-	}
 	/// Get all results from non-legacy analyses.
 	pub fn plugin_results(&self) -> impl Iterator<Item = (&Analysis, &PluginAnalysisResult)> {
 		self.table.iter()
