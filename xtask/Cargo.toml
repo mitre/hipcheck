@@ -4,6 +4,9 @@ description = "Hipcheck development task runner."
 version = "0.1.0"
 license = "Apache-2.0"
 edition = "2021"
+# This ensures we do not publish this to Crates.io, and that
+# 'dist' doesn't try to create any releases of this, since it's just
+# internal tooling.
 publish = false
 
 [dependencies]

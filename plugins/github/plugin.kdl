@@ -2,9 +2,10 @@ publisher "mitre"
 name "github"
 version "0.1.0"
 license "Apache-2.0"
+
 entrypoint {
-  on arch="aarch64-apple-darwin" "./target/debug/github"
-  on arch="x86_64-apple-darwin" "./target/debug/github"
-  on arch="x86_64-unknown-linux-gnu" "./target/debug/github"
-  on arch="x86_64-pc-windows-msvc" "./target/debug/github.exe"
+  on arch="aarch64-apple-darwin" "github"
+  on arch="x86_64-apple-darwin" "github"
+  on arch="x86_64-unknown-linux-gnu" "github"
+  on arch="x86_64-pc-windows-msvc" "github.exe"
 }

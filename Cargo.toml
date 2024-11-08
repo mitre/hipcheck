@@ -13,12 +13,10 @@ resolver = "2"
 # Members of the workspace.
 members = [
     "hipcheck",
+    "hipcheck-common",
     "hipcheck-macros",
-    "xtask",
-    "test-plugins/dummy_rand_data",
-    "test-plugins/dummy_sha256",
-    "sdk/rust",
     "hipcheck-sdk-macros",
+    "sdk/rust",
     "plugins/git",
     "plugins/github",
     "plugins/npm",
@@ -32,7 +30,9 @@ members = [
     "plugins/linguist",
     "plugins/review",
     "plugins/typo",
-    "hipcheck-common"
+    "test-plugins/dummy_rand_data",
+    "test-plugins/dummy_sha256",
+    "xtask",
 ]
 
 # Make sure Hipcheck is run with `cargo run`.
@@ -41,44 +41,13 @@ members = [
 # See `.cargo/config.toml` for how this is done.
 default-members = ["hipcheck"]
 
-# Config for 'dist'
-[workspace.metadata.dist]
-# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.25.1"
-# CI backends to support
-ci = "github"
-# The installers to generate for each app
-installers = ["shell", "powershell"]
-# Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
-# Which actions to run on pull requests
-pr-run-mode = "plan"
-# Whether to install an updater program
-install-updater = true
-# Extra static files to include in each App (path relative to this Cargo.toml's dir)
-include = ["config/"]
-# Path that installers should place binaries in
-install-path = "CARGO_HOME"
-
-# Ubuntu build dependencies for `cargo-dist`
-[workspace.metadata.dist.dependencies.apt]
-protobuf-compiler = "*"
-
-# macOS build dependencies for 'cargo-dist'
-[workspace.metadata.dist.dependencies.homebrew]
-protobuf = "*"
-
-# Windows build dependencies for `cargo-dist`
-[workspace.metadata.dist.dependencies.chocolatey]
-protoc = "*"
-
 # The profile that 'cargo dist' will build with
-[profile.dist]
-
+#
 # For now this is just the release profile, but with "thin" Link-Time
 # Optimization enabled. This performs _some_ LTO and tries to hit the
 # right trade-off between the runtime performance improvements of more
 # LTO and the compile time cost of doing LTO.
+[profile.dist]
 inherits = "release"
 lto = "thin"
 

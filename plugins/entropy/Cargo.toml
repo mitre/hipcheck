@@ -3,6 +3,7 @@ name = "entropy"
 version = "0.1.0"
 license = "Apache-2.0"
 edition = "2021"
+repository = "https://github.com/mitre/hipcheck"
 publish = false
 
 [dependencies]
@@ -11,7 +12,9 @@ clap = { version = "4.5.21", features = ["derive"] }
 dashmap = { version = "6.1.0", features = ["inline", "rayon"] }
 finl_unicode = { version = "1.3.0", features = ["grapheme_clusters"] }
 futures = "0.3.31"
-hipcheck-sdk = { version = "0.1.0", path = "../../sdk/rust", features = ["macros"] }
+hipcheck-sdk = { version = "0.1.0", path = "../../sdk/rust", features = [
+    "macros",
+] }
 ordered-float = { version = "4.5.0", features = ["serde"] }
 pathbuf = "1.0.0"
 rayon = "1.10.0"

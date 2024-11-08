@@ -158,8 +158,3 @@ which = { version = "7.0.0", default-features = false }
 
 dirs = "5.0.1"
 test-log = "0.2.16"
-
-[package.metadata.dist]
-
-# Make sure that `cargo-dist` can find this binary.
-dist = true

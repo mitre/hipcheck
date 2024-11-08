@@ -1,0 +1,11 @@
+publisher "mitre"
+name "linguist"
+version "0.1.0"
+license "Apache-2.0"
+
+entrypoint {
+  on arch="aarch64-apple-darwin" "linguist"
+  on arch="x86_64-apple-darwin" "linguist"
+  on arch="x86_64-unknown-linux-gnu" "linguist"
+  on arch="x86_64-pc-windows-msvc" "linguist.exe"
+}
