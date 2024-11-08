@@ -469,4 +469,12 @@ mod test {
 		let (leftover, _) = crate::parse::patch(input).unwrap();
 		assert!(leftover.is_empty());
 	}
+
+	#[test]
+	fn test_patch_without_triple_plus_minus() {
+		let input = "~~~\n\n0\t0\tmy_test_.py\n\ndiff --git a/my_test_.py b/my_test_.py\ndeleted file mode 100644\nindex e69de29bb2..0000000000\n~~~\n\n33\t3\tnumpy/_core/src/umath/string_fastsearch.h\n\ndiff --git a/numpy/_core/src/umath/string_fastsearch.h b/numpy/_core/src/umath/string_fastsearch.h\nindex 2a778bb86f..1f2d47e8f1 100644\n--- a/numpy/_core/src/umath/string_fastsearch.h\n+++ b/numpy/_core/src/umath/string_fastsearch.h\n@@ -35,0 +36 @@\n+ * @internal\n";
+		let (leftover, diffs) = crate::parse::diffs(input).unwrap();
+		assert!(leftover.is_empty());
+		assert!(diffs.len() == 2);
+	}
 }

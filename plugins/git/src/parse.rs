@@ -7,7 +7,8 @@ use anyhow::{Context as _, Error, Result};
 use jiff::Timestamp;
 use nom::{
 	branch::alt,
-	character::complete::{char as character, digit1, not_line_ending, one_of, space1},
+	bytes::complete::tag,
+	character::complete::{char as character, digit1, newline, not_line_ending, one_of, space1},
 	combinator::{map, opt, peek, recognize},
 	error::{Error as NomError, ErrorKind},
 	multi::{fold_many0, many0, many1, many_m_n},
@@ -74,9 +75,11 @@ fn commit(input: &str) -> IResult<&str, RawCommit> {
 	let (input, committer_name) = line(input)?;
 	let (input, committer_email) = line(input)?;
 	let (input, committed_on_str) = line(input)?;
-	// For now, we do not use a commit's signer information
-	let (input, _signer_name) = line(input)?;
-	let (input, _signer_key) = line(input)?;
+	// At one point our `git log` invocation was configured
+	// to return GPG key info, but that was leading to errors
+	// with format and GPG key validation, so we removed it
+	// from the print specifier
+
 	// There is always an empty line here; ignore it
 	let (input, _empty_line) = line(input)?;
 
@@ -183,6 +186,30 @@ pub(crate) fn stats(input: &str) -> IResult<&str, Vec<Stat<'_>>> {
 	})(input)
 }
 
+pub(crate) fn opt_rest_diff_header(input: &str) -> IResult<&str, Diff> {
+	opt(tuple((newline, diff)))(input).map(|(i, x)| {
+		if let Some((_, d)) = x {
+			(i, d)
+		} else {
+			(
+				i,
+				Diff {
+					additions: None,
+					deletions: None,
+					file_diffs: vec![],
+				},
+			)
+		}
+	})
+}
+
+// Some empty commits have no output in the corresponding `git log` command, so we had to add a
+// special header to be able to parse and recognize empty diffs and thus make the number of diffs
+// and commits equal
+pub(crate) fn diff_header(input: &str) -> IResult<&str, Diff> {
+	tuple((tag("~~~\n"), opt_rest_diff_header))(input).map(|(i, (_, diff))| (i, diff))
+}
+
 pub(crate) fn diff(input: &str) -> IResult<&str, Diff> {
 	log::trace!("input is {:#?}", input);
 	tuple((stats, line, patches))(input).map(|(i, (stats, _, patches))| {
@@ -255,7 +282,7 @@ fn gh_diff(input: &str) -> IResult<&str, Diff> {
 }
 
 pub(crate) fn diffs(input: &str) -> IResult<&str, Vec<Diff>> {
-	many0(diff)(input)
+	many0(diff_header)(input)
 }
 
 fn gh_diffs(input: &str) -> IResult<&str, Vec<Diff>> {
@@ -277,8 +304,16 @@ fn single_alpha(input: &str) -> IResult<&str, &str> {
 	))(input)
 }
 
+fn triple_plus_minus_line(input: &str) -> IResult<&str, &str> {
+	recognize(tuple((alt((tag("+++"), tag("---"))), line)))(input)
+}
+
 pub(crate) fn patch_header(input: &str) -> IResult<&str, &str> {
-	recognize(tuple((metas, opt(line), opt(line))))(input)
+	recognize(tuple((
+		metas,
+		opt(triple_plus_minus_line),
+		opt(triple_plus_minus_line),
+	)))(input)
 }
 
 fn chunk_prefix(input: &str) -> IResult<&str, &str> {
@@ -427,6 +462,27 @@ pub struct Stat<'a> {
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	#[test]
+	fn parse_diff_header() {
+		let input = "\
+~~~\n\
+~~~\n\
+\n\
+1\t0\trequirements/test_requirements.txt\n\
+\n\
+diff --git a/requirements/test_requirements.txt b/requirements/test_requirements.txt\n\
+index 4e53f86d35..856ecf115e 100644\n\
+--- a/requirements/test_requirements.txt\n\
++++ b/requirements/test_requirements.txt\n\
+@@ -7,0 +8 @@ pytest==7.4.0\n\
++scipy-doctest\n";
+		let (leftover, diffs) = diffs(input).unwrap();
+		assert!(leftover.is_empty());
+		assert_eq!(diffs.len(), 2);
+		assert!(diffs.get(0).unwrap().file_diffs.is_empty());
+		assert!(!(diffs.get(1).unwrap().file_diffs.is_empty()));
+	}
 
 	#[test]
 	fn parse_stat() {

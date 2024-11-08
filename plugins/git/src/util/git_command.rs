@@ -78,7 +78,7 @@ pub fn get_commits(repo: &str) -> Result<Vec<RawCommit>> {
 			"log",
 			"--no-merges",
 			"--date=iso-strict",
-			"--pretty=tformat:%H%n%aN%n%aE%n%ad%n%cN%n%cE%n%cd%n%GS%n%GK%n",
+			"--pretty=tformat:%H%n%aN%n%aE%n%ad%n%cN%n%cE%n%cd%n",
 		],
 	)?
 	.output()
@@ -118,7 +118,7 @@ pub fn get_diffs(repo: &str) -> Result<Vec<Diff>> {
 			"log",
 			"--no-merges",
 			"--numstat",
-			"--pretty=tformat:",
+			"--pretty=tformat:~~~",
 			"-U0",
 		],
 	)?
