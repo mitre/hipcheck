@@ -11,6 +11,7 @@ use crate::{
 	languages::TypoFile,
 	types::{Lang, NpmDependencies},
 };
+use anyhow::{anyhow, Context as _};
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::Target};
 use serde::Deserialize;
@@ -66,34 +67,25 @@ impl TryFrom<RawConfig> for Config {
 async fn typo(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	log::debug!("running typo query");
 
-	let local = value.local;
-
-	// Get the typo file
-	let typo_file = TYPOFILE.get().ok_or(Error::UnspecifiedQueryState)?;
+	// Get the typo file.
+	let typo_file = TYPOFILE
+		.get()
+		.ok_or_else(|| anyhow!("could not find typo file"))?;
 
 	// Get the repo's dependencies
 	let value = engine
-		.query("mitre/npm/dependencies", local)
+		.query("mitre/npm/dependencies", value.local)
 		.await
-		.map_err(|e| {
-			log::error!("failed to get dependencies for typo query: {}", e);
-			Error::UnspecifiedQueryState
-		})?;
+		.context("failed to get dependencies")?;
+
 	let dependencies: NpmDependencies =
 		serde_json::from_value(value).map_err(Error::InvalidJsonInQueryOutput)?;
 
 	// Get the dependencies with identified typos
 	let typo_deps = match dependencies.language {
-		Lang::JavaScript => languages::typos_for_javascript(typo_file, dependencies.clone())
-			.map_err(|e| {
-				log::error!("{}", e);
-				Error::UnspecifiedQueryState
-			}),
-		Lang::Unknown => {
-			log::error!("failed to identify a known language");
-			Err(Error::UnexpectedPluginQueryInputFormat)
-		}
-	}?;
+		Lang::JavaScript => languages::typos_for_javascript(typo_file, dependencies.clone())?,
+		Lang::Unknown => Err(anyhow!("failed to identify a known language"))?,
+	};
 
 	// Generate a boolean list of depedencies with and without typos
 	let typos = dependencies

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proto::{ConfigurationStatus, InitiateQueryProtocolResponse, SetConfigurationResponse};
-use std::{convert::Infallible, ops::Not, result::Result as StdResult};
+use std::{convert::Infallible, error::Error as StdError, ops::Not, result::Result as StdResult};
 use tokio::sync::mpsc::error::SendError as TokioMpscSendError;
 use tonic::Status as TonicStatus;
 
@@ -59,7 +59,29 @@ pub enum Error {
 
 	#[error("invalid format for QueryTarget")]
 	InvalidQueryTargetFormat,
+
+	#[error(transparent)]
+	Unspecified { source: DynError },
 }
+
+impl From<anyhow::Error> for Error {
+	fn from(value: anyhow::Error) -> Self {
+		Error::Unspecified {
+			source: value.into(),
+		}
+	}
+}
+
+impl Error {
+	pub fn any<E: StdError + 'static + Send + Sync>(source: E) -> Self {
+		Error::Unspecified {
+			source: Box::new(source),
+		}
+	}
+}
+
+/// A thread-safe error trait object.
+pub type DynError = Box<dyn StdError + 'static + Send + Sync>;
 
 // this will never happen, but is needed to enable passing QueryTarget to PluginEngine::query
 impl From<Infallible> for Error {
