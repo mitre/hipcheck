@@ -82,6 +82,15 @@ impl PluginExecutor {
 			// ports in the desired range are already bound
 			let port = self.get_available_port()?;
 			let port_str = port.to_string();
+
+			if let Ok(false) = std::fs::exists(&plugin.entrypoint) {
+				log::warn!(
+					"entrypoint '{}' for {} does not exist",
+					plugin.entrypoint,
+					plugin.name
+				)
+			}
+
 			// Spawn plugin process
 			log::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
 			let Ok(mut proc) = Command::new(&plugin.entrypoint)
