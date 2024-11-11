@@ -9,7 +9,7 @@ publish = false
 anyhow = "1.0.91"
 clap = { version = "4.5.18", features = ["derive"] }
 hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"]}
-jiff = { version = "0.1.13", features = ["serde"] }
+jiff = { version = "0.1.14", features = ["serde"] }
 log = "0.4.22"
 nom = "7.1.3"
 once_cell = "1.10.0"
