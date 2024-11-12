@@ -10,12 +10,13 @@ title: Plugins101
 - Plugins can support multiple queries. 
 - Query endpoints are the functions that implement those queries
 - Top-level analysis plugins should have a default query endpoint that accepts a struct Target
+- Policy expressions determine whether the analysis from the plugins passes or fails.
+- Policy files are provided by the user. They specify which top-level plugins to execute and policy expressions
 -  The struct Target encompasses all the relevant info of a repository that we want to analyze. The struct is generally a local repo or github URL or package id. 
 - Every query endpoint must have a struct that implements the Query trait. You can also use the macro called 'query' to mark functions you've written as query endpoints 
 - The Query trait has the input, output, and actual query logic. The actual query logic is contained in the run() function. The run() function takes a mutable plugin engine as a parameter
 - A plugin engine is a struct that allows you to request information from other plugins.
 - The input and output schema for the Query trait are in a json file format. Plugins return data/measurements on data as a json. 
-- Policy expressions determine whether the analysis from the plugins passes or fails.
 - You can provide plugins with a set of parameters to configure the plugins behaviors
 - In addition to query structs, plugins contain a Plugin trait:
 - The functions/strings within the Plugin trait are:
