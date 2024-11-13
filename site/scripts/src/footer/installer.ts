@@ -62,33 +62,47 @@ export function setupInstallerPicker() {
 function installerForPlatform(platform: string | undefined): string {
   if (platform === undefined) throw new UnknownPlatformError(platform);
 
+  const host = resolve_host();
+
   switch (platform) {
     case "macos":
-      return UNIX_INSTALLER;
+      return unix_installer(host);
     case "linux":
-      return UNIX_INSTALLER;
+      return unix_installer(host);
     case "windows":
-      return WINDOWS_INSTALLER;
+      return windows_installer(host);
     default:
       throw new UnknownPlatformError(platform);
   }
 }
 
 /**
- * The current host of the site.
+ * Get the host of the site.
+ *
+ * This is intended to correctly handle deployment locally in development and
+ * deployment in production on GitHub Pages.
  */
-const HOST: string =
-  `${globalThis.window.location.protocol}//${globalThis.window.location.host}`;
+function resolve_host(): string {
+  const protocol = globalThis.window.location.protocol;
+  const host = globalThis.window.location.host;
+  // If we're on GitHub Pages, append the `/hipcheck` path.
+  const amendedHost = (host === "mitre.github.io") ? `${host}/hipcheck` : host;
+  return `${protocol}//${amendedHost}`;
+}
 
 /**
  * The install script to use for Unix (macOS and Linux) platforms.
  */
-const UNIX_INSTALLER: string = `curl -LsSf ${HOST}/dl/install.sh | sh`;
+function unix_installer(host: string): string {
+  return `curl -LsSf ${host}/dl/install.sh | sh`;
+}
 
 /**
  * The install script to use for Windows.
  */
-const WINDOWS_INSTALLER: string = `irm ${HOST}/dl/install.ps1 | iex`;
+function windows_installer(host: string): string {
+  return `irm ${host}/dl/install.ps1 | iex`;
+}
 
 /**
  * Indicates an error while trying to detect the user's install platform.
