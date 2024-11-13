@@ -2,13 +2,13 @@
 
 FROM node:bookworm-slim
 
-ARG HC_VERSION="3.6.3"
+ARG HC_VERSION="3.7.0"
 
 WORKDIR /app
 
 RUN set -eux \
     && apt-get update \
-    && apt-get install --no-install-recommends -y git curl xz-utils \
+    && apt-get install --no-install-recommends -y ca-certificates git curl xz-utils \
     && rm -rf /var/lib/apt/lists/* \
     && adduser --disabled-password hc_user \
     && chown -R hc_user /app
