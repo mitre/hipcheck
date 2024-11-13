@@ -107,7 +107,7 @@ impl Plugin for BinaryPlugin {
 	fn default_policy_expr(&self) -> Result<String> {
 		match self.policy_conf.get() {
 			None => Err(Error::UnspecifiedQueryState),
-			Some(policy_conf) => Ok(format!("(lte (count $) {})", policy_conf.unwrap_or(0))),
+			Some(policy_conf) => Ok(format!("(lte $ {})", policy_conf.unwrap_or(0))),
 		}
 	}
 
