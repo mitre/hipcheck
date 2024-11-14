@@ -75,10 +75,16 @@ to the plugin's download manifest. For an example of the manifest field, see
 registry is established, the manifest field will become optional. In the
 immediate term it will be practically required.
 
-At runtime, each plugin will be downloaded by Hipcheck, its size and checksum
-verified, and the plugin contents decompressed and unarchived to produce the
-plugin executable artifacts which will be stored in a local plugin cache.
-Hipcheck will do the same recursively for all plugins.
+The `manifest` field can be either a URL to the plugin's **download manifest**,
+or a local path to the plugin's **plugin manifest**. The latter option exists
+to allow for local testing of plugins without requiring the changes first be
+published.
+
+At runtime, each plugin that does not have a local-path-type `manifest` field
+will be downloaded by Hipcheck, its size and checksum verified, and the plugin
+contents decompressed and unarchived to produce the plugin executable artifacts
+which will be stored in a local plugin cache.  Hipcheck will do the same
+recursively for all plugins.
 
 In the future Hipcheck will likely add some form of dependency resolution to
 minimize duplication of shared dependencies, similar to what exists in other

@@ -511,17 +511,22 @@ As you can see, the file has two main sections: a `plugins` section, and an
 
 This section defines the plugins that will be used to run the analyses
 described in the file. These plugins are defined in the same way dependent
-plugins are defined in the plugin manifest, with a plugin name, version,
-and an optional `manifest` field (not shown in the example above) which
-provides a link to the plugin's download manifest. In the future, when a
-Hipcheck plugin registry is established, the `manifest` field will become
+plugins are defined in the plugin manifest, with a plugin name, version, and an
+optional `manifest` field (not shown in the example above). In the future, when
+a Hipcheck plugin registry is established, the `manifest` field will become
 optional. In the immediate term it will be practically required.
 
-Each plugin will be downloaded by Hipcheck, its size and checksum
-verified, and the plugin contents decompressed and unarchived to produce
-the plugin executable artifacts and plugin manifest which will be stored
-in a local plugin cache. Hipcheck will do the same recursively for all
-plugins.
+The `manifest` field can be either a URL link to the plugin's **download**
+manifest file, or a local path to a plugin's **plugin** manifest file. The
+latter case is to allow for local testing of plugins without requiring the
+changes be published.
+
+Each plugin without a local-path-type `manifest` field will be downloaded by
+Hipcheck, its size and checksum verified, and the plugin contents decompressed
+and unarchived to produce the plugin executable artifacts and plugin manifest
+which will be stored in a local plugin cache. Hipcheck will do the same
+recursively for all plugins. Local-path-type `manifest` plugins will have their
+plugin manifest and endpoint binary copied to the plugin cache.
 
 In the future Hipcheck will likely add some form of dependency resolution
 to minimize duplication of shared dependencies, similar to what exists in
