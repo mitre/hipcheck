@@ -134,12 +134,19 @@ fn retrieve_local_plugin(
 			// unwrap is safe here, we just updated the entrypoint for current arch
 			let new_bin = try_get_bin_for_entrypoint(&new_entrypoint).0.unwrap();
 
+			// path where the binary for this plugin will get cached
+			let binary_cache_location = plugin_cache.plugin_download_dir(&plugin_id).join(new_bin);
+
 			// @Note - sneaky potential for unexpected behavior if we write local plugin manifest
 			// to a cache dir that already included a remote download
-			std::fs::copy(
-				&original_entrypoint,
-				plugin_cache.plugin_download_dir(&plugin_id).join(new_bin),
-			)?;
+			//
+			// Due to an issue that arises on macOS when copying a binary over a running copy of a binary, we copy the
+			// file to a temp file, then move it, rather than copying directly to its source
+			//
+			// See: https://forums.developer.apple.com/forums/thread/126187
+			let tmp_file = tempfile::NamedTempFile::new()?;
+			std::fs::copy(&original_entrypoint, tmp_file.path())?;
+			std::fs::rename(tmp_file, binary_cache_location)?;
 		}
 	}
 
