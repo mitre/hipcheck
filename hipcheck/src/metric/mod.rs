@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod activity;
 pub mod affiliation;
 pub mod binary;
 pub mod binary_detector;
@@ -20,7 +19,7 @@ use crate::{
 	data::{git::GitProvider, DependenciesProvider, FuzzProvider, PullRequestReviewProvider},
 	error::Result,
 	metric::{
-		activity::ActivityOutput, affiliation::AffiliationOutput, binary::BinaryOutput,
+		affiliation::AffiliationOutput, binary::BinaryOutput,
 		binary_detector::BinaryFile, churn::ChurnOutput, commit_trust::CommitTrustOutput,
 		contributor_trust::ContributorTrustOutput, entropy::EntropyOutput, fuzz::FuzzOutput,
 		identity::IdentityOutput, linguist::Linguist, review::ReviewOutput, typo::TypoOutput,
@@ -40,10 +39,7 @@ pub trait MetricProvider:
 	+ FuzzProvider
 	+ PullRequestReviewProvider
 {
-	/// Returns result of activity metric
-	#[salsa::invoke(activity::activity_metric)]
-	fn activity_metric(&self) -> Result<Arc<ActivityOutput>>;
-
+	
 	/// Returns result of affiliation metric
 	#[salsa::invoke(affiliation::affiliation_metric)]
 	fn affiliation_metric(&self) -> Result<Arc<AffiliationOutput>>;

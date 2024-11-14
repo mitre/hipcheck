@@ -22,9 +22,7 @@ use std::{
 pub trait AnalysisProvider:
 	AttacksConfigQuery + CommitConfigQuery + GitProvider + MetricProvider + PracticesConfigQuery
 {
-	/// Returns result of activity analysis
-	fn activity_analysis(&self) -> Result<QueryResult>;
-
+	 
 	/// Returns result of affiliation analysis
 	fn affiliation_analysis(&self) -> Result<QueryResult>;
 
@@ -50,14 +48,6 @@ pub trait AnalysisProvider:
 	fn typo_analysis(&self) -> Result<QueryResult>;
 }
 
-pub fn activity_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
-	let results = db.activity_metric()?;
-	let value = results.time_since_last_commit.num_weeks() as u64;
-	Ok(QueryResult {
-		value: serde_json::to_value(value)?,
-		concerns: vec![],
-	})
-}
 
 pub fn affiliation_analysis(db: &dyn AnalysisProvider) -> Result<QueryResult> {
 	let results = db.affiliation_metric()?;
