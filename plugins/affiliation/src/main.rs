@@ -38,7 +38,7 @@ struct Config {
 
 #[derive(Debug, Deserialize)]
 struct RawConfig {
-	#[serde(rename = "orgs-file-path")]
+	#[serde(rename = "orgs-file")]
 	orgs_file_path: Option<String>,
 	#[serde(rename = "count-threshold")]
 	count_threshold: Option<u64>,
@@ -51,14 +51,14 @@ impl TryFrom<RawConfig> for Config {
 			// Get the Orgs file path and confirm it exists
 			let orgs_file = PathBuf::from(&ofv);
 			file::exists(&orgs_file).map_err(|_e| ConfigError::InvalidConfigValue {
-				field_name: "orgs_file_path".to_owned(),
+				field_name: "orgs-file".to_owned(),
 				value: ofv.clone(),
 				reason: "could not find an orgs file with that name".to_owned(),
 			})?;
 			// Parse the Orgs file and construct an OrgSpec.
 			let orgs_spec =
 				OrgSpec::load_from(&orgs_file).map_err(|e| ConfigError::InvalidConfigValue {
-					field_name: "orgs_file_path".to_owned(),
+					field_name: "orgs-file".to_owned(),
 					value: ofv.clone(),
 					reason: format!("Failed to load org spec: {}", e),
 				})?;
@@ -68,7 +68,7 @@ impl TryFrom<RawConfig> for Config {
 			})
 		} else {
 			Err(ConfigError::MissingRequiredConfig {
-				field_name: "orgs_file_path".to_owned(),
+				field_name: "orgs-file".to_owned(),
 				field_type: "string".to_owned(),
 				possible_values: vec![],
 			})
