@@ -5,8 +5,8 @@ use crate::{
 	error::Error,
 	hc_error,
 	plugin::{
-		download_manifest::DownloadManifestEntry, ArchiveFormat, DownloadManifest, HashAlgorithm,
-		HashWithDigest, PluginId, PluginManifest,
+		download_manifest::DownloadManifestEntry, try_get_bin_for_entrypoint, ArchiveFormat,
+		DownloadManifest, HashAlgorithm, HashWithDigest, PluginId, PluginManifest,
 	},
 	policy::policy_file::{ManifestLocation, PolicyPlugin},
 	util::http::agent::agent,
@@ -121,18 +121,27 @@ fn retrieve_local_plugin(
 	let mut plugin_manifest = PluginManifest::from_file(plugin_manifest_path)?;
 	let current_arch = get_current_arch();
 
-	let original_entrypoint = plugin_manifest
-		.update_entrypoint(&current_arch, plugin_cache.plugin_download_dir(&plugin_id))?;
+	let curr_entrypoint = plugin_manifest.get_entrypoint_for(&current_arch)?;
 
-	// @Note - sneaky potential for unexpected behavior if we write local plugin manifest
-	// to a cache dir that already included a remote download
-	std::fs::copy(
-		&original_entrypoint,
-		plugin_cache
-			.plugin_download_dir(&plugin_id)
+	if let Some(curr_bin) = try_get_bin_for_entrypoint(&curr_entrypoint).0 {
+		// Only do copy if using a path to a binary instead of a PATH-based resolution (i.e.
+		// `docker _`. We wouldn't want to copy the `docker` binary in this case
+		if std::fs::exists(curr_bin)? {
+			let original_entrypoint = plugin_manifest
+				.update_entrypoint(&current_arch, plugin_cache.plugin_download_dir(&plugin_id))?;
+
+			let new_entrypoint = plugin_manifest.get_entrypoint_for(&current_arch)?;
 			// unwrap is safe here, we just updated the entrypoint for current arch
-			.join(plugin_manifest.get_entrypoint(&current_arch).unwrap()),
-	)?;
+			let new_bin = try_get_bin_for_entrypoint(&new_entrypoint).0.unwrap();
+
+			// @Note - sneaky potential for unexpected behavior if we write local plugin manifest
+			// to a cache dir that already included a remote download
+			std::fs::copy(
+				&original_entrypoint,
+				plugin_cache.plugin_download_dir(&plugin_id).join(new_bin),
+			)?;
+		}
+	}
 
 	let plugin_kdl_path = plugin_cache.plugin_kdl(&plugin_id);
 	write_all(&plugin_kdl_path, &plugin_manifest.to_kdl_formatted_string()).map_err(|e| {
