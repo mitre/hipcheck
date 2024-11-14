@@ -14,6 +14,7 @@ use crate::{
 use kdl::{KdlDocument, KdlNode};
 use std::{
 	collections::HashMap,
+	ops::Not,
 	path::{Path, PathBuf},
 	str::FromStr,
 };
@@ -247,6 +248,14 @@ impl PluginManifest {
 		Self::from_str(read_string(path)?.as_str())
 	}
 
+	pub fn get_entrypoint_for(&self, arch: &Arch) -> Result<String, Error> {
+		self.entrypoints
+			.0
+			.get(arch)
+			.map(String::from)
+			.ok_or(hc_error!("No entrypoint for current arch ({})", arch))
+	}
+
 	/// Update the directory that an entrypoint is stored in
 	///
 	/// Returns previous entrypoint
@@ -254,12 +263,16 @@ impl PluginManifest {
 	where
 		P: AsRef<Path>,
 	{
-		let current_entrypoint = self
+		let curr_entrypoint_str = self
 			.entrypoints
 			.0
 			.remove(arch)
-			.map(PathBuf::from)
 			.ok_or(hc_error!("No entrypoint for current arch ({})", arch))?;
+
+		let (opt_bin_path, args) = try_get_bin_for_entrypoint(&curr_entrypoint_str);
+		let bin_path = opt_bin_path
+			.map(PathBuf::from)
+			.ok_or(hc_error!("Malformed entrypoint string"))?;
 
 		fn new_path(new_directory: &Path, current_entrypoint: &Path) -> Result<PathBuf, Error> {
 			let entrypoint_filename =
@@ -270,9 +283,15 @@ impl PluginManifest {
 			Ok(entrypoint_filename)
 		}
 
-		let new_entrypoint = new_path(new_directory.as_ref(), &current_entrypoint)?;
-		self.set_entrypoint(arch.clone(), new_entrypoint.to_string_lossy().to_string());
-		Ok(current_entrypoint)
+		let new_bin_path = new_path(new_directory.as_ref(), &bin_path)?;
+		let mut new_entrypoint = new_bin_path.to_string_lossy().to_string();
+		if args.is_empty().not() {
+			new_entrypoint.push(' ');
+			new_entrypoint.push_str(&args);
+		}
+
+		self.set_entrypoint(arch.clone(), new_entrypoint);
+		Ok(bin_path)
 	}
 
 	/// convert a `PluginManifest` to a `KdlDocument`
@@ -325,6 +344,11 @@ impl FromStr for PluginManifest {
 			dependencies,
 		})
 	}
+}
+
+pub fn try_get_bin_for_entrypoint(entrypoint: &str) -> (Option<&str>, String) {
+	let mut split = entrypoint.split_whitespace();
+	(split.next(), split.collect())
 }
 
 #[cfg(test)]

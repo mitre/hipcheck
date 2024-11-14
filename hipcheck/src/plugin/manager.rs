@@ -3,7 +3,7 @@
 use crate::{
 	hc_error,
 	hipcheck::plugin_service_client::PluginServiceClient,
-	plugin::{HcPluginClient, Plugin, PluginContext},
+	plugin::{try_get_bin_for_entrypoint, HcPluginClient, Plugin, PluginContext},
 	Result,
 };
 use futures::future::join_all;
@@ -75,21 +75,27 @@ impl PluginExecutor {
 		// on the cmdline is not already in use, but it is still possible for that
 		// port to become unavailable between our check and the plugin's bind attempt.
 		// Hence the need for subsequent attempts if we get unlucky
+
 		log::debug!("Starting plugin '{}'", plugin.name);
+
+		// `entrypoint` is a string that represents a CLI invocation which may contain
+		// arguments, so we have to split off only the first token
+		if let Some(bin_path) = try_get_bin_for_entrypoint(&plugin.entrypoint).0 {
+			if which::which(bin_path).is_err() {
+				log::warn!(
+					"Binary '{}' used to spawn {} does not exist, spawn is unlikely to succeed",
+					bin_path,
+					plugin.name
+				);
+			}
+		}
+
 		let mut spawn_attempts: usize = 0;
 		while spawn_attempts < self.max_spawn_attempts {
 			// Find free port for process. Don't retry if we fail since this means all
 			// ports in the desired range are already bound
 			let port = self.get_available_port()?;
 			let port_str = port.to_string();
-
-			if let Ok(false) = std::fs::exists(&plugin.entrypoint) {
-				log::warn!(
-					"entrypoint '{}' for {} does not exist",
-					plugin.entrypoint,
-					plugin.name
-				)
-			}
 
 			// Spawn plugin process
 			log::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);

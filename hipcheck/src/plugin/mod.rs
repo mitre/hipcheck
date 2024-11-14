@@ -12,7 +12,9 @@ use crate::error::Result;
 pub use crate::plugin::{get_plugin_key, manager::*, plugin_id::PluginId, types::*};
 pub use arch::{get_current_arch, try_set_arch, Arch};
 pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
-pub use plugin_manifest::{PluginManifest, PluginName, PluginPublisher, PluginVersion};
+pub use plugin_manifest::{
+	try_get_bin_for_entrypoint, PluginManifest, PluginName, PluginPublisher, PluginVersion,
+};
 pub use retrieval::retrieve_plugins;
 use serde_json::Value;
 use std::collections::HashMap;
