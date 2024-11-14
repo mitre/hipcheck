@@ -100,7 +100,12 @@ rustls = { version = "0.23.10", default-features = false, features = [
 ] }
 rustls-native-certs = "0.8.0"
 salsa = "0.16.1"
-schemars = { version = "0.8.21", default-features = false, features = ["derive", "preserve_order", "chrono", "url"] }
+schemars = { version = "0.8.21", default-features = false, features = [
+    "derive",
+    "preserve_order",
+    "chrono",
+    "url",
+] }
 semver = "1.0.9"
 serde = { version = "1.0.214", features = ["derive", "rc"] }
 serde_derive = "1.0.137"
@@ -110,6 +115,7 @@ smart-default = "0.7.1"
 spdx-rs = "0.5.0"
 tabled = "0.16.0"
 tar = "0.4.43"
+tempfile = "3.13.0"
 term_size = "0.3.2"
 tokio = { version = "1.41.1", features = [
     "rt",
@@ -149,7 +155,6 @@ which = { version = "7.0.0", default-features = false }
 [dev-dependencies]
 
 dirs = "5.0.1"
-tempfile = "3.13.0"
 test-log = "0.2.16"
 
 [package.metadata.dist]
