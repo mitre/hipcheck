@@ -21,7 +21,7 @@ pub static TYPOFILE: OnceLock<TypoFile> = OnceLock::new();
 
 #[derive(Deserialize)]
 struct RawConfig {
-	#[serde(rename = "typo-file-path")]
+	#[serde(rename = "typo-file")]
 	typo_file_path: Option<String>,
 	#[serde(rename = "count-threshold")]
 	count_threshold: Option<u64>,
@@ -38,7 +38,7 @@ impl TryFrom<RawConfig> for Config {
 		// Get path to typo TOML file
 		let Some(raw_typo_path) = value.typo_file_path else {
 			return Err(ConfigError::MissingRequiredConfig {
-				field_name: "typo_file_path".to_owned(),
+				field_name: "typo-file".to_owned(),
 				field_type: "string".to_owned(),
 				possible_values: vec![],
 			});
@@ -48,7 +48,7 @@ impl TryFrom<RawConfig> for Config {
 		let typo_file = TypoFile::load_from(&typo_path).map_err(|e| {
 			log::error!("failed to load typo file: {}", e);
 			ConfigError::InvalidConfigValue {
-				field_name: "typo_file_path".to_owned(),
+				field_name: "typo-file".to_owned(),
 				value: "string".to_owned(),
 				reason: format!("failed to load typo file: {}", e),
 			}
