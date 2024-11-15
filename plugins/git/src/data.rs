@@ -21,7 +21,7 @@ pub struct DetailedGitRepo {
 }
 
 /// Commits as they come directly out of `git log`.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct RawCommit {
 	pub hash: String,
 
