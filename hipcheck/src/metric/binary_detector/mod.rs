@@ -5,23 +5,18 @@ mod query;
 pub use query::*;
 
 use crate::{
-	error::{Context, Result},
-	hc_error,
+	error::Context,
 	util::fs::read_toml,
 };
-use content_inspector::{inspect, ContentType};
+
 use serde::{de::Visitor, Deserialize, Deserializer};
 use std::{
 	fmt,
 	fmt::Formatter,
-	fs::File,
-	io::{prelude::Read, BufReader},
 	path::Path,
 	result::Result as StdResult,
-	sync::Arc,
 };
-use walkdir::{DirEntry, WalkDir};
-
+ 
 #[derive(Debug, PartialEq, Eq)]
 pub struct BinaryFileDetector {
 	extensions: Vec<String>,
@@ -133,59 +128,4 @@ impl<'de> Visitor<'de> for BinaryTypeVisitor {
 			_ => Err(serde::de::Error::custom("unknown binary format")),
 		}
 	}
-}
-
-/// Determines whether a DirEntry is a hidden file/directory.
-///
-/// This is a Unix-style determination.
-fn is_hidden(entry: &DirEntry) -> bool {
-	entry
-		.file_name()
-		.to_str()
-		.map(|s| s.starts_with('.'))
-		.unwrap_or(false)
-}
-
-/// Fetches all files from `dir`.
-fn fetch_entries(dir: &Path) -> Result<Vec<DirEntry>> {
-	let walker = WalkDir::new(dir).into_iter();
-	let mut entries: Vec<DirEntry> = Vec::new();
-	for entry in walker.filter_entry(|e| !is_hidden(e)) {
-		entries.push(entry?)
-	}
-	Ok(entries)
-}
-
-/// Searches `dir` for any binary files and records their paths as Strings.
-pub fn detect_binary_files(dir: &Path) -> Result<Vec<Arc<String>>> {
-	let path_entries = fetch_entries(dir)?;
-	let mut possible_binary: Vec<Arc<String>> = Vec::new();
-
-	// Inspect the first 4K of each file for telltale signs of binary data.
-	// Store a String of each Path that leads to a binary file.
-	const SAMPLE_SIZE: u64 = 4096;
-	for entry in path_entries {
-		// Skip directories, as they are neither text nor binary.
-		if entry.path().is_dir() {
-			continue;
-		}
-
-		let working_file = File::open(entry.path())?;
-		let reader = BufReader::new(working_file);
-		let mut contents: Vec<u8> = Vec::new();
-		let _bytes_read = reader.take(SAMPLE_SIZE).read_to_end(&mut contents)?;
-		if inspect(&contents) == ContentType::BINARY {
-			possible_binary.push(match entry.path().strip_prefix(dir)?.to_str() {
-				Some(p) => Arc::new(String::from(p)),
-				None => {
-					return Err(hc_error!(
-						"path was not valid unicode: '{}'",
-						entry.path().display()
-					))
-				}
-			});
-		}
-	}
-
-	Ok(possible_binary)
 }

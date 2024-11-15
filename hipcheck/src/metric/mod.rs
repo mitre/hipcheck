@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod affiliation;
-pub mod binary;
 pub mod binary_detector;
 pub mod churn;
 pub mod commit_trust;
@@ -11,7 +9,6 @@ pub mod fuzz;
 pub mod identity;
 pub mod linguist;
 mod math;
-pub mod review;
 pub mod typo;
 
 use crate::{
@@ -19,10 +16,9 @@ use crate::{
 	data::{git::GitProvider, DependenciesProvider, FuzzProvider, PullRequestReviewProvider},
 	error::Result,
 	metric::{
-		affiliation::AffiliationOutput, binary::BinaryOutput,
 		binary_detector::BinaryFile, churn::ChurnOutput, commit_trust::CommitTrustOutput,
 		contributor_trust::ContributorTrustOutput, entropy::EntropyOutput, fuzz::FuzzOutput,
-		identity::IdentityOutput, linguist::Linguist, review::ReviewOutput, typo::TypoOutput,
+		identity::IdentityOutput, linguist::Linguist, typo::TypoOutput,
 	},
 };
 use std::sync::Arc;
@@ -38,16 +34,7 @@ pub trait MetricProvider:
 	+ Linguist
 	+ FuzzProvider
 	+ PullRequestReviewProvider
-{
-	
-	/// Returns result of affiliation metric
-	#[salsa::invoke(affiliation::affiliation_metric)]
-	fn affiliation_metric(&self) -> Result<Arc<AffiliationOutput>>;
-
-	/// Returns result of binary metric
-	#[salsa::invoke(binary::binary_metric)]
-	fn binary_metric(&self) -> Result<Arc<BinaryOutput>>;
-
+{	
 	/// Returns result of churn metric
 	#[salsa::invoke(churn::churn_metric)]
 	fn churn_metric(&self) -> Result<Arc<ChurnOutput>>;
@@ -71,11 +58,7 @@ pub trait MetricProvider:
 	/// Returns result of fuzz metric
 	#[salsa::invoke(fuzz::fuzz_metric)]
 	fn fuzz_metric(&self) -> Result<Arc<FuzzOutput>>;
-
-	/// Returns result of review metric
-	#[salsa::invoke(review::review_metric)]
-	fn review_metric(&self) -> Result<Arc<ReviewOutput>>;
-
+	 
 	/// Returns result of typo metric
 	#[salsa::invoke(typo::typo_metric)]
 	fn typo_metric(&self) -> Result<Arc<TypoOutput>>;
