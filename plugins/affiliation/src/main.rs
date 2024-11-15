@@ -220,6 +220,67 @@ impl AffiliatedType {
 	}
 }
 
+// Can be hopefully removed once Submit has chunking
+mod chunk {
+	use super::*;
+
+	pub const GRPC_MAX_SIZE: usize = 1024 * 1024 * 4; // 4MB
+	pub const GRPC_EFFECTIVE_MAX_SIZE: usize = 3 * (GRPC_MAX_SIZE / 4); // 1024; // Minus one KB
+
+	pub fn chunk_hashes(
+		mut hashes: Vec<String>,
+		max_chunk_size: usize,
+	) -> Result<Vec<Vec<String>>> {
+		let mut out = vec![];
+
+		let mut made_progress = true;
+		while hashes.len() > 0 && made_progress {
+			made_progress = false;
+			let mut curr = vec![];
+			let mut remaining = max_chunk_size;
+
+			// While we still want to steal more bytes and we have more elements of
+			// `concern` to possibly steal
+			while remaining > 0 && !hashes.is_empty() {
+				let c_bytes = hashes.last().unwrap().bytes().len();
+
+				if c_bytes > max_chunk_size {
+					log::error!("Query cannot be chunked, there is a concern that is larger than max chunk size");
+					return Err(Error::UnspecifiedQueryState);
+				} else if c_bytes <= remaining {
+					// steal this concern
+					let concern = hashes.pop().unwrap();
+					curr.push(concern);
+					remaining -= c_bytes;
+					made_progress = true;
+				} else {
+					// Unlike concern chunking, hashes are likely to all be same size, no need to
+					// keep checking if we fail on one
+					break;
+				}
+			}
+			out.push(curr);
+		}
+
+		Ok(out)
+	}
+
+	#[cfg(test)]
+	mod test {
+		use super::*;
+
+		#[test]
+		fn test_hash_chunk() {
+			let hashes: Vec<String> = vec!["1234", "1234", "1234", "1234", "1234"]
+				.into_iter()
+				.map(String::from)
+				.collect();
+			let res = chunk_hashes(hashes, 10).unwrap();
+			assert_eq!(res.len(), 3);
+		}
+	}
+}
+
 /// Returns a boolean list with one entry per contributor to the repo
 /// A `true` entry corresponds to an affiliated contributor
 #[query(default)]
@@ -252,6 +313,9 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 
 	// Temporary solution to retrieve afilliated commits until batching is implemented
 	// TODO: Once batching works, revert to using looped calls of contributors_to_commit() in the commented out code
+	// @Note - this lacks a way to chunk the commits into `contributors_for_commit`. Until this
+	// code is updated ot do so or outbound PluginQuerys get a SubmitInProgress state, this will be
+	// broken when analyzing large repos.
 
 	// for commit in commits.iter() {
 	// 	// Check if a commit matches the affiliation rules.
@@ -285,22 +349,30 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 
 	// Get the hashes for each commit
 	let hashes = commits.iter().map(|c| c.hash.clone()).collect();
-	// Repo with the hash of every commit
-	let commit_batch_repo = BatchGitRepo {
-		local: repo.clone(),
-		details: hashes,
-	};
 
-	// Get a list of lookup structs for linking contributors to each commit
-	let commit_values = engine
-		.query("mitre/git/batch_contributors_for_commit", commit_batch_repo)
-		.await
-		.map_err(|e| {
-			log::error!("failed to get contributors for commits: {}", e);
-			Error::UnspecifiedQueryState
-		})?;
-	let commit_views: Vec<CommitContributorView> = serde_json::from_value(commit_values)
-		.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
+	// Chunk hashes because for large repos the request message would be too large
+	let chunked_hashes = chunk::chunk_hashes(hashes, chunk::GRPC_EFFECTIVE_MAX_SIZE)?;
+
+	let mut commit_views: Vec<CommitContributorView> = vec![];
+	for (i, hashes) in chunked_hashes.into_iter().enumerate() {
+		// Repo with the hash of every commit
+		let commit_batch_repo = BatchGitRepo {
+			local: repo.clone(),
+			details: hashes,
+		};
+		// Get a list of lookup structs for linking contributors to each commit
+		let commit_values = engine
+			.query("mitre/git/batch_contributors_for_commit", commit_batch_repo)
+			.await
+			.map_err(|e| {
+				log::error!("failed to get contributors for commits: {}", e);
+				Error::UnspecifiedQueryState
+			})?;
+		println!("Finished batch contrib #{i}");
+		let views: Vec<CommitContributorView> = serde_json::from_value(commit_values)
+			.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
+		commit_views.extend(views.into_iter());
+	}
 
 	// For each commit, collect contributors that fail the affiliation rules
 	for commit_view in commit_views {
@@ -554,9 +626,9 @@ mod test {
 		let commits_repo = BatchGitRepo {
 			local: repo.clone(),
 			details: vec![
-				"abc-123".to_string(),
-				"def-456".to_string(),
 				"ghi-789".to_string(),
+				"def-456".to_string(),
+				"abc-123".to_string(),
 			],
 		};
 
@@ -595,7 +667,7 @@ mod test {
 			.insert(
 				"mitre/git/batch_contributors_for_commit",
 				commits_repo,
-				Ok(vec![commit_1_view, commit_2_view, commit_3_view]),
+				Ok(vec![commit_3_view, commit_2_view, commit_1_view]),
 			)
 			.unwrap();
 		mock_responses
