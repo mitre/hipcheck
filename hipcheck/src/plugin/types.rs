@@ -387,13 +387,28 @@ impl TryFrom<Query> for PluginQuery {
 const GRPC_MAX_SIZE: usize = 1024 * 1024 * 4; // 4MB
 const GRPC_EFFECTIVE_MAX_SIZE: usize = GRPC_MAX_SIZE - 1024; // Minus one KB
 
+/// Try to drain `max` bytes from `buf`, or the full string, whichever is shortest.
+/// If `max` bytes is somewhere within `buf` but lands within a char boundary,
+/// walk backwards to the start of the previous char. Returns the substring
+/// drained from `buf`.
+fn drain_at_most_n_bytes(buf: &mut String, max: usize) -> Result<String> {
+	let mut to_drain = std::cmp::min(buf.bytes().len(), max);
+	while to_drain > 0 && buf.is_char_boundary(to_drain).not() {
+		to_drain -= 1;
+	}
+	if to_drain == 0 {
+		return Err(hc_error!("Could not drain any whole char from string"));
+	}
+	Ok(buf.drain(0..to_drain).collect::<String>())
+}
+
 fn estimate_size(msg: &PluginQuery) -> usize {
 	msg.key.bytes().len()
 		+ msg.output.bytes().len()
 		+ msg.concern.iter().map(|x| x.bytes().len()).sum::<usize>()
 }
 
-fn chunk(msg: PluginQuery) -> Result<Vec<PluginQuery>> {
+fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<PluginQuery>> {
 	// Chunking only does something on response objects, mostly because
 	// we don't have a state to represent "SubmitInProgress"
 	if msg.state == QueryState::Submit as i32 {
@@ -405,18 +420,16 @@ fn chunk(msg: PluginQuery) -> Result<Vec<PluginQuery>> {
 
 	// Track whether we did anything on each iteration to avoid infinite loop
 	let mut made_progress = true;
-	while estimate_size(&base) > GRPC_EFFECTIVE_MAX_SIZE {
+	while estimate_size(&base) > max_est_size {
 		log::trace!("Estimated size is too large, chunking");
-
 		if !made_progress {
-			log::error!("Message could not be chunked");
 			return Err(hc_error!("Message could not be chunked"));
 		}
 
 		made_progress = false;
 		// For this loop, we want to take at most MAX_SIZE bytes because that's
 		// all that can fit in a PluginQuery
-		let mut remaining = GRPC_EFFECTIVE_MAX_SIZE;
+		let mut remaining = max_est_size;
 		let mut query = PluginQuery {
 			id: base.id,
 			state: QueryState::ReplyInProgress as i32,
@@ -428,37 +441,51 @@ fn chunk(msg: PluginQuery) -> Result<Vec<PluginQuery>> {
 			concern: vec![],
 		};
 
-		let num_key_bytes = base.key.bytes().len();
-		if remaining > 0 && num_key_bytes > 0 {
+		if remaining > 0 && base.key.bytes().len() > 0 {
 			// steal from key
-			let to_drain = std::cmp::min(num_key_bytes, remaining);
-			query.key = base.key.drain(0..to_drain).collect::<String>();
-			remaining -= to_drain;
+			query.key = drain_at_most_n_bytes(&mut base.key, remaining)?;
+			remaining -= query.key.bytes().len();
 			made_progress = true;
 		}
 
-		let num_output_bytes = base.output.bytes().len();
-		if remaining > 0 && num_output_bytes > 0 {
+		if remaining > 0 && base.output.bytes().len() > 0 {
 			// steal from output
-			let to_drain = std::cmp::min(num_output_bytes, remaining);
-			query.output = base.output.drain(0..to_drain).collect::<String>();
-			remaining -= to_drain;
+			query.output = drain_at_most_n_bytes(&mut base.output, remaining)?;
+			remaining -= query.output.bytes().len();
 			made_progress = true;
 		}
 
-		while remaining > 0 && !base.concern.is_empty() {
-			// steal from concerns
-			let concern = base.concern.pop().unwrap();
-			let concern_len = concern.bytes().len();
-			query.concern.push(concern);
-			remaining -= std::cmp::min(concern_len, remaining);
-			made_progress = true;
+		let mut l = base.concern.len();
+		// While we still want to steal more bytes and we have more elements of
+		// `concern` to possibly steal
+		while remaining > 0 && l > 0 {
+			let i = l - 1;
+
+			let c_bytes = base.concern.get(i).unwrap().bytes().len();
+
+			if c_bytes > max_est_size {
+				return Err(hc_error!("Query cannot be chunked, there is a concern that is larger than max chunk size"));
+			} else if c_bytes <= remaining {
+				// steal this concern
+				let concern = base.concern.swap_remove(i);
+				query.concern.push(concern);
+				remaining -= c_bytes;
+				made_progress = true;
+			}
+			// since we use `swap_remove`, whether or not we stole a concern we know the element
+			// currently at `i` is too big for `remainder` (since if we removed, the element at `i`
+			// now is one we already passed on)
+			l -= 1;
 		}
 
 		out.push(query);
 	}
 	out.push(base);
 	Ok(out)
+}
+
+fn chunk(msg: PluginQuery) -> Result<Vec<PluginQuery>> {
+	chunk_with_size(msg, GRPC_EFFECTIVE_MAX_SIZE)
 }
 
 pub struct MultiplexedQueryReceiver {
