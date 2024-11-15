@@ -3,18 +3,13 @@
 //! Plugin containing secondary queries that return information about a Git repo to another query
 
 mod data;
-mod local;
 mod parse;
 mod util;
 
 use crate::{
 	data::{
 		Commit, CommitContributor, CommitContributorView, CommitDiff, Contributor, ContributorView,
-		DetailedGitRepo, Diff,
-	},
-	local::{
-		local_commit_contributors, local_commits, local_commits_for_contributor,
-		local_contributors, local_contributors_for_commit,
+		DetailedGitRepo, Diff, RawCommit,
 	},
 	util::git_command::{get_commits, get_commits_from_date, get_diffs},
 };
@@ -35,6 +30,14 @@ pub struct BatchGitRepo {
 
 	/// Optional additional information for the query
 	pub details: Vec<String>,
+}
+
+/// Returns all raw commits extracted from the repository
+fn local_raw_commits(repo: LocalGitRepo) -> Result<Vec<RawCommit>> {
+	get_commits(&repo.path).map_err(|e| {
+		log::error!("failed to get raw commits: {}", e);
+		Error::UnspecifiedQueryState
+	})
 }
 
 /// Returns the date of the most recent commit to a Git repo as `jiff:Timestamp` displayed as a String
@@ -235,6 +238,8 @@ async fn commits_for_contributor(
 	})
 }
 
+use std::collections::{HashMap, HashSet};
+
 // Temporary query to call multiple commits_for_contributors() queries until we implement batching
 // TODO: Remove this query once batching works
 #[query]
@@ -247,27 +252,68 @@ async fn batch_commits_for_contributor(
 
 	let mut views = Vec::new();
 
-	let commits = local_commits(local.clone()).map_err(|e| {
+	let raw_commits = local_raw_commits(local.clone()).map_err(|e| {
 		log::error!("failed to get commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
-	let contributors = local_contributors(local.clone()).map_err(|e| {
-		log::error!("failed to get contributors: {}", e);
-		Error::UnspecifiedQueryState
-	})?;
-	let commit_contributors =
-		local_commit_contributors(local.clone(), &contributors).map_err(|e| {
-			log::error!("failed to get join table: {}", e);
-			Error::UnspecifiedQueryState
-		})?;
+	let commits: Vec<Commit> = raw_commits
+		.iter()
+		.map(|raw| Commit {
+			hash: raw.hash.to_owned(),
+			written_on: raw.written_on.to_owned(),
+			committed_on: raw.committed_on.to_owned(),
+		})
+		.collect();
+	// @Assert - raw_commit and commits idxes correspond
+
+	// Map contributors to the set of commits (by idx) they have contributed to
+	let mut contrib_to_commits: HashMap<Contributor, HashSet<usize>> = HashMap::default();
+	// Map an email to a contributor
+	let mut email_to_contrib: HashMap<String, Contributor> = HashMap::default();
+
+	fn add_contributor(
+		map: &mut HashMap<Contributor, HashSet<usize>>,
+		c: &Contributor,
+		commit_id: usize,
+	) {
+		let cv = match map.get_mut(c) {
+			Some(v) => v,
+			None => {
+				map.insert(c.clone(), HashSet::new());
+				map.get_mut(c).unwrap()
+			}
+		};
+		cv.insert(commit_id);
+	}
+
+	// For each commit, update the contributors' entries in the above maps
+	for (i, commit) in raw_commits.iter().enumerate() {
+		add_contributor(&mut contrib_to_commits, &commit.author, i);
+		email_to_contrib.insert(commit.author.email.clone(), commit.author.clone());
+		add_contributor(&mut contrib_to_commits, &commit.committer, i);
+		email_to_contrib.insert(commit.committer.email.clone(), commit.committer.clone());
+	}
 
 	for email in emails {
-		views.push(local_commits_for_contributor(
-			&commits,
-			&contributors,
-			&commit_contributors,
-			&email,
-		)?);
+		// Get a contributor from their email
+		let contributor = email_to_contrib
+			.get(&email)
+			.ok_or_else(|| {
+				log::error!("failed to find contributor");
+				Error::UnspecifiedQueryState
+			})?
+			.clone();
+		// Resolve all commits that contributor touched by idx
+		let commits = contrib_to_commits
+			.get(&contributor)
+			.unwrap()
+			.iter()
+			.map(|i| commits.get(*i).unwrap().clone())
+			.collect::<Vec<Commit>>();
+		views.push(ContributorView {
+			contributor,
+			commits,
+		});
 	}
 
 	Ok(views)
@@ -345,29 +391,40 @@ async fn batch_contributors_for_commit(
 	let local = repo.local;
 	let hashes = repo.details;
 
-	let commits = local_commits(local.clone()).map_err(|e| {
+	let raw_commits = local_raw_commits(local.clone()).map_err(|e| {
 		log::error!("failed to get commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
-	let contributors = local_contributors(local.clone()).map_err(|e| {
-		log::error!("failed to get contributors: {}", e);
-		Error::UnspecifiedQueryState
-	})?;
-	let commit_contributors =
-		local_commit_contributors(local.clone(), &contributors).map_err(|e| {
-			log::error!("failed to get join table: {}", e);
-			Error::UnspecifiedQueryState
-		})?;
 
-	let mut views = Vec::new();
+	let mut hash_to_idx: HashMap<String, usize> = HashMap::default();
+	let commit_views: Vec<CommitContributorView> = raw_commits
+		.into_iter()
+		.enumerate()
+		.map(|(i, raw)| {
+			let commit = Commit {
+				hash: raw.hash.to_owned(),
+				written_on: raw.written_on.to_owned(),
+				committed_on: raw.committed_on.to_owned(),
+			};
+			let author = raw.author;
+			let committer = raw.committer;
+			hash_to_idx.insert(raw.hash.clone(), i);
+			CommitContributorView {
+				commit,
+				author,
+				committer,
+			}
+		})
+		.collect();
+
+	let mut views: Vec<CommitContributorView> = vec![];
 
 	for hash in hashes {
-		views.push(local_contributors_for_commit(
-			&commits,
-			&contributors,
-			&commit_contributors,
-			&hash,
-		)?);
+		let idx = hash_to_idx.get(&hash).ok_or_else(|| {
+			log::error!("hash could not be found in repo");
+			Error::UnspecifiedQueryState
+		})?;
+		views.push(commit_views.get(*idx).unwrap().clone());
 	}
 
 	Ok(views)

@@ -234,7 +234,7 @@ mod chunk {
 		let mut out = vec![];
 
 		let mut made_progress = true;
-		while hashes.len() > 0 && made_progress {
+		while !hashes.is_empty() && made_progress {
 			made_progress = false;
 			let mut curr = vec![];
 			let mut remaining = max_chunk_size;
@@ -354,7 +354,7 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 	let chunked_hashes = chunk::chunk_hashes(hashes, chunk::GRPC_EFFECTIVE_MAX_SIZE)?;
 
 	let mut commit_views: Vec<CommitContributorView> = vec![];
-	for (i, hashes) in chunked_hashes.into_iter().enumerate() {
+	for hashes in chunked_hashes {
 		// Repo with the hash of every commit
 		let commit_batch_repo = BatchGitRepo {
 			local: repo.clone(),
@@ -368,7 +368,6 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 				log::error!("failed to get contributors for commits: {}", e);
 				Error::UnspecifiedQueryState
 			})?;
-		println!("Finished batch contrib #{i}");
 		let views: Vec<CommitContributorView> = serde_json::from_value(commit_values)
 			.map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
 		commit_views.extend(views.into_iter());
