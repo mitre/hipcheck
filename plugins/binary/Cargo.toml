@@ -12,7 +12,7 @@ hipcheck-sdk = { version = "0.1.0", path = "../../sdk/rust", features = ["macros
 log = "0.4.22"
 pathbuf = "1.0.0"
 schemars = "0.8.21"
-serde = "1.0.214"
+serde = "1.0.215"
 serde_json = "1.0.132"
 tokio = { version = "1.41.1", features = ["rt"] }
 toml = "0.8.19"
