@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.91"
-clap = { version = "4.5.18", features = ["derive"] }
+clap = { version = "4.5.21", features = ["derive"] }
 hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"] }
 rand = "0.8.5"
 tokio = { version = "1.41.1", features = ["rt"] }
