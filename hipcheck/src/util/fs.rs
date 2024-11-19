@@ -71,3 +71,9 @@ pub fn exists<P: AsRef<Path>>(path: P) -> Result<()> {
 
 	inner(path.as_ref())
 }
+
+/// return the sha256 of a file
+pub fn file_sha256<P: AsRef<Path>>(path: P) -> Result<String> {
+	let bytes = read_bytes(path)?;
+	Ok(sha256::digest(&bytes))
+}

@@ -9,7 +9,7 @@ use crate::{
 		DownloadManifest, HashAlgorithm, HashWithDigest, PluginId, PluginManifest,
 	},
 	policy::policy_file::{ManifestLocation, PolicyPlugin},
-	util::http::agent::agent,
+	util::{fs::file_sha256, http::agent::agent},
 };
 use flate2::read::GzDecoder;
 use fs_extra::{dir::remove, file::write_all};
@@ -137,16 +137,24 @@ fn retrieve_local_plugin(
 			// path where the binary for this plugin will get cached
 			let binary_cache_location = plugin_cache.plugin_download_dir(&plugin_id).join(new_bin);
 
-			// @Note - sneaky potential for unexpected behavior if we write local plugin manifest
-			// to a cache dir that already included a remote download
-			//
-			// Due to an issue that arises on macOS when copying a binary over a running copy of a binary, we copy the
-			// file to a temp file, then move it, rather than copying directly to its source
-			//
-			// See: https://forums.developer.apple.com/forums/thread/126187
-			let tmp_file = tempfile::NamedTempFile::new()?;
-			std::fs::copy(&original_entrypoint, tmp_file.path())?;
-			std::fs::rename(tmp_file, binary_cache_location)?;
+			// if on windows, first check if we can skip copying. this is because windows won't let
+			// you overwrite a plugin binary that is currently in use (such as when another hc
+			// instance is already running)
+			if !cfg!(target_os = "windows")
+				|| file_sha256(&original_entrypoint)?
+					!= file_sha256(&binary_cache_location).unwrap_or_default()
+			{
+				// @Note - sneaky potential for unexpected behavior if we write local plugin manifest
+				// to a cache dir that already included a remote download
+				//
+				// Due to an issue that arises on macOS when copying a binary over a running copy of a binary, we copy the
+				// file to a temp file, then move it, rather than copying directly to its source
+				//
+				// See: https://forums.developer.apple.com/forums/thread/126187
+				let tmp_file = tempfile::NamedTempFile::new()?;
+				std::fs::copy(&original_entrypoint, tmp_file.path())?;
+				std::fs::rename(tmp_file, binary_cache_location)?;
+			}
 		}
 	}
 
