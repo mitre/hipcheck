@@ -293,10 +293,9 @@ impl CliConfig {
 		CliConfig {
 			path_args: PathArgs {
 				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
-				// TODO: currently if this is set, then when running `hc check`, it errors out
-				// because policy files are not yet supported
-				// policy: env::current_dir().ok().map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
-				policy: None,
+				policy: std::env::current_dir()
+					.ok()
+					.map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
 			},
 			deprecated_args: DeprecatedArgs {
 				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),

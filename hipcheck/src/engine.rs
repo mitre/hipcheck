@@ -77,9 +77,13 @@ fn query(
 	query: String,
 	key: Value,
 ) -> Result<QueryResult> {
+	let hash_key = get_plugin_key(publisher.as_str(), plugin.as_str());
+
+	#[cfg(feature = "print-timings")]
+	let _0 = crate::benchmarking::print_scope_time!(format!("{}/{}", &hash_key, &query));
+
 	let runtime = RUNTIME.handle();
 	let core = db.core();
-	let hash_key = get_plugin_key(publisher.as_str(), plugin.as_str());
 
 	// Find the plugin
 	let Some(p_handle) = core.plugins.get(&hash_key) else {
@@ -127,8 +131,12 @@ pub fn async_query(
 	key: Value,
 ) -> BoxFuture<'static, Result<QueryResult>> {
 	async move {
-		// Find the plugin
 		let hash_key = get_plugin_key(publisher.as_str(), plugin.as_str());
+
+		#[cfg(feature = "print-timings")]
+		let _0 = crate::benchmarking::print_scope_time!(format!("{}/{}", &hash_key, &query));
+
+		// Find the plugin
 		let Some(p_handle) = core.plugins.get(&hash_key) else {
 			return Err(hc_error!("No such plugin {}", hash_key));
 		};

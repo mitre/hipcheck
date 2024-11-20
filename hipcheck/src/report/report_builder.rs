@@ -17,6 +17,9 @@ use std::{collections::HashSet, default::Default};
 
 /// Print the final report of a Hipcheck run.
 pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Report> {
+	#[cfg(feature = "print-timings")]
+	let _0 = crate::benchmarking::print_scope_time!("build_report");
+
 	log::debug!("building final report");
 
 	// This function needs to:
