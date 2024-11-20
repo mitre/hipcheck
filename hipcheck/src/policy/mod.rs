@@ -2,9 +2,11 @@
 
 //! Data types and functions for parsing policy KDL files
 
-pub mod config_to_policy;
+mod config_to_policy;
 pub mod policy_file;
 mod tests;
+
+pub use config_to_policy::config_to_policy;
 
 use crate::{
 	error::Result,

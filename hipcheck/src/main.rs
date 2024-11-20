@@ -31,9 +31,10 @@ use crate::{
 	analysis::score::score_results,
 	cache::repo::HcRepoCache,
 	cli::Format,
-	config::WeightTreeProvider,
+	config::{normalized_unresolved_analysis_tree_from_policy, Config},
 	error::{Context as _, Error, Result},
 	plugin::{try_set_arch, Plugin, PluginExecutor, PluginWithConfig},
+	policy::{config_to_policy, PolicyFile},
 	report::report_builder::{build_report, Report},
 	session::Session,
 	setup::{resolve_and_transform_source, SourceType},
@@ -61,7 +62,7 @@ use std::{
 	result::Result as StdResult,
 	time::Duration,
 };
-use target::{RemoteGitRepo, TargetSeed, TargetSeedKind, ToTargetSeed};
+use target::{TargetSeed, ToTargetSeed};
 use util::command::DependentProgram;
 use util::fs::create_dir_all;
 use which::which;
@@ -166,28 +167,19 @@ fn cmd_schema(args: &SchemaArgs) {
 }
 
 fn cmd_print_weights(config: &CliConfig) -> Result<()> {
-	// Silence the global shell while we're checking the dummy repo to prevent progress bars and
-	// title messages from displaying while calculating the weight tree.
-	let silence_guard = Shell::silence();
-
-	// Create a dummy session to query the salsa database for a weight graph for printing.
-	let session = Session::new(
-		// Use the hipcheck repo as a dummy url until checking is de-coupled from `Session`.
-		&TargetSeed {
-			kind: TargetSeedKind::RemoteRepo(RemoteGitRepo {
-				url: url::Url::parse("https://github.com/mitre/hipcheck.git").unwrap(),
-				known_remote: None,
-			}),
-			refspec: Some("HEAD".to_owned()),
-		},
-		config.config().map(ToOwned::to_owned),
-		config.cache().map(ToOwned::to_owned),
-		config.policy().map(ToOwned::to_owned),
-		config.format(),
-	)?;
+	let policy = if let Some(p) = config.policy() {
+		PolicyFile::load_from(p)
+		.context("Failed to load policy. Plase make sure the policy file is in the provided location and is formatted correctly.")?
+	} else if let Some(c) = config.config() {
+		let config = Config::load_from(c)
+		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
+		config_to_policy(config)?
+	} else {
+		return Err(hc_error!("No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."));
+	};
 
 	// Get the weight tree and print it.
-	let weight_tree = session.normalized_analysis_tree()?;
+	let weight_tree = normalized_unresolved_analysis_tree_from_policy(&policy)?;
 
 	// Create a special wrapper to override `Debug` so that we can use indextree's \
 	// debug pretty print function instead of writing our own.
@@ -248,9 +240,6 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 			new_root
 		}
 	}
-
-	// Drop the silence guard to make the shell produce output again.
-	drop(silence_guard);
 
 	let mut print_tree = ConvertTree(Arena::with_capacity(weight_tree.tree.capacity()));
 	let print_root = print_tree.convert_tree(weight_tree.root, &weight_tree.tree);
