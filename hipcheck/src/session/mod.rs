@@ -25,7 +25,7 @@ use crate::{
 	metric::{
 		binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,
 	},
-	policy::{config_to_policy::config_to_policy, PolicyFile},
+	policy::{config_to_policy, PolicyFile},
 	report::{ReportParams, ReportParamsStorage},
 	session::{
 		cyclone_dx::extract_cyclonedx_download_url,
@@ -253,7 +253,7 @@ fn load_software_versions() -> Result<(String, String)> {
 	Ok((git_version, npm_version))
 }
 
-fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, PathBuf, String)> {
+pub fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, PathBuf, String)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("Loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.");
 	// Increment the phase into the "running" stage.
@@ -280,7 +280,7 @@ fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, PathB
 	Ok((policy, valid_config_path.to_path_buf(), hc_github_token))
 }
 
-fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathBuf, String)> {
+pub fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathBuf, String)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("loading policy and data files");
 	// Increment the phase into the "running" stage.

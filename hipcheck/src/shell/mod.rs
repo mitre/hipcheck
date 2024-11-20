@@ -110,6 +110,7 @@ impl Shell {
 	///
 	/// This is equivalent to using [Shell::set_verbosity] to silence the global shell,
 	/// and then reseting it back to the previous value whenever the returned [SilenceGuard] is [drop]ped.
+	#[allow(unused)]
 	pub fn silence() -> SilenceGuard {
 		let previous_verbosity = Shell::get_verbosity();
 		Shell::set_verbosity(Verbosity::Silent);

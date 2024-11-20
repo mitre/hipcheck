@@ -197,7 +197,7 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 	// Values set with -1.0 are reseved for parent nodes whose score comes always
 	// from children nodes with a score set by hc_analysis algorithms
 
-	let analysis_tree = db.normalized_analysis_tree()?;
+	let analysis_tree = db.analysis_tree()?;
 	let mut plugin_results = PluginAnalysisResults::default();
 
 	// RFD4 analysis style - get all "leaf" analyses and call through plugin architecture
