@@ -9,10 +9,7 @@ use crate::{
 	},
 };
 use kdl::{KdlDocument, KdlNode, KdlValue};
-use std::{
-	path::Path,
-	str::FromStr,
-};
+use std::{path::Path, str::FromStr};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PluginBackoffInterval {
@@ -47,11 +44,9 @@ impl ParseKdlNode for PluginBackoffInterval {
 					return None;
 				}
 			}
-			_ => {
-				return None
-			},
+			_ => return None,
 		};
-		Some(PluginBackoffInterval { micros})
+		Some(PluginBackoffInterval { micros })
 	}
 }
 
@@ -88,11 +83,9 @@ impl ParseKdlNode for PluginMaxSpawnAttempts {
 					return None;
 				}
 			}
-			_ => {
-				return None
-			},
+			_ => return None,
 		};
-		Some(PluginMaxSpawnAttempts { attempts})
+		Some(PluginMaxSpawnAttempts { attempts })
 	}
 }
 
@@ -129,11 +122,9 @@ impl ParseKdlNode for PluginMaxConnectionAttempts {
 					return None;
 				}
 			}
-			_ => {
-				return None
-			},
+			_ => return None,
 		};
-		Some(PluginMaxConnectionAttempts { attempts})
+		Some(PluginMaxConnectionAttempts { attempts })
 	}
 }
 
@@ -170,11 +161,9 @@ impl ParseKdlNode for PluginJitterPercent {
 					return None;
 				}
 			}
-			_ => {
-				return None
-			},
+			_ => return None,
 		};
-		Some(PluginJitterPercent { percent})
+		Some(PluginJitterPercent { percent })
 	}
 }
 
@@ -211,9 +200,7 @@ impl ParseKdlNode for PluginMsgBufferSize {
 					return None;
 				}
 			}
-			_ => {
-				return None
-			},
+			_ => return None,
 		};
 		Some(PluginMsgBufferSize { size })
 	}
@@ -225,13 +212,13 @@ pub struct PluginConfig {
 	pub max_spawn: PluginMaxSpawnAttempts,
 	pub max_conn: PluginMaxConnectionAttempts,
 	pub jitter: PluginJitterPercent,
-	pub grpc_buffer: PluginMsgBufferSize, 
+	pub grpc_buffer: PluginMsgBufferSize,
 }
 
 impl PluginConfig {
 	#[cfg(test)]
-	pub fn new (
-		backoff: PluginBackoffInterval, 
+	pub fn new(
+		backoff: PluginBackoffInterval,
 		max_spawn: PluginMaxSpawnAttempts,
 		max_conn: PluginMaxConnectionAttempts,
 		jitter: PluginJitterPercent,
@@ -242,7 +229,7 @@ impl PluginConfig {
 			max_spawn,
 			max_conn,
 			jitter,
-			grpc_buffer
+			grpc_buffer,
 		}
 	}
 }
@@ -252,7 +239,7 @@ impl ParseKdlNode for PluginConfig {
 		"plugin"
 	}
 
-	fn parse_node(node: &KdlNode) -> Option<Self> { 
+	fn parse_node(node: &KdlNode) -> Option<Self> {
 		if node.name().to_string().as_str() != Self::kdl_key() {
 			return None;
 		}
@@ -270,7 +257,7 @@ impl ParseKdlNode for PluginConfig {
 			max_spawn,
 			max_conn,
 			jitter,
-			grpc_buffer
+			grpc_buffer,
 		})
 	}
 
@@ -284,14 +271,12 @@ pub struct ExecConfig {
 }
 
 impl ExecConfig {
-
 	pub fn from_file<P>(path: P) -> Result<Self, Error>
 	where
 		P: AsRef<Path>,
 	{
-		Self::from_str(read_string(path)?.as_str())
+		Self::from_str(&read_string(path)?)
 	}
-
 }
 
 impl FromStr for ExecConfig {
@@ -301,18 +286,18 @@ impl FromStr for ExecConfig {
 		let document = KdlDocument::from_str(s)
 			.map_err(|e| hc_error!("Error parsing exec config file: {}", e))?;
 		let nodes = document.nodes();
-		let plugin_data:PluginConfig = extract_data(nodes).unwrap();
+		let plugin_data: PluginConfig = extract_data(nodes).unwrap();
 		// added config groups will here
-		Ok(Self {
-			plugin_data,
-		})
+		Ok(Self { plugin_data })
 	}
 }
 
 #[cfg(test)]
 mod test {
-	use std::path::Path;
+	use std::path::PathBuf;
+
 	use super::*;
+	use pathbuf::pathbuf;
 
 	#[test]
 	fn test_parsing_plugin_backoff_interval() {
@@ -379,18 +364,10 @@ mod test {
 		let max_conn = PluginMaxConnectionAttempts::new(5);
 		let jitter = PluginJitterPercent::new(10);
 		let grpc_buffer = PluginMsgBufferSize::new(10);
-		
-		let expected = PluginConfig::new(
-			backoff, 
-			max_spawn, 
-			max_conn, 
-			jitter, 
-			grpc_buffer);
-		
-		assert_eq!(
-			expected,
-			PluginConfig::parse_node(&node).unwrap()
-		)
+
+		let expected = PluginConfig::new(backoff, max_spawn, max_conn, jitter, grpc_buffer);
+
+		assert_eq!(expected, PluginConfig::parse_node(&node).unwrap())
 	}
 
 	#[test]
@@ -405,9 +382,7 @@ mod test {
 		let node = KdlNode::from_str(data).unwrap();
 		let parsed_node = PluginConfig::parse_node(&node).unwrap();
 
-		assert_eq!(
-			parsed_node.backoff.micros, 100000
-		);
+		assert_eq!(parsed_node.backoff.micros, 100000);
 	}
 
 	#[test]
@@ -422,9 +397,7 @@ mod test {
 		let node = KdlNode::from_str(data).unwrap();
 		let parsed_node = PluginConfig::parse_node(&node).unwrap();
 
-		assert_eq!(
-			parsed_node.max_spawn.attempts, 3
-		);
+		assert_eq!(parsed_node.max_spawn.attempts, 3);
 	}
 
 	#[test]
@@ -439,9 +412,7 @@ mod test {
 		let node = KdlNode::from_str(data).unwrap();
 		let parsed_node = PluginConfig::parse_node(&node).unwrap();
 
-		assert_ne!(
-			parsed_node.max_conn.attempts, 3
-		);
+		assert_ne!(parsed_node.max_conn.attempts, 3);
 	}
 
 	#[test]
@@ -456,9 +427,7 @@ mod test {
 		let node = KdlNode::from_str(data).unwrap();
 		let parsed_node = PluginConfig::parse_node(&node).unwrap();
 
-		assert_eq!(
-			parsed_node.jitter.percent, 10
-		);
+		assert_eq!(parsed_node.jitter.percent, 10);
 	}
 
 	#[test]
@@ -473,9 +442,7 @@ mod test {
 		let node = KdlNode::from_str(data).unwrap();
 		let parsed_node = PluginConfig::parse_node(&node).unwrap();
 
-		assert_eq!(
-			parsed_node.grpc_buffer.size, 10
-		);
+		assert_eq!(parsed_node.grpc_buffer.size, 10);
 	}
 
 	#[test]
@@ -488,32 +455,32 @@ mod test {
 			grpc-msg-buffer-size 10
 		}"#;
 		let exec_config = ExecConfig::from_str(data).unwrap();
-		assert_eq!(
-			exec_config.plugin_data.backoff.micros, 100000
-		);
-		assert_eq!(
-			exec_config.plugin_data.max_spawn.attempts, 3
-		);
-		assert_eq!(
-			exec_config.plugin_data.max_conn.attempts, 5
-		);
-		assert_eq!(
-			exec_config.plugin_data.jitter.percent, 10
-		);
-		assert_eq!(
-			exec_config.plugin_data.grpc_buffer.size, 10
-		);
+		assert_eq!(exec_config.plugin_data.backoff.micros, 100000);
+		assert_eq!(exec_config.plugin_data.max_spawn.attempts, 3);
+		assert_eq!(exec_config.plugin_data.max_conn.attempts, 5);
+		assert_eq!(exec_config.plugin_data.jitter.percent, 10);
+		assert_eq!(exec_config.plugin_data.grpc_buffer.size, 10);
 	}
 
 	#[test]
 	fn test_parsing_exec_config_from_file() {
-		let data = "config/Exec.kdl";
-		let path: &Path = data.as_ref();
+		let root = workspace_dir();
+		let path = pathbuf![&root, "config", "Exec.kdl"];
+		let config = ExecConfig::from_file(path);
+		assert!(config.is_ok())
+	}
 
-		// let config = ExecConfig::from_file(path)?;
-
-		let parsed_node = ExecConfig::from_file(path);
-		println!("````````parsed node: {:?}", parsed_node);
-		assert!(parsed_node.is_ok(), "Error")
+	// Adapted from https://stackoverflow.com/a/74942075
+	// Licensed CC BY-SA 4.0
+	fn workspace_dir() -> PathBuf {
+		let output = std::process::Command::new(env!("CARGO"))
+			.arg("locate-project")
+			.arg("--workspace")
+			.arg("--message-format=plain")
+			.output()
+			.unwrap()
+			.stdout;
+		let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
+		cargo_path.parent().unwrap().to_path_buf()
 	}
 }
