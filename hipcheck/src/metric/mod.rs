@@ -6,7 +6,6 @@ pub mod contributor_trust;
 pub mod fuzz;
 pub mod identity;
 pub mod linguist;
-mod math;
 
 use crate::{
 	config::{AttacksConfigQuery, CommitConfigQuery},
