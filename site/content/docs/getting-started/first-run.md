@@ -272,7 +272,7 @@ interested in their results. You can also change how specific analyses work,
 and configure your risk tolerance to your liking as well. In general, Hipcheck
 is designed to adapt to your own policies and risk considerations, not the
 other way around. More about this is covered in the Hipcheck
-[Complete Guide](/docs/guide).
+[Complete Guide](@/docs/guide/_index.md).
 
 In this case, Hipcheck has given itself a `PASS` (would be concerning if it
 didn't)! This means that, by Hipcheck's estimation, you should feel comfortable
@@ -283,7 +283,7 @@ using it without further manual investigation.
 With that, we've completed the Quickstart guide to Hipcheck! If you'd like
 to understand more about Hipcheck's underlying concepts, how it works under the
 hood, how to configure it, how to interpret the results, and more, we recommend
-reading the [Complete Guide](/docs/guide).
+reading the [Complete Guide](@/docs/guide/_index.md).
 
 If you have questions about using Hipcheck, feel free to ask them on our
 [Discussions](https://github.com/mitre/hipcheck/discussions) forum.
