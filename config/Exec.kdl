@@ -1,0 +1,7 @@
+plugin {
+    backoff-interval 100000
+    max-spawn-attempts 3
+    max-conn-attempts 5
+    jitter-percent 10
+    grpc-msg-buffer-size 10
+}

@@ -6,6 +6,7 @@ mod benchmarking;
 mod cache;
 mod cli;
 mod config;
+mod executor;
 mod data;
 mod engine;
 mod error;
@@ -45,6 +46,7 @@ use cli::{
 	SetupArgs, UpdateArgs,
 };
 use config::AnalysisTreeNode;
+// use executor::ExecConfig;
 use core::fmt;
 use indextree::{Arena, NodeId};
 use ordered_float::NotNan;
@@ -558,6 +560,7 @@ fn cmd_plugin(args: PluginArgs) {
 		name: "dummy/sha256".to_owned(),
 		entrypoint: entrypoint2.display().to_string(),
 	};
+	// ADDED: use values from plugins.kdl
 	let plugin_executor = PluginExecutor::new(
 		/* max_spawn_attempts */ 3,
 		/* max_conn_attempts */ 5,

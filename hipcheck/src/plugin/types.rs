@@ -292,6 +292,7 @@ impl PluginContext {
 		let opt_explain_default_query = self.explain_default_query().await?;
 
 		// TODO: Make the size of this channel configurable.
+		// ADDED: grpc-msg-buffer-size
 		let (tx, out_rx) = mpsc::channel::<PluginQuery>(10);
 		let rx = self.initiate_query_protocol(out_rx).await?;
 

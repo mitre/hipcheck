@@ -236,6 +236,8 @@ impl Session {
 		// equal, and the idea of memoizing/invalidating it does not make sense.
 		// Thus, we will do the plugin startup here.
 		let policy = session.policy();
+		// ADDED: create a plugin executor w/ the exec config and pass into start_plugins
+
 		let core = start_plugins(policy.as_ref(), &plugin_cache)?;
 		session.set_core(core);
 

@@ -215,6 +215,7 @@ pub fn start_plugins(
 	policy_file: &PolicyFile,
 	plugin_cache: &HcPluginCache,
 ) -> Result<Arc<HcPluginCore>> {
+	// ADDED: use values from plugins.kdl
 	let executor = PluginExecutor::new(
 		/* max_spawn_attempts */ 3,
 		/* max_conn_attempts */ 5,

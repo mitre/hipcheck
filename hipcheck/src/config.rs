@@ -449,6 +449,9 @@ pub trait ConfigSource: salsa::Database {
 	/// Returns the input `Policy File` struct
 	#[salsa::input]
 	fn policy(&self) -> Rc<PolicyFile>;
+	/// ADDED: Returns the input `Exec Config File` struct
+	// #[salsa::input]
+	// fn policy(&self) -> Rc<ExecConfigFile>;
 	/// Returns the location of the policy file
 	#[salsa::input]
 	fn policy_path(&self) -> Option<Rc<PathBuf>>;
