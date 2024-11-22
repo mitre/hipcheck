@@ -39,7 +39,6 @@ use crate::{
 	session::Session,
 	setup::{resolve_and_transform_source, SourceType},
 	shell::Shell,
-	util::iter::{TryAny, TryFilter},
 };
 use cli::{
 	CacheArgs, CacheOp, CheckArgs, CliConfig, FullCommands, PluginArgs, SchemaArgs, SchemaCommand,
