@@ -132,7 +132,7 @@ ureq = { version = "2.10.1", default-features = false, features = [
     "json",
     "tls",
 ] }
-url = { version = "2.5.2", features = ["serde"] }
+url = { version = "2.5.4", features = ["serde"] }
 walkdir = "2.5.0"
 which = { version = "7.0.0", default-features = false }
 xml-rs = "0.8.23"
@@ -149,7 +149,7 @@ schemars = { version = "0.8.21", features = ["chrono", "url"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.128"
 tonic-build = "0.12.3"
-url = { version = "2.5.2", features = ["serde"] }
+url = { version = "2.5.4", features = ["serde"] }
 which = { version = "7.0.0", default-features = false }
 
 [dev-dependencies]
