@@ -8,7 +8,6 @@ use crate::{
 	metric::MetricProvider,
 };
 
-
 /// Queries about analyses
 #[salsa::query_group(AnalysisProviderStorage)]
 pub trait AnalysisProvider:
