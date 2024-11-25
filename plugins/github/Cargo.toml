@@ -29,4 +29,4 @@ ureq = { version = "2.10.1", default-features = false, features = [
     "json",
     "tls",
 ] }
-url = { version = "2.5.2", features = ["serde"] }
+url = { version = "2.5.4", features = ["serde"] }
