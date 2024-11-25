@@ -3,8 +3,6 @@
 pub mod binary_detector;
 pub mod commit_trust;
 pub mod contributor_trust;
-pub mod fuzz;
-pub mod identity;
 pub mod linguist;
 
 use crate::{
@@ -13,8 +11,7 @@ use crate::{
 	error::Result,
 	metric::{
 		binary_detector::BinaryFile, commit_trust::CommitTrustOutput,
-		contributor_trust::ContributorTrustOutput, fuzz::FuzzOutput,
-		identity::IdentityOutput, linguist::Linguist,
+		contributor_trust::ContributorTrustOutput, linguist::Linguist,
 	},
 };
 use std::sync::Arc;
@@ -38,12 +35,4 @@ pub trait MetricProvider:
 	/// Returns result of contributor trust metric
 	#[salsa::invoke(contributor_trust::contributor_trust_metric)]
 	fn contributor_trust_metric(&self) -> Result<Arc<ContributorTrustOutput>>;
-
-	/// Returns result of identity metric
-	#[salsa::invoke(identity::identity_metric)]
-	fn identity_metric(&self) -> Result<Arc<IdentityOutput>>;
-
-	/// Returns result of fuzz metric
-	#[salsa::invoke(fuzz::fuzz_metric)]
-	fn fuzz_metric(&self) -> Result<Arc<FuzzOutput>>;
 }
