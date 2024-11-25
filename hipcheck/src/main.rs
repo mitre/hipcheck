@@ -560,7 +560,6 @@ fn cmd_plugin(args: PluginArgs) {
 		name: "dummy/sha256".to_owned(),
 		entrypoint: entrypoint2.display().to_string(),
 	};
-	// COMPLETED
 	let config_path = pathbuf!["./config", "Config.kdl"];
 	let plugin_data = ExecConfig::from_file(config_path).unwrap().plugin_data;
 

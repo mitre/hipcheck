@@ -293,9 +293,6 @@ impl PluginContext {
 
 		let opt_explain_default_query = self.explain_default_query().await?;
 
-		// TODO: Make the size of this channel configurable.
-		// COMPLETED
-
 		let config_path = pathbuf!["./config", "Config.kdl"];
 		let plugin_data = ExecConfig::from_file(config_path).unwrap().plugin_data;
 

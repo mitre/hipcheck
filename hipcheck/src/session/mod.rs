@@ -240,7 +240,6 @@ impl Session {
 		// Thus, we will do the plugin startup here.
 		let policy = session.policy();
 
-		// COMPLETED
 		let config_path = pathbuf!["./config", "Config.kdl"];
 		let plugin_data = ExecConfig::from_file(config_path).unwrap().plugin_data;
 

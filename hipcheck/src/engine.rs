@@ -216,7 +216,6 @@ pub fn start_plugins(
 	plugin_cache: &HcPluginCache,
 	executor: PluginExecutor
 ) -> Result<Arc<HcPluginCore>> {
-	// COMPLETED
 	let current_arch = get_current_arch();
 
 	// retrieve, verify and extract all required plugins
