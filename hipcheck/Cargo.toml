@@ -48,7 +48,7 @@ env_logger = { version = "0.11.5" }
 finl_unicode = { version = "1.3.0", default-features = false, features = [
     "grapheme_clusters",
 ] }
-flate2 = "1.0.34"
+flate2 = "1.0.35"
 fs_extra = "1.3.0"
 futures = "0.3.31"
 # Vendor libgit2 and openssl so that they will be statically included
