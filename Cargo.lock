@@ -660,9 +660,9 @@ dependencies = [
 
 [[package]]
 name = "cyclonedx-bom"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa4bc2b1186cf894ec0192863b5d6e6164de1a39ab66d2a281a4157b4ea45138"
+checksum = "ce2ec98a191e17f63b92b132f6852462de9eaee03ca8dbf2df401b9fd809bcac"
 dependencies = [
  "base64 0.21.7",
  "cyclonedx-bom-macros",
