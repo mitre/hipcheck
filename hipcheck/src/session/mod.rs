@@ -21,10 +21,12 @@ use crate::{
 	},
 	engine::{start_plugins, HcEngine, HcEngineStorage},
 	error::{Context as _, Error, Result},
+	executor::ExecConfig,
 	hc_error,
 	metric::{
 		binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,
 	},
+	plugin::PluginExecutor,
 	policy::{config_to_policy::config_to_policy, PolicyFile},
 	report::{ReportParams, ReportParamsStorage},
 	session::{
@@ -41,6 +43,7 @@ use crate::{
 };
 use chrono::prelude::*;
 use dotenv::var;
+use pathbuf::pathbuf;
 use std::{
 	fmt,
 	path::{Path, PathBuf},
@@ -236,9 +239,19 @@ impl Session {
 		// equal, and the idea of memoizing/invalidating it does not make sense.
 		// Thus, we will do the plugin startup here.
 		let policy = session.policy();
-		// ADDED: create a plugin executor w/ the exec config and pass into start_plugins
 
-		let core = start_plugins(policy.as_ref(), &plugin_cache)?;
+		// COMPLETED
+		let config_path = pathbuf!["./config", "Config.kdl"];
+		let plugin_data = ExecConfig::from_file(config_path).unwrap().plugin_data;
+
+		let executor = PluginExecutor::new(
+			/* max_spawn_attempts */ plugin_data.max_spawn.attempts,
+			/* max_conn_attempts */ plugin_data.max_conn.attempts,
+			/* port_range */ 40000..u16::MAX,
+			/* backoff_interval_micros */ plugin_data.backoff.micros,
+			/* jitter_percent */ plugin_data.jitter.percent,
+		)?;
+		let core = start_plugins(policy.as_ref(), &plugin_cache, executor)?;
 		session.set_core(core);
 
 		Ok(session)

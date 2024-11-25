@@ -9,9 +9,11 @@ use crate::{
 		Query as PluginQuery, QueryState, SetConfigurationRequest,
 		SetConfigurationResponse as PluginConfigResult,
 	},
+	executor::ExecConfig,
 	Error, Result,
 };
 use futures::{Stream, StreamExt};
+use pathbuf::pathbuf;
 use serde_json::Value;
 use std::{
 	collections::{HashMap, VecDeque},
@@ -292,8 +294,12 @@ impl PluginContext {
 		let opt_explain_default_query = self.explain_default_query().await?;
 
 		// TODO: Make the size of this channel configurable.
-		// ADDED: grpc-msg-buffer-size
-		let (tx, out_rx) = mpsc::channel::<PluginQuery>(10);
+		// COMPLETED
+
+		let config_path = pathbuf!["./config", "Config.kdl"];
+		let plugin_data = ExecConfig::from_file(config_path).unwrap().plugin_data;
+
+		let (tx, out_rx) = mpsc::channel::<PluginQuery>(plugin_data.grpc_buffer.size);
 		let rx = self.initiate_query_protocol(out_rx).await?;
 
 		Ok(PluginTransport {

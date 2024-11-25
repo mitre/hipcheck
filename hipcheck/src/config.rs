@@ -449,12 +449,12 @@ pub trait ConfigSource: salsa::Database {
 	/// Returns the input `Policy File` struct
 	#[salsa::input]
 	fn policy(&self) -> Rc<PolicyFile>;
-	/// ADDED: Returns the input `Exec Config File` struct
-	// #[salsa::input]
-	// fn policy(&self) -> Rc<ExecConfigFile>;
 	/// Returns the location of the policy file
 	#[salsa::input]
 	fn policy_path(&self) -> Option<Rc<PathBuf>>;
+	/// ADDED: Returns the input `Exec Config File` struct
+	// #[salsa::input]
+	// fn exec_config(&self) -> Rc<ExecConfigFile>;
 	/// Returns the token set in HC_GITHUB_TOKEN env var
 	#[salsa::input]
 	fn github_api_token(&self) -> Option<Rc<String>>;

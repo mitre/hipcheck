@@ -46,7 +46,7 @@ use cli::{
 	SetupArgs, UpdateArgs,
 };
 use config::AnalysisTreeNode;
-// use executor::ExecConfig;
+use executor::ExecConfig;
 use core::fmt;
 use indextree::{Arena, NodeId};
 use ordered_float::NotNan;
@@ -560,13 +560,16 @@ fn cmd_plugin(args: PluginArgs) {
 		name: "dummy/sha256".to_owned(),
 		entrypoint: entrypoint2.display().to_string(),
 	};
-	// ADDED: use values from plugins.kdl
+	// COMPLETED
+	let config_path = pathbuf!["./config", "Config.kdl"];
+	let plugin_data = ExecConfig::from_file(config_path).unwrap().plugin_data;
+
 	let plugin_executor = PluginExecutor::new(
-		/* max_spawn_attempts */ 3,
-		/* max_conn_attempts */ 5,
+		/* max_spawn_attempts */ plugin_data.max_spawn.attempts,
+		/* max_conn_attempts */ plugin_data.max_conn.attempts,
 		/* port_range */ 40000..u16::MAX,
-		/* backoff_interval_micros */ 100000,
-		/* jitter_percent */ 10,
+		/* backoff_interval_micros */ plugin_data.backoff.micros,
+		/* jitter_percent */ plugin_data.jitter.percent,
 	)
 	.unwrap();
 	let engine = match HcEngineImpl::new(
