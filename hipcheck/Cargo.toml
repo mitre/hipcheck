@@ -137,7 +137,7 @@ walkdir = "2.5.0"
 which = { version = "7.0.0", default-features = false }
 xml-rs = "0.8.23"
 xz2 = "0.1.7"
-zip = "2.2.0"
+zip = "2.2.1"
 zip-extensions = "0.8.1"
 zstd = "0.13.2"
 
