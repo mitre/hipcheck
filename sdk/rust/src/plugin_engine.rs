@@ -1,194 +1,35 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proto::QueryState;
 use crate::{
 	error::{Error, Result},
-	proto::{
-		self, InitiateQueryProtocolRequest, InitiateQueryProtocolResponse, Query as PluginQuery,
-	},
 	QueryTarget,
 };
 use crate::{mock::MockResponses, JsonValue, Plugin};
-use anyhow::anyhow;
 use futures::Stream;
+use hipcheck_common::proto::{
+	self, InitiateQueryProtocolRequest, InitiateQueryProtocolResponse, Query as PluginQuery,
+	QueryState,
+};
+use hipcheck_common::{
+	chunk::QuerySynthesizer,
+	types::{Query, QueryDirection},
+};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use std::{
 	collections::{HashMap, VecDeque},
 	future::poll_fn,
-	ops::Not,
 	pin::Pin,
 	result::Result as StdResult,
 };
 use tokio::sync::mpsc::{self, error::TrySendError};
 use tonic::Status;
 
-const GRPC_MAX_SIZE: usize = 1024 * 1024 * 4; // 4MB
-const GRPC_EFFECTIVE_MAX_SIZE: usize = GRPC_MAX_SIZE - 1024; // Minus one KB
-
-/// Try to drain `max` bytes from `buf`, or the full string, whichever is shortest.
-/// If `max` bytes is somewhere within `buf` but lands within a char boundary,
-/// walk backwards to the start of the previous char. Returns the substring
-/// drained from `buf`.
-fn drain_at_most_n_bytes(buf: &mut String, max: usize) -> Result<String> {
-	let mut to_drain = std::cmp::min(buf.bytes().len(), max);
-	while to_drain > 0 && buf.is_char_boundary(to_drain).not() {
-		to_drain -= 1;
-	}
-	if to_drain == 0 {
-		return Err(anyhow!("Could not drain any whole char from string").into());
-	}
-	Ok(buf.drain(0..to_drain).collect::<String>())
-}
-
-fn estimate_size(msg: &PluginQuery) -> usize {
-	msg.key.bytes().len()
-		+ msg.output.bytes().len()
-		+ msg.concern.iter().map(|x| x.bytes().len()).sum::<usize>()
-}
-
-fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<PluginQuery>> {
-	// Chunking only does something on response objects, mostly because
-	// we don't have a state to represent "SubmitInProgress"
-	if msg.state == QueryState::Submit as i32 {
-		return Ok(vec![msg]);
-	}
-
-	let mut out: Vec<PluginQuery> = vec![];
-	let mut base: PluginQuery = msg;
-
-	// Track whether we did anything on each iteration to avoid infinite loop
-	let mut made_progress = true;
-	while estimate_size(&base) > max_est_size {
-		log::trace!("Estimated size is too large, chunking");
-		if !made_progress {
-			log::error!("Message could not be chunked");
-			return Err(Error::UnspecifiedQueryState);
-		}
-
-		made_progress = false;
-		// For this loop, we want to take at most MAX_SIZE bytes because that's
-		// all that can fit in a PluginQuery
-		let mut remaining = max_est_size;
-		let mut query = proto::Query {
-			id: base.id,
-			state: QueryState::ReplyInProgress as i32,
-			publisher_name: base.publisher_name.clone(),
-			plugin_name: base.plugin_name.clone(),
-			query_name: base.query_name.clone(),
-			key: String::new(),
-			output: String::new(),
-			concern: vec![],
-		};
-
-		if remaining > 0 && base.key.bytes().len() > 0 {
-			// steal from key
-			query.key = drain_at_most_n_bytes(&mut base.key, remaining)?;
-			remaining -= query.key.bytes().len();
-			made_progress = true;
-		}
-
-		if remaining > 0 && base.output.bytes().len() > 0 {
-			// steal from output
-			query.output = drain_at_most_n_bytes(&mut base.output, remaining)?;
-			remaining -= query.output.bytes().len();
-			made_progress = true;
-		}
-
-		let mut l = base.concern.len();
-		// While we still want to steal more bytes and we have more elements of
-		// `concern` to possibly steal
-		while remaining > 0 && l > 0 {
-			let i = l - 1;
-
-			let c_bytes = base.concern.get(i).unwrap().bytes().len();
-
-			if c_bytes > max_est_size {
-				return Err(anyhow!("Query cannot be chunked, there is a concern that is larger than max chunk size").into());
-			} else if c_bytes <= remaining {
-				// steal this concern
-				let concern = base.concern.swap_remove(i);
-				query.concern.push(concern);
-				remaining -= c_bytes;
-				made_progress = true;
-			}
-			// since we use `swap_remove`, whether or not we stole a concern we know the element
-			// currently at `i` is too big for `remainder` (since if we removed, the element at `i`
-			// now is one we already passed on)
-			l -= 1;
-		}
-
-		out.push(query);
-	}
-	out.push(base);
-	Ok(out)
-}
-
-fn chunk(msg: PluginQuery) -> Result<Vec<PluginQuery>> {
-	chunk_with_size(msg, GRPC_EFFECTIVE_MAX_SIZE)
-}
-
 impl From<Status> for Error {
 	fn from(_value: Status) -> Error {
 		// TODO: higher-fidelity handling?
 		Error::SessionChannelClosed
-	}
-}
-
-#[derive(Debug)]
-struct Query {
-	direction: QueryDirection,
-	publisher: String,
-	plugin: String,
-	query: String,
-	key: Value,
-	output: Value,
-	concerns: Vec<String>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum QueryDirection {
-	Request,
-	Response,
-}
-
-impl TryFrom<QueryState> for QueryDirection {
-	type Error = Error;
-
-	fn try_from(value: QueryState) -> std::result::Result<Self, Self::Error> {
-		match value {
-			QueryState::Unspecified => Err(Error::UnspecifiedQueryState),
-			QueryState::Submit => Ok(QueryDirection::Request),
-			QueryState::ReplyInProgress => Err(Error::UnexpectedReplyInProgress),
-			QueryState::ReplyComplete => Ok(QueryDirection::Response),
-		}
-	}
-}
-
-impl From<QueryDirection> for QueryState {
-	fn from(value: QueryDirection) -> Self {
-		match value {
-			QueryDirection::Request => QueryState::Submit,
-			QueryDirection::Response => QueryState::ReplyComplete,
-		}
-	}
-}
-
-impl TryFrom<PluginQuery> for Query {
-	type Error = Error;
-
-	fn try_from(value: PluginQuery) -> Result<Query> {
-		Ok(Query {
-			direction: QueryDirection::try_from(value.state())?,
-			publisher: value.publisher_name,
-			plugin: value.plugin_name,
-			query: value.query_name,
-			key: serde_json::from_str(value.key.as_str()).map_err(Error::InvalidJsonInQueryKey)?,
-			output: serde_json::from_str(value.output.as_str())
-				.map_err(Error::InvalidJsonInQueryOutput)?,
-			concerns: value.concern,
-		})
 	}
 }
 
@@ -247,6 +88,7 @@ impl PluginEngine {
 			// Normal execution, send messages to hipcheck core to query other plugin
 			else {
 				let query = Query {
+					id: 0,
 					direction: QueryDirection::Request,
 					publisher: target.publisher,
 					plugin: target.plugin,
@@ -268,26 +110,6 @@ impl PluginEngine {
 
 	fn id(&self) -> usize {
 		self.id
-	}
-
-	// Roughly equivalent to TryFrom, but the `id` field value
-	// comes from the QuerySession
-	fn convert(&self, value: Query) -> Result<PluginQuery> {
-		let state: QueryState = value.direction.into();
-		let key = serde_json::to_string(&value.key).map_err(Error::InvalidJsonInQueryKey)?;
-		let output =
-			serde_json::to_string(&value.output).map_err(Error::InvalidJsonInQueryOutput)?;
-
-		Ok(PluginQuery {
-			id: self.id() as i32,
-			state: state as i32,
-			publisher_name: value.publisher,
-			plugin_name: value.plugin,
-			query_name: value.query,
-			key,
-			output,
-			concern: value.concerns,
-		})
 	}
 
 	async fn recv_raw(&mut self) -> Result<Option<VecDeque<PluginQuery>>> {
@@ -324,8 +146,9 @@ impl PluginEngine {
 	}
 
 	// Send a gRPC query from plugin to the hipcheck server
-	async fn send(&self, query: Query) -> Result<()> {
-		let queries = chunk(self.convert(query)?)?;
+	async fn send(&self, mut query: Query) -> Result<()> {
+		query.id = self.id(); // incoming id value is just a placeholder
+		let queries = hipcheck_common::chunk::prepare(query)?;
 		for pq in queries {
 			let query = InitiateQueryProtocolResponse { query: Some(pq) };
 			self.tx
@@ -357,64 +180,15 @@ impl PluginEngine {
 	}
 
 	async fn recv(&mut self) -> Result<Option<Query>> {
-		let Some(mut msg_chunks) = self.recv_raw().await? else {
-			return Ok(None);
-		};
-
-		let mut raw: PluginQuery = msg_chunks.pop_front().unwrap();
-
-		let mut state: QueryState = raw
-			.state
-			.try_into()
-			.map_err(|_| Error::UnspecifiedQueryState)?;
-
-		// If response is the first of a set of chunks, handle
-		if matches!(state, QueryState::ReplyInProgress) {
-			while matches!(state, QueryState::ReplyInProgress) {
-				// We expect another message. Pull it off the existing queue,
-				// or get a new one if we have run out
-				let next = match msg_chunks.pop_front() {
-					Some(msg) => msg,
-					None => {
-						// We ran out of messages, get a new batch
-						match self.recv_raw().await? {
-							Some(x) => {
-								msg_chunks = x;
-							}
-							None => {
-								return Ok(None);
-							}
-						};
-						msg_chunks.pop_front().unwrap()
-					}
-				};
-
-				// By now we have our "next" message
-				state = next
-					.state
-					.try_into()
-					.map_err(|_| Error::UnspecifiedQueryState)?;
-				match state {
-					QueryState::Unspecified => return Err(Error::UnspecifiedQueryState),
-					QueryState::Submit => return Err(Error::ReceivedSubmitWhenExpectingReplyChunk),
-					QueryState::ReplyInProgress | QueryState::ReplyComplete => {
-						if state == QueryState::ReplyComplete {
-							raw.state = QueryState::ReplyComplete.into();
-						}
-						raw.key.push_str(next.key.as_str());
-						raw.output.push_str(next.output.as_str());
-						raw.concern.extend_from_slice(next.concern.as_slice());
-					}
-				};
-			}
-
-			// Sanity check - after we've left this loop, there should be no left over message
-			if msg_chunks.is_empty().not() {
-				return Err(Error::MoreAfterQueryComplete { id: self.id });
-			}
+		let mut synth = QuerySynthesizer::default();
+		let mut res: Option<Query> = None;
+		while res.is_none() {
+			let Some(msg_chunks) = self.recv_raw().await? else {
+				return Ok(None);
+			};
+			res = synth.add(msg_chunks.into_iter())?;
 		}
-
-		raw.try_into().map(Some)
+		Ok(res)
 	}
 
 	async fn handle_session_fallible<P>(&mut self, plugin: Arc<P>) -> crate::error::Result<()>
@@ -445,6 +219,7 @@ impl PluginEngine {
 		let value = query.run(self, key).await?;
 
 		let query = Query {
+			id: self.id(),
 			direction: QueryDirection::Response,
 			publisher: P::PUBLISHER.to_owned(),
 			plugin: P::NAME.to_owned(),
@@ -684,50 +459,4 @@ impl HcSessionSocket {
 enum HandleAction<'s> {
 	ForwardMsgToExistingSession(&'s mut mpsc::Sender<Option<PluginQuery>>),
 	CreateSession,
-}
-
-#[cfg(test)]
-mod test {
-	use super::*;
-
-	#[test]
-	fn test_bounded_char_draining() {
-		let orig_key = "aこれは実験です".to_owned();
-
-		let mut key = orig_key.clone();
-		let res = drain_at_most_n_bytes(&mut key, 10).unwrap();
-		let num_bytes = res.bytes().len();
-
-		assert!(num_bytes > 0 && num_bytes <= 10);
-
-		// Make sure the drained str + retained str combine to re-create original
-		let mut reassembled = res.clone();
-		reassembled.push_str(&key);
-
-		assert_eq!(orig_key, reassembled);
-	}
-
-	#[test]
-	fn test_chunking() {
-		let query = PluginQuery {
-			id: 0,
-			state: QueryState::ReplyComplete as i32,
-			publisher_name: "".to_owned(),
-			plugin_name: "".to_owned(),
-			query_name: "".to_owned(),
-			// This key will cause the chunk not to occur on a char boundary
-			key: "aこれは実験です".to_owned(),
-			output: "".to_owned(),
-			concern: vec!["< 10".to_owned(), "0123456789".to_owned()],
-		};
-		let res = match chunk_with_size(query, 10) {
-			Ok(r) => r,
-			Err(e) => {
-				println!("{e}");
-				assert!(false);
-				return;
-			}
-		};
-		assert_eq!(res.len(), 4);
-	}
 }

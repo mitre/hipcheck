@@ -1320,6 +1320,7 @@ dependencies = [
  "futures",
  "git2",
  "graphql_client",
+ "hipcheck-common",
  "hipcheck-macros",
  "http",
  "indexmap 2.7.0",
@@ -1379,6 +1380,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "hipcheck-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "log",
+ "pathbuf",
+ "prost",
+ "serde_json",
+ "thiserror 2.0.3",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
 name = "hipcheck-macros"
 version = "0.3.1"
 dependencies = [
@@ -1393,6 +1408,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures",
+ "hipcheck-common",
  "hipcheck-sdk-macros",
  "indexmap 2.7.0",
  "jiff",
@@ -1406,7 +1422,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
- "tonic-build",
  "typify-macro",
  "url",
 ]

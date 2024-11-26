@@ -3,20 +3,19 @@
 use crate::{
 	error::{Error, Result},
 	plugin_engine::HcSessionSocket,
-	proto::{
-		plugin_service_server::{PluginService, PluginServiceServer},
-		ConfigurationStatus, ExplainDefaultQueryRequest as ExplainDefaultQueryReq,
-		ExplainDefaultQueryResponse as ExplainDefaultQueryResp,
-		GetDefaultPolicyExpressionRequest as GetDefaultPolicyExpressionReq,
-		GetDefaultPolicyExpressionResponse as GetDefaultPolicyExpressionResp,
-		GetQuerySchemasRequest as GetQuerySchemasReq,
-		GetQuerySchemasResponse as GetQuerySchemasResp,
-		InitiateQueryProtocolRequest as InitiateQueryProtocolReq,
-		InitiateQueryProtocolResponse as InitiateQueryProtocolResp,
-		SetConfigurationRequest as SetConfigurationReq,
-		SetConfigurationResponse as SetConfigurationResp,
-	},
 	Plugin, QuerySchema,
+};
+use hipcheck_common::proto::{
+	plugin_service_server::{PluginService, PluginServiceServer},
+	ConfigurationStatus, ExplainDefaultQueryRequest as ExplainDefaultQueryReq,
+	ExplainDefaultQueryResponse as ExplainDefaultQueryResp,
+	GetDefaultPolicyExpressionRequest as GetDefaultPolicyExpressionReq,
+	GetDefaultPolicyExpressionResponse as GetDefaultPolicyExpressionResp,
+	GetQuerySchemasRequest as GetQuerySchemasReq, GetQuerySchemasResponse as GetQuerySchemasResp,
+	InitiateQueryProtocolRequest as InitiateQueryProtocolReq,
+	InitiateQueryProtocolResponse as InitiateQueryProtocolResp,
+	SetConfigurationRequest as SetConfigurationReq,
+	SetConfigurationResponse as SetConfigurationResp,
 };
 use std::{result::Result as StdResult, sync::Arc};
 use tokio::sync::mpsc;
