@@ -3,7 +3,6 @@
 //! Plugin containing secondary queries that return information about a Git repo to another query
 
 mod data;
-mod parse;
 mod util;
 
 use crate::{
@@ -11,12 +10,14 @@ use crate::{
 		Commit, CommitContributor, CommitContributorView, CommitDiff, Contributor, ContributorView,
 		DetailedGitRepo, Diff, RawCommit,
 	},
-	util::git_command::{get_commits, get_commits_from_date, get_diffs},
+	util::git_command::{get_commits_from_date, get_diffs, get_raw_commits},
 };
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::LocalGitRepo};
+use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use util::git_command::{get_commit_diffs, get_commits};
 
 /// A locally stored git repo, with a list of additional details
 /// The details will vary based on the query (e.g. a date, a committer e-mail address, a commit hash)
@@ -34,7 +35,7 @@ pub struct BatchGitRepo {
 
 /// Returns all raw commits extracted from the repository
 fn local_raw_commits(repo: LocalGitRepo) -> Result<Vec<RawCommit>> {
-	get_commits(&repo.path).map_err(|e| {
+	get_raw_commits(&repo.path).map_err(|e| {
 		log::error!("failed to get raw commits: {}", e);
 		Error::UnspecifiedQueryState
 	})
@@ -45,7 +46,7 @@ fn local_raw_commits(repo: LocalGitRepo) -> Result<Vec<RawCommit>> {
 #[query]
 async fn last_commit_date(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<String> {
 	let path = &repo.path;
-	let commits = get_commits(path).map_err(|e| {
+	let commits = get_raw_commits(path).map_err(|e| {
 		log::error!("failed to get raw commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
@@ -55,10 +56,11 @@ async fn last_commit_date(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Res
 		Error::UnspecifiedQueryState
 	})?;
 
-	first.written_on.clone().map_err(|e| {
-		log::error!("{}", e);
-		Error::UnspecifiedQueryState
-	})
+	Ok(first
+		.written_on
+		.clone()
+		.map(|x| x.to_string())
+		.unwrap_or_else(|e| e))
 }
 
 /// Returns all diffs extracted from the repository
@@ -76,19 +78,10 @@ async fn diffs(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Dif
 #[query]
 async fn commits(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Commit>> {
 	let path = &repo.path;
-	let raw_commits = get_commits(path).map_err(|e| {
+	let commits = get_commits(path).map_err(|e| {
 		log::error!("failed to get raw commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
-	let commits = raw_commits
-		.iter()
-		.map(|raw| Commit {
-			hash: raw.hash.to_owned(),
-			written_on: raw.written_on.to_owned(),
-			committed_on: raw.committed_on.to_owned(),
-		})
-		.collect();
-
 	Ok(commits)
 }
 
@@ -108,34 +101,29 @@ async fn commits_from_date(
 		}
 	};
 	// The called function will return an error if the date is not formatted correctly, so we do not need to check for ahead of time
-	let raw_commits_from_date = get_commits_from_date(path, &date).map_err(|e| {
+	let timestamp: Timestamp = date.parse().map_err(|_| {
+		log::error!("Error parsing provided date '{}' as a timestamp", date);
+		Error::UnspecifiedQueryState
+	})?;
+	let commits_from_data = get_commits_from_date(path, timestamp).map_err(|e| {
 		log::error!("failed to get raw commits from date: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
-	let commits = raw_commits_from_date
-		.iter()
-		.map(|raw| Commit {
-			hash: raw.hash.to_owned(),
-			written_on: raw.written_on.to_owned(),
-			committed_on: raw.committed_on.to_owned(),
-		})
-		.collect();
-
-	Ok(commits)
+	Ok(commits_from_data)
 }
 
 /// Returns all contributors to the repository
 #[query]
 async fn contributors(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Contributor>> {
 	let path = &repo.path;
-	let raw_commits = get_commits(path).map_err(|e| {
+	let raw_commits = get_raw_commits(path).map_err(|e| {
 		log::error!("failed to get raw commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 
-	let mut contributors: Vec<_> = raw_commits
-		.iter()
-		.flat_map(|raw| [raw.author.to_owned(), raw.committer.to_owned()])
+	let mut contributors: Vec<Contributor> = raw_commits
+		.into_iter()
+		.flat_map(|raw| [raw.author, raw.committer])
 		.collect();
 
 	contributors.sort();
@@ -146,33 +134,12 @@ async fn contributors(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<
 
 /// Returns all commit-diff pairs
 #[query]
-async fn commit_diffs(engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<CommitDiff>> {
-	let commits = commits(engine, repo.clone()).await.map_err(|e| {
-		log::error!("failed to get commits: {}", e);
+async fn commit_diffs(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<CommitDiff>> {
+	let diffs = get_commit_diffs(&repo.path).map_err(|e| {
+		eprintln!("failed to get commit_diffs: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
-	let diffs = diffs(engine, repo).await.map_err(|e| {
-		log::error!("failed to get diffs: {}", e);
-		Error::UnspecifiedQueryState
-	})?;
-
-	if commits.len() != diffs.len() {
-		log::error!(
-			"parsed {} diffs but there are {} commits",
-			diffs.len(),
-			commits.len()
-		);
-		return Err(Error::UnspecifiedQueryState);
-	}
-
-	let commit_diffs = Iterator::zip(commits.iter(), diffs.iter())
-		.map(|(commit, diff)| CommitDiff {
-			commit: commit.clone(),
-			diff: diff.clone(),
-		})
-		.collect();
-
-	Ok(commit_diffs)
+	Ok(diffs)
 }
 
 /// Returns the commits associated with a given contributor (identified by e-mail address in the `details` value)
@@ -258,11 +225,7 @@ async fn batch_commits_for_contributor(
 	})?;
 	let commits: Vec<Commit> = raw_commits
 		.iter()
-		.map(|raw| Commit {
-			hash: raw.hash.to_owned(),
-			written_on: raw.written_on.to_owned(),
-			committed_on: raw.committed_on.to_owned(),
-		})
+		.map(|raw_commit| Commit::from(raw_commit.clone()))
 		.collect();
 	// @Assert - raw_commit and commits idxes correspond
 
@@ -401,11 +364,7 @@ async fn batch_contributors_for_commit(
 		.into_iter()
 		.enumerate()
 		.map(|(i, raw)| {
-			let commit = Commit {
-				hash: raw.hash.to_owned(),
-				written_on: raw.written_on.to_owned(),
-				committed_on: raw.committed_on.to_owned(),
-			};
+			let commit = Commit::from(raw.clone());
 			let author = raw.author;
 			let committer = raw.committer;
 			hash_to_idx.insert(raw.hash.clone(), i);
@@ -438,9 +397,10 @@ async fn commit_contributors(
 	let path = &repo.path;
 	let contributors = contributors(engine, repo.clone()).await.map_err(|e| {
 		log::error!("failed to get contributors: {}", e);
+
 		Error::UnspecifiedQueryState
 	})?;
-	let raw_commits = get_commits(path).map_err(|e| {
+	let raw_commits = get_raw_commits(path).map_err(|e| {
 		log::error!("failed to get raw commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
@@ -501,37 +461,4 @@ struct Args {
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
 	PluginServer::register(GitPlugin {}).listen(args.port).await
-}
-
-#[cfg(test)]
-mod test {
-	#[test]
-	fn test_no_newline_before_end_of_chunk() {
-		let input = "diff --git a/plugins/review/plugin.kdl b/plugins/review/plugin.kdl\nindex 83f0355..9fa8e47 100644\n--- a/plugins/review/plugin.kdl\n+++ b/plugins/review/plugin.kdl\n@@ -6,4 +6,4 @@ entrypoint {\n-  on arch=\"aarch64-apple-darwin\" \"./hc-mitre-review\"\n-  on arch=\"x86_64-apple-darwin\" \"./hc-mitre-review\"\n-  on arch=\"x86_64-unknown-linux-gnu\" \"./hc-mitre-review\"\n-  on arch=\"x86_64-pc-windows-msvc\" \"./hc-mitre-review\"\n+  on arch=\"aarch64-apple-darwin\" \"./target/debug/review_sdk\"\n+  on arch=\"x86_64-apple-darwin\" \"./target/debug/review_sdk\"\n+  on arch=\"x86_64-unknown-linux-gnu\" \"./target/debug/review_sdk\"\n+  on arch=\"x86_64-pc-windows-msvc\" \"./target/debug/review_sdk\"\n@@ -14 +14 @@ dependencies {\n-}\n\\ No newline at end of file\n+}\n";
-
-		let (leftover, _parsed) = crate::parse::patch(input).unwrap();
-		assert!(leftover.is_empty());
-	}
-
-	#[test]
-	fn test_hyphens_in_diff_stats() {
-		let input = "0\t4\tsite/content/_index.md\n136\t2\tsite/content/install/_index.md\n-\t-\tsite/static/images/homepage-bg.png\n2\t2\tsite/tailwind.config.js\n2\t0\tsite/templates/bases/base.tera.html\n82\t1\tsite/templates/index.html\n3\t3\tsite/templates/shortcodes/info.html\n15\t14\txtask/src/task/site/serve.rs\n";
-		let (leftover, _) = crate::parse::stats(input).unwrap();
-		assert!(leftover.is_empty());
-	}
-
-	#[test]
-	fn test_patch_with_only_meta() {
-		let input = "diff --git a/hipcheck/src/analysis/session/spdx.rs b/hipcheck/src/session/spdx.rs\nsimilarity index 100%\nrename from hipcheck/src/analysis/session/spdx.rs\nrename to hipcheck/src/session/spdx.rs\n";
-		let (leftover, _) = crate::parse::patch(input).unwrap();
-		assert!(leftover.is_empty());
-	}
-
-	#[test]
-	fn test_patch_without_triple_plus_minus() {
-		let input = "~~~\n\n0\t0\tmy_test_.py\n\ndiff --git a/my_test_.py b/my_test_.py\ndeleted file mode 100644\nindex e69de29bb2..0000000000\n~~~\n\n33\t3\tnumpy/_core/src/umath/string_fastsearch.h\n\ndiff --git a/numpy/_core/src/umath/string_fastsearch.h b/numpy/_core/src/umath/string_fastsearch.h\nindex 2a778bb86f..1f2d47e8f1 100644\n--- a/numpy/_core/src/umath/string_fastsearch.h\n+++ b/numpy/_core/src/umath/string_fastsearch.h\n@@ -35,0 +36 @@\n+ * @internal\n";
-		let (leftover, diffs) = crate::parse::diffs(input).unwrap();
-		assert!(leftover.is_empty());
-		assert!(diffs.len() == 2);
-	}
 }
