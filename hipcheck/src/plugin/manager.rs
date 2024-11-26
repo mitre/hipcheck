@@ -2,11 +2,11 @@
 
 use crate::{
 	hc_error,
-	hipcheck::plugin_service_client::PluginServiceClient,
 	plugin::{try_get_bin_for_entrypoint, HcPluginClient, Plugin, PluginContext},
 	Result,
 };
 use futures::future::join_all;
+use hipcheck_common::proto::plugin_service_client::PluginServiceClient;
 use rand::Rng;
 use std::{ops::Range, process::Command};
 use tokio::time::{sleep_until, Duration, Instant};

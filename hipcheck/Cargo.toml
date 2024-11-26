@@ -140,6 +140,7 @@ xz2 = "0.1.7"
 zip = "2.2.1"
 zip-extensions = "0.8.1"
 zstd = "0.13.2"
+hipcheck-common = { version = "0.1.0", path = "../hipcheck-common" }
 
 [build-dependencies]
 

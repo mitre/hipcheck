@@ -21,10 +21,6 @@ mod target;
 mod util;
 mod version;
 
-pub mod hipcheck {
-	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
-}
-
 use crate::{
 	cache::repo::HcRepoCache,
 	cli::Format,

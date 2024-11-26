@@ -12,6 +12,7 @@ use crate::error::Result;
 pub use crate::plugin::{get_plugin_key, manager::*, plugin_id::PluginId, types::*};
 pub use arch::{get_current_arch, try_set_arch, Arch};
 pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
+use hipcheck_common::types::{Query, QueryDirection};
 pub use plugin_manifest::{
 	try_get_bin_for_entrypoint, PluginManifest, PluginName, PluginPublisher, PluginVersion,
 };
@@ -80,7 +81,7 @@ impl ActivePlugin {
 		// @Todo - check name+key valid for schema
 		let query = Query {
 			id,
-			request: true,
+			direction: QueryDirection::Request,
 			publisher: publisher.to_owned(),
 			plugin: plugin.to_owned(),
 			query: name,
@@ -99,7 +100,7 @@ impl ActivePlugin {
 	) -> Result<PluginResponse> {
 		let query = Query {
 			id: state.id,
-			request: false,
+			direction: QueryDirection::Response,
 			publisher: state.publisher,
 			plugin: state.plugin,
 			query: state.query,

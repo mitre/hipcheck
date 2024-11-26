@@ -12,10 +12,6 @@ use std::str::FromStr;
 #[cfg(feature = "macros")]
 extern crate hipcheck_sdk_macros;
 
-mod proto {
-	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
-}
-
 pub mod error;
 mod mock;
 pub mod plugin_engine;
