@@ -5,11 +5,11 @@ pub mod query;
 
 pub use crate::source::query::*;
 use crate::{
-	data::git_command::GitCommand,
 	error::{Context, Error, Result},
 	hc_error,
 	shell::spinner_phase::SpinnerPhase,
 	target::{KnownRemote, LocalGitRepo, RemoteGitRepo, Target},
+	util::git::GitCommand,
 };
 use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};

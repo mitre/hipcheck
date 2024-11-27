@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	analysis::AnalysisProvider,
 	config::{visit_leaves, Analysis, AnalysisTree, WeightTreeProvider},
 	engine::HcEngine,
 	error::Result,
@@ -9,6 +8,7 @@ use crate::{
 	plugin::QueryResult,
 	policy_exprs::Executor,
 	shell::spinner_phase::SpinnerPhase,
+	source::SourceQuery,
 };
 use indextree::{Arena, NodeId};
 #[cfg(test)]
@@ -63,7 +63,7 @@ pub struct Score {
 }
 
 #[salsa::query_group(ScoringProviderStorage)]
-pub trait ScoringProvider: HcEngine + AnalysisProvider + WeightTreeProvider {}
+pub trait ScoringProvider: HcEngine + WeightTreeProvider + SourceQuery {}
 
 #[cfg(test)]
 fn normalize_st_internal(node: NodeId, tree: &mut Arena<ScoreTreeNode>) -> f64 {

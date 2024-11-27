@@ -2,13 +2,13 @@
 
 pub use crate::report::*;
 use crate::{
-	analysis::score::*,
 	config::{ConfigSource, RiskConfigQuery},
 	engine::HcEngine,
 	error::{Error, Result},
 	hc_error,
 	plugin::{PluginName, PluginPublisher},
 	policy::policy_file::PolicyPluginName,
+	score::*,
 	session::Session,
 	source::SourceQuery,
 	version::VersionQuery,

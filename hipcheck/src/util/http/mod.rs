@@ -3,4 +3,3 @@
 //! Methods and types for making HTTP requests
 
 pub mod agent;
-pub mod authenticated_agent;
