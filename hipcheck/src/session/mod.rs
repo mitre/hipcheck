@@ -5,7 +5,6 @@ pub mod pm;
 pub mod spdx;
 
 use crate::{
-	analysis::{score::ScoringProviderStorage, AnalysisProviderStorage},
 	cache::plugin::HcPluginCache,
 	cli::Format,
 	config::{
@@ -13,20 +12,12 @@ use crate::{
 		ConfigSourceStorage, LanguagesConfigQueryStorage, PracticesConfigQueryStorage,
 		RiskConfigQueryStorage, WeightTreeQueryStorage,
 	},
-	data::{
-		git::{get_git_version, GitProviderStorage},
-		npm::get_npm_version,
-		CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
-		GitHubProviderStorage, PullRequestReviewProviderStorage,
-	},
 	engine::{start_plugins, HcEngine, HcEngineStorage},
 	error::{Context as _, Error, Result},
 	hc_error,
-	metric::{
-		binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,
-	},
 	policy::{config_to_policy, PolicyFile},
 	report::{ReportParams, ReportParamsStorage},
+	score::ScoringProviderStorage,
 	session::{
 		cyclone_dx::extract_cyclonedx_download_url,
 		pm::{detect_and_extract, extract_repo_for_maven},
@@ -37,6 +28,7 @@ use crate::{
 	source::{SourceQuery, SourceQueryStorage},
 	target::{SbomStandard, Target, TargetSeed, TargetSeedKind},
 	util::command::DependentProgram,
+	util::{git::get_git_version, npm::get_npm_version},
 	version::{VersionQuery, VersionQueryStorage},
 };
 use chrono::prelude::*;
@@ -53,22 +45,12 @@ use url::Url;
 
 /// Immutable configuration and base data for a run of Hipcheck.
 #[salsa::database(
-	AnalysisProviderStorage,
 	AttacksConfigQueryStorage,
-	BinaryFileStorage,
-	CodeQualityProviderStorage,
 	CommitConfigQueryStorage,
 	ConfigSourceStorage,
-	DependenciesProviderStorage,
-	GitProviderStorage,
-	GitHubProviderStorage,
 	HcEngineStorage,
 	LanguagesConfigQueryStorage,
-	LinguistStorage,
-	MetricProviderStorage,
-	FuzzProviderStorage,
 	PracticesConfigQueryStorage,
-	PullRequestReviewProviderStorage,
 	ReportParamsStorage,
 	RiskConfigQueryStorage,
 	ScoringProviderStorage,

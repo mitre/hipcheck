@@ -3,7 +3,6 @@
 //! Defines the configuration file format.
 
 use crate::{
-	analysis::score::*,
 	engine::HcEngine,
 	error::{Context, Result},
 	hc_error,
@@ -11,6 +10,7 @@ use crate::{
 		policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild},
 		PolicyFile,
 	},
+	score::*,
 	util::fs as file,
 	BINARY_CONFIG_FILE, F64, LANGS_FILE, ORGS_FILE, TYPO_FILE,
 };

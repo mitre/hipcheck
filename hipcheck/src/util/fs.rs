@@ -38,14 +38,6 @@ pub fn read_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P) -> Result<T> {
 		.with_context(|| format!("failed to read as TOML '{}'", path.display()))
 }
 
-/// Read file to a struct that can be deserialize from JSON format.
-pub fn read_json<P: AsRef<Path>, T: DeserializeOwned>(path: P) -> Result<T> {
-	let path = path.as_ref();
-	let contents = read_bytes(path)?;
-	serde_json::from_slice(&contents)
-		.with_context(|| format!("failed to read as JSON '{}'", path.display()))
-}
-
 /// Create a directory and missing parents.
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
 	fn inner(path: &Path) -> Result<()> {

@@ -9,6 +9,14 @@ use std::{
 	convert::AsRef, ffi::OsStr, iter::IntoIterator, ops::Not as _, path::Path, process::Command,
 };
 
+pub fn get_git_version() -> Result<String> {
+	let raw_output = GitCommand::new_repo(["--version"])?
+		.output()
+		.context("git version command failed")?;
+	log::debug!("get_git_version [raw_output='{}']", raw_output);
+	Ok(raw_output)
+}
+
 #[derive(Debug)]
 pub struct GitCommand {
 	command: Command,

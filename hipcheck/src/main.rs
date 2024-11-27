@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-mod analysis;
 #[cfg(feature = "benchmarking")]
 mod benchmarking;
 mod cache;
 mod cli;
 mod config;
-mod data;
 mod engine;
 mod error;
 mod init;
-mod metric;
 mod plugin;
 mod policy;
 mod policy_exprs;
 mod report;
+mod score;
 mod session;
 mod setup;
 mod shell;
@@ -28,7 +26,6 @@ pub mod hipcheck {
 }
 
 use crate::{
-	analysis::score::score_results,
 	cache::repo::HcRepoCache,
 	cli::Format,
 	config::{normalized_unresolved_analysis_tree_from_policy, Config},
@@ -36,6 +33,7 @@ use crate::{
 	plugin::{try_set_arch, Plugin, PluginExecutor, PluginWithConfig},
 	policy::{config_to_policy, PolicyFile},
 	report::report_builder::{build_report, Report},
+	score::score_results,
 	session::Session,
 	setup::{resolve_and_transform_source, SourceType},
 	shell::Shell,
@@ -456,7 +454,7 @@ fn check_hipcheck_version() -> StdResult<String, VersionCheckError> {
 }
 
 fn check_git_version() -> StdResult<String, VersionCheckError> {
-	let version = data::git::get_git_version().map_err(|_| VersionCheckError {
+	let version = util::git::get_git_version().map_err(|_| VersionCheckError {
 		cmd_name: "git",
 		kind: VersionCheckErrorKind::CmdNotFound,
 	})?;
@@ -474,7 +472,7 @@ fn check_git_version() -> StdResult<String, VersionCheckError> {
 }
 
 fn check_npm_version() -> StdResult<String, VersionCheckError> {
-	let version = data::npm::get_npm_version()
+	let version = util::npm::get_npm_version()
 		.map(|version| version.trim().to_owned())
 		.map_err(|_| VersionCheckError {
 			cmd_name: "npm",
