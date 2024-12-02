@@ -216,7 +216,13 @@ impl PluginEngine {
 			.or_else(|| plugin.default_query())
 			.ok_or_else(|| Error::UnknownPluginQuery)?;
 
+		#[cfg(feature = "print-timings")]
+		let _0 = crate::benchmarking::print_scope_time!(format!("{}/{}", P::NAME, name));
+
 		let value = query.run(self, key).await?;
+
+		#[cfg(feature = "print-timings")]
+		drop(_0);
 
 		let query = Query {
 			id: self.id(),
