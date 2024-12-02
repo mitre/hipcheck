@@ -12,6 +12,9 @@ use std::str::FromStr;
 #[cfg(feature = "macros")]
 extern crate hipcheck_sdk_macros;
 
+#[cfg(feature = "print-timings")]
+mod benchmarking;
+
 pub mod error;
 mod mock;
 pub mod plugin_engine;

@@ -31,7 +31,9 @@ members = [
     "plugins/identity",
     "plugins/linguist",
     "plugins/review",
-    "plugins/typo", "hipcheck-common"]
+    "plugins/typo",
+    "hipcheck-common"
+]
 
 # Make sure Hipcheck is run with `cargo run`.
 #

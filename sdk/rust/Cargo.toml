@@ -23,7 +23,9 @@ typify-macro = "0.2.0"
 url = { version = "2.5.4", features = ["serde"] }
 log = "0.4.22"
 hipcheck-common = { version = "0.1.0", path = "../../hipcheck-common" }
+console = "0.15.8"
 
 [features]
 macros = ["dep:hipcheck-sdk-macros"]
 mock_engine = []
+print-timings = []
