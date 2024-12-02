@@ -110,7 +110,7 @@ impl<'de> Deserialize<'de> for BinaryType {
 
 struct BinaryTypeVisitor;
 
-impl<'de> Visitor<'de> for BinaryTypeVisitor {
+impl Visitor<'_> for BinaryTypeVisitor {
 	type Value = BinaryType;
 	fn expecting(&self, f: &mut Formatter) -> fmt::Result {
 		write!(f, "'executable', 'object', or 'combination'")

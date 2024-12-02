@@ -21,7 +21,7 @@ impl<'ctx> LookupJsonPointers<'ctx> {
 	}
 }
 
-impl<'ctx> ExprMutator for LookupJsonPointers<'ctx> {
+impl ExprMutator for LookupJsonPointers<'_> {
 	fn visit_json_pointer(&self, mut jp: JsonPointer) -> Result<Expr> {
 		let pointer = &jp.pointer;
 		let context = self.context;

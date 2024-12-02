@@ -114,7 +114,7 @@ impl<'de> Deserialize<'de> for LanguageType {
 
 struct LanguageTypeVisitor;
 
-impl<'de> Visitor<'de> for LanguageTypeVisitor {
+impl Visitor<'_> for LanguageTypeVisitor {
 	type Value = LanguageType;
 
 	fn expecting(&self, f: &mut Formatter) -> fmt::Result {

@@ -205,7 +205,7 @@ pub struct Chain<'e> {
 	current: Option<&'e ErrorNode>,
 }
 
-impl<'e> Chain<'e> {
+impl Chain<'_> {
 	fn new(error: &Error) -> Chain<'_> {
 		Chain {
 			current: Some(error.head.as_ref()),

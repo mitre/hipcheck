@@ -410,7 +410,7 @@ mod de {
 	{
 		struct PercentVisitor;
 
-		impl<'de> Visitor<'de> for PercentVisitor {
+		impl Visitor<'_> for PercentVisitor {
 			type Value = f64;
 
 			fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
@@ -859,12 +859,12 @@ pub fn normalized_unresolved_analysis_tree(db: &dyn ConfigSource) -> Result<Rc<A
 	Ok(Rc::new(norm_tree))
 }
 
-/// Derived query implementations
+// Derived query implementations
 
-/// In general, these simply return the value of a particular field in
-/// one of the `Config` child structs.  When the type of the desired
-/// field is `String`, it is returned wrapped in an `Rc`.  This is
-/// done to keep Salsa's cloning cheap.
+// In general, these simply return the value of a particular field in
+// one of the `Config` child structs.  When the type of the desired
+// field is `String`, it is returned wrapped in an `Rc`.  This is
+// done to keep Salsa's cloning cheap.
 
 fn risk_policy(db: &dyn RiskConfigQuery) -> Rc<String> {
 	let policy = db.policy();
