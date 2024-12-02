@@ -33,7 +33,7 @@ benchmarking = []
 
 async-stream = "0.3.6"
 base64 = "0.22.1"
-blake3 = "1.5.4"
+blake3 = "1.5.5"
 content_inspector = "0.2.4"
 cyclonedx-bom = "0.8.0"
 dotenv = "0.15.0"
