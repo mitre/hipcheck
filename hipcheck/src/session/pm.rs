@@ -256,7 +256,7 @@ impl<'s> PartialEq for ScoredCandidateUrl<'s> {
 	}
 }
 
-impl<'s> Eq for ScoredCandidateUrl<'s> {}
+impl Eq for ScoredCandidateUrl<'_> {}
 
 impl<'s> PartialOrd for ScoredCandidateUrl<'s> {
 	fn partial_cmp(&self, other: &ScoredCandidateUrl<'s>) -> Option<Ordering> {

@@ -358,7 +358,7 @@ fn ty_bool_binary(args: &[Type]) -> Result<ReturnableType> {
 	Ok(PrimitiveType::Bool.into())
 }
 
-impl<'parent> Env<'parent> {
+impl Env<'_> {
 	/// Create an empty environment.
 	fn empty() -> Self {
 		Env {

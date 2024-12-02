@@ -15,23 +15,23 @@ use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};
 use url::{Host, Url};
 
-/// Resolving is how we ensure we have a valid, ready-to-go source of Git data
-/// for the rest of Hipcheck's analysis. The below functions handle the resolution
-/// of local or remote repos.
-///
-/// If the repo is local, the resolve function will work with the local repository
-/// without cloning (all operationsare write-only, so this won't harm the repo at
-/// all).
-///
-/// If it's a remote source, Hipcheck will clone the source so it can work with a
-/// local copy, putting the clone in '<root>/clones'. It also notes whether a
-/// remote repo is from a known or unknown host, because some forms of analysis
-/// rely on accessing the API's of certain known hosts (currently just GitHub).
-///
-/// In either case, it also gets the commit head of the HEAD commit, so we can
-/// make sure future operations are all done relative to the HEAD, and that any
-/// cached data records what the HEAD was at the time of caching, to enable
-/// cache invalidation.
+// Resolving is how we ensure we have a valid, ready-to-go source of Git data
+// for the rest of Hipcheck's analysis. The below functions handle the resolution
+// of local or remote repos.
+//
+// If the repo is local, the resolve function will work with the local repository
+// without cloning (all operationsare write-only, so this won't harm the repo at
+// all).
+//
+// If it's a remote source, Hipcheck will clone the source so it can work with a
+// local copy, putting the clone in '<root>/clones'. It also notes whether a
+// remote repo is from a known or unknown host, because some forms of analysis
+// rely on accessing the API's of certain known hosts (currently just GitHub).
+//
+// In either case, it also gets the commit head of the HEAD commit, so we can
+// make sure future operations are all done relative to the HEAD, and that any
+// cached data records what the HEAD was at the time of caching, to enable
+// cache invalidation.
 
 /// Resolves a specified local git repo into a Target for analysis by Hipcheck
 pub fn resolve_local_repo(
