@@ -29,13 +29,13 @@ analyze {
 
     category "attacks" {
         analysis "mitre/typo" {
-            typo-file-path "./config/Typos.toml"
+            typo-file "./config/Typos.toml"
             count-threshold 0
         }
 
         category "commit" {
             analysis "mitre/affiliation" {
-                orgs-file-path "./plugins/affiliation/test/example_orgs.kdl"
+                orgs-file "./plugins/affiliation/test/example_orgs.kdl"
                 count-threshold 0
             }
 
