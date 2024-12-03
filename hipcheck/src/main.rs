@@ -39,7 +39,7 @@ use crate::{
 	shell::Shell,
 };
 use cli::{
-	CacheArgs, CacheOp, CheckArgs, CliConfig, FullCommands, PluginArgs, SchemaArgs, SchemaCommand,
+	Args, CacheArgs, CacheOp, CheckArgs, FullCommands, PluginArgs, SchemaArgs, SchemaCommand,
 	SetupArgs, UpdateArgs,
 };
 use config::AnalysisTreeNode;
@@ -76,7 +76,7 @@ fn main() -> ExitCode {
 	#[cfg(feature = "print-timings")]
 	let _0 = benchmarking::print_scope_time!("main");
 
-	let config = CliConfig::load();
+	let config = Args::load();
 
 	// Set the global verbosity.
 	Shell::set_verbosity(config.verbosity());
@@ -115,7 +115,7 @@ fn main() -> ExitCode {
 }
 
 /// Run the `check` command.
-fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
+fn cmd_check(args: &CheckArgs, config: &Args) -> ExitCode {
 	// Before we do any analysis, set the user-provided arch
 	if let Some(arch) = &args.arch {
 		if let Err(e) = try_set_arch(arch) {
@@ -163,7 +163,7 @@ fn cmd_schema(args: &SchemaArgs) {
 	}
 }
 
-fn cmd_print_weights(config: &CliConfig) -> Result<()> {
+fn cmd_print_weights(config: &Args) -> Result<()> {
 	let policy = if let Some(p) = config.policy() {
 		PolicyFile::load_from(p)
 		.context("Failed to load policy. Plase make sure the policy file is in the provided location and is formatted correctly.")?
@@ -280,7 +280,7 @@ fn copy_dir_contents<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<(
 	inner(from.as_ref(), to.as_ref())
 }
 
-fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
+fn cmd_setup(args: &SetupArgs, config: &Args) -> ExitCode {
 	// Find or download a Hipcheck bundle source and decompress
 	let source = match resolve_and_transform_source(args) {
 		Err(e) => {
@@ -491,7 +491,7 @@ fn check_npm_version() -> StdResult<String, VersionCheckError> {
 		})
 }
 
-fn check_cache_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
+fn check_cache_path(config: &Args) -> StdResult<PathBuf, PathCheckError> {
 	let path = config.cache().ok_or(PathCheckError::PathNotFound)?;
 
 	// Try to create the cache directory if it doesn't exist.
@@ -502,7 +502,7 @@ fn check_cache_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	Ok(path.to_owned())
 }
 
-fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
+fn check_policy_path(config: &Args) -> StdResult<PathBuf, PathCheckError> {
 	let path = config.policy().ok_or(PathCheckError::PolicyNotFound)?;
 
 	if path.exists().not() {
@@ -623,7 +623,7 @@ fn cmd_plugin(args: PluginArgs) {
 	}
 }
 
-fn cmd_ready(config: &CliConfig) {
+fn cmd_ready(config: &Args) {
 	let ready = ReadyChecks {
 		hipcheck_version_check: check_hipcheck_version(),
 		git_version_check: check_git_version(),
@@ -714,7 +714,7 @@ fn updater_command(command_name: &str, args: &UpdateArgs) -> Command {
 	command
 }
 
-fn cmd_cache(args: CacheArgs, config: &CliConfig) -> ExitCode {
+fn cmd_cache(args: CacheArgs, config: &Args) -> ExitCode {
 	let Some(path) = config.cache() else {
 		println!("cache path must be defined by cmdline arg or $HC_CACHE env var");
 		return ExitCode::FAILURE;

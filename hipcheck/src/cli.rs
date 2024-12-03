@@ -28,7 +28,7 @@ use url::Url;
 /// Automatated supply chain risk assessment of software packages.
 #[derive(Debug, Default, clap::Parser, hc::Update)]
 #[command(name = "Hipcheck", about, version, long_about=None, arg_required_else_help = true)]
-pub struct CliConfig {
+pub struct Args {
 	#[command(subcommand)]
 	command: Option<Commands>,
 
@@ -134,7 +134,7 @@ struct DeprecatedArgs {
 	home: Option<PathBuf>,
 }
 
-impl CliConfig {
+impl Args {
 	/// Load CLI configuration.
 	///
 	/// This loads values in increasing order of precedence:
@@ -143,12 +143,12 @@ impl CliConfig {
 	/// - Environment variables, if set
 	/// - CLI flags, if set.
 	/// - Final defaults, if still unset.
-	pub fn load() -> CliConfig {
-		let mut config = CliConfig::empty();
-		config.update(&CliConfig::backups());
-		config.update(&CliConfig::from_platform());
-		config.update(&CliConfig::from_env());
-		config.update(&CliConfig::from_cli());
+	pub fn load() -> Args {
+		let mut config = Args::empty();
+		config.update(&Args::backups());
+		config.update(&Args::from_platform());
+		config.update(&Args::from_env());
+		config.update(&Args::from_cli());
 		config
 	}
 
@@ -234,22 +234,22 @@ impl CliConfig {
 	/// Get an empty configuration object with nothing set.
 	///
 	/// This is just an alias for `default()`.
-	fn empty() -> CliConfig {
-		CliConfig::default()
+	fn empty() -> Args {
+		Args::default()
 	}
 
 	/// Load configuration from CLI flags and positional arguments.
 	///
 	/// This is just an alias for `parse()`.
-	fn from_cli() -> CliConfig {
-		CliConfig::parse()
+	fn from_cli() -> Args {
+		Args::parse()
 	}
 
 	/// Load config from environment variables.
 	///
 	/// Note that this only loads _some_ config items from the environment.
-	fn from_env() -> CliConfig {
-		CliConfig {
+	fn from_env() -> Args {
+		Args {
 			output_args: OutputArgs {
 				verbosity: hc_env_var_value_enum("verbosity"),
 				color: hc_env_var_value_enum("color"),
@@ -273,8 +273,8 @@ impl CliConfig {
 	///
 	/// Note that this only loads _some_ config items based on platform-specific
 	/// information.
-	fn from_platform() -> CliConfig {
-		CliConfig {
+	fn from_platform() -> Args {
+		Args {
 			path_args: PathArgs {
 				cache: platform_cache(),
 				// There is no central per-user or per-system location for the policy file, so pass a None to never update this field
@@ -289,8 +289,8 @@ impl CliConfig {
 	}
 
 	/// Set configuration backups for paths.
-	fn backups() -> CliConfig {
-		CliConfig {
+	fn backups() -> Args {
+		Args {
 			path_args: PathArgs {
 				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
 				policy: std::env::current_dir()
@@ -954,7 +954,7 @@ impl Format {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::{cli::CliConfig, util::test::with_env_vars};
+	use crate::{cli::Args, util::test::with_env_vars};
 	use clap::CommandFactory;
 	use tempfile::TempDir;
 
@@ -962,7 +962,7 @@ mod tests {
 
 	#[test]
 	fn verify_cli() {
-		CliConfig::command().debug_assert()
+		Args::command().debug_assert()
 	}
 
 	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
@@ -978,9 +978,9 @@ mod tests {
 
 		with_env_vars(vars, || {
 			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
+				let mut temp = Args::empty();
+				temp.update(&Args::from_platform());
+				temp.update(&Args::from_env());
 				temp
 			};
 
@@ -1000,9 +1000,9 @@ mod tests {
 
 		with_env_vars(vars, || {
 			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
+				let mut temp = Args::empty();
+				temp.update(&Args::from_platform());
+				temp.update(&Args::from_env());
 				temp
 			};
 
@@ -1024,10 +1024,10 @@ mod tests {
 			let expected = pathbuf![tempdir.path(), "hipcheck"];
 
 			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
-				temp.update(&CliConfig {
+				let mut temp = Args::empty();
+				temp.update(&Args::from_platform());
+				temp.update(&Args::from_env());
+				temp.update(&Args {
 					path_args: PathArgs {
 						cache: Some(expected.clone()),
 						..Default::default()
@@ -1054,9 +1054,9 @@ mod tests {
 
 		with_env_vars(vars, || {
 			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
+				let mut temp = Args::empty();
+				temp.update(&Args::from_platform());
+				temp.update(&Args::from_env());
 				temp
 			};
 
@@ -1076,9 +1076,9 @@ mod tests {
 
 		with_env_vars(vars, || {
 			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
+				let mut temp = Args::empty();
+				temp.update(&Args::from_platform());
+				temp.update(&Args::from_env());
 				temp
 			};
 
@@ -1100,10 +1100,10 @@ mod tests {
 			let expected = pathbuf![tempdir.path(), "hipcheck"];
 
 			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
-				temp.update(&CliConfig {
+				let mut temp = Args::empty();
+				temp.update(&Args::from_platform());
+				temp.update(&Args::from_env());
+				temp.update(&Args {
 					deprecated_args: DeprecatedArgs {
 						config: Some(expected.clone()),
 						..Default::default()
@@ -1124,10 +1124,10 @@ mod tests {
 		let expected = pathbuf![tempdir.path(), "HipcheckPolicy.kdl"];
 
 		let config = {
-			let mut temp = CliConfig::empty();
-			temp.update(&CliConfig::from_platform());
-			temp.update(&CliConfig::from_env());
-			temp.update(&CliConfig {
+			let mut temp = Args::empty();
+			temp.update(&Args::from_platform());
+			temp.update(&Args::from_env());
+			temp.update(&Args {
 				path_args: PathArgs {
 					policy: Some(expected.clone()),
 					..Default::default()
@@ -1145,14 +1145,14 @@ mod tests {
 		let check_args = vec!["hc", "check"];
 		let schema_args = vec!["hc", "schema"];
 
-		let parsed = CliConfig::try_parse_from(check_args);
+		let parsed = Args::try_parse_from(check_args);
 		assert!(parsed.is_err());
 		assert_eq!(
 			parsed.unwrap_err().kind(),
 			clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
 		);
 
-		let parsed = CliConfig::try_parse_from(schema_args);
+		let parsed = Args::try_parse_from(schema_args);
 		assert!(parsed.is_err());
 		assert_eq!(
 			parsed.unwrap_err().kind(),
@@ -1161,7 +1161,7 @@ mod tests {
 	}
 
 	fn get_check_cmd_from_cli(args: Vec<&str>) -> Result<CheckCommand> {
-		let parsed = CliConfig::try_parse_from(args);
+		let parsed = Args::try_parse_from(args);
 		assert!(parsed.is_ok());
 		let command = parsed.unwrap().command;
 		let Some(Commands::Check(chck_args)) = command else {
