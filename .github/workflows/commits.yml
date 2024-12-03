@@ -15,3 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: webiny/action-conventional-commits@v1.3.0
+
+  developer-certificate-of-origin:
+    name: Developer Certificate of Origin
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Enforce Sign-Off
+        uses: KineticCafe/actions-dco@v1.3.2
