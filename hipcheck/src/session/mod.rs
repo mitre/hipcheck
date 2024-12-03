@@ -32,7 +32,6 @@ use crate::{
 	version::{VersionQuery, VersionQueryStorage},
 };
 use chrono::prelude::*;
-use dotenv::var;
 use std::{
 	fmt,
 	path::{Path, PathBuf},
@@ -129,7 +128,7 @@ impl Session {
 
 		// Check if a policy file was provided, otherwise convert a deprecated config file to a policy file. If neither was provided, error out.
 		if policy_path.is_some() {
-			let (policy, policy_path, hc_github_token) =
+			let (policy, policy_path) =
 				match load_policy_and_data(policy_path.as_deref()) {
 					Ok(results) => results,
 					Err(err) => return Err(err),
@@ -141,11 +140,8 @@ impl Session {
 			// Set policy file and its location
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(Some(Rc::new(policy_path)));
-
-			// Set github token in salsa
-			session.set_github_api_token(Some(Rc::new(hc_github_token)));
 		} else if config_path.is_some() {
-			let (policy, config_dir, hc_github_token) =
+			let (policy, config_dir) =
 				match load_config_and_data(config_path.as_deref()) {
 					Ok(results) => results,
 					Err(err) => return Err(err),
@@ -158,8 +154,6 @@ impl Session {
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(None);
 
-			// Set github token in salsa
-			session.set_github_api_token(Some(Rc::new(hc_github_token)));
 		} else {
 			return Err(hc_error!("No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."));
 		}
@@ -235,7 +229,7 @@ fn load_software_versions() -> Result<(String, String)> {
 	Ok((git_version, npm_version))
 }
 
-pub fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, PathBuf, String)> {
+pub fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, PathBuf)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("Loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.");
 	// Increment the phase into the "running" stage.
@@ -253,16 +247,13 @@ pub fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, P
 
 	// Convert the Config struct to a PolicyFile struct
 	let policy = config_to_policy(config)?;
-
-	// Resolve the github token file.
-	let hc_github_token = resolve_token()?;
-
+	
 	phase.finish_successful();
 
-	Ok((policy, valid_config_path.to_path_buf(), hc_github_token))
+	Ok((policy, valid_config_path.to_path_buf()))
 }
 
-pub fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathBuf, String)> {
+pub fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathBuf)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("loading policy and data files");
 	// Increment the phase into the "running" stage.
@@ -281,12 +272,9 @@ pub fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, P
 	let policy = PolicyFile::load_from(valid_policy_path)
 		.context("Failed to load policy. Plase make sure the policy file is in the provided location and is formatted correctly.")?;
 
-	// Resolve the github token file.
-	let hc_github_token = resolve_token()?;
-
 	phase.finish_successful();
 
-	Ok((policy, valid_policy_path.to_path_buf(), hc_github_token))
+	Ok((policy, valid_policy_path.to_path_buf()))
 }
 
 fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
@@ -309,13 +297,6 @@ fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	Ok(target)
 }
 
-/// Resolves github token for Hipcheck to query github with.
-fn resolve_token() -> Result<String> {
-	match var("HC_GITHUB_TOKEN") {
-		Ok(token) => Ok(token),
-		_ => Ok("".to_string()),
-	}
-}
 
 /// Resolves the target specifier into an actual target.
 fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Result<Target> {
@@ -395,17 +376,5 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 				seed.refspec.clone(),
 			)
 		}
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use crate::util::test::with_env_vars;
-
-	#[test]
-	fn resolve_token_test() {
-		let vars = vec![("HC_GITHUB_TOKEN", Some("test"))];
-		with_env_vars(vars, || assert_eq!(resolve_token().unwrap(), "test"));
 	}
 }

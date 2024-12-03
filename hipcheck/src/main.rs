@@ -362,13 +362,10 @@ struct ReadyChecks {
 	npm_version_check: StdResult<String, VersionCheckError>,
 	cache_path_check: StdResult<PathBuf, PathCheckError>,
 	policy_path_check: StdResult<PathBuf, PathCheckError>,
-	github_token_check: StdResult<(), EnvVarCheckError>,
 }
 
 impl ReadyChecks {
 	/// Check if Hipcheck is ready to run.
-	///
-	/// We don't check `github_token_check`, because it's allowed to fail.
 	fn is_ready(&self) -> bool {
 		self.hipcheck_version_check.is_ok()
 			&& self.git_version_check.is_ok()
@@ -418,27 +415,6 @@ impl Display for PathCheckError {
 			PathCheckError::PolicyNotFound => write!(f, "Policy file not found. Specify the location of a policy file using the --policy flag.")
 		}
 	}
-}
-
-#[derive(Debug)]
-struct EnvVarCheckError {
-	name: &'static str,
-	kind: EnvVarCheckErrorKind,
-}
-
-impl Display for EnvVarCheckError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		match &self.kind {
-			EnvVarCheckErrorKind::VarNotFound => {
-				write!(f, "environment variable '{}' was not found", self.name)
-			}
-		}
-	}
-}
-
-#[derive(Debug)]
-enum EnvVarCheckErrorKind {
-	VarNotFound,
 }
 
 fn check_hipcheck_version() -> StdResult<String, VersionCheckError> {
@@ -510,21 +486,6 @@ fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	}
 
 	Ok(path.to_owned())
-}
-
-/// Check that a GitHub token has been provided as an environment variable
-/// This does not check if the token is valid or not
-/// The absence of a token does not trigger the failure state for the readiness check, because
-/// Hipcheck *can* run without a token, but some analyses will not.
-fn check_github_token() -> StdResult<(), EnvVarCheckError> {
-	let name = "HC_GITHUB_TOKEN";
-
-	std::env::var(name)
-		.map(|_| ())
-		.map_err(|_| EnvVarCheckError {
-			name,
-			kind: EnvVarCheckErrorKind::VarNotFound,
-		})
 }
 
 fn cmd_plugin(args: PluginArgs) {
@@ -630,7 +591,6 @@ fn cmd_ready(config: &CliConfig) {
 		npm_version_check: check_npm_version(),
 		cache_path_check: check_cache_path(config),
 		policy_path_check: check_policy_path(config),
-		github_token_check: check_github_token(),
 	};
 
 	match &ready.hipcheck_version_check {
@@ -656,11 +616,6 @@ fn cmd_ready(config: &CliConfig) {
 	match &ready.policy_path_check {
 		Ok(path) => println!("{:<17} {}", "Policy Path:", path.display()),
 		Err(e) => println!("{:<17} {}", "Policy Path:", e),
-	}
-
-	match &ready.github_token_check {
-		Ok(_) => println!("{:<17} Found!", "GitHub Token:"),
-		Err(e) => println!("{:<17} {}", "GitHub Token:", e),
 	}
 
 	if ready.is_ready() {
