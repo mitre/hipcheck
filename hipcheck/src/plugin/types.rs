@@ -288,10 +288,19 @@ impl PluginContext {
 
 		self.set_configuration(&config).await?.as_result()?;
 
-		let opt_default_policy_expr = self
-			.get_default_policy_expression()
-			.await?
-			.map(|s| std_parse(s.as_str()))
+		let opt_str = self.get_default_policy_expression().await?;
+		// This is where we turn the `std_parse` error into a user-facing message
+		let opt_default_policy_expr = opt_str
+			.map(|s| {
+				std_parse(s.as_str()).map_err(|e| {
+					hc_error!(
+						"Plugin '{}' has bad default policy expression '{}': {}",
+						self.plugin.name,
+						s,
+						e
+					)
+				})
+			})
 			.transpose()?;
 
 		let opt_explain_default_query = self.explain_default_query().await?;

@@ -8,9 +8,9 @@ mod plugin_manifest;
 mod retrieval;
 mod types;
 
-use crate::error::Result;
 pub use crate::plugin::{get_plugin_key, manager::*, plugin_id::PluginId, types::*};
 use crate::policy_exprs::Expr;
+use crate::{error::Result, hc_error};
 pub use arch::{get_current_arch, try_set_arch, Arch};
 pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
 use hipcheck_common::types::{Query, QueryDirection};
@@ -19,7 +19,7 @@ pub use plugin_manifest::{
 };
 pub use retrieval::retrieve_plugins;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Not};
 use tokio::sync::Mutex;
 
 pub async fn initialize_plugins(
@@ -34,12 +34,31 @@ pub async fn initialize_plugins(
 		set.spawn(p.initialize(c));
 	}
 
-	let mut out: Vec<PluginTransport> = vec![];
+	let mut inited: Vec<PluginTransport> = vec![];
+	let mut failures: Vec<_> = vec![];
+
 	while let Some(res) = set.join_next().await {
-		out.push(res??);
+		// @Todo - what is the cleanup if the tokio func fails?
+		let init_res = res?;
+
+		// Instead of immediately erroring, we need to finish
+		// initializing all plugins so they shut down properly
+		match init_res {
+			Ok(pt) => inited.push(pt),
+			Err(e) => failures.push(e),
+		};
 	}
 
-	Ok(out)
+	if failures.is_empty().not() {
+		let mut err = "Failures occurred during plugin initialization:".to_owned();
+		for x in failures {
+			err += "\n";
+			err += x.to_string().as_str();
+		}
+		Err(hc_error!("{}", err))
+	} else {
+		Ok(inited)
+	}
 }
 
 #[derive(Debug)]
