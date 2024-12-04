@@ -15,6 +15,7 @@ use nom::{
 	Finish as _, IResult,
 };
 use ordered_float::NotNan;
+use serde_with::{DeserializeFromStr, SerializeDisplay};
 use std::{
 	cmp::Ordering,
 	fmt::Display,
@@ -27,7 +28,7 @@ use std::{
 use jiff::civil::Date;
 
 /// A `deke` expression to evaluate.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, SerializeDisplay, DeserializeFromStr)]
 pub enum Expr {
 	/// Primitive data (ints, floats, bool).
 	Primitive(Primitive),
@@ -453,7 +454,7 @@ impl Display for Expr {
 				)
 			}
 			Expr::Function(func) => func.fmt(f),
-			Expr::Lambda(l) => write!(f, "(lambda ({}) {})", l.arg, l.body),
+			Expr::Lambda(l) => l.fmt(f),
 			Expr::JsonPointer(pointer) => write!(f, "${}", pointer.pointer),
 		}
 	}
@@ -469,6 +470,22 @@ impl Display for Primitive {
 			Primitive::DateTime(dt) => write!(f, "{}", dt),
 			Primitive::Span(span) => write!(f, "{}", span),
 		}
+	}
+}
+
+impl Display for Lambda {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let mut out: Vec<String> = vec![self.body.ident.to_string()];
+		// Filter out references to placeholder var
+		let arg: Expr = Primitive::Identifier(self.arg.clone()).into();
+		out.extend(self.body.args.iter().filter_map(|x| {
+			if *x != arg {
+				Some(ToString::to_string(x))
+			} else {
+				None
+			}
+		}));
+		write!(f, "({})", out.join(" "))
 	}
 }
 
@@ -491,8 +508,9 @@ impl Primitive {
 
 impl Display for Function {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let args = self.args.iter().map(ToString::to_string).join(" ");
-		write!(f, "({} {})", self.ident, args)
+		let mut out: Vec<String> = vec![self.ident.to_string()];
+		out.extend(self.args.iter().map(ToString::to_string));
+		write!(f, "({})", out.join(" "))
 	}
 }
 

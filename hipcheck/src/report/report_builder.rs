@@ -58,7 +58,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 
 	builder
 		.set_risk_score(scoring.score.total)
-		.set_risk_policy(session.risk_policy().as_ref().clone());
+		.set_risk_policy(session.risk_policy()?.as_ref().clone());
 
 	let report = builder.build()?;
 
@@ -85,7 +85,7 @@ pub struct ReportBuilder<'sess> {
 	errored: Vec<ErroredAnalysis>,
 
 	/// What risk threshold was configured for the run.
-	risk_policy: Option<String>,
+	risk_policy: Option<Expr>,
 
 	/// What risk score Hipcheck assigned.
 	risk_score: Option<f64>,
@@ -151,7 +151,7 @@ impl<'sess> ReportBuilder<'sess> {
 	}
 
 	/// Set what's being recommended to the user.
-	pub fn set_risk_policy(&mut self, risk_policy: String) -> &mut Self {
+	pub fn set_risk_policy(&mut self, risk_policy: Expr) -> &mut Self {
 		self.risk_policy = Some(risk_policy);
 		self
 	}
@@ -177,7 +177,7 @@ impl<'sess> ReportBuilder<'sess> {
 			let policy = self
 				.risk_policy
 				.ok_or_else(|| hc_error!("no risk threshold set for report"))
-				.map(RiskPolicy)?;
+				.map(RiskPolicy::new)?;
 
 			// Determine recommendation based on score and investigate policy expr
 			let mut rec = Recommendation::is(score, policy)?;

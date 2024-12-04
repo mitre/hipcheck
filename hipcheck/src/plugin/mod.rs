@@ -10,6 +10,7 @@ mod types;
 
 use crate::error::Result;
 pub use crate::plugin::{get_plugin_key, manager::*, plugin_id::PluginId, types::*};
+use crate::policy_exprs::Expr;
 pub use arch::{get_current_arch, try_set_arch, Arch};
 pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
 use hipcheck_common::types::{Query, QueryDirection};
@@ -55,7 +56,7 @@ impl ActivePlugin {
 		}
 	}
 
-	pub fn get_default_policy_expr(&self) -> Option<&String> {
+	pub fn get_default_policy_expr(&self) -> Option<&Expr> {
 		self.channel.opt_default_policy_expr.as_ref()
 	}
 

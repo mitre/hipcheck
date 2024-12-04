@@ -25,7 +25,59 @@ use env::Binding;
 pub use expr::{parse, Primitive};
 use json_pointer::LookupJsonPointers;
 use serde_json::Value;
-use std::ops::Deref;
+use std::{ops::Deref, str::FromStr, sync::LazyLock};
+
+static PASS_STD_FUNC_RES: LazyLock<FunctionResolver> = LazyLock::new(FunctionResolver::std);
+static PASS_STD_TYPE_FIX: LazyLock<TypeFixer> = LazyLock::new(TypeFixer::std);
+static PASS_STD_TYPE_CHK: LazyLock<TypeChecker> = LazyLock::new(TypeChecker::default);
+
+pub fn std_pre_analysis_pipeline(mut expr: Expr) -> Result<Expr> {
+	expr = PASS_STD_FUNC_RES.run(expr)?;
+	expr = PASS_STD_TYPE_FIX.run(expr)?;
+	PASS_STD_TYPE_CHK.run(&expr)?;
+	Ok(expr)
+}
+
+pub fn std_post_analysis_pipeline(
+	mut expr: Expr,
+	context: Option<&Value>,
+	run_pre_passes: bool,
+) -> Result<Expr> {
+	// Track whether we've done type checking or we've added something to require re-doing it
+	let mut needs_check = true;
+	if run_pre_passes {
+		expr = std_pre_analysis_pipeline(expr)?;
+		needs_check = false;
+	}
+	// Adding JSON context requires re-type checking
+	if let Some(ctx) = context {
+		expr = LookupJsonPointers::with_context(ctx).run(expr)?;
+		needs_check = true;
+	}
+	if needs_check {
+		PASS_STD_TYPE_CHK.run(&expr)?;
+	}
+	Env::std().run(expr)
+}
+
+pub fn std_parse(raw_program: &str) -> Result<Expr> {
+	std_pre_analysis_pipeline(parse(raw_program)?)
+}
+
+pub fn std_exec(mut expr: Expr, context: Option<&Value>) -> Result<bool> {
+	match std_post_analysis_pipeline(expr, context, false)? {
+		Expr::Primitive(Primitive::Bool(b)) => Ok(b),
+		result => Err(Error::DidNotReturnBool(result)),
+	}
+}
+
+impl FromStr for Expr {
+	type Err = crate::policy_exprs::error::Error;
+
+	fn from_str(raw: &str) -> Result<Expr> {
+		std_pre_analysis_pipeline(parse(raw)?)
+	}
+}
 
 /// Evaluates `deke` expressions.
 pub struct Executor {
@@ -55,6 +107,7 @@ impl Executor {
 		Ok(expr)
 	}
 }
+
 impl ExprMutator for Env<'_> {
 	fn visit_primitive(&self, prim: Primitive) -> Result<Expr> {
 		Ok(prim.resolve(self)?.into())
@@ -373,5 +426,18 @@ mod tests {
 		};
 		let ret_ty = f_ty.get_return_type();
 		assert_eq!(ret_ty, Ok(ReturnableType::Primitive(PrimitiveType::Bool)));
+	}
+
+	#[test]
+	fn from_and_to_string() {
+		let programs = vec!["(not $)", "(gt 0)", "(filter (gt 0) $/alpha)"];
+
+		for program in programs {
+			let mut expr = parse(&program).unwrap();
+			expr = FunctionResolver::std().run(expr).unwrap();
+			expr = TypeFixer::std().run(expr).unwrap();
+			let string = expr.to_string();
+			assert_eq!(program, string);
+		}
 	}
 }

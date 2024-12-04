@@ -9,6 +9,7 @@ use crate::{
 		QueryResult,
 	},
 	policy::PolicyFile,
+	policy_exprs::Expr,
 	Result,
 };
 use futures::future::{BoxFuture, FutureExt};
@@ -27,7 +28,7 @@ pub trait HcEngine: salsa::Database {
 	#[salsa::input]
 	fn core(&self) -> Arc<HcPluginCore>;
 
-	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<String>>;
+	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<Expr>>;
 
 	fn default_query_explanation(
 		&self,
@@ -48,7 +49,7 @@ fn default_policy_expr(
 	db: &dyn HcEngine,
 	publisher: String,
 	plugin: String,
-) -> Result<Option<String>> {
+) -> Result<Option<Expr>> {
 	let core = db.core();
 	let key = get_plugin_key(publisher.as_str(), plugin.as_str());
 	let Some(p_handle) = core.plugins.get(&key) else {
