@@ -76,7 +76,7 @@ impl Plugin for ActivityPlugin {
 			return Err(Error::UnspecifiedQueryState);
 		};
 
-		Ok(format!("lte $ P{}w", conf.weeks.unwrap_or(71)))
+		Ok(format!("(lte $ P{}w)", conf.weeks.unwrap_or(71)))
 	}
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
