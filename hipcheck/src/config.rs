@@ -10,6 +10,7 @@ use crate::{
 		policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild},
 		PolicyFile,
 	},
+	policy_exprs::{std_parse, Expr},
 	score::*,
 	util::fs as file,
 	BINARY_CONFIG_FILE, F64, LANGS_FILE, ORGS_FILE, TYPO_FILE,
@@ -468,7 +469,7 @@ pub trait ConfigSource: salsa::Database {
 #[salsa::query_group(RiskConfigQueryStorage)]
 pub trait RiskConfigQuery: ConfigSource {
 	/// Returns the risk policy expr
-	fn risk_policy(&self) -> Rc<String>;
+	fn risk_policy(&self) -> Result<Rc<Expr>>;
 }
 
 /// Query for accessing the languages analysis config
@@ -522,7 +523,7 @@ pub struct Analysis {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PoliciedAnalysis(pub Analysis, pub String);
+pub struct PoliciedAnalysis(pub Analysis, pub Option<Expr>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnalysisTreeNode {
@@ -566,9 +567,9 @@ impl AnalysisTreeNode {
 			weight,
 		}
 	}
-	pub fn analysis(analysis: Analysis, raw_policy: String, weight: F64) -> Self {
+	pub fn analysis(analysis: Analysis, opt_policy: Option<Expr>, weight: F64) -> Self {
 		AnalysisTreeNode::Analysis {
-			analysis: PoliciedAnalysis(analysis, raw_policy),
+			analysis: PoliciedAnalysis(analysis, opt_policy),
 			weight,
 		}
 	}
@@ -653,13 +654,13 @@ impl AnalysisTree {
 		&mut self,
 		under: NodeId,
 		analysis: Analysis,
-		raw_policy: String,
+		opt_policy: Option<Expr>,
 		weight: F64,
 	) -> Result<NodeId> {
 		if self.node_is_category(under)? {
 			let child = self
 				.tree
-				.new_node(AnalysisTreeNode::analysis(analysis, raw_policy, weight));
+				.new_node(AnalysisTreeNode::analysis(analysis, opt_policy, weight));
 			under.append(child, &mut self.tree);
 			Ok(child)
 		} else {
@@ -748,16 +749,16 @@ fn add_analysis(
 		Some(u) => F64::new(u as f64)?,
 		None => F64::new(1.0)?,
 	};
-	let raw_policy = match analysis.policy_expression {
-		Some(x) => x,
-		None => "".to_owned(),
-	};
+	let opt_policy = analysis
+		.policy_expression
+		.map(|s| s.parse::<Expr>())
+		.transpose()?;
 	let analysis = Analysis {
 		publisher: publisher.0,
 		plugin: plugin.0,
 		query: DEFAULT_QUERY.to_owned(),
 	};
-	tree.add_analysis(under, analysis, raw_policy, weight)
+	tree.add_analysis(under, analysis, opt_policy, weight)
 }
 
 fn add_category(
@@ -815,8 +816,8 @@ pub fn analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<AnalysisTree>> {
 	let update_policy = |node: &mut AnalysisTreeNode| -> Result<()> {
 		if let AnalysisTreeNode::Analysis { analysis, .. } = node {
 			let a: &Analysis = &analysis.0;
-			if analysis.1.is_empty() {
-				analysis.1 = db.default_policy_expr(a.publisher.clone(), a.plugin.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file", a.publisher.clone(), a.plugin.clone()))?;
+			if analysis.1.is_none() {
+				analysis.1 = Some(db.default_policy_expr(a.publisher.clone(), a.plugin.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file", a.publisher.clone(), a.plugin.clone()))?);
 			}
 		}
 		Ok(())
@@ -866,9 +867,13 @@ pub fn normalized_unresolved_analysis_tree(db: &dyn ConfigSource) -> Result<Rc<A
 // field is `String`, it is returned wrapped in an `Rc`.  This is
 // done to keep Salsa's cloning cheap.
 
-fn risk_policy(db: &dyn RiskConfigQuery) -> Rc<String> {
+fn risk_policy(db: &dyn RiskConfigQuery) -> Result<Rc<Expr>> {
 	let policy = db.policy();
-	Rc::new(policy.analyze.investigate_policy.0.clone())
+	let expr_str = policy.analyze.investigate_policy.0.as_str();
+	let expr = std_parse(expr_str)
+		.map_err(|e| hc_error!("Malformed risk policy expression '{}': {}", expr_str, e))?;
+
+	Ok(Rc::new(expr))
 }
 
 fn langs_file_rel(_db: &dyn LanguagesConfigQuery) -> Rc<String> {

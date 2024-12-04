@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{hc_error, Result};
+use crate::{
+	hc_error,
+	policy_exprs::{std_parse, Expr},
+	Result,
+};
 use futures::{Stream, StreamExt};
 use hipcheck_common::proto::{
 	plugin_service_client::PluginServiceClient, ConfigurationStatus, Empty,
@@ -284,7 +288,11 @@ impl PluginContext {
 
 		self.set_configuration(&config).await?.as_result()?;
 
-		let opt_default_policy_expr = self.get_default_policy_expression().await?;
+		let opt_default_policy_expr = self
+			.get_default_policy_expression()
+			.await?
+			.map(|s| std_parse(s.as_str()))
+			.transpose()?;
 
 		let opt_explain_default_query = self.explain_default_query().await?;
 
@@ -387,7 +395,7 @@ impl MultiplexedQueryReceiver {
 #[derive(Debug)]
 pub struct PluginTransport {
 	pub schemas: HashMap<String, Schema>,
-	pub opt_default_policy_expr: Option<String>,
+	pub opt_default_policy_expr: Option<Expr>,
 	pub opt_explain_default_query: Option<String>,
 	ctx: PluginContext,
 	tx: mpsc::Sender<PluginQuery>,

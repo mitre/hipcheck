@@ -14,7 +14,7 @@ pub mod report_builder;
 use crate::{
 	cli::Format,
 	error::{Context, Error, Result},
-	policy_exprs::Executor,
+	policy_exprs::{std_exec, Expr},
 	version::VersionQuery,
 };
 use chrono::prelude::*;
@@ -281,14 +281,20 @@ pub struct Analysis {
 	///
 	/// We use this when printing the result to help explain to the user
 	/// *why* an analysis failed.
-	policy_expr: String,
+	#[schemars(schema_with = "String::json_schema")]
+	policy_expr: Expr,
 
 	/// The default query explanation pulled from RPC with the plugin.
 	message: String,
 }
 
+// fn custom_schema(generator: &mut SchemaGenerator) -> Schema {
+// 	let mut schema = String::json_schema(generator);
+// 	schema
+// }
+
 impl Analysis {
-	pub fn plugin(name: String, passed: bool, policy_expr: String, message: String) -> Self {
+	pub fn plugin(name: String, passed: bool, policy_expr: Expr, message: String) -> Self {
 		Analysis {
 			name,
 			passed,
@@ -363,7 +369,7 @@ impl Recommendation {
 	pub fn statement(&self) -> String {
 		format!(
 			"risk rated as {:.2}, policy was {}",
-			self.risk_score.0, self.risk_policy.0
+			self.risk_score.0, self.risk_policy.expr
 		)
 	}
 }
@@ -380,8 +386,7 @@ impl RecommendationKind {
 	fn is(risk_score: RiskScore, risk_policy: RiskPolicy) -> Result<RecommendationKind> {
 		let value = serde_json::to_value(risk_score.0).unwrap();
 		Ok(
-			if Executor::std()
-				.run(&risk_policy.0, &value)
+			if std_exec(risk_policy.expr.clone(), Some(&value))
 				.context("investigate policy expression execution failed")?
 			{
 				RecommendationKind::Pass
@@ -402,7 +407,15 @@ pub struct RiskScore(pub f64);
 #[derive(Debug, Serialize, JsonSchema, Clone)]
 #[serde(transparent)]
 #[schemars(crate = "schemars")]
-pub struct RiskPolicy(pub String);
+pub struct RiskPolicy {
+	#[schemars(schema_with = "String::json_schema")]
+	pub expr: Expr,
+}
+impl RiskPolicy {
+	pub fn new(expr: Expr) -> Self {
+		RiskPolicy { expr }
+	}
+}
 
 /// A serializable and printable wrapper around a datetime with the local timezone.
 #[derive(Debug, JsonSchema)]

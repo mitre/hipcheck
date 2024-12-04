@@ -6,7 +6,7 @@ use crate::{
 	error::Result,
 	hc_error,
 	plugin::QueryResult,
-	policy_exprs::Executor,
+	policy_exprs::{std_exec, Expr},
 	shell::spinner_phase::SpinnerPhase,
 	source::SourceQuery,
 };
@@ -41,7 +41,7 @@ pub struct ScoringResults {
 #[derive(Debug, Clone)]
 pub struct PluginAnalysisResult {
 	pub response: Result<QueryResult>,
-	pub policy: String,
+	pub policy: Expr,
 	pub passed: bool,
 }
 
@@ -205,6 +205,10 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 		let target_json = serde_json::to_value(db.target().as_ref())?;
 
 		for analysis in analysis_tree.get_analyses() {
+			let policy = analysis.1.ok_or(hc_error!(
+				"We should not have been able to get this far without a policy expr"
+			))?;
+
 			// Perform query, passing target in JSON
 			let response = db.query(
 				analysis.0.publisher.clone(),
@@ -216,9 +220,7 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 			// Determine if analysis passed by evaluating policy expr
 			let passed = {
 				if let Ok(output) = &response {
-					Executor::std()
-						.run(analysis.1.as_str(), &output.value)
-						.map_err(|e| hc_error!("{}", e))?
+					std_exec(policy.clone(), Some(&output.value)).map_err(|e| hc_error!("{}", e))?
 				} else {
 					false
 				}
@@ -229,7 +231,7 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 				analysis.0.clone(),
 				PluginAnalysisResult {
 					response,
-					policy: analysis.1.clone(),
+					policy,
 					passed,
 				},
 			);

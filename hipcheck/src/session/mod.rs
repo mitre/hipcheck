@@ -10,7 +10,7 @@ use crate::{
 	config::{
 		AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource,
 		ConfigSourceStorage, LanguagesConfigQueryStorage, PracticesConfigQueryStorage,
-		RiskConfigQueryStorage, WeightTreeQueryStorage,
+		RiskConfigQuery, RiskConfigQueryStorage, WeightTreeQueryStorage,
 	},
 	engine::{start_plugins, HcEngine, HcEngineStorage},
 	error::{Context as _, Error, Result},
@@ -128,11 +128,10 @@ impl Session {
 
 		// Check if a policy file was provided, otherwise convert a deprecated config file to a policy file. If neither was provided, error out.
 		if policy_path.is_some() {
-			let (policy, policy_path) =
-				match load_policy_and_data(policy_path.as_deref()) {
-					Ok(results) => results,
-					Err(err) => return Err(err),
-				};
+			let (policy, policy_path) = match load_policy_and_data(policy_path.as_deref()) {
+				Ok(results) => results,
+				Err(err) => return Err(err),
+			};
 
 			// No config or dir
 			session.set_config_dir(None);
@@ -141,11 +140,10 @@ impl Session {
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(Some(Rc::new(policy_path)));
 		} else if config_path.is_some() {
-			let (policy, config_dir) =
-				match load_config_and_data(config_path.as_deref()) {
-					Ok(results) => results,
-					Err(err) => return Err(err),
-				};
+			let (policy, config_dir) = match load_config_and_data(config_path.as_deref()) {
+				Ok(results) => results,
+				Err(err) => return Err(err),
+			};
 
 			// Set config dir
 			session.set_config_dir(Some(Rc::new(config_dir)));
@@ -153,10 +151,12 @@ impl Session {
 			// Set policy file, with no location to represent that none was given
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(None);
-
 		} else {
 			return Err(hc_error!("No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."));
 		}
+
+		// Force eval the risk policy expr - wouldn't be necessary if the PolicyFile parsed
+		let _ = session.risk_policy()?;
 
 		/*===================================================================
 		 *  Resolving the Hipcheck home.
@@ -247,7 +247,7 @@ pub fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, P
 
 	// Convert the Config struct to a PolicyFile struct
 	let policy = config_to_policy(config)?;
-	
+
 	phase.finish_successful();
 
 	Ok((policy, valid_config_path.to_path_buf()))
@@ -296,7 +296,6 @@ fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 
 	Ok(target)
 }
-
 
 /// Resolves the target specifier into an actual target.
 fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Result<Target> {
