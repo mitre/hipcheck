@@ -1,5 +1,5 @@
 # The URL of the side.
-base_url = "https://mitre.github.io/hipcheck"
+base_url = "https://hipcheck.mitre.org"
 
 # Generate an Atom feed for the blog.
 generate_feeds = true

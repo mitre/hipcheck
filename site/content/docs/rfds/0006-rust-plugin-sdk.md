@@ -326,4 +326,4 @@ Where `InputType` and `OutputType` are types defined by the user of the SDK
 which implement the `schemars::JsonSchema` trait. This macro could generate
 a `DoThing` type implementing `Query`.
 
-[RFD 4]: https://mitre.github.io/hipcheck/rfds/0004/
+[RFD 4]: https://hipcheck.mitre.org/rfds/0004/

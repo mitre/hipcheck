@@ -85,9 +85,7 @@ function installerForPlatform(platform: string | undefined): string {
 function resolve_host(): string {
   const protocol = globalThis.window.location.protocol;
   const host = globalThis.window.location.host;
-  // If we're on GitHub Pages, append the `/hipcheck` path.
-  const amendedHost = (host === "mitre.github.io") ? `${host}/hipcheck` : host;
-  return `${protocol}//${amendedHost}`;
+  return `${protocol}//${host}`;
 }
 
 /**

@@ -4,6 +4,9 @@ weight: 10
 slug: 0010
 extra:
   rfd: 10
+  primary_author: Julian Lanson
+  primary_author_link: https://github.com/j-lanson
+  status: Accepted
 ---
 
 # Submit Chunking
