@@ -15,3 +15,15 @@ install-updater = false
 
 # Make sure to include the plugin manifest.
 include = ["plugin.kdl"]
+
+# Make sure that both Hipcheck and all the plugins are built with the protobuf
+# compiler present on their platform.
+
+[dist.dependencies.apt]
+protobuf-compiler = "*"
+
+[dist.dependencies.homebrew]
+protobuf = "*"
+
+[dist.dependencies.chocolatey]
+protoc = "*"
