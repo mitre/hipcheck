@@ -4,6 +4,9 @@ weight: 9
 slug: 0009
 extra:
   rfd: 9
+  primary_author: Julian Lanson
+  primary_author_link: https://github.com/j-lanson
+  status: Accepted
 ---
 
 # Batched Plugin Queries

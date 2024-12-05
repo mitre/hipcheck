@@ -1030,6 +1030,6 @@ architectures.
 [cargo_semver]: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#version-requirement-syntax
 [rust_platforms]: https://doc.rust-lang.org/beta/rustc/platform-support.html
 [gRPC]: https://grpc.io/
-[hipcheck_scoring]: https://mitre.github.io/hipcheck/docs/guide/concepts/#scoring
+[hipcheck_scoring]: https://hipcheck.mitre.org/docs/guide/concepts/#scoring
 [rfd_3]: ./003-plugin-architecture-vision.md
 [grpc]: https://grpc.io/

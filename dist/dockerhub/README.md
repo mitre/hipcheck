@@ -23,9 +23,9 @@ Hipcheck currently provides images for the following architectures:
 
 ## Helpful Links
 
-* [Website](https://mitre.github.io/hipcheck)
-* [Quickstart Guide](https://mitre.github.io/hipcheck/docs/quickstart/)
-* [Complete Guide](https://mitre.github.io/hipcheck/docs/guide/)
+* [Website](https://hipcheck.mitre.org)
+* [Quickstart Guide](https://hipcheck.mitre.org/docs/quickstart/)
+* [Complete Guide](https://hipcheck.mitre.org/docs/guide/)
 * [Github](https://github.com/mitre/hipcheck)
 * [Report an Issue](https://github.com/mitre/hipcheck/issues/new)
 
@@ -33,4 +33,3 @@ Hipcheck currently provides images for the following architectures:
 
 Hipcheck's software is licensed under the Apache 2.0 license, which can be
 found [here](https://github.com/mitre/hipcheck/blob/main/LICENSE)
-

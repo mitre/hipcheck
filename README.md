@@ -72,9 +72,9 @@ found in the [`LICENSE`](LICENSE) file in this repository.
 > (FEB 2014)][dfars].
 
 [dfars]: https://www.acquisition.gov/dfars/252.227-7014-rights-other-commercial-computer-software-and-other-commercial-computer-software-documentation.
-[quickstart]: https://mitre.github.io/hipcheck/docs/getting-started/first-run/
-[install]: https://mitre.github.io/hipcheck/docs/getting-started/install/
+[quickstart]: https://hipcheck.mitre.org/docs/getting-started/first-run/
+[install]: https://hipcheck.mitre.org/docs/getting-started/install/
 [license]: https://github.com/mitre/hipcheck/blob/main/LICENSE
 [release]: https://github.com/mitre/hipcheck/releases/latest
-[rfd_2]: https://mitre.github.io/hipcheck/docs/rfds/0002/
-[website]: https://mitre.github.io/hipcheck
+[rfd_2]: https://hipcheck.mitre.org/docs/rfds/0002/
+[website]: https://hipcheck.mitre.org

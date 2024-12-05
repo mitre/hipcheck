@@ -8,7 +8,7 @@ project adheres to [Semantic Versioning].
 
 ## UPCOMING: We Will No Longer Publish to Crates.io starting with 3.8.0
 
-We recently merged [RFD #7, "Simplified Release Procedures"](https://mitre.github.io/hipcheck/rfds/0007/),
+We recently merged [RFD #7, "Simplified Release Procedures"](https://hipcheck.mitre.org/docs/rfds/0007/),
 which explains that starting with version 3.8.0 (the next minor version), we'll
 no longer be publishing Hipcheck itself to Crates.io. The reasons for this are
 explained in the RFD, but essentially the need to publish to Crates.io has been
@@ -169,7 +169,7 @@ to modify Hipcheck itself. This placed some limitations on our ability to grow
 Hipcheck, and more importantly it conflicted with a core design philosophy
 of Hipcheck: that it should *empower* uses to express their policies about
 using open source software (this is one of our Product Values, as expressed in
-[RFD #2](https://mitre.github.io/hipcheck/rfds/0002/)).
+[RFD #2](https://hipcheck.mitre.org/rfds/0002/)).
 
 With `3.6.1` users can now define custom plugins to provide new sources of
 data and new analyses. There's a lot more for us to do with this, including
@@ -179,7 +179,7 @@ distribute, and use plugins, and more! For now though, this launch is our
 official starting point where users _can_ create, distribute, and run plugins.
 
 For more details on the design of the new plugin system, check out
-[RFD #4](https://mitre.github.io/hipcheck/rfds/0004/). If you have questions
+[RFD #4](https://hipcheck.mitre.org/rfds/0004/). If you have questions
 on how to work with plugins, you can always ask us in our [GitHub Discussions
 forum](https://github.com/mitre/hipcheck/discussions)!
 
@@ -309,7 +309,7 @@ And finally, many dependency version bumps:
 __Full Changelog__: <https://github.com/mitre/hipcheck/compare/hipcheck-v3.5.0...hipcheck-v3.6.0>
 
 [3.6.0]: https://github.com/mitre/hipcheck/compare/hipcheck-v3.5.0..hipcheck-v3.6.0
-[rfd_4]: https://mitre.github.io/hipcheck/rfds/0004/
+[rfd_4]: https://hipcheck.mitre.org/rfds/0004/
 
 ## [3.5.0] - 2024-08-05
 
@@ -423,7 +423,7 @@ Hipcheck 3.4.0 is an exciting release featuring 3 new subcommands!
   out exactly how much each analysis contributes to the overall score. This
   command does that math for you to make it easier.
 
-Hipcheck also now has an [official website](https://mitre.github.io/hipcheck)!
+Hipcheck also now has an [official website](https://hipcheck.mitre.org)!
 Feel free to check it out, and let us know if you encounter any issues with it.
 
 ### Added

@@ -1,5 +1,12 @@
 ---
 title: "Policy Expression Typing"
+weight: 8
+slug: 0008
+extra:
+  rfd: 8
+  primary_author: Julian Lanson
+  primary_author_link: https://github.com/j-lanson
+  status: Accepted
 ---
 
 ## The Current Situation
