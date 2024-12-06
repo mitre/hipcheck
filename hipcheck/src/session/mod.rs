@@ -5,28 +5,19 @@ pub mod pm;
 pub mod spdx;
 
 use crate::{
-	analysis::{score::ScoringProviderStorage, AnalysisProviderStorage},
 	cache::plugin::HcPluginCache,
 	cli::Format,
 	config::{
 		AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource,
 		ConfigSourceStorage, LanguagesConfigQueryStorage, PracticesConfigQueryStorage,
-		RiskConfigQueryStorage, WeightTreeQueryStorage,
-	},
-	data::{
-		git::{get_git_version, GitProviderStorage},
-		npm::get_npm_version,
-		CodeQualityProviderStorage, DependenciesProviderStorage, FuzzProviderStorage,
-		GitHubProviderStorage, PullRequestReviewProviderStorage,
+		RiskConfigQuery, RiskConfigQueryStorage, WeightTreeQueryStorage,
 	},
 	engine::{start_plugins, HcEngine, HcEngineStorage},
 	error::{Context as _, Error, Result},
 	hc_error,
-	metric::{
-		binary_detector::BinaryFileStorage, linguist::LinguistStorage, MetricProviderStorage,
-	},
-	policy::{config_to_policy::config_to_policy, PolicyFile},
+	policy::{config_to_policy, PolicyFile},
 	report::{ReportParams, ReportParamsStorage},
+	score::ScoringProviderStorage,
 	session::{
 		cyclone_dx::extract_cyclonedx_download_url,
 		pm::{detect_and_extract, extract_repo_for_maven},
@@ -37,10 +28,10 @@ use crate::{
 	source::{SourceQuery, SourceQueryStorage},
 	target::{SbomStandard, Target, TargetSeed, TargetSeedKind},
 	util::command::DependentProgram,
+	util::{git::get_git_version, npm::get_npm_version},
 	version::{VersionQuery, VersionQueryStorage},
 };
 use chrono::prelude::*;
-use dotenv::var;
 use std::{
 	fmt,
 	path::{Path, PathBuf},
@@ -53,22 +44,12 @@ use url::Url;
 
 /// Immutable configuration and base data for a run of Hipcheck.
 #[salsa::database(
-	AnalysisProviderStorage,
 	AttacksConfigQueryStorage,
-	BinaryFileStorage,
-	CodeQualityProviderStorage,
 	CommitConfigQueryStorage,
 	ConfigSourceStorage,
-	DependenciesProviderStorage,
-	GitProviderStorage,
-	GitHubProviderStorage,
 	HcEngineStorage,
 	LanguagesConfigQueryStorage,
-	LinguistStorage,
-	MetricProviderStorage,
-	FuzzProviderStorage,
 	PracticesConfigQueryStorage,
-	PullRequestReviewProviderStorage,
 	ReportParamsStorage,
 	RiskConfigQueryStorage,
 	ScoringProviderStorage,
@@ -147,11 +128,10 @@ impl Session {
 
 		// Check if a policy file was provided, otherwise convert a deprecated config file to a policy file. If neither was provided, error out.
 		if policy_path.is_some() {
-			let (policy, policy_path, hc_github_token) =
-				match load_policy_and_data(policy_path.as_deref()) {
-					Ok(results) => results,
-					Err(err) => return Err(err),
-				};
+			let (policy, policy_path) = match load_policy_and_data(policy_path.as_deref()) {
+				Ok(results) => results,
+				Err(err) => return Err(err),
+			};
 
 			// No config or dir
 			session.set_config_dir(None);
@@ -159,15 +139,11 @@ impl Session {
 			// Set policy file and its location
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(Some(Rc::new(policy_path)));
-
-			// Set github token in salsa
-			session.set_github_api_token(Some(Rc::new(hc_github_token)));
 		} else if config_path.is_some() {
-			let (policy, config_dir, hc_github_token) =
-				match load_config_and_data(config_path.as_deref()) {
-					Ok(results) => results,
-					Err(err) => return Err(err),
-				};
+			let (policy, config_dir) = match load_config_and_data(config_path.as_deref()) {
+				Ok(results) => results,
+				Err(err) => return Err(err),
+			};
 
 			// Set config dir
 			session.set_config_dir(Some(Rc::new(config_dir)));
@@ -175,12 +151,12 @@ impl Session {
 			// Set policy file, with no location to represent that none was given
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(None);
-
-			// Set github token in salsa
-			session.set_github_api_token(Some(Rc::new(hc_github_token)));
 		} else {
 			return Err(hc_error!("No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."));
 		}
+
+		// Force eval the risk policy expr - wouldn't be necessary if the PolicyFile parsed
+		let _ = session.risk_policy()?;
 
 		/*===================================================================
 		 *  Resolving the Hipcheck home.
@@ -253,7 +229,7 @@ fn load_software_versions() -> Result<(String, String)> {
 	Ok((git_version, npm_version))
 }
 
-fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, PathBuf, String)> {
+pub fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, PathBuf)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("Loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.");
 	// Increment the phase into the "running" stage.
@@ -272,15 +248,12 @@ fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, PathB
 	// Convert the Config struct to a PolicyFile struct
 	let policy = config_to_policy(config)?;
 
-	// Resolve the github token file.
-	let hc_github_token = resolve_token()?;
-
 	phase.finish_successful();
 
-	Ok((policy, valid_config_path.to_path_buf(), hc_github_token))
+	Ok((policy, valid_config_path.to_path_buf()))
 }
 
-fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathBuf, String)> {
+pub fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathBuf)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("loading policy and data files");
 	// Increment the phase into the "running" stage.
@@ -297,14 +270,11 @@ fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathB
 
 	// Load the policy file.
 	let policy = PolicyFile::load_from(valid_policy_path)
-		.context("Failed to load policy. Plase make sure the policy file is in the proidved location and is formatted correctly.")?;
-
-	// Resolve the github token file.
-	let hc_github_token = resolve_token()?;
+		.context("Failed to load policy. Plase make sure the policy file is in the provided location and is formatted correctly.")?;
 
 	phase.finish_successful();
 
-	Ok((policy, valid_policy_path.to_path_buf(), hc_github_token))
+	Ok((policy, valid_policy_path.to_path_buf()))
 }
 
 fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
@@ -325,14 +295,6 @@ fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	phase.finish_successful();
 
 	Ok(target)
-}
-
-/// Resolves github token for Hipcheck to query github with.
-fn resolve_token() -> Result<String> {
-	match var("HC_GITHUB_TOKEN") {
-		Ok(token) => Ok(token),
-		_ => Ok("".to_string()),
-	}
 }
 
 /// Resolves the target specifier into an actual target.
@@ -413,17 +375,5 @@ fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Resul
 				seed.refspec.clone(),
 			)
 		}
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use crate::util::test::with_env_vars;
-
-	#[test]
-	fn resolve_token_test() {
-		let vars = vec![("HC_GITHUB_TOKEN", Some("test"))];
-		with_env_vars(vars, || assert_eq!(resolve_token().unwrap(), "test"));
 	}
 }

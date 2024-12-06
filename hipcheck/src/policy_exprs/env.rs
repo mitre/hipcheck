@@ -1,12 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
-	pass::ExprMutator, Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction,
-	Ident, Lambda as StructLambda, Primitive, Result, F64,
+	expr::{
+		ArrayType as ExprArrayType, FuncReturnType, Function, FunctionDef, FunctionType, Op,
+		OpInfo, PrimitiveType, ReturnableType, Type, TypeChecker, Typed,
+	},
+	pass::ExprMutator,
+	Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction, Ident,
+	Lambda as StructLambda, Primitive, Result, F64,
 };
 use itertools::Itertools as _;
 use jiff::{Span, Zoned};
-use std::{cmp::Ordering, collections::HashMap, ops::Not as _};
+use std::{
+	cmp::{Ordering, PartialEq},
+	collections::HashMap,
+	ops::Not as _,
+};
 use Expr::*;
 use Primitive::*;
 
@@ -23,16 +32,333 @@ pub struct Env<'parent> {
 #[derive(Clone)]
 pub enum Binding {
 	/// A function.
-	Fn(Op),
+	Fn(FunctionDef),
 
 	/// A primitive value.
 	Var(Primitive),
 }
 
-/// Helper type for operation function pointer.
-type Op = fn(&Env, &[Expr]) -> Result<Expr>;
+// Ensure that type of array elements is valid with a lambda
+fn ty_check_higher_order_lambda(
+	l_ty: &FunctionType,
+	arr_ty: &ExprArrayType,
+) -> Result<ReturnableType> {
+	if let Some(arr_elt_ty) = arr_ty {
+		// Copy the lambda function type, replace ident with arr_elt_ty
+		let mut try_l_ty = l_ty.clone();
+		let first_arg = try_l_ty.arg_tys.get_mut(0).ok_or(Error::NotEnoughArgs {
+			name: "".to_owned(),
+			expected: 1,
+			given: 0,
+		})?;
+		*first_arg = Type::Primitive(*arr_elt_ty);
+		// If this returns error, means array type was incorrect for lambda
+		try_l_ty.get_return_type()
+	} else {
+		Ok(ReturnableType::Unknown)
+	}
+}
 
-impl<'parent> Env<'parent> {
+// Expects args to contain [lambda, array]
+fn ty_filter(args: &[Type]) -> Result<ReturnableType> {
+	let arr_ty = expect_array_at(args, 1)?;
+
+	let wrapped_l_ty = args.first().ok_or(Error::InternalError(
+		"we were supposed to have already checked that there are at least two arguments".to_owned(),
+	))?;
+	let Type::Lambda(l_ty) = wrapped_l_ty else {
+		return Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "a lambda".to_owned(),
+			got: wrapped_l_ty.clone(),
+		});
+	};
+
+	let res_ty = ty_check_higher_order_lambda(l_ty, &arr_ty)?;
+	match res_ty {
+		ReturnableType::Primitive(PrimitiveType::Bool) | ReturnableType::Unknown => {
+			Ok(ReturnableType::Array(arr_ty))
+		}
+		a => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "a bool-returning lambda".to_owned(),
+			got: Type::Lambda(l_ty.clone()),
+		}),
+	}
+}
+
+// Expects args to contain [lambda, array]
+fn ty_higher_order_bool_fn(args: &[Type]) -> Result<ReturnableType> {
+	let arr_ty = expect_array_at(args, 1)?;
+
+	let wrapped_l_ty = args.first().ok_or(Error::InternalError(
+		"we were supposed to have already checked that there are at least two arguments".to_owned(),
+	))?;
+	let Type::Lambda(l_ty) = wrapped_l_ty else {
+		return Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "a lambda".to_owned(),
+			got: wrapped_l_ty.clone(),
+		});
+	};
+
+	let res_ty = ty_check_higher_order_lambda(l_ty, &arr_ty)?;
+	match res_ty {
+		ReturnableType::Primitive(PrimitiveType::Bool) | ReturnableType::Unknown => {
+			Ok(ReturnableType::Primitive(PrimitiveType::Bool))
+		}
+		a => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "a bool-returning lambda".to_owned(),
+			got: Type::Lambda(l_ty.clone()),
+		}),
+	}
+}
+
+// Type of dynamic function is dependent on first arg
+fn ty_inherit_first(args: &[Type]) -> Result<ReturnableType> {
+	args.first().ok_or(
+        Error::InternalError("type checking function expects one argument, was incorrectly applied to a function that takes none".to_owned())
+    )?.try_into()
+}
+
+fn ty_from_first_arr(args: &[Type]) -> Result<ReturnableType> {
+	let arr_ty = expect_array_at(args, 0)?;
+	Ok(match arr_ty {
+		None => ReturnableType::Unknown,
+		Some(p_ty) => ReturnableType::Primitive(p_ty),
+	})
+}
+
+fn expect_primitive_at(args: &[Type], idx: usize) -> Result<Option<PrimitiveType>> {
+	let arg = args
+		.get(idx)
+		.ok_or(Error::InternalError(
+			"we were supposed to have already checked that function had enough arguments"
+				.to_owned(),
+		))?
+		.try_into()?;
+
+	match arg {
+		ReturnableType::Primitive(p) => Ok(Some(p)),
+		ReturnableType::Array(a) => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx,
+			expected: "a primitive type".to_owned(),
+			got: Type::Array(a),
+		}),
+		ReturnableType::Unknown => Ok(None),
+	}
+}
+
+fn expect_array_at(args: &[Type], idx: usize) -> Result<ExprArrayType> {
+	let arg = args
+		.get(idx)
+		.ok_or(Error::InternalError(
+			"we were supposed to have already checked that function had enough arguments"
+				.to_owned(),
+		))?
+		.try_into()?;
+
+	match arg {
+		ReturnableType::Array(a) => Ok(a),
+		ReturnableType::Unknown => Ok(None),
+		ReturnableType::Primitive(p) => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx,
+			expected: "an array".to_owned(),
+			got: Type::Primitive(p),
+		}),
+	}
+}
+
+fn ty_divz(args: &[Type]) -> Result<ReturnableType> {
+	let opt_ty_1 = expect_primitive_at(args, 0)?;
+	let opt_ty_2 = expect_primitive_at(args, 1)?;
+	use PrimitiveType::*;
+	use ReturnableType::*;
+
+	let (bad, idx) = match (opt_ty_1, opt_ty_2) {
+		(None | Some(Int | Float), None | Some(Int | Float)) => return Ok(Float.into()),
+		(Some(x), None | Some(_)) => (x, 0),
+		(None, Some(x)) => (x, 1),
+	};
+
+	Err(Error::BadFuncArgType {
+		name: "".to_owned(),
+		idx,
+		expected: "an int or float".to_owned(),
+		got: Type::Primitive(bad),
+	})
+}
+
+fn ty_arithmetic_binary_ops(args: &[Type]) -> Result<ReturnableType> {
+	// ensure both ops result in primitive types or unknown
+	let opt_ty_1 = expect_primitive_at(args, 0)?;
+	let opt_ty_2 = expect_primitive_at(args, 1)?;
+	use PrimitiveType::*;
+	use ReturnableType::*;
+
+	let (bad, idx) = match (opt_ty_1, opt_ty_2) {
+		(None, None) => return Ok(Unknown),
+		(None | Some(Int), None | Some(Int)) => return Ok(Primitive(Int)),
+		(None | Some(Int | Float), None | Some(Int | Float)) => return Ok(Primitive(Float)),
+		(None, Some(Span)) => return Ok(Unknown),
+		(Some(Span), None | Some(Span)) => return Ok(Primitive(DateTime)),
+		(Some(DateTime), None | Some(Span)) => return Ok(Primitive(DateTime)),
+		(Some(x), _) => (x, 0),
+		(_, Some(x)) => (x, 1),
+	};
+
+	Err(Error::BadFuncArgType {
+		name: "".to_owned(),
+		idx,
+		expected: "a float, int, span, or datetime".to_owned(),
+		got: Type::Primitive(bad),
+	})
+}
+
+fn ty_foreach(args: &[Type]) -> Result<ReturnableType> {
+	expect_array_at(args, 1)?;
+	let first_arg = args.first().ok_or(Error::InternalError(
+		"we were supposed to have already checked that there are at least two arguments".to_owned(),
+	))?;
+	let fty = match first_arg {
+		Type::Lambda(f) => f,
+		other => {
+			return Err(Error::BadFuncArgType {
+				name: "foreach".to_owned(),
+				idx: 0,
+				expected: "lambda".to_owned(),
+				got: other.clone(),
+			});
+		}
+	};
+	fty.get_return_type()
+}
+
+fn ty_comp(args: &[Type]) -> Result<ReturnableType> {
+	let resp = Ok(Bool.into());
+	let opt_ty_1: Option<PrimitiveType> = expect_primitive_at(args, 0)?;
+	let opt_ty_2: Option<PrimitiveType> = expect_primitive_at(args, 1)?;
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	let (bad, idx) = match (opt_ty_1, opt_ty_2) {
+		(None, None) => return Ok(Primitive(Bool)),
+		(None | Some(Int), None | Some(Int)) => return resp,
+		(None | Some(Int | Float), None | Some(Int | Float)) => return resp,
+		(None | Some(Span), None | Some(Span)) => return resp,
+		(None | Some(Bool), None | Some(Bool)) => return resp,
+		(None | Some(DateTime), None | Some(DateTime)) => return resp,
+		(Some(x), _) => (x, 0),
+		(_, Some(x)) => (x, 1),
+	};
+	Err(Error::BadFuncArgType {
+		name: "".to_owned(),
+		idx,
+		expected: "a float, int, bool, span, or datetime".to_owned(),
+		got: Type::Primitive(bad),
+	})
+}
+
+fn ty_count(args: &[Type]) -> Result<ReturnableType> {
+	Ok(PrimitiveType::Int.into())
+}
+
+fn ty_avg(args: &[Type]) -> Result<ReturnableType> {
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	let arr_ty = expect_array_at(args, 0)?;
+	match arr_ty {
+		None | Some(Int) | Some(Float) => Ok(Float.into()),
+		Some(x) => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "array of ints or floats".to_owned(),
+			got: Type::Array(Some(x)),
+		}),
+	}
+}
+
+fn ty_duration(args: &[Type]) -> Result<ReturnableType> {
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	let opt_ty_1 = expect_primitive_at(args, 0)?;
+	let opt_ty_2 = expect_primitive_at(args, 1)?;
+	match opt_ty_1 {
+		None | (Some(DateTime)) => (),
+		Some(got) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx: 0,
+				expected: "a datetime".to_owned(),
+				got: Type::Primitive(got),
+			});
+		}
+	}
+	match opt_ty_2 {
+		None | (Some(DateTime)) => (),
+		Some(got) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx: 1,
+				expected: "a datetime".to_owned(),
+				got: Type::Primitive(got),
+			});
+		}
+	}
+	Ok(PrimitiveType::Span.into())
+}
+
+fn ty_bool_unary(args: &[Type]) -> Result<ReturnableType> {
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	match expect_primitive_at(args, 0)? {
+		None | (Some(Bool)) => Ok(PrimitiveType::Bool.into()),
+		Some(got) => Err(Error::BadFuncArgType {
+			name: "".to_owned(),
+			idx: 0,
+			expected: "a bool".to_owned(),
+			got: Type::Primitive(got),
+		}),
+	}
+}
+
+fn ty_bool_binary(args: &[Type]) -> Result<ReturnableType> {
+	use PrimitiveType::*;
+	use ReturnableType::*;
+	let opt_ty_1 = expect_primitive_at(args, 0)?;
+	let opt_ty_2 = expect_primitive_at(args, 1)?;
+	match opt_ty_1 {
+		None | (Some(Bool)) => (),
+		Some(got) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx: 0,
+				expected: "a bool".to_owned(),
+				got: Type::Primitive(got),
+			});
+		}
+	}
+	match opt_ty_2 {
+		None | (Some(Bool)) => (),
+		Some(got) => {
+			return Err(Error::BadFuncArgType {
+				name: "".to_owned(),
+				idx: 1,
+				expected: "a bool".to_owned(),
+				got: Type::Primitive(got),
+			});
+		}
+	}
+	Ok(PrimitiveType::Bool.into())
+}
+
+impl Env<'_> {
 	/// Create an empty environment.
 	fn empty() -> Self {
 		Env {
@@ -43,48 +369,50 @@ impl<'parent> Env<'parent> {
 
 	/// Create the standard environment.
 	pub fn std() -> Self {
+		use FuncReturnType::*;
+		use PrimitiveType::*;
 		let mut env = Env::empty();
 
 		// Comparison functions.
-		env.add_fn("gt", gt);
-		env.add_fn("lt", lt);
-		env.add_fn("gte", gte);
-		env.add_fn("lte", lte);
-		env.add_fn("eq", eq);
-		env.add_fn("neq", neq);
+		env.add_fn("gt", gt, 2, ty_comp);
+		env.add_fn("lt", lt, 2, ty_comp);
+		env.add_fn("gte", gte, 2, ty_comp);
+		env.add_fn("lte", lte, 2, ty_comp);
+		env.add_fn("eq", eq, 2, ty_comp);
+		env.add_fn("neq", neq, 2, ty_comp);
 
 		// Math functions.
-		env.add_fn("add", add);
-		env.add_fn("sub", sub);
-		env.add_fn("divz", divz);
+		env.add_fn("add", add, 2, ty_arithmetic_binary_ops);
+		env.add_fn("sub", sub, 2, ty_arithmetic_binary_ops);
+		env.add_fn("divz", divz, 2, ty_divz);
 
 		// Additional datetime math functions
-		env.add_fn("duration", duration);
+		env.add_fn("duration", duration, 2, ty_duration);
 
 		// Logical functions.
-		env.add_fn("and", and);
-		env.add_fn("or", or);
-		env.add_fn("not", not);
+		env.add_fn("and", and, 2, ty_bool_binary);
+		env.add_fn("or", or, 2, ty_bool_binary);
+		env.add_fn("not", not, 1, ty_bool_unary);
 
 		// Array math functions.
-		env.add_fn("max", max);
-		env.add_fn("min", min);
-		env.add_fn("avg", avg);
-		env.add_fn("median", median);
-		env.add_fn("count", count);
+		env.add_fn("max", max, 1, ty_from_first_arr);
+		env.add_fn("min", min, 1, ty_from_first_arr);
+		env.add_fn("avg", avg, 1, ty_avg);
+		env.add_fn("median", median, 1, ty_from_first_arr);
+		env.add_fn("count", count, 1, ty_count);
 
 		// Array logic functions.
-		env.add_fn("all", all);
-		env.add_fn("nall", nall);
-		env.add_fn("some", some);
-		env.add_fn("none", none);
+		env.add_fn("all", all, 1, ty_higher_order_bool_fn);
+		env.add_fn("nall", nall, 1, ty_higher_order_bool_fn);
+		env.add_fn("some", some, 1, ty_higher_order_bool_fn);
+		env.add_fn("none", none, 1, ty_higher_order_bool_fn);
 
 		// Array higher-order functions.
-		env.add_fn("filter", filter);
-		env.add_fn("foreach", foreach);
+		env.add_fn("filter", filter, 2, ty_filter);
+		env.add_fn("foreach", foreach, 2, ty_foreach);
 
 		// Debugging functions.
-		env.add_fn("dbg", dbg);
+		env.add_fn("dbg", dbg, 1, ty_inherit_first);
 
 		env
 	}
@@ -103,8 +431,22 @@ impl<'parent> Env<'parent> {
 	}
 
 	/// Add a function to the environment.
-	pub fn add_fn(&mut self, name: &str, op: Op) -> Option<Binding> {
-		self.bindings.insert(name.to_owned(), Binding::Fn(op))
+	pub fn add_fn(
+		&mut self,
+		name: &str,
+		op: Op,
+		expected_args: usize,
+		ty_checker: TypeChecker,
+	) -> Option<Binding> {
+		self.bindings.insert(
+			name.to_owned(),
+			Binding::Fn(FunctionDef {
+				name: name.to_owned(),
+				expected_args,
+				ty_checker,
+				op,
+			}),
+		)
 	}
 
 	/// Get a binding from the environment, walking up the scopes.
@@ -136,7 +478,7 @@ fn check_num_args(name: &str, args: &[Expr], expected: usize) -> Result<()> {
 }
 
 /// Partially evaluate a binary operation on primitives.
-fn partially_evaluate(fn_name: &'static str, arg: Expr) -> Result<Expr> {
+pub fn partially_evaluate(env: &Env, fn_name: &str, arg: Expr) -> Result<Expr> {
 	let var_name = "x";
 	let var = Ident(String::from(var_name));
 	let func = Ident(String::from(fn_name));
@@ -144,8 +486,10 @@ fn partially_evaluate(fn_name: &'static str, arg: Expr) -> Result<Expr> {
 	// function lambda to make higher-order functions read better.
 	// e.g. `(filter (lt 3) [])` would actually check if array elements are
 	// greater than 3 if we put the placeholder var second
-	let op = StructFunction::new(func, vec![Primitive(Identifier(var.clone())), arg]).into();
-	let lambda = StructLambda::new(var, Box::new(op)).into();
+	let op =
+		StructFunction::new(func, vec![Primitive(Identifier(var.clone())), arg]).resolve(env)?;
+	let lambda: Expr = StructLambda::new(var, op).into();
+	lambda.get_type()?;
 	Ok(lambda)
 }
 
@@ -159,7 +503,7 @@ where
 	F: FnOnce(Primitive, Primitive) -> Result<Primitive>,
 {
 	if args.len() == 1 {
-		return partially_evaluate(name, args[0].clone());
+		return partially_evaluate(env, name, args[0].clone());
 	}
 
 	check_num_args(name, args, 2)?;
@@ -216,7 +560,7 @@ where
 /// Define a higher-order operation over arrays.
 fn higher_order_array_op<F>(name: &'static str, env: &Env, args: &[Expr], op: F) -> Result<Expr>
 where
-	F: FnOnce(ArrayType, Ident, Box<Expr>) -> Result<Expr>,
+	F: FnOnce(ArrayType, Ident, Function) -> Result<Expr>,
 {
 	check_num_args(name, args, 2)?;
 
@@ -322,14 +666,14 @@ fn array_type(arr: &[Primitive]) -> Result<ArrayType> {
 }
 
 /// Evaluate the lambda, injecting into the environment.
-fn eval_lambda(env: &Env, ident: &Ident, val: Primitive, body: Expr) -> Result<Expr> {
+fn eval_lambda(env: &Env, ident: &Ident, val: Primitive, body: Function) -> Result<Expr> {
 	let mut child = env.child();
 
 	if child.add_var(&ident.0, val).is_some() {
 		return Err(Error::AlreadyBound);
 	}
 
-	child.visit_expr(body)
+	child.visit_function(body)
 }
 
 #[allow(clippy::bool_comparison)]
@@ -710,35 +1054,35 @@ fn count(env: &Env, args: &[Expr]) -> Result<Expr> {
 fn all(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "all";
 
-	let op = |arr, ident: Ident, body: Box<Expr>| {
+	let op = |arr, ident: Ident, body: Function| {
 		let result = match arr {
 			ArrayType::Int(ints) => ints
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Int(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Int(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
 			ArrayType::Float(floats) => floats
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Float(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Float(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
 			ArrayType::Bool(bools) => bools
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Bool(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Bool(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
 			ArrayType::DateTime(dts) => dts
 				.iter()
-				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), body.clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
 			ArrayType::Span(spans) => spans
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Span(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Span(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
@@ -754,35 +1098,35 @@ fn all(env: &Env, args: &[Expr]) -> Result<Expr> {
 fn nall(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "nall";
 
-	let op = |arr, ident: Ident, body: Box<Expr>| {
+	let op = |arr, ident: Ident, body: Function| {
 		let result = match arr {
 			ArrayType::Int(ints) => ints
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Int(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Int(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
 			ArrayType::Float(floats) => floats
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Float(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Float(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
 			ArrayType::Bool(bools) => bools
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Bool(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Bool(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
 			ArrayType::DateTime(dts) => dts
 				.iter()
-				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), body.clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
 			ArrayType::Span(spans) => spans
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Span(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Span(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.all(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
@@ -798,35 +1142,35 @@ fn nall(env: &Env, args: &[Expr]) -> Result<Expr> {
 fn some(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "some";
 
-	let op = |arr, ident: Ident, body: Box<Expr>| {
+	let op = |arr, ident: Ident, body: Function| {
 		let result = match arr {
 			ArrayType::Int(ints) => ints
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Int(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Int(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
 			ArrayType::Float(floats) => floats
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Float(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Float(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
 			ArrayType::Bool(bools) => bools
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Bool(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Bool(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
 			ArrayType::DateTime(dts) => dts
 				.iter()
-				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), body.clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
 			ArrayType::Span(spans) => spans
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Span(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Span(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true))))
 				})?,
@@ -842,35 +1186,35 @@ fn some(env: &Env, args: &[Expr]) -> Result<Expr> {
 fn none(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "none";
 
-	let op = |arr, ident: Ident, body: Box<Expr>| {
+	let op = |arr, ident: Ident, body: Function| {
 		let result = match arr {
 			ArrayType::Int(ints) => ints
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Int(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Int(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
 			ArrayType::Float(floats) => floats
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Float(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Float(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
 			ArrayType::Bool(bools) => bools
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Bool(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Bool(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
 			ArrayType::DateTime(dts) => dts
 				.iter()
-				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), body.clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
 			ArrayType::Span(spans) => spans
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Span(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Span(*val), body.clone()))
 				.process_results(|mut iter| {
 					iter.any(|expr| matches!(expr, Primitive(Bool(true)))).not()
 				})?,
@@ -886,11 +1230,11 @@ fn none(env: &Env, args: &[Expr]) -> Result<Expr> {
 fn filter(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "filter";
 
-	let op = |arr, ident: Ident, body: Box<Expr>| {
+	let op = |arr, ident: Ident, body: Function| {
 		let arr = match arr {
 			ArrayType::Int(ints) => ints
 				.iter()
-				.map(|val| Ok((val, eval_lambda(env, &ident, Int(*val), (*body).clone()))))
+				.map(|val| Ok((val, eval_lambda(env, &ident, Int(*val), body.clone()))))
 				.filter_map_ok(|(val, expr)| {
 					if let Ok(Primitive(Bool(true))) = expr {
 						Some(Primitive::Int(*val))
@@ -901,7 +1245,7 @@ fn filter(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.collect::<Result<Vec<_>>>()?,
 			ArrayType::Float(floats) => floats
 				.iter()
-				.map(|val| Ok((val, eval_lambda(env, &ident, Float(*val), (*body).clone()))))
+				.map(|val| Ok((val, eval_lambda(env, &ident, Float(*val), body.clone()))))
 				.filter_map_ok(|(val, expr)| {
 					if let Ok(Primitive(Bool(true))) = expr {
 						Some(Primitive::Float(*val))
@@ -912,7 +1256,7 @@ fn filter(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.collect::<Result<Vec<_>>>()?,
 			ArrayType::Bool(bools) => bools
 				.iter()
-				.map(|val| Ok((val, eval_lambda(env, &ident, Bool(*val), (*body).clone()))))
+				.map(|val| Ok((val, eval_lambda(env, &ident, Bool(*val), body.clone()))))
 				.filter_map_ok(|(val, expr)| {
 					if let Ok(Primitive(Bool(true))) = expr {
 						Some(Primitive::Bool(*val))
@@ -926,7 +1270,7 @@ fn filter(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.map(|val| {
 					Ok((
 						val,
-						eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()),
+						eval_lambda(env, &ident, DateTime(val.clone()), body.clone()),
 					))
 				})
 				.filter_map_ok(|(val, expr)| {
@@ -939,7 +1283,7 @@ fn filter(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.collect::<Result<Vec<_>>>()?,
 			ArrayType::Span(spans) => spans
 				.iter()
-				.map(|val| Ok((val, eval_lambda(env, &ident, Span(*val), (*body).clone()))))
+				.map(|val| Ok((val, eval_lambda(env, &ident, Span(*val), body.clone()))))
 				.filter_map_ok(|(val, expr)| {
 					if let Ok(Primitive(Bool(true))) = expr {
 						Some(Primitive::Span(*val))
@@ -960,11 +1304,11 @@ fn filter(env: &Env, args: &[Expr]) -> Result<Expr> {
 fn foreach(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "foreach";
 
-	let op = |arr, ident: Ident, body: Box<Expr>| {
+	let op = |arr, ident: Ident, body: Function| {
 		let arr = match arr {
 			ArrayType::Int(ints) => ints
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Int(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Int(*val), body.clone()))
 				.map(|expr| match expr {
 					Ok(Primitive(inner)) => Ok(inner),
 					Ok(_) => Err(Error::BadType(name)),
@@ -973,7 +1317,7 @@ fn foreach(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.collect::<Result<Vec<_>>>()?,
 			ArrayType::Float(floats) => floats
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Float(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Float(*val), body.clone()))
 				.map(|expr| match expr {
 					Ok(Primitive(inner)) => Ok(inner),
 					Ok(_) => Err(Error::BadType(name)),
@@ -982,7 +1326,7 @@ fn foreach(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.collect::<Result<Vec<_>>>()?,
 			ArrayType::Bool(bools) => bools
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Bool(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Bool(*val), body.clone()))
 				.map(|expr| match expr {
 					Ok(Primitive(inner)) => Ok(inner),
 					Ok(_) => Err(Error::BadType(name)),
@@ -991,7 +1335,7 @@ fn foreach(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.collect::<Result<Vec<_>>>()?,
 			ArrayType::DateTime(dts) => dts
 				.iter()
-				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, DateTime(val.clone()), body.clone()))
 				.map(|expr| match expr {
 					Ok(Primitive(inner)) => Ok(inner),
 					Ok(_) => Err(Error::BadType(name)),
@@ -1000,7 +1344,7 @@ fn foreach(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.collect::<Result<Vec<_>>>()?,
 			ArrayType::Span(spans) => spans
 				.iter()
-				.map(|val| eval_lambda(env, &ident, Span(*val), (*body).clone()))
+				.map(|val| eval_lambda(env, &ident, Span(*val), body.clone()))
 				.map(|expr| match expr {
 					Ok(Primitive(inner)) => Ok(inner),
 					Ok(_) => Err(Error::BadType(name)),

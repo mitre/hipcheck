@@ -11,7 +11,6 @@
 //! A macro is provided to automatically tag timings with the file and line number that they were created on.
 
 use crate::shell::Shell;
-pub use print_scope_time;
 use std::time::Instant;
 
 /// Structure used to track timing that will print its location and elapsed time when dropped.
@@ -47,7 +46,7 @@ macro_rules! print_scope_time {
 		))
 	};
 
-	($msg:literal) => {
+	($msg:expr) => {
 		$crate::benchmarking::PrintTime::new(format!(
 			"{}:{}:{} ({})",
 			module_path!(),
@@ -57,3 +56,6 @@ macro_rules! print_scope_time {
 		))
 	};
 }
+
+// Make `print_scope_time` available through `benchmarking` module
+pub(super) use print_scope_time;

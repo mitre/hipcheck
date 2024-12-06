@@ -2,32 +2,47 @@
     {# TODO: Don't hide this on mobile #}
     <div class="
             hidden
-            lg:block
+            lg:flex
             text-sm
-            text-zinc-500 dark:text-zinc-400
-            px-14 p-2
+            text-neutral-500
+            dark:text-neutral-400
+            px-8 p-2
             mx-[-0.5rem]
-            border-t border-zinc-100 dark:border-zinc-800
+            border-t
+            border-neutral-200
+            dark:border-neutral-800
             rounded-md
+            bg-neutral-50
+            dark:bg-neutral-700
+            gap-3
             ">
+
+        {# Always show 'Home' first #}
         <a href="{{ get_url(path="@/_index.md") }}" class="
                 font-normal
-                no-underline hover:underline
+                underline
+                hover:text-blue-500
                 ">
             Home
         </a>
+
+        {# For each ancestor, show separator and link #}
 
         {% for ancestor in current.ancestors %}
             {% if loop.first %}
                 {% continue %}
             {% endif %}
 
+            <span class="text-neutral-300">›</span>
+
             {% set section = get_section(path=ancestor) %}
-            <span class="text-zinc-300 px-1">›</span>
-            <a href="{{ section.permalink }}" class="font-normal no-underline hover:underline">{{ section.title }}</a>
+            <a href="{{ section.permalink }}" class="font-normal underline hover:text-blue-500">{{ section.title }}</a>
         {% endfor %}
 
-        <span class="text-zinc-300 px-1">›</span>
-        <a href="{{ current.permalink }}" class="font-normal no-underline hover:underline">{{ current.title }}</a>
+        {# For current, show separator and link #}
+
+        <span class="text-neutral-300">›</span>
+
+        <span href="{{ current.permalink }}" class="font-normal no-underline">{{ current.title }}</span>
     </div>
 {% endmacro breadcrumbs %}

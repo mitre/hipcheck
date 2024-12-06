@@ -1,20 +1,21 @@
 [package]
-name = "git_sdk"
+name = "git"
 version = "0.1.0"
 license = "Apache-2.0"
 edition = "2021"
+repository = "https://github.com/mitre/hipcheck"
 publish = false
 
 [dependencies]
 anyhow = "1.0.91"
-clap = { version = "4.5.18", features = ["derive"] }
-hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"]}
-jiff = { version = "0.1.13", features = ["serde"] }
+clap = { version = "4.5.21", features = ["derive"] }
+hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"] }
+jiff = { version = "0.1.14", features = ["serde"] }
 log = "0.4.22"
 nom = "7.1.3"
 once_cell = "1.10.0"
 schemars = { version = "0.8.21", features = ["url"] }
 semver = "1.0.9"
-serde = { version = "1.0.210", features = ["derive", "rc"] }
-tokio = { version = "1.40.0", features = ["rt"] }
-which = { version = "6.0.3", default-features = false }
+serde = { version = "1.0.215", features = ["derive", "rc"] }
+tokio = { version = "1.41.1", features = ["rt"] }
+which = { version = "7.0.0", default-features = false }

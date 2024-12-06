@@ -9,7 +9,7 @@ readme = "../README.md"
 version = "3.7.0"
 edition = "2021"
 license = "Apache-2.0"
-homepage = "https://mitre.github.io/hipcheck"
+homepage = "https://hipcheck.mitre.org"
 repository = "https://github.com/mitre/hipcheck"
 include = ["src/**", "../LICENSE", "../README.md", "build.rs", "proto/**"]
 
@@ -33,22 +33,22 @@ benchmarking = []
 
 async-stream = "0.3.6"
 base64 = "0.22.1"
-blake3 = "1.5.4"
+blake3 = "1.5.5"
 content_inspector = "0.2.4"
-cyclonedx-bom = "0.7.0"
+cyclonedx-bom = "0.8.0"
 dotenv = "0.15.0"
 chrono = { version = "0.4.19", features = ["alloc", "serde"] }
-clap = { version = "4.5.18", features = ["derive"] }
+clap = { version = "4.5.21", features = ["derive"] }
 console = { version = "0.15.8", features = ["windows-console-colors"] }
 dashmap = { version = "6.1.0", features = ["rayon", "inline"] }
 dialoguer = "0.11.0"
 dirs = "5.0.1"
 duct = "0.13.5"
 env_logger = { version = "0.11.5" }
-finl_unicode = { version = "1.2.0", default-features = false, features = [
+finl_unicode = { version = "1.3.0", default-features = false, features = [
     "grapheme_clusters",
 ] }
-flate2 = "1.0.34"
+flate2 = "1.0.35"
 fs_extra = "1.3.0"
 futures = "0.3.31"
 # Vendor libgit2 and openssl so that they will be statically included
@@ -67,11 +67,11 @@ graphql_client = "0.14.0"
 # See: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#multiple-locations
 hipcheck-macros = { path = "../hipcheck-macros", version = "0.3.1" }
 http = "1.1.0"
-indexmap = "2.6.0"
+indexmap = "2.7.0"
 indextree = "4.7.3"
-indicatif = { version = "0.17.8", features = ["rayon"] }
+indicatif = { version = "0.17.9", features = ["rayon"] }
 itertools = "0.13.0"
-jiff = "0.1.13"
+jiff = "0.1.14"
 kdl = "4.6.0"
 log = "0.4.22"
 logos = "0.14.2"
@@ -80,7 +80,7 @@ nom = "7.1.3"
 num-traits = "0.2.19"
 num_enum = "0.7.3"
 once_cell = "1.20.2"
-ordered-float = { version = "4.4.0", features = ["serde"] }
+ordered-float = { version = "4.5.0", features = ["serde"] }
 packageurl = "0.4.1"
 paste = "1.0.7"
 pathbuf = "1.0.0"
@@ -88,7 +88,7 @@ petgraph = { version = "0.6.0", features = ["serde-1"] }
 prost = "0.13.3"
 rand = "0.8.5"
 rayon = "1.10.0"
-regex = "1.11.0"
+regex = "1.11.1"
 # Exactly matching the version of rustls used by ureq
 # Get rid of default features since we don't use the AWS backed crypto
 # provider (we use ring) and it breaks stuff on windows.
@@ -100,18 +100,24 @@ rustls = { version = "0.23.10", default-features = false, features = [
 ] }
 rustls-native-certs = "0.8.0"
 salsa = "0.16.1"
-schemars = { version = "0.8.21", default-features = false, features = ["derive", "preserve_order", "chrono", "url"] }
+schemars = { version = "0.8.21", default-features = false, features = [
+    "derive",
+    "preserve_order",
+    "chrono",
+    "url",
+] }
 semver = "1.0.9"
-serde = { version = "1.0.210", features = ["derive", "rc"] }
+serde = { version = "1.0.215", features = ["derive", "rc"] }
 serde_derive = "1.0.137"
-serde_json = "1.0.128"
+serde_json = "1.0.133"
 sha256 = { version = "1.5.0", default-features = false }
 smart-default = "0.7.1"
 spdx-rs = "0.5.0"
-tabled = "0.16.0"
-tar = "0.4.42"
+tabled = "0.17.0"
+tar = "0.4.43"
+tempfile = "3.14.0"
 term_size = "0.3.2"
-tokio = { version = "1.40.0", features = [
+tokio = { version = "1.41.1", features = [
     "rt",
     "rt-multi-thread",
     "sync",
@@ -120,39 +126,35 @@ tokio = { version = "1.40.0", features = [
 tokio-stream = "0.1.16"
 toml = "0.8.19"
 tonic = "0.12.3"
-thiserror = "1.0.65"
+thiserror = "2.0.3"
 unicode-normalization = "0.1.24"
 ureq = { version = "2.10.1", default-features = false, features = [
     "json",
     "tls",
 ] }
-url = { version = "2.5.2", features = ["serde"] }
+url = { version = "2.5.4", features = ["serde"] }
 walkdir = "2.5.0"
-which = { version = "6.0.3", default-features = false }
-xml-rs = "0.8.22"
+which = { version = "7.0.0", default-features = false }
+xml-rs = "0.8.23"
 xz2 = "0.1.7"
-zip = "2.2.0"
+zip = "2.2.1"
 zip-extensions = "0.8.1"
 zstd = "0.13.2"
+hipcheck-common = { version = "0.1.0", path = "../hipcheck-common" }
+serde_with = "3.11.0"
 
 [build-dependencies]
 
 anyhow = "1.0.91"
 pathbuf = "1.0.0"
 schemars = { version = "0.8.21", features = ["chrono", "url"] }
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = "1.0.128"
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.133"
 tonic-build = "0.12.3"
-url = { version = "2.5.2", features = ["serde"] }
-which = { version = "6.0.3", default-features = false }
+url = { version = "2.5.4", features = ["serde"] }
+which = { version = "7.0.0", default-features = false }
 
 [dev-dependencies]
 
 dirs = "5.0.1"
-tempfile = "3.13.0"
 test-log = "0.2.16"
-
-[package.metadata.dist]
-
-# Make sure that `cargo-dist` can find this binary.
-dist = true

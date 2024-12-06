@@ -1,8 +1,4 @@
-
-{% import "macros/icon.tera.html" as ic %}
-{% import "macros/toc.tera.html" as toc %}
-
-{% extends "bases/base.tera.html" %}
+{% extends "bases/docs.tera.html" %}
 
 {% block title %}
     {% if section.title %}
@@ -12,18 +8,45 @@
     {% endif %}
 {% endblock %}
 
-{% block sidebar %}
-{% endblock %}
-
 {% block content %}
     {{ section.content | safe }}
 
-    <ol>
-        {% for page in section.pages %}
+    <table>
+        <thead class="bg-neutral-100 dark:bg-neutral-800 font-medium">
+            <tr>
+                <td class="px-2">#</td>
+                <td class="px-2">Name</td>
+                <td class="px-2">Status</td>
+                <td class="px-2">Primary Author</td>
+                <td class="px-2">Submission</td>
+            </tr>
+        </thead>
+        <tbody>
+            {% for page in section.pages %}
+                <tr class="even:bg-neutral-50 dark:even:bg-neutral-800">
+                    <td class="px-2">{{ page.extra.rfd | default(value="???") }}</td>
+                    <td><a href="{{ page.permalink }}">{{ page.title }}</a></td>
+                    <td>{{ page.extra.status | default(value="Unknown") }}</td>
+                    <td>
+                        {% if page.extra.primary_author_link %}
+                            <a href="{{ page.extra.primary_author_link }}">
+                        {% endif %}
+                            {{ page.extra.primary_author | default(value="Unknown") }}
+                        {% if page.extra.primary_author_link %}
+                            </a>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if page.extra.pr %}
+                            <a href="https://github.com/mitre/hipcheck/pull/{{ page.extra.pr }}">PR #{{ page.extra.pr }}</a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
 
-            <li>
-                <a href="{{ page.permalink }}">{% if page.extra.rfd %}RFD #{{ page.extra.rfd }}: {% endif %}{{ page.title }}</a></li>
-
-        {% endfor %}
-    </ol>
+{% block sidebar %}
+    {{ toc::toc(content=section.toc, is_doc=true) }}
 {% endblock %}

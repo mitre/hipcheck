@@ -1,8 +1,4 @@
-
-{% import "macros/icon.tera.html" as ic %}
-{% import "macros/toc.tera.html" as toc %}
-
-{% extends "bases/base.tera.html" %}
+{% extends "bases/blog.tera.html" %}
 
 {% block title %}
     {% if section.title %}
@@ -12,27 +8,37 @@
     {% endif %}
 {% endblock %}
 
-{% block sidebar %}
-{% endblock %}
-
 {% block content %}
     {{ section.content | safe }}
 
-    {% for page in section.pages %}
-
-        <article>
-            <header>
-                <h2 class="text-4xl"><a class="no-underline font-extrabold" href="{{ page.permalink }}">{{ page.title }}</a></h2>
-                <p class="">Posted on {{ page.date | date(format="%B %-d, %Y") }}</p>
-
-                {% if page.summary %}
-                    {{ page.summary | safe }}
-                {% endif %}
-
-            </header>
-
-        </article>
-
-    {% endfor %}
+    <div class="grid lg:grid-cols-2 gap-8">
+        {% for page in section.pages %}
+            <a class="no-underline hover:text-blue-500 group" href="{{ page.permalink }}">
+                <article class="p-5 lg:p-10 rounded-xl bg-neutral-50 dark:bg-neutral-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-500">
+                    <div class="flex flex-col gap-4 items-stretch">
+                        <div class="">
+                            <h2 class="text-xl font-semibold !m-0 dark:text-neutral-200 dark:group-hover:text-white">{{ page.title }}</h2>
+                        </div>
+                        <div class="dark:text-neutral-400 dark:group-hover:text-white">
+                            {% if page.summary %}
+                                {{ page.summary | safe }}
+                            {% endif %}
+                        </div>
+                        <div class="flex gap-4 items-center">
+                            <div class="flex-initial">
+                                <div class="bg-white dark:bg-neutral-700 rounded-full p-1 shadow-sm border border-neutral-300 dark:border-neutral-600 dark:group-hover:bg-white dark:group-hover:border-white">
+                                    <img class="rounded-full w-10 h-10" src="{{ config.base_url }}/{{ page.extra.author_img }}">
+                                </div>
+                            </div>
+                            <div class="flex-shrink text-neutral-500 group-hover:text-blue-500 dark:group-hover:text-white text-sm leading-relaxed">
+                                <p>Written by {{ page.authors.0 }}</p>
+                                <p>Posted on {{ page.date | date(format="%B %-d, %Y") }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </a>
+        {% endfor %}
+    </div>
 
 {% endblock %}

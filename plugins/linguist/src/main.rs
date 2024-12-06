@@ -5,12 +5,10 @@
 mod fs;
 mod linguist;
 
-use linguist::SourceFileDetector;
-
 use clap::Parser;
 use hipcheck_sdk::prelude::*;
+use linguist::SourceFileDetector;
 use serde::Deserialize;
-
 use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
 #[derive(Deserialize)]

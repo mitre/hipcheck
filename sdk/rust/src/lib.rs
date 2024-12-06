@@ -12,9 +12,8 @@ use std::str::FromStr;
 #[cfg(feature = "macros")]
 extern crate hipcheck_sdk_macros;
 
-mod proto {
-	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
-}
+#[cfg(feature = "print-timings")]
+mod benchmarking;
 
 pub mod error;
 mod mock;
@@ -40,6 +39,7 @@ pub mod prelude {
 
 /// re-export of user-facing third-party dependencies
 pub mod deps {
+	pub use jiff::{Span, Zoned};
 	pub use schemars::{schema::SchemaObject as JsonSchema, schema_for};
 	pub use serde_json::{from_str, from_value, to_value, Value};
 	pub use tonic::async_trait;

@@ -1,0 +1,17 @@
+{% extends "bases/docs.tera.html" %}
+
+{% block title %}
+    {% if section.title %}
+        {{ section.title }}
+    {% else %}
+        Hipcheck
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {{ section.content | safe }}
+{% endblock %}
+
+{% block sidebar %}
+    {{ toc::toc(content=section.toc, is_doc=true) }}
+{% endblock %}

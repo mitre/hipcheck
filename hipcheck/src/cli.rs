@@ -293,10 +293,9 @@ impl CliConfig {
 		CliConfig {
 			path_args: PathArgs {
 				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
-				// TODO: currently if this is set, then when running `hc check`, it errors out
-				// because policy files are not yet supported
-				// policy: env::current_dir().ok().map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
-				policy: None,
+				policy: std::env::current_dir()
+					.ok()
+					.map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
 			},
 			deprecated_args: DeprecatedArgs {
 				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),
@@ -929,8 +928,6 @@ impl TryFrom<Vec<String>> for RepoCacheDeleteScope {
 pub struct PluginArgs {
 	#[arg(long = "async")]
 	pub asynch: bool,
-	#[arg(long = "sdk")]
-	pub sdk: bool,
 }
 
 /// The format to report results in.

@@ -1,22 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proto::QueryState;
 use crate::{
 	error::{Error, Result},
-	proto::{
-		self, InitiateQueryProtocolRequest, InitiateQueryProtocolResponse, Query as PluginQuery,
-	},
 	QueryTarget,
 };
 use crate::{mock::MockResponses, JsonValue, Plugin};
 use futures::Stream;
+use hipcheck_common::proto::{
+	self, InitiateQueryProtocolRequest, InitiateQueryProtocolResponse, Query as PluginQuery,
+	QueryState,
+};
+use hipcheck_common::{
+	chunk::QuerySynthesizer,
+	types::{Query, QueryDirection},
+};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use std::{
 	collections::{HashMap, VecDeque},
 	future::poll_fn,
-	ops::Not,
 	pin::Pin,
 	result::Result as StdResult,
 };
@@ -27,62 +30,6 @@ impl From<Status> for Error {
 	fn from(_value: Status) -> Error {
 		// TODO: higher-fidelity handling?
 		Error::SessionChannelClosed
-	}
-}
-
-#[derive(Debug)]
-struct Query {
-	direction: QueryDirection,
-	publisher: String,
-	plugin: String,
-	query: String,
-	key: Value,
-	output: Value,
-	concerns: Vec<String>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum QueryDirection {
-	Request,
-	Response,
-}
-
-impl TryFrom<QueryState> for QueryDirection {
-	type Error = Error;
-
-	fn try_from(value: QueryState) -> std::result::Result<Self, Self::Error> {
-		match value {
-			QueryState::Unspecified => Err(Error::UnspecifiedQueryState),
-			QueryState::Submit => Ok(QueryDirection::Request),
-			QueryState::ReplyInProgress => Err(Error::UnexpectedReplyInProgress),
-			QueryState::ReplyComplete => Ok(QueryDirection::Response),
-		}
-	}
-}
-
-impl From<QueryDirection> for QueryState {
-	fn from(value: QueryDirection) -> Self {
-		match value {
-			QueryDirection::Request => QueryState::Submit,
-			QueryDirection::Response => QueryState::ReplyComplete,
-		}
-	}
-}
-
-impl TryFrom<PluginQuery> for Query {
-	type Error = Error;
-
-	fn try_from(value: PluginQuery) -> Result<Query> {
-		Ok(Query {
-			direction: QueryDirection::try_from(value.state())?,
-			publisher: value.publisher_name,
-			plugin: value.plugin_name,
-			query: value.query_name,
-			key: serde_json::from_str(value.key.as_str()).map_err(Error::InvalidJsonInQueryKey)?,
-			output: serde_json::from_str(value.output.as_str())
-				.map_err(Error::InvalidJsonInQueryOutput)?,
-			concerns: value.concern,
-		})
 	}
 }
 
@@ -141,6 +88,7 @@ impl PluginEngine {
 			// Normal execution, send messages to hipcheck core to query other plugin
 			else {
 				let query = Query {
+					id: 0,
 					direction: QueryDirection::Request,
 					publisher: target.publisher,
 					plugin: target.plugin,
@@ -164,30 +112,10 @@ impl PluginEngine {
 		self.id
 	}
 
-	// Roughly equivalent to TryFrom, but the `id` field value
-	// comes from the QuerySession
-	fn convert(&self, value: Query) -> Result<PluginQuery> {
-		let state: QueryState = value.direction.into();
-		let key = serde_json::to_string(&value.key).map_err(Error::InvalidJsonInQueryKey)?;
-		let output =
-			serde_json::to_string(&value.output).map_err(Error::InvalidJsonInQueryOutput)?;
-
-		Ok(PluginQuery {
-			id: self.id() as i32,
-			state: state as i32,
-			publisher_name: value.publisher,
-			plugin_name: value.plugin,
-			query_name: value.query,
-			key,
-			output,
-			concern: value.concerns,
-		})
-	}
-
 	async fn recv_raw(&mut self) -> Result<Option<VecDeque<PluginQuery>>> {
 		let mut out = VecDeque::new();
 
-		eprintln!("SDK: awaiting raw rx recv");
+		log::trace!("SDK: awaiting raw rx recv");
 
 		let opt_first = self.rx.recv().await.ok_or(Error::SessionChannelClosed)?;
 
@@ -204,7 +132,7 @@ impl PluginEngine {
 					out.push_back(msg);
 				}
 				Ok(None) => {
-					eprintln!("warning: None received, gRPC channel closed. we may not close properly if None is not returned again");
+					log::warn!("None received, gRPC channel closed. we may not close properly if None is not returned again");
 					break;
 				}
 				// Whether empty or disconnected, we return what we have
@@ -213,80 +141,57 @@ impl PluginEngine {
 				}
 			}
 		}
+
 		Ok(Some(out))
 	}
 
 	// Send a gRPC query from plugin to the hipcheck server
-	async fn send(&self, query: Query) -> Result<()> {
-		let query = InitiateQueryProtocolResponse {
-			query: Some(self.convert(query)?),
-		};
-		self.tx
-			.send(Ok(query))
-			.await
-			.map_err(Error::FailedToSendQueryFromSessionToServer)?;
+	async fn send(&self, mut query: Query) -> Result<()> {
+		query.id = self.id(); // incoming id value is just a placeholder
+		let queries = hipcheck_common::chunk::prepare(query)?;
+		for pq in queries {
+			let query = InitiateQueryProtocolResponse { query: Some(pq) };
+			self.tx
+				.send(Ok(query))
+				.await
+				.map_err(Error::FailedToSendQueryFromSessionToServer)?;
+		}
 		Ok(())
 	}
 
-	async fn recv(&mut self) -> Result<Option<Query>> {
-		let Some(mut msg_chunks) = self.recv_raw().await? else {
-			return Ok(None);
+	async fn send_session_err<P>(&mut self) -> crate::error::Result<()>
+	where
+		P: Plugin,
+	{
+		let query = proto::Query {
+			id: self.id() as i32,
+			state: QueryState::Unspecified as i32,
+			publisher_name: P::PUBLISHER.to_owned(),
+			plugin_name: P::NAME.to_owned(),
+			query_name: "".to_owned(),
+			key: json!(Value::Null).to_string(),
+			output: json!(Value::Null).to_string(),
+			concern: self.take_concerns(),
 		};
-
-		let mut raw: PluginQuery = msg_chunks.pop_front().unwrap();
-		// eprintln!("SDK: recv got raw {raw:?}");
-
-		let mut state: QueryState = raw
-			.state
-			.try_into()
-			.map_err(|_| Error::UnspecifiedQueryState)?;
-
-		// If response is the first of a set of chunks, handle
-		if matches!(state, QueryState::ReplyInProgress) {
-			while matches!(state, QueryState::ReplyInProgress) {
-				// We expect another message. Pull it off the existing queue,
-				// or get a new one if we have run out
-				let next = match msg_chunks.pop_front() {
-					Some(msg) => msg,
-					None => {
-						// We ran out of messages, get a new batch
-						match self.recv_raw().await? {
-							Some(x) => {
-								msg_chunks = x;
-							}
-							None => {
-								return Ok(None);
-							}
-						};
-						msg_chunks.pop_front().unwrap()
-					}
-				};
-
-				// By now we have our "next" message
-				state = next
-					.state
-					.try_into()
-					.map_err(|_| Error::UnspecifiedQueryState)?;
-				match state {
-					QueryState::Unspecified => return Err(Error::UnspecifiedQueryState),
-					QueryState::Submit => return Err(Error::ReceivedSubmitWhenExpectingReplyChunk),
-					QueryState::ReplyInProgress | QueryState::ReplyComplete => {
-						raw.output.push_str(next.output.as_str());
-						raw.concern.extend_from_slice(next.concern.as_slice());
-					}
-				};
-			}
-
-			// Sanity check - after we've left this loop, there should be no left over message
-			if msg_chunks.is_empty().not() {
-				return Err(Error::MoreAfterQueryComplete { id: self.id });
-			}
-		}
-
-		raw.try_into().map(Some)
+		self.tx
+			.send(Ok(InitiateQueryProtocolResponse { query: Some(query) }))
+			.await
+			.map_err(Error::FailedToSendQueryFromSessionToServer)
 	}
 
-	async fn handle_session<P>(&mut self, plugin: Arc<P>) -> crate::error::Result<()>
+	async fn recv(&mut self) -> Result<Option<Query>> {
+		let mut synth = QuerySynthesizer::default();
+		let mut res: Option<Query> = None;
+		while res.is_none() {
+			let Some(msg_chunks) = self.recv_raw().await? else {
+				return Ok(None);
+			};
+			res = synth.add(msg_chunks.into_iter())?;
+		}
+		Ok(res)
+	}
+
+	async fn handle_session_fallible<P>(&mut self, plugin: Arc<P>) -> crate::error::Result<()>
 	where
 		P: Plugin,
 	{
@@ -311,25 +216,48 @@ impl PluginEngine {
 			.or_else(|| plugin.default_query())
 			.ok_or_else(|| Error::UnknownPluginQuery)?;
 
+		#[cfg(feature = "print-timings")]
+		let _0 = crate::benchmarking::print_scope_time!(format!("{}/{}", P::NAME, name));
+
 		let value = query.run(self, key).await?;
 
-		let query = proto::Query {
-			id: self.id() as i32,
-			state: QueryState::ReplyComplete as i32,
-			publisher_name: P::PUBLISHER.to_owned(),
-			plugin_name: P::NAME.to_owned(),
-			query_name: name,
-			key: json!(Value::Null).to_string(),
-			output: value.to_string(),
-			concern: self.take_concerns(),
+		#[cfg(feature = "print-timings")]
+		drop(_0);
+
+		let query = Query {
+			id: self.id(),
+			direction: QueryDirection::Response,
+			publisher: P::PUBLISHER.to_owned(),
+			plugin: P::NAME.to_owned(),
+			query: name.to_owned(),
+			key: json!(Value::Null),
+			output: value,
+			concerns: self.take_concerns(),
 		};
 
-		self.tx
-			.send(Ok(InitiateQueryProtocolResponse { query: Some(query) }))
-			.await
-			.map_err(Error::FailedToSendQueryFromSessionToServer)?;
+		self.send(query).await
+	}
 
-		Ok(())
+	async fn handle_session<P>(&mut self, plugin: Arc<P>)
+	where
+		P: Plugin,
+	{
+		use crate::error::Error::*;
+		if let Err(e) = self.handle_session_fallible(plugin).await {
+			let res_err_send = match e {
+				FailedToSendQueryFromSessionToServer(_) => {
+					log::error!("Failed to send message to Hipcheck core, analysis will hang.");
+					return;
+				}
+				other => {
+					log::error!("{}", other);
+					self.send_session_err::<P>().await
+				}
+			};
+			if res_err_send.is_err() {
+				log::error!("Failed to send message to Hipcheck core, analysis will hang.");
+			}
+		}
 	}
 
 	pub fn record_concern<S: AsRef<str>>(&mut self, concern: S) {
@@ -429,10 +357,10 @@ impl HcSessionSocket {
 	fn cleanup_sessions(&mut self) {
 		while let Ok(id) = self.drop_rx.try_recv() {
 			match self.sessions.remove(&id) {
-				Some(_) => eprintln!("Cleaned up session {id}"),
-				None => eprintln!(
-					"WARNING: HcSessionSocket got request to drop a session that does not exist"
-				),
+				Some(_) => log::trace!("Cleaned up session {id}"),
+				None => {
+					log::warn!("HcSessionSocket got request to drop a session that does not exist")
+				}
 			}
 		}
 	}
@@ -462,15 +390,15 @@ impl HcSessionSocket {
 
 			match self.decide_action(&raw) {
 				Ok(HandleAction::ForwardMsgToExistingSession(tx)) => {
-					eprintln!("SDK: forwarding message to session {id}");
+					log::trace!("SDK: forwarding message to session {id}");
 
 					if let Err(_e) = tx.send(Some(raw)).await {
-						eprintln!("Error forwarding msg to session {id}");
+						log::error!("Error forwarding msg to session {id}");
 						self.sessions.remove(&id);
 					};
 				}
 				Ok(HandleAction::CreateSession) => {
-					eprintln!("SDK: creating new session {id}");
+					log::trace!("SDK: creating new session {id}");
 
 					let (in_tx, rx) = mpsc::channel::<Option<PluginQuery>>(10);
 					let tx = self.tx.clone();
@@ -488,12 +416,12 @@ impl HcSessionSocket {
 						"Failed sending message to newly created Session, should never happen",
 					);
 
-					eprintln!("SDK: adding new session {id} to tracker");
+					log::trace!("SDK: adding new session {id} to tracker");
 					self.sessions.insert(id, in_tx);
 
 					return Ok(Some(session));
 				}
-				Err(e) => eprintln!("error: {}", e),
+				Err(e) => log::error!("{}", e),
 			}
 		}
 	}
@@ -520,15 +448,13 @@ impl HcSessionSocket {
 				.await
 				.map_err(|_| Error::SessionChannelClosed)?
 			else {
-				eprintln!("Channel closed by remote");
+				log::trace!("Channel closed by remote");
 				break;
 			};
 
 			let cloned_plugin = plugin.clone();
 			tokio::spawn(async move {
-				if let Err(e) = engine.handle_session(cloned_plugin).await {
-					panic!("handle_session failed: {e}");
-				};
+				engine.handle_session(cloned_plugin).await;
 			});
 		}
 

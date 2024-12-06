@@ -1,5 +1,7 @@
 ---
 title: Documentation
+template: docs.html
+page_template: docs_page.html
 sort_by: weight
 ---
 
@@ -7,25 +9,22 @@ sort_by: weight
 
 Welcome to the official Hipcheck documentation!
 
-## Quickstart
+<div class="grid grid-cols-2 gap-8 mt-8">
 
-This is a guide to installing and running Hipcheck for the first time, and
-is our recommended starting point for beginners!
+{% waypoint(title="Getting Started", path="@/docs/getting-started/_index.md", icon="map-pin") %}
+A guide to installing and running Hipcheck for the first time.
+{% end %}
 
-{{ button(link="@/docs/quickstart/_index.md", text="Check out the Quickstart Guide") }}
+{% waypoint(title="Complete Guide", path="@/docs/guide/_index.md", icon="map") %}
+A complete guide to all of Hipcheck's functionality.
+{% end %}
 
-## Complete Guide
+{% waypoint(title="Contribute", path="@/docs/contributing/_index.md", icon="award") %}
+Learn how to make contributions to Hipcheck itself.
+{% end %}
 
-This is a complete guide to all of Hipcheck's functionality, including both
-how to use Hipcheck and how to develop plugins for Hipcheck.
+{% waypoint(title="RFDs", path="@/docs/rfds/_index.md", icon="pen-tool") %}
+Design documents proposing important changes to Hipcheck.
+{% end %}
 
-{{ button(link="@/docs/guide/_index.md", text="Check out the Complete Guide") }}
-
-## RFDs
-
-Hipcheck's evolution is managed by Requests for Discussion (RFDs), documents
-which describe in detail any proposals for improvement or modification of
-Hipcheck's behavior. This list shows all completed RFDs; draft or proposed
-RFDs can be found on the [Hipcheck GitHub repository](https://github.com/mitre/hipcheck).
-
-{{ button(link="@/rfds/_index.md", text="Check out the RFDs") }}
+</div>

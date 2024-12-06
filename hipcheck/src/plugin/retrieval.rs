@@ -2,18 +2,17 @@
 
 use crate::{
 	cache::plugin::HcPluginCache,
-	config::MITRE_PUBLISHER,
 	error::Error,
 	hc_error,
 	plugin::{
-		download_manifest::DownloadManifestEntry, ArchiveFormat, DownloadManifest, HashAlgorithm,
-		HashWithDigest, PluginId, PluginManifest,
+		download_manifest::DownloadManifestEntry, try_get_bin_for_entrypoint, ArchiveFormat,
+		DownloadManifest, HashAlgorithm, HashWithDigest, PluginId, PluginManifest,
 	},
 	policy::policy_file::{ManifestLocation, PolicyPlugin},
-	util::http::agent::agent,
+	util::{fs::file_sha256, http::agent::agent},
 };
 use flate2::read::GzDecoder;
-use fs_extra::dir::remove;
+use fs_extra::{dir::remove, file::write_all};
 use std::{
 	collections::HashSet,
 	fs::File,
@@ -27,33 +26,17 @@ use xz2::read::XzDecoder;
 
 use super::get_current_arch;
 
-/// The plugins currently are not delegated via the `plugin` system and are still part of `hipcheck` core
-pub const MITRE_LEGACY_PLUGINS: [&str; 7] = [
-	"activity",
-	"entropy",
-	"affiliation",
-	"binary",
-	"churn",
-	"review",
-	"typo",
-];
-
 /// determine all of the plugins that need to be run and locate download them, if they do not exist
 pub fn retrieve_plugins(
 	policy_plugins: &[PolicyPlugin],
 	plugin_cache: &HcPluginCache,
 ) -> Result<HashSet<PluginId>, Error> {
+	#[cfg(feature = "print-timings")]
+	let _0 = crate::benchmarking::print_scope_time!("retrieve plugins");
+
 	let mut required_plugins = HashSet::new();
 
 	for policy_plugin in policy_plugins.iter() {
-		// TODO: while the legacy passes are still integrated in the main codebase, we skip downloading them!
-		if policy_plugin.name.publisher.0.as_str() == MITRE_PUBLISHER
-			&& MITRE_LEGACY_PLUGINS
-				.iter()
-				.any(|x| *x == policy_plugin.name.name.0.as_str())
-		{
-			continue;
-		}
 		retrieve_plugin(
 			policy_plugin.get_plugin_id(),
 			&policy_plugin.manifest,
@@ -123,33 +106,71 @@ fn retrieve_plugin_from_network(
 	))
 }
 
-/// retrieves a plugin from the local filesystem
+/// retrieves a plugin from the local filesystem by copying its `plugin.kdl` and `entrypoint` binary to the plugin_cache
 fn retrieve_local_plugin(
 	plugin_id: PluginId,
 	plugin_manifest_path: &PathBuf,
 	plugin_cache: &HcPluginCache,
 ) -> Result<PluginManifest, Error> {
 	let download_dir = plugin_cache.plugin_download_dir(&plugin_id);
-	std::fs::create_dir_all(download_dir.as_path()).map_err(|e| {
+	std::fs::create_dir_all(&download_dir).map_err(|e| {
 		hc_error!(
 			"Error [{}] creating download directory {}",
 			e,
 			download_dir.to_string_lossy()
 		)
 	})?;
-	let plugin_kdl_path = plugin_cache.plugin_kdl(&plugin_id);
 
-	// @Note - sneaky potential for unexpected behavior if we write local plugin manifest
-	// to a cache dir that already included a remote download
-	std::fs::copy(plugin_manifest_path, &plugin_kdl_path).map_err(|e| {
+	let mut plugin_manifest = PluginManifest::from_file(plugin_manifest_path)?;
+	let current_arch = get_current_arch();
+
+	let curr_entrypoint = plugin_manifest.get_entrypoint_for(&current_arch)?;
+
+	if let Some(curr_bin) = try_get_bin_for_entrypoint(&curr_entrypoint).0 {
+		// Only do copy if using a path to a binary instead of a PATH-based resolution (i.e.
+		// `docker _`. We wouldn't want to copy the `docker` binary in this case
+		if std::fs::exists(curr_bin)? {
+			let original_entrypoint = plugin_manifest
+				.update_entrypoint(&current_arch, plugin_cache.plugin_download_dir(&plugin_id))?;
+
+			let new_entrypoint = plugin_manifest.get_entrypoint_for(&current_arch)?;
+			// unwrap is safe here, we just updated the entrypoint for current arch
+			let new_bin = try_get_bin_for_entrypoint(&new_entrypoint).0.unwrap();
+
+			// path where the binary for this plugin will get cached
+			let binary_cache_location = plugin_cache.plugin_download_dir(&plugin_id).join(new_bin);
+
+			// if on windows, first check if we can skip copying. this is because windows won't let
+			// you overwrite a plugin binary that is currently in use (such as when another hc
+			// instance is already running)
+			if !cfg!(target_os = "windows")
+				|| file_sha256(&original_entrypoint)?
+					!= file_sha256(&binary_cache_location).unwrap_or_default()
+			{
+				// @Note - sneaky potential for unexpected behavior if we write local plugin manifest
+				// to a cache dir that already included a remote download
+				//
+				// Due to an issue that arises on macOS when copying a binary over a running copy of a binary, we copy the
+				// file to a temp file, then move it, rather than copying directly to its source
+				//
+				// See: https://forums.developer.apple.com/forums/thread/126187
+				let tmp_file = tempfile::NamedTempFile::new()?;
+				std::fs::copy(&original_entrypoint, tmp_file.path())?;
+				std::fs::rename(tmp_file, binary_cache_location)?;
+			}
+		}
+	}
+
+	let plugin_kdl_path = plugin_cache.plugin_kdl(&plugin_id);
+	write_all(&plugin_kdl_path, &plugin_manifest.to_kdl_formatted_string()).map_err(|e| {
 		hc_error!(
-			"Error [{}] copying local plugin manifest for {} to cache",
+			"Error [{}] writing {}",
 			e,
-			plugin_id.to_policy_file_plugin_identifier()
+			plugin_kdl_path.to_string_lossy()
 		)
 	})?;
 
-	PluginManifest::from_file(plugin_kdl_path)
+	Ok(plugin_manifest)
 }
 
 /// This function does the following:

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use hipcheck_sdk::types::LocalGitRepo;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -8,8 +9,19 @@ use std::{
 	sync::Arc,
 };
 
+/// A locally stored git repo, with optional additional details
+/// The details will vary based on the query (e.g. a date, a committer e-mail address, a commit hash)
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct DetailedGitRepo {
+	/// The local repo
+	pub local: LocalGitRepo,
+
+	/// Optional additional information for the query
+	pub details: Option<String>,
+}
+
 /// Commits as they come directly out of `git log`.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct RawCommit {
 	pub hash: String,
 

@@ -7,8 +7,9 @@ use anyhow::{Context as _, Error, Result};
 use jiff::Timestamp;
 use nom::{
 	branch::alt,
-	character::complete::{char as character, digit1, not_line_ending, one_of, space1},
-	combinator::{opt, peek, recognize},
+	bytes::complete::tag,
+	character::complete::{char as character, digit1, newline, not_line_ending, one_of, space1},
+	combinator::{map, opt, peek, recognize},
 	error::{Error as NomError, ErrorKind},
 	multi::{fold_many0, many0, many1, many_m_n},
 	sequence::{preceded, terminated, tuple},
@@ -74,9 +75,11 @@ fn commit(input: &str) -> IResult<&str, RawCommit> {
 	let (input, committer_name) = line(input)?;
 	let (input, committer_email) = line(input)?;
 	let (input, committed_on_str) = line(input)?;
-	// For now, we do not use a commit's signer information
-	let (input, _signer_name) = line(input)?;
-	let (input, _signer_key) = line(input)?;
+	// At one point our `git log` invocation was configured
+	// to return GPG key info, but that was leading to errors
+	// with format and GPG key validation, so we removed it
+	// from the print specifier
+
 	// There is always an empty line here; ignore it
 	let (input, _empty_line) = line(input)?;
 
@@ -149,25 +152,65 @@ fn num(input: &str) -> IResult<&str, i64> {
 	})
 }
 
-fn stat(input: &str) -> IResult<&str, Stat<'_>> {
-	tuple((num, space1, num, space1, line))(input).map(
+fn num_or_dash(input: &str) -> IResult<&str, Option<i64>> {
+	let some_num = map(num, Some);
+	let dash = map(character('-'), |_| None);
+	alt((some_num, dash))(input)
+}
+
+fn stat(input: &str) -> IResult<&str, Option<Stat<'_>>> {
+	tuple((num_or_dash, space1, num_or_dash, space1, line))(input).map(
 		|(i, (lines_added, _, lines_deleted, _, file_name))| {
+			let Some(lines_added) = lines_added else {
+				return (i, None);
+			};
+
+			let Some(lines_deleted) = lines_deleted else {
+				return (i, None);
+			};
+
 			let stat = Stat {
 				lines_added,
 				lines_deleted,
 				file_name,
 			};
 
-			(i, stat)
+			(i, Some(stat))
 		},
 	)
 }
 
-fn stats(input: &str) -> IResult<&str, Vec<Stat<'_>>> {
-	many0(stat)(input)
+pub(crate) fn stats(input: &str) -> IResult<&str, Vec<Stat<'_>>> {
+	map(many0(stat), |vec| {
+		vec.into_iter().flatten().collect::<Vec<_>>()
+	})(input)
 }
 
-fn diff(input: &str) -> IResult<&str, Diff> {
+pub(crate) fn opt_rest_diff_header(input: &str) -> IResult<&str, Diff> {
+	opt(tuple((newline, diff)))(input).map(|(i, x)| {
+		if let Some((_, d)) = x {
+			(i, d)
+		} else {
+			(
+				i,
+				Diff {
+					additions: None,
+					deletions: None,
+					file_diffs: vec![],
+				},
+			)
+		}
+	})
+}
+
+// Some empty commits have no output in the corresponding `git log` command, so we had to add a
+// special header to be able to parse and recognize empty diffs and thus make the number of diffs
+// and commits equal
+pub(crate) fn diff_header(input: &str) -> IResult<&str, Diff> {
+	tuple((tag("~~~\n"), opt_rest_diff_header))(input).map(|(i, (_, diff))| (i, diff))
+}
+
+pub(crate) fn diff(input: &str) -> IResult<&str, Diff> {
 	log::trace!("input is {:#?}", input);
 	tuple((stats, line, patches))(input).map(|(i, (stats, _, patches))| {
 		log::trace!("patches are {:#?}", patches);
@@ -238,8 +281,8 @@ fn gh_diff(input: &str) -> IResult<&str, Diff> {
 	})
 }
 
-fn diffs(input: &str) -> IResult<&str, Vec<Diff>> {
-	many0(diff)(input)
+pub(crate) fn diffs(input: &str) -> IResult<&str, Vec<Diff>> {
+	many0(diff_header)(input)
 }
 
 fn gh_diffs(input: &str) -> IResult<&str, Vec<Diff>> {
@@ -251,7 +294,7 @@ fn meta(input: &str) -> IResult<&str, &str> {
 	recognize(tuple((single_alpha, line)))(input)
 }
 
-fn metas(input: &str) -> IResult<&str, Vec<&str>> {
+pub(crate) fn metas(input: &str) -> IResult<&str, Vec<&str>> {
 	many1(meta)(input)
 }
 
@@ -261,12 +304,20 @@ fn single_alpha(input: &str) -> IResult<&str, &str> {
 	))(input)
 }
 
-fn patch_header(input: &str) -> IResult<&str, &str> {
-	recognize(tuple((metas, line, line)))(input)
+fn triple_plus_minus_line(input: &str) -> IResult<&str, &str> {
+	recognize(tuple((alt((tag("+++"), tag("---"))), line)))(input)
 }
 
-fn plus_or_minus(input: &str) -> IResult<&str, &str> {
-	recognize(one_of("+-"))(input)
+pub(crate) fn patch_header(input: &str) -> IResult<&str, &str> {
+	recognize(tuple((
+		metas,
+		opt(triple_plus_minus_line),
+		opt(triple_plus_minus_line),
+	)))(input)
+}
+
+fn chunk_prefix(input: &str) -> IResult<&str, &str> {
+	recognize(one_of("+-\\"))(input)
 }
 
 fn line_with_ending(input: &str) -> IResult<&str, &str> {
@@ -274,11 +325,15 @@ fn line_with_ending(input: &str) -> IResult<&str, &str> {
 }
 
 fn chunk_line(input: &str) -> IResult<&str, &str> {
-	preceded(plus_or_minus, line_with_ending)(input)
+	preceded(chunk_prefix, line_with_ending)(input)
 }
 
 fn chunk_body(input: &str) -> IResult<&str, String> {
 	fold_many0(chunk_line, String::new, |mut patch, line| {
+		if line == " No newline at end of file\n" {
+			return patch;
+		}
+
 		patch.push_str(line);
 		patch
 	})(input)
@@ -307,8 +362,9 @@ fn patch_footer(input: &str) -> IResult<&str, Option<&str>> {
 	opt(no_newline)(input)
 }
 
-fn patch(input: &str) -> IResult<&str, String> {
-	tuple((patch_header, chunks, patch_footer))(input).map(|(i, (_, chunks, _))| (i, chunks))
+pub(crate) fn patch(input: &str) -> IResult<&str, String> {
+	tuple((patch_header, opt(chunks), patch_footer))(input)
+		.map(|(i, (_, chunks, _))| (i, chunks.unwrap_or_else(String::new)))
 }
 
 fn gh_meta(input: &str) -> IResult<&str, &str> {
@@ -408,10 +464,32 @@ mod test {
 	use super::*;
 
 	#[test]
+	fn parse_diff_header() {
+		let input = "\
+~~~\n\
+~~~\n\
+\n\
+1\t0\trequirements/test_requirements.txt\n\
+\n\
+diff --git a/requirements/test_requirements.txt b/requirements/test_requirements.txt\n\
+index 4e53f86d35..856ecf115e 100644\n\
+--- a/requirements/test_requirements.txt\n\
++++ b/requirements/test_requirements.txt\n\
+@@ -7,0 +8 @@ pytest==7.4.0\n\
++scipy-doctest\n";
+		let (leftover, diffs) = diffs(input).unwrap();
+		assert!(leftover.is_empty());
+		assert_eq!(diffs.len(), 2);
+		assert!(diffs.get(0).unwrap().file_diffs.is_empty());
+		assert!(!(diffs.get(1).unwrap().file_diffs.is_empty()));
+	}
+
+	#[test]
 	fn parse_stat() {
 		let line = "7       0       Cargo.toml\n";
 
 		let (remaining, stat) = stat(line).unwrap();
+		let stat = stat.unwrap();
 
 		assert_eq!("", remaining);
 		assert_eq!(7, stat.lines_added);
@@ -612,13 +690,13 @@ use serde::{Serialize, Deserialize};\n";
 		let input_plus = "+";
 		let expected_plus = "+";
 
-		let (remaining, c) = plus_or_minus(input_plus).unwrap();
+		let (remaining, c) = chunk_prefix(input_plus).unwrap();
 		assert_eq!("", remaining);
 		assert_eq!(expected_plus, c);
 
 		let input_minus = "-";
 		let expected_minus = "-";
-		let (remaining, c) = plus_or_minus(input_minus).unwrap();
+		let (remaining, c) = chunk_prefix(input_minus).unwrap();
 		assert_eq!("", remaining);
 		assert_eq!(expected_minus, c);
 	}

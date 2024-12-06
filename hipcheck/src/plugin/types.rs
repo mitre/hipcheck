@@ -2,16 +2,17 @@
 
 use crate::{
 	hc_error,
-	hipcheck::{
-		plugin_service_client::PluginServiceClient, ConfigurationStatus, Empty,
-		ExplainDefaultQueryRequest, GetDefaultPolicyExpressionRequest, GetQuerySchemasRequest,
-		GetQuerySchemasResponse as PluginSchema, InitiateQueryProtocolRequest,
-		Query as PluginQuery, QueryState, SetConfigurationRequest,
-		SetConfigurationResponse as PluginConfigResult,
-	},
-	Error, Result,
+	policy_exprs::{std_parse, Expr},
+	Result,
 };
 use futures::{Stream, StreamExt};
+use hipcheck_common::proto::{
+	plugin_service_client::PluginServiceClient, ConfigurationStatus, Empty,
+	ExplainDefaultQueryRequest, GetDefaultPolicyExpressionRequest, GetQuerySchemasRequest,
+	GetQuerySchemasResponse as PluginSchema, InitiateQueryProtocolRequest, Query as PluginQuery,
+	SetConfigurationRequest, SetConfigurationResponse as PluginConfigResult,
+};
+use hipcheck_common::{chunk::QuerySynthesizer, types::*};
 use serde_json::Value;
 use std::{
 	collections::{HashMap, VecDeque},
@@ -287,7 +288,20 @@ impl PluginContext {
 
 		self.set_configuration(&config).await?.as_result()?;
 
-		let opt_default_policy_expr = self.get_default_policy_expression().await?;
+		let opt_str = self.get_default_policy_expression().await?;
+		// This is where we turn the `std_parse` error into a user-facing message
+		let opt_default_policy_expr = opt_str
+			.map(|s| {
+				std_parse(s.as_str()).map_err(|e| {
+					hc_error!(
+						"Plugin '{}' has bad default policy expression '{}': {}",
+						self.plugin.name,
+						s,
+						e
+					)
+				})
+			})
+			.transpose()?;
 
 		let opt_explain_default_query = self.explain_default_query().await?;
 
@@ -310,77 +324,6 @@ impl Drop for PluginContext {
 		if let Err(e) = self.proc.kill() {
 			println!("Failed to kill child: {e}");
 		}
-	}
-}
-
-#[derive(Debug)]
-pub struct Query {
-	pub id: usize,
-	// if false, response
-	pub request: bool,
-	pub publisher: String,
-	pub plugin: String,
-	pub query: String,
-	pub key: Value,
-	pub output: Value,
-	pub concerns: Vec<String>,
-}
-
-impl TryFrom<PluginQuery> for Query {
-	type Error = Error;
-
-	fn try_from(value: PluginQuery) -> Result<Query> {
-		use QueryState::*;
-
-		let request = match TryInto::<QueryState>::try_into(value.state)? {
-			Unspecified => return Err(hc_error!("unspecified error from plugin")),
-			ReplyInProgress => {
-				return Err(hc_error!(
-					"invalid state QueryReplyInProgress for conversion to Query"
-				))
-			}
-			ReplyComplete => false,
-			Submit => true,
-		};
-
-		let key: Value = serde_json::from_str(value.key.as_str())?;
-		let output: Value = serde_json::from_str(value.output.as_str())?;
-
-		Ok(Query {
-			id: value.id as usize,
-			request,
-			publisher: value.publisher_name,
-			plugin: value.plugin_name,
-			query: value.query_name,
-			key,
-			output,
-			concerns: value.concern,
-		})
-	}
-}
-
-impl TryFrom<Query> for PluginQuery {
-	type Error = crate::error::Error;
-
-	fn try_from(value: Query) -> Result<PluginQuery> {
-		let state_enum = match value.request {
-			true => QueryState::Submit,
-			false => QueryState::ReplyComplete,
-		};
-
-		let key = serde_json::to_string(&value.key)?;
-		let output = serde_json::to_string(&value.output)?;
-
-		Ok(PluginQuery {
-			id: value.id as i32,
-			state: state_enum as i32,
-			publisher_name: value.publisher,
-			plugin_name: value.plugin,
-			query_name: value.query,
-			key,
-			output,
-			concern: value.concerns,
-		})
 	}
 }
 
@@ -461,7 +404,7 @@ impl MultiplexedQueryReceiver {
 #[derive(Debug)]
 pub struct PluginTransport {
 	pub schemas: HashMap<String, Schema>,
-	pub opt_default_policy_expr: Option<String>,
+	pub opt_default_policy_expr: Option<Expr>,
 	pub opt_explain_default_query: Option<String>,
 	ctx: PluginContext,
 	tx: mpsc::Sender<PluginQuery>,
@@ -474,75 +417,31 @@ impl PluginTransport {
 	}
 
 	pub async fn query(&self, query: Query) -> Result<Option<Query>> {
-		use QueryState::*;
-
 		// Send the query
-		let query: PluginQuery = query.try_into()?;
+		let id = query.id as i32;
+		let queries = hipcheck_common::chunk::prepare(query).map_err(|e| hc_error!("{}", e))?;
 
-		let id = query.id;
-		self.tx
-			.send(query)
-			.await
-			.map_err(|e| hc_error!("sending query failed: {}", e))?;
-
-		// Get initial response batch
-		let mut rx_handle = self.rx.lock().await;
-		let Some(mut msg_chunks) = rx_handle.recv(id).await? else {
-			return Ok(None);
-		};
-		drop(rx_handle);
-
-		let mut raw = msg_chunks.pop_front().unwrap();
-		let mut state: QueryState = raw.state.try_into()?;
-
-		// If response is the first of a set of chunks, handle
-		if matches!(state, ReplyInProgress) {
-			while matches!(state, ReplyInProgress) {
-				// We expect another message. Pull it off the existing queue,
-				// or get a new one if we have run out
-				eprintln!("In progress");
-
-				let next = match msg_chunks.pop_front() {
-					Some(msg) => msg,
-					None => {
-						// We ran out of messages, get a new batch
-						let mut rx_handle = self.rx.lock().await;
-						match rx_handle.recv(id).await? {
-							Some(x) => {
-								drop(rx_handle);
-								msg_chunks = x;
-							}
-							None => {
-								return Ok(None);
-							}
-						};
-						msg_chunks.pop_front().unwrap()
-					}
-				};
-				// By now we have our "next" message
-				state = next.state.try_into()?;
-				match state {
-					Unspecified => return Err(hc_error!("unspecified error from plugin")),
-					Submit => {
-						return Err(hc_error!(
-							"plugin sent QuerySubmit state when reply chunk expected"
-						))
-					}
-					ReplyInProgress | ReplyComplete => {
-						raw.output.push_str(next.output.as_str());
-						raw.concern.extend_from_slice(next.concern.as_slice());
-					}
-				};
-			}
-			// Sanity check - after we've left this loop, there should be no left over message
-			if !msg_chunks.is_empty() {
-				return Err(hc_error!(
-					"received additional messages for id '{}' after QueryComplete status message",
-					id
-				));
-			}
+		for query in queries {
+			self.tx
+				.send(query)
+				.await
+				.map_err(|e| hc_error!("sending query failed: {}", e))?;
 		}
-		raw.try_into().map(Some)
+
+		// De-chunk received messages into a response Query object
+		let mut synth = QuerySynthesizer::default();
+		let mut res: Option<Query> = None;
+		while res.is_none() {
+			// Get initial response batch
+			let mut rx_handle = self.rx.lock().await;
+			let Some(msg_chunks) = rx_handle.recv(id).await? else {
+				return Ok(None);
+			};
+			drop(rx_handle);
+			res = synth.add(msg_chunks.into_iter())?;
+		}
+
+		Ok(res)
 	}
 }
 
@@ -605,7 +504,7 @@ impl From<Option<Query>> for PluginResponse {
 
 impl From<Query> for PluginResponse {
 	fn from(value: Query) -> Self {
-		if !value.request {
+		if value.direction == QueryDirection::Response {
 			let result = QueryResult {
 				value: value.output,
 				concerns: value.concerns,

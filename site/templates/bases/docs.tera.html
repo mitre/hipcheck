@@ -1,0 +1,163 @@
+{% import "macros/breadcrumbs.tera.html" as bc %}
+{% import "macros/icon.tera.html" as ic %}
+{% import "macros/toc.tera.html" as toc %}
+
+<!doctype html>
+<html lang="en-US" class="">
+    <head>
+        <title>{% block title %}Hipcheck{% endblock %}</title>
+        {% include "partials/head.tera.html" %}
+    </head>
+    <body class="bg-white dark:bg-neutral-900">
+        <div class="">
+            <div class="border-b border-neutral-200 dark:border-neutral-800">
+                {% include "partials/nav.tera.html" %}
+
+                {% block breadcrumbs %}
+                    {% set current = section | default(value=page) %}
+                    {{ bc::breadcrumbs(current=current) }}
+                {% endblock %}
+            </div>
+
+            <div class="grid grid-cols-[repeat(16,_minmax(0,_1fr))] border-b border-neutral-100 dark:border-neutral-800">
+                <div class="hidden lg:block col-span-3 border-r border-neutral-100 dark:border-neutral-800">
+                    <div class="h-full">
+                        {% set docs_section = get_section(path="docs/_index.md") %}
+                        <ol class="text-sm sticky top-0 max-h-screen overflow-y-scroll">
+                            <li class=""><span class="text-base font-semibold"><a class="block px-6 py-4 dark:text-neutral-300 hover:text-blue-500" href="{{ get_url(path='@/docs/_index.md') }}">Documentation</a></span></li>
+                            {% for section_path in docs_section.subsections %}
+                                {% set section = get_section(path=section_path) %}
+
+                                <li class="relative">
+                                    <div class="absolute top-[10px] right-4">
+                                        <a href="#" data-section="{{ section.title }}" class="
+                                            docs-nav-toggle
+                                            h-6 w-6
+                                            flex justify-center items-center
+                                            bg-neutral-500/10
+                                            dark:bg-neutral-300/10
+                                            rounded-full
+                                            dark:text-neutral-100/35
+                                            hover:bg-blue-50 hover:text-blue-500
+                                            dark:hover:bg-blue-500 dark:hover:text-white
+                                            transition-[rotate]
+                                            ">
+                                            <span>{{ ic::icon(name="chevron-right", classes="toggle-icon -mt-[1px] !h-4 !w-4") }}</span>
+                                        </a>
+                                    </div>
+
+                                    <div class="">
+                                        <a class="group flex gap-2 items-center font-medium py-3 px-6 text-neutral-700 dark:text-neutral-400 hover:bg-blue-50 dark:hover:bg-blue-500 hover:text-blue-500 dark:hover:text-white border-t border-neutral-200 dark:border-neutral-800 hover:border-blue-200 dark:hover:border-blue-300" href="{{ section.permalink }}">
+                                            {% if section.title == "Getting Started" %}
+                                                {{ ic::icon(name="map-pin", classes="!fill-neutral-400 group-hover:!fill-blue-500 dark:group-hover:!fill-white") }}
+                                            {% elif section.title == "Complete Guide" %}
+                                                {{ ic::icon(name="map", classes="!fill-neutral-400 group-hover:!fill-blue-500 dark:group-hover:!fill-white") }}
+                                            {% elif section.title == "Contribute" %}
+                                                {{ ic::icon(name="award", classes="!fill-neutral-400 group-hover:!fill-blue-500 dark:group-hover:!fill-white") }}
+                                            {% elif section.title == "Requests for Discussion" %}
+                                                {{ ic::icon(name="pen-tool", classes="!fill-neutral-400 group-hover:!fill-blue-500 dark:group-hover:!fill-white") }}
+                                            {% endif %}
+                                            {{ section.title }}
+                                        </a>
+                                    </div>
+
+                                    <ol class="docs-nav-section mt-1 px-6 mb-4">
+                                        {% if section.title == "Requests for Discussion" %}
+                                            <li>
+                                                <a href="{{ get_url(path='@/docs/rfds/0000-rfds.md') }}" class="{% if section.title == current.title %}text-black dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-600 pointer-events-none font-medium{% else %}text-neutral-500{% endif %} py-1 px-2 -mx-2 block rounded-md hover:bg-blue-50 dark:hover:bg-blue-500 dark:hover:text-white hover:text-blue-500">The RFD Process</a>
+                                            </li>
+                                            <li>
+                                                <a href="{{ get_url(path='@/docs/rfds/_index.md') }}" class="{% if section.title == current.title %}text-black dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-600 pointer-events-none font-medium{% else %}text-neutral-500{% endif %} py-1 px-2 -mx-2 block rounded-md hover:bg-blue-50 dark:hover:bg-blue-500 dark:hover:text-white hover:text-blue-500">All RFDs</a>
+                                            </li>
+                                        {% else %}
+                                            {% for nav_page in section.pages %}
+                                                <li>
+                                                    <a href="{{ nav_page.permalink }}" class="{% if nav_page.title == current.title %}text-black bg-neutral-100 pointer-events-none font-medium{% else %}text-neutral-500{% endif %} py-1 px-2 -mx-2 block rounded-md hover:bg-blue-50 dark:hover:bg-blue-500 dark:hover:text-white hover:text-blue-500">{{ nav_page.title }}</a>
+                                                </li>
+                                            {% endfor %}
+                                        {% endif %}
+
+                                        {% for subsection_path in section.subsections %}
+                                            {% set subsection = get_section(path=subsection_path) %}
+
+                                            <li>
+                                                <a href="{{ subsection.permalink }}" class="{% if subsection.title == current.title %}text-black bg-neutral-100 pointer-events-none font-medium{% else %}text-neutral-500{% endif %} py-1 px-2 -mx-2 block rounded-md hover:bg-blue-50 dark:hover:bg-blue-500 dark:hover:text-white hover:text-blue-500 group">
+                                                    {{ subsection.title }}
+                                                </a>
+
+                                                <ol class="mt-1 border-l border-neutral-300 dark:border-neutral-700 mb-2">
+                                                    {% for nav_page in subsection.pages %}
+                                                        <li class="pl-4">
+                                                            {% if nav_page.extra.nav_title %}
+                                                                {% set subnav_title = nav_page.extra.nav_title %}
+                                                            {% else %}
+                                                                {% set subnav_title = nav_page.title %}
+                                                            {% endif %}
+                                                            <a href="{{ nav_page.permalink }}" class="{% if nav_page.title == current.title %}text-black dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-600 pointer-events-none font-medium{% else %}text-neutral-500{% endif %} my-0 py-1 px-2 -mx-2 block rounded-md hover:bg-blue-50 dark:hover:bg-blue-500 dark:hover:text-white hover:text-blue-500">{{ subnav_title | safe }}</a>
+                                                        </li>
+                                                    {% endfor %}
+                                                </ol>
+                                            </li>
+                                        {% endfor %}
+                                    </ol>
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    </div>
+                </div>
+                <div class="col-span-full lg:col-span-10 px-6 lg:px-20 py-14">
+                    <div class="
+                        max-w-3xl
+                        mx-auto
+                        {% include 'partials/prose-config.tera.html' %}
+                        ">
+                        {% block content %}{% endblock %}
+                    </div>
+
+                    <div class="flex justify-between items-center mt-14">
+                        <div>
+                            {% if current.lower %}
+                                <a class="p-2 px-4
+                                my-6
+                                inline-flex
+                                gap-2
+                                items-center
+                                bg-blue-500 hover:bg-blue-700
+                                text-white
+                                hover:!text-white
+                                no-underline
+                                rounded-lg
+                                font-normal" href="{{ current.lower.permalink }}">{{ ic::icon(name="arrow-left") }}  {{ current.lower.title }}</a>
+                            {% endif %}
+                        </div>
+                        <div>
+                            {% if current.higher %}
+                                <a class="p-2 px-4
+                                my-6
+                                inline-flex
+                                gap-2
+                                items-center
+                                bg-blue-500 hover:bg-blue-700
+                                text-white
+                                hover:!text-white
+                                no-underline
+                                rounded-lg
+                                font-normal" href="{{ current.higher.permalink }}">{{ current.higher.title }} {{ ic::icon(name="arrow-right") }}</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="hidden lg:block col-span-3 p-10 pt-7 border-l border-neutral-100 dark:border-neutral-800">
+                    <div class="sticky top-10">
+                        {% block sidebar %}{% endblock %}
+                    </div>
+                </div>
+            </div>
+
+            {% include "partials/footer.tera.html" %}
+        </div>
+
+        {% include "partials/search.tera.html" %}
+        {% include "partials/end.tera.html" %}
+    </body>
+</html>

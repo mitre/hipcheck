@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/mitre/hipcheck)][release]
 [![Hipcheck Website](https://img.shields.io/badge/Website-blue)][website]
 
-__Go from hundreds of dependencies you can't review, to just a few you can!__
+_Helping maintainers assess software packages for long term risk._
 
 Managing the security risk of third-party software at scale is difficult.
 Normal projects can easily have hundreds of dependencies; far too many to
@@ -19,8 +19,6 @@ software packages and source repositories to understand their software supply
 chain risk. It analyzes a project's _software development practices_ and
 detects _active supply chain attacks_ to give you both a long-term and
 immediate picture of the risk from using a package.
-
-For more information, see ["Why Hipcheck?"][why]
 
 ## Very Quick Explanation
 
@@ -74,10 +72,9 @@ found in the [`LICENSE`](LICENSE) file in this repository.
 > (FEB 2014)][dfars].
 
 [dfars]: https://www.acquisition.gov/dfars/252.227-7014-rights-other-commercial-computer-software-and-other-commercial-computer-software-documentation.
-[quickstart]: https://mitre.github.io/hipcheck/docs/quickstart/
-[install]: https://mitre.github.io/hipcheck/install
+[quickstart]: https://hipcheck.mitre.org/docs/getting-started/first-run/
+[install]: https://hipcheck.mitre.org/docs/getting-started/install/
 [license]: https://github.com/mitre/hipcheck/blob/main/LICENSE
 [release]: https://github.com/mitre/hipcheck/releases/latest
-[rfd_2]: https://mitre.github.io/hipcheck/rfds/0002
-[website]: https://mitre.github.io/hipcheck
-[why]: https://mitre.github.io/hipcheck/docs/guide/why/
+[rfd_2]: https://hipcheck.mitre.org/docs/rfds/0002/
+[website]: https://hipcheck.mitre.org

@@ -9,6 +9,7 @@ use crate::{
 		QueryResult,
 	},
 	policy::PolicyFile,
+	policy_exprs::Expr,
 	Result,
 };
 use futures::future::{BoxFuture, FutureExt};
@@ -27,7 +28,7 @@ pub trait HcEngine: salsa::Database {
 	#[salsa::input]
 	fn core(&self) -> Arc<HcPluginCore>;
 
-	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<String>>;
+	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<Expr>>;
 
 	fn default_query_explanation(
 		&self,
@@ -48,7 +49,7 @@ fn default_policy_expr(
 	db: &dyn HcEngine,
 	publisher: String,
 	plugin: String,
-) -> Result<Option<String>> {
+) -> Result<Option<Expr>> {
 	let core = db.core();
 	let key = get_plugin_key(publisher.as_str(), plugin.as_str());
 	let Some(p_handle) = core.plugins.get(&key) else {
@@ -65,10 +66,7 @@ fn default_query_explanation(
 	let core = db.core();
 	let key = get_plugin_key(publisher.as_str(), plugin.as_str());
 	let Some(p_handle) = core.plugins.get(&key) else {
-		return Err(hc_error!(
-			"Plugin '{}' not found",
-			key,
-		));
+		return Err(hc_error!("Plugin '{}' not found", key,));
 	};
 	Ok(p_handle.get_default_query_explanation().cloned())
 }
@@ -80,9 +78,13 @@ fn query(
 	query: String,
 	key: Value,
 ) -> Result<QueryResult> {
+	let hash_key = get_plugin_key(publisher.as_str(), plugin.as_str());
+
+	#[cfg(feature = "print-timings")]
+	let _0 = crate::benchmarking::print_scope_time!(format!("{}/{}", &hash_key, &query));
+
 	let runtime = RUNTIME.handle();
 	let core = db.core();
-	let hash_key = get_plugin_key(publisher.as_str(), plugin.as_str());
 
 	// Find the plugin
 	let Some(p_handle) = core.plugins.get(&hash_key) else {
@@ -90,22 +92,18 @@ fn query(
 	};
 	// Initiate the query. If remote closed or we got our response immediately,
 	// return
-	eprintln!("Querying {plugin}::{query} with key {key:?}");
 	let mut ar = match runtime.block_on(p_handle.query(query, key))? {
 		PluginResponse::RemoteClosed => {
 			return Err(hc_error!("Plugin channel closed unexpected"));
 		}
 		PluginResponse::Completed(v) => return Ok(v),
-		PluginResponse::AwaitingResult(a) => {
-			eprintln!("awaiting result: {:?}", a);
-			a
-		}
+		PluginResponse::AwaitingResult(a) => a,
 	};
 	// Otherwise, the plugin needs more data to continue. Recursively query
 	// (with salsa memo-ization) to get the needed data, and resume our
 	// current query by providing the plugin the answer.
 	loop {
-		eprintln!("Query needs more info, recursing...");
+		log::trace!("Query needs more info, recursing...");
 		let answer = db
 			.query(
 				ar.publisher.clone(),
@@ -114,7 +112,7 @@ fn query(
 				ar.key.clone(),
 			)?
 			.value;
-		eprintln!("Got answer {answer:?}, resuming");
+		log::trace!("Got answer, resuming");
 		ar = match runtime.block_on(p_handle.resume_query(ar, answer))? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));
@@ -134,14 +132,18 @@ pub fn async_query(
 	key: Value,
 ) -> BoxFuture<'static, Result<QueryResult>> {
 	async move {
-		// Find the plugin
 		let hash_key = get_plugin_key(publisher.as_str(), plugin.as_str());
+
+		#[cfg(feature = "print-timings")]
+		let _0 = crate::benchmarking::print_scope_time!(format!("{}/{}", &hash_key, &query));
+
+		// Find the plugin
 		let Some(p_handle) = core.plugins.get(&hash_key) else {
 			return Err(hc_error!("No such plugin {}", hash_key));
 		};
 		// Initiate the query. If remote closed or we got our response immediately,
 		// return
-		eprintln!("Querying: {query}, key: {key:?}");
+		log::trace!("Querying: {query}, key: {key:?}");
 		let mut ar = match p_handle.query(query, key).await? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));
@@ -155,7 +157,7 @@ pub fn async_query(
 		// (with salsa memo-ization) to get the needed data, and resume our
 		// current query by providing the plugin the answer.
 		loop {
-			eprintln!("Awaiting result, now recursing");
+			log::trace!("Awaiting result, now recursing");
 			let answer = async_query(
 				Arc::clone(&core),
 				ar.publisher.clone(),
@@ -165,7 +167,7 @@ pub fn async_query(
 			)
 			.await?
 			.value;
-			eprintln!("Resuming query with answer {answer:?}");
+			log::trace!("Resuming query with answer {answer:?}");
 			ar = match p_handle.resume_query(ar, answer).await? {
 				PluginResponse::RemoteClosed => {
 					return Err(hc_error!("Plugin channel closed unexpected"));
@@ -203,7 +205,7 @@ impl HcEngineImpl {
 	// independent of Salsa.
 	pub fn new(executor: PluginExecutor, plugins: Vec<PluginWithConfig>) -> Result<Self> {
 		let runtime = RUNTIME.handle();
-		eprintln!("Starting HcPluginCore");
+		log::info!("Starting HcPluginCore");
 		let core = runtime.block_on(HcPluginCore::new(executor, plugins))?;
 		let mut engine = HcEngineImpl {
 			storage: Default::default(),
@@ -226,7 +228,7 @@ pub fn start_plugins(
 		/* max_spawn_attempts */ 3,
 		/* max_conn_attempts */ 5,
 		/* port_range */ 40000..u16::MAX,
-		/* backoff_interval_micros */ 1000,
+		/* backoff_interval_micros */ 100000,
 		/* jitter_percent */ 10,
 	)?;
 

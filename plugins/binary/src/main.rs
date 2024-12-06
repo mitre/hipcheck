@@ -5,19 +5,22 @@ mod error;
 mod fs;
 
 use crate::binary_detector::{detect_binary_files, BinaryFileDetector};
-
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target};
+use hipcheck_sdk::{
+	prelude::*,
+	types::{LocalGitRepo, Target},
+};
 use pathbuf::pathbuf;
 use serde::Deserialize;
-
 use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
 pub static DETECTOR: OnceLock<BinaryFileDetector> = OnceLock::new();
 
 #[derive(Deserialize)]
 struct RawConfig {
+	#[serde(rename = "binary-file")]
 	binary_file: Option<PathBuf>,
+	#[serde(rename = "binary-file-threshold")]
 	binary_file_threshold: Option<u64>,
 }
 
@@ -31,7 +34,7 @@ impl TryFrom<RawConfig> for Config {
 	fn try_from(value: RawConfig) -> StdResult<Config, Self::Error> {
 		let Some(binary_file) = value.binary_file else {
 			return Err(ConfigError::MissingRequiredConfig {
-				field_name: "binary_file".to_owned(),
+				field_name: "binary-file".to_owned(),
 				field_type: "string".to_owned(),
 				possible_values: vec![],
 			});
@@ -44,19 +47,25 @@ impl TryFrom<RawConfig> for Config {
 	}
 }
 
-#[query(default)]
-async fn binary(engine: &mut PluginEngine, value: Target) -> Result<Vec<PathBuf>> {
+#[query]
+async fn files(_engine: &mut PluginEngine, value: LocalGitRepo) -> Result<Vec<PathBuf>> {
 	let bfd = DETECTOR.get().ok_or(Error::UnspecifiedQueryState)?;
-	let repo = pathbuf![&value.local.path];
+	let repo = pathbuf![&value.path];
 	let out: Vec<PathBuf> = detect_binary_files(&repo)
 		.map_err(|_| Error::UnspecifiedQueryState)?
 		.into_iter()
 		.filter(|f| bfd.is_likely_binary_file(f))
 		.collect();
-	out.iter().for_each(|f| {
+	Ok(out)
+}
+
+#[query(default)]
+async fn binary(engine: &mut PluginEngine, value: Target) -> Result<usize> {
+	let paths = files(engine, value.local).await?;
+	paths.iter().for_each(|f| {
 		engine.record_concern(format!("Found binary file at '{}'", f.to_string_lossy()))
 	});
-	Ok(out)
+	Ok(paths.len())
 }
 
 #[derive(Clone, Debug, Default)]
@@ -98,10 +107,7 @@ impl Plugin for BinaryPlugin {
 	fn default_policy_expr(&self) -> Result<String> {
 		match self.policy_conf.get() {
 			None => Err(Error::UnspecifiedQueryState),
-			// If no policy vars, we have no default expr
-			Some(None) => Ok("".to_owned()),
-			// Use policy config vars to construct a default expr
-			Some(Some(policy_conf)) => Ok(format!("(lte $ {}))", policy_conf)),
+			Some(policy_conf) => Ok(format!("(lte $ {})", policy_conf.unwrap_or(0))),
 		}
 	}
 

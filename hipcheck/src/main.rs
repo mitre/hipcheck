@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-mod analysis;
 #[cfg(feature = "benchmarking")]
 mod benchmarking;
 mod cache;
 mod cli;
 mod config;
-mod data;
 mod engine;
 mod error;
 mod init;
-mod metric;
 mod plugin;
 mod policy;
 mod policy_exprs;
 mod report;
+mod score;
 mod session;
 mod setup;
 mod shell;
@@ -23,22 +21,18 @@ mod target;
 mod util;
 mod version;
 
-pub mod hipcheck {
-	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
-}
-
 use crate::{
-	analysis::score::score_results,
 	cache::repo::HcRepoCache,
 	cli::Format,
-	config::WeightTreeProvider,
+	config::{normalized_unresolved_analysis_tree_from_policy, Config},
 	error::{Context as _, Error, Result},
 	plugin::{try_set_arch, Plugin, PluginExecutor, PluginWithConfig},
+	policy::{config_to_policy, PolicyFile},
 	report::report_builder::{build_report, Report},
+	score::score_results,
 	session::Session,
 	setup::{resolve_and_transform_source, SourceType},
 	shell::Shell,
-	util::iter::{TryAny, TryFilter},
 };
 use cli::{
 	CacheArgs, CacheOp, CheckArgs, CliConfig, FullCommands, PluginArgs, SchemaArgs, SchemaCommand,
@@ -61,7 +55,7 @@ use std::{
 	result::Result as StdResult,
 	time::Duration,
 };
-use target::{RemoteGitRepo, TargetSeed, TargetSeedKind, ToTargetSeed};
+use target::{TargetSeed, ToTargetSeed};
 use util::command::DependentProgram;
 use util::fs::create_dir_all;
 use which::which;
@@ -166,28 +160,19 @@ fn cmd_schema(args: &SchemaArgs) {
 }
 
 fn cmd_print_weights(config: &CliConfig) -> Result<()> {
-	// Silence the global shell while we're checking the dummy repo to prevent progress bars and
-	// title messages from displaying while calculating the weight tree.
-	let silence_guard = Shell::silence();
-
-	// Create a dummy session to query the salsa database for a weight graph for printing.
-	let session = Session::new(
-		// Use the hipcheck repo as a dummy url until checking is de-coupled from `Session`.
-		&TargetSeed {
-			kind: TargetSeedKind::RemoteRepo(RemoteGitRepo {
-				url: url::Url::parse("https://github.com/mitre/hipcheck.git").unwrap(),
-				known_remote: None,
-			}),
-			refspec: Some("HEAD".to_owned()),
-		},
-		config.config().map(ToOwned::to_owned),
-		config.cache().map(ToOwned::to_owned),
-		config.policy().map(ToOwned::to_owned),
-		config.format(),
-	)?;
+	let policy = if let Some(p) = config.policy() {
+		PolicyFile::load_from(p)
+		.context("Failed to load policy. Plase make sure the policy file is in the provided location and is formatted correctly.")?
+	} else if let Some(c) = config.config() {
+		let config = Config::load_from(c)
+		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
+		config_to_policy(config)?
+	} else {
+		return Err(hc_error!("No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."));
+	};
 
 	// Get the weight tree and print it.
-	let weight_tree = session.normalized_analysis_tree()?;
+	let weight_tree = normalized_unresolved_analysis_tree_from_policy(&policy)?;
 
 	// Create a special wrapper to override `Debug` so that we can use indextree's \
 	// debug pretty print function instead of writing our own.
@@ -248,9 +233,6 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 			new_root
 		}
 	}
-
-	// Drop the silence guard to make the shell produce output again.
-	drop(silence_guard);
 
 	let mut print_tree = ConvertTree(Arena::with_capacity(weight_tree.tree.capacity()));
 	let print_root = print_tree.convert_tree(weight_tree.root, &weight_tree.tree);
@@ -376,13 +358,10 @@ struct ReadyChecks {
 	npm_version_check: StdResult<String, VersionCheckError>,
 	cache_path_check: StdResult<PathBuf, PathCheckError>,
 	policy_path_check: StdResult<PathBuf, PathCheckError>,
-	github_token_check: StdResult<(), EnvVarCheckError>,
 }
 
 impl ReadyChecks {
 	/// Check if Hipcheck is ready to run.
-	///
-	/// We don't check `github_token_check`, because it's allowed to fail.
 	fn is_ready(&self) -> bool {
 		self.hipcheck_version_check.is_ok()
 			&& self.git_version_check.is_ok()
@@ -434,27 +413,6 @@ impl Display for PathCheckError {
 	}
 }
 
-#[derive(Debug)]
-struct EnvVarCheckError {
-	name: &'static str,
-	kind: EnvVarCheckErrorKind,
-}
-
-impl Display for EnvVarCheckError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		match &self.kind {
-			EnvVarCheckErrorKind::VarNotFound => {
-				write!(f, "environment variable '{}' was not found", self.name)
-			}
-		}
-	}
-}
-
-#[derive(Debug)]
-enum EnvVarCheckErrorKind {
-	VarNotFound,
-}
-
 fn check_hipcheck_version() -> StdResult<String, VersionCheckError> {
 	let pkg_name = env!("CARGO_PKG_NAME", "can't find Hipcheck package name");
 
@@ -468,7 +426,7 @@ fn check_hipcheck_version() -> StdResult<String, VersionCheckError> {
 }
 
 fn check_git_version() -> StdResult<String, VersionCheckError> {
-	let version = data::git::get_git_version().map_err(|_| VersionCheckError {
+	let version = util::git::get_git_version().map_err(|_| VersionCheckError {
 		cmd_name: "git",
 		kind: VersionCheckErrorKind::CmdNotFound,
 	})?;
@@ -486,7 +444,7 @@ fn check_git_version() -> StdResult<String, VersionCheckError> {
 }
 
 fn check_npm_version() -> StdResult<String, VersionCheckError> {
-	let version = data::npm::get_npm_version()
+	let version = util::npm::get_npm_version()
 		.map(|version| version.trim().to_owned())
 		.map_err(|_| VersionCheckError {
 			cmd_name: "npm",
@@ -526,21 +484,6 @@ fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	Ok(path.to_owned())
 }
 
-/// Check that a GitHub token has been provided as an environment variable
-/// This does not check if the token is valid or not
-/// The absence of a token does not trigger the failure state for the readiness check, because
-/// Hipcheck *can* run without a token, but some analyses will not.
-fn check_github_token() -> StdResult<(), EnvVarCheckError> {
-	let name = "HC_GITHUB_TOKEN";
-
-	std::env::var(name)
-		.map(|_| ())
-		.map_err(|_| EnvVarCheckError {
-			name,
-			kind: EnvVarCheckErrorKind::VarNotFound,
-		})
-}
-
 fn cmd_plugin(args: PluginArgs) {
 	use crate::engine::{async_query, HcEngine, HcEngineImpl};
 	use std::sync::Arc;
@@ -548,17 +491,8 @@ fn cmd_plugin(args: PluginArgs) {
 
 	let tgt_dir = "./target/debug";
 
-	let (entrypoint1, entrypoint2) = match args.sdk {
-		true => (
-			pathbuf![tgt_dir, "dummy_rand_data_sdk"],
-			pathbuf![tgt_dir, "dummy_sha256_sdk"],
-		),
-		false => (
-			pathbuf![tgt_dir, "dummy_rand_data"],
-			pathbuf![tgt_dir, "dummy_sha256"],
-		),
-	};
-
+	let entrypoint1 = pathbuf![tgt_dir, "dummy_rand_data"];
+	let entrypoint2 = pathbuf![tgt_dir, "dummy_sha256"];
 	let plugin1 = Plugin {
 		name: "dummy/rand_data".to_owned(),
 		entrypoint: entrypoint1.display().to_string(),
@@ -571,7 +505,7 @@ fn cmd_plugin(args: PluginArgs) {
 		/* max_spawn_attempts */ 3,
 		/* max_conn_attempts */ 5,
 		/* port_range */ 40000..u16::MAX,
-		/* backoff_interval_micros */ 1000,
+		/* backoff_interval_micros */ 100000,
 		/* jitter_percent */ 10,
 	)
 	.unwrap();
@@ -653,7 +587,6 @@ fn cmd_ready(config: &CliConfig) {
 		npm_version_check: check_npm_version(),
 		cache_path_check: check_cache_path(config),
 		policy_path_check: check_policy_path(config),
-		github_token_check: check_github_token(),
 	};
 
 	match &ready.hipcheck_version_check {
@@ -679,11 +612,6 @@ fn cmd_ready(config: &CliConfig) {
 	match &ready.policy_path_check {
 		Ok(path) => println!("{:<17} {}", "Policy Path:", path.display()),
 		Err(e) => println!("{:<17} {}", "Policy Path:", e),
-	}
-
-	match &ready.github_token_check {
-		Ok(_) => println!("{:<17} Found!", "GitHub Token:"),
-		Err(e) => println!("{:<17} {}", "GitHub Token:", e),
 	}
 
 	if ready.is_ready() {

@@ -1,0 +1,48 @@
+{% import "macros/breadcrumbs.tera.html" as bc %}
+{% import "macros/icon.tera.html" as ic %}
+{% import "macros/toc.tera.html" as toc %}
+
+<!doctype html>
+<html lang="en-US" class="">
+    <head>
+        <title>{% block title %}Hipcheck{% endblock %}</title>
+        {% include "partials/head.tera.html" %}
+    </head>
+    <body class="bg-white dark:bg-neutral-900 {% block body_classes %}{% endblock %}">
+        <div class="">
+            <div class="border-b border-neutral-200 dark:border-neutral-800">
+                {% include "partials/nav.tera.html" %}
+
+                {% block breadcrumbs %}
+                    {% set current = section | default(value=page) %}
+                    {{ bc::breadcrumbs(current=current) }}
+                {% endblock %}
+            </div>
+
+            <div class="lg:max-w-7xl lg:mx-auto px-4 lg:px-0 lg:pb-40">
+                <div class="lg:grid lg:grid-cols-12 lg:gap-16">
+                    <div class="lg:col-span-10 lg:col-start-2">
+
+                        {% block blog_header %}
+                            <div class="mb-8 pt-8 lg:pt-16 pb-4 flex justify-between items-start lg:items-center">
+                                <span class="font-semibold text-3xl lg:inline-flex gap-8 items-end dark:text-neutral-200">Blog <span class="block mt-2 lg:mt-0 lg:inline text-base lg:text-lg font-normal text-neutral-500">Messages from the maintainers</span></span>
+                                <span><a href="{{ config.base_url }}/atom.xml" class="text-sm py-1 px-2 inline-flex items-center gap-2 rounded-md dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-700 hover:bg-blue-50 dark:hover:bg-blue-500 hover:border-blue-200 dark:hover:border-blue-400 hover:text-blue-500 dark:hover:text-white">Subscribe {{ ic::icon(name="rss") }}</a></span>
+                            </div>
+                        {% endblock %}
+
+                        <div class="lg:w-full lg:max-w-none">
+                            {% block content %}{% endblock %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% block extra %}{% endblock %}
+
+            {% include "partials/footer.tera.html" %}
+        </div>
+
+        {% include "partials/search.tera.html" %}
+        {% include "partials/end.tera.html" %}
+    </body>
+</html>

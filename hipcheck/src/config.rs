@@ -3,7 +3,6 @@
 //! Defines the configuration file format.
 
 use crate::{
-	analysis::score::*,
 	engine::HcEngine,
 	error::{Context, Result},
 	hc_error,
@@ -11,6 +10,8 @@ use crate::{
 		policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild},
 		PolicyFile,
 	},
+	policy_exprs::{std_parse, Expr},
+	score::*,
 	util::fs as file,
 	BINARY_CONFIG_FILE, F64, LANGS_FILE, ORGS_FILE, TYPO_FILE,
 };
@@ -410,7 +411,7 @@ mod de {
 	{
 		struct PercentVisitor;
 
-		impl<'de> Visitor<'de> for PercentVisitor {
+		impl Visitor<'_> for PercentVisitor {
 			type Value = f64;
 
 			fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
@@ -458,13 +459,17 @@ pub trait ConfigSource: salsa::Database {
 	/// Returns the directory being used to hold cache data
 	#[salsa::input]
 	fn cache_dir(&self) -> Rc<PathBuf>;
+	/// Returns the analysis tree as-is, i.e. without resolving policy expressions with plugins
+	fn unresolved_analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
+	/// Returns a weight-normalized version of `unresolved_analysis_tree()`
+	fn normalized_unresolved_analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
 }
 
 /// Query for accessing the risk threshold config
 #[salsa::query_group(RiskConfigQueryStorage)]
 pub trait RiskConfigQuery: ConfigSource {
 	/// Returns the risk policy expr
-	fn risk_policy(&self) -> Rc<String>;
+	fn risk_policy(&self) -> Result<Rc<Expr>>;
 }
 
 /// Query for accessing the languages analysis config
@@ -508,7 +513,6 @@ pub trait CommitConfigQuery: ConfigSource {
 	fn contributor_trust_month_count_threshold(&self) -> Result<u64>;
 }
 
-pub static MITRE_PUBLISHER: &str = "mitre";
 pub static DEFAULT_QUERY: &str = "";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -517,22 +521,9 @@ pub struct Analysis {
 	pub plugin: String,
 	pub query: String,
 }
-impl Analysis {
-	pub fn new(publisher: &str, plugin: &str, query: &str) -> Analysis {
-		Analysis {
-			publisher: publisher.to_owned(),
-			plugin: plugin.to_owned(),
-			query: query.to_owned(),
-		}
-	}
-
-	pub fn legacy(analysis: &str) -> Analysis {
-		Analysis::new(MITRE_PUBLISHER, analysis, DEFAULT_QUERY)
-	}
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PoliciedAnalysis(pub Analysis, pub String);
+pub struct PoliciedAnalysis(pub Analysis, pub Option<Expr>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnalysisTreeNode {
@@ -576,9 +567,9 @@ impl AnalysisTreeNode {
 			weight,
 		}
 	}
-	pub fn analysis(analysis: Analysis, raw_policy: String, weight: F64) -> Self {
+	pub fn analysis(analysis: Analysis, opt_policy: Option<Expr>, weight: F64) -> Self {
 		AnalysisTreeNode::Analysis {
-			analysis: PoliciedAnalysis(analysis, raw_policy),
+			analysis: PoliciedAnalysis(analysis, opt_policy),
 			weight,
 		}
 	}
@@ -663,13 +654,13 @@ impl AnalysisTree {
 		&mut self,
 		under: NodeId,
 		analysis: Analysis,
-		raw_policy: String,
+		opt_policy: Option<Expr>,
 		weight: F64,
 	) -> Result<NodeId> {
 		if self.node_is_category(under)? {
 			let child = self
 				.tree
-				.new_node(AnalysisTreeNode::analysis(analysis, raw_policy, weight));
+				.new_node(AnalysisTreeNode::analysis(analysis, opt_policy, weight));
 			under.append(child, &mut self.tree);
 			Ok(child)
 		} else {
@@ -717,16 +708,37 @@ where
 	out_vals
 }
 
-#[salsa::query_group(WeightTreeQueryStorage)]
-pub trait WeightTreeProvider: ConfigSource + HcEngine {
-	/// Returns the weight tree including policy expressions
-	fn analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
-	/// Returns the tree of normalized weights for analyses from the config
-	fn normalized_analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
+// Generic function for visiting and performing operations on an indexmap::Arena.
+// A function `acc_op` is applied to each node, and the results this function build up a
+// "scope" which is a vector of `acc_op` output from the root node to the current node.
+// When a leaf node is detected, `chil_op` is called, and the function receives both
+// the current node and a slice-view of the scope vector. The output of calling `chil_op`
+// on each leaf node is aggregated and returned.
+pub fn mutate_leaves<T, F>(node: NodeId, tree: &mut Arena<T>, op: F) -> Result<()>
+where
+	F: Fn(&mut T) -> Result<()>,
+{
+	let mut last_start: NodeId = node;
+	let edges: Vec<_> = node.traverse(tree).collect();
+	for edge in edges {
+		match edge {
+			// Entering a new scope, update the tracker vec
+			NodeEdge::Start(n) => {
+				last_start = n;
+			}
+			NodeEdge::End(n) => {
+				// If we just saw Start on the same NodeId, this is a leaf
+				if n == last_start {
+					let node = tree.get_mut(n).unwrap().get_mut();
+					op(node)?;
+				}
+			}
+		}
+	}
+	Ok(())
 }
 
 fn add_analysis(
-	core: &dyn WeightTreeProvider,
 	tree: &mut AnalysisTree,
 	under: NodeId,
 	analysis: PolicyAnalysis,
@@ -737,20 +749,19 @@ fn add_analysis(
 		Some(u) => F64::new(u as f64)?,
 		None => F64::new(1.0)?,
 	};
-	let raw_policy = match analysis.policy_expression {
-        Some(x) => x,
-        None => core.default_policy_expr(publisher.0.clone(), plugin.0.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file", publisher.0, plugin.0))?
-    };
+	let opt_policy = analysis
+		.policy_expression
+		.map(|s| s.parse::<Expr>())
+		.transpose()?;
 	let analysis = Analysis {
 		publisher: publisher.0,
 		plugin: plugin.0,
 		query: DEFAULT_QUERY.to_owned(),
 	};
-	tree.add_analysis(under, analysis, raw_policy, weight)
+	tree.add_analysis(under, analysis, opt_policy, weight)
 }
 
 fn add_category(
-	core: &dyn WeightTreeProvider,
 	tree: &mut AnalysisTree,
 	under: NodeId,
 	category: &PolicyCategory,
@@ -764,28 +775,61 @@ fn add_category(
 	for c in category.children.iter() {
 		match c {
 			PolicyCategoryChild::Analysis(analysis) => {
-				add_analysis(core, tree, id, analysis.clone())?;
+				add_analysis(tree, id, analysis.clone())?;
 			}
 			PolicyCategoryChild::Category(category) => {
-				add_category(core, tree, id, category)?;
+				add_category(tree, id, category)?;
 			}
 		}
 	}
 	Ok(id)
 }
 
-pub fn analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<AnalysisTree>> {
-	let policy = db.policy();
+// Lowest-level function to turn a PolicyFile into an AnalysisTree
+pub fn unresolved_analysis_tree_from_policy(policy: &PolicyFile) -> Result<AnalysisTree> {
 	let mut tree = AnalysisTree::new("risk");
 	let root = tree.root;
 
 	for c in policy.analyze.categories.iter() {
-		add_category(db, &mut tree, root, c)?;
+		add_category(&mut tree, root, c)?;
 	}
 
-	Ok(Rc::new(tree))
+	Ok(tree)
 }
 
+pub fn unresolved_analysis_tree(db: &dyn ConfigSource) -> Result<Rc<AnalysisTree>> {
+	let policy = db.policy();
+	unresolved_analysis_tree_from_policy(&policy).map(Rc::new)
+}
+
+#[salsa::query_group(WeightTreeQueryStorage)]
+pub trait WeightTreeProvider: ConfigSource + HcEngine {
+	/// Returns the normalized weight tree including resolved policy expressions
+	fn analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
+}
+
+pub fn analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<AnalysisTree>> {
+	let unresolved_tree = db.normalized_unresolved_analysis_tree()?;
+	let mut res_tree: AnalysisTree = (*unresolved_tree).clone();
+
+	// If the policy is empty, try to look up from plugin engine
+	let update_policy = |node: &mut AnalysisTreeNode| -> Result<()> {
+		if let AnalysisTreeNode::Analysis { analysis, .. } = node {
+			let a: &Analysis = &analysis.0;
+			if analysis.1.is_none() {
+				analysis.1 = Some(db.default_policy_expr(a.publisher.clone(), a.plugin.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file", a.publisher.clone(), a.plugin.clone()))?);
+			}
+		}
+		Ok(())
+	};
+
+	// Walk the tree, applying the above closure to each leaf (i.e. Analysis) node
+	mutate_leaves(res_tree.root, &mut res_tree.tree, update_policy)?;
+
+	Ok(Rc::new(res_tree))
+}
+
+// Recursive implementation of tree weight normalization
 fn normalize_at_internal(node: NodeId, tree: &mut Arena<AnalysisTreeNode>) -> F64 {
 	let children: Vec<NodeId> = node.children(tree).collect();
 	let weight_sum: F64 = children
@@ -801,23 +845,35 @@ fn normalize_at_internal(node: NodeId, tree: &mut Arena<AnalysisTreeNode>) -> F6
 	tree.get(node).unwrap().get().get_weight()
 }
 
-pub fn normalized_analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<AnalysisTree>> {
-	let tree = db.analysis_tree();
+pub fn normalized_unresolved_analysis_tree_from_policy(
+	policy: &PolicyFile,
+) -> Result<Rc<AnalysisTree>> {
+	let mut tree = unresolved_analysis_tree_from_policy(policy)?;
+	normalize_at_internal(tree.root, &mut tree.tree);
+	Ok(Rc::new(tree))
+}
+
+pub fn normalized_unresolved_analysis_tree(db: &dyn ConfigSource) -> Result<Rc<AnalysisTree>> {
+	let tree = db.unresolved_analysis_tree();
 	let mut norm_tree: AnalysisTree = (*tree?).clone();
 	normalize_at_internal(norm_tree.root, &mut norm_tree.tree);
 	Ok(Rc::new(norm_tree))
 }
 
-/// Derived query implementations
+// Derived query implementations
 
-/// In general, these simply return the value of a particular field in
-/// one of the `Config` child structs.  When the type of the desired
-/// field is `String`, it is returned wrapped in an `Rc`.  This is
-/// done to keep Salsa's cloning cheap.
+// In general, these simply return the value of a particular field in
+// one of the `Config` child structs.  When the type of the desired
+// field is `String`, it is returned wrapped in an `Rc`.  This is
+// done to keep Salsa's cloning cheap.
 
-fn risk_policy(db: &dyn RiskConfigQuery) -> Rc<String> {
+fn risk_policy(db: &dyn RiskConfigQuery) -> Result<Rc<Expr>> {
 	let policy = db.policy();
-	Rc::new(policy.analyze.investigate_policy.0.clone())
+	let expr_str = policy.analyze.investigate_policy.0.as_str();
+	let expr = std_parse(expr_str)
+		.map_err(|e| hc_error!("Malformed risk policy expression '{}': {}", expr_str, e))?;
+
+	Ok(Rc::new(expr))
 }
 
 fn langs_file_rel(_db: &dyn LanguagesConfigQuery) -> Rc<String> {

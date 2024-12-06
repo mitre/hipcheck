@@ -3,20 +3,19 @@
 use crate::{
 	error::{Error, Result},
 	plugin_engine::HcSessionSocket,
-	proto::{
-		plugin_service_server::{PluginService, PluginServiceServer},
-		ConfigurationStatus, ExplainDefaultQueryRequest as ExplainDefaultQueryReq,
-		ExplainDefaultQueryResponse as ExplainDefaultQueryResp,
-		GetDefaultPolicyExpressionRequest as GetDefaultPolicyExpressionReq,
-		GetDefaultPolicyExpressionResponse as GetDefaultPolicyExpressionResp,
-		GetQuerySchemasRequest as GetQuerySchemasReq,
-		GetQuerySchemasResponse as GetQuerySchemasResp,
-		InitiateQueryProtocolRequest as InitiateQueryProtocolReq,
-		InitiateQueryProtocolResponse as InitiateQueryProtocolResp,
-		SetConfigurationRequest as SetConfigurationReq,
-		SetConfigurationResponse as SetConfigurationResp,
-	},
 	Plugin, QuerySchema,
+};
+use hipcheck_common::proto::{
+	plugin_service_server::{PluginService, PluginServiceServer},
+	ConfigurationStatus, ExplainDefaultQueryRequest as ExplainDefaultQueryReq,
+	ExplainDefaultQueryResponse as ExplainDefaultQueryResp,
+	GetDefaultPolicyExpressionRequest as GetDefaultPolicyExpressionReq,
+	GetDefaultPolicyExpressionResponse as GetDefaultPolicyExpressionResp,
+	GetQuerySchemasRequest as GetQuerySchemasReq, GetQuerySchemasResponse as GetQuerySchemasResp,
+	InitiateQueryProtocolRequest as InitiateQueryProtocolReq,
+	InitiateQueryProtocolResponse as InitiateQueryProtocolResp,
+	SetConfigurationRequest as SetConfigurationReq,
+	SetConfigurationResponse as SetConfigurationResp,
 };
 use std::{result::Result as StdResult, sync::Arc};
 use tokio::sync::mpsc;
@@ -101,8 +100,11 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 		&self,
 		_req: Req<ExplainDefaultQueryReq>,
 	) -> QueryResult<Resp<ExplainDefaultQueryResp>> {
-		match self.plugin.default_policy_expr() {
-			Ok(explanation) => Ok(Resp::new(ExplainDefaultQueryResp { explanation })),
+		match self.plugin.explain_default_query() {
+			Ok(explanation) => Ok(Resp::new(ExplainDefaultQueryResp {
+				explanation: explanation
+					.unwrap_or_else(|| "No default query explanation provided".to_owned()),
+			})),
 			Err(e) => Err(Status::new(
 				tonic::Code::NotFound,
 				format!(

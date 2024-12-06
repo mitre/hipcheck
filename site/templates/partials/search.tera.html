@@ -1,0 +1,46 @@
+
+<div id="search-modal" class="hidden">
+    <div id="search-modal-shroud" class="fixed top-0 left-0 right-0 bottom-0 bg-black/50 z-50">
+        <div class="flex items-top mt-10 justify-center">
+            <div id="search-modal-box" class="relative bg-neutral-100 rounded-lg w-1/2 max-w-3xl min-w-96 shadow-2xl overflow-hidden">
+                <div class="py-4 px-4 bg-white dark:bg-neutral-700 rounded-t-lg flex justify-between items-center">
+                    <input
+                        placeholder="Search"
+                        class="
+                            w-full
+                            rounded-md
+                            p-4
+                            bg-white dark:bg-neutral-700
+                            dark:text-neutral-100
+                            text-xl
+                            focus-visible:outline-none
+                            "
+                        type="text"
+                        id="search-input"
+                        name="search-input"
+                    />
+                    <a
+                        href="#"
+                        id="search-modal-close"
+                        class="
+                            absolute
+                            top-7 right-7
+                            inline-flex items-center justify-center
+                            h-8 w-8
+                            rounded-full
+                            bg-neutral-100 dark:bg-neutral-600
+                            hover:bg-blue-100
+                            group
+                    ">
+                        {{ ic::icon(name="x-circle", classes="!w-5 !h-5 !fill-neutral-600 dark:!fill-neutral-100 group-hover:!fill-blue-500") }}
+                    </a>
+                </div>
+                <div class="bg-white dark:bg-neutral-600 data-[active]:border-t data-[active]:border-neutral-300 data-[active]:dark:border-neutral-600">
+                    <div id="search-results" class="bg-neutral-100 dark:bg-neutral-600 dark:text-neutral-100 max-h-vh overflow-y-scroll">
+                        <ol id="search-results-items"></ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

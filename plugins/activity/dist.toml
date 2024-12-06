@@ -1,0 +1,29 @@
+
+[dist]
+
+# Make sure that 'dist' will handle releases for this. Otherwise, since
+# the crate is set to 'publish = false', 'dist' would ignore it by default.
+dist = true
+
+# We explicitly *don't* want 'dist' to produce installers; just to prebuild
+# the binaries for us and bundle everything together. Hipcheck itself will
+# handle people getting the prebuilt binaries based on the download manifest.
+installers = []
+
+# Do not install an updater.
+install-updater = false
+
+# Make sure to include the plugin manifest.
+include = ["plugin.kdl"]
+
+# Make sure that both Hipcheck and all the plugins are built with the protobuf
+# compiler present on their platform.
+
+[dist.dependencies.apt]
+protobuf-compiler = "*"
+
+[dist.dependencies.homebrew]
+protobuf = "*"
+
+[dist.dependencies.chocolatey]
+protoc = "*"

@@ -17,7 +17,7 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 
 /// Returns the span of time since the most recent commit to a Git repo as `jiff:Span` displayed as a String
 /// (Which means that anything expecting a `Span` must parse the output of this query appropriately)
-#[query]
+#[query(default)]
 async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 	log::debug!("running activity query");
 
@@ -75,15 +75,13 @@ impl Plugin for ActivityPlugin {
 			log::error!("tried to access config before set by Hipcheck core!");
 			return Err(Error::UnspecifiedQueryState);
 		};
-		match conf.weeks {
-			Some(weeks) => Ok(format!("lte $ P{}w", weeks)),
-			None => Ok("".to_owned()),
-		}
+
+		Ok(format!("(lte $ P{}w)", conf.weeks.unwrap_or(71)))
 	}
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"Number of weeks since last activity in repo".to_string(),
+			"Span of time that has elapsed since last activity in repo".to_string(),
 		))
 	}
 

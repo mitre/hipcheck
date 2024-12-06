@@ -24,11 +24,11 @@ pub trait SourceQuery: salsa::Database {
 	fn url(&self) -> Option<Arc<String>>;
 }
 
-/// Derived query implementations
+// Derived query implementations
 
-/// These return the value of a particular field in the input `Target`
-/// struct.  Since all are owned types, the values are wrapped in an
-/// `Rc` to keep cloning cheap.
+// These return the value of a particular field in the input `Target`
+// struct.  Since all are owned types, the values are wrapped in an
+// `Rc` to keep cloning cheap.
 
 fn local(db: &dyn SourceQuery) -> Arc<PathBuf> {
 	let target = db.target();

@@ -2,6 +2,7 @@
 
 //! Plugin for querying what percentage of pull requests were merged without review
 
+use anyhow::Context as _;
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::Target};
 use schemars::JsonSchema;
@@ -10,6 +11,7 @@ use std::{result::Result as StdResult, sync::OnceLock};
 
 #[derive(Deserialize)]
 struct Config {
+	#[serde(rename = "percent-threshold")]
 	percent_threshold: Option<f64>,
 }
 
@@ -27,9 +29,9 @@ pub struct PullReview {
 	pub has_review: bool,
 }
 
-/// Returns the percentage of commits to the repo that were merged without review
-#[query]
-async fn review(engine: &mut PluginEngine, value: Target) -> Result<f64> {
+/// Returns whether each commit in a repo was merged with a review
+#[query(default)]
+async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	log::debug!("running review metric");
 
 	// Confirm that the target is a GitHub repo
@@ -37,6 +39,7 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<f64> {
 		log::error!("target repository does not have a remote repository URL");
 		return Err(Error::UnexpectedPluginQueryInputFormat);
 	};
+
 	let Some(known_remote) = remote.known_remote else {
 		log::error!("target repository is not a GitHub repository or else is missing GitHub repo information");
 		return Err(Error::UnexpectedPluginQueryInputFormat);
@@ -44,15 +47,9 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<f64> {
 
 	// Get a list of all pull requests to the repo, with their corresponding number of reviews
 	let value = engine
-		.query("mitre/github_api/pr_reviews", known_remote)
+		.query("mitre/github/pr_reviews", known_remote)
 		.await
-		.map_err(|e| {
-			log::error!(
-				"failed to get pull request reviews from GitHub for review query: {}",
-				e
-			);
-			Error::UnspecifiedQueryState
-		})?;
+		.context("failed to get pull request reviews from GitHub")?;
 
 	let pull_requests: Vec<PullRequest> =
 		serde_json::from_value(value).map_err(Error::InvalidJsonInQueryOutput)?;
@@ -62,28 +59,11 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<f64> {
 	// Create a Vec big enough to hold every single pull request
 	let mut pull_reviews = Vec::with_capacity(pull_requests.len());
 
-	// Create a list of pull requesets, with a boolean indicating if they have at least one review or not
-	for pull_request in pull_requests {
-		let has_review = pull_request.reviews > 0;
-		pull_reviews.push(PullReview {
-			pull_request,
-			has_review,
-		});
-	}
-
-	// Calculate the percentage of unreviewed pull requests out of the total
-	// If there are no pull requests, return 0.0 to avoid a divide-by-zero error
-	let num_flagged = pull_reviews.iter().filter(|p| !p.has_review).count() as u64;
-	let percent_flagged = match (num_flagged, pull_reviews.len()) {
-		(flagged, total) if flagged != 0 && total != 0 => {
-			num_flagged as f64 / pull_reviews.len() as f64
-		}
-		_ => 0.0,
-	};
+	pull_reviews.extend(pull_requests.into_iter().map(|pr| pr.reviews > 0));
 
 	log::info!("completed review query");
 
-	Ok(percent_flagged)
+	Ok(pull_reviews)
 }
 
 #[derive(Clone, Debug)]
@@ -109,10 +89,13 @@ impl Plugin for ReviewPlugin {
 			log::error!("tried to access config before set by Hipcheck core!");
 			return Err(Error::UnspecifiedQueryState);
 		};
-		match conf.percent_threshold {
-			Some(threshold) => Ok(format!("lte $ {}", threshold)),
-			None => Ok("".to_owned()),
-		}
+
+		let threshold = conf.percent_threshold.unwrap_or(0.05);
+
+		Ok(format!(
+			"(lte (divz (count (filter (eq #f) $)) (count $)) {})",
+			threshold
+		))
 	}
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
@@ -164,7 +147,7 @@ mod test {
 
 		// when calling into query, the input known_remote gets passed to `pr_reviews`, lets assume it returns the vec of PullRequests `prs`
 		let mut mock_responses = MockResponses::new();
-		mock_responses.insert("mitre/github_api/pr_reviews", known_remote, Ok(prs))?;
+		mock_responses.insert("mitre/github/pr_reviews", known_remote, Ok(prs))?;
 		Ok(mock_responses)
 	}
 
@@ -186,7 +169,7 @@ mod test {
 		let mut engine = PluginEngine::mock(mock_responses().unwrap());
 		let result = review(&mut engine, target).await.unwrap();
 
-		let expected = 0.25;
+		let expected = vec![true, true, false, true];
 
 		assert_eq!(result, expected);
 	}
