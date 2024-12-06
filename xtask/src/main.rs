@@ -27,6 +27,7 @@ fn main() -> ExitCode {
 		Commands::Site(args) => match args.command {
 			SiteCommand::Serve(args) => task::site::serve::run(args),
 		},
+		Commands::Manifest => task::manifest::run(),
 	};
 
 	match result {
@@ -63,6 +64,9 @@ enum Commands {
 	Site(SiteArgs),
 	/// Lint the Hipcheck plugin gRPC definition.
 	Buf,
+	/// Update the plugin download manifests in the local repo based on
+	/// output from the GitHub Releases API
+	Manifest,
 }
 
 #[derive(Debug, clap::Args)]
