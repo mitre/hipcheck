@@ -5,17 +5,18 @@ use crate::{
 	error::Error,
 	hc_error,
 	plugin::{
-		download_manifest::DownloadManifestEntry, try_get_bin_for_entrypoint, ArchiveFormat,
-		DownloadManifest, HashAlgorithm, HashWithDigest, PluginId, PluginManifest,
+		download_manifest::DownloadManifestEntry, get_current_arch, try_get_bin_for_entrypoint,
+		ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest, PluginId, PluginManifest,
 	},
 	policy::policy_file::{ManifestLocation, PolicyPlugin},
 	util::{fs::file_sha256, http::agent::agent},
 };
 use flate2::read::GzDecoder;
 use fs_extra::{dir::remove, file::write_all};
+use pathbuf::pathbuf;
 use std::{
 	collections::HashSet,
-	fs::File,
+	fs::{read_dir, rename, DirEntry, File},
 	io::{Read, Write},
 	path::{Path, PathBuf},
 	str::FromStr,
@@ -23,8 +24,6 @@ use std::{
 use tar::Archive;
 use url::Url;
 use xz2::read::XzDecoder;
-
-use super::get_current_arch;
 
 /// determine all of the plugins that need to be run and locate download them, if they do not exist
 pub fn retrieve_plugins(
@@ -56,6 +55,7 @@ fn retrieve_plugin(
 	if required_plugins.contains(&plugin_id) {
 		return Ok(());
 	}
+
 	// TODO: if the plugin.kdl file for the plugin already exists, then should we skip the retrieval process?
 	// if plugin_cache.plugin_kdl(&plugin_id).exists()
 
@@ -350,6 +350,35 @@ fn extract_plugin(
 		}
 	};
 
+	for child in read_dir(extract_dir)? {
+		let child = child?;
+
+		if child.file_type()?.is_file() {
+			continue;
+		}
+
+		for extracted_content in read_dir(child.path())? {
+			let extracted_content = extracted_content?;
+			move_to_extract_dir(extract_dir, &extracted_content)?;
+		}
+	}
+
+	Ok(())
+}
+
+fn move_to_extract_dir(extract_dir: &Path, entry: &DirEntry) -> Result<(), Error> {
+	let remaining_path = entry
+		.path()
+		.components()
+		.last()
+		.ok_or_else(|| hc_error!("no last component: {}", entry.path().display()))
+		.map(|component| {
+			let path: &Path = component.as_ref();
+			path.to_path_buf()
+		})?;
+
+	let new_path = pathbuf![extract_dir, &remaining_path];
+	rename(entry.path(), new_path)?;
 	Ok(())
 }
 

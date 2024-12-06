@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(test)]
+use crate::plugin::arch::KnownArch;
 use crate::{
 	hc_error,
 	plugin::{arch::Arch, PluginVersion},
@@ -7,9 +9,6 @@ use crate::{
 };
 use kdl::{KdlDocument, KdlNode, KdlValue};
 use std::{fmt::Display, str::FromStr};
-
-#[cfg(test)]
-use crate::plugin::arch::KnownArch;
 
 // NOTE: the implementation in this crate was largely derived from RFD #0004
 
