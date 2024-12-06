@@ -94,6 +94,7 @@ impl ParseKdlNode for Entrypoints {
 				.value()
 				.as_string()?
 				.to_string();
+
 			if let Err(_e) = entrypoints.insert(arch.clone(), entrypoint) {
 				log::error!("Duplicate entrypoint detected for [{}]", arch);
 				return None;
