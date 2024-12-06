@@ -1,0 +1,28 @@
+
+plugin version="0.1.0" arch="aarch64-apple-darwin" {
+  url "https://github.com/mitre/hipcheck/releases/download/activity-v0.1.0/activity-aarch64-apple-darwin.tar.xz"
+  hash alg="SHA256" digest="5089ef5d6e7307adc1793cbfc8dde8f53d407d8a9c6e77dcad0703c4d2431f2f"
+  compress format="tar.xz"
+  size bytes=1_096_284
+}
+
+plugin version="0.1.0" arch="x86_64-apple-darwin" {
+  url "https://github.com/mitre/hipcheck/releases/download/activity-v0.1.0/activity-x86_64-apple-darwin.tar.xz"
+  hash alg="SHA256" digest="0138af7120977be6a0f44309345a9a79a0d4d1ba3cd77dd02635450ac0ab1a11"
+  compress format="tar.xz"
+  size bytes=1_185_456
+}
+
+plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
+  url "https://github.com/mitre/hipcheck/releases/download/activity-v0.1.0/activity-x86_64-pc-windows-msvc.zip"
+  hash alg="SHA256" digest="791c1051179966f59f9c1e14ccd21fedfa58458a83bda7d570acfcca7a647761"
+  compress format="zip"
+  size bytes=3_989_179
+}
+
+plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
+  url "https://github.com/mitre/hipcheck/releases/download/activity-v0.1.0/activity-x86_64-uknown-linux-gnu.tar.xz"
+  hash alg="SHA256" digest="83db1e17115fc5b8c71a06ca79ffa10cf972288001bc11ec5252ac301897f091"
+  compress format="tar.xz"
+  size bytes=1_275_520
+}
