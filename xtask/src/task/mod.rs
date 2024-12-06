@@ -8,3 +8,4 @@ pub mod check;
 pub mod ci;
 pub mod rfd;
 pub mod site;
+pub mod manifest;
