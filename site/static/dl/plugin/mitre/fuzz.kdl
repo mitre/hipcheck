@@ -1,0 +1,28 @@
+
+plugin version="0.1.0" arch="aarch64-apple-darwin" {
+  url "https://github.com/mitre/hipcheck/releases/download/fuzz-v0.1.0/fuzz-aarch64-apple-darwin.tar.xz"
+  hash alg="SHA256" digest="774811c01d0c351c2c1b8e60b6b1f89773d4ab73cbb4b83c229357bf6778fa17"
+  compress format="tar.xz"
+  size bytes=1_066_152
+}
+
+plugin version="0.1.0" arch="x86_64-apple-darwin" {
+  url "https://github.com/mitre/hipcheck/releases/download/fuzz-v0.1.0/fuzz-x86_64-apple-darwin.tar.xz"
+  hash alg="SHA256" digest="429314ada27f2f0230f9eb7f0109481dea211218bda1eaa1e9282413836923cb"
+  compress format="tar.xz"
+  size bytes=1_157_248
+}
+
+plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
+  url "https://github.com/mitre/hipcheck/releases/download/fuzz-v0.1.0/fuzz-x86_64-pc-windows-msvc.zip"
+  hash alg="SHA256" digest="e9b6b8e7066fc860610b2408cd3180e114108d7c8d8ee3e87e5b1a320dbe7822"
+  compress format="zip"
+  size bytes=3_883_154
+}
+
+plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
+  url "https://github.com/mitre/hipcheck/releases/download/fuzz-v0.1.0/fuzz-x86_64-uknown-linux-gnu.tar.xz"
+  hash alg="SHA256" digest="769a55b18246d273eae538ba19f9cbeaba3c787358c5017aa5b65ce376d596c9"
+  compress format="tar.xz"
+  size bytes=1_243_404
+}
