@@ -43,7 +43,6 @@ use crate::{
 };
 use chrono::prelude::*;
 use dotenv::var;
-use pathbuf::pathbuf;
 use std::{
 	fmt,
 	path::{Path, PathBuf},
@@ -114,6 +113,7 @@ impl Session {
 		config_path: Option<PathBuf>,
 		home_dir: Option<PathBuf>,
 		policy_path: Option<PathBuf>,
+		exec_path: Option<PathBuf>,
 		format: Format,
 	) -> StdResult<Session, Error> {
 		/*===================================================================
@@ -186,6 +186,17 @@ impl Session {
 		}
 
 		/*===================================================================
+		 *  Load the Exec Configuration
+		 *-----------------------------------------------------------------*/
+		let exec = 
+			match load_exec_config(exec_path.as_deref()) {
+				Ok(config) => config,
+				Err(err) => return Err(err)
+			};
+
+		session.set_exec_config(Rc::new(exec)); // ADDED
+
+		/*===================================================================
 		 *  Resolving the Hipcheck home.
 		 *-----------------------------------------------------------------*/
 
@@ -240,8 +251,8 @@ impl Session {
 		// Thus, we will do the plugin startup here.
 		let policy = session.policy();
 
-		let config_path = pathbuf!["./config", "Config.kdl"];
-		let plugin_data = ExecConfig::from_file(config_path).unwrap().plugin_data;
+		let exec_config = session.exec_config(); // ADDED
+		let plugin_data = &exec_config.plugin_data;
 
 		let executor = PluginExecutor::new(
 			/* max_spawn_attempts */ plugin_data.max_spawn.attempts,
@@ -249,6 +260,7 @@ impl Session {
 			/* port_range */ 40000..u16::MAX,
 			/* backoff_interval_micros */ plugin_data.backoff.micros,
 			/* jitter_percent */ plugin_data.jitter.percent,
+			/*grpc_buffer*/ plugin_data.grpc_buffer.size
 		)?;
 		let core = start_plugins(policy.as_ref(), &plugin_cache, executor)?;
 		session.set_core(core);
@@ -311,7 +323,7 @@ fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathB
 
 	// Load the policy file.
 	let policy = PolicyFile::load_from(valid_policy_path)
-		.context("Failed to load policy. Plase make sure the policy file is in the provided location and is formatted correctly.")?;
+		.context("Failed to load policy. Please make sure the policy file is in the provided location and is formatted correctly.")?;
 
 	// Resolve the github token file.
 	let hc_github_token = resolve_token()?;
@@ -319,6 +331,32 @@ fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathB
 	phase.finish_successful();
 
 	Ok((policy, valid_policy_path.to_path_buf(), hc_github_token))
+}
+
+fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> { // ADDED
+	// Start the phase QUESTION
+	let phase = SpinnerPhase::start("loading exec config");
+	// Increment the phase into the "running" stage.
+	phase.inc();
+	// Set the spinner phase to tick constantly, 10 times a second.
+	phase.enable_steady_tick(Duration::from_millis(100));
+
+	// Resolve the path to the exec config file.
+	let valid_path = exec_path.ok_or_else(|| {
+		hc_error!(
+			"Failed to load exec config. Please make sure the path set by the --exec flag exists."
+		)
+	})?;
+
+	// Load the exec config file
+	let exec_config = ExecConfig::from_file(valid_path)
+		.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")?;
+
+	// QUESTION do I need to get the hc_github_token in this function too?
+
+	phase.finish_successful();
+
+	Ok(exec_config)
 }
 
 fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {

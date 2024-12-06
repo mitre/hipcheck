@@ -81,6 +81,7 @@ fn main() -> ExitCode {
 	let _0 = benchmarking::print_scope_time!("main");
 
 	let config = CliConfig::load();
+	println!("```````````exec: {:?}", config.exec());
 
 	// Set the global verbosity.
 	Shell::set_verbosity(config.verbosity());
@@ -140,6 +141,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 		config.config().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
 		config.policy().map(ToOwned::to_owned),
+		config.exec().map(ToOwned::to_owned),
 		config.format(),
 	);
 
@@ -185,6 +187,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		config.config().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
 		config.policy().map(ToOwned::to_owned),
+		config.exec().map(ToOwned::to_owned),
 		config.format(),
 	)?;
 
@@ -560,7 +563,7 @@ fn cmd_plugin(args: PluginArgs) {
 		name: "dummy/sha256".to_owned(),
 		entrypoint: entrypoint2.display().to_string(),
 	};
-	let config_path = pathbuf!["./config", "Config.kdl"];
+	let config_path = pathbuf!["./config", "Config.kdl"]; // REPLACE
 	let plugin_data = ExecConfig::from_file(config_path).unwrap().plugin_data;
 
 	let plugin_executor = PluginExecutor::new(
@@ -569,6 +572,7 @@ fn cmd_plugin(args: PluginArgs) {
 		/* port_range */ 40000..u16::MAX,
 		/* backoff_interval_micros */ plugin_data.backoff.micros,
 		/* jitter_percent */ plugin_data.jitter.percent,
+		/*grpc_buffer*/ plugin_data.grpc_buffer.size
 	)
 	.unwrap();
 	let engine = match HcEngineImpl::new(
@@ -855,10 +859,11 @@ fn run(
 	config_path: Option<PathBuf>,
 	home_dir: Option<PathBuf>,
 	policy_path: Option<PathBuf>,
+	exec_path: Option<PathBuf>,
 	format: Format,
 ) -> Result<Report> {
 	// Initialize the session.
-	let session = match Session::new(&target, config_path, home_dir, policy_path, format) {
+	let session = match Session::new(&target, config_path, home_dir, policy_path, exec_path, format) {
 		Ok(session) => session,
 		Err(err) => return Err(err),
 	};

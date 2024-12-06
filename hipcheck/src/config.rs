@@ -6,6 +6,7 @@ use crate::{
 	analysis::score::*,
 	engine::HcEngine,
 	error::{Context, Result},
+	executor::ExecConfig,
 	hc_error,
 	policy::{
 		policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild},
@@ -452,9 +453,9 @@ pub trait ConfigSource: salsa::Database {
 	/// Returns the location of the policy file
 	#[salsa::input]
 	fn policy_path(&self) -> Option<Rc<PathBuf>>;
-	/// ADDED: Returns the input `Exec Config File` struct
-	// #[salsa::input]
-	// fn exec_config(&self) -> Rc<ExecConfigFile>;
+	/// ADDED: Returns the input `Exec Config` struct
+	#[salsa::input]
+	fn exec_config(&self) -> Rc<ExecConfig>;
 	/// Returns the token set in HC_GITHUB_TOKEN env var
 	#[salsa::input]
 	fn github_api_token(&self) -> Option<Rc<String>>;

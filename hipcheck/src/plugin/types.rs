@@ -9,11 +9,9 @@ use crate::{
 		Query as PluginQuery, QueryState, SetConfigurationRequest,
 		SetConfigurationResponse as PluginConfigResult,
 	},
-	executor::ExecConfig,
 	Error, Result,
 };
 use futures::{Stream, StreamExt};
-use pathbuf::pathbuf;
 use serde_json::Value;
 use std::{
 	collections::{HashMap, VecDeque},
@@ -159,6 +157,9 @@ pub struct PluginContext {
 
 	/// The child process in which the plugin is running.
 	pub proc: Child,
+
+	/// The size of the gRPC buffer
+	pub grpc_buffer: usize,
 }
 
 // Redefinition of `grpc` field's functions with more useful types, additional
@@ -293,10 +294,7 @@ impl PluginContext {
 
 		let opt_explain_default_query = self.explain_default_query().await?;
 
-		let config_path = pathbuf!["./config", "Config.kdl"];
-		let plugin_data = ExecConfig::from_file(config_path).unwrap().plugin_data;
-
-		let (tx, out_rx) = mpsc::channel::<PluginQuery>(plugin_data.grpc_buffer.size);
+		let (tx, out_rx) = mpsc::channel::<PluginQuery>(self.grpc_buffer);
 		let rx = self.initiate_query_protocol(out_rx).await?;
 
 		Ok(PluginTransport {
