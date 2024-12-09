@@ -1,28 +1,28 @@
 
 plugin version="0.1.0" arch="aarch64-apple-darwin" {
-  url "https://github.com/mitre/hipcheck/releases/download/entropy-v0.1.0/entropy-aarch64-apple-darwin.tar.xz"
-  hash alg="SHA256" digest="a68265eabb994f65aa01ead6747421000f47051960dd10a195f01a1741c84687"
-  compress format="tar.xz"
-  size bytes=1_332_104
+    url "https://github.com/mitre/hipcheck/releases/download/entropy-v0.1.0/entropy-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="a68265eabb994f65aa01ead6747421000f47051960dd10a195f01a1741c84687"
+    compress format="tar.xz"
+    size bytes=1332104
 }
 
 plugin version="0.1.0" arch="x86_64-apple-darwin" {
-  url "https://github.com/mitre/hipcheck/releases/download/entropy-v0.1.0/entropy-x86_64-apple-darwin.tar.xz"
-  hash alg="SHA256" digest="81a5962e3819b82d2999f1a5a575894aab451cc69485b65cba581c28f5b305ff"
-  compress format="tar.xz"
-  size bytes=1_446_056
+    url "https://github.com/mitre/hipcheck/releases/download/entropy-v0.1.0/entropy-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="81a5962e3819b82d2999f1a5a575894aab451cc69485b65cba581c28f5b305ff"
+    compress format="tar.xz"
+    size bytes=1446056
 }
 
 plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
-  url "https://github.com/mitre/hipcheck/releases/download/entropy-v0.1.0/entropy-x86_64-pc-windows-msvc.zip"
-  hash alg="SHA256" digest="794c72b0793de206d2d99c59d3bfbf079ab13d39a59b012ae50535d57e119586"
-  compress format="zip"
-  size bytes=4_889_780
+    url "https://github.com/mitre/hipcheck/releases/download/entropy-v0.1.0/entropy-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="794c72b0793de206d2d99c59d3bfbf079ab13d39a59b012ae50535d57e119586"
+    compress format="zip"
+    size bytes=4889780
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/entropy-v0.1.0/entropy-x86_64-unknown-linux-gnu.tar.xz"
-  hash alg="SHA256" digest="fb23a8df4904e188e130ecba17ca1d8f9795ee3d788ccee103b11d45d8590dac"
-  compress format="tar.xz"
-  size bytes=1_543_064
+    url "https://github.com/mitre/hipcheck/releases/download/entropy-v0.1.0/entropy-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="fb23a8df4904e188e130ecba17ca1d8f9795ee3d788ccee103b11d45d8590dac"
+    compress format="tar.xz"
+    size bytes=1543064
 }
