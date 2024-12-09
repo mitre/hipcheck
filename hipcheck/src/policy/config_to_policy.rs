@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use url::Url;
 
 const PLUGIN_VERSION: &str = "0.1.0";
+const FUZZ_PLUGIN_VERSION: &str = "0.1.1";
 
 /// Converts a Config struct to a PolicyFile struct
 pub fn config_to_policy(config: Config) -> Result<PolicyFile> {
@@ -136,17 +137,14 @@ fn parse_activity(
 		// Cap the weight at 65,533
 		let weight = activity.weight.try_into().unwrap_or(u16::MAX);
 		let threshold = activity.week_count_threshold;
-		let expression = format!("(lte $ {})", threshold);
+		let expression = format!("(lte $ P{}w)", threshold);
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
 			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(ManifestLocation::Url(
-				Url::parse(
-					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
-				)
-				.unwrap(),
+				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/activity.kdl").unwrap(),
 			)),
 		);
 		plugins.push(plugin);
@@ -173,17 +171,22 @@ fn parse_binary(
 		// Cap the weight at 65,533
 		let weight = binary.weight.try_into().unwrap_or(u16::MAX);
 		let threshold = binary.binary_file_threshold;
+		let file = binary.binary_config_file.clone();
 		let expression = format!("(lte $ {})", threshold);
+		let mut config = PolicyConfig::new();
+		config
+			.insert(
+				"binary-file".to_string(),
+				Value::String(format!("./config/{}", file)),
+			)
+			.unwrap();
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/binary").unwrap(),
 			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(ManifestLocation::Url(
-				Url::parse(
-					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl",
-				)
-				.unwrap(),
+				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/binary.kdl").unwrap(),
 			)),
 		);
 		plugins.push(plugin);
@@ -193,7 +196,7 @@ fn parse_binary(
 			PolicyPluginName::new("mitre/binary").unwrap(),
 			Some(expression),
 			Some(weight),
-			None,
+			Some(config),
 		));
 		practices.push(analysis);
 	}
@@ -210,12 +213,9 @@ fn parse_fuzz(plugins: &mut PolicyPluginList, practices: &mut PolicyCategory, fu
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/fuzz").unwrap(),
-			PluginVersion::new(PLUGIN_VERSION.to_string()),
+			PluginVersion::new(FUZZ_PLUGIN_VERSION.to_string()),
 			Some(ManifestLocation::Url(
-				Url::parse(
-					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-fuzz.kdl",
-				)
-				.unwrap(),
+				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/fuzz.kdl").unwrap(),
 			)),
 		);
 		plugins.push(plugin);
@@ -242,17 +242,17 @@ fn parse_identity(
 		// Cap the weight at 65,533
 		let weight = identity.weight.try_into().unwrap_or(u16::MAX);
 		let threshold = identity.percent_threshold;
-		let expression = format!("(lte $ {})", threshold);
+		let expression = format!(
+			"(lte (divz (count (filter (eq #t) $)) (count $)) {})",
+			threshold
+		);
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/identity").unwrap(),
 			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(ManifestLocation::Url(
-				Url::parse(
-					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-identity.kdl",
-				)
-				.unwrap(),
+				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/identity.kdl").unwrap(),
 			)),
 		);
 		plugins.push(plugin);
@@ -279,17 +279,17 @@ fn parse_review(
 		// Cap the weight at 65,533
 		let weight = review.weight.try_into().unwrap_or(u16::MAX);
 		let threshold = review.percent_threshold;
-		let expression = format!("(lte $ {})", threshold);
+		let expression = format!(
+			"(lte (divz (count (filter (eq #f) $)) (count $)) {})",
+			threshold
+		);
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/review").unwrap(),
 			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(ManifestLocation::Url(
-				Url::parse(
-					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-review.kdl",
-				)
-				.unwrap(),
+				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/review.kdl").unwrap(),
 			)),
 		);
 		plugins.push(plugin);
@@ -312,7 +312,7 @@ fn parse_typo(plugins: &mut PolicyPluginList, attacks: &mut PolicyCategory, typo
 		// Cap the weight at 65,533
 		let weight = typo.weight.try_into().unwrap_or(u16::MAX);
 		let threshold = typo.count_threshold;
-		let expression = format!("(eq {} (count $))", threshold);
+		let expression = format!("(lte (count (filter (eq #t) $)) {})", threshold);
 		let file = typo.typo_file.clone();
 		let mut config = PolicyConfig::new();
 		config
@@ -327,10 +327,7 @@ fn parse_typo(plugins: &mut PolicyPluginList, attacks: &mut PolicyCategory, typo
 			PolicyPluginName::new("mitre/typo").unwrap(),
 			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(ManifestLocation::Url(
-				Url::parse(
-					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-typo.kdl",
-				)
-				.unwrap(),
+				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/typo.kdl").unwrap(),
 			)),
 		);
 		plugins.push(plugin);
@@ -357,14 +354,12 @@ fn parse_affiliation(
 		// Cap the weight at 65,533
 		let weight = affiliation.weight.try_into().unwrap_or(u16::MAX);
 		let threshold = affiliation.count_threshold;
-		let expression = format!("(eq {} (count $))", threshold);
+		let expression = format!("(lte (count (filter (eq #t) $)) {})", threshold);
 		let file = affiliation.orgs_file.clone();
 		let mut config = PolicyConfig::new();
 		config
-			.insert(
-				"orgs-file".to_string(),
-				Value::String(format!("./config/{}", file)),
-			)
+			// Our working .kdl orgs file is not in `config` currently
+			.insert("orgs-file".to_string(), Value::String(file))
 			.unwrap();
 
 		// Add the plugin
@@ -372,10 +367,7 @@ fn parse_affiliation(
 			PolicyPluginName::new("mitre/affiliation").unwrap(),
 			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(ManifestLocation::Url(
-				Url::parse(
-					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-affiliation.kdl",
-				)
-				.unwrap(),
+				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/affiliation.kdl").unwrap(),
 			)),
 		);
 		plugins.push(plugin);
@@ -403,16 +395,20 @@ fn parse_churn(plugins: &mut PolicyPluginList, commit: &mut PolicyCategory, chur
 			"(lte (divz (count (filter (gt {}) $)) (count $)) {})",
 			value_threshold, percent_threshold,
 		);
+		let mut config = PolicyConfig::new();
+		config
+			.insert(
+				"langs-file".to_string(),
+				Value::String("./config/Langs.toml".to_string()),
+			)
+			.unwrap();
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/churn").unwrap(),
 			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(ManifestLocation::Url(
-				Url::parse(
-					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-churn.kdl",
-				)
-				.unwrap(),
+				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/churn.kdl").unwrap(),
 			)),
 		);
 		plugins.push(plugin);
@@ -422,7 +418,7 @@ fn parse_churn(plugins: &mut PolicyPluginList, commit: &mut PolicyCategory, chur
 			PolicyPluginName::new("mitre/churn").unwrap(),
 			Some(expression),
 			Some(weight),
-			None,
+			Some(config),
 		));
 		commit.push(analysis);
 	}
@@ -444,16 +440,20 @@ fn parse_entropy(
 			"(lte (divz (count (filter (gt {}) $)) (count $)) {})",
 			value_threshold, percent_threshold
 		);
+		let mut config = PolicyConfig::new();
+		config
+			.insert(
+				"langs-file".to_string(),
+				Value::String("./config/Langs.toml".to_string()),
+			)
+			.unwrap();
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/entropy").unwrap(),
 			PluginVersion::new(PLUGIN_VERSION.to_string()),
 			Some(ManifestLocation::Url(
-				Url::parse(
-					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-entropy.kdl",
-				)
-				.unwrap(),
+				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/entropy.kdl").unwrap(),
 			)),
 		);
 		plugins.push(plugin);
@@ -463,7 +463,7 @@ fn parse_entropy(
 			PolicyPluginName::new("mitre/entropy").unwrap(),
 			Some(expression),
 			Some(weight),
-			None,
+			Some(config),
 		));
 		commit.push(analysis);
 	}
