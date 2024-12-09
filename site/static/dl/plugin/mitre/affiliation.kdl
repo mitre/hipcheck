@@ -21,7 +21,7 @@ plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/affiliation-v0.1.0/affiliation-x86_64-uknown-linux-gnu.tar.xz"
+  url "https://github.com/mitre/hipcheck/releases/download/affiliation-v0.1.0/affiliation-x86_64-unknown-linux-gnu.tar.xz"
   hash alg="SHA256" digest="f2ec3958e00e7f877b4efde246f8596e502b1f2240914e22b28e58840f3fdf3b"
   compress format="tar.xz"
   size bytes=1_332_908

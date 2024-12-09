@@ -21,7 +21,7 @@ plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/git-v0.1.0/git-x86_64-uknown-linux-gnu.tar.xz"
+  url "https://github.com/mitre/hipcheck/releases/download/git-v0.1.0/git-x86_64-unknown-linux-gnu.tar.xz"
   hash alg="SHA256" digest="df3660353b36b4fe95544fe2411c6a90283002628409997fe7e9313aa01170d3"
   compress format="tar.xz"
   size bytes=1_270_216

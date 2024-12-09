@@ -21,7 +21,7 @@ plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/activity-v0.1.0/activity-x86_64-uknown-linux-gnu.tar.xz"
+  url "https://github.com/mitre/hipcheck/releases/download/activity-v0.1.0/activity-x86_64-unknown-linux-gnu.tar.xz"
   hash alg="SHA256" digest="83db1e17115fc5b8c71a06ca79ffa10cf972288001bc11ec5252ac301897f091"
   compress format="tar.xz"
   size bytes=1_275_520

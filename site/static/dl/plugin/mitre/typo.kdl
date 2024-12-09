@@ -21,7 +21,7 @@ plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/typo-v0.1.0/typo-x86_64-uknown-linux-gnu.tar.xz"
+  url "https://github.com/mitre/hipcheck/releases/download/typo-v0.1.0/typo-x86_64-unknown-linux-gnu.tar.xz"
   hash alg="SHA256" digest="8d11ef7f23c438dfcc4c9a84a774e9a86aa5467430fca896d4954da1b3d56be9"
   compress format="tar.xz"
   size bytes=1_392_500
