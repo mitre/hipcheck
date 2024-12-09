@@ -1,28 +1,28 @@
 
 plugin version="0.1.0" arch="aarch64-apple-darwin" {
-  url "https://github.com/mitre/hipcheck/releases/download/review-v0.1.0/review-aarch64-apple-darwin.tar.xz"
-  hash alg="SHA256" digest="8a8326468ea9a0f7e29696426a82c5366512b45659d7a3cc8761bf8ad6b0c861"
-  compress format="tar.xz"
-  size bytes=1_077_628
+    url "https://github.com/mitre/hipcheck/releases/download/review-v0.1.0/review-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="8a8326468ea9a0f7e29696426a82c5366512b45659d7a3cc8761bf8ad6b0c861"
+    compress format="tar.xz"
+    size bytes=1077628
 }
 
 plugin version="0.1.0" arch="x86_64-apple-darwin" {
-  url "https://github.com/mitre/hipcheck/releases/download/review-v0.1.0/review-x86_64-apple-darwin.tar.xz"
-  hash alg="SHA256" digest="a8103dd97d1b8438e3c30d0f164dea57834e42d51bb41f92a10fd68f0fadb08c"
-  compress format="tar.xz"
-  size bytes=1_168_736
+    url "https://github.com/mitre/hipcheck/releases/download/review-v0.1.0/review-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="a8103dd97d1b8438e3c30d0f164dea57834e42d51bb41f92a10fd68f0fadb08c"
+    compress format="tar.xz"
+    size bytes=1168736
 }
 
 plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
-  url "https://github.com/mitre/hipcheck/releases/download/review-v0.1.0/review-x86_64-pc-windows-msvc.zip"
-  hash alg="SHA256" digest="ae0cbc0dadace695a99aff433a48be6d4d55f1312460c81897ea5fbf821d452c"
-  compress format="zip"
-  size bytes=3_920_051
+    url "https://github.com/mitre/hipcheck/releases/download/review-v0.1.0/review-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="ae0cbc0dadace695a99aff433a48be6d4d55f1312460c81897ea5fbf821d452c"
+    compress format="zip"
+    size bytes=3920051
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/review-v0.1.0/review-x86_64-unknown-linux-gnu.tar.xz"
-  hash alg="SHA256" digest="254615fdd57ab3f949bbcbe5bbe0c1c457430de991515daeafc15cb5a3e612d8"
-  compress format="tar.xz"
-  size bytes=1_257_140
+    url "https://github.com/mitre/hipcheck/releases/download/review-v0.1.0/review-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="254615fdd57ab3f949bbcbe5bbe0c1c457430de991515daeafc15cb5a3e612d8"
+    compress format="tar.xz"
+    size bytes=1257140
 }

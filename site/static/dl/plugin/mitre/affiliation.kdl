@@ -1,28 +1,28 @@
 
 plugin version="0.1.0" arch="aarch64-apple-darwin" {
-  url "https://github.com/mitre/hipcheck/releases/download/affiliation-v0.1.0/affiliation-aarch64-apple-darwin.tar.xz"
-  hash alg="SHA256" digest="31672ec1e7cbde637c9c1a7a890d40fefb44d2e47205fb21d8ab812092bf3208"
-  compress format="tar.xz"
-  size bytes=1_143_068
+    url "https://github.com/mitre/hipcheck/releases/download/affiliation-v0.1.0/affiliation-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="31672ec1e7cbde637c9c1a7a890d40fefb44d2e47205fb21d8ab812092bf3208"
+    compress format="tar.xz"
+    size bytes=1143068
 }
 
 plugin version="0.1.0" arch="x86_64-apple-darwin" {
-  url "https://github.com/mitre/hipcheck/releases/download/affiliation-v0.1.0/affiliation-x86_64-apple-darwin.tar.xz"
-  hash alg="SHA256" digest="1303425c8cde0236f7f80da3bb227f01d222e38f0c0da1329563243401d045e7"
-  compress format="tar.xz"
-  size bytes=1_242_800
+    url "https://github.com/mitre/hipcheck/releases/download/affiliation-v0.1.0/affiliation-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="1303425c8cde0236f7f80da3bb227f01d222e38f0c0da1329563243401d045e7"
+    compress format="tar.xz"
+    size bytes=1242800
 }
 
 plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
-  url "https://github.com/mitre/hipcheck/releases/download/affiliation-v0.1.0/affiliation-x86_64-pc-windows-msvc.zip"
-  hash alg="SHA256" digest="d6745e07807c7bb195f822be4a3416a2ed2b2080cb9f9379c7fc7743a652ed19"
-  compress format="zip"
-  size bytes=4_139_728
+    url "https://github.com/mitre/hipcheck/releases/download/affiliation-v0.1.0/affiliation-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="d6745e07807c7bb195f822be4a3416a2ed2b2080cb9f9379c7fc7743a652ed19"
+    compress format="zip"
+    size bytes=4139728
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/affiliation-v0.1.0/affiliation-x86_64-unknown-linux-gnu.tar.xz"
-  hash alg="SHA256" digest="f2ec3958e00e7f877b4efde246f8596e502b1f2240914e22b28e58840f3fdf3b"
-  compress format="tar.xz"
-  size bytes=1_332_908
+    url "https://github.com/mitre/hipcheck/releases/download/affiliation-v0.1.0/affiliation-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="f2ec3958e00e7f877b4efde246f8596e502b1f2240914e22b28e58840f3fdf3b"
+    compress format="tar.xz"
+    size bytes=1332908
 }

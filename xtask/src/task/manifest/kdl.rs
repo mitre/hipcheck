@@ -19,7 +19,7 @@ where
 pub trait ToKdlNode {
 	/// convert self to a KdlNode
 	#[allow(unused)]
-	fn to_kdl_node(&self) -> KdlNode;
+	fn to_kdl_node(&self) -> Result<KdlNode, anyhow::Error>;
 }
 
 /// Returns the first successful node that can be parsed into T, if there is one
@@ -85,10 +85,10 @@ macro_rules! string_newtype_parse_kdl_node {
 
 		impl ToKdlNode for $type {
 			#[allow(unused)]
-			fn to_kdl_node(&self) -> KdlNode {
+			fn to_kdl_node(&self) -> Result<KdlNode, anyhow::Error> {
 				let mut node = KdlNode::new(Self::kdl_key());
 				node.insert(0, self.0.clone());
-				node
+				Ok(node)
 			}
 		}
 	};

@@ -7,10 +7,16 @@ use crate::{
 		util::agent,
 	},
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use kdl::{KdlDocument, KdlNode, KdlValue};
 use regex::Regex;
-use std::{fmt::Display, str::FromStr, sync::LazyLock};
+use std::{
+	cmp::Ordering,
+	fmt::Display,
+	hash::{Hash, Hasher},
+	str::FromStr,
+	sync::LazyLock,
+};
 
 static VERSION_REGEX: LazyLock<Regex> =
 	LazyLock::new(|| Regex::new("[v]?([0-9]+).([0-9]+).([0-9]+)").unwrap());
@@ -25,7 +31,7 @@ pub fn parse_plugin_version(version_str: &str) -> Option<PluginVersion> {
 	})
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct PluginVersion(pub u8, pub u8, pub u8);
 
 impl ParseKdlNode for PluginVersion {
@@ -39,7 +45,13 @@ impl ParseKdlNode for PluginVersion {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+impl Display for PluginVersion {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "{}.{}.{}", self.0, self.1, self.2)
+	}
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Arch(pub String);
 string_newtype_parse_kdl_node!(Arch, "arch");
 
@@ -270,7 +282,7 @@ impl ParseKdlNode for Size {
 ///  size bytes=2_869_896
 ///}
 ///```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 pub struct DownloadManifestEntry {
 	// TODO: make this a SemVer type?
 	/// A `SemVer` version of the plugin. Not a version requirement as in the plugin manifest file,
@@ -289,6 +301,35 @@ pub struct DownloadManifestEntry {
 	/// Describes the size of the downloaded artifact, used to validate the download was
 	/// successful, makes it more difficult for an attacker to distribute malformed artifacts
 	pub size: Size,
+}
+
+impl PartialEq for DownloadManifestEntry {
+	fn eq(&self, other: &Self) -> bool {
+		self.arch == other.arch && self.version == other.version
+	}
+}
+
+impl Ord for DownloadManifestEntry {
+	fn cmp(&self, other: &Self) -> Ordering {
+		match self.version.cmp(&other.version) {
+			Ordering::Equal => self.arch.cmp(&other.arch),
+			o => o,
+		}
+	}
+}
+
+impl PartialOrd for DownloadManifestEntry {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+// Makes it so we can HashSet and enforce unique (version, arch) pairs
+impl Hash for DownloadManifestEntry {
+	fn hash<H: Hasher>(&self, state: &mut H) {
+		self.version.hash(state);
+		self.arch.hash(state);
+	}
 }
 
 impl ParseKdlNode for DownloadManifestEntry {
@@ -323,6 +364,38 @@ impl ParseKdlNode for DownloadManifestEntry {
 			compress,
 			size,
 		})
+	}
+}
+
+impl ToKdlNode for DownloadManifestEntry {
+	fn to_kdl_node(&self) -> Result<KdlNode> {
+		let mut parent = KdlNode::new("plugin");
+		parent.insert("version", self.version.to_string());
+		parent.insert("arch", self.arch.0.clone());
+
+		let mut children = KdlDocument::new();
+		let children_nodes = children.nodes_mut();
+
+		let mut url = KdlNode::new("url");
+		url.insert(0, self.url.to_string());
+		children_nodes.push(url);
+
+		let mut hash = KdlNode::new("hash");
+		hash.insert("alg", self.hash.hash_algorithm.to_string());
+		let resolved_hash = self.hash.digest.clone().resolve()?;
+		hash.insert("digest", resolved_hash);
+		children_nodes.push(hash);
+
+		let mut compress = KdlNode::new("compress");
+		compress.insert("format", self.compress.format.to_string());
+		children_nodes.push(compress);
+
+		let mut size = KdlNode::new("size");
+		size.insert("bytes", self.size.bytes as i64);
+		children_nodes.push(size);
+
+		parent.set_children(children);
+		Ok(parent)
 	}
 }
 
@@ -537,5 +610,50 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 			},
 		    entries_iter.next().unwrap()
         );
+	}
+
+	#[test]
+	fn entry_ordering() {
+		let a = DownloadManifestEntry {
+				version: PluginVersion(0, 1, 0),
+				arch: Arch("x86_64-apple-darwin".to_owned()),
+				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz").unwrap(),
+				hash: HashWithDigest::new(HashAlgorithm::Sha256, "ddb8c6d26dd9a91e11c99b3bd7ee2b9585aedac6e6df614190f1ba2bfe86dc19".to_owned().into()),
+                compress: Compress::new(ArchiveFormat::TarXz),
+                size: Size::new(3_183_768)
+			};
+		let b =DownloadManifestEntry {
+				version: PluginVersion(0, 2, 0),
+				arch: Arch("aarch64-apple-darwin".to_owned()),
+				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-aarch64-apple-darwin.tar.xz").unwrap(),
+				hash: HashWithDigest::new(HashAlgorithm::Sha256, "b8e111e7817c4a1eb40ed50712d04e15b369546c4748be1aa8893b553f4e756b".to_owned().into()),
+				compress: Compress::new(ArchiveFormat::TarXz),
+				size: Size {
+					bytes: 2_869_896
+				}
+            };
+		let c = DownloadManifestEntry {
+				version: PluginVersion(1, 1, 0),
+				arch: Arch("x86_64-apple-darwin".to_owned()),
+				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz").unwrap(),
+				hash: HashWithDigest::new(HashAlgorithm::Sha256, "ddb8c6d26dd9a91e11c99b3bd7ee2b9585aedac6e6df614190f1ba2bfe86dc19".to_owned().into()),
+                compress: Compress::new(ArchiveFormat::TarXz),
+                size: Size::new(3_183_768)
+			};
+		let d = DownloadManifestEntry {
+				version: PluginVersion(1, 1, 0),
+				arch: Arch("aarch64-apple-darwin".to_owned()),
+				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-aarch64-apple-darwin.tar.xz").unwrap(),
+				hash: HashWithDigest::new(HashAlgorithm::Sha256, "b8e111e7817c4a1eb40ed50712d04e15b369546c4748be1aa8893b553f4e756b".to_owned().into()),
+				compress: Compress::new(ArchiveFormat::TarXz),
+				size: Size {
+					bytes: 2_869_896
+				}
+            };
+		let mut raw_vec = vec![&d, &c, &b, &a];
+		// smallest version, then arch used as tiebreaker
+		let exp_vec = vec![&a, &b, &d, &c];
+		raw_vec.sort();
+		assert_eq!(raw_vec, exp_vec);
 	}
 }

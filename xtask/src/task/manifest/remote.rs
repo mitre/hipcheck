@@ -38,6 +38,11 @@ impl TryFrom<Vec<RawReleaseDigest>> for ReleaseDigest {
 
 		// For each RawReleaseDigest,
 		for release in value {
+			// @Todo - come up with a better way to distinguish plugin releases
+			if release.name.starts_with("hipcheck") {
+				continue;
+			}
+
 			// Attempt to split out the name and version string from the raw name,
 			// this should fail for non-plugins because they follow a different release
 			// naming convention
@@ -119,7 +124,7 @@ impl TryFrom<Vec<RawReleaseDigest>> for ReleaseDigest {
 	}
 }
 
-pub fn get_hipcheck_releases(github_api_token: &str) -> Result<ReleaseDigest> {
+pub fn get_hipcheck_plugin_releases(github_api_token: &str) -> Result<ReleaseDigest> {
 	let auth_agent = util::authenticated_agent::AuthenticatedAgent::new(github_api_token);
 	let raw_rel_json = auth_agent
 		.get("https://api.github.com/repos/mitre/hipcheck/releases")

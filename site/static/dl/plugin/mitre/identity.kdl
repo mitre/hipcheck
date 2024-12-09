@@ -1,28 +1,28 @@
 
 plugin version="0.1.0" arch="aarch64-apple-darwin" {
-  url "https://github.com/mitre/hipcheck/releases/download/identity-v0.1.0/identity-aarch64-apple-darwin.tar.xz"
-  hash alg="SHA256" digest="29743e3af0c58d89aae7609463b268548b13d1f0ebc3380be3bb47406206b877"
-  compress format="tar.xz"
-  size bytes=1_083_808
+    url "https://github.com/mitre/hipcheck/releases/download/identity-v0.1.0/identity-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="29743e3af0c58d89aae7609463b268548b13d1f0ebc3380be3bb47406206b877"
+    compress format="tar.xz"
+    size bytes=1083808
 }
 
 plugin version="0.1.0" arch="x86_64-apple-darwin" {
-  url "https://github.com/mitre/hipcheck/releases/download/identity-v0.1.0/identity-x86_64-apple-darwin.tar.xz"
-  hash alg="SHA256" digest="6b6ba8985c8a5c1a322d211c451040d9d2166cb4943284c8321fecfcd8f70190"
-  compress format="tar.xz"
-  size bytes=1_174_092
+    url "https://github.com/mitre/hipcheck/releases/download/identity-v0.1.0/identity-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="6b6ba8985c8a5c1a322d211c451040d9d2166cb4943284c8321fecfcd8f70190"
+    compress format="tar.xz"
+    size bytes=1174092
 }
 
 plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
-  url "https://github.com/mitre/hipcheck/releases/download/identity-v0.1.0/identity-x86_64-pc-windows-msvc.zip"
-  hash alg="SHA256" digest="ceea8f1003efaf712c42987a04a61ce5d0c7c7331b9098fa70f2d16a85effbcb"
-  compress format="zip"
-  size bytes=3_961_541
+    url "https://github.com/mitre/hipcheck/releases/download/identity-v0.1.0/identity-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="ceea8f1003efaf712c42987a04a61ce5d0c7c7331b9098fa70f2d16a85effbcb"
+    compress format="zip"
+    size bytes=3961541
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/identity-v0.1.0/identity-x86_64-unknown-linux-gnu.tar.xz"
-  hash alg="SHA256" digest="81087950da4be880f1cf7900f2f105f6a26a7d625365f3e027b475b076dfd820"
-  compress format="tar.xz"
-  size bytes=1_261_408
+    url "https://github.com/mitre/hipcheck/releases/download/identity-v0.1.0/identity-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="81087950da4be880f1cf7900f2f105f6a26a7d625365f3e027b475b076dfd820"
+    compress format="tar.xz"
+    size bytes=1261408
 }
