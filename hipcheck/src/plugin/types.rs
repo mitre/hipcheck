@@ -19,6 +19,7 @@ use std::{
 	convert::TryFrom,
 	future::poll_fn,
 	ops::Not as _,
+	path::PathBuf,
 	pin::Pin,
 	process::Child,
 	result::Result as StdResult,
@@ -32,6 +33,7 @@ pub type HcPluginClient = PluginServiceClient<Channel>;
 #[derive(Clone, Debug)]
 pub struct Plugin {
 	pub name: String,
+	pub working_dir: PathBuf,
 	pub entrypoint: String,
 }
 

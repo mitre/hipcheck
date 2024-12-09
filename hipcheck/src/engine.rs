@@ -239,7 +239,12 @@ pub fn start_plugins(
 
 	let mut plugins = vec![];
 	for plugin_id in required_plugin_names.iter() {
-		let plugin_manifest = PluginManifest::from_file(plugin_cache.plugin_kdl(plugin_id))?;
+		let plugin_kdl = plugin_cache.plugin_kdl(plugin_id);
+		let working_dir = plugin_kdl
+			.parent()
+			.expect("The plugin.kdl is always in the plugin cache")
+			.to_owned();
+		let plugin_manifest = PluginManifest::from_file(plugin_kdl)?;
 		let entrypoint = plugin_manifest
 			.get_entrypoint(&current_arch)
 			.ok_or_else(|| {
@@ -252,6 +257,7 @@ pub fn start_plugins(
 
 		let plugin = Plugin {
 			name: plugin_id.to_policy_file_plugin_identifier(),
+			working_dir,
 			entrypoint,
 		};
 

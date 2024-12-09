@@ -59,7 +59,11 @@ fn retrieve_plugin(
 	// TODO: if the plugin.kdl file for the plugin already exists, then should we skip the retrieval process?
 	// if plugin_cache.plugin_kdl(&plugin_id).exists()
 
-	log::debug!("Retrieving Plugin ID: {:?}", plugin_id);
+	log::debug!(
+		"Retrieving Plugin ID {:?} from {:?}",
+		plugin_id,
+		manifest_location
+	);
 
 	let plugin_manifest = match manifest_location {
 		Some(ManifestLocation::Url(plugin_url)) => {
@@ -94,15 +98,17 @@ fn retrieve_plugin_from_network(
 	plugin_cache: &HcPluginCache,
 ) -> Result<PluginManifest, Error> {
 	let current_arch = get_current_arch();
+	let version = plugin_id.version();
 	let download_manifest = retrieve_download_manifest(plugin_url)?;
 	for entry in &download_manifest.entries {
-		if entry.arch == current_arch {
+		if entry.arch == current_arch && version == &entry.version {
 			return download_and_unpack_plugin(entry, plugin_id, plugin_cache);
 		}
 	}
 	Err(hc_error!(
-		"Could not find download manifest entry for arch '{}'",
-		current_arch
+		"Could not find download manifest entry for arch '{}' with version '{}'",
+		current_arch,
+		version.0
 	))
 }
 
