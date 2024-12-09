@@ -17,7 +17,6 @@ use crate::{
 	executor::ExecConfig,
 	hc_error,
 	policy::{config_to_policy, PolicyFile},
-	PluginExecutor,
 	report::{ReportParams, ReportParamsStorage},
 	score::ScoringProviderStorage,
 	session::{
@@ -32,6 +31,7 @@ use crate::{
 	util::command::DependentProgram,
 	util::{git::get_git_version, npm::get_npm_version},
 	version::{VersionQuery, VersionQueryStorage},
+	PluginExecutor,
 };
 use chrono::prelude::*;
 use std::{
@@ -164,13 +164,12 @@ impl Session {
 		/*===================================================================
 		 *  Load the Exec Configuration
 		 *-----------------------------------------------------------------*/
-		let exec = 
-			match load_exec_config(exec_path.as_deref()) {
-				Ok(config) => config,
-				Err(err) => return Err(err)
-			};
+		let exec = match load_exec_config(exec_path.as_deref()) {
+			Ok(config) => config,
+			Err(err) => return Err(err),
+		};
 
-		session.set_exec_config(Rc::new(exec)); 
+		session.set_exec_config(Rc::new(exec));
 
 		/*===================================================================
 		 *  Resolving the Hipcheck home.
@@ -236,7 +235,7 @@ impl Session {
 			/* port_range */ 40000..u16::MAX,
 			/* backoff_interval_micros */ plugin_data.backoff.micros,
 			/* jitter_percent */ plugin_data.jitter.percent,
-			/*grpc_buffer*/ plugin_data.grpc_buffer.size
+			/* grpc_buffer */ plugin_data.grpc_buffer.size,
 		)?;
 		let core = start_plugins(policy.as_ref(), &plugin_cache, executor)?;
 		session.set_core(core);

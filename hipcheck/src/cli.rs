@@ -4,9 +4,9 @@
 
 use crate::{
 	cache::repo::{RepoCacheDeleteScope, RepoCacheListScope, RepoCacheSort},
+	env,
 	error::Context,
 	error::Result,
-	env,
 	hc_error,
 	plugin::Arch,
 	session::pm,
@@ -106,7 +106,7 @@ struct PathArgs {
 	)]
 	policy: Option<PathBuf>,
 
-	/// Path to the exec config file ADDED
+	/// Path to the exec config file
 	#[arg(
 		short = 'e',
 		long = "exec",
@@ -315,7 +315,9 @@ impl CliConfig {
 				policy: std::env::current_dir()
 					.ok()
 					.map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
-				exec: env::current_dir().ok().map(|dir| pathbuf![&dir, "config/Config.kdl"]),
+				exec: env::current_dir()
+					.ok()
+					.map(|dir| pathbuf![&dir, "config/Config.kdl"]),
 			},
 			deprecated_args: DeprecatedArgs {
 				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),

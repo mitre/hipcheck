@@ -510,7 +510,9 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) {
 		ExecConfig::from_file(p)
 		.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
 	} else {
-		Err(hc_error!("No exec file found. Please provide an exec config file before running Hipcheck."))
+		Err(hc_error!(
+			"No exec file found. Please provide an exec config file before running Hipcheck."
+		))
 	};
 
 	let plugin_data = exec_config.unwrap().plugin_data;
@@ -521,7 +523,7 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) {
 		/* port_range */ 40000..u16::MAX,
 		/* backoff_interval_micros */ plugin_data.backoff.micros,
 		/* jitter_percent */ plugin_data.jitter.percent,
-		/*grpc_buffer*/ plugin_data.grpc_buffer.size
+		/*grpc_buffer*/ plugin_data.grpc_buffer.size,
 	)
 	.unwrap();
 	let engine = match HcEngineImpl::new(
@@ -806,7 +808,14 @@ fn run(
 	format: Format,
 ) -> Result<Report> {
 	// Initialize the session.
-	let session = match Session::new(&target, config_path, home_dir, policy_path, exec_path, format) {
+	let session = match Session::new(
+		&target,
+		config_path,
+		home_dir,
+		policy_path,
+		exec_path,
+		format,
+	) {
 		Ok(session) => session,
 		Err(err) => return Err(err),
 	};

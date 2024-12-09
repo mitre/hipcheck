@@ -223,7 +223,7 @@ impl HcEngineImpl {
 pub fn start_plugins(
 	policy_file: &PolicyFile,
 	plugin_cache: &HcPluginCache,
-	executor: PluginExecutor
+	executor: PluginExecutor,
 ) -> Result<Arc<HcPluginCore>> {
 	let current_arch = get_current_arch();
 

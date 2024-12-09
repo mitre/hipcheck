@@ -496,5 +496,4 @@ mod test {
 		assert_eq!(config.plugin_data.jitter.percent, 10);
 		assert_eq!(config.plugin_data.grpc_buffer.size, 10);
 	}
-	
 }
