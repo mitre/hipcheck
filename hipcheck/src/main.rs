@@ -7,6 +7,7 @@ mod cli;
 mod config;
 mod engine;
 mod error;
+mod executor;
 mod init;
 mod plugin;
 mod policy;
@@ -26,6 +27,7 @@ use crate::{
 	cli::Format,
 	config::{normalized_unresolved_analysis_tree_from_policy, Config},
 	error::{Context as _, Error, Result},
+	executor::ExecConfig,
 	plugin::{try_set_arch, Plugin, PluginExecutor, PluginWithConfig},
 	policy::{config_to_policy, PolicyFile},
 	report::report_builder::{build_report, Report},
@@ -91,7 +93,7 @@ fn main() -> ExitCode {
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
 		Some(FullCommands::Cache(args)) => return cmd_cache(args, &config),
-		Some(FullCommands::Plugin(args)) => cmd_plugin(args),
+		Some(FullCommands::Plugin(args)) => cmd_plugin(args, &config),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
 		Some(FullCommands::Scoring) => {
@@ -132,6 +134,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 		config.config().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
 		config.policy().map(ToOwned::to_owned),
+		config.exec().map(ToOwned::to_owned),
 		config.format(),
 	);
 
@@ -484,7 +487,7 @@ fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	Ok(path.to_owned())
 }
 
-fn cmd_plugin(args: PluginArgs) {
+fn cmd_plugin(args: PluginArgs, config: &CliConfig) {
 	use crate::engine::{async_query, HcEngine, HcEngineImpl};
 	use std::sync::Arc;
 	use tokio::task::JoinSet;
@@ -503,12 +506,22 @@ fn cmd_plugin(args: PluginArgs) {
 		working_dir: working_dir.clone(),
 		entrypoint: entrypoint2.display().to_string(),
 	};
+	let exec_config = if let Some(p) = config.exec() {
+		ExecConfig::from_file(p)
+		.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
+	} else {
+		Err(hc_error!("No exec file found. Please provide an exec config file before running Hipcheck."))
+	};
+
+	let plugin_data = exec_config.unwrap().plugin_data;
+
 	let plugin_executor = PluginExecutor::new(
-		/* max_spawn_attempts */ 3,
-		/* max_conn_attempts */ 5,
+		/* max_spawn_attempts */ plugin_data.max_spawn.attempts,
+		/* max_conn_attempts */ plugin_data.max_conn.attempts,
 		/* port_range */ 40000..u16::MAX,
-		/* backoff_interval_micros */ 100000,
-		/* jitter_percent */ 10,
+		/* backoff_interval_micros */ plugin_data.backoff.micros,
+		/* jitter_percent */ plugin_data.jitter.percent,
+		/*grpc_buffer*/ plugin_data.grpc_buffer.size
 	)
 	.unwrap();
 	let engine = match HcEngineImpl::new(
@@ -789,10 +802,11 @@ fn run(
 	config_path: Option<PathBuf>,
 	home_dir: Option<PathBuf>,
 	policy_path: Option<PathBuf>,
+	exec_path: Option<PathBuf>,
 	format: Format,
 ) -> Result<Report> {
 	// Initialize the session.
-	let session = match Session::new(&target, config_path, home_dir, policy_path, format) {
+	let session = match Session::new(&target, config_path, home_dir, policy_path, exec_path, format) {
 		Ok(session) => session,
 		Err(err) => return Err(err),
 	};
