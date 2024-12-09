@@ -6,6 +6,7 @@ use crate::{
 	cache::repo::{RepoCacheDeleteScope, RepoCacheListScope, RepoCacheSort},
 	error::Context,
 	error::Result,
+	env,
 	hc_error,
 	plugin::Arch,
 	session::pm,
@@ -104,6 +105,16 @@ struct PathArgs {
 		long_help = "Path to the policy file."
 	)]
 	policy: Option<PathBuf>,
+
+	/// Path to the exec config file ADDED
+	#[arg(
+		short = 'e',
+		long = "exec",
+		global = true,
+		help_heading = "Path Flags",
+		long_help = "Path to the exec file."
+	)]
+	exec: Option<PathBuf>,
 }
 
 /// Soft-deprecated arguments, to be removed in a future version.
@@ -221,6 +232,11 @@ impl CliConfig {
 		self.deprecated_args.config.as_deref()
 	}
 
+	/// Get the path to the exec config file
+	pub fn exec(&self) -> Option<&Path> {
+		self.path_args.exec.as_deref()
+	}
+
 	/// Check if the `--print-home` flag was used.
 	pub fn print_home(&self) -> bool {
 		self.deprecated_args.print_home.unwrap_or(false)
@@ -259,6 +275,8 @@ impl CliConfig {
 				cache: hc_env_var("cache"),
 				// For now, we do not get this from the environment, so pass a None to never update this field
 				policy: None,
+				// For now, we don't get this from the environment
+				exec: None,
 			},
 			deprecated_args: DeprecatedArgs {
 				config: hc_env_var("config"),
@@ -277,8 +295,9 @@ impl CliConfig {
 		CliConfig {
 			path_args: PathArgs {
 				cache: platform_cache(),
-				// There is no central per-user or per-system location for the policy file, so pass a None to never update this field
+				// There is no central per-user or per-system location for the policy or exec file, so pass a None to never update this field
 				policy: None,
+				exec: None,
 			},
 			deprecated_args: DeprecatedArgs {
 				config: platform_config(),
@@ -296,6 +315,7 @@ impl CliConfig {
 				policy: std::env::current_dir()
 					.ok()
 					.map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
+				exec: env::current_dir().ok().map(|dir| pathbuf![&dir, "config/Config.kdl"]),
 			},
 			deprecated_args: DeprecatedArgs {
 				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),
