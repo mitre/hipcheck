@@ -489,16 +489,18 @@ fn cmd_plugin(args: PluginArgs) {
 	use std::sync::Arc;
 	use tokio::task::JoinSet;
 
-	let tgt_dir = "./target/debug";
+	let working_dir = PathBuf::from("./target/debug");
 
-	let entrypoint1 = pathbuf![tgt_dir, "dummy_rand_data"];
-	let entrypoint2 = pathbuf![tgt_dir, "dummy_sha256"];
+	let entrypoint1 = pathbuf!["dummy_rand_data"];
+	let entrypoint2 = pathbuf!["dummy_sha256"];
 	let plugin1 = Plugin {
 		name: "dummy/rand_data".to_owned(),
+		working_dir: working_dir.clone(),
 		entrypoint: entrypoint1.display().to_string(),
 	};
 	let plugin2 = Plugin {
 		name: "dummy/sha256".to_owned(),
+		working_dir: working_dir.clone(),
 		entrypoint: entrypoint2.display().to_string(),
 	};
 	let plugin_executor = PluginExecutor::new(

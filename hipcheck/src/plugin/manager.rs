@@ -8,7 +8,7 @@ use crate::{
 use futures::future::join_all;
 use hipcheck_common::proto::plugin_service_client::PluginServiceClient;
 use rand::Rng;
-use std::{ops::Range, process::Command};
+use std::{ffi::OsString, ops::Range, path::Path, process::Command};
 use tokio::time::{sleep_until, Duration, Instant};
 
 #[derive(Clone, Debug)]
@@ -76,31 +76,69 @@ impl PluginExecutor {
 		// port to become unavailable between our check and the plugin's bind attempt.
 		// Hence the need for subsequent attempts if we get unlucky
 
-		log::debug!("Starting plugin '{}'", plugin.name);
-
 		// `entrypoint` is a string that represents a CLI invocation which may contain
 		// arguments, so we have to split off only the first token
-		if let Some(bin_path) = try_get_bin_for_entrypoint(&plugin.entrypoint).0 {
-			if which::which(bin_path).is_err() {
-				log::warn!(
-					"Binary '{}' used to spawn {} does not exist, spawn is unlikely to succeed",
-					bin_path,
-					plugin.name
-				);
-			}
-		}
+		let (opt_bin_path_str, args) = try_get_bin_for_entrypoint(&plugin.entrypoint);
+		let Some(bin_path_str) = opt_bin_path_str else {
+			return Err(hc_error!(
+				"Unable to get bin path for plugin entrypoint '{}'",
+				&plugin.entrypoint
+			));
+		};
+
+		// Entrypoints are often "<BIN_NAME>" which can overlap with existing binaries on the
+		// system like "git", "npm", so we must search for <BIN_NAME> from within the plugin
+		// cache subfolder. First, grab the existing path.
+		let Some(mut os_paths) =
+			std::env::var_os("PATH").map(|s| std::env::split_paths(&s).collect::<Vec<_>>())
+		else {
+			return Err(hc_error!("Unable to get system PATH var"));
+		};
+
+		let Ok(canon_working_dir) = plugin.working_dir.canonicalize() else {
+			return Err(hc_error!(
+				"Failed to canonicalize plugin working dir: {:?}",
+				&plugin.working_dir
+			));
+		};
+
+		// Add canonicalized plugin cache dir to temp PATH
+		os_paths.insert(0, canon_working_dir.clone());
+		let search_path = std::env::join_paths(os_paths).unwrap();
+
+		// Find the binary_str using temp PATH
+		let Ok(canon_bin_path) = which::which_in::<&str, &OsString, &Path>(
+			bin_path_str,
+			Some(&search_path),
+			canon_working_dir.as_ref(),
+		) else {
+			return Err(hc_error!(
+				"Failed to find binary '{}' for plugin",
+				bin_path_str
+			));
+		};
+
+		log::debug!(
+			"Starting plugin '{}' at '{:?}'",
+			plugin.name,
+			&canon_bin_path
+		);
 
 		let mut spawn_attempts: usize = 0;
 		while spawn_attempts < self.max_spawn_attempts {
+			let mut spawn_args = args.clone();
+
 			// Find free port for process. Don't retry if we fail since this means all
 			// ports in the desired range are already bound
 			let port = self.get_available_port()?;
 			let port_str = port.to_string();
+			spawn_args.push("--port");
+			spawn_args.push(port_str.as_str());
 
 			// Spawn plugin process
 			log::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
-			let Ok(mut proc) = Command::new(&plugin.entrypoint)
-				.args(["--port", port_str.as_str()])
+			let Ok(mut proc) = Command::new(&canon_bin_path)
+				.args(spawn_args)
 				// @Temporary - directly forward stdout/stderr from plugin to shell
 				.stdout(std::io::stdout())
 				.stderr(std::io::stderr())

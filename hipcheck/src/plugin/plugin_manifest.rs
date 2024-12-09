@@ -288,7 +288,7 @@ impl PluginManifest {
 		let mut new_entrypoint = new_bin_path.to_string_lossy().to_string();
 		if args.is_empty().not() {
 			new_entrypoint.push(' ');
-			new_entrypoint.push_str(&args);
+			new_entrypoint.push_str(&args.join(" "));
 		}
 
 		self.set_entrypoint(arch.clone(), new_entrypoint);
@@ -347,7 +347,7 @@ impl FromStr for PluginManifest {
 	}
 }
 
-pub fn try_get_bin_for_entrypoint(entrypoint: &str) -> (Option<&str>, String) {
+pub fn try_get_bin_for_entrypoint(entrypoint: &str) -> (Option<&str>, Vec<&str>) {
 	let mut split = entrypoint.split_whitespace();
 	(split.next(), split.collect())
 }
