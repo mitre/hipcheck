@@ -21,7 +21,7 @@ plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-uknown-linux-gnu.tar.xz"
+  url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-unknown-linux-gnu.tar.xz"
   hash alg="SHA256" digest="dfe3f12d5c4b8c9397f69aad40db27978f5777dd16440380e8f35c6ddf65f485"
   compress format="tar.xz"
   size bytes=1_382_112

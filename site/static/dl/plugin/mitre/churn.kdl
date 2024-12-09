@@ -21,7 +21,7 @@ plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/churn-v0.1.0/churn-x86_64-uknown-linux-gnu.tar.xz"
+  url "https://github.com/mitre/hipcheck/releases/download/churn-v0.1.0/churn-x86_64-unknown-linux-gnu.tar.xz"
   hash alg="SHA256" digest="2b45370f46212f8b6186618291b02e14b91b0df30051b5b21eb3ae09acd0fee3"
   compress format="tar.xz"
   size bytes=1_443_640

@@ -21,7 +21,7 @@ plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
 }
 
 plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/fuzz-v0.1.0/fuzz-x86_64-uknown-linux-gnu.tar.xz"
+  url "https://github.com/mitre/hipcheck/releases/download/fuzz-v0.1.0/fuzz-x86_64-unknown-linux-gnu.tar.xz"
   hash alg="SHA256" digest="769a55b18246d273eae538ba19f9cbeaba3c787358c5017aa5b65ce376d596c9"
   compress format="tar.xz"
   size bytes=1_243_404
@@ -49,7 +49,7 @@ plugin version="0.1.1" arch="x86_64-pc-windows-msvc" {
 }
 
 plugin version="0.1.1" arch="x86_64-unknown-linux-gnu" {
-  url "https://github.com/mitre/hipcheck/releases/download/fuzz-v0.1.1/fuzz-x86_64-uknown-linux-gnu.tar.xz"
+  url "https://github.com/mitre/hipcheck/releases/download/fuzz-v0.1.1/fuzz-x86_64-unknown-linux-gnu.tar.xz"
   hash alg="SHA256" digest="cffdda1499eedda20b374df71790acfd29ca2da02106efdf06999cca29611c89"
   compress format="tar.xz"
   size bytes=1_243_712
