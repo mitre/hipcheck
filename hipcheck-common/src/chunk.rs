@@ -223,9 +223,7 @@ mod test {
 		let res = match chunk_with_size(query, 10) {
 			Ok(r) => r,
 			Err(e) => {
-				println!("{e}");
-				assert!(false);
-				return;
+				panic!("{e}");
 			}
 		};
 		assert_eq!(res.len(), 4);

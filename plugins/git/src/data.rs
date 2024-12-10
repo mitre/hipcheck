@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use std::{
 	fmt::{self, Display, Formatter},
 	hash::Hash,
-	sync::Arc,
 };
 
 /// A locally stored git repo, with optional additional details
@@ -21,15 +20,44 @@ pub struct DetailedGitRepo {
 }
 
 /// Commits as they come directly out of `git log`.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct RawCommit {
 	pub hash: String,
 
 	pub author: Contributor,
-	pub written_on: Result<String, String>,
+	pub written_on: Result<jiff::Timestamp, String>,
 
 	pub committer: Contributor,
-	pub committed_on: Result<String, String>,
+	pub committed_on: Result<jiff::Timestamp, String>,
+}
+
+impl TryFrom<gix::Commit<'_>> for RawCommit {
+	type Error = anyhow::Error;
+
+	fn try_from(value: gix::Commit<'_>) -> Result<Self, Self::Error> {
+		let commit_author = value.author()?;
+		let author = Contributor {
+			name: commit_author.name.to_string(),
+			email: commit_author.email.to_string(),
+		};
+		let written_on =
+			jiff::Timestamp::from_second(commit_author.time.seconds).map_err(|x| x.to_string());
+		let commit_committer = value.committer()?;
+		let committer = Contributor {
+			name: commit_committer.name.to_string(),
+			email: commit_committer.email.to_string(),
+		};
+		let committed_on =
+			jiff::Timestamp::from_second(commit_committer.time.seconds).map_err(|x| x.to_string());
+
+		Ok(Self {
+			hash: value.id().to_string(),
+			author,
+			written_on,
+			committer,
+			committed_on,
+		})
+	}
 }
 
 /// Commits as understood in Hipcheck's data model.
@@ -39,10 +67,18 @@ pub struct RawCommit {
 #[derive(Debug, Serialize, Clone, PartialEq, Eq, Hash, JsonSchema)]
 pub struct Commit {
 	pub hash: String,
-
 	pub written_on: Result<String, String>,
-
 	pub committed_on: Result<String, String>,
+}
+
+impl From<RawCommit> for Commit {
+	fn from(value: RawCommit) -> Self {
+		Self {
+			hash: value.hash,
+			written_on: value.written_on.map(|x| x.to_string()),
+			committed_on: value.committed_on.map(|x| x.to_string()),
+		}
+	}
 }
 
 impl Display for Commit {
@@ -98,22 +134,18 @@ pub struct CommitDiff {
 	pub diff: Diff,
 }
 
+impl CommitDiff {
+	pub fn new(commit: Commit, diff: Diff) -> Self {
+		Self { commit, diff }
+	}
+}
+
 impl Display for CommitDiff {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		write!(
 			f,
 			"{} +{} -{}",
-			self.commit,
-			self.diff
-				.additions
-				.map(|n| n.to_string())
-				.as_deref()
-				.unwrap_or("<unknown>"),
-			self.diff
-				.deletions
-				.map(|n| n.to_string())
-				.as_deref()
-				.unwrap_or("<unknown>")
+			self.commit, self.diff.additions, self.diff.deletions
 		)
 	}
 }
@@ -121,16 +153,39 @@ impl Display for CommitDiff {
 /// A set of changes in a commit.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct Diff {
-	pub additions: Option<i64>,
-	pub deletions: Option<i64>,
+	pub additions: i64,
+	pub deletions: i64,
 	pub file_diffs: Vec<FileDiff>,
 }
 
 /// A set of changes to a specific file in a commit.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct FileDiff {
-	pub file_name: Arc<String>,
-	pub additions: Option<i64>,
-	pub deletions: Option<i64>,
+	pub file_name: String,
+	pub additions: i64,
+	pub deletions: i64,
 	pub patch: String,
+}
+
+impl FileDiff {
+	pub fn new(file_name: String) -> Self {
+		Self {
+			file_name,
+			additions: 0,
+			deletions: 0,
+			patch: String::new(),
+		}
+	}
+
+	pub fn increment_additions(&mut self, additions: i64) {
+		self.additions += additions
+	}
+
+	pub fn increment_deletions(&mut self, deletions: i64) {
+		self.deletions += deletions
+	}
+
+	pub fn set_patch(&mut self, patch_data: String) {
+		self.patch = patch_data;
+	}
 }
