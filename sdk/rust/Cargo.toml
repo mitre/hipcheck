@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.94"
-thiserror = "2.0.3"
+thiserror = "2.0.6"
 futures = "0.3.31"
 indexmap = "2.7.0"
 jiff = { version = "0.1.14", features = ["serde"] }
