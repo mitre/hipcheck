@@ -22,3 +22,21 @@ toml = "0.8.19"
 xshell = "0.2.7"
 which = "7.0.0"
 convert_case = "0.6.0"
+serde_json = "1.0.133"
+url = { version = "2.5.4", features = ["serde"] }
+kdl = "4.7.0"
+regex = "1.11.1"
+ureq = { version = "2.10.1", default-features = false, features = [
+    "json",
+    "tls",
+] }
+# Exactly matching the version of rustls used by ureq
+# Get rid of default features since we don't use the AWS backed crypto
+# provider (we use ring) and it breaks stuff on windows.
+rustls = { version = "0.23.10", default-features = false, features = [
+    "logging",
+    "std",
+    "tls12",
+    "ring",
+] }
+rustls-native-certs = "0.8.0"
