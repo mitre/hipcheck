@@ -66,7 +66,7 @@ graphql_client = "0.14.0"
 #
 # See: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#multiple-locations
 hipcheck-macros = { path = "../hipcheck-macros", version = "0.3.1" }
-http = "1.1.0"
+http = "1.2.0"
 indexmap = "2.7.0"
 indextree = "4.7.3"
 indicatif = { version = "0.17.9", features = ["rayon"] }
@@ -126,7 +126,7 @@ tokio = { version = "1.41.1", features = [
 tokio-stream = "0.1.16"
 toml = "0.8.19"
 tonic = "0.12.3"
-thiserror = "2.0.3"
+thiserror = "2.0.6"
 unicode-normalization = "0.1.24"
 ureq = { version = "2.10.1", default-features = false, features = [
     "json",
@@ -145,7 +145,7 @@ serde_with = "3.11.0"
 
 [build-dependencies]
 
-anyhow = "1.0.91"
+anyhow = "1.0.94"
 pathbuf = "1.0.0"
 schemars = { version = "0.8.21", features = ["chrono", "url"] }
 serde = { version = "1.0.215", features = ["derive"] }
