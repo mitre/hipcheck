@@ -66,7 +66,7 @@ graphql_client = "0.14.0"
 #
 # See: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#multiple-locations
 hipcheck-macros = { path = "../hipcheck-macros", version = "0.3.1" }
-http = "1.1.0"
+http = "1.2.0"
 indexmap = "2.7.0"
 indextree = "4.7.3"
 indicatif = { version = "0.17.9", features = ["rayon"] }
