@@ -2,7 +2,7 @@
 name = "hipcheck-macros"
 description = "Helper macros for the `hipcheck` crate."
 repository = "https://github.com/mitre/hipcheck"
-version = "0.3.1"
+version = "0.3.3"
 edition = "2021"
 license = "Apache-2.0"
 
