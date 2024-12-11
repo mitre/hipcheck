@@ -6,12 +6,13 @@ Automatically assess and score software packages for supply chain risk.
 keywords = ["security", "sbom"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "../README.md"
-version = "3.7.0"
+version = "3.8.0"
 edition = "2021"
 license = "Apache-2.0"
 homepage = "https://hipcheck.mitre.org"
 repository = "https://github.com/mitre/hipcheck"
 include = ["src/**", "../LICENSE", "../README.md", "build.rs", "proto/**"]
+publish = false
 
 # Rename the binary from the default "hipcheck" (based on the package name)
 # to "hc".
