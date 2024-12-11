@@ -1432,7 +1432,7 @@ dependencies = [
 
 [[package]]
 name = "hipcheck-macros"
-version = "0.3.1"
+version = "0.3.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1466,7 +1466,7 @@ dependencies = [
 
 [[package]]
 name = "hipcheck-sdk-macros"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "convert_case",
