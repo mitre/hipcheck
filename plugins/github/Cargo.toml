@@ -10,7 +10,7 @@ publish = false
 anyhow = "1.0.94"
 clap = { version = "4.5.23", features = ["derive"] }
 graphql_client = "0.14.0"
-hipcheck-sdk = { version = "0.1.0", path = "../../sdk/rust", features = [
+hipcheck-sdk = { version = "0.2.0", path = "../../sdk/rust", features = [
     "macros",
 ] }
 log = "0.4.22"
