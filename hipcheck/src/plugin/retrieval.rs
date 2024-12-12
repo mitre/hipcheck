@@ -2,7 +2,7 @@
 
 use crate::{
 	cache::plugin::HcPluginCache,
-	error::Error,
+	error::{Context, Error},
 	hc_error,
 	plugin::{
 		download_manifest::DownloadManifestEntry, get_current_arch, try_get_bin_for_entrypoint,
@@ -56,18 +56,15 @@ fn retrieve_plugin(
 		return Ok(());
 	}
 
-	// TODO: if the plugin.kdl file for the plugin already exists, then should we skip the retrieval process?
-	// if plugin_cache.plugin_kdl(&plugin_id).exists()
-
 	log::debug!(
-		"Retrieving Plugin ID {:?} from {:?}",
+		"Retrieving Plugin ID {} from {:?}",
 		plugin_id,
 		manifest_location
 	);
 
 	let plugin_manifest = match manifest_location {
 		Some(ManifestLocation::Url(plugin_url)) => {
-			retrieve_plugin_from_network(plugin_id.clone(), plugin_url, plugin_cache)?
+			retrieve_plugin_from_network(plugin_id.clone(), plugin_url, plugin_cache, false)?
 		}
 		Some(ManifestLocation::Local(plugin_manifest_path)) => {
 			retrieve_local_plugin(plugin_id.clone(), plugin_manifest_path, plugin_cache)?
@@ -96,7 +93,15 @@ fn retrieve_plugin_from_network(
 	plugin_id: PluginId,
 	plugin_url: &Url,
 	plugin_cache: &HcPluginCache,
+	force: bool,
 ) -> Result<PluginManifest, Error> {
+	// Use existing cache entry if not force
+	let target_manifest = plugin_cache.plugin_kdl(&plugin_id);
+	if target_manifest.is_file() && !force {
+		log::debug!("Using existing entry in cache for {}", &plugin_id);
+		return PluginManifest::from_file(target_manifest);
+	}
+
 	let current_arch = get_current_arch();
 	let version = plugin_id.version();
 	let download_manifest = retrieve_download_manifest(plugin_url)?;
@@ -211,6 +216,7 @@ fn download_and_unpack_plugin(
 		output_path.as_path(),
 		download_dir.as_path(),
 		download_manifest_entry.compress.format,
+		true,
 	)
 	.map_err(|e| {
 		// delete any leftover remnants
@@ -310,6 +316,7 @@ fn extract_plugin(
 	bundle_path: &Path,
 	extract_dir: &Path,
 	archive_format: ArchiveFormat,
+	delete_bundle: bool,
 ) -> Result<(), Error> {
 	let file = File::open(bundle_path).map_err(|e| {
 		hc_error!(
@@ -356,17 +363,27 @@ fn extract_plugin(
 		}
 	};
 
-	for child in read_dir(extract_dir)? {
-		let child = child?;
+	let bundle_path_name = bundle_path.file_name().unwrap().to_string_lossy();
+	let extension = format!(".{}", archive_format);
 
-		if child.file_type()?.is_file() {
-			continue;
-		}
+	// If extracting archive caused a dir with the same name as the archive to be created, copy
+	// the contents of that dir up a level
+	if let Some(subdir_name) = bundle_path_name.strip_suffix(&extension) {
+		let extract_subdir = pathbuf![extract_dir, subdir_name];
 
-		for extracted_content in read_dir(child.path())? {
-			let extracted_content = extracted_content?;
-			move_to_extract_dir(extract_dir, &extracted_content)?;
+		// Also does implicit exists() check
+		if extract_subdir.is_dir() {
+			for extracted_content in read_dir(&extract_subdir)? {
+				let extracted_content = extracted_content?;
+				move_to_extract_dir(extract_dir, &extracted_content)?;
+			}
+			std::fs::remove_dir_all(extract_subdir)
+				.context("Failed to clean up plugin's extracted subdir")?;
 		}
+	}
+
+	if delete_bundle {
+		std::fs::remove_file(bundle_path)?;
 	}
 
 	Ok(())
