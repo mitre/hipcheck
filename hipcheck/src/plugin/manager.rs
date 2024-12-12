@@ -86,15 +86,6 @@ impl PluginExecutor {
 			));
 		};
 
-		// Entrypoints are often "<BIN_NAME>" which can overlap with existing binaries on the
-		// system like "git", "npm", so we must search for <BIN_NAME> from within the plugin
-		// cache subfolder. First, grab the existing path.
-		let Some(mut os_paths) =
-			std::env::var_os("PATH").map(|s| std::env::split_paths(&s).collect::<Vec<_>>())
-		else {
-			return Err(hc_error!("Unable to get system PATH var"));
-		};
-
 		let Ok(canon_working_dir) = plugin.working_dir.canonicalize() else {
 			return Err(hc_error!(
 				"Failed to canonicalize plugin working dir: {:?}",
@@ -102,14 +93,28 @@ impl PluginExecutor {
 			));
 		};
 
-		// Add canonicalized plugin cache dir to temp PATH
-		os_paths.insert(0, canon_working_dir.clone());
-		let search_path = std::env::join_paths(os_paths).unwrap();
+		// Entrypoints are often "<BIN_NAME>" which can overlap with existing binaries on the
+		// system like "git", "npm", so we must search for <BIN_NAME> from within the plugin
+		// cache subfolder. First, grab the existing path.
+		let Some(mut which_os_paths) =
+			std::env::var_os("PATH").map(|s| std::env::split_paths(&s).collect::<Vec<_>>())
+		else {
+			return Err(hc_error!("Unable to get system PATH var"));
+		};
+
+		// Add canonicalized plugin cache dir to end of PATH for plugin exec
+		let mut cmd_os_paths = which_os_paths.clone();
+		cmd_os_paths.push(canon_working_dir.clone());
+		let cmd_path = std::env::join_paths(cmd_os_paths).unwrap();
+
+		// Add canonicalized plugin cache dir to front of PATH for bin-searching
+		which_os_paths.insert(0, canon_working_dir.clone());
+		let which_path = std::env::join_paths(which_os_paths).unwrap();
 
 		// Find the binary_str using temp PATH
 		let Ok(canon_bin_path) = which::which_in::<&str, &OsString, &Path>(
 			bin_path_str,
-			Some(&search_path),
+			Some(&which_path),
 			canon_working_dir.as_ref(),
 		) else {
 			return Err(hc_error!(
@@ -138,6 +143,7 @@ impl PluginExecutor {
 			// Spawn plugin process
 			log::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
 			let Ok(mut proc) = Command::new(&canon_bin_path)
+				.env("PATH", &cmd_path)
 				.args(spawn_args)
 				// @Temporary - directly forward stdout/stderr from plugin to shell
 				.stdout(std::io::stdout())
