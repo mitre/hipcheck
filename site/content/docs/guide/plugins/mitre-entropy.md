@@ -36,13 +36,13 @@ likely source files.
 ## Explanation
 
 Entropy analysis attempts to identify commits which contain a high degree of
-textual randomness, in the believe that high textual randomness may indicate
+textual randomness, in the belief that high textual randomness may indicate
 the presence of packed malware or obfuscated code which ought to be assessed
 for possible malicious content.
 
 Entropy analysis works by determining the total number of occurrences for all
 unicode graphemes which appear in a repository's Git diffs for commits which
-include code. In then converts these occurence counts into frequencies based on
+include code. It then converts these occurrence counts into frequencies based on
 the total number of each individual grapheme divided by the total number of
 all graphemes in the combined set of Git diffs. It also determines grapheme
 frequencies for each commit individually. These individual and total grapheme
