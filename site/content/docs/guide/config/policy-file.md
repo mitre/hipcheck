@@ -140,8 +140,8 @@ other plugins could be written to consume and process their output. However,
 the scoring system of Hipcheck relies on turning the output of each top-level
 plugin into a pass/fail evalution. In order to facilitate transforming plugin
 data into a boolean value, Hipcheck provides "policy expressions", which are a
-small expression language. See [here](policy-expr) for a reference on the policy
-expression language.
+small expression language. See [here](@/docs/guide/config/policy-expr.md) for a
+reference on the policy expression language.
 
 Users can define the pass/fail policy for an analysis node in the score tree
 with a `policy` key. As described in more detail in the policy expression
