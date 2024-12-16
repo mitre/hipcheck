@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(unused)]
-
 mod bridge;
 mod env;
 mod error;
@@ -14,10 +12,7 @@ use crate::policy_exprs::env::Env;
 pub(crate) use crate::policy_exprs::{bridge::Tokens, expr::F64};
 pub use crate::policy_exprs::{
 	error::{Error, Result},
-	expr::{
-		Array, Expr, Function, Ident, JsonPointer, Lambda, PrimitiveType, ReturnableType, Type,
-		Typed,
-	},
+	expr::{Array, Expr, Function, Ident, JsonPointer, Lambda},
 	pass::{ExprMutator, ExprVisitor, FunctionResolver, TypeChecker, TypeFixer},
 	token::LexingError,
 };
@@ -64,7 +59,7 @@ pub fn std_parse(raw_program: &str) -> Result<Expr> {
 	std_pre_analysis_pipeline(parse(raw_program)?)
 }
 
-pub fn std_exec(mut expr: Expr, context: Option<&Value>) -> Result<bool> {
+pub fn std_exec(expr: Expr, context: Option<&Value>) -> Result<bool> {
 	match std_post_analysis_pipeline(expr, context, false)? {
 		Expr::Primitive(Primitive::Bool(b)) => Ok(b),
 		result => Err(Error::DidNotReturnBool(result)),
@@ -80,10 +75,12 @@ impl FromStr for Expr {
 }
 
 /// Evaluates `deke` expressions.
+#[cfg(test)]
 pub struct Executor {
 	env: Env<'static>,
 }
 
+#[cfg(test)]
 impl Executor {
 	/// Create an `Executor` with the standard set of functions defined.
 	pub fn std() -> Self {
@@ -162,6 +159,7 @@ impl ExprMutator for Env<'_> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::policy_exprs::expr::{PrimitiveType, ReturnableType, Type};
 	use test_log::test;
 
 	#[test]
@@ -336,7 +334,6 @@ mod tests {
 	fn eval_datetime_span_add() {
 		let date = "2024-09-26";
 		let span = "P1w";
-		let eval_fmt = "(add {} {})";
 		let context = Value::Null;
 		let expected = parse("2024-10-03").unwrap();
 		let result1 = Executor::std()
@@ -417,7 +414,6 @@ mod tests {
 		let mut expr = parse(program).unwrap();
 		expr = FunctionResolver::std().run(expr).unwrap();
 		let res_ty = TypeChecker::default().run(&expr);
-		println!("RESTY: {res_ty:?}");
 		let Ok(Type::Function(f_ty)) = res_ty else {
 			panic!()
 		};

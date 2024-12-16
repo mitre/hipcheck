@@ -99,7 +99,7 @@ impl ExprMutator for FunctionResolver {
 		let new_body = self.visit_function(func.body)?;
 		func.body = match new_body {
 			Expr::Function(f) => f,
-			other => {
+			_ => {
 				return Err(Error::InternalError(
 					"FunctionResolver's `visit_function` impl should always return a function"
 						.to_owned(),
@@ -169,14 +169,13 @@ impl ExprMutator for TypeFixer {
 		let fn_ty = func.get_type()?;
 		// At this point we know it has info
 		match fn_ty {
-			Type::Function(ft) => Ok(func.into()),
-			Type::Lambda(lt) => {
+			Type::Function(_) => Ok(func.into()),
+			Type::Lambda(_) => {
 				// Have to feed the new expr through the current pass again
 				// for any additional transformations
 				let res = partially_evaluate(&self.env, &func.ident.0, func.args.remove(0))?;
 				self.visit_expr(res)
 			}
-
 			_ => unreachable!(),
 		}
 	}

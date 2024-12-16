@@ -16,13 +16,7 @@ use nom::{
 };
 use ordered_float::NotNan;
 use serde_with::{DeserializeFromStr, SerializeDisplay};
-use std::{
-	cmp::Ordering,
-	fmt::Display,
-	mem::{discriminant, Discriminant},
-	ops::Deref,
-	sync::LazyLock,
-};
+use std::{cmp::Ordering, fmt::Display, ops::Deref};
 
 #[cfg(test)]
 use jiff::civil::Date;
@@ -64,13 +58,6 @@ impl From<Array> for Expr {
 
 /// Helper type for operation function pointer.
 pub type Op = fn(&Env, &[Expr]) -> Result<Expr>;
-
-#[derive(Clone, PartialEq, Debug, Eq)]
-pub struct OpInfo {
-	pub fn_ty: FuncReturnType,
-	pub expected_args: usize,
-	pub op: Op,
-}
 
 pub type TypeChecker = fn(&[Type]) -> Result<ReturnableType>;
 
@@ -114,7 +101,7 @@ impl FunctionDef {
 			.iter()
 			.map(|a| a.get_type())
 			.collect::<Result<Vec<Type>>>()?;
-		self.type_check(types.as_slice());
+		self.type_check(types.as_slice())?;
 		(self.op)(env, args)
 	}
 }
@@ -261,15 +248,6 @@ impl From<PrimitiveType> for ReturnableType {
 	}
 }
 
-// We allow overloaded functions, such that the returned type is dependent on
-// the input operand types. This enum encapsulates both static and dynamically
-// determined return types.
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
-pub enum FuncReturnType {
-	Dynamic(fn(&[Type]) -> Result<ReturnableType>),
-	Static(ReturnableType),
-}
-
 // A function signature is the combination of the return type and the arg types
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionType {
@@ -355,8 +333,6 @@ impl Typed for Array {
 
 impl Typed for Function {
 	fn get_type(&self) -> Result<Type> {
-		use FuncReturnType::*;
-
 		// Can't get a type if we haven't resolved the function
 		let Some(def) = self.opt_def.clone() else {
 			return Err(Error::UnknownFunction(self.ident.0.clone()));
@@ -632,13 +608,9 @@ pub fn json_ptr(name: &str) -> Expr {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::policy_exprs::LexingError;
 	use test_log::test;
 
-	use jiff::{
-		tz::{self, TimeZone},
-		Span, Timestamp, Zoned,
-	};
+	use jiff::{tz::TimeZone, Span, Timestamp, Zoned};
 
 	trait IntoExpr {
 		fn into_expr(self) -> Expr;

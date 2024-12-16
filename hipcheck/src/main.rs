@@ -755,12 +755,6 @@ fn print_missing() {
 /// An `f64` that is never `NaN`.
 type F64 = ordered_float::NotNan<f64>;
 
-// Global variables for toml files per issue 157 config updates
-const LANGS_FILE: &str = "Langs.toml";
-const BINARY_CONFIG_FILE: &str = "Binary.toml";
-const TYPO_FILE: &str = "Typos.toml";
-const ORGS_FILE: &str = "Orgs.toml";
-
 // Constants for exiting with error codes.
 /// Indicates the program failed.
 const EXIT_FAILURE: i32 = 1;
