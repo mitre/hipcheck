@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	linguist::{Linguist, LinguistSource},
 	types::*,
+	util::db::{Linguist, LinguistSource},
 };
 use std::iter::Iterator;
 

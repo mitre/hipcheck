@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use super::kdl::{extract_data, ParseKdlNode};
 use anyhow::{anyhow, Context as _, Result};
-use serde::de::DeserializeOwned;
-use std::{fs, path::Path};
+use kdl::KdlDocument;
+use std::{fs, path::Path, str::FromStr};
 
 /// Read a file to a string.
 pub fn read_string<P: AsRef<Path>>(path: P) -> Result<String> {
@@ -14,12 +15,13 @@ pub fn read_string<P: AsRef<Path>>(path: P) -> Result<String> {
 	inner(path.as_ref())
 }
 
-/// Read file to a struct that can be deserialized from TOML format.
-pub fn read_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P) -> Result<T> {
+/// Read file to a struct that can be deserialized from kdl format.
+pub fn read_kdl<P: AsRef<Path>, T: ParseKdlNode>(path: P) -> Result<T> {
 	let path = path.as_ref();
 	let contents = read_string(path)?;
-	toml::de::from_str(&contents)
-		.with_context(|| format!("failed to read as TOML '{}'", path.display()))
+	let document = KdlDocument::from_str(&contents).map_err(|e| anyhow!(e))?;
+	let nodes = document.nodes();
+	extract_data(nodes).ok_or(anyhow!("Could not parse typo KDL 'format'"))
 }
 
 /// Check that a given path exists.

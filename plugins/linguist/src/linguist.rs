@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::fs::read_toml;
-use anyhow::{Context as _, Result};
+use crate::error::{Context, Result};
+use crate::hc_error;
+use crate::util::fs::read_kdl;
+use crate::util::kdl::ParseKdlNode;
+use kdl::KdlDocument;
 use serde::{de::Visitor, Deserialize, Deserializer};
-use std::{convert::AsRef, fmt, fmt::Formatter, path::Path, result::Result as StdResult};
+use std::{
+	convert::AsRef, fmt, fmt::Formatter, path::Path, result::Result as StdResult, str::FromStr,
+};
 
 /// Detects whether a file name is a likely source code file.
 #[derive(Debug, PartialEq, Eq)]
@@ -22,7 +27,7 @@ impl SourceFileDetector {
 	pub fn load<P: AsRef<Path>>(langs_file: P) -> Result<SourceFileDetector> {
 		fn inner(langs_file: &Path) -> Result<SourceFileDetector> {
 			// Load the file and parse it.
-			let language_file: LanguageFile = read_toml(langs_file)
+			let language_file: LanguageFile = read_kdl(langs_file)
 				.context("failed to read language definitions from langs file")?;
 
 			// Get the list of extensions from it.
@@ -60,15 +65,33 @@ impl SourceFileDetector {
 }
 
 #[derive(Debug, Deserialize)]
-struct LanguageFile {
+pub struct LanguageFile {
 	languages: Vec<LanguageExtensions>,
+}
+
+impl FromStr for LanguageFile {
+	type Err = crate::error::Error;
+
+	fn from_str(s: &str) -> StdResult<Self, Self::Err> {
+		let document = KdlDocument::from_str(s)
+			.map_err(|e| hc_error!("Error parsing Langs.kdl file: {}", e.to_string()))?;
+		let mut languages = vec![];
+		for node in document.nodes() {
+			if let Some(entry) = LanguageExtensions::parse_node(node) {
+				languages.push(entry);
+			} else {
+				return Err(hc_error!("Error parsing Language entry: {}", node));
+			}
+		}
+		Ok(Self { languages })
+	}
 }
 
 #[derive(Debug, Deserialize)]
 struct LanguageExtensions {
 	#[serde(default = "missing_lang_type")]
 	r#type: LanguageType,
-	extensions: Option<Vec<String>>,
+	extensions: Vec<String>,
 }
 
 impl LanguageFile {
@@ -77,16 +100,50 @@ impl LanguageFile {
 
 		for language in self.languages {
 			if matches!(language.r#type, LanguageType::Programming) {
-				match language.extensions {
-					None => continue,
-					Some(mut extensions) => result.extend(extensions.drain(0..)),
-				}
+				let mut extensions = language.extensions;
+				result.extend(extensions.drain(0..));
 			}
 		}
 
 		log::trace!("linguist known code extensions [exts='{:#?}']", result);
 
 		result
+	}
+}
+
+impl ParseKdlNode for LanguageExtensions {
+	fn kdl_key() -> &'static str {
+		"language"
+	}
+
+	fn parse_node(node: &kdl::KdlNode) -> Option<Self> {
+		if node.name().to_string().as_str() != Self::kdl_key() {
+			return None;
+		}
+
+		let lanugage_type = node.get("type")?.value().as_string()?;
+
+		let r#type = match lanugage_type {
+			"data" => Some(LanguageType::Data),
+			"programming" => Some(LanguageType::Programming),
+			"markup" => Some(LanguageType::Markup),
+			"prose" => Some(LanguageType::Prose),
+			_ => None,
+		}?;
+
+		let mut extensions_from_node = Vec::new();
+		for node in node.children()?.nodes() {
+			if node.name().to_string().as_str() == "extensions" {
+				for entry in node.entries() {
+					extensions_from_node.push(entry.value().as_string()?.to_string());
+				}
+			}
+		}
+
+		Some(Self {
+			r#type,
+			extensions: extensions_from_node,
+		})
 	}
 }
 

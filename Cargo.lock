@@ -328,6 +328,7 @@ dependencies = [
  "clap",
  "content_inspector",
  "hipcheck-sdk",
+ "kdl 4.7.1",
  "log",
  "pathbuf",
  "schemars",
@@ -464,8 +465,10 @@ dependencies = [
 name = "churn"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "clap",
  "hipcheck-sdk",
+ "kdl 4.7.1",
  "log",
  "pathbuf",
  "salsa",
@@ -941,6 +944,7 @@ dependencies = [
  "finl_unicode",
  "futures",
  "hipcheck-sdk",
+ "kdl 4.7.1",
  "ordered-float",
  "pathbuf",
  "rayon",
@@ -2813,6 +2817,7 @@ dependencies = [
  "anyhow",
  "clap",
  "hipcheck-sdk",
+ "kdl 4.7.1",
  "log",
  "pathbuf",
  "serde",
@@ -4794,6 +4799,7 @@ dependencies = [
  "anyhow",
  "clap",
  "hipcheck-sdk",
+ "kdl 4.7.1",
  "log",
  "maplit",
  "pathbuf",

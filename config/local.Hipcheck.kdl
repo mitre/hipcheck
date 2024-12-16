@@ -22,8 +22,8 @@ analyze {
     category "practices" {
         analysis "mitre/activity" policy="(lte $ P52w)" weight=3
         analysis "mitre/binary" {
-			binary-file #rel("Binary.toml")
-			binary-file-threshold 0
+            binary-file #rel("Binary.kdl")
+            binary-file-threshold 0
 		}
         analysis "mitre/fuzz" policy="(eq #t $)"
         analysis "mitre/review" policy="(lte (divz (count (filter (eq #f) $)) (count $)) 0.05)"
@@ -31,7 +31,7 @@ analyze {
 
     category "attacks" {
         analysis "mitre/typo" {
-            typo-file #rel("Typos.toml")
+            typo-file #rel("Typos.kdl")
             count-threshold 0
         }
 
@@ -42,12 +42,12 @@ analyze {
             }
 
             analysis "mitre/entropy" policy="(eq 0 (count (filter (gt 8.0) $)))" {
-				langs-file #rel("Langs.toml")
-				entropy-threshold 10.0
-				commit-percentage 0.0
+                langs-file #rel("Langs.kdl")
+                entropy-threshold 10.0
+                commit-percentage 0.0
 	 		}
             analysis "mitre/churn" policy="(lte (divz (count (filter (gt 3) $)) (count $)) 0.02)" {
-				langs-file #rel("Langs.toml")
+                langs-file #rel("Langs.kdl")
 			}
         }
     }

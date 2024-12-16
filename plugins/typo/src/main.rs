@@ -203,7 +203,7 @@ mod test {
 
 	#[tokio::test]
 	async fn test_typo() {
-		let typo_path = pathbuf![&env::current_dir().unwrap(), "test", "Typos.toml"];
+		let typo_path = pathbuf![&env::current_dir().unwrap(), "test", "Typos.kdl"];
 		let typo_file = TypoFile::load_from(&typo_path).unwrap();
 		TYPOFILE.get_or_init(|| typo_file);
 

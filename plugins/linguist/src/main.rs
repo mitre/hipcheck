@@ -2,8 +2,9 @@
 
 //! Plugin for determining if a particular path is a source file
 
-mod fs;
+mod error;
 mod linguist;
+mod util;
 
 use clap::Parser;
 use hipcheck_sdk::prelude::*;

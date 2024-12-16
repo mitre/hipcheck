@@ -3,8 +3,8 @@
 use crate::{
 	error::*,
 	hc_error,
-	linguist::{Linguist, LinguistSource},
 	types::*,
+	util::db::{Linguist, LinguistSource},
 };
 use dashmap::DashMap;
 use finl_unicode::grapheme_clusters::Graphemes;

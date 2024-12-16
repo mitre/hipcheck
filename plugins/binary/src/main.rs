@@ -2,7 +2,7 @@
 
 mod binary_detector;
 mod error;
-mod fs;
+mod util;
 
 use crate::binary_detector::{detect_binary_files, BinaryFileDetector};
 use clap::Parser;

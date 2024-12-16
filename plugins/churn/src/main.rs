@@ -4,14 +4,16 @@ mod error;
 mod linguist;
 mod metric;
 mod types;
+mod util;
 
 use crate::{
-	linguist::*,
 	metric::*,
 	types::{CommitChurn, CommitChurnFreq, CommitDiff},
+	util::db::*,
 };
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::Target};
+use linguist::SourceFileDetector;
 use serde::Deserialize;
 use std::{
 	collections::HashMap,
@@ -328,7 +330,7 @@ mod test {
 	fn init_db_if_uninited() {
 		fn create_db() -> Arc<Mutex<Linguist>> {
 			let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-			let langs_path = pathbuf![&manifest_dir, "../../config/Langs.toml"];
+			let langs_path = pathbuf![&manifest_dir, "../../config/Langs.kdl"];
 			let sfd = SourceFileDetector::load(langs_path)
 				.map_err(|e| ConfigError::Unspecified {
 					message: e.to_string(),
