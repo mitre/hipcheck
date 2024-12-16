@@ -358,8 +358,10 @@ fn parse_affiliation(
 		let file = affiliation.orgs_file.clone();
 		let mut config = PolicyConfig::new();
 		config
-			// Our working .kdl orgs file is not in `config` currently
-			.insert("orgs-file".to_string(), Value::String(file))
+			.insert(
+				"orgs-file".to_string(),
+				Value::String(format!("./config/{}", file)),
+			)
 			.unwrap();
 
 		// Add the plugin
@@ -399,7 +401,7 @@ fn parse_churn(plugins: &mut PolicyPluginList, commit: &mut PolicyCategory, chur
 		config
 			.insert(
 				"langs-file".to_string(),
-				Value::String("./config/Langs.toml".to_string()),
+				Value::String("./config/Langs.kdl".to_string()),
 			)
 			.unwrap();
 
@@ -444,7 +446,7 @@ fn parse_entropy(
 		config
 			.insert(
 				"langs-file".to_string(),
-				Value::String("./config/Langs.toml".to_string()),
+				Value::String("./config/Langs.kdl".to_string()),
 			)
 			.unwrap();
 

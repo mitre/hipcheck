@@ -4,11 +4,13 @@ mod error;
 mod linguist;
 mod metric;
 mod types;
+mod util;
 
-use crate::{linguist::*, metric::*, types::*};
+use crate::{metric::*, types::*, util::db::*};
 
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::Target};
+use linguist::SourceFileDetector;
 use serde::Deserialize;
 use tokio::sync::Mutex;
 
