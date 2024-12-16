@@ -8,9 +8,8 @@ use crate::{
 	cache::plugin::HcPluginCache,
 	cli::Format,
 	config::{
-		AttacksConfigQueryStorage, CommitConfigQueryStorage, Config, ConfigSource,
-		ConfigSourceStorage, LanguagesConfigQueryStorage, PracticesConfigQueryStorage,
-		RiskConfigQuery, RiskConfigQueryStorage, WeightTreeQueryStorage,
+		Config, ConfigSource, ConfigSourceStorage, RiskConfigQuery, RiskConfigQueryStorage,
+		WeightTreeQueryStorage,
 	},
 	engine::{start_plugins, HcEngine, HcEngineStorage},
 	error::{Context as _, Error, Result},
@@ -44,12 +43,8 @@ use url::Url;
 
 /// Immutable configuration and base data for a run of Hipcheck.
 #[salsa::database(
-	AttacksConfigQueryStorage,
-	CommitConfigQueryStorage,
 	ConfigSourceStorage,
 	HcEngineStorage,
-	LanguagesConfigQueryStorage,
-	PracticesConfigQueryStorage,
 	ReportParamsStorage,
 	RiskConfigQueryStorage,
 	ScoringProviderStorage,

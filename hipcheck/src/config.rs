@@ -13,13 +13,12 @@ use crate::{
 	policy_exprs::{std_parse, Expr},
 	score::*,
 	util::fs as file,
-	BINARY_CONFIG_FILE, F64, LANGS_FILE, ORGS_FILE, TYPO_FILE,
+	F64,
 };
 use indextree::{Arena, NodeEdge, NodeId};
 use num_traits::identities::Zero;
 use pathbuf::pathbuf;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use smart_default::SmartDefault;
 use std::{
 	collections::HashMap,
@@ -472,47 +471,6 @@ pub trait RiskConfigQuery: ConfigSource {
 	fn risk_policy(&self) -> Result<Rc<Expr>>;
 }
 
-/// Query for accessing the languages analysis config
-#[salsa::query_group(LanguagesConfigQueryStorage)]
-pub trait LanguagesConfigQuery: ConfigSource {
-	/// Returns the langs file path relative to the config file
-	fn langs_file_rel(&self) -> Rc<String>;
-	/// Returns the langs file absolute path
-	fn langs_file(&self) -> Result<Rc<PathBuf>>;
-}
-
-/// Queries for accessing the practices analysis config
-#[salsa::query_group(PracticesConfigQueryStorage)]
-pub trait PracticesConfigQuery: ConfigSource {
-	/// Returns the binary formats file path relative to the
-	/// config file
-	fn binary_formats_file_rel(&self) -> Rc<String>;
-	/// Returns the binary formats file absolute path
-	fn binary_formats_file(&self) -> Result<Rc<PathBuf>>;
-}
-
-/// Queries for accessing the attacks analysis config
-#[salsa::query_group(AttacksConfigQueryStorage)]
-pub trait AttacksConfigQuery: CommitConfigQuery {
-	/// Returns the typo file path relative to the config file
-	fn typo_file_rel(&self) -> Rc<String>;
-	/// Returns the typo file absolute path
-	fn typo_file(&self) -> Result<Rc<PathBuf>>;
-}
-
-/// Queries for accessing the commit analysis config
-#[salsa::query_group(CommitConfigQueryStorage)]
-pub trait CommitConfigQuery: ConfigSource {
-	/// Returns the orgs file path relative to the config file
-	fn orgs_file_rel(&self) -> Rc<String>;
-	/// Returns the orgs file absolute path
-	fn orgs_file(&self) -> Result<Rc<PathBuf>>;
-	/// Returns the contributor trust analysis count threshold
-	fn contributor_trust_value_threshold(&self) -> Result<u64>;
-	/// Returns the contributor trust analysis month threshold
-	fn contributor_trust_month_count_threshold(&self) -> Result<u64>;
-}
-
 pub static DEFAULT_QUERY: &str = "";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -874,139 +832,4 @@ fn risk_policy(db: &dyn RiskConfigQuery) -> Result<Rc<Expr>> {
 		.map_err(|e| hc_error!("Malformed risk policy expression '{}': {}", expr_str, e))?;
 
 	Ok(Rc::new(expr))
-}
-
-fn langs_file_rel(_db: &dyn LanguagesConfigQuery) -> Rc<String> {
-	Rc::new(LANGS_FILE.to_string())
-}
-
-fn langs_file(db: &dyn LanguagesConfigQuery) -> Result<Rc<PathBuf>> {
-	if let Some(config_dir) = db.config_dir() {
-		return Ok(Rc::new(pathbuf![
-			config_dir.as_ref(),
-			db.langs_file_rel().as_ref()
-		]));
-	}
-
-	let options = vec!["mitre/churn", "mitre/entropy"];
-	let policy_file = db.policy();
-	for opt in options {
-		if let Some(langs_config) = policy_file.get_config(opt) {
-			if let Some(v_filepath) = langs_config.get("langs-file") {
-				let Value::String(filepath) = v_filepath else {
-					return Err(hc_error!("'langs-file' was not a string"));
-				};
-				return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
-			}
-		};
-	}
-
-	Err(hc_error!("Cannot find path to languages config file in policy file. This file is necessary for running the linguist analysis."))
-}
-
-fn binary_formats_file_rel(_db: &dyn PracticesConfigQuery) -> Rc<String> {
-	Rc::new(BINARY_CONFIG_FILE.to_string())
-}
-
-fn binary_formats_file(db: &dyn PracticesConfigQuery) -> Result<Rc<PathBuf>> {
-	if let Some(config_dir) = db.config_dir() {
-		return Ok(Rc::new(pathbuf![
-			config_dir.as_ref(),
-			db.binary_formats_file_rel().as_ref()
-		]));
-	}
-
-	let policy_file = db.policy();
-	if let Some(binary_config) = policy_file.get_config("mitre/binary") {
-		if let Some(v_filepath) = binary_config.get("binary-file") {
-			let Value::String(filepath) = v_filepath else {
-				return Err(hc_error!("'binary-file' was not a string"));
-			};
-			return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
-		}
-	};
-
-	Err(hc_error!("Cannot find path to binary config file in policy file. This file is necessary for running the binary analysis."))
-}
-
-fn typo_file_rel(_db: &dyn AttacksConfigQuery) -> Rc<String> {
-	Rc::new(TYPO_FILE.to_string())
-}
-
-fn typo_file(db: &dyn AttacksConfigQuery) -> Result<Rc<PathBuf>> {
-	if let Some(config_dir) = db.config_dir() {
-		return Ok(Rc::new(pathbuf![
-			config_dir.as_ref(),
-			db.typo_file_rel().as_ref()
-		]));
-	}
-
-	let policy_file = db.policy();
-	if let Some(typo_config) = policy_file.get_config("mitre/typo") {
-		if let Some(v_filepath) = typo_config.get("typo-file") {
-			let Value::String(filepath) = v_filepath else {
-				return Err(hc_error!("'typo-file' was not a string"));
-			};
-			return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
-		}
-	};
-
-	Err(hc_error!("Cannot find path to typo config file in policy file. This file is necessary for running the typo analysis."))
-}
-
-fn orgs_file_rel(_db: &dyn CommitConfigQuery) -> Rc<String> {
-	Rc::new(ORGS_FILE.to_string())
-}
-
-fn orgs_file(db: &dyn CommitConfigQuery) -> Result<Rc<PathBuf>> {
-	if let Some(config_dir) = db.config_dir() {
-		return Ok(Rc::new(pathbuf![
-			config_dir.as_ref(),
-			db.orgs_file_rel().as_ref()
-		]));
-	}
-
-	let policy_file = db.policy();
-	if let Some(affiliation_config) = policy_file.get_config("mitre/affiliation") {
-		if let Some(v_filepath) = affiliation_config.get("orgs-file") {
-			let Value::String(filepath) = v_filepath else {
-				return Err(hc_error!("'orgs-file' was not a string"));
-			};
-			return Ok(Rc::new(Path::new(&filepath).to_path_buf()));
-		}
-	};
-
-	Err(hc_error!("Cannot find path to orgs config file in policy file. This file is necessary for running the affiliation analysis."))
-}
-
-fn contributor_trust_value_threshold(db: &dyn CommitConfigQuery) -> Result<u64> {
-	let policy_file = db.policy();
-	if let Some(trust_config) = policy_file.get_config("mitre/contributor-trust") {
-		if let Some(v_threshold) = trust_config.get("value-threshold") {
-			let Value::Number(threshold) = v_threshold else {
-				return Err(hc_error!("'value-threshold' was not a number"));
-			};
-			return threshold
-				.as_u64()
-				.ok_or_else(|| hc_error!("'value-threshold' was too large to be a u64"));
-		}
-	};
-
-	Err(hc_error!("Cannot find config for contributor trust value in policy file. This file is necessary for running the commit trust analysis."))
-}
-
-fn contributor_trust_month_count_threshold(db: &dyn CommitConfigQuery) -> Result<u64> {
-	let policy_file = db.policy();
-	if let Some(trust_config) = policy_file.get_config("mitre/contributor-trust") {
-		if let Some(v_threshold) = trust_config.get("month-count-threshold") {
-			let Value::Number(threshold) = v_threshold else {
-				return Err(hc_error!("'month-count-threshold' was not a number"));
-			};
-			return threshold
-				.as_u64()
-				.ok_or_else(|| hc_error!("'month-count-threshold' was too large to be a u64"));
-		}
-	};
-
-	Err(hc_error!("Cannot find config for contributor trust month threshold in policy file. This file is necessary for running the commit trust analysis."))
 }

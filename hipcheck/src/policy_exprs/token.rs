@@ -2,10 +2,9 @@
 
 use crate::policy_exprs::error::JiffError;
 use crate::policy_exprs::F64;
-use git2::Time;
 use jiff::{
 	civil::{Date, DateTime},
-	tz::{self, TimeZone},
+	tz::TimeZone,
 	Span, Timestamp, Zoned,
 };
 use logos::{Lexer, Logos};
@@ -221,10 +220,7 @@ pub enum LexingError {
 #[cfg(test)]
 mod tests {
 	use crate::policy_exprs::{token::Token, Error::Lex, LexingError, Result, F64};
-	use jiff::{
-		tz::{self, TimeZone},
-		Span, Timestamp, Zoned,
-	};
+	use jiff::{tz::TimeZone, Span, Timestamp, Zoned};
 	use logos::Logos as _;
 	use test_log::test;
 

@@ -2,20 +2,16 @@
 
 use crate::policy_exprs::{
 	expr::{
-		ArrayType as ExprArrayType, FuncReturnType, Function, FunctionDef, FunctionType, Op,
-		OpInfo, PrimitiveType, ReturnableType, Type, TypeChecker, Typed,
+		ArrayType as ExprArrayType, Function, FunctionDef, FunctionType, Op, PrimitiveType,
+		ReturnableType, Type, TypeChecker, Typed,
 	},
 	pass::ExprMutator,
-	Array as StructArray, Error, Expr, ExprVisitor, Function as StructFunction, Ident,
-	Lambda as StructLambda, Primitive, Result, F64,
+	Array as StructArray, Error, Expr, Function as StructFunction, Ident, Lambda as StructLambda,
+	Primitive, Result, F64,
 };
 use itertools::Itertools as _;
 use jiff::{Span, Zoned};
-use std::{
-	cmp::{Ordering, PartialEq},
-	collections::HashMap,
-	ops::Not as _,
-};
+use std::{cmp::Ordering, collections::HashMap, ops::Not as _};
 use Expr::*;
 use Primitive::*;
 
@@ -80,7 +76,7 @@ fn ty_filter(args: &[Type]) -> Result<ReturnableType> {
 		ReturnableType::Primitive(PrimitiveType::Bool) | ReturnableType::Unknown => {
 			Ok(ReturnableType::Array(arr_ty))
 		}
-		a => Err(Error::BadFuncArgType {
+		_ => Err(Error::BadFuncArgType {
 			name: "".to_owned(),
 			idx: 0,
 			expected: "a bool-returning lambda".to_owned(),
@@ -110,7 +106,7 @@ fn ty_higher_order_bool_fn(args: &[Type]) -> Result<ReturnableType> {
 		ReturnableType::Primitive(PrimitiveType::Bool) | ReturnableType::Unknown => {
 			Ok(ReturnableType::Primitive(PrimitiveType::Bool))
 		}
-		a => Err(Error::BadFuncArgType {
+		_ => Err(Error::BadFuncArgType {
 			name: "".to_owned(),
 			idx: 0,
 			expected: "a bool-returning lambda".to_owned(),
@@ -180,7 +176,6 @@ fn ty_divz(args: &[Type]) -> Result<ReturnableType> {
 	let opt_ty_1 = expect_primitive_at(args, 0)?;
 	let opt_ty_2 = expect_primitive_at(args, 1)?;
 	use PrimitiveType::*;
-	use ReturnableType::*;
 
 	let (bad, idx) = match (opt_ty_1, opt_ty_2) {
 		(None | Some(Int | Float), None | Some(Int | Float)) => return Ok(Float.into()),
@@ -265,13 +260,12 @@ fn ty_comp(args: &[Type]) -> Result<ReturnableType> {
 	})
 }
 
-fn ty_count(args: &[Type]) -> Result<ReturnableType> {
+fn ty_count(_args: &[Type]) -> Result<ReturnableType> {
 	Ok(PrimitiveType::Int.into())
 }
 
 fn ty_avg(args: &[Type]) -> Result<ReturnableType> {
 	use PrimitiveType::*;
-	use ReturnableType::*;
 	let arr_ty = expect_array_at(args, 0)?;
 	match arr_ty {
 		None | Some(Int) | Some(Float) => Ok(Float.into()),
@@ -286,11 +280,10 @@ fn ty_avg(args: &[Type]) -> Result<ReturnableType> {
 
 fn ty_duration(args: &[Type]) -> Result<ReturnableType> {
 	use PrimitiveType::*;
-	use ReturnableType::*;
 	let opt_ty_1 = expect_primitive_at(args, 0)?;
 	let opt_ty_2 = expect_primitive_at(args, 1)?;
 	match opt_ty_1 {
-		None | (Some(DateTime)) => (),
+		None | Some(DateTime) => (),
 		Some(got) => {
 			return Err(Error::BadFuncArgType {
 				name: "".to_owned(),
@@ -301,7 +294,7 @@ fn ty_duration(args: &[Type]) -> Result<ReturnableType> {
 		}
 	}
 	match opt_ty_2 {
-		None | (Some(DateTime)) => (),
+		None | Some(DateTime) => (),
 		Some(got) => {
 			return Err(Error::BadFuncArgType {
 				name: "".to_owned(),
@@ -316,9 +309,8 @@ fn ty_duration(args: &[Type]) -> Result<ReturnableType> {
 
 fn ty_bool_unary(args: &[Type]) -> Result<ReturnableType> {
 	use PrimitiveType::*;
-	use ReturnableType::*;
 	match expect_primitive_at(args, 0)? {
-		None | (Some(Bool)) => Ok(PrimitiveType::Bool.into()),
+		None | Some(Bool) => Ok(PrimitiveType::Bool.into()),
 		Some(got) => Err(Error::BadFuncArgType {
 			name: "".to_owned(),
 			idx: 0,
@@ -330,11 +322,10 @@ fn ty_bool_unary(args: &[Type]) -> Result<ReturnableType> {
 
 fn ty_bool_binary(args: &[Type]) -> Result<ReturnableType> {
 	use PrimitiveType::*;
-	use ReturnableType::*;
 	let opt_ty_1 = expect_primitive_at(args, 0)?;
 	let opt_ty_2 = expect_primitive_at(args, 1)?;
 	match opt_ty_1 {
-		None | (Some(Bool)) => (),
+		None | Some(Bool) => (),
 		Some(got) => {
 			return Err(Error::BadFuncArgType {
 				name: "".to_owned(),
@@ -345,7 +336,7 @@ fn ty_bool_binary(args: &[Type]) -> Result<ReturnableType> {
 		}
 	}
 	match opt_ty_2 {
-		None | (Some(Bool)) => (),
+		None | Some(Bool) => (),
 		Some(got) => {
 			return Err(Error::BadFuncArgType {
 				name: "".to_owned(),
@@ -369,8 +360,6 @@ impl Env<'_> {
 
 	/// Create the standard environment.
 	pub fn std() -> Self {
-		use FuncReturnType::*;
-		use PrimitiveType::*;
 		let mut env = Env::empty();
 
 		// Comparison functions.
@@ -821,7 +810,6 @@ fn add(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.map_err(|err| Error::Datetime(err.to_string()))?,
 		)),
 		(_, _) => Err(Error::BadType(name)),
-		_ => unreachable!(),
 	};
 
 	binary_primitive_op(name, env, args, op)
@@ -847,7 +835,6 @@ fn sub(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.map_err(|err| Error::Datetime(err.to_string()))?,
 		)),
 		(_, _) => Err(Error::BadType(name)),
-		_ => unreachable!(),
 	};
 
 	binary_primitive_op(name, env, args, op)
@@ -872,7 +859,6 @@ fn divz(env: &Env, args: &[Expr]) -> Result<Expr> {
 			Float(arg_1 / arg_2)
 		}),
 		(_, _) => Err(Error::BadType(name)),
-		_ => unreachable!(),
 	};
 
 	binary_primitive_op(name, env, args, op)
@@ -889,7 +875,6 @@ fn duration(env: &Env, args: &[Expr]) -> Result<Expr> {
 				.map_err(|err| Error::Datetime(err.to_string()))?,
 		)),
 		(_, _) => Err(Error::BadType(name)),
-		_ => unreachable!(),
 	};
 
 	binary_primitive_op(name, env, args, op)
@@ -901,7 +886,6 @@ fn and(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 && arg_2)),
 		(_, _) => Err(Error::BadType(name)),
-		_ => unreachable!(),
 	};
 
 	binary_primitive_op(name, env, args, op)
@@ -913,7 +897,6 @@ fn or(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 || arg_2)),
 		(_, _) => Err(Error::BadType(name)),
-		_ => unreachable!(),
 	};
 
 	binary_primitive_op(name, env, args, op)
