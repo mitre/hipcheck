@@ -1,0 +1,195 @@
+//###############################################################################
+// Orgs.kdl
+// 
+// This configuration file defines the set of organizations against which
+// affiliation may be checked for committers and authors in a repository,
+// and how that affiliation determination will be made (the "strategy").
+//###############################################################################
+
+
+//==============================================================================
+// Strategy
+//
+// This section defines one of two forms of a strategy, either a single string
+// representing the mode (which may be "independent", "affiliated", "all", or
+// "none"), or a mode and a list of references (either "country:<country_name>"
+// or "org:<org_name>"). Together, these define the list of organizations to be
+// considered for matching, and whether to flag identities as concerning if
+// if they're _affiliated_ with an org in the list ("affiliated" mode), or are
+// _not affiliated_ with an org in the list ("independent" mode).
+//==============================================================================
+
+// The strategy spec can be short, implicitly being affiliated with or
+// independent from all the orgs in the file.
+strategy "independent"
+
+// The strategy spec would alternatively look like this.
+// With this mode, you can more completely specify the orgs or countries
+// to include in the list, and mark whether we're rejecting those affiliated
+// with or independent from the selected org list.
+//
+// strategy_spec = { mode = "affiliated", list = ["country:United States", "org:MITRE"] }
+
+
+//==============================================================================
+// Orgs
+//
+// This section defines a list of organizations, including their name, primary
+// affiliated country, and any email hosts known to be connected to them.
+//==============================================================================
+
+orgs {
+    org "AT&T" country="United States" {
+        host "att.com"
+    }
+    org "Alibaba" country="China" {
+        host "alibaba.com"
+    }
+    org "Amazon" country="United States" {
+        host "amazon.com"
+    }
+    org "Blue Box Cloud" country="United States" {
+        host "blueboxcloud.com"
+    }
+    org "CERN" country="Switzerland" {
+        host "home.cern"
+    }
+    org "Cisco" country="United States" {
+        host "cisco.com"
+    }
+    org "Cloud Foundry" country="United States" {
+        host "cloudfoundry.org"
+    }
+    org "Code Think" country="United Kingdom" {
+        host "codethink.co.uk"
+    }
+    org "Comcast" country="United States" {
+        host "comcast.com"
+    }
+    org "CoreOS" country="United States" {
+        host "coreos.com"
+    }
+    org "Dell EMC" country="United States" {
+        host "dellemc.com"
+        host "emc.com"
+    }
+    org "DT Dream" country="China" {
+        host "dtdream.com"
+    }
+    org "Facebook" country="United States" {
+        host "facebook.com"
+    }
+    org "Fujitsu" country="Japan" {
+        host "fujitsu.com"
+    }
+    org "Google" country="United States" {
+        host "google.com"
+    }
+    org "HP" country="United States" {
+        host "hp.com"
+        host "hpe.com"
+    }
+    org "Heroku" country="United States" {
+        host "heroku.com"
+    }
+    org "Huawei" country="China" {
+        host "huawei.com"
+    }
+    org "IBM" country="United States" {
+        host "ibm.com"
+    }
+    org "Influx Data" country="United States" {
+        host "influxdata.com"
+    }
+    org "Intel" country="United States" {
+        host "intel.com"
+    }
+    org "MIT" country="United States" {
+        host "mit.edu"
+    }
+    org "MITRE" country="United States" {
+        host "mitre.org"
+    }
+    org "Microsoft" country="United States" {
+        host "microsoft.com"
+    }
+    org "NTT" country="Japan" {
+        host "ntt.com"
+    }
+    org "Oracle" country="United States" {
+        host "oracle.com"
+    }
+    org "Orange" country="France" {
+        host "orange.com"
+    }
+    org "Percona" country="United States" {
+        host "persona.com"
+    }
+    org "Pivotal" country="United States" {
+        host "pivotal.io"
+        host "pivotallabs.com"
+    }
+    org "Rackspace" country="United States" {
+        host "rackspace.com"
+    }
+    org "Rakuten" country="Japan" {
+        host "rakuten.com"
+    }
+    org "Red Hat" country="United States" {
+        host "redhat.com"
+    }
+    org "RightScale" country="United States" {
+        host "rightscale.com"
+    }
+    org "SAP" country="Germany" {
+        host "sap.com"
+    }
+    org "SINA" country="China" {
+        host "sina.com"
+    }
+    org "SUSE" country="Germany" {
+        host "suse.com"
+    }
+    org "SalesForce" country="United States" {
+        host "salesforce.com"
+    }
+    org "Stark & Wayne" country="United States" {
+        host "starkandwayne.com"
+    }
+    org "Stripe" country="United States" {
+        host "stripe.com"
+    }
+    org "Swisscom" country="Switzerland" {
+        host "swisscom.com"
+    }
+    org "Apache" country="United States" {
+        host "apache.org"
+    }
+    org "ThoughtWorks" country="United States" {
+        host "thoughtworks.com"
+    }
+    org "Undead Labs" country="United States" {
+        host "undeadlabs.com"
+    }
+    org "VMWare" country="United States" {
+        host "vmware.com"
+    }
+    org "Walmart" country="United States" {
+        host "walmart.com"
+    }
+    org "ZTE" country="China" {
+        host "zte.com.cn"
+    }
+    org "ZJI" country="China" {
+        host "zji.edu.cn"
+    }
+    org "NPM" country="United States" {
+        host "npmjs.com"
+    }
+    org "UK Digital Cabinet Office" country="United Kingdom" {
+        host "digital.cabinet-office.gov.uk"
+    }
+    org "RBC Royal Bank" country="Canada" {
+        host "rbcon.com"
+    }
+}
