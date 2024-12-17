@@ -223,15 +223,8 @@ impl HcEngineImpl {
 pub fn start_plugins(
 	policy_file: &PolicyFile,
 	plugin_cache: &HcPluginCache,
+	executor: PluginExecutor,
 ) -> Result<Arc<HcPluginCore>> {
-	let executor = PluginExecutor::new(
-		/* max_spawn_attempts */ 3,
-		/* max_conn_attempts */ 5,
-		/* port_range */ 40000..u16::MAX,
-		/* backoff_interval_micros */ 100000,
-		/* jitter_percent */ 10,
-	)?;
-
 	let current_arch = get_current_arch();
 
 	// retrieve, verify and extract all required plugins
