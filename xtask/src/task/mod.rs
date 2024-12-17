@@ -6,6 +6,6 @@ pub mod buf;
 pub mod changelog;
 pub mod check;
 pub mod ci;
+pub mod manifest;
 pub mod rfd;
 pub mod site;
-pub mod manifest;
