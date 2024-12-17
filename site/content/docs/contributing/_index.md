@@ -30,4 +30,12 @@ A walkthrough of running Hipcheck for the first time.
 A walkthrough of running Hipcheck for the first time.
 {% end %}
 
+{% waypoint(title="PR Review Checklist", path="@/docs/contributing/pr-review.md", icon="message-circle") %}
+Things to track when reviewing a PR.
+{% end %}
+
+{% waypoint(title="Developer Docs", path="@/docs/contributing/developer-docs/_index.md") %}
+Documentation for Hipcheck developers.
+{% end %}
+
 </div>
