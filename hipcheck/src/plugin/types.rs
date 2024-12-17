@@ -160,6 +160,9 @@ pub struct PluginContext {
 
 	/// The child process in which the plugin is running.
 	pub proc: Child,
+
+	/// The size of the gRPC buffer
+	pub grpc_query_buffer_size: usize,
 }
 
 // Redefinition of `grpc` field's functions with more useful types, additional
@@ -307,8 +310,7 @@ impl PluginContext {
 
 		let opt_explain_default_query = self.explain_default_query().await?;
 
-		// TODO: Make the size of this channel configurable.
-		let (tx, out_rx) = mpsc::channel::<PluginQuery>(10);
+		let (tx, out_rx) = mpsc::channel::<PluginQuery>(self.grpc_query_buffer_size);
 		let rx = self.initiate_query_protocol(out_rx).await?;
 
 		Ok(PluginTransport {
