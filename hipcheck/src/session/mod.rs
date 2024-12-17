@@ -13,6 +13,7 @@ use crate::{
 	},
 	engine::{start_plugins, HcEngine, HcEngineStorage},
 	error::{Context as _, Error, Result},
+	exec::ExecConfig,
 	hc_error,
 	policy::{config_to_policy, PolicyFile},
 	report::{ReportParams, ReportParamsStorage},
@@ -29,7 +30,7 @@ use crate::{
 };
 use chrono::prelude::*;
 use std::{
-	fmt,
+	env, fmt,
 	path::{Path, PathBuf},
 	rc::Rc,
 	result::Result as StdResult,
@@ -83,6 +84,7 @@ impl Session {
 		config_path: Option<PathBuf>,
 		home_dir: Option<PathBuf>,
 		policy_path: Option<PathBuf>,
+		exec_path: Option<PathBuf>,
 		format: Format,
 	) -> StdResult<Session, Error> {
 		/*===================================================================
@@ -141,6 +143,13 @@ impl Session {
 		let _ = session.risk_policy()?;
 
 		/*===================================================================
+		 *  Load the Exec Configuration
+		 *-----------------------------------------------------------------*/
+		let exec = load_exec_config(exec_path.as_deref())?;
+
+		session.set_exec_config(Rc::new(exec));
+
+		/*===================================================================
 		 *  Resolving the Hipcheck home.
 		 *-----------------------------------------------------------------*/
 
@@ -186,7 +195,12 @@ impl Session {
 		// equal, and the idea of memoizing/invalidating it does not make sense.
 		// Thus, we will do the plugin startup here.
 		let policy = session.policy();
-		let core = start_plugins(policy.as_ref(), &plugin_cache)?;
+
+		let exec_config = session.exec_config();
+
+		let executor = ExecConfig::get_plugin_executor(&exec_config)?;
+
+		let core = start_plugins(policy.as_ref(), &plugin_cache, executor)?;
 		session.set_core(core);
 
 		Ok(session)
@@ -244,11 +258,41 @@ pub fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, P
 
 	// Load the policy file.
 	let policy = PolicyFile::load_from(valid_policy_path)
-		.context("Failed to load policy. Plase make sure the policy file is in the provided location and is formatted correctly.")?;
+		.context("Failed to load policy. Please make sure the policy file is in the provided location and is formatted correctly.")?;
 
 	phase.finish_successful();
 
 	Ok((policy, valid_policy_path.to_path_buf()))
+}
+
+fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
+	// Start the phase
+	let phase = SpinnerPhase::start("loading exec config");
+	// Increment the phase into the "running" stage.
+	phase.inc();
+	// Set the spinner phase to tick constantly, 10 times a second.
+	phase.enable_steady_tick(Duration::from_millis(100));
+
+	// Resolve the path to the exec config file.
+	let exec_config = match exec_path {
+		Some(p) => {
+			// Use the path provided
+			if !p.exists() {
+				return Err(hc_error!("Failed to load exec config. Please make sure the path set by the --exec flag exists."));
+			}
+			ExecConfig::from_file(p)
+				.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")?
+		}
+		None => {
+			// Search for file or load the default if not provided
+			ExecConfig::find_file()
+				.context("Failed to load the default config. Please ensure the Exec.kdl is in the current directory or in .hipcheck/Exec.kdl of a parent directory.")?
+		}
+	};
+
+	phase.finish_successful();
+
+	Ok(exec_config)
 }
 
 fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {

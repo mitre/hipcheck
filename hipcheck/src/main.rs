@@ -7,6 +7,7 @@ mod cli;
 mod config;
 mod engine;
 mod error;
+mod exec;
 mod init;
 mod plugin;
 mod policy;
@@ -26,7 +27,8 @@ use crate::{
 	cli::Format,
 	config::{normalized_unresolved_analysis_tree_from_policy, Config},
 	error::{Context as _, Error, Result},
-	plugin::{try_set_arch, Plugin, PluginExecutor, PluginWithConfig},
+	exec::ExecConfig,
+	plugin::{try_set_arch, Plugin, PluginWithConfig},
 	policy::{config_to_policy, PolicyFile},
 	report::report_builder::{build_report, Report},
 	score::score_results,
@@ -91,7 +93,7 @@ fn main() -> ExitCode {
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
 		Some(FullCommands::Cache(args)) => return cmd_cache(args, &config),
-		Some(FullCommands::Plugin(args)) => cmd_plugin(args),
+		Some(FullCommands::Plugin(args)) => return cmd_plugin(args, &config),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
 		Some(FullCommands::Scoring) => {
@@ -132,6 +134,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 		config.config().map(ToOwned::to_owned),
 		config.cache().map(ToOwned::to_owned),
 		config.policy().map(ToOwned::to_owned),
+		config.exec().map(ToOwned::to_owned),
 		config.format(),
 	);
 
@@ -484,7 +487,7 @@ fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	Ok(path.to_owned())
 }
 
-fn cmd_plugin(args: PluginArgs) {
+fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
 	use crate::engine::{async_query, HcEngine, HcEngineImpl};
 	use std::sync::Arc;
 	use tokio::task::JoinSet;
@@ -503,14 +506,36 @@ fn cmd_plugin(args: PluginArgs) {
 		working_dir: working_dir.clone(),
 		entrypoint: entrypoint2.display().to_string(),
 	};
-	let plugin_executor = PluginExecutor::new(
-		/* max_spawn_attempts */ 3,
-		/* max_conn_attempts */ 5,
-		/* port_range */ 40000..u16::MAX,
-		/* backoff_interval_micros */ 100000,
-		/* jitter_percent */ 10,
-	)
-	.unwrap();
+	let res_exec_config = if let Some(p) = config.exec() {
+		ExecConfig::from_file(p)
+			.context("Failed to load the provided exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
+	} else {
+		ExecConfig::find_file()
+			.context("Failed to locate the exec config. Please make sure the exec config file exists somewhere in this directory or one of its parents as '.hipcheck/Exec.kdl'.")
+	};
+
+	let exec_config = match res_exec_config {
+		Ok(config) => config,
+		Err(e) => {
+			Shell::print_error(
+				&hc_error!("Failed to resolve the exec config {}", e),
+				Format::Human,
+			);
+			return ExitCode::FAILURE;
+		}
+	};
+
+	let plugin_executor = match ExecConfig::get_plugin_executor(&exec_config) {
+		Ok(e) => e,
+		Err(e) => {
+			Shell::print_error(
+				&hc_error!("Failed to resolve the Plugin Executor {}", e),
+				Format::Human,
+			);
+			return ExitCode::FAILURE;
+		}
+	};
+
 	let engine = match HcEngineImpl::new(
 		plugin_executor,
 		vec![
@@ -520,8 +545,8 @@ fn cmd_plugin(args: PluginArgs) {
 	) {
 		Ok(e) => e,
 		Err(e) => {
-			println!("Failed to create engine: {e}");
-			return;
+			Shell::print_error(&hc_error!("Failed to create engine {}", e), Format::Human);
+			return ExitCode::FAILURE;
 		}
 	};
 	if args.asynch {
@@ -580,6 +605,7 @@ fn cmd_plugin(args: PluginArgs) {
 		// 	x.join().unwrap();
 		// }
 	}
+	ExitCode::SUCCESS
 }
 
 fn cmd_ready(config: &CliConfig) {
@@ -783,10 +809,18 @@ fn run(
 	config_path: Option<PathBuf>,
 	home_dir: Option<PathBuf>,
 	policy_path: Option<PathBuf>,
+	exec_path: Option<PathBuf>,
 	format: Format,
 ) -> Result<Report> {
 	// Initialize the session.
-	let session = Session::new(&target, config_path, home_dir, policy_path, format)?;
+	let session = Session::new(
+		&target,
+		config_path,
+		home_dir,
+		policy_path,
+		exec_path,
+		format,
+	)?;
 
 	// Run analyses against a repo and score the results (score calls analyses that call metrics).
 	let phase = SpinnerPhase::start("analyzing and scoring results");
