@@ -64,7 +64,7 @@ impl RepoCacheEntry {
 			.unwrap_or("<DISPLAY_ERROR>".to_owned())
 			.to_string()
 	}
-	fn display_modified(&self) -> String {
+	pub fn display_modified(&self) -> String {
 		let Ok(dur) = self.modified.duration_since(SystemTime::UNIX_EPOCH) else {
 			return "<DISPLAY_ERROR>".to_owned();
 		};
@@ -129,7 +129,7 @@ fn load_or_get_empty(path: &Path) -> HcRepoCacheDisk {
 fn try_get_last_modified(path: &Path) -> Result<SystemTime> {
 	Ok(fs::metadata(path)?.modified()?)
 }
-fn get_last_modified_or_now(path: &Path) -> SystemTime {
+pub fn get_last_modified_or_now(path: &Path) -> SystemTime {
 	try_get_last_modified(path).unwrap_or(SystemTime::now())
 }
 
