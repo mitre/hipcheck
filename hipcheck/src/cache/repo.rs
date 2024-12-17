@@ -129,7 +129,7 @@ fn load_or_get_empty(path: &Path) -> HcRepoCacheDisk {
 fn try_get_last_modified(path: &Path) -> Result<SystemTime> {
 	Ok(fs::metadata(path)?.modified()?)
 }
-fn get_last_modified_or_now(path: &Path) -> SystemTime {
+pub fn get_last_modified_or_now(path: &Path) -> SystemTime {
 	try_get_last_modified(path).unwrap_or(SystemTime::now())
 }
 
