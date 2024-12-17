@@ -1,0 +1,42 @@
+syntax = "proto3";
+package hipcheck.v1;
+
+import "hipcheck/v1/query_state.proto";
+
+message Query {
+  // The ID of the request, used to associate requests and replies.
+  // Odd numbers = initiated by `hc`.
+  // Even numbers = initiated by a plugin.
+  int32 id = 1;
+
+  // The state of the query, indicating if this is a request or a reply,
+  // and if it's a reply whether it's the end of the reply.
+  QueryState state = 2;
+
+  // Publisher name and plugin name, when sent from Hipcheck to a plugin
+  // to initiate a fresh query, are used by the receiving plugin to validate
+  // that the query was intended for them.
+  //
+  // When a plugin is making a query to another plugin through Hipcheck, it's
+  // used to indicate the destination plugin, and to indicate the plugin that
+  // is replying when Hipcheck sends back the reply.
+  string publisher_name = 3;
+  string plugin_name = 4;
+
+  // The name of the query being made, so the responding plugin knows what
+  // to do with the provided data.
+  string query_name = 5;
+
+  // The key for the query, as a JSON object. This is the data that Hipcheck's
+  // incremental computation system will use to cache the response.
+  string key = 6;
+
+  // The response for the query, as a JSON object. This will be cached by
+  // Hipcheck for future queries matching the publisher name, plugin name,
+  // query name, and key.
+  string output = 7;
+
+  // An unstructured concern raised during the query that will be raised
+  // in the final Hipcheck report.
+  repeated string concern = 8;
+}

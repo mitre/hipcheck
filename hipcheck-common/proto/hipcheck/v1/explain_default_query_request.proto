@@ -1,8 +1,8 @@
 syntax = "proto3";
 package hipcheck.v1;
 
-import "empty.proto";
+import "hipcheck/v1/empty.proto";
 
 message ExplainDefaultQueryRequest {
-    Empty empty = 1;
+  Empty empty = 1;
 }

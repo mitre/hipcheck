@@ -1,0 +1,19 @@
+syntax = "proto3";
+package hipcheck.v1;
+
+enum QueryState {
+  // Something has gone wrong.
+  QUERY_STATE_UNSPECIFIED = 0;
+
+  // We are submitting a new query.
+  QUERY_STATE_SUBMIT = 1;
+
+  // We are replying to a query and expect more chunks.
+  QUERY_STATE_REPLY_IN_PROGRESS = 2;
+
+  // We are closing a reply to a query. If a query response is in one chunk,
+  // just send this. If a query is in more than one chunk, send this with
+  // the last message in the reply. This tells the receiver that all chunks
+  // have been received.
+  QUERY_STATE_REPLY_COMPLETE = 3;
+}

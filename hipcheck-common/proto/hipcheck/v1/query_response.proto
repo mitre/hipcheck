@@ -1,0 +1,18 @@
+syntax = "proto3";
+package hipcheck.v1;
+
+message GetQuerySchemasResponse {
+  // The name of the query being described by the schemas provided.
+  //
+  // If either the key and/or output schemas result in a message which is
+  // too big, they may be chunked across multiple replies in the stream.
+  // Replies with matching query names should have their fields concatenated
+  // in the order received to reconstruct the chunks.
+  string query_name = 1;
+
+  // The key schema, in JSON Schema format.
+  string key_schema = 2;
+
+  // The output schema, in JSON Schema format.
+  string output_schema = 3;
+}

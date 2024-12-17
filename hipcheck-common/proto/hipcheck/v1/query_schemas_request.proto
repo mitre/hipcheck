@@ -1,0 +1,8 @@
+syntax = "proto3";
+package hipcheck.v1;
+
+import "hipcheck/v1/empty.proto";
+
+message GetQuerySchemasRequest {
+  Empty empty = 1;
+}

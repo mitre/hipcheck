@@ -1,8 +1,0 @@
-syntax = "proto3";
-package hipcheck.v1;
-
-import "empty.proto";
-
-message QuerySchemasRequest {
-    Empty empty = 1;
-}

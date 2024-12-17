@@ -2108,7 +2108,6 @@ dependencies = [
  "tokio-stream",
  "toml",
  "tonic",
- "tonic-build",
  "unicode-normalization",
  "ureq",
  "url",

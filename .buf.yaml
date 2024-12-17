@@ -1,4 +1,6 @@
 version: v2
+modules:
+  - path: hipcheck-common/proto
 lint:
   use:
     - STANDARD
