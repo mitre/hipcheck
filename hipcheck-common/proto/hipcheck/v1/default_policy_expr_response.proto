@@ -1,0 +1,10 @@
+syntax = "proto3";
+package hipcheck.v1;
+
+message GetDefaultPolicyExpressionResponse {
+  // A policy expression, if the plugin has a default policy.
+  // This MUST be filled in with any default values pulled from the plugin's
+  // configuration. Hipcheck will only request the default policy _after_
+  // configuring the plugin.
+  string policy_expression = 1;
+}

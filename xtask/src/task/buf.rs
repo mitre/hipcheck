@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::workspace;
 use anyhow::{Context, Result};
-use pathbuf::pathbuf;
 use which::which;
-use xshell::{cmd, Shell};
+use xshell::Shell;
+
+use super::ci::run_buf_lint;
 
 /// Run the `buf lint` command
 pub fn run() -> Result<()> {
 	let sh = Shell::new().context("could not init shell")?;
 	which("buf").context("could not find 'buf'")?;
-
-	let root = workspace::root()?;
-	let config = pathbuf![&root, ".buf.yaml"];
-	let target = pathbuf![&root, "hipcheck", "proto"];
-
-	cmd!(sh, "buf lint --config {config} {target}").run()?;
-
+	run_buf_lint(&sh)?;
 	Ok(())
 }

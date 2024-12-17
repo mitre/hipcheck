@@ -25,6 +25,7 @@ pub fn run() -> Result<()> {
 		task!(check_target_matches_ci),
 		task!(print_versions),
 		task!(run_fmt),
+		task!(run_buf_lint),
 		task!(run_check),
 		task!(run_build),
 		task!(run_test),
@@ -123,7 +124,7 @@ fn print_versions(sh: &Shell) -> Result<()> {
 	print_fmt_version(sh)?;
 	print_clippy_version(sh)?;
 	print_xtask_version(sh)?;
-
+	print_buf_version(sh)?;
 	Ok(())
 }
 
@@ -167,6 +168,13 @@ fn print_xtask_version(sh: &Shell) -> Result<()> {
 	.run()
 	.map(drop)
 	.map_err(reason("call to cargo xtask failed. Make sure rust is installed and path to home-dir-here/.cargo/bin is on your path."))
+}
+
+// Print the version of `buf`
+fn print_buf_version(sh: &Shell) -> Result<()> {
+	cmd!(sh, "buf --version").run().map(drop).map_err(reason(
+		"call to buf failed. Make sure buf is installed and on your path.",
+	))
 }
 
 /// Run `cargo fmt`.
@@ -226,6 +234,14 @@ fn run_xtask_check(sh: &Shell) -> Result<()> {
 		.run()
 		.map(drop)
 		.map_err(reason("call to cargo xtask failed"))
+}
+
+/// Run `buf lint`
+pub fn run_buf_lint(sh: &Shell) -> Result<()> {
+	cmd!(sh, "buf lint --config .buf.yaml")
+		.run()
+		.map(drop)
+		.map_err(reason("call to buf lint failed"))
 }
 
 /// Tell the user we're done.

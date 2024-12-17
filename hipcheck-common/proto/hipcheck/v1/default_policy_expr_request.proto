@@ -1,12 +1,12 @@
 syntax = "proto3";
 package hipcheck.v1;
 
-import "empty.proto";
+import "hipcheck/v1/empty.proto";
 
 /**
  * Getting the default policy expression has no params, so we just wrap
  * the empty message for maximal forward compatibility.
  */
-message DefaultPolicyExprRequest {
-    Empty empty = 1;
+message GetDefaultPolicyExpressionRequest {
+  Empty empty = 1;
 }
