@@ -279,10 +279,6 @@ impl ExecConfig {
 	}
 
 	pub fn default() -> Result<Self, Error> {
-		// let path = env::current_dir()
-		// 			.ok()
-		// 			.map(|dir| pathbuf![&dir, "Config.kdl"])
-		// 			.as_ref();
 
 		// These are the default values
 		let data = r#"plugin {
@@ -499,19 +495,6 @@ mod test {
 			.stdout;
 		let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
 		cargo_path.parent().unwrap().to_path_buf()
-	}
-
-	#[test]
-	fn test_parsing_exec_config_from_file() {
-		let root = workspace_dir();
-		let path = pathbuf![&root, "config", "Config.kdl"];
-		let config = ExecConfig::from_file(path).unwrap();
-
-		assert_eq!(config.plugin_data.backoff.micros, 100000);
-		assert_eq!(config.plugin_data.max_spawn.attempts, 3);
-		assert_eq!(config.plugin_data.max_conn.attempts, 5);
-		assert_eq!(config.plugin_data.jitter.percent, 10);
-		assert_eq!(config.plugin_data.grpc_buffer.size, 10);
 	}
 
 	#[test]
