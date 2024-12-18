@@ -312,9 +312,8 @@ fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
 			if !p.exists() {
 				hc_error!("Failed to load exec config. Please make sure the path set by the --exec flag exists.");
 			}
-			let config = ExecConfig::from_file(p)
+			ExecConfig::from_file(p)
 					.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.");
-			config
 		},
 		None => {
 			// Search for file if not provided
