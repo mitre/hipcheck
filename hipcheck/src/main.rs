@@ -613,7 +613,7 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
 		// 	x.join().unwrap();
 		// }
 	}
-	return ExitCode::SUCCESS;
+	ExitCode::SUCCESS
 }
 
 fn cmd_ready(config: &CliConfig) {

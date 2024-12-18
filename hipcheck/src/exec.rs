@@ -279,7 +279,6 @@ impl ExecConfig {
 	}
 
 	pub fn default() -> Result<Self, Error> {
-
 		// These are the default values
 		let data = r#"plugin {
 			backoff-interval 100000
