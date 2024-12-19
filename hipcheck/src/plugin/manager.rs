@@ -18,6 +18,7 @@ pub struct PluginExecutor {
 	port_range: Range<u16>,
 	backoff_interval: Duration,
 	jitter_percent: u8,
+	grpc_buffer: usize,
 }
 impl PluginExecutor {
 	pub fn new(
@@ -26,6 +27,7 @@ impl PluginExecutor {
 		port_range: Range<u16>,
 		backoff_interval_micros: u64,
 		jitter_percent: u8,
+		grpc_buffer: usize,
 	) -> Result<Self> {
 		if jitter_percent > 100 {
 			return Err(hc_error!(
@@ -42,6 +44,7 @@ impl PluginExecutor {
 			port_range,
 			backoff_interval,
 			jitter_percent,
+			grpc_buffer,
 		})
 	}
 
@@ -196,6 +199,7 @@ impl PluginExecutor {
 				port,
 				grpc,
 				proc,
+				grpc_query_buffer_size: self.grpc_buffer,
 			});
 		}
 		Err(hc_error!(
