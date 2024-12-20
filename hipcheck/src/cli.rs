@@ -233,7 +233,6 @@ impl CliConfig {
 
 	/// Get the path to the exec config file
 	pub fn exec(&self) -> Option<&Path> {
-		// Question - should I remove the path from backups
 		self.path_args.exec.as_deref()
 	}
 
