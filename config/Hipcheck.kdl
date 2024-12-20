@@ -37,7 +37,7 @@ analyze {
 
         category "commit" {
             analysis "mitre/affiliation" {
-                orgs-file "./plugins/affiliation/test/example_orgs.kdl"
+                orgs-file "./config/Orgs.kdl"
                 count-threshold 0
             }
 
