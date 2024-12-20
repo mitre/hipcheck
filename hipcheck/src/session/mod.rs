@@ -307,23 +307,21 @@ fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
 	phase.enable_steady_tick(Duration::from_millis(100));
 
 	// Resolve the path to the exec config file.
-	let exec_config: ExecConfig;
-	
-	match exec_path {
+	let exec_config = match exec_path {
 		Some(p) => {
 			// Use the path provided
 			if !p.exists() {
 				hc_error!("Failed to load exec config. Please make sure the path set by the --exec flag exists.");
 			}
-			exec_config = ExecConfig::from_file(p)
+			ExecConfig::from_file(p)
 				.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
-				.unwrap();
-		},
+				.unwrap()
+		}
 		None => {
 			// Search for file if not provided
-			exec_config = ExecConfig::find_file()
+			ExecConfig::find_file()
 				.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
-				.unwrap();
+				.unwrap()
 		}
 	};
 

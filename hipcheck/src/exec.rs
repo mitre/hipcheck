@@ -10,7 +10,7 @@ use crate::{
 	},
 };
 use kdl::{KdlDocument, KdlNode, KdlValue};
-use std::{path::Path, str::FromStr, env};
+use std::{env, path::Path, str::FromStr};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PluginBackoffInterval {
@@ -281,18 +281,18 @@ impl ExecConfig {
 
 	pub fn find_file() -> Result<Self, Error> {
 		let exec_file = "Exec.kdl";
-		let mut curr_dir= env::current_dir().unwrap();
+		let mut curr_dir = env::current_dir().unwrap();
 		loop {
 			let target_path = curr_dir.join(exec_file);
 			let target_ref = target_path.as_path();
 			if target_ref.exists() {
 				// Parse found file
 				log::info!("Using Exec Config at {:?}", target_ref);
-				return Self::from_file(target_ref)
+				return Self::from_file(target_ref);
 			}
 			if let Some(parent) = curr_dir.parent() {
 				curr_dir = parent.to_path_buf();
-			} else  {
+			} else {
 				// If file not found, use default values
 				log::info!("Using a default Exec Config");
 				return Self::default();
