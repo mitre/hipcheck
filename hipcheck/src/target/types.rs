@@ -125,6 +125,7 @@ pub enum TargetSeedKind {
 pub struct TargetSeed {
 	pub kind: TargetSeedKind,
 	pub refspec: Option<String>,
+	pub specifier: String,
 }
 
 impl Display for TargetSeedKind {

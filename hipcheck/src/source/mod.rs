@@ -7,68 +7,12 @@ pub use crate::source::query::*;
 use crate::{
 	error::{Context, Error, Result},
 	hc_error,
-	shell::spinner_phase::SpinnerPhase,
-	target::{KnownRemote, LocalGitRepo, RemoteGitRepo, Target},
+	target::{KnownRemote, RemoteGitRepo},
 	util::git::GitCommand,
 };
 use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};
 use url::{Host, Url};
-
-// Resolving is how we ensure we have a valid, ready-to-go source of Git data
-// for the rest of Hipcheck's analysis. The below functions handle the resolution
-// of local or remote repos.
-//
-// If the repo is local, the resolve function will work with the local repository
-// without cloning (all operationsare write-only, so this won't harm the repo at
-// all).
-//
-// If it's a remote source, Hipcheck will clone the source so it can work with a
-// local copy, putting the clone in '<root>/clones'. It also notes whether a
-// remote repo is from a known or unknown host, because some forms of analysis
-// rely on accessing the API's of certain known hosts (currently just GitHub).
-//
-// In either case, it also gets the commit head of the HEAD commit, so we can
-// make sure future operations are all done relative to the HEAD, and that any
-// cached data records what the HEAD was at the time of caching, to enable
-// cache invalidation.
-
-/// Resolves a specified local git repo into a Target for analysis by Hipcheck
-pub fn resolve_local_repo(
-	phase: &SpinnerPhase,
-	root: &Path,
-	local_repo: LocalGitRepo,
-) -> Result<Target> {
-	let src = local_repo.path.clone();
-
-	let specifier = src
-		.to_str()
-		.ok_or(hc_error!(
-			"Path to local repo contained one or more invalid characters"
-		))?
-		.to_string();
-
-	phase.update_status("copying");
-	let path = clone_local_repo_to_cache(src.as_path(), root)?;
-	let git_ref = git::checkout(&path, Some(local_repo.git_ref.clone()))?;
-	phase.update_status("trying to get remote");
-	let remote = match try_resolve_remote_for_local(&path) {
-		Ok(remote) => Some(remote),
-		Err(err) => {
-			log::debug!("failed to get remote [err='{}']", err);
-			None
-		}
-	};
-
-	let local = LocalGitRepo { path, git_ref };
-
-	Ok(Target {
-		specifier,
-		local,
-		remote,
-		package: None,
-	})
-}
 
 /// Creates a RemoteGitRepo struct from a given git URL by idenfitying if it is from a known host (currently only GitHub) or not
 pub fn get_remote_repo_from_url(url: Url) -> Result<RemoteGitRepo> {
@@ -88,54 +32,7 @@ pub fn get_remote_repo_from_url(url: Url) -> Result<RemoteGitRepo> {
 	}
 }
 
-/// Resolves a remote git repo originally specified by its remote location into a Target for analysis by Hipcheck
-pub fn resolve_remote_repo(
-	phase: &SpinnerPhase,
-	root: &Path,
-	remote_repo: RemoteGitRepo,
-	refspec: Option<String>,
-) -> Result<Target> {
-	// For remote repos originally specified by their URL, the specifier is just that URL
-	let specifier = remote_repo.url.to_string();
-
-	let path = match remote_repo.known_remote {
-		Some(KnownRemote::GitHub {
-			ref owner,
-			ref repo,
-		}) => pathbuf![root, "clones", "github", owner, repo],
-		_ => {
-			let clone_dir = build_unknown_remote_clone_dir(&remote_repo.url)
-				.context("failed to prepare local clone directory")?;
-			pathbuf![root, "clones", "unknown", &clone_dir]
-		}
-	};
-
-	let git_ref = clone_or_update_remote(phase, &remote_repo.url, &path, refspec)?;
-
-	let local = LocalGitRepo { path, git_ref };
-
-	Ok(Target {
-		specifier,
-		local,
-		remote: Some(remote_repo),
-		package: None,
-	})
-}
-
-/// Resolves a remote git repo derived from a source other than its remote location (e.g. a package or SPDX file) into a Target for analysis by Hipcheck
-pub fn resolve_remote_package_repo(
-	phase: &SpinnerPhase,
-	root: &Path,
-	remote_repo: RemoteGitRepo,
-	specifier: String,
-	refspec: Option<String>,
-) -> Result<Target> {
-	let mut target = resolve_remote_repo(phase, root, remote_repo, refspec)?;
-	target.specifier = specifier;
-	Ok(target)
-}
-
-fn try_resolve_remote_for_local(local: &Path) -> Result<RemoteGitRepo> {
+pub fn try_resolve_remote_for_local(local: &Path) -> Result<RemoteGitRepo> {
 	let url = {
 		let symbolic_ref = get_symbolic_ref(local)?;
 
@@ -215,7 +112,7 @@ pub fn get_github_owner_and_repo(url: &Url) -> Result<(String, String)> {
 	Ok((owner, repo))
 }
 
-fn build_unknown_remote_clone_dir(url: &Url) -> Result<String> {
+pub fn build_unknown_remote_clone_dir(url: &Url) -> Result<String> {
 	let mut dir = String::new();
 
 	// Add the host to the destination.
@@ -238,7 +135,7 @@ fn build_unknown_remote_clone_dir(url: &Url) -> Result<String> {
 	Ok(dir)
 }
 
-fn clone_local_repo_to_cache(src: &Path, root: &Path) -> Result<PathBuf> {
+pub fn clone_local_repo_to_cache(src: &Path, root: &Path) -> Result<PathBuf> {
 	let src = src.canonicalize()?;
 	let hc_data_root = pathbuf![root, "clones"];
 	// If src dir is already in HC_CACHE/clones, leave it be. else clone from local fs
@@ -257,22 +154,6 @@ fn clone_local_repo_to_cache(src: &Path, root: &Path) -> Result<PathBuf> {
 		.ok_or_else(|| hc_error!("destination isn't UTF-8 encoded '{}'", dest.display()))?;
 	let _output = GitCommand::new_repo(["clone", src_str, dest_str])?.output()?;
 	Ok(dest)
-}
-
-pub fn clone_or_update_remote(
-	phase: &SpinnerPhase,
-	url: &Url,
-	dest: &Path,
-	refspec: Option<String>,
-) -> Result<String> {
-	if dest.exists() {
-		phase.update_status("pulling");
-		git::fetch(dest).context("failed to update remote repository")?;
-	} else {
-		phase.update_status("cloning");
-		git::clone(url, dest).context("failed to clone remote repository")?;
-	}
-	git::checkout(dest, refspec)
 }
 
 fn get_symbolic_ref(dest: &Path) -> Result<String> {

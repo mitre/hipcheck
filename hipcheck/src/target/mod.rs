@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod resolve;
 pub mod types;
 pub use types::*;
 
@@ -8,6 +9,7 @@ use crate::error::Error;
 use clap::ValueEnum;
 use packageurl::PackageUrl;
 use serde::Serialize;
+use std::path::PathBuf;
 use std::str::FromStr;
 use url::Url;
 
@@ -148,6 +150,9 @@ impl TargetType {
 			|| tgt.ends_with(".cdx.xml")
 		{
 			Some((Sbom, tgt.to_string()))
+		// If is path to a file/dir that exists, treat as a local Repo
+		} else if PathBuf::from(tgt).exists() {
+			Some((Repo, tgt.to_string()))
 		} else {
 			None
 		}

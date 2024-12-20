@@ -500,10 +500,11 @@ impl CheckArgs {
 }
 impl ToTargetSeed for CheckArgs {
 	fn to_target_seed(&self) -> Result<TargetSeed> {
-		let kind = self.command()?.to_target_seed_kind()?;
+		let command = self.command()?;
 		let target = TargetSeed {
-			kind,
+			kind: command.to_target_seed_kind()?,
 			refspec: self.refspec.clone(),
+			specifier: command.get_specifier().to_owned(),
 		};
 		// Validate
 		if let Some(refspec) = &target.refspec {
@@ -536,6 +537,19 @@ pub enum CheckCommand {
 	/// Analyze packages specified in an SBOM document
 	#[command(hide = true)]
 	Sbom(CheckSbomArgs),
+}
+
+impl CheckCommand {
+	fn get_specifier(&self) -> &str {
+		use CheckCommand::*;
+		match self {
+			Maven(args) => &args.package,
+			Npm(args) => &args.package,
+			Pypi(args) => &args.package,
+			Repo(args) => &args.source,
+			Sbom(args) => &args.path,
+		}
+	}
 }
 
 impl ToTargetSeedKind for CheckCommand {

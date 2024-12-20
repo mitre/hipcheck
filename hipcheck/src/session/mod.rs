@@ -17,15 +17,12 @@ use crate::{
 	policy::{config_to_policy, PolicyFile},
 	report::{ReportParams, ReportParamsStorage},
 	score::ScoringProviderStorage,
-	session::{
-		cyclone_dx::extract_cyclonedx_download_url,
-		pm::{detect_and_extract, extract_repo_for_maven},
-		spdx::extract_spdx_download_url,
-	},
 	shell::{spinner_phase::SpinnerPhase, Shell},
-	source,
 	source::{SourceQuery, SourceQueryStorage},
-	target::{SbomStandard, Target, TargetSeed, TargetSeedKind},
+	target::{
+		resolve::{TargetResolver, TargetResolverConfig},
+		Target, TargetSeed, TargetSeedKind,
+	},
 	util::command::DependentProgram,
 	util::{git::get_git_version, npm::get_npm_version},
 	version::{VersionQuery, VersionQueryStorage},
@@ -39,7 +36,6 @@ use std::{
 	sync::Arc,
 	time::Duration,
 };
-use url::Url;
 
 /// Immutable configuration and base data for a run of Hipcheck.
 #[salsa::database(
@@ -294,81 +290,12 @@ fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 
 /// Resolves the target specifier into an actual target.
 fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Result<Target> {
-	use TargetSeedKind::*;
 	#[cfg(feature = "print-timings")]
-	let _0 = crate::benchmarking::print_scope_time!("resolve_source");
+	let _0 = crate::benchmarking::print_scope_time!("resolve_target");
 
-	match &seed.kind {
-		RemoteRepo(remote) => {
-			source::resolve_remote_repo(phase, home, remote.to_owned(), seed.refspec.clone())
-		}
-		LocalRepo(source) => {
-			// Because other TargetSeedKind variants need to transfer refspec info from the CLI,
-			// there's overlap with LocalGitRepo.git_ref. Copy CLI refspec here.
-			let mut source = source.to_owned();
-			source.git_ref = seed.refspec.clone().unwrap_or("HEAD".to_owned());
-			source::resolve_local_repo(phase, home, source)
-		}
-		Package(package) => {
-			// Attempt to get the git repo URL for the package
-			let package_git_repo_url =
-				detect_and_extract(package).context("Could not get git repo URL for package")?;
-
-			// Create Target for a remote git repo originating with a package
-			let package_git_repo = source::get_remote_repo_from_url(package_git_repo_url)?;
-			// TargetSeed validation step should have already ensured both refspec and package
-			// version are not provided, so we can do this
-			let refspec = if let Some(refspec) = &seed.refspec {
-				Some(refspec.to_owned())
-			} else if package.has_version() {
-				Some(package.version.to_owned())
-			} else {
-				None
-			};
-			source::resolve_remote_package_repo(
-				phase,
-				home,
-				package_git_repo,
-				format!("{}@{}", package.name, package.version),
-				refspec,
-			)
-		}
-		MavenPackage(package) => {
-			// Attempt to get the git repo URL for the Maven package
-			let package_git_repo_url = extract_repo_for_maven(package.url.as_ref())
-				.context("Could not get git repo URL for Maven package")?;
-
-			// Create Target for a remote git repo originating with a Maven package
-			let package_git_repo = source::get_remote_repo_from_url(package_git_repo_url)?;
-			// We do not currently harvest version info from the maven url
-			source::resolve_remote_package_repo(
-				phase,
-				home,
-				package_git_repo,
-				package.url.to_string(),
-				seed.refspec.clone(),
-			)
-		}
-		Sbom(sbom) => {
-			let source = sbom.path.to_str().ok_or(hc_error!(
-				"SBOM path contained one or more invalid characters"
-			))?;
-			// Attempt to get the download location for the local SBOM package, using the function
-			// appropriate to the SBOM standard
-			let download_url = match sbom.standard {
-				SbomStandard::Spdx => Url::parse(&extract_spdx_download_url(source)?)?,
-				SbomStandard::CycloneDX => extract_cyclonedx_download_url(source)?,
-			};
-
-			// Create a Target for a remote git repo originating with an SBOM
-			let sbom_git_repo = source::get_remote_repo_from_url(download_url)?;
-			source::resolve_remote_package_repo(
-				phase,
-				home,
-				sbom_git_repo,
-				source.to_string(),
-				seed.refspec.clone(),
-			)
-		}
-	}
+	let conf = TargetResolverConfig {
+		phase: Some(phase.clone()),
+		cache: PathBuf::from(home),
+	};
+	TargetResolver::resolve(conf, seed.clone())
 }
