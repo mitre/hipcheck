@@ -29,10 +29,20 @@ fn drain_at_most_n_bytes(buf: &mut String, max: usize) -> Result<String> {
 	Ok(buf.drain(0..to_drain).collect::<String>())
 }
 
+fn estimate_key_size(msg: &PluginQuery) -> usize {
+	msg.key.iter().map(|x| x.bytes().len()).sum::<usize>()
+}
+
+fn estimate_output_size(msg: &PluginQuery) -> usize {
+	msg.output.iter().map(|x| x.bytes().len()).sum::<usize>()
+}
+
+fn estimate_concern_size(msg: &PluginQuery) -> usize {
+	msg.concern.iter().map(|x| x.bytes().len()).sum::<usize>()
+}
+
 fn estimate_size(msg: &PluginQuery) -> usize {
-	msg.key.bytes().len()
-		+ msg.output.bytes().len()
-		+ msg.concern.iter().map(|x| x.bytes().len()).sum::<usize>()
+	estimate_key_size(msg) + estimate_output_size(msg) + estimate_concern_size(msg)
 }
 
 pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<PluginQuery>> {
@@ -64,24 +74,26 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 			publisher_name: base.publisher_name.clone(),
 			plugin_name: base.plugin_name.clone(),
 			query_name: base.query_name.clone(),
-			key: String::new(),
-			output: String::new(),
+			key: vec![],
+			output: vec![],
 			concern: vec![],
 		};
 
-		if remaining > 0 && base.key.bytes().len() > 0 {
-			// steal from key
-			query.key = drain_at_most_n_bytes(&mut base.key, remaining)?;
-			remaining -= query.key.bytes().len();
-			made_progress = true;
-		}
+		drain_vec_of_string(
+			&mut base.key,
+			&mut query.key,
+			&mut remaining,
+			max_est_size,
+			&mut made_progress,
+		)?;
 
-		if remaining > 0 && base.output.bytes().len() > 0 {
-			// steal from output
-			query.output = drain_at_most_n_bytes(&mut base.output, remaining)?;
-			remaining -= query.output.bytes().len();
-			made_progress = true;
-		}
+		drain_vec_of_string(
+			&mut base.output,
+			&mut query.output,
+			&mut remaining,
+			max_est_size,
+			&mut made_progress,
+		)?;
 
 		drain_vec_of_string(
 			&mut base.concern,
@@ -183,8 +195,9 @@ impl QuerySynthesizer {
 						if state == QueryState::ReplyComplete {
 							raw.state = QueryState::ReplyComplete.into();
 						}
-						raw.key.push_str(next.key.as_str());
-						raw.output.push_str(next.output.as_str());
+
+						raw.key.extend_from_slice(next.key.as_slice());
+						raw.output.extend_from_slice(next.output.as_slice());
 						raw.concern.extend_from_slice(next.concern.as_slice());
 					}
 				};
@@ -232,8 +245,8 @@ mod test {
 			plugin_name: "".to_owned(),
 			query_name: "".to_owned(),
 			// This key will cause the chunk not to occur on a char boundary
-			key: "aこれは実験です".to_owned(),
-			output: "".to_owned(),
+			key: vec!["aこれは実験です".to_owned()],
+			output: vec!["".to_owned()],
 			concern: vec!["< 10".to_owned(), "0123456789".to_owned()],
 		};
 		let res = match chunk_with_size(query, 10) {

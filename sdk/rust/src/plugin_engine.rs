@@ -15,7 +15,6 @@ use hipcheck_common::{
 	types::{Query, QueryDirection},
 };
 use serde::Serialize;
-use serde_json::{json, Value};
 use std::sync::Arc;
 use std::{
 	collections::{HashMap, VecDeque},
@@ -48,10 +47,80 @@ pub struct PluginEngine {
 	mock_responses: MockResponses,
 }
 
+#[derive(Clone, Debug)]
+enum QueryInput {
+	SingleKey(JsonValue),
+	MultiKey(Vec<JsonValue>),
+}
+
+#[derive(Clone, Debug)]
+enum QueryOutput {
+	SingleOutput(JsonValue),
+	MultiOutput(Vec<JsonValue>),
+}
+
+impl QueryInput {
+	/// Convert query key into the type expected when crafting a `Query` (Vec<JsonValue>)
+	fn query_key(self) -> Vec<JsonValue> {
+		match self {
+			Self::SingleKey(key) => vec![key],
+			Self::MultiKey(keys) => keys,
+		}
+	}
+}
+
 impl PluginEngine {
 	#[cfg(feature = "mock_engine")]
 	pub fn mock(mock_responses: MockResponses) -> Self {
 		mock_responses.into()
+	}
+
+	async fn query_inner(&mut self, target: QueryTarget, input: QueryInput) -> Result<QueryOutput> {
+		// If doing a mock engine, look to the `mock_responses` field for the query answer
+		if cfg!(feature = "mock_engine") {
+			match self
+				.mock_responses
+				.0
+				.get(&(target, input.clone().query_key()))
+			{
+				Some(res) => {
+					match res {
+						Ok(val) => match input {
+							QueryInput::SingleKey(_) => Ok(QueryOutput::SingleOutput(val.clone())),
+							QueryInput::MultiKey(_) => todo!(),
+						},
+						// TODO: since Error is not Clone, is there a better way to deal with this
+						Err(_) => Err(Error::UnexpectedPluginQueryInputFormat),
+					}
+				}
+				None => Err(Error::UnknownPluginQuery),
+			}
+		}
+		// Normal execution, send messages to hipcheck core to query other plugin
+		else {
+			let query = Query {
+				id: 0,
+				direction: QueryDirection::Request,
+				publisher: target.publisher,
+				plugin: target.plugin,
+				query: target.query.unwrap_or_else(|| "".to_owned()),
+				key: input.clone().query_key(),
+				output: vec![],
+				concerns: vec![],
+			};
+			self.send(query).await?;
+			let response = self.recv().await?;
+			match response {
+				Some(mut response) => match input {
+					QueryInput::SingleKey(_) => {
+						debug_assert_eq!(response.output.len(), 1);
+						Ok(QueryOutput::SingleOutput(response.output.pop().unwrap()))
+					}
+					QueryInput::MultiKey(_) => Ok(QueryOutput::MultiOutput(response.output)),
+				},
+				None => Err(Error::SessionChannelClosed),
+			}
+		}
 	}
 
 	/// Query another Hipcheck plugin `target` with key `input`. On success, the JSONified result
@@ -66,46 +135,14 @@ impl PluginEngine {
 	{
 		let query_target: QueryTarget = target.try_into().map_err(|e| e.into())?;
 		let input: JsonValue = serde_json::to_value(input).map_err(Error::InvalidJsonInQueryKey)?;
-
-		async fn query_inner(
-			engine: &mut PluginEngine,
-			target: QueryTarget,
-			input: JsonValue,
-		) -> Result<JsonValue> {
-			// If doing a mock engine, look to the `mock_responses` field for the query answer
-			if cfg!(feature = "mock_engine") {
-				match engine.mock_responses.0.get(&(target, input)) {
-					Some(res) => {
-						match res {
-							Ok(val) => Ok(val.clone()),
-							// TODO: since Error is not Clone, is there a better way to deal with this
-							Err(_) => Err(Error::UnexpectedPluginQueryInputFormat),
-						}
-					}
-					None => Err(Error::UnknownPluginQuery),
-				}
-			}
-			// Normal execution, send messages to hipcheck core to query other plugin
-			else {
-				let query = Query {
-					id: 0,
-					direction: QueryDirection::Request,
-					publisher: target.publisher,
-					plugin: target.plugin,
-					query: target.query.unwrap_or_else(|| "".to_owned()),
-					key: input,
-					output: json!(Value::Null),
-					concerns: vec![],
-				};
-				engine.send(query).await?;
-				let response = engine.recv().await?;
-				match response {
-					Some(response) => Ok(response.output),
-					None => Err(Error::SessionChannelClosed),
-				}
-			}
+		let value = self
+			.query_inner(query_target, QueryInput::SingleKey(input))
+			.await?;
+		match value {
+			QueryOutput::SingleOutput(value) => Ok(value),
+			// TODO: look at this error message
+			QueryOutput::MultiOutput(_) => Err(Error::UnknownPluginQuery),
 		}
-		query_inner(self, query_target, input).await
 	}
 
 	fn id(&self) -> usize {
@@ -169,8 +206,8 @@ impl PluginEngine {
 			publisher_name: P::PUBLISHER.to_owned(),
 			plugin_name: P::NAME.to_owned(),
 			query_name: "".to_owned(),
-			key: json!(Value::Null).to_string(),
-			output: json!(Value::Null).to_string(),
+			key: vec![],
+			output: vec![],
 			concern: self.take_concerns(),
 		};
 		self.tx
@@ -219,23 +256,24 @@ impl PluginEngine {
 		#[cfg(feature = "print-timings")]
 		let _0 = crate::benchmarking::print_scope_time!(format!("{}/{}", P::NAME, name));
 
-		let value = query.run(self, key).await?;
+		for key in key {
+			let output = query.run(self, key).await?;
+			let query = Query {
+				id: self.id(),
+				direction: QueryDirection::Response,
+				publisher: P::PUBLISHER.to_owned(),
+				plugin: P::NAME.to_owned(),
+				query: name.to_owned(),
+				key: vec![],
+				output: vec![output],
+				concerns: self.take_concerns(),
+			};
+			self.send(query).await?;
+		}
 
 		#[cfg(feature = "print-timings")]
 		drop(_0);
-
-		let query = Query {
-			id: self.id(),
-			direction: QueryDirection::Response,
-			publisher: P::PUBLISHER.to_owned(),
-			plugin: P::NAME.to_owned(),
-			query: name.to_owned(),
-			key: json!(Value::Null),
-			output: value,
-			concerns: self.take_concerns(),
-		};
-
-		self.send(query).await
+		Ok(())
 	}
 
 	async fn handle_session<P>(&mut self, plugin: Arc<P>)

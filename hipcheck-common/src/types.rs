@@ -12,8 +12,8 @@ pub struct Query {
 	pub publisher: String,
 	pub plugin: String,
 	pub query: String,
-	pub key: serde_json::Value,
-	pub output: serde_json::Value,
+	pub key: Vec<serde_json::Value>,
+	pub output: Vec<serde_json::Value>,
 	pub concerns: Vec<String>,
 }
 
@@ -49,15 +49,27 @@ impl TryFrom<PluginQuery> for Query {
 	type Error = Error;
 
 	fn try_from(value: PluginQuery) -> Result<Query, Self::Error> {
+		let direction = QueryDirection::try_from(value.state())?;
+		let mut keys = vec![];
+		for json_formatted_key in value.key {
+			let key =
+				serde_json::from_str(&json_formatted_key).map_err(Error::InvalidJsonInQueryKey)?;
+			keys.push(key);
+		}
+		let mut outputs = vec![];
+		for json_formatted_output in value.output {
+			let output = serde_json::from_str(&json_formatted_output)
+				.map_err(Error::InvalidJsonInQueryKey)?;
+			outputs.push(output);
+		}
 		Ok(Query {
 			id: value.id as usize,
-			direction: QueryDirection::try_from(value.state())?,
+			direction,
 			publisher: value.publisher_name,
 			plugin: value.plugin_name,
 			query: value.query_name,
-			key: serde_json::from_str(value.key.as_str()).map_err(Error::InvalidJsonInQueryKey)?,
-			output: serde_json::from_str(value.output.as_str())
-				.map_err(Error::InvalidJsonInQueryOutput)?,
+			key: keys,
+			output: outputs,
 			concerns: value.concern,
 		})
 	}
@@ -68,9 +80,19 @@ impl TryFrom<Query> for PluginQuery {
 
 	fn try_from(value: Query) -> Result<PluginQuery, Self::Error> {
 		let state: QueryState = value.direction.into();
-		let key = serde_json::to_string(&value.key).map_err(Error::InvalidJsonInQueryKey)?;
-		let output =
-			serde_json::to_string(&value.output).map_err(Error::InvalidJsonInQueryOutput)?;
+
+		let mut keys = vec![];
+		for key in value.key {
+			let json_formatted_key =
+				serde_json::to_string(&key).map_err(Error::InvalidJsonInQueryKey)?;
+			keys.push(json_formatted_key);
+		}
+		let mut outputs = vec![];
+		for output in value.output {
+			let json_formatted_output =
+				serde_json::to_string(&output).map_err(Error::InvalidJsonInQueryKey)?;
+			outputs.push(json_formatted_output);
+		}
 
 		Ok(PluginQuery {
 			id: value.id as i32,
@@ -78,8 +100,8 @@ impl TryFrom<Query> for PluginQuery {
 			publisher_name: value.publisher,
 			plugin_name: value.plugin,
 			query_name: value.query,
-			key,
-			output,
+			key: keys,
+			output: outputs,
 			concern: value.concerns,
 		})
 	}

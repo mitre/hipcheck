@@ -104,16 +104,20 @@ fn query(
 	// current query by providing the plugin the answer.
 	loop {
 		log::trace!("Query needs more info, recursing...");
-		let answer = db
-			.query(
-				ar.publisher.clone(),
-				ar.plugin.clone(),
-				ar.query.clone(),
-				ar.key.clone(),
-			)?
-			.value;
+		let mut answers = vec![];
+		for key in ar.key.clone() {
+			let value = db
+				.query(
+					ar.publisher.clone(),
+					ar.plugin.clone(),
+					ar.query.clone(),
+					key,
+				)?
+				.value;
+			answers.push(value);
+		}
 		log::trace!("Got answer, resuming");
-		ar = match runtime.block_on(p_handle.resume_query(ar, answer))? {
+		ar = match runtime.block_on(p_handle.resume_query(ar, answers))? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));
 			}
@@ -158,17 +162,21 @@ pub fn async_query(
 		// current query by providing the plugin the answer.
 		loop {
 			log::trace!("Awaiting result, now recursing");
-			let answer = async_query(
-				Arc::clone(&core),
-				ar.publisher.clone(),
-				ar.plugin.clone(),
-				ar.query.clone(),
-				ar.key.clone(),
-			)
-			.await?
-			.value;
-			log::trace!("Resuming query with answer {answer:?}");
-			ar = match p_handle.resume_query(ar, answer).await? {
+			let mut answers = vec![];
+			for key in ar.key.clone() {
+				let value = async_query(
+					Arc::clone(&core),
+					ar.publisher.clone(),
+					ar.plugin.clone(),
+					ar.query.clone(),
+					key,
+				)
+				.await?
+				.value;
+				answers.push(value);
+			}
+			log::trace!("Resuming query with answers {answers:#?}");
+			ar = match p_handle.resume_query(ar, answers).await? {
 				PluginResponse::RemoteClosed => {
 					return Err(hc_error!("Plugin channel closed unexpected"));
 				}

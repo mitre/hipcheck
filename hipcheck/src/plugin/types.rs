@@ -467,7 +467,7 @@ pub struct AwaitingResult {
 	pub publisher: String,
 	pub plugin: String,
 	pub query: String,
-	pub key: Value,
+	pub key: Vec<Value>,
 }
 
 impl From<Query> for AwaitingResult {
@@ -505,10 +505,11 @@ impl From<Option<Query>> for PluginResponse {
 }
 
 impl From<Query> for PluginResponse {
-	fn from(value: Query) -> Self {
+	// TODO: the pop().unwrap() is probably wrong
+	fn from(mut value: Query) -> Self {
 		if value.direction == QueryDirection::Response {
 			let result = QueryResult {
-				value: value.output,
+				value: value.output.pop().unwrap(),
 				concerns: value.concerns,
 			};
 			PluginResponse::Completed(result)
