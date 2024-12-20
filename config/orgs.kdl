@@ -1,42 +1,4 @@
-//###############################################################################
-// Orgs.kdl
-// 
-// This configuration file defines the set of organizations against which
-// affiliation may be checked for committers and authors in a repository,
-// and how that affiliation determination will be made (the "strategy").
-//###############################################################################
-
-
-//==============================================================================
-// Strategy
-//
-// This section defines one of two forms of a strategy, either a single string
-// representing the mode (which may be "independent", "affiliated", "all", or
-// "none"), or a mode and a list of references (either "country:<country_name>"
-// or "org:<org_name>"). Together, these define the list of organizations to be
-// considered for matching, and whether to flag identities as concerning if
-// if they're _affiliated_ with an org in the list ("affiliated" mode), or are
-// _not affiliated_ with an org in the list ("independent" mode).
-//==============================================================================
-
-// The strategy spec can be short, implicitly being affiliated with or
-// independent from all the orgs in the file.
 strategy "independent"
-
-// The strategy spec would alternatively look like this.
-// With this mode, you can more completely specify the orgs or countries
-// to include in the list, and mark whether we're rejecting those affiliated
-// with or independent from the selected org list.
-//
-// strategy_spec = { mode = "affiliated", list = ["country:United States", "org:MITRE"] }
-
-
-//==============================================================================
-// Orgs
-//
-// This section defines a list of organizations, including their name, primary
-// affiliated country, and any email hosts known to be connected to them.
-//==============================================================================
 
 orgs {
     org "AT&T" country="United States" {
