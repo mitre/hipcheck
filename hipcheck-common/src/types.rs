@@ -29,7 +29,8 @@ impl TryFrom<QueryState> for QueryDirection {
 	fn try_from(value: QueryState) -> Result<Self, Self::Error> {
 		match value {
 			QueryState::Unspecified => Err(Error::UnspecifiedQueryState),
-			QueryState::Submit => Ok(QueryDirection::Request),
+			QueryState::SubmitInProgress => Err(Error::UnexpectedRequestInProgress),
+			QueryState::SubmitComplete => Ok(QueryDirection::Request),
 			QueryState::ReplyInProgress => Err(Error::UnexpectedReplyInProgress),
 			QueryState::ReplyComplete => Ok(QueryDirection::Response),
 		}
@@ -39,7 +40,7 @@ impl TryFrom<QueryState> for QueryDirection {
 impl From<QueryDirection> for QueryState {
 	fn from(value: QueryDirection) -> Self {
 		match value {
-			QueryDirection::Request => QueryState::Submit,
+			QueryDirection::Request => QueryState::SubmitComplete,
 			QueryDirection::Response => QueryState::ReplyComplete,
 		}
 	}
