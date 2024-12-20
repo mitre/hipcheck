@@ -29,18 +29,23 @@ fn drain_at_most_n_bytes(buf: &mut String, max: usize) -> Result<String> {
 	Ok(buf.drain(0..to_drain).collect::<String>())
 }
 
+/// estimate the size of all of the keys in `PluginQuery`
 fn estimate_key_size(msg: &PluginQuery) -> usize {
 	msg.key.iter().map(|x| x.bytes().len()).sum::<usize>()
 }
 
+/// estimate the size of all of the outputs in `PluginQuery`
 fn estimate_output_size(msg: &PluginQuery) -> usize {
 	msg.output.iter().map(|x| x.bytes().len()).sum::<usize>()
 }
 
+/// estimate the size of all of the concerns in `PluginQuery`
 fn estimate_concern_size(msg: &PluginQuery) -> usize {
 	msg.concern.iter().map(|x| x.bytes().len()).sum::<usize>()
 }
 
+/// estimate the size of a `PluginQuery` by calculating the size of each field in `PluginQuery`
+/// which holds a Vec
 fn estimate_size(msg: &PluginQuery) -> usize {
 	estimate_key_size(msg) + estimate_output_size(msg) + estimate_concern_size(msg)
 }
@@ -115,27 +120,23 @@ fn drain_vec_of_string(
 	max_est_size: usize,
 	made_progress: &mut bool,
 ) -> Result<()> {
-	let mut l = input_buffer.len();
-	while *remaining > 0 && l > 0 {
-		let i = l - 1;
-
-		let c_bytes = input_buffer.get(i).unwrap().bytes().len();
-
-		if c_bytes > max_est_size {
-			return Err(anyhow!(
-				"Query cannot be chunked, there is a concern that is larger than max chunk size"
-			));
-		} else if c_bytes <= *remaining {
-			// steal this concern
-			let concern = input_buffer.swap_remove(i);
-			output_buffer.push(concern);
-			*remaining -= c_bytes;
-			*made_progress = true;
+	while let Some(str) = input_buffer.pop() {
+		if *remaining == 0 {
+			break;
 		}
-		// since we use `swap_remove`, whether or not we stole a concern we know the element
-		// currently at `i` is too big for `remainder` (since if we removed, the element at `i`
-		// now is one we already passed on)
-		l -= 1;
+		let str_len = str.bytes().len();
+		if str_len > max_est_size {
+			return Err(anyhow!(
+				"Query cannot be chunked, there is a value that is larger than max chunk size"
+			));
+		} else if str_len <= *remaining {
+			output_buffer.push(str);
+			*remaining -= str_len;
+			*made_progress = true;
+			// if we hit this branch, we did not process this value and we need to put it back
+		} else {
+			input_buffer.push(str);
+		}
 	}
 	Ok(())
 }
@@ -244,10 +245,10 @@ mod test {
 			publisher_name: "".to_owned(),
 			plugin_name: "".to_owned(),
 			query_name: "".to_owned(),
-			// This key will cause the chunk not to occur on a char boundary
-			key: vec!["aこれは実験です".to_owned()],
-			output: vec!["".to_owned()],
-			concern: vec!["< 10".to_owned(), "0123456789".to_owned()],
+			// This key will cause query to be split into two parts
+			key: vec!["0123456789".to_owned(), "0123456789".to_owned()],
+			output: vec![],
+			concern: vec![],
 		};
 		let res = match chunk_with_size(query, 10) {
 			Ok(r) => r,
@@ -255,6 +256,11 @@ mod test {
 				panic!("{e}");
 			}
 		};
-		assert_eq!(res.len(), 4);
+		// this should have been chunked into 2 messages
+		assert_eq!(res.len(), 2);
+		// first message should be progress
+		assert_eq!(res.first().unwrap().state(), QueryState::ReplyInProgress);
+		// last message should be complete
+		assert_eq!(res.get(1).unwrap().state(), QueryState::ReplyComplete);
 	}
 }
