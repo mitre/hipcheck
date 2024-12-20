@@ -10,6 +10,7 @@ mod types;
 
 pub use crate::plugin::{get_plugin_key, manager::*, plugin_id::PluginId, types::*};
 use crate::policy_exprs::Expr;
+use crate::shell::macros::eprintln;
 use crate::{error::Result, hc_error};
 pub use arch::{get_current_arch, try_set_arch, Arch};
 pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
@@ -110,7 +111,14 @@ impl ActivePlugin {
 			concerns: vec![],
 		};
 
-		Ok(self.channel.query(query).await?.into())
+		Ok(self
+			.channel
+			.query(query)
+			.await
+			.inspect_err(|e| {
+				eprintln!("Error querying channel: {}", e);
+			})?
+			.into())
 	}
 
 	pub async fn resume_query(

@@ -108,8 +108,14 @@ impl PluginEngine {
 				output: vec![],
 				concerns: vec![],
 			};
+			eprintln!("Sending query");
 			self.send(query).await?;
-			let response = self.recv().await?;
+			eprintln!("Waiting for recv");
+			let response = self
+				.recv()
+				.await
+				.inspect_err(|e| eprintln!("Error waiting for recv: {e}"))?;
+			eprintln!("response: {:?}", response);
 			match response {
 				Some(mut response) => match input {
 					QueryInput::SingleKey(_) => {
@@ -220,10 +226,16 @@ impl PluginEngine {
 		let mut synth = QuerySynthesizer::default();
 		let mut res: Option<Query> = None;
 		while res.is_none() {
-			let Some(msg_chunks) = self.recv_raw().await? else {
+			let Some(msg_chunks) = self
+				.recv_raw()
+				.await
+				.inspect_err(|e| eprintln!("Error synth::recv: {e}"))?
+			else {
 				return Ok(None);
 			};
-			res = synth.add(msg_chunks.into_iter())?;
+			res = synth
+				.add(msg_chunks.into_iter())
+				.inspect_err(|e| eprintln!("Error synth::add: {e}"))?;
 		}
 		Ok(res)
 	}
@@ -288,7 +300,7 @@ impl PluginEngine {
 					return;
 				}
 				other => {
-					log::error!("{}", other);
+					eprintln!("SESSION ERROR: {}", other);
 					self.send_session_err::<P>().await
 				}
 			};

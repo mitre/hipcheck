@@ -3,6 +3,7 @@
 use crate::{
 	hc_error,
 	policy_exprs::{std_parse, Expr},
+	shell::macros::eprintln,
 	Result,
 };
 use futures::{Stream, StreamExt};
@@ -421,12 +422,18 @@ impl PluginTransport {
 	pub async fn query(&self, query: Query) -> Result<Option<Query>> {
 		// Send the query
 		let id = query.id as i32;
-		let queries = hipcheck_common::chunk::prepare(query).map_err(|e| hc_error!("{}", e))?;
-
+		let queries = hipcheck_common::chunk::prepare(query)
+			.inspect_err(|e| {
+				eprintln!("Error preparing chunk {e}");
+			})
+			.map_err(|e| hc_error!("{}", e))?;
 		for query in queries {
 			self.tx
 				.send(query)
 				.await
+				.inspect_err(|e| {
+					eprintln!("Error sending chunk {e}");
+				})
 				.map_err(|e| hc_error!("sending query failed: {}", e))?;
 		}
 
@@ -436,11 +443,16 @@ impl PluginTransport {
 		while res.is_none() {
 			// Get initial response batch
 			let mut rx_handle = self.rx.lock().await;
-			let Some(msg_chunks) = rx_handle.recv(id).await? else {
+			let Some(msg_chunks) = rx_handle.recv(id).await.inspect_err(|e| {
+				eprintln!("Error recv msg_chunks: {e}");
+			})?
+			else {
 				return Ok(None);
 			};
 			drop(rx_handle);
-			res = synth.add(msg_chunks.into_iter())?;
+			res = synth.add(msg_chunks.into_iter()).inspect_err(|e| {
+				eprintln!("Error add to synth: {e}");
+			})?;
 		}
 
 		Ok(res)

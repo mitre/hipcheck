@@ -136,7 +136,9 @@ async fn commit_entropies(
 #[query(default)]
 async fn entropy(engine: &mut PluginEngine, value: Target) -> Result<Vec<f64>> {
 	let local = value.local;
+	eprintln!("Querying commit_diffs");
 	let val_commits = engine.query("mitre/git/commit_diffs", local).await?;
+	eprintln!("Queried commit_diffs");
 	let commits: Vec<CommitDiff> =
 		serde_json::from_value(val_commits).map_err(Error::InvalidJsonInQueryOutput)?;
 	Ok(commit_entropies(engine, commits)

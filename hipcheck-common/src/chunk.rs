@@ -126,6 +126,9 @@ fn drain_vec_of_string(
 		}
 		let str_len = str.bytes().len();
 		if str_len > max_est_size {
+			eprintln!("MAX SIZE: {max_est_size}");
+			eprintln!("SIZE: {}", str_len);
+			eprintln!("\n\nVALUE: {}\n\n", str);
 			return Err(anyhow!(
 				"Query cannot be chunked, there is a value that is larger than max chunk size"
 			));
@@ -170,6 +173,9 @@ impl QuerySynthesizer {
 		let mut state = raw
 			.state
 			.try_into()
+			.inspect_err(|e| {
+				eprintln!("LINE 172: {e}");
+			})
 			.map_err(|_| Error::UnspecifiedQueryState)?;
 
 		// If response is the first of a set of chunks, handle
@@ -188,15 +194,20 @@ impl QuerySynthesizer {
 				state = next
 					.state
 					.try_into()
+					.inspect_err(|e| {
+						eprintln!("194: {e}");
+					})
 					.map_err(|_| Error::UnspecifiedQueryState)?;
 				match state {
-					QueryState::Unspecified => return Err(Error::UnspecifiedQueryState),
+					QueryState::Unspecified => {
+						eprintln!("QueryState::Unspecified");
+						return Err(Error::UnspecifiedQueryState);
+					}
 					QueryState::Submit => return Err(Error::ReceivedSubmitWhenExpectingReplyChunk),
 					QueryState::ReplyInProgress | QueryState::ReplyComplete => {
 						if state == QueryState::ReplyComplete {
 							raw.state = QueryState::ReplyComplete.into();
 						}
-
 						raw.key.extend_from_slice(next.key.as_slice());
 						raw.output.extend_from_slice(next.output.as_slice());
 						raw.concern.extend_from_slice(next.concern.as_slice());
@@ -212,7 +223,16 @@ impl QuerySynthesizer {
 			}
 		}
 
-		self.raw.take().unwrap().try_into().map(Some)
+		eprintln!("SELF RAW: {:?}", self.raw);
+
+		self.raw
+			.take()
+			.unwrap()
+			.try_into()
+			.inspect_err(|e| {
+				eprintln!("223: {e}");
+			})
+			.map(Some)
 	}
 }
 
