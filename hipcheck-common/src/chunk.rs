@@ -83,33 +83,49 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 			made_progress = true;
 		}
 
-		let mut l = base.concern.len();
-		// While we still want to steal more bytes and we have more elements of
-		// `concern` to possibly steal
-		while remaining > 0 && l > 0 {
-			let i = l - 1;
-
-			let c_bytes = base.concern.get(i).unwrap().bytes().len();
-
-			if c_bytes > max_est_size {
-				return Err(anyhow!("Query cannot be chunked, there is a concern that is larger than max chunk size"));
-			} else if c_bytes <= remaining {
-				// steal this concern
-				let concern = base.concern.swap_remove(i);
-				query.concern.push(concern);
-				remaining -= c_bytes;
-				made_progress = true;
-			}
-			// since we use `swap_remove`, whether or not we stole a concern we know the element
-			// currently at `i` is too big for `remainder` (since if we removed, the element at `i`
-			// now is one we already passed on)
-			l -= 1;
-		}
-
+		drain_vec_of_string(
+			&mut base.concern,
+			&mut query.concern,
+			&mut remaining,
+			max_est_size,
+			&mut made_progress,
+		)?;
 		out.push(query);
 	}
 	out.push(base);
 	Ok(out)
+}
+
+fn drain_vec_of_string(
+	input_buffer: &mut Vec<String>,
+	output_buffer: &mut Vec<String>,
+	remaining: &mut usize,
+	max_est_size: usize,
+	made_progress: &mut bool,
+) -> Result<()> {
+	let mut l = input_buffer.len();
+	while *remaining > 0 && l > 0 {
+		let i = l - 1;
+
+		let c_bytes = input_buffer.get(i).unwrap().bytes().len();
+
+		if c_bytes > max_est_size {
+			return Err(anyhow!(
+				"Query cannot be chunked, there is a concern that is larger than max chunk size"
+			));
+		} else if c_bytes <= *remaining {
+			// steal this concern
+			let concern = input_buffer.swap_remove(i);
+			output_buffer.push(concern);
+			*remaining -= c_bytes;
+			*made_progress = true;
+		}
+		// since we use `swap_remove`, whether or not we stole a concern we know the element
+		// currently at `i` is too big for `remainder` (since if we removed, the element at `i`
+		// now is one we already passed on)
+		l -= 1;
+	}
+	Ok(())
 }
 
 pub fn chunk(msg: PluginQuery) -> Result<Vec<PluginQuery>> {
