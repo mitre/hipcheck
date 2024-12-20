@@ -30,7 +30,6 @@ use crate::{
 	util::command::DependentProgram,
 	util::{git::get_git_version, npm::get_npm_version},
 	version::{VersionQuery, VersionQueryStorage},
-	PluginExecutor,
 };
 use chrono::prelude::*;
 use std::{
@@ -224,14 +223,16 @@ impl Session {
 		let exec_config = session.exec_config();
 		let plugin_data = &exec_config.plugin_data;
 
-		let executor = PluginExecutor::new(
-			/* max_spawn_attempts */ plugin_data.max_spawn.attempts,
-			/* max_conn_attempts */ plugin_data.max_conn.attempts,
-			/* port_range */ 40000..u16::MAX,
-			/* backoff_interval_micros */ plugin_data.backoff.micros,
-			/* jitter_percent */ plugin_data.jitter.percent,
-			/* grpc_buffer */ plugin_data.grpc_buffer.size,
-		)?;
+		let executor = ExecConfig::get_plugin_executor(plugin_data.clone());
+
+		// let executor = PluginExecutor::new(
+		// 	/* max_spawn_attempts */ plugin_data.max_spawn.attempts,
+		// 	/* max_conn_attempts */ plugin_data.max_conn.attempts,
+		// 	/* port_range */ 40000..u16::MAX,
+		// 	/* backoff_interval_micros */ plugin_data.backoff.micros,
+		// 	/* jitter_percent */ plugin_data.jitter.percent,
+		// 	/* grpc_buffer */ plugin_data.grpc_buffer.size,
+		// )?;
 		let core = start_plugins(policy.as_ref(), &plugin_cache, executor)?;
 		session.set_core(core);
 
@@ -320,26 +321,9 @@ fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
 		},
 		None => {
 			// Search for file if not provided
-			let exec_file = "Exec.kdl";
-			let mut curr_dir= env::current_dir().unwrap();
-			loop {
-				let target_path = curr_dir.join(exec_file);
-				let target_ref = target_path.as_path();
-				if target_ref.exists() {
-					exec_config = ExecConfig::from_file(target_ref)
-						.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
-						.unwrap();
-					break;
-				}
-				if let Some(parent) = curr_dir.parent() {
-					curr_dir = parent.to_path_buf();
-				} else  {
-					// If file not found, use default values
-					log::info!("Using a default Exec Config");
-					exec_config = ExecConfig::default().unwrap();
-					break;
-				}
-			}
+			exec_config = ExecConfig::find_file()
+				.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
+				.unwrap();
 		}
 	};
 

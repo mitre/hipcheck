@@ -28,7 +28,7 @@ use crate::{
 	config::{normalized_unresolved_analysis_tree_from_policy, Config},
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
-	plugin::{try_set_arch, Plugin, PluginExecutor, PluginWithConfig},
+	plugin::{try_set_arch, Plugin, PluginWithConfig},
 	policy::{config_to_policy, PolicyFile},
 	report::report_builder::{build_report, Report},
 	score::score_results,
@@ -510,40 +510,13 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
 		ExecConfig::from_file(p)
 			.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
 	} else {
-		let exec_file = "Exec.kdl";
-		let mut curr_dir= env::current_dir().unwrap();
-		let config: Result<ExecConfig>;
-		loop {
-			let target_path = curr_dir.join(exec_file);
-			let target_ref = target_path.as_path();
-			if target_ref.exists() {
-				config = ExecConfig::from_file(target_ref)
-					.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.");
-				break;
-			}
-			if let Some(parent) = curr_dir.parent() {
-				curr_dir = parent.to_path_buf();
-			} else  {
-				log::info!("Using a default Exec Config");
-				config = ExecConfig::default();
-				break;
-			}
-		}
-
-		config
+		ExecConfig::find_file()
+			.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
 	}.unwrap();
 
 	let plugin_data = exec_config.plugin_data;
+	let plugin_executor = ExecConfig::get_plugin_executor(plugin_data);
 
-	let plugin_executor = PluginExecutor::new(
-		/* max_spawn_attempts */ plugin_data.max_spawn.attempts,
-		/* max_conn_attempts */ plugin_data.max_conn.attempts,
-		/* port_range */ 40000..u16::MAX,
-		/* backoff_interval_micros */ plugin_data.backoff.micros,
-		/* jitter_percent */ plugin_data.jitter.percent,
-		/*grpc_buffer*/ plugin_data.grpc_buffer.size,
-	)
-	.unwrap();
 	let engine = match HcEngineImpl::new(
 		plugin_executor,
 		vec![
