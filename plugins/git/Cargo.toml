@@ -19,5 +19,5 @@ once_cell = "1.10.0"
 schemars = { version = "0.8.21", features = ["url"] }
 semver = "1.0.24"
 serde = { version = "1.0.215", features = ["derive", "rc"] }
-tokio = { version = "1.41.1", features = ["rt"] }
+tokio = { version = "1.42.0", features = ["rt"] }
 which = { version = "7.0.0", default-features = false }
