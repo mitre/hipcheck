@@ -49,6 +49,7 @@ data, and caching repositories locally. The current flags are:
   use.
 - `-d <DATA>`/`--data <DATA>`: the path to the data folder to use.
 - `-C <CACHE>`/`--cache <CACHE>`: the path to the cache folder to use.
+- `-e <EXEC>`/`--exec <EXEC>`: the path to the execution config file.
 
 Each of these is inferred by default based on the user's platform. They can
 also be set with environment variables:
