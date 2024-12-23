@@ -10,7 +10,7 @@ edition = "2021"
 anyhow = "1.0.94"
 log = "0.4.22"
 prost = "0.13.3"
-serde_json = "1.0.133"
+serde_json = "1.0.134"
 thiserror = "2.0.6"
 tonic = "0.12.3"
 
