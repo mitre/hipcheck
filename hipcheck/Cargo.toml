@@ -40,7 +40,7 @@ cyclonedx-bom = "0.8.0"
 dotenv = "0.15.0"
 chrono = { version = "0.4.19", features = ["alloc", "serde"] }
 clap = { version = "4.5.23", features = ["derive"] }
-console = { version = "0.15.8", features = ["windows-console-colors"] }
+console = { version = "0.15.10", features = ["windows-console-colors"] }
 dashmap = { version = "6.1.0", features = ["rayon", "inline"] }
 dialoguer = "0.11.0"
 dirs = "5.0.1"
