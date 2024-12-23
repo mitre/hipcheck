@@ -431,7 +431,7 @@ impl HcSessionSocket {
 			return Ok(HandleAction::ForwardMsgToExistingSession(tx));
 		}
 
-		if query.state() == QueryState::Submit {
+		if [QueryState::SubmitInProgress, QueryState::SubmitComplete].contains(&query.state()) {
 			return Ok(HandleAction::CreateSession);
 		}
 

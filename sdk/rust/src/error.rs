@@ -71,6 +71,7 @@ impl From<hipcheck_common::error::Error> for Error {
 		use hipcheck_common::error::Error::*;
 		match value {
 			UnspecifiedQueryState => Error::UnspecifiedQueryState,
+			UnexpectedRequestInProgress => Error::UnexpectedReplyInProgress,
 			UnexpectedReplyInProgress => Error::UnexpectedReplyInProgress,
 			ReceivedSubmitWhenExpectingReplyChunk => Error::ReceivedSubmitWhenExpectingReplyChunk,
 			MoreAfterQueryComplete { id } => Error::MoreAfterQueryComplete { id },
