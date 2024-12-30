@@ -2,6 +2,8 @@
 
 use crate::data::*;
 
+use crate::Error;
+use crate::CACHE;
 use anyhow::Context;
 use anyhow::Result;
 use gix::bstr::ByteSlice;
@@ -18,13 +20,12 @@ use gix::traverse::commit::simple::CommitTimeOrder;
 use gix::ObjectId;
 use gix::Repository;
 use jiff::Timestamp;
+use lru::LruCache;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Mutex;
 
 /// used to cache all of the `RawCommit` from the last repo/HEAD combination analyzed by this
-/// plugin
-type GitRawCommitCache = Option<(PathBuf, ObjectId, Vec<RawCommit>)>;
+pub type GitRawCommitCache = LruCache<(PathBuf, ObjectId), Vec<RawCommit>>;
 
 /// retrieve a handle to the git repo at this path, as well as determine the commit hash of
 /// HEAD
@@ -122,24 +123,25 @@ pub fn get_all_raw_commits<P>(repo_path: P) -> Result<Vec<RawCommit>>
 where
 	P: AsRef<Path>,
 {
-	// used to cache all of the RawCommits from the last repository analyzed
-	static ALL_RAW_COMMITS: Mutex<GitRawCommitCache> = Mutex::new(None);
-
 	let (repo, head_commit) = initialize_repo(repo_path.as_ref())?;
-	let mut cache = ALL_RAW_COMMITS.lock().unwrap();
+	let unlocked_cache = CACHE.get().ok_or(Error::UnspecifiedQueryState)?;
+	let mut cache = unlocked_cache
+		.lock()
+		.map_err(|_| Error::UnspecifiedQueryState)?;
 
 	// if there is a value in cache, and it is the same repo with the same HEAD commit, then we can use the
 	// cached value
-	if let Some(cached_value) = cache.as_ref() {
-		if cached_value.0 == repo_path.as_ref().to_path_buf() && cached_value.1 == head_commit {
-			return Ok(cached_value.2.clone());
-		}
+	if let Some(cached_value) = cache.get_mut(&(repo_path.as_ref().to_path_buf(), head_commit)) {
+		return Ok(cached_value.clone());
 	}
 
 	// otherwise the cache needs to be updated with the data from this repo_path/HEAD combination
 	let updated_value = get_all_raw_commits_inner(&repo, repo_path.as_ref(), head_commit)?;
 	let raw_commits = updated_value.2.clone();
-	*cache = Some(get_all_raw_commits_inner(&repo, repo_path, head_commit)?);
+	cache.put(
+		(repo_path.as_ref().to_path_buf(), head_commit),
+		raw_commits.clone(),
+	);
 	Ok(raw_commits)
 }
 
