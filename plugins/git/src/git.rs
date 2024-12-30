@@ -4,6 +4,7 @@ use crate::data::*;
 
 use anyhow::Context;
 use anyhow::Result;
+use clru::CLruCache;
 use gix::bstr::ByteSlice;
 use gix::diff::blob::intern::InternedInput;
 use gix::diff::blob::sink::Counter;
@@ -18,13 +19,17 @@ use gix::traverse::commit::simple::CommitTimeOrder;
 use gix::ObjectId;
 use gix::Repository;
 use jiff::Timestamp;
+use std::num::NonZero;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 use std::sync::Mutex;
 
 /// used to cache all of the `RawCommit` from the last repo/HEAD combination analyzed by this
 /// plugin
-type GitRawCommitCache = Option<(PathBuf, ObjectId, Vec<RawCommit>)>;
+type GitRawCommitCache = CLruCache<(PathBuf, ObjectId), Vec<RawCommit>>;
+static CACHE: LazyLock<Mutex<GitRawCommitCache>> =
+	LazyLock::new(|| Mutex::new(CLruCache::new(NonZero::new(1).unwrap())));
 
 /// retrieve a handle to the git repo at this path, as well as determine the commit hash of
 /// HEAD
@@ -108,6 +113,7 @@ where
 {
 	let commit_walker = get_commit_walker(repo, head_commit)?;
 	let commits = walk_commits(repo, commit_walker, &get_raw_commit, None)?;
+	// let raw_commits: GitRawCommitCache =
 	Ok((repo_path.as_ref().to_path_buf(), head_commit, commits))
 }
 
@@ -122,24 +128,22 @@ pub fn get_all_raw_commits<P>(repo_path: P) -> Result<Vec<RawCommit>>
 where
 	P: AsRef<Path>,
 {
-	// used to cache all of the RawCommits from the last repository analyzed
-	static ALL_RAW_COMMITS: Mutex<GitRawCommitCache> = Mutex::new(None);
-
 	let (repo, head_commit) = initialize_repo(repo_path.as_ref())?;
-	let mut cache = ALL_RAW_COMMITS.lock().unwrap();
+	let mut cache = CACHE.lock().unwrap();
 
 	// if there is a value in cache, and it is the same repo with the same HEAD commit, then we can use the
 	// cached value
-	if let Some(cached_value) = cache.as_ref() {
-		if cached_value.0 == repo_path.as_ref().to_path_buf() && cached_value.1 == head_commit {
-			return Ok(cached_value.2.clone());
-		}
+	if let Some(cached_value) = cache.get_mut(&(repo_path.as_ref().to_path_buf(), head_commit)) {
+		return Ok(cached_value.clone());
 	}
 
 	// otherwise the cache needs to be updated with the data from this repo_path/HEAD combination
 	let updated_value = get_all_raw_commits_inner(&repo, repo_path.as_ref(), head_commit)?;
 	let raw_commits = updated_value.2.clone();
-	*cache = Some(get_all_raw_commits_inner(&repo, repo_path, head_commit)?);
+	cache.put(
+		(repo_path.as_ref().to_path_buf(), head_commit),
+		raw_commits.clone(),
+	);
 	Ok(raw_commits)
 }
 

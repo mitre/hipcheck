@@ -1205,6 +1205,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
+ "clru",
  "gix",
  "hipcheck-sdk",
  "jiff",
