@@ -12,14 +12,21 @@ use crate::{
 	},
 	git::{
 		get_all_raw_commits, get_commit_diffs, get_commits_from_date, get_contributors, get_diffs,
-		get_latest_commit,
+		get_latest_commit, GitRawCommitCache,
 	},
 };
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::LocalGitRepo};
 use jiff::Timestamp;
+use lru::LruCache;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::{
+	num::NonZero,
+	sync::{Mutex, OnceLock},
+};
+
+pub static CACHE: OnceLock<Mutex<GitRawCommitCache>> = OnceLock::new();
 
 /// A locally stored git repo, with a list of additional details
 /// The details will vary based on the query (e.g. a date, a committer e-mail address, a commit hash)
@@ -428,7 +435,17 @@ async fn commit_contributors(
 	Ok(commit_contributors)
 }
 
-#[derive(Clone, Debug)]
+#[derive(Deserialize)]
+struct Config {
+	#[serde(default = "default_commit_cache_size")]
+	commit_cache_size: usize,
+}
+
+fn default_commit_cache_size() -> usize {
+	1
+}
+
+#[derive(Clone, Debug, Default)]
 struct GitPlugin;
 
 impl Plugin for GitPlugin {
@@ -436,8 +453,19 @@ impl Plugin for GitPlugin {
 
 	const NAME: &'static str = "git";
 
-	fn set_config(&self, _config: Value) -> std::result::Result<(), ConfigError> {
-		Ok(())
+	fn set_config(&self, config: Value) -> std::result::Result<(), ConfigError> {
+		// Deserialize and validate the config struct
+		let conf: Config =
+			serde_json::from_value::<Config>(config).map_err(|e| ConfigError::Unspecified {
+				message: e.to_string(),
+			})?;
+		let cache_size = conf.commit_cache_size;
+
+		CACHE
+			.set(Mutex::new(LruCache::new(NonZero::new(cache_size).unwrap())))
+			.map_err(|_e| ConfigError::Unspecified {
+				message: "config was already set".to_owned(),
+			})
 	}
 
 	fn default_policy_expr(&self) -> hipcheck_sdk::prelude::Result<String> {
