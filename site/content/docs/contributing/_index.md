@@ -30,4 +30,8 @@ A walkthrough of running Hipcheck for the first time.
 A walkthrough of running Hipcheck for the first time.
 {% end %}
 
+{% waypoint(title="Developer Docs", path="@/docs/contributing/developer-docs/_index.md") %}
+Documentation for Hipcheck developers.
+{% end %}
+
 </div>
