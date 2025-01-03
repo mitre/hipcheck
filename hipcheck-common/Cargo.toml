@@ -7,7 +7,7 @@ license = "Apache-2.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.94"
+anyhow = "1.0.95"
 log = "0.4.22"
 prost = "0.13.3"
 serde_json = "1.0.134"
@@ -15,6 +15,6 @@ thiserror = "2.0.6"
 tonic = "0.12.3"
 
 [build-dependencies]
-anyhow = "1.0.94"
+anyhow = "1.0.95"
 pathbuf = "1.0.0"
 tonic-build = "0.12.3"
