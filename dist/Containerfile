@@ -2,7 +2,7 @@
 
 FROM node:bookworm-slim
 
-ARG HC_VERSION="3.7.0"
+ARG HC_VERSION="3.9.0"
 
 WORKDIR /app
 
@@ -17,8 +17,8 @@ USER hc_user
 
 RUN set -eux \
     && curl --proto '=https' --tlsv1.2 -LsSf https://github.com/mitre/hipcheck/releases/download/hipcheck-v${HC_VERSION}/hipcheck-installer.sh | sh \
-    && $HOME/.cargo/bin/hc setup
+    && $HOME/.local/bin/hc setup
 
-ENV HC_CONFIG="$HOME/.config/hipcheck"
-ENTRYPOINT "$HOME/.cargo/bin/hc"
-CMD "help"
+ENV HC_CONFIG="/home/hc_user/.config/hipcheck"
+ENTRYPOINT ["/home/hc_user/.local/bin/hc"]
+CMD ["help"]
