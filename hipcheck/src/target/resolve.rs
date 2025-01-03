@@ -15,10 +15,18 @@ use crate::{
 	},
 	target::types::*,
 };
+use git2::{AnnotatedCommit, Repository};
 use pathbuf::pathbuf;
+use regex::Regex;
+use semver::Version;
 use url::Url;
 
-use std::{fmt::Display, ops::Not, path::PathBuf};
+use std::{
+	fmt::Display,
+	ops::Not,
+	path::{Path, PathBuf},
+	sync::LazyLock,
+};
 
 // This module implements the behavior described in RFD 0005 for target
 // resolution. The `TargetResolver` acts as a mutable superset of the fields of
@@ -74,15 +82,33 @@ impl TargetResolver {
 
 	/// Try to determine the correct refspec to check out, depending on the
 	/// resolution history.
-	pub fn get_checkout_target(&mut self) -> Result<Option<String>> {
-		let res = if let Some(pkg) = &self.package {
-			// @Todo - if version != "no version", try fuzzy match against repo, we know
-			// we already have a local repo to use
-			// if version fuzzy match fails, and self.seed.ignore_version_errors, use "origin/HEAD"
-			Some(pkg.version.clone())
-		} else if let Some(refspec) = &self.seed.refspec {
+	pub fn get_checkout_target(&mut self, repo_path: &Path) -> Result<Option<String>> {
+		let res = if let Some(refspec) = &self.seed.refspec {
 			// if ref provided on CLI, use that
 			Some(refspec.clone())
+		} else if let Some(pkg) = &self.package {
+			// Open the repo with git2.
+			let repo: Repository = Repository::open(repo_path)?;
+
+			let cmt = {
+				// If the package was specified with a version, try fuzzy matching it with the repo tags
+				if pkg.has_version() {
+					// @Todo - add self.seed.ignore_version_errors, and if fuzzy match fails use "origin/HEAD"
+					fuzzy_match_package_version(&repo, pkg)?
+				}
+				// No version was specified. Try to figure out the tag representing the latest version in the repo
+				else if let Some(cmt) = {
+					log::debug!("Package specified without version, trying to determine latest version tag in repo");
+					try_find_commit_for_latest_version_tag(&repo)?
+				} {
+					cmt
+				}
+				// We've exhausted our heuristics, the user must provide a ref flag
+				else {
+					return Err(hc_error!("please provide --ref flag"));
+				}
+			};
+			Some(format!("{}", cmt.id()))
 		} else {
 			use TargetSeedKind::*;
 			match &self.seed.kind {
@@ -163,7 +189,7 @@ impl ResolveRepo for LocalGitRepo {
 			log::debug!("Targeting existing `git_ref` field '{}'", &self.git_ref);
 			Some(self.git_ref.clone())
 		} else {
-			let refspec = t.get_checkout_target()?;
+			let refspec = t.get_checkout_target(&self.path)?;
 			log::debug!(
 				"Existing `git_ref` field was empty, using git_ref '{:?}'",
 				refspec
@@ -209,16 +235,17 @@ impl ResolveRepo for RemoteGitRepo {
 			}
 		};
 
-		// Clone or update remote repo
-		if path.exists() {
-			t.update_status("pulling");
-			git::fetch(&path).context("failed to update remote repository")?;
-		} else {
+		// Clone remote repo if not exists
+		if path.exists().not() {
 			t.update_status("cloning");
 			git::clone(&self.url, &path).context("failed to clone remote repository")?;
+		} else {
+			t.update_status("pulling");
 		}
+		// Whether we cloned or not, we need to fetch so we get tags
+		git::fetch(&path).context("failed to fetch updates from remote repository")?;
 
-		let refspec = t.get_checkout_target()?;
+		let refspec = t.get_checkout_target(&path)?;
 		let git_ref = git::checkout(&path, refspec)?;
 		log::debug!("Resolved git ref was '{}'", &git_ref);
 
@@ -272,5 +299,97 @@ impl ResolveRepo for Sbom {
 		t.remote = Some(sbom_git_repo.clone());
 
 		sbom_git_repo.resolve(t)
+	}
+}
+
+fn fuzzy_match_package_version<'a>(
+	repo: &'a Repository,
+	package: &Package,
+) -> Result<AnnotatedCommit<'a>> {
+	let version = &package.version;
+	let pkg_name = &package.name;
+
+	log::debug!("Fuzzy matching package version '{version}'");
+
+	let potential_tags = [
+		version.clone(),
+		format!("v{version}"),
+		format!("{pkg_name}-{version}"),
+		format!("{pkg_name}-v{version}"),
+		format!("{pkg_name}_{version}"),
+		format!("{pkg_name}_v{version}"),
+		format!("{pkg_name}@{version}"), // NPM webpack-cli tags like this
+		format!("{pkg_name}@v{version}"),
+	];
+
+	let mut opt_tgt_ref: Option<AnnotatedCommit> = None;
+	for tag_str in potential_tags {
+		if let Ok(obj) = repo.revparse_single(&tag_str) {
+			log::debug!("revparse_single succeeded on '{}'", tag_str);
+			opt_tgt_ref = Some(repo.find_annotated_commit(obj.peel_to_commit()?.id())?);
+			break;
+		} else {
+			log::trace!("Tried and failed to find a tag '{tag_str}' in repo");
+		}
+	}
+
+	let Some(tgt_ref) = opt_tgt_ref else {
+		return Err(hc_error!(
+			"Could not find in repo a refspec with any known combo of '{pkg_name}' and '{version}'"
+		));
+	};
+
+	log::debug!("Resolved to commit: {}", tgt_ref.id());
+
+	Ok(tgt_ref)
+}
+
+static SEMVER_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+	Regex::new(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?").unwrap()
+});
+
+fn try_get_version_from_tag(opt_tag: Option<&str>) -> Option<(Version, String)> {
+	if let Some(tag_str) = opt_tag {
+		SEMVER_REGEX.captures(tag_str).and_then(|m| {
+			Version::parse(m.get(0).unwrap().as_str())
+				.ok()
+				.map(|v| (v, tag_str.to_owned()))
+		})
+	} else {
+		None
+	}
+}
+
+// @SpeedUp - could reverse the `tag_names()` iterator and just find the first tag that matches the
+// regex in `try_get_version_from_tag()`.
+fn try_find_commit_for_latest_version_tag(
+	repo: &Repository,
+) -> Result<Option<AnnotatedCommit<'_>>> {
+	// Iterate through the tags in the repo and filter for those that have a semver version embedded
+	// in the name
+	let mut tags: Vec<(Version, String)> = repo
+		.tag_names(None)?
+		.iter()
+		.filter_map(try_get_version_from_tag)
+		.collect();
+	// Reverse-sort so "highest" version is first
+	tags.sort_by(|a, b| b.0.cmp_precedence(&a.0));
+
+	// Get the tag of the highest version and convert to an AnnotatedCommit
+	if let Some((_, tag_str)) = tags.first() {
+		log::debug!("Determined '{tag_str}' to be the tag for the newest version");
+		if let Ok(obj) = repo.revparse_single(tag_str) {
+			log::debug!("revparse_single succeeded on '{tag_str}'");
+			Ok(Some(
+				repo.find_annotated_commit(obj.peel_to_commit()?.id())?,
+			))
+		} else {
+			let err_msg = format!("Failed to get commit for known tag '{}' in repo", tag_str);
+			log::error!("{err_msg}");
+			Err(hc_error!("{}", err_msg))
+		}
+	} else {
+		log::debug!("No tags containing semver-compatible version numbers detected in repo");
+		Ok(None)
 	}
 }

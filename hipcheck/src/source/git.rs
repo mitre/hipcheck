@@ -157,15 +157,12 @@ pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<String> {
 		let tgt_ref: AnnotatedCommit = match repo.revparse_single(&refspec_str) {
 			Ok(object) => repo.find_annotated_commit(object.peel_to_commit()?.id())?,
 			// If that refspec is not found, try it again with a leading "v"
-			Err(e) => match repo.revparse_single(&format!("v{refspec_str}")) {
-				Ok(new_object) => repo.find_annotated_commit(new_object.peel_to_commit()?.id())?,
-				Err(_) => {
-					return Err(hc_error!(
-					"Could not find repo with provided refspec with or without a leading 'v': {}",
+			Err(e) => {
+				return Err(hc_error!(
+					"Could not find repo with provided refspec: {}",
 					e
-				))
-				}
-			},
+				));
+			}
 		};
 
 		repo.set_head_detached_from_annotated(tgt_ref)?;

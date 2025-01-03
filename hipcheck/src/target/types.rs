@@ -139,11 +139,14 @@ impl Display for TargetSeedKind {
 				}
 				_ => write!(f, "remote repo at {}", remote.url.as_str()),
 			},
-			Package(package) => write!(
-				f,
-				"{} package {}@{}",
-				package.host, package.name, package.version
-			),
+			Package(package) => {
+				let ver_str = if package.has_version() {
+					format!("@{}", package.version)
+				} else {
+					format!(" ({})", package.version)
+				};
+				write!(f, "{} package {}{}", package.host, package.name, ver_str)
+			}
 			MavenPackage(package) => {
 				write!(f, "Maven package {}", package.url.as_str())
 			}
