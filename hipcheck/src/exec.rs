@@ -280,8 +280,19 @@ impl ExecConfig {
 	}
 
 	pub fn find_file() -> Result<Self, Error> {
-		let exec_file = "Exec.kdl";
+		// Locate file
+		let mut exec_file = "Exec.kdl";
 		let mut curr_dir = env::current_dir().unwrap();
+		let file = curr_dir.join(exec_file);
+		let file_path = file.as_path();
+		if file_path.exists() {
+			// Parse found file
+			log::info!("Using Exec Config at {:?}", file_path);
+			return Self::from_file(file_path);
+		}
+
+		// Walk the directory tree for the file
+		exec_file = "hipcheck/Exec.kdl";
 		loop {
 			let target_path = curr_dir.join(exec_file);
 			let target_ref = target_path.as_path();
@@ -312,8 +323,8 @@ impl ExecConfig {
 		Self::from_str(data)
 	}
 
-	pub fn get_plugin_executor(plugin_data: PluginConfig) -> PluginExecutor {
-		// let plugin_data = exec_config.plugin_data;
+	pub fn get_plugin_executor(exec_config: &Self) -> Result<PluginExecutor, Error> {
+		let plugin_data = &exec_config.plugin_data;
 		PluginExecutor::new(
 			/* max_spawn_attempts */ plugin_data.max_spawn.attempts,
 			/* max_conn_attempts */ plugin_data.max_conn.attempts,
@@ -322,7 +333,6 @@ impl ExecConfig {
 			/* jitter_percent */ plugin_data.jitter.percent,
 			/*grpc_buffer*/ plugin_data.grpc_buffer.size,
 		)
-		.unwrap()
 	}
 }
 
@@ -394,6 +404,13 @@ mod test {
 			PluginMsgBufferSize::new(10),
 			PluginMsgBufferSize::parse_node(&node).unwrap()
 		)
+	}
+
+	#[test]
+	fn test_optional_parsing_plugin_buffer_size() {
+		let data = "jitter-percent 10";
+		let node = KdlNode::from_str(data).unwrap();
+		assert_eq!(None, PluginMsgBufferSize::parse_node(&node))
 	}
 
 	#[test]

@@ -221,18 +221,9 @@ impl Session {
 		let policy = session.policy();
 
 		let exec_config = session.exec_config();
-		let plugin_data = &exec_config.plugin_data;
 
-		let executor = ExecConfig::get_plugin_executor(plugin_data.clone());
+		let executor = ExecConfig::get_plugin_executor(&exec_config)?;
 
-		// let executor = PluginExecutor::new(
-		// 	/* max_spawn_attempts */ plugin_data.max_spawn.attempts,
-		// 	/* max_conn_attempts */ plugin_data.max_conn.attempts,
-		// 	/* port_range */ 40000..u16::MAX,
-		// 	/* backoff_interval_micros */ plugin_data.backoff.micros,
-		// 	/* jitter_percent */ plugin_data.jitter.percent,
-		// 	/* grpc_buffer */ plugin_data.grpc_buffer.size,
-		// )?;
 		let core = start_plugins(policy.as_ref(), &plugin_cache, executor)?;
 		session.set_core(core);
 
@@ -319,7 +310,7 @@ fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
 		None => {
 			// Search for file if not provided
 			ExecConfig::find_file()
-				.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")?
+				.context("Please ensure the Exec.kdl is in the current directory or in .hipcheck/Exec.kdl of a parent directory.")?
 		}
 	};
 

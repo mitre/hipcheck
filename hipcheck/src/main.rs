@@ -506,16 +506,27 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
 		working_dir: working_dir.clone(),
 		entrypoint: entrypoint2.display().to_string(),
 	};
-	let exec_config = if let Some(p) = config.exec() {
+	let res_exec_config = if let Some(p) = config.exec() {
 		ExecConfig::from_file(p)
-			.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
+			.context("Failed to load the provided exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
 	} else {
 		ExecConfig::find_file()
-			.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")
-	}.unwrap();
+			.context("Failed to locate the exec config. Please make sure the exec config file exists as 'hipcheck/Exec.kdl' and is formatted correctly.")
+	};
 
-	let plugin_data = exec_config.plugin_data;
-	let plugin_executor = ExecConfig::get_plugin_executor(plugin_data);
+	let exec_config = match res_exec_config {
+		Ok(config) => {
+			config
+		},
+		Err(e) => {
+			Shell::print_error(&hc_error!("Failed to resolve the exec config {}", e), Format::Human);
+			return ExitCode::FAILURE;
+		}
+	};
+
+	let plugin_executor = ExecConfig::get_plugin_executor(&exec_config)
+		.context("Failed to resolve the Plugin Executor.")
+		.unwrap();
 
 	let engine = match HcEngineImpl::new(
 		plugin_executor,
