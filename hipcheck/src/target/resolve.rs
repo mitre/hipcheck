@@ -15,10 +15,15 @@ use crate::{
 	},
 	target::types::*,
 };
+use git2::{AnnotatedCommit, Repository};
 use pathbuf::pathbuf;
 use url::Url;
 
-use std::{fmt::Display, ops::Not, path::PathBuf};
+use std::{
+	fmt::Display,
+	ops::Not,
+	path::{Path, PathBuf},
+};
 
 // This module implements the behavior described in RFD 0005 for target
 // resolution. The `TargetResolver` acts as a mutable superset of the fields of
@@ -74,12 +79,20 @@ impl TargetResolver {
 
 	/// Try to determine the correct refspec to check out, depending on the
 	/// resolution history.
-	pub fn get_checkout_target(&mut self) -> Result<Option<String>> {
-		let res = if let Some(pkg) = &self.package {
-			// @Todo - if version != "no version", try fuzzy match against repo, we know
-			// we already have a local repo to use
-			// if version fuzzy match fails, and self.seed.ignore_version_errors, use "origin/HEAD"
-			Some(pkg.version.clone())
+	pub fn get_checkout_target(&mut self, repo_path: &Path) -> Result<Option<String>> {
+		let res = if self
+			.package
+			.as_ref()
+			.is_some_and(|p| p.version != "no version")
+		{
+			let pkg = self.package.as_ref().unwrap(); // we wouldn't be in this block if package was None
+
+			// Open the repo with git2.
+			let repo: Repository = Repository::open(repo_path)?;
+
+			// @Todo - add self.seed.ignore_version_errors, and if fuzzy match fails use "origin/HEAD"
+			let cmt = fuzzy_match_package_version(&repo, pkg)?;
+			Some(format!("{}", cmt.id()))
 		} else if let Some(refspec) = &self.seed.refspec {
 			// if ref provided on CLI, use that
 			Some(refspec.clone())
@@ -163,7 +176,7 @@ impl ResolveRepo for LocalGitRepo {
 			log::debug!("Targeting existing `git_ref` field '{}'", &self.git_ref);
 			Some(self.git_ref.clone())
 		} else {
-			let refspec = t.get_checkout_target()?;
+			let refspec = t.get_checkout_target(&self.path)?;
 			log::debug!(
 				"Existing `git_ref` field was empty, using git_ref '{:?}'",
 				refspec
@@ -218,7 +231,7 @@ impl ResolveRepo for RemoteGitRepo {
 			git::clone(&self.url, &path).context("failed to clone remote repository")?;
 		}
 
-		let refspec = t.get_checkout_target()?;
+		let refspec = t.get_checkout_target(&path)?;
 		let git_ref = git::checkout(&path, refspec)?;
 		log::debug!("Resolved git ref was '{}'", &git_ref);
 
@@ -273,4 +286,44 @@ impl ResolveRepo for Sbom {
 
 		sbom_git_repo.resolve(t)
 	}
+}
+
+fn fuzzy_match_package_version<'a>(
+	repo: &'a Repository,
+	package: &Package,
+) -> Result<AnnotatedCommit<'a>> {
+	let version = &package.version;
+	let pkg_name = &package.name;
+
+	log::debug!("Fuzzy matching package version '{version}'");
+
+	let potential_tags = [
+		version.clone(),
+		format!("v{version}"),
+		format!("{pkg_name}-{version}"),
+		format!("{pkg_name}-v{version}"),
+		format!("{pkg_name}_{version}"),
+		format!("{pkg_name}_v{version}"),
+	];
+
+	let mut opt_tgt_ref: Option<AnnotatedCommit> = None;
+	for tag_str in potential_tags {
+		if let Ok(obj) = repo.revparse_single(&tag_str) {
+			log::debug!("revparse_single succeeded on '{}'", tag_str);
+			opt_tgt_ref = Some(repo.find_annotated_commit(obj.peel_to_commit()?.id())?);
+			break;
+		} else {
+			log::debug!("Tried and failed to find a tag '{tag_str}' in repo");
+		}
+	}
+
+	let Some(tgt_ref) = opt_tgt_ref else {
+		return Err(hc_error!(
+			"Could not find in repo a refspec with any known combo of '{pkg_name}' and '{version}'"
+		));
+	};
+
+	log::debug!("Resolved to commit: {}", tgt_ref.id());
+
+	Ok(tgt_ref)
 }
