@@ -205,7 +205,9 @@ pub struct AffiliationConfig {
 	pub count_threshold: u64,
 
 	/// An "orgs file" containing info for affiliation matching.
-	#[default = "plugins/affiliation/test/example_orgs.kdl"]
+	// #[default = "plugins/affiliation/test/example_orgs.kdl"]
+	
+	#[default = "Orgs.kdl"]
 	pub orgs_file: String,
 }
 

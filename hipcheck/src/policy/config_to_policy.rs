@@ -22,6 +22,8 @@ use url::Url;
 
 const PLUGIN_VERSION: &str = "0.1.0";
 const FUZZ_PLUGIN_VERSION: &str = "0.1.1";
+// Write versioning like the example below [task 718]
+// const FUZZ_PLUGIN_VERSION: &str = "^0.1.1";
 
 /// Converts a Config struct to a PolicyFile struct
 pub fn config_to_policy(config: Config) -> Result<PolicyFile> {
@@ -359,7 +361,7 @@ fn parse_affiliation(
 		let mut config = PolicyConfig::new();
 		config
 			// Our working .kdl orgs file is not in `config` currently
-			.insert("orgs-file".to_string(), Value::String(file))
+			.insert("orgs-file".to_string(), Value::String(format!("./config/{}", file)))
 			.unwrap();
 
 		// Add the plugin

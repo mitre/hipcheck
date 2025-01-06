@@ -106,6 +106,7 @@ fn retrieve_plugin_from_network(
 	let version = plugin_id.version();
 	let download_manifest = retrieve_download_manifest(plugin_url)?;
 	for entry in &download_manifest.entries {
+		// handle semver version dependency stuff here to tell us which version to get [task #718]
 		if entry.arch == current_arch && version == &entry.version {
 			return download_and_unpack_plugin(entry, plugin_id, plugin_cache);
 		}
