@@ -55,7 +55,7 @@ futures = "0.3.31"
 # Vendor libgit2 and openssl so that they will be statically included
 # and not cause problems on certain systems that might not have one or
 # the other.
-git2 = { version = "0.19.0", features = [
+git2 = { version = "0.20.0", features = [
     "vendored-libgit2",
     "vendored-openssl",
 ] }
