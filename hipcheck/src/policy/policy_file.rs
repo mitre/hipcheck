@@ -82,13 +82,13 @@ impl ParseKdlNode for PolicyPlugin {
 				return None;
 			}
 		};
-		let version = PluginVersion::new(node.get("version")?.value().as_string()?.to_string());
+		let version = PluginVersion::new(node.get("version")?.as_string()?.to_string());
 
 		// The manifest is technically optional, as there should be a default Hipcheck plugin artifactory sometime in the future
 		// But for now it is essentially mandatory, so a plugin without a manifest will return an error downstream
 		let manifest = match node.get("manifest") {
 			Some(entry) => {
-				let raw_url = entry.value().as_string()?;
+				let raw_url = entry.as_string()?;
 				let path = pathbuf::pathbuf![raw_url];
 				if let Ok(url) = Url::parse(raw_url) {
 					Some(ManifestLocation::Url(url))
@@ -163,13 +163,12 @@ fn try_to_serde_json(value: &kdl::KdlValue) -> Result<Value> {
 	use kdl::KdlValue::*;
 	let value = value.clone();
 	Ok(match value {
-		RawString(s) => Value::String(s),
 		String(s) => Value::String(s),
-		Base2(i) | Base8(i) | Base10(i) | Base16(i) => Value::Number(
-			serde_json::Number::from_i128(i.into())
+		Integer(i) => Value::Number(
+			serde_json::Number::from_i128(i)
 				.ok_or_else(|| hc_error!("kdl value contained an extremely large int"))?,
 		),
-		Base10Float(f) => Value::Number(
+		Float(f) => Value::Number(
 			serde_json::Number::from_f64(f)
 				.ok_or_else(|| hc_error!("kdl value contained infinite or NaN float"))?,
 		),
@@ -283,11 +282,11 @@ impl ParseKdlNode for PolicyAnalysis {
 			}
 		};
 		let policy_expression = match node.get("policy") {
-			Some(entry) => Some(entry.value().as_string()?.to_string()),
+			Some(entry) => Some(entry.as_string()?.to_string()),
 			None => None,
 		};
 		let weight = match node.get("weight") {
-			Some(entry) => Some(entry.value().as_i64()? as u16),
+			Some(entry) => Some(entry.as_integer()? as u16),
 			None => None,
 		};
 
@@ -360,7 +359,7 @@ impl ParseKdlNode for PolicyCategory {
 
 		let name = node.entries().first()?.value().as_string()?.to_string();
 		let weight = match node.get("weight") {
-			Some(entry) => Some(entry.value().as_i64()? as u16),
+			Some(entry) => Some(entry.as_integer()? as u16),
 			None => None,
 		};
 
@@ -463,10 +462,8 @@ impl ParseKdlNode for InvestigateIfFail {
 
 		for node in node.entries() {
 			// Trim leading and trailing quotation marks from each policy in the list
-			let mut policy = node.value().to_string();
-			policy.remove(0);
-			policy.pop();
-			policies.push(PolicyPluginName::new(&policy).ok()?)
+			let policy = node.value().as_string()?;
+			policies.push(PolicyPluginName::new(policy).ok()?)
 		}
 
 		Some(Self(policies))

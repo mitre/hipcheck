@@ -73,7 +73,7 @@ indextree = "4.7.3"
 indicatif = { version = "0.17.9", features = ["rayon"] }
 itertools = "0.13.0"
 jiff = "0.1.14"
-kdl = "4.7.1"
+kdl = "6.2.2"
 log = "0.4.22"
 logos = "0.15.0"
 maplit = "1.0.2"

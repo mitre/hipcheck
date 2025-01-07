@@ -78,10 +78,10 @@ impl ParseKdlNode for HashWithDigest {
 			return None;
 		}
 		// Per RFD #0004, the hash algorithm is of type String
-		let specified_algorithm = node.get("alg")?.value().as_string()?;
+		let specified_algorithm = node.get("alg")?.as_string()?;
 		let hash_algorithm = HashAlgorithm::try_from(specified_algorithm).ok()?;
 		// Per RFD #0004, the digest is of type String
-		let digest = node.get("digest")?.value().as_string()?.to_string();
+		let digest = node.get("digest")?.as_string()?.to_string();
 		Some(HashWithDigest::new(hash_algorithm, digest))
 	}
 }
@@ -152,7 +152,7 @@ impl ParseKdlNode for Compress {
 			return None;
 		}
 		// Per RFD #0004, the format is of type String
-		let specified_format = node.get("format")?.value().as_string()?;
+		let specified_format = node.get("format")?.as_string()?;
 		let format = ArchiveFormat::try_from(specified_format).ok()?;
 		Some(Compress { format })
 	}
@@ -181,9 +181,9 @@ impl ParseKdlNode for Size {
 			return None;
 		}
 		let specified_size = node.get("bytes")?;
-		let bytes = match specified_size.value() {
+		let bytes = match specified_size {
 			// Negative size and a size of 0 do not make sense
-			KdlValue::Base10(bytes) => {
+			KdlValue::Integer(bytes) => {
 				let bytes = *bytes;
 				if bytes.is_positive() {
 					bytes as u64
@@ -238,9 +238,9 @@ impl ParseKdlNode for DownloadManifestEntry {
 			return None;
 		}
 		// Per RFD #0004, version is of type String
-		let version = PluginVersion(node.get("version")?.value().as_string()?.to_string());
+		let version = PluginVersion(node.get("version")?.as_string()?.to_string());
 		// Per RFD #0004, arch is of type String
-		let arch = Arch::from_str(node.get("arch")?.value().as_string()?).ok()?;
+		let arch = Arch::from_str(node.get("arch")?.as_string()?).ok()?;
 
 		// there should be one child for each plugin and it should contain the url, hash, compress
 		// and size information
