@@ -85,7 +85,7 @@ impl ParseKdlNode for Entrypoints {
 		let mut entrypoints = Entrypoints::new();
 		for entrypoint_spec in node.children()?.nodes() {
 			// per RFD #0004, the value for "arch" is of type String
-			let arch = Arch::from_str(entrypoint_spec.get("arch")?.value().as_string()?).ok()?;
+			let arch = Arch::from_str(entrypoint_spec.get("arch")?.as_string()?).ok()?;
 			// per RFD #0004, the actual entrypoint is the first positional arg after "arch" and is
 			// of type String
 			let entrypoint = entrypoint_spec
@@ -148,10 +148,10 @@ impl ParseKdlNode for PluginDependency {
 			None => return None,
 		};
 
-		let version = PluginVersion(node.get("version")?.value().as_string()?.to_string());
+		let version = PluginVersion(node.get("version")?.as_string()?.to_string());
 		let manifest = match node.get("manifest") {
 			Some(manifest) => {
-				let manifest_location = manifest.value().as_string()?;
+				let manifest_location = manifest.as_string()?;
 				if let Ok(url) = url::Url::parse(manifest_location) {
 					Some(ManifestLocation::Url(url))
 				} else {

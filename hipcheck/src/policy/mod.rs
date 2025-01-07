@@ -3,6 +3,7 @@
 //! Data types and functions for parsing policy KDL files
 
 mod config_to_policy;
+mod macros;
 pub mod policy_file;
 mod tests;
 
@@ -58,7 +59,11 @@ impl PolicyFile {
 			));
 		}
 		file::exists(policy_path)?;
-		let policy = PolicyFile::from_str(&file::read_string(policy_path)?)?;
+
+		let raw_data = file::read_string(policy_path)?;
+		let data = macros::preprocess_policy_file(raw_data.as_str(), policy_path)?;
+
+		let policy = PolicyFile::from_str(&data)?;
 
 		Ok(policy)
 	}
