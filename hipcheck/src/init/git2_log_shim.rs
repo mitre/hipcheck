@@ -2,6 +2,8 @@
 
 //! Log shim function to redirect [git2] trace messages to [log].
 
+use crate::hc_error;
+
 /// Shim the [git2] crate's tracing infrastructure with calls to the [log] crate which we use.
 pub fn git2_set_trace_log_shim() {
 	git2::trace_set(git2::TraceLevel::Trace, |level, msg| {
@@ -23,6 +25,10 @@ pub fn git2_set_trace_log_shim() {
 
 		record_builder.level(log_level).target("libgit2");
 
-		log::logger().log(&record_builder.args(format_args!("{}", msg)).build());
-	});
+		let msg_str = std::str::from_utf8(msg).unwrap_or("non-UTF8 string received in callback");
+
+		log::logger().log(&record_builder.args(format_args!("{}", msg_str)).build());
+	})
+	.map_err(|e| hc_error!("Failed to set git2 callback: {}", e))
+	.unwrap();
 }
