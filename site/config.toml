@@ -59,7 +59,7 @@ footer = [
         { name = "Release Notes", url = "https://github.com/mitre/hipcheck/releases", external = true },
         { name = "Changelog", url = "https://github.com/mitre/hipcheck/blob/main/CHANGELOG.md", external = true },
         { name = "Packages", title = true },
-        { name = "Hipcheck", url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.7.0", external = true },
+        { name = "Hipcheck", url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.9.0", external = true },
         { name = "Rust Plugin SDK", url = "https://crates.io/crates/hipcheck-sdk", external = true },
     ],
     [
