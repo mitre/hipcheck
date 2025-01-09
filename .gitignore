@@ -33,3 +33,7 @@ flamegraph.svg
 
 # Generated file based on the protobuf definition.
 /hipcheck/src/hipcheck.rs
+
+# Editor-specific directory for Zed
+.zed
+
