@@ -328,6 +328,7 @@ dependencies = [
  "clap",
  "content_inspector",
  "hipcheck-sdk",
+ "kdl 4.7.1",
  "log",
  "pathbuf",
  "schemars",
