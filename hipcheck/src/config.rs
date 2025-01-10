@@ -205,8 +205,6 @@ pub struct AffiliationConfig {
 	pub count_threshold: u64,
 
 	/// An "orgs file" containing info for affiliation matching.
-	// #[default = "plugins/affiliation/test/example_orgs.kdl"]
-	
 	#[default = "Orgs.kdl"]
 	pub orgs_file: String,
 }
@@ -216,7 +214,7 @@ pub struct AffiliationConfig {
 #[serde(default)]
 pub struct BinaryConfig {
 	/// Binary file extension configuration file.
-	#[default = "Binary.toml"]
+	#[default = "Binary.kdl"]
 	pub binary_config_file: String,
 
 	/// Whether the analysis is active.
