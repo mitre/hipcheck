@@ -11,9 +11,17 @@ pub enum Error {
 	#[error("unexpected ReplyInProgress state for query")]
 	UnexpectedReplyInProgress,
 
+	/// The `PluginEngine` received a message with the unexpected status `RequestInProgress`
+	#[error("unexpected RequestInProgress state for query")]
+	UnexpectedRequestInProgress,
+
 	/// The `PluginEngine` received a message with a request-type status when it expected a reply
 	#[error("remote sent QuerySubmit when reply chunk expected")]
 	ReceivedSubmitWhenExpectingReplyChunk,
+
+	/// The `PluginEngine` received a message with a reply-type status when it expected a submit
+	#[error("remote sent QueryReply when submit chunk expected")]
+	ReceivedReplyWhenExpectingSubmitChunk,
 
 	/// The `PluginEngine` received additional messages when it did not expect any
 	#[error("received additional message for ID '{id}' after query completion")]

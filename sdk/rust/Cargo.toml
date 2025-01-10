@@ -4,7 +4,7 @@ description = "SDK for writing Hipcheck plugins in Rust"
 homepage = "https://hipcheck.mitre.org"
 repository = "https://github.com/mitre/hipcheck"
 license = "Apache-2.0"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]
@@ -25,7 +25,7 @@ hipcheck-sdk-macros = { path = "../../hipcheck-sdk-macros", version = "0.1.0", o
 typify-macro = "0.2.0"
 url = { version = "2.5.4", features = ["serde"] }
 log = "0.4.22"
-hipcheck-common = { version = "0.1.0", path = "../../hipcheck-common" }
+hipcheck-common = { version = "0.2.0", path = "../../hipcheck-common" }
 console = "0.15.10"
 
 [features]

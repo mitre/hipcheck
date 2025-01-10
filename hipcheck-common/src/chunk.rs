@@ -36,11 +36,20 @@ fn estimate_size(msg: &PluginQuery) -> usize {
 }
 
 pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<PluginQuery>> {
-	// Chunking only does something on response objects, mostly because
-	// we don't have a state to represent "SubmitInProgress"
-	if msg.state == QueryState::Submit as i32 {
-		return Ok(vec![msg]);
-	}
+	// in_progress_state - the state the PluginQuery is in for all queries in the resulting Vec,
+	// EXCEPT the last one
+	//
+	// completion_state - the state the PluginQuery is in if it is the last chunked message
+	let (in_progress_state, completion_state) = match msg.state() {
+		// if the message gets chunked, then it must either be a reply or submission that is in process
+		QueryState::Unspecified => return Err(anyhow!("msg in Unspecified query state")),
+		QueryState::SubmitInProgress | QueryState::SubmitComplete => {
+			(QueryState::SubmitInProgress, QueryState::SubmitComplete)
+		}
+		QueryState::ReplyInProgress | QueryState::ReplyComplete => {
+			(QueryState::ReplyInProgress, QueryState::ReplyComplete)
+		}
+	};
 
 	let mut out: Vec<PluginQuery> = vec![];
 	let mut base: PluginQuery = msg;
@@ -58,9 +67,9 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 		// For this loop, we want to take at most MAX_SIZE bytes because that's
 		// all that can fit in a PluginQuery
 		let mut remaining = max_est_size;
-		let mut query = PluginQuery {
+		let mut chunked_query = PluginQuery {
 			id: base.id,
-			state: QueryState::ReplyInProgress as i32,
+			state: in_progress_state as i32,
 			publisher_name: base.publisher_name.clone(),
 			plugin_name: base.plugin_name.clone(),
 			query_name: base.query_name.clone(),
@@ -71,15 +80,15 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 
 		if remaining > 0 && base.key.bytes().len() > 0 {
 			// steal from key
-			query.key = drain_at_most_n_bytes(&mut base.key, remaining)?;
-			remaining -= query.key.bytes().len();
+			chunked_query.key = drain_at_most_n_bytes(&mut base.key, remaining)?;
+			remaining -= chunked_query.key.bytes().len();
 			made_progress = true;
 		}
 
 		if remaining > 0 && base.output.bytes().len() > 0 {
 			// steal from output
-			query.output = drain_at_most_n_bytes(&mut base.output, remaining)?;
-			remaining -= query.output.bytes().len();
+			chunked_query.output = drain_at_most_n_bytes(&mut base.output, remaining)?;
+			remaining -= chunked_query.output.bytes().len();
 			made_progress = true;
 		}
 
@@ -96,7 +105,7 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 			} else if c_bytes <= remaining {
 				// steal this concern
 				let concern = base.concern.swap_remove(i);
-				query.concern.push(concern);
+				chunked_query.concern.push(concern);
 				remaining -= c_bytes;
 				made_progress = true;
 			}
@@ -106,9 +115,14 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 			l -= 1;
 		}
 
-		out.push(query);
+		out.push(chunked_query);
 	}
 	out.push(base);
+
+	// ensure the last message in the chunked messages is set to the appropriate Complete state
+	if let Some(last) = out.last_mut() {
+		last.state = completion_state as i32;
+	}
 	Ok(out)
 }
 
@@ -118,6 +132,14 @@ pub fn chunk(msg: PluginQuery) -> Result<Vec<PluginQuery>> {
 
 pub fn prepare(msg: Query) -> Result<Vec<PluginQuery>> {
 	chunk(msg.try_into()?)
+}
+
+/// Determine whether or not the given `QueryState` represents an intermediate InProgress state
+fn in_progress_state(state: &QueryState) -> bool {
+	matches!(
+		state,
+		QueryState::ReplyInProgress | QueryState::SubmitInProgress
+	)
 }
 
 #[derive(Default)]
@@ -138,14 +160,16 @@ impl QuerySynthesizer {
 			};
 		}
 		let raw = self.raw.as_mut().unwrap(); // We know its `Some`, was set above
-		let mut state = raw
+		let initial_state: QueryState = raw
 			.state
 			.try_into()
 			.map_err(|_| Error::UnspecifiedQueryState)?;
+		// holds state of current chunk
+		let mut current_state: QueryState = initial_state;
 
 		// If response is the first of a set of chunks, handle
-		if matches!(state, QueryState::ReplyInProgress) {
-			while matches!(state, QueryState::ReplyInProgress) {
+		if in_progress_state(&current_state) {
+			while in_progress_state(&current_state) {
 				// We expect another message. Pull it off the existing queue,
 				// or get a new one if we have run out
 				let next = match chunks.next() {
@@ -156,20 +180,41 @@ impl QuerySynthesizer {
 				};
 
 				// By now we have our "next" message
-				state = next
+				current_state = next
 					.state
 					.try_into()
 					.map_err(|_| Error::UnspecifiedQueryState)?;
-				match state {
-					QueryState::Unspecified => return Err(Error::UnspecifiedQueryState),
-					QueryState::Submit => return Err(Error::ReceivedSubmitWhenExpectingReplyChunk),
-					QueryState::ReplyInProgress | QueryState::ReplyComplete => {
-						if state == QueryState::ReplyComplete {
-							raw.state = QueryState::ReplyComplete.into();
+				match (initial_state, current_state) {
+					// initial_state has been checked and is known to be XInProgress
+					(QueryState::Unspecified, _)
+					| (QueryState::ReplyComplete, _)
+					| (QueryState::SubmitComplete, _) => {
+						unreachable!()
+					}
+
+					// error out if any states are unspecified
+					(_, QueryState::Unspecified) => return Err(Error::UnspecifiedQueryState),
+					// error out if expecting a Submit messages and a Reply is received
+					(QueryState::SubmitInProgress, QueryState::ReplyInProgress)
+					| (QueryState::SubmitInProgress, QueryState::ReplyComplete) => {
+						return Err(Error::ReceivedReplyWhenExpectingSubmitChunk)
+					}
+					// error out if expecting a Reply message and Submit is received
+					(QueryState::ReplyInProgress, QueryState::SubmitInProgress)
+					| (QueryState::ReplyInProgress, QueryState::SubmitComplete) => {
+						return Err(Error::ReceivedSubmitWhenExpectingReplyChunk)
+					}
+					// otherwise we got an expected message type
+					(_, _) => {
+						if current_state == QueryState::ReplyComplete {
+							raw.set_state(QueryState::ReplyComplete);
+						}
+						if current_state == QueryState::SubmitComplete {
+							raw.set_state(QueryState::SubmitComplete);
 						}
 						raw.key.push_str(next.key.as_str());
 						raw.output.push_str(next.output.as_str());
-						raw.concern.extend_from_slice(next.concern.as_slice());
+						raw.concern.extend(next.concern);
 					}
 				};
 			}
@@ -181,7 +226,6 @@ impl QuerySynthesizer {
 				});
 			}
 		}
-
 		self.raw.take().unwrap().try_into().map(Some)
 	}
 }
@@ -209,23 +253,54 @@ mod test {
 
 	#[test]
 	fn test_chunking() {
-		let query = PluginQuery {
-			id: 0,
-			state: QueryState::ReplyComplete as i32,
-			publisher_name: "".to_owned(),
-			plugin_name: "".to_owned(),
-			query_name: "".to_owned(),
-			// This key will cause the chunk not to occur on a char boundary
-			key: "aこれは実験です".to_owned(),
-			output: "".to_owned(),
-			concern: vec!["< 10".to_owned(), "0123456789".to_owned()],
-		};
-		let res = match chunk_with_size(query, 10) {
-			Ok(r) => r,
-			Err(e) => {
-				panic!("{e}");
-			}
-		};
-		assert_eq!(res.len(), 4);
+		// test both reply and submission chunking
+		let states = [
+			(QueryState::SubmitInProgress, QueryState::SubmitComplete),
+			(QueryState::ReplyInProgress, QueryState::ReplyComplete),
+		];
+
+		for (intermediate_state, final_state) in states.into_iter() {
+			let orig_query = PluginQuery {
+				id: 0,
+				state: final_state as i32,
+				publisher_name: "".to_owned(),
+				plugin_name: "".to_owned(),
+				query_name: "".to_owned(),
+				// This key will cause the chunk not to occur on a char boundary
+				key: serde_json::to_string("aこれは実験です").unwrap(),
+				output: serde_json::to_string("").unwrap(),
+				concern: vec![
+					"< 10".to_owned(),
+					"0123456789".to_owned(),
+					"< 10#2".to_owned(),
+				],
+			};
+			let res = match chunk_with_size(orig_query.clone(), 10) {
+				Ok(r) => r,
+				Err(e) => {
+					panic!("{e}");
+				}
+			};
+			// ensure first 4 are ...InProgress
+			assert_eq!(
+				res.iter()
+					.filter(|x| x.state() == intermediate_state)
+					.count(),
+				4
+			);
+			// ensure last one is ...Complete
+			assert_eq!(res.last().unwrap().state(), final_state);
+			assert_eq!(res.len(), 5);
+			// attempt to reassemble message
+			let mut synth = QuerySynthesizer::default();
+			let synthesized_query = synth.add(res.into_iter()).unwrap();
+
+			// there is no guarantee of concerns being synthesized in a consistent order
+			let mut orig_query = orig_query;
+			orig_query.concern.sort();
+			let mut synthesized_query: PluginQuery = synthesized_query.unwrap().try_into().unwrap();
+			synthesized_query.concern.sort();
+			assert_eq!(orig_query, synthesized_query);
+		}
 	}
 }

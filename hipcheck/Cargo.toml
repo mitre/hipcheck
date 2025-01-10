@@ -141,7 +141,7 @@ xz2 = "0.1.7"
 zip = "2.2.2"
 zip-extensions = "0.8.1"
 zstd = "0.13.2"
-hipcheck-common = { version = "0.1.0", path = "../hipcheck-common" }
+hipcheck-common = { version = "0.2.0", path = "../hipcheck-common" }
 serde_with = "3.11.0"
 
 [build-dependencies]
