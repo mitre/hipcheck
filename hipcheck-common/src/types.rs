@@ -29,7 +29,8 @@ impl TryFrom<QueryState> for QueryDirection {
 	fn try_from(value: QueryState) -> Result<Self, Self::Error> {
 		match value {
 			QueryState::Unspecified => Err(Error::UnspecifiedQueryState),
-			QueryState::Submit => Ok(QueryDirection::Request),
+			QueryState::SubmitInProgress => Err(Error::UnexpectedRequestInProgress),
+			QueryState::SubmitComplete => Ok(QueryDirection::Request),
 			QueryState::ReplyInProgress => Err(Error::UnexpectedReplyInProgress),
 			QueryState::ReplyComplete => Ok(QueryDirection::Response),
 		}
@@ -39,7 +40,7 @@ impl TryFrom<QueryState> for QueryDirection {
 impl From<QueryDirection> for QueryState {
 	fn from(value: QueryDirection) -> Self {
 		match value {
-			QueryDirection::Request => QueryState::Submit,
+			QueryDirection::Request => QueryState::SubmitComplete,
 			QueryDirection::Response => QueryState::ReplyComplete,
 		}
 	}
@@ -49,15 +50,18 @@ impl TryFrom<PluginQuery> for Query {
 	type Error = Error;
 
 	fn try_from(value: PluginQuery) -> Result<Query, Self::Error> {
+		let direction = QueryDirection::try_from(value.state())?;
+		let key = serde_json::from_str(&value.key).map_err(Error::InvalidJsonInQueryKey)?;
+		let output =
+			serde_json::from_str(&value.output).map_err(Error::InvalidJsonInQueryOutput)?;
 		Ok(Query {
 			id: value.id as usize,
-			direction: QueryDirection::try_from(value.state())?,
+			direction,
 			publisher: value.publisher_name,
 			plugin: value.plugin_name,
 			query: value.query_name,
-			key: serde_json::from_str(value.key.as_str()).map_err(Error::InvalidJsonInQueryKey)?,
-			output: serde_json::from_str(value.output.as_str())
-				.map_err(Error::InvalidJsonInQueryOutput)?,
+			key,
+			output,
 			concerns: value.concern,
 		})
 	}

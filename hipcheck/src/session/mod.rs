@@ -105,10 +105,7 @@ impl Session {
 		 *  Loading current versions of needed software git, npm, and eslint into salsa.
 		 *-----------------------------------------------------------------*/
 
-		let (git_version, npm_version) = match load_software_versions() {
-			Ok(results) => results,
-			Err(err) => return Err(err),
-		};
+		let (git_version, npm_version) = load_software_versions()?;
 
 		session.set_git_version(Rc::new(git_version));
 		session.set_npm_version(Rc::new(npm_version));
@@ -119,10 +116,7 @@ impl Session {
 
 		// Check if a policy file was provided, otherwise convert a deprecated config file to a policy file. If neither was provided, error out.
 		if policy_path.is_some() {
-			let (policy, policy_path) = match load_policy_and_data(policy_path.as_deref()) {
-				Ok(results) => results,
-				Err(err) => return Err(err),
-			};
+			let (policy, policy_path) = load_policy_and_data(policy_path.as_deref())?;
 
 			// No config or dir
 			session.set_config_dir(None);
@@ -131,10 +125,7 @@ impl Session {
 			session.set_policy(Rc::new(policy));
 			session.set_policy_path(Some(Rc::new(policy_path)));
 		} else if config_path.is_some() {
-			let (policy, config_dir) = match load_config_and_data(config_path.as_deref()) {
-				Ok(results) => results,
-				Err(err) => return Err(err),
-			};
+			let (policy, config_dir) = load_config_and_data(config_path.as_deref())?;
 
 			// Set config dir
 			session.set_config_dir(Some(Rc::new(config_dir)));
@@ -153,14 +144,10 @@ impl Session {
 		 *  Resolving the Hipcheck home.
 		 *-----------------------------------------------------------------*/
 
-		let home = match home_dir
+		let home = home_dir
 			.as_deref()
 			.map(ToOwned::to_owned)
-			.ok_or_else(|| hc_error!("can't find cache directory"))
-		{
-			Ok(results) => results,
-			Err(err) => return Err(err),
-		};
+			.ok_or_else(|| hc_error!("can't find cache directory"))?;
 
 		session.set_cache_dir(Rc::new(home.clone()));
 
@@ -170,11 +157,7 @@ impl Session {
 		 *  Resolving the source.
 		 *-----------------------------------------------------------------*/
 
-		let target = match load_target(target, &home) {
-			Ok(results) => results,
-			Err(err) => return Err(err),
-		};
-
+		let target = load_target(target, &home)?;
 		session.set_target(Arc::new(target));
 
 		/*===================================================================

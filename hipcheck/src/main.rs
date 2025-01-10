@@ -786,10 +786,7 @@ fn run(
 	format: Format,
 ) -> Result<Report> {
 	// Initialize the session.
-	let session = match Session::new(&target, config_path, home_dir, policy_path, format) {
-		Ok(session) => session,
-		Err(err) => return Err(err),
-	};
+	let session = Session::new(&target, config_path, home_dir, policy_path, format)?;
 
 	// Run analyses against a repo and score the results (score calls analyses that call metrics).
 	let phase = SpinnerPhase::start("analyzing and scoring results");
