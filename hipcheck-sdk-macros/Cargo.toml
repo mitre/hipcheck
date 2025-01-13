@@ -11,7 +11,7 @@ proc-macro = true
 
 [dependencies]
 anyhow = "1.0.95"
-convert_case = "0.6.0"
+convert_case = "0.7.1"
 log = "0.4.22"
 proc-macro2 = "1.0.93"
 quote = "1.0.38"
