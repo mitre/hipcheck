@@ -21,7 +21,7 @@ struct Languages {
 impl TypoFile {
 	pub fn load_from(typo_path: &Path) -> Result<TypoFile> {
 		file::exists(typo_path).context("typo file does not exist")?;
-		let typo_file = file::read_toml(typo_path).context("failed to open typo file")?;
+		let typo_file = file::read_kdl(typo_path).context("failed to open typo file")?;
 
 		Ok(typo_file)
 	}

@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// use crate::util::kdl::extract_data;
 use super::kdl::{extract_data, ParseKdlNode};
 use crate::error::*;
-
-// use serde::de::DeserializeOwned;
 use std::{fs, path::Path, str::FromStr};
 use kdl::KdlDocument;
 
@@ -18,14 +15,6 @@ pub fn read_string<P: AsRef<Path>>(path: P) -> Result<String> {
 
 	inner(path.as_ref())
 }
-
-/// Read file to a struct that can be deserialized from TOML format.
-// pub fn read_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P) -> Result<T> {
-// 	let path = path.as_ref();
-// 	let contents = read_string(path)?;
-// 	toml::de::from_str(&contents)
-// 		.with_context(|| format!("failed to read as TOML '{}'", path.display()))
-// }
 
 /// Read file to a struct that can be deserialized from kdl format.
 pub fn read_kdl<P: AsRef<Path>, T: ParseKdlNode>(path: P) -> Result<T> {

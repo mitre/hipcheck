@@ -32,7 +32,8 @@ analyze {
 
     category "attacks" {
         analysis "mitre/typo" {
-            typo-file #rel("Typos.toml")
+            // typo-file #rel("Typos.toml")
+            typo-file #rel("Typos.kdl")
             count-threshold 0
         }
 
