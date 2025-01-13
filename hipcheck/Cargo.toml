@@ -142,7 +142,7 @@ zip = "2.2.2"
 zip-extensions = "0.8.1"
 zstd = "0.13.2"
 hipcheck-common = { version = "0.2.0", path = "../hipcheck-common" }
-serde_with = "3.11.0"
+serde_with = "3.12.0"
 
 [build-dependencies]
 
