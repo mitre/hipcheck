@@ -382,7 +382,10 @@ fn print_human(report: Report) -> Result<()> {
 				Title::Failed,
 				analysis.statement()
 			);
-			macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
+			macros::println!(
+				"{EMPTY:LEFT_COL_WIDTH$} {}",
+				analysis.failing_explanation().unwrap()
+			);
 
 			for concern in failing_analysis.concerns() {
 				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", concern);

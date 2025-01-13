@@ -64,6 +64,7 @@ pub type TypeChecker = fn(&[Type]) -> Result<ReturnableType>;
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub struct FunctionDef {
 	pub name: String,
+	pub english: String,
 	pub expected_args: usize,
 	pub ty_checker: TypeChecker,
 	pub op: Op,

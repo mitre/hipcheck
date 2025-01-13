@@ -43,6 +43,9 @@ pub enum Error {
 	#[error("expression returned '{0:?}', not a boolean")]
 	DidNotReturnBool(Expr),
 
+	#[error("evaluation of inner expression returned '{0:?}', not a primitive or array")]
+	BadReturnType(Expr),
+
 	#[error("tried to call unknown function '{0}'")]
 	UnknownFunction(String),
 
@@ -143,6 +146,11 @@ pub enum Error {
 
 	#[error("Datetime error: {0}")]
 	Datetime(String),
+
+	#[error(
+		"Not enough explanations given in plugin for number of JSON pointers in policy expression"
+	)]
+	NotEnoughExplanations,
 }
 
 #[derive(Debug, PartialEq)]
