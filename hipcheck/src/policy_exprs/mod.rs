@@ -75,18 +75,17 @@ impl FromStr for Expr {
 }
 
 /// Evaluates `deke` expressions.
-#[cfg(test)]
 pub struct Executor {
 	env: Env<'static>,
 }
 
-#[cfg(test)]
 impl Executor {
 	/// Create an `Executor` with the standard set of functions defined.
 	pub fn std() -> Self {
 		Executor { env: Env::std() }
 	}
 
+	#[cfg(test)]
 	/// Run a `deke` program.
 	pub fn run(&self, raw_program: &str, context: &Value) -> Result<bool> {
 		match self.parse_and_eval(raw_program, context)? {
@@ -498,6 +497,7 @@ mod tests {
 		println!("EXPR: {:?}", &expr);
 		let expr = FunctionResolver::std().run(expr).unwrap();
 		let expr = TypeFixer::std().run(expr).unwrap();
+		println!("RESOLVER RES: {:?}", expr);
 		let result = Executor::std().parse_and_eval(program, &context).unwrap();
 		assert_eq!(result, Primitive::Bool(true).into());
 	}
