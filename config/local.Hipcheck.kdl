@@ -22,7 +22,6 @@ analyze {
     category "practices" {
         analysis "mitre/activity" policy="(lte $ P52w)" weight=3
         analysis "mitre/binary" {
-			// binary-file #rel("Binary.toml")
             binary-file #rel("Binary.kdl")
 			binary-file-threshold 0
 		}
@@ -32,7 +31,6 @@ analyze {
 
     category "attacks" {
         analysis "mitre/typo" {
-            // typo-file #rel("Typos.toml")
             typo-file #rel("Typos.kdl")
             count-threshold 0
         }
@@ -44,7 +42,7 @@ analyze {
             }
 
             analysis "mitre/entropy" policy="(eq 0 (count (filter (gt 8.0) $)))" {
-				langs-file #rel("Langs.toml")
+				langs-file #rel("Langs.kdl")
 				entropy-threshold 10.0
 				commit-percentage 0.0
 	 		}

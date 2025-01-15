@@ -2,11 +2,12 @@
 
 mod db;
 mod fs;
+mod kdl;
 
 pub use db::{Linguist, LinguistSource};
 
 use anyhow::{Context as _, Result};
-use fs::read_toml;
+use fs::read_kdl;
 use serde::{de::Visitor, Deserialize, Deserializer};
 use std::{convert::AsRef, fmt, fmt::Formatter, path::Path, result::Result as StdResult};
 
@@ -27,7 +28,7 @@ impl SourceFileDetector {
 	pub fn load<P: AsRef<Path>>(langs_file: P) -> Result<SourceFileDetector> {
 		fn inner(langs_file: &Path) -> Result<SourceFileDetector> {
 			// Load the file and parse it.
-			let language_file: LanguageFile = read_toml(langs_file)
+			let language_file: LanguageFile = read_kdl(langs_file)
 				.context("failed to read language definitions from langs file")?;
 
 			// Get the list of extensions from it.

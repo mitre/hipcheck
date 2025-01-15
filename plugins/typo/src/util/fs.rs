@@ -22,7 +22,7 @@ pub fn read_kdl<P: AsRef<Path>, T: ParseKdlNode>(path: P) -> Result<T> {
 	let document =
 	KdlDocument::from_str(&contents).map_err(|e| anyhow!(e))?;
 	let nodes = document.nodes();
-	extract_data(nodes).ok_or(anyhow!("Could not parse binary KDL 'format'"))
+	extract_data(nodes).ok_or(anyhow!("Could not parse typo KDL 'format'"))
 
 }
 

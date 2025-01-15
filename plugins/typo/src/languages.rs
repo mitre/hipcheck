@@ -49,7 +49,7 @@ struct Language {
 }
 
 impl ParseKdlNode for Language {
-	// Ask about best way to handle kdl_key() logic for Typos.kdl unique format
+	// TODO: Ask about best way to handle kdl_key() logic for Typos.kdl unique format
 	fn kdl_key() -> &'static str {
 		"javascript"
 	}
@@ -147,7 +147,7 @@ pub(crate) fn typos_for_javascript(
 			}
 		}
 	}
-	
+
 	Ok(typos)
 }
 

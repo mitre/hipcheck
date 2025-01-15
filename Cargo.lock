@@ -942,6 +942,7 @@ dependencies = [
  "finl_unicode",
  "futures",
  "hipcheck-sdk",
+ "kdl 4.7.1",
  "ordered-float",
  "pathbuf",
  "rayon",
