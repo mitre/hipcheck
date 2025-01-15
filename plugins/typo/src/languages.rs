@@ -2,20 +2,35 @@
 
 use crate::{
 	types::{Homoglyphs, KeyboardLayout, NpmDependencies, Typo},
+	util::kdl::ParseKdlNode,
 	util::fs as file,
 };
 use anyhow::{Context as _, Result};
-use serde::Deserialize;
 use std::{collections::HashMap, path::Path};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct TypoFile {
-	languages: Languages,
+	languages: Vec<Language>,
 }
 
-#[derive(Debug, Deserialize)]
-struct Languages {
-	javascript: Vec<String>,
+impl ParseKdlNode for TypoFile {
+	fn kdl_key() -> &'static str {
+		"languages"
+	}
+
+	fn parse_node(node: &kdl::KdlNode) -> Option<Self> {
+		if node.name().to_string().as_str() != Self::kdl_key() {
+			return None;
+		}
+
+		let mut languages = Vec::new();
+		for node in node.children()?.nodes() {
+			languages.push(Language::parse_node(node)?);
+		}
+		Some(Self { languages })
+
+	}
+
 }
 
 impl TypoFile {
@@ -27,6 +42,39 @@ impl TypoFile {
 	}
 }
 
+#[derive(Debug)]
+struct Language {
+	language: LanguageType,
+	packages: Vec<String>,
+}
+
+impl ParseKdlNode for Language {
+	// Ask about best way to handle kdl_key() logic for Typos.kdl unique format
+	fn kdl_key() -> &'static str {
+		"javascript"
+	}
+
+	fn parse_node(node: &kdl::KdlNode) -> Option<Self> {
+		// if node.name().to_string().as_str() != Self::kdl_key() {
+		// 	return None;
+		// }
+
+		let language = match node.name().to_string().as_str() {
+			"javascript" => LanguageType::Javascript,
+			_ => return None,
+		};
+		let mut packages = Vec::new();
+		for package in node.entries() {
+			packages.push(package.value().as_string()?.to_string());
+		}
+		Some(Self { language, packages })
+	}
+}
+
+#[derive(Debug, PartialEq)]
+enum LanguageType {
+	Javascript,
+}
 #[derive(Debug, Clone)]
 pub struct NameFuzzer<'t> {
 	// A map of strings which may be typos to the notes for what they may be
@@ -83,8 +131,13 @@ pub(crate) fn typos_for_javascript(
 	dependencies: NpmDependencies,
 ) -> Result<Vec<String>> {
 	let mut typos = Vec::new();
-
-	for legit_name in &typo_file.languages.javascript {
+	let mut javascript_packages = &Vec::new();
+	for language in &typo_file.languages {
+		if LanguageType::Javascript == language.language {
+			javascript_packages = &language.packages;
+		}
+	}
+	for legit_name in javascript_packages {
 		let fuzzer = NameFuzzer::new(legit_name);
 
 		// Add a dependency name to the list of typos if the list of possible typos for that name is non-empty
@@ -94,7 +147,7 @@ pub(crate) fn typos_for_javascript(
 			}
 		}
 	}
-
+	
 	Ok(typos)
 }
 
