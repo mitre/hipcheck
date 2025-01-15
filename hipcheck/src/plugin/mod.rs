@@ -105,8 +105,8 @@ impl ActivePlugin {
 			publisher: publisher.to_owned(),
 			plugin: plugin.to_owned(),
 			query: name,
-			key,
-			output: serde_json::json!(null),
+			key: vec![key],
+			output: vec![],
 			concerns: vec![],
 		};
 
@@ -116,7 +116,7 @@ impl ActivePlugin {
 	pub async fn resume_query(
 		&self,
 		state: AwaitingResult,
-		output: Value,
+		output: Vec<Value>,
 	) -> Result<PluginResponse> {
 		let query = Query {
 			id: state.id,
@@ -124,7 +124,7 @@ impl ActivePlugin {
 			publisher: state.publisher,
 			plugin: state.plugin,
 			query: state.query,
-			key: serde_json::json!(null),
+			key: vec![],
 			output,
 			concerns: vec![],
 		};

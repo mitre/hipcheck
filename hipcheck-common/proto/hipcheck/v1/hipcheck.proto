@@ -176,16 +176,20 @@ message Query {
 
     // The key for the query, as a JSON object. This is the data that Hipcheck's
     // incremental computation system will use to cache the response.
-    string key = 6;
+    repeated string key = 6;
 
     // The response for the query, as a JSON object. This will be cached by
     // Hipcheck for future queries matching the publisher name, plugin name,
     // query name, and key.
-    string output = 7;
+    repeated string output = 7;
 
 	// An unstructured concern raised during the query that will be raised
 	// in the final Hipcheck report.
 	repeated string concern = 8;
+
+    // Used to indicate whether or not a string field present in a `repeated string` field
+    // was split between two messages
+    bool split = 9;
 }
 
 enum QueryState {
