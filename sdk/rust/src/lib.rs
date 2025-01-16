@@ -1,43 +1,86 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::Error;
-use crate::error::Result;
-use error::ConfigError;
-use plugin_engine::PluginEngine;
+#![allow(unexpected_cfgs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, allow(unused_attributes))]
+
+//! Hipcheck Plugin SDK in Rust.
+//!
+//! ## What is Hipcheck?
+//! [Hipcheck][hipcheck] is a command line interface (CLI) tool for analyzing open source software
+//! packages and source repositories to understand their software supply chain risk. It analyzes a
+//! project's software development practices and detects active supply chain attacks to give you
+//! both a long-term and immediate picture of the risk from using a package.
+//!
+//! Part of Hipcheck's value is its [plugin system][hipcheck_plugins], which allows anyone to write
+//! a new data source or analysis component, or build even higher level analyses off of the results
+//! of multiple other components.
+//!
+//! ## The Plugin SDK
+//! This crate is a Rust SDK to help developers focus on writing the essential logic of their
+//! Hipcheck plugins instead of worrying about session management or communication with Hipcheck
+//! core. The essential steps of using this SDK are to implement the `Query` trait for each query
+//! endpoint you wish to support, then implement the `Plugin` trait to tie your plugin together and
+//! describe things like configuration parameters.
+//!
+//! For more, see our [detailed guide][web_sdk_docs] on writing plugins using this crate.
+//!
+//! [hipcheck]: https://hipcheck.mitre.org/
+//! [hipcheck_plugins]: https://hipcheck.mitre.org/docs/guide/making-plugins/creating-a-plugin/
+//! [web_sdk_docs]: https://hipcheck.mitre.org/docs/guide/making-plugins/rust-sdk/
+
+use crate::error::{ConfigError, Error, Result};
+pub use engine::PluginEngine;
 use schemars::schema::SchemaObject as JsonSchema;
 use serde_json::Value as JsonValue;
+pub use server::PluginServer;
 use std::result::Result as StdResult;
 use std::str::FromStr;
 
 #[cfg(feature = "macros")]
-extern crate hipcheck_sdk_macros;
+#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+/// Macros for simplifying `Query` and `Plugin` trait implementations
+pub mod macros {
+	pub use hipcheck_sdk_macros::*;
+}
 
 #[cfg(feature = "print-timings")]
 mod benchmarking;
 
+mod engine;
 pub mod error;
-mod mock;
-pub mod plugin_engine;
-pub mod plugin_server;
+mod server;
+
+#[cfg(feature = "mock_engine")]
+#[cfg_attr(docsrs, doc(cfg(feature = "mock_engine")))]
+/// Tools for unit-testing plugin `Query` implementations
+pub mod mock {
+	pub use crate::engine::MockResponses;
+}
+
+/// The definitions of Hipcheck's analysis `Target` object and its sub-types for use in writing
+/// query endpoints.
 pub mod types;
 
-/// A utility module, users can simply write `use hipcheck_sdk::prelude::*` to import everything
-/// they need to write a plugin
+/// A utility module containing everything needed to write a plugin, just write `use
+/// hipcheck_sdk::prelude::*`.
 pub mod prelude {
 	pub use crate::deps::*;
+	pub use crate::engine::PluginEngine;
 	pub use crate::error::{ConfigError, Error, Result};
-	pub use crate::plugin_engine::PluginEngine;
-	pub use crate::plugin_server::{PluginServer, QueryResult};
+	pub use crate::server::{PluginServer, QueryResult};
 	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
 	// Re-export macros
 	#[cfg(feature = "macros")]
-	pub use hipcheck_sdk_macros::{queries, query};
+	#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+	pub use crate::macros::{queries, query};
 
 	#[cfg(feature = "mock_engine")]
-	pub use crate::mock::MockResponses;
+	#[cfg_attr(docsrs, doc(cfg(feature = "mock_engine")))]
+	pub use crate::engine::MockResponses;
 }
 
-/// re-export of user-facing third-party dependencies
+/// Re-export of user-facing third-party dependencies
 pub mod deps {
 	pub use jiff::{Span, Zoned};
 	pub use schemars::{schema::SchemaObject as JsonSchema, schema_for};
@@ -45,11 +88,13 @@ pub mod deps {
 	pub use tonic::async_trait;
 }
 
-/// The target of a Hipcheck query. The `publisher` and `plugin` fields are necessary to identify a
-/// plugin process. Plugins may define one or more query endpoints, and may include an unnamed
-/// endpoint as the "default", hence why the `query` field is of type Option. QueryTarget
-/// implements `FromStr`, taking strings of the format `"publisher/plugin[/query]"` where the
-/// bracketed substring is optional.
+/// Identifies the target plugin and endpoint of a Hipcheck query.
+///
+/// The `publisher` and `plugin` fields are necessary from Hipcheck core's perspective to identify
+/// a plugin process. Plugins may define one or more query endpoints, and may include an unnamed
+/// endpoint as the "default", hence why the `query` field is optional. `QueryTarget` implements
+/// `FromStr` so it can be parsed from strings of the format `"publisher/plugin[/query]"`, where
+/// the bracketed substring is optional.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct QueryTarget {
 	pub publisher: String,
@@ -85,9 +130,10 @@ impl TryInto<QueryTarget> for &str {
 	}
 }
 
-/// Encapsulates the signature of a particular `NamedQuery`. Instances of this type are usually
-/// created by the default implementation of `Plugin::schemas()` and would not need to be created
-/// by hand unless you are doing something very unorthodox.
+/// Descrbies the signature of a particular `NamedQuery`.
+///
+/// Instances of this type are usually created by the default implementation of `Plugin::schemas()`
+/// and would not need to be created by hand unless you are doing something very unorthodox.
 pub struct QuerySchema {
 	/// The name of the query being described.
 	query_name: &'static str,
@@ -102,9 +148,12 @@ pub struct QuerySchema {
 /// A `Query` trait object.
 pub type DynQuery = Box<dyn Query>;
 
+/// Pairs a query endpoint name with a particular `Query` trait implementation.
+///
 /// Since the `Query` trait needs to be made into a trait object, we can't use a static associated
 /// string to store the query's name in the trait itself. This object wraps a `Query` trait object
-/// and allows us to associate a name with it.
+/// and allows us to associate a name with it so that when the plugin receives a query from
+/// Hipcheck core, it can look up the proper behavior to invoke.
 pub struct NamedQuery {
 	/// The name of the query.
 	pub name: &'static str,
@@ -136,7 +185,8 @@ pub trait Query: Send {
 	async fn run(&self, engine: &mut PluginEngine, input: JsonValue) -> Result<JsonValue>;
 }
 
-/// The core trait that a plugin author must implement to write a plugin with the Hipcheck SDK.
+/// The core trait that a plugin author must implement using the Hipcheck SDK.
+///
 /// Declares basic information about the plugin and its query endpoints, and accepts a
 /// configuration map from Hipcheck core.
 pub trait Plugin: Send + Sync + 'static {
@@ -160,7 +210,7 @@ pub trait Plugin: Send + Sync + 'static {
 
 	/// Get all the queries supported by the plugin. Each query endpoint in a plugin will have its
 	/// own `trait Query` implementation. This function should return an iterator containing one
-	/// `NamedQuery` instance ofr each `trait Query` implementation defined by the plugin author.
+	/// `NamedQuery` instance for each `trait Query` implementation defined by the plugin author.
 	fn queries(&self) -> impl Iterator<Item = NamedQuery>;
 
 	/// Get the plugin's default query, if it has one. The default query is a `NamedQuery` with an

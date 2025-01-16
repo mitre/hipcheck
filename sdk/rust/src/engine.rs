@@ -2,9 +2,8 @@
 
 use crate::{
 	error::{Error, Result},
-	QueryTarget,
+	JsonValue, Plugin, QueryTarget,
 };
-use crate::{mock::MockResponses, JsonValue, Plugin};
 use futures::Stream;
 use hipcheck_common::proto::{
 	self, InitiateQueryProtocolRequest, InitiateQueryProtocolResponse, Query as PluginQuery,
@@ -35,8 +34,10 @@ impl From<Status> for Error {
 
 type SessionTracker = HashMap<i32, mpsc::Sender<Option<PluginQuery>>>;
 
-/// The handle that a `Query::run()` function can use to request information from other Hipcheck
-/// plugins in order to fulfill a query.
+/// Manages a particular query session.
+///
+/// This struct invokes a `Query` trait object, passing a handle to itself to `Query::run()`. This
+/// allows the query logic to request information from other Hipcheck plugins in order to complete.
 pub struct PluginEngine {
 	id: usize,
 	tx: mpsc::Sender<StdResult<InitiateQueryProtocolResponse, Status>>,
@@ -44,12 +45,15 @@ pub struct PluginEngine {
 	concerns: Vec<String>,
 	// So that we can remove ourselves when we get dropped
 	drop_tx: mpsc::Sender<i32>,
-	/// when unit testing, this enables the user to mock plugin responses to various inputs
+	// When unit testing, this enables the user to mock plugin responses to various inputs
 	mock_responses: MockResponses,
 }
 
 impl PluginEngine {
 	#[cfg(feature = "mock_engine")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "mock_engine")))]
+	/// Constructor for use in unit tests, `query()` function will reference this map instead of
+	/// trying to connect to Hipcheck core for a response value
 	pub fn mock(mock_responses: MockResponses) -> Self {
 		mock_responses.into()
 	}
@@ -260,6 +264,8 @@ impl PluginEngine {
 		}
 	}
 
+	/// Records a string-like concern that will be emitted in the final Hipcheck report. Intended
+	/// for use within a `Query` trait impl.
 	pub fn record_concern<S: AsRef<str>>(&mut self, concern: S) {
 		fn inner(engine: &mut PluginEngine, concern: &str) {
 			engine.concerns.push(concern.to_owned());
@@ -267,12 +273,13 @@ impl PluginEngine {
 		inner(self, concern.as_ref())
 	}
 
-	pub fn take_concerns(&mut self) -> Vec<String> {
+	fn take_concerns(&mut self) -> Vec<String> {
 		self.concerns.drain(..).collect()
 	}
 }
 
 #[cfg(feature = "mock_engine")]
+#[cfg_attr(docsrs, doc(cfg(feature = "mock_engine")))]
 impl From<MockResponses> for PluginEngine {
 	fn from(value: MockResponses) -> Self {
 		let (tx, _) = mpsc::channel(1);
@@ -465,4 +472,43 @@ impl HcSessionSocket {
 enum HandleAction<'s> {
 	ForwardMsgToExistingSession(&'s mut mpsc::Sender<Option<PluginQuery>>),
 	CreateSession,
+}
+
+/// A map of query endpoints to mock return values.
+///
+/// When using the `mock_engine` feature, calling `PluginEngine::query()` will cause this
+/// structure to be referenced instead of trying to communicate with Hipcheck core. Allows
+/// constructing a `PluginEngine` with which to write unit tests.
+#[derive(Default, Debug)]
+pub struct MockResponses(pub(crate) HashMap<(QueryTarget, JsonValue), Result<JsonValue>>);
+
+impl MockResponses {
+	pub fn new() -> Self {
+		Self(HashMap::new())
+	}
+}
+
+impl MockResponses {
+	#[cfg(feature = "mock_engine")]
+	pub fn insert<T, V, W>(
+		&mut self,
+		query_target: T,
+		query_value: V,
+		query_response: Result<W>,
+	) -> Result<()>
+	where
+		T: TryInto<QueryTarget, Error: Into<crate::Error>>,
+		V: serde::Serialize,
+		W: serde::Serialize,
+	{
+		let query_target: QueryTarget = query_target.try_into().map_err(|e| e.into())?;
+		let query_value: JsonValue =
+			serde_json::to_value(query_value).map_err(crate::Error::InvalidJsonInQueryKey)?;
+		let query_response = match query_response {
+			Ok(v) => serde_json::to_value(v).map_err(crate::Error::InvalidJsonInQueryKey),
+			Err(e) => Err(e),
+		};
+		self.0.insert((query_target, query_value), query_response);
+		Ok(())
+	}
 }
