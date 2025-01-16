@@ -2,7 +2,6 @@
 
 use super::kdl_util::{extract_data, ParseKdlNode};
 use anyhow::{anyhow, Context as _, Result};
-use serde::de::DeserializeOwned;
 use std::{fs, path::Path, str::FromStr};
 use kdl::KdlDocument;
 
@@ -14,14 +13,6 @@ pub fn read_string<P: AsRef<Path>>(path: P) -> Result<String> {
 	}
 
 	inner(path.as_ref())
-}
-
-/// Read file to a struct that can be deserialized from TOML format.
-pub fn read_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P) -> Result<T> {
-	let path = path.as_ref();
-	let contents = read_string(path)?;
-	toml::de::from_str(&contents)
-		.with_context(|| format!("failed to read as TOML '{}'", path.display()))
 }
 
 /// Read file to a struct that can be deserialized from kdl format.
