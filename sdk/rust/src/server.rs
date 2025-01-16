@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+	engine::HcSessionSocket,
 	error::{Error, Result},
-	plugin_engine::HcSessionSocket,
 	Plugin, QuerySchema,
 };
 use hipcheck_common::proto::{
