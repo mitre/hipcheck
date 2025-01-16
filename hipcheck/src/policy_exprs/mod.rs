@@ -157,26 +157,44 @@ impl ExprMutator for Env<'_> {
 
 pub fn parse_failing_expr_to_english(
 	input: &Expr,
-	explanations: &mut Vec<&str>,
+	message: &str,
 	value: &Option<Value>,
 ) -> Result<String> {
 	let env = Env::std();
-	if let Expr::Function(function) = input {
-		let english_expr = function_to_english(&env, &function, explanations)?;
+	let english = English {
+		env,
+		message: message.to_string(),
+	};
+	if let Expr::Function(func) = input {
+		let english_expr = english.visit_function(func)?;
 
-		let inner = function.args.first().ok_or(Error::MissingArgs)?;
+		let args = &func.args;
+
+		// Confirm that the outermost function has two arguments
+		if args.len() != 2 {
+			return Err(Error::MissingArgs);
+		}
+
+		// Get whichever of the function's arguments is **not** a primitive (i.e. the expected value) for evaluation
+		let inner = match (&args[0], &args[1]) {
+			(&Expr::Primitive(_), inner) => inner,
+			(inner, &Expr::Primitive(_)) => inner,
+			_ => return Err(Error::MissingArgs),
+		};
+
+		// Evaluate to get the returned value the uppermost operator is comparing the expected value to
 		let inner_value = match value {
 			Some(context) => {
 				format!(
 					"it was {}",
 					match Executor::std().parse_and_eval(&inner.to_string(), context)? {
-						Expr::Primitive(primitive) => primitive_to_english(&primitive)?,
-						Expr::Array(array) => array_to_english(&array)?,
+						Expr::Primitive(prim) => english.visit_primitive(&prim)?,
+						Expr::Array(arr) => english.visit_array(&arr)?,
 						_ => return Err(Error::BadReturnType(inner.clone())),
 					}
 				)
 			}
-			None => "no value returned was by the query".to_string(),
+			None => "no value was returned by the query".to_string(),
 		};
 
 		return Ok(format!("Expected {english_expr} but {inner_value}"));
@@ -185,180 +203,282 @@ pub fn parse_failing_expr_to_english(
 	Err(Error::MissingIdent)
 }
 
-fn function_to_english(
-	env: &Env,
-	function: &Function,
-	explanations: &mut Vec<&str>,
-) -> Result<String> {
-	let ident = &function.ident;
-	let fn_name = ident.to_string();
+pub struct English<'a> {
+	env: Env<'a>,
+	message: String,
+}
 
-	let function_def = match env.get(&fn_name) {
-		Some(binding) => match binding {
-			Binding::Fn(function_def) => function_def,
+impl<'a> ExprVisitor<Result<String>> for English<'a> {
+	fn visit_function(&self, func: &Function) -> Result<String> {
+		let env = &self.env;
+
+		let ident = &func.ident;
+		let fn_name = ident.to_string();
+
+		let function_def = match env.get(&fn_name) {
+			Some(binding) => match binding {
+				Binding::Fn(function_def) => function_def,
+				_ => {
+					return Err(Error::UnknownFunction(format!(
+						"Given function name {} is not a function",
+						fn_name
+					)))
+				}
+			},
 			_ => {
 				return Err(Error::UnknownFunction(format!(
-					"Given function name {} is not a function",
+					"Given function name {} not found in list of functions",
 					fn_name
 				)))
 			}
-		},
-		_ => {
-			return Err(Error::UnknownFunction(format!(
-				"Given function name {} not found in list of functions",
-				fn_name
-			)))
+		};
+
+		// Convert an operator to English, with additional phrasing specific to comparison operators in a function
+		let operator = match function_def.name.as_ref() {
+			"gt" | "lt" | "gte" | "lte" | "eq" | "ne" => format!("to be {}", function_def.english),
+			_ => function_def.english,
+		};
+		let expected_args = function_def.expected_args;
+
+		let args = &func.args;
+
+		// Check for an invalid number of arguments
+		if args.len() < expected_args {
+			return Err(Error::NotEnoughArgs {
+				name: fn_name,
+				expected: expected_args,
+				given: args.len(),
+			});
 		}
-	};
+		if args.len() > expected_args {
+			return Err(Error::TooManyArgs {
+				name: fn_name,
+				expected: expected_args,
+				given: args.len(),
+			});
+		}
 
-	// Convert an operator to English, with additional phrasing specific to comparison operators in a function
-	let operator = match function_def.name.as_ref() {
-		"gt" | "lt" | "gte" | "lte" | "eq" | "ne" => format!("to be {}", function_def.english),
-		_ => function_def.english,
-	};
-	let expected_args = function_def.expected_args;
-
-	let args = &function.args;
-
-	// If one argument is give for a two argument function, parse the function as a lambda
-	if expected_args == 2 && args.len() == 1 {
-		return lambda_to_english(env, function, explanations);
-	}
-
-	// Check for an invalid number of arguments
-	if args.len() < expected_args {
-		return Err(Error::NotEnoughArgs {
-			name: fn_name,
-			expected: expected_args,
-			given: args.len(),
-		});
-	}
-	if args.len() > expected_args {
-		return Err(Error::TooManyArgs {
-			name: fn_name,
-			expected: expected_args,
-			given: args.len(),
-		});
-	}
-
-	if args.len() == 2 {
-		// If there are two arguments, parse a function comparing a pair of some combination of primitives,
-		// JSON pointers, nested functions (including lambdas), or arrays (in the second position)
-		let argument_1 = match &args[0] {
-			Expr::Primitive(primitive) => primitive_to_english(primitive)?,
-			Expr::JsonPointer(_) => explanations
-				.pop()
-				.ok_or(Error::NotEnoughExplanations)?
-				.to_string(),
-			Expr::Function(inner_function) => {
-				function_to_english(env, inner_function, explanations)?
+		if args.len() == 2 {
+			// If there are two arguments, parse a function comparing a pair of some combination of primitives,
+			// JSON pointers, nested functions (including lambdas), or arrays (in the second position)
+			if matches!(args[0], Expr::Array(_)) || matches!(args[1], Expr::Lambda(_)) {
+				return Err(Error::BadType("English::visit_function()"));
 			}
-			_ => return Err(Error::BadType("function_to_english()")),
-		};
-		let argument_2 = match &args[1] {
-			Expr::Array(array) => array_to_english(array)?,
-			Expr::Primitive(primitive) => primitive_to_english(primitive)?,
-			Expr::JsonPointer(_) => explanations
-				.pop()
-				.ok_or(Error::NotEnoughExplanations)?
-				.to_string(),
-			Expr::Function(inner_function) => {
-				function_to_english(env, inner_function, explanations)?
-			}
-			_ => return Err(Error::BadType("function_to_english()")),
-		};
+			let argument_1 = self.visit_expr(&args[0])?;
+			let argument_2 = self.visit_expr(&args[1])?;
 
-		Ok(format!("{} {} {}", argument_1, operator, argument_2))
-	} else {
-		// If there is one argument, parse a function operating on an array, JSON pointer, or a nested function
-		let argument = match &args[0] {
-			Expr::Array(array) => array_to_english(array)?,
-			Expr::Primitive(primitive) => primitive_to_english(primitive)?,
-			Expr::JsonPointer(_) => explanations
-				.pop()
-				.ok_or(Error::NotEnoughExplanations)?
-				.to_string(),
-			Expr::Function(inner_function) => {
-				function_to_english(env, inner_function, explanations)?
+			Ok(format!("{} {} {}", argument_1, operator, argument_2))
+		} else {
+			// If there is one argument, parse a function operating on an array, JSON pointer, or a nested function
+			if matches!(args[0], Expr::Lambda(_)) {
+				return Err(Error::BadType("English::visit_function()"));
 			}
-			_ => return Err(Error::BadType("function_to_english()")),
-		};
+			let argument = self.visit_expr(&args[0])?;
 
-		Ok(format!("{} {}", operator, argument))
+			Ok(format!("{} {}", operator, argument))
+		}
 	}
-}
 
-fn lambda_to_english(
-	env: &Env,
-	function: &Function,
-	explanations: &mut Vec<&str>,
-) -> Result<String> {
-	let ident = &function.ident;
-	let fn_name = ident.to_string();
+	fn visit_lambda(&self, func: &Lambda) -> Result<String> {
+		let env = &self.env;
 
-	let function_def = match env.get(&fn_name) {
-		Some(binding) => match binding {
-			Binding::Fn(function_def) => function_def,
+		let function = &func.body;
+		let ident = &function.ident;
+		let fn_name = ident.to_string();
+
+		let function_def = match env.get(&fn_name) {
+			Some(binding) => match binding {
+				Binding::Fn(function_def) => function_def,
+				_ => {
+					return Err(Error::UnknownFunction(format!(
+						"Given function name {} is not a function",
+						fn_name
+					)))
+				}
+			},
 			_ => {
 				return Err(Error::UnknownFunction(format!(
-					"Given function name {} is not a function",
+					"Given function name {} not found in list of functions",
 					fn_name
 				)))
 			}
-		},
-		_ => {
-			return Err(Error::UnknownFunction(format!(
-				"Given function name {} not found in list of functions",
-				fn_name
-			)))
+		};
+
+		let operator = function_def.english;
+
+		let args = &function.args;
+
+		// The arugment for a lambda function is the *second* argument
+		let argument = self.visit_expr(&args[1])?;
+
+		Ok(format!("\"{} {}\"", operator, argument))
+	}
+
+	fn visit_primitive(&self, prim: &Primitive) -> Result<String> {
+		match prim {
+			Primitive::Bool(true) => Ok("true".to_string()),
+			Primitive::Bool(false) => Ok("false".to_string()),
+			Primitive::Int(i) => Ok(i.to_string()),
+			Primitive::Float(f) => Ok(f.to_string()),
+			Primitive::DateTime(dt) => Ok(dt.to_string()),
+			Primitive::Span(span) => Ok(span.to_string()),
+			_ => Err(Error::BadType("English::visit_primitive()")),
 		}
-	};
-
-	let operator = function_def.english;
-
-	let args = &function.args;
-	if args.len() > 1 {
-		return Err(Error::TooManyArgs {
-			name: format!("{} as lambda", fn_name),
-			expected: 1,
-			given: args.len(),
-		});
 	}
 
-	let argument = match &args[0] {
-		Expr::Primitive(primitive) => primitive_to_english(primitive)?,
-		Expr::JsonPointer(_) => explanations
-			.pop()
-			.ok_or(Error::NotEnoughExplanations)?
-			.to_string(),
-		Expr::Function(inner_function) => function_to_english(env, inner_function, explanations)?,
-		_ => return Err(Error::BadType("lambda_to_english()")),
-	};
+	fn visit_array(&self, arr: &Array) -> Result<String> {
+		let english_elts = arr
+			.elts
+			.iter()
+			.map(|p| self.visit_primitive(p).unwrap())
+			.collect::<Vec<String>>()
+			.join(",");
+		Ok(format!("the array [{}]", english_elts))
+	}
 
-	Ok(format!("\"{} {}\"", operator, argument))
-}
-
-fn primitive_to_english(primitive: &Primitive) -> Result<String> {
-	match primitive {
-		Primitive::Bool(true) => Ok("true".to_string()),
-		Primitive::Bool(false) => Ok("false".to_string()),
-		Primitive::Int(i) => Ok(i.to_string()),
-		Primitive::Float(f) => Ok(f.to_string()),
-		Primitive::DateTime(dt) => Ok(dt.to_string()),
-		Primitive::Span(span) => Ok(span.to_string()),
-		_ => Err(Error::BadType("primitive_to_english()")),
+	fn visit_json_pointer(&self, _func: &JsonPointer) -> Result<String> {
+		Ok(self.message.clone())
 	}
 }
 
-fn array_to_english(array: &Array) -> Result<String> {
-	let english_elts = array
-		.elts
-		.iter()
-		.map(|p| primitive_to_english(p).unwrap())
-		.collect::<Vec<String>>()
-		.join(",");
-	Ok(format!("the array [{}]", english_elts))
-}
+// fn function_to_english(env: &Env, function: &Function, message: &str) -> Result<String> {
+// 	let ident = &function.ident;
+// 	let fn_name = ident.to_string();
+
+// 	let function_def = match env.get(&fn_name) {
+// 		Some(binding) => match binding {
+// 			Binding::Fn(function_def) => function_def,
+// 			_ => {
+// 				return Err(Error::UnknownFunction(format!(
+// 					"Given function name {} is not a function",
+// 					fn_name
+// 				)))
+// 			}
+// 		},
+// 		_ => {
+// 			return Err(Error::UnknownFunction(format!(
+// 				"Given function name {} not found in list of functions",
+// 				fn_name
+// 			)))
+// 		}
+// 	};
+
+// 	// Convert an operator to English, with additional phrasing specific to comparison operators in a function
+// 	let operator = match function_def.name.as_ref() {
+// 		"gt" | "lt" | "gte" | "lte" | "eq" | "ne" => format!("to be {}", function_def.english),
+// 		_ => function_def.english,
+// 	};
+// 	let expected_args = function_def.expected_args;
+
+// 	let args = &function.args;
+
+// 	// Check for an invalid number of arguments
+// 	if args.len() < expected_args {
+// 		return Err(Error::NotEnoughArgs {
+// 			name: fn_name,
+// 			expected: expected_args,
+// 			given: args.len(),
+// 		});
+// 	}
+// 	if args.len() > expected_args {
+// 		return Err(Error::TooManyArgs {
+// 			name: fn_name,
+// 			expected: expected_args,
+// 			given: args.len(),
+// 		});
+// 	}
+
+// 	if args.len() == 2 {
+// 		// If there are two arguments, parse a function comparing a pair of some combination of primitives,
+// 		// JSON pointers, nested functions (including lambdas), or arrays (in the second position)
+// 		let argument_1 = match &args[0] {
+// 			Expr::Primitive(primitive) => primitive_to_english(primitive)?,
+// 			Expr::JsonPointer(_) => message.to_string(),
+// 			Expr::Function(inner_function) => function_to_english(env, inner_function, message)?,
+// 			Expr::Lambda(lambda) => lambda_to_english(env, &lambda.body, message)?,
+// 			_ => return Err(Error::BadType("function_to_english()")),
+// 		};
+// 		let argument_2 = match &args[1] {
+// 			Expr::Array(array) => array_to_english(array)?,
+// 			Expr::Primitive(primitive) => primitive_to_english(primitive)?,
+// 			Expr::JsonPointer(_) => message.to_string(),
+// 			Expr::Function(inner_function) => function_to_english(env, inner_function, message)?,
+// 			_ => return Err(Error::BadType("function_to_english()")),
+// 		};
+
+// 		Ok(format!("{} {} {}", argument_1, operator, argument_2))
+// 	} else {
+// 		// If there is one argument, parse a function operating on an array, JSON pointer, or a nested function
+// 		let argument = match &args[0] {
+// 			Expr::Array(array) => array_to_english(array)?,
+// 			Expr::Primitive(primitive) => primitive_to_english(primitive)?,
+// 			Expr::JsonPointer(_) => message.to_string(),
+// 			Expr::Function(inner_function) => function_to_english(env, inner_function, message)?,
+// 			_ => return Err(Error::BadType("function_to_english()")),
+// 		};
+
+// 		Ok(format!("{} {}", operator, argument))
+// 	}
+// }
+
+// fn lambda_to_english(env: &Env, function: &Function, message: &str) -> Result<String> {
+// 	let ident = &function.ident;
+// 	let fn_name = ident.to_string();
+
+// 	let function_def = match env.get(&fn_name) {
+// 		Some(binding) => match binding {
+// 			Binding::Fn(function_def) => function_def,
+// 			_ => {
+// 				return Err(Error::UnknownFunction(format!(
+// 					"Given function name {} is not a function",
+// 					fn_name
+// 				)))
+// 			}
+// 		},
+// 		_ => {
+// 			return Err(Error::UnknownFunction(format!(
+// 				"Given function name {} not found in list of functions",
+// 				fn_name
+// 			)))
+// 		}
+// 	};
+
+// 	let operator = function_def.english;
+
+// 	let args = &function.args;
+
+// 	// The arugment for a lambda function is the *second* argument
+// 	let argument = match &args[1] {
+// 		Expr::Primitive(primitive) => primitive_to_english(primitive)?,
+// 		Expr::JsonPointer(_) => message.to_string(),
+// 		Expr::Function(inner_function) => function_to_english(env, inner_function, message)?,
+// 		_ => return Err(Error::BadType("lambda_to_english()")),
+// 	};
+
+// 	Ok(format!("\"{} {}\"", operator, argument))
+// }
+
+// fn primitive_to_english(primitive: &Primitive) -> Result<String> {
+// 	match primitive {
+// 		Primitive::Bool(true) => Ok("true".to_string()),
+// 		Primitive::Bool(false) => Ok("false".to_string()),
+// 		Primitive::Int(i) => Ok(i.to_string()),
+// 		Primitive::Float(f) => Ok(f.to_string()),
+// 		Primitive::DateTime(dt) => Ok(dt.to_string()),
+// 		Primitive::Span(span) => Ok(span.to_string()),
+// 		_ => Err(Error::BadType("primitive_to_english()")),
+// 	}
+// }
+
+// fn array_to_english(array: &Array) -> Result<String> {
+// 	let english_elts = array
+// 		.elts
+// 		.iter()
+// 		.map(|p| primitive_to_english(p).unwrap())
+// 		.collect::<Vec<String>>()
+// 		.join(",");
+// 	Ok(format!("the array [{}]", english_elts))
+// }
 
 #[cfg(test)]
 mod tests {

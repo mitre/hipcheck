@@ -336,13 +336,10 @@ impl Analysis {
 	pub fn failing_explanation(&self) -> Result<String> {
 		let input = &self.policy_expr;
 		// Split the explanation message into components on commas, and reverse the order so it can serve as a stack
-		let explanations = &mut self.message.split(", ").collect::<Vec<&str>>();
-		explanations.reverse();
+		let message = &self.message;
 		let value = &self.value;
 		Ok(policy_exprs::parse_failing_expr_to_english(
-			input,
-			explanations,
-			value,
+			input, message, value,
 		)?)
 	}
 }

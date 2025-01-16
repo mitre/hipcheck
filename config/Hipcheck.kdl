@@ -25,7 +25,7 @@ analyze {
 			binary-file #rel("Binary.toml")
 			binary-file-threshold 0
 		}
-        analysis "mitre/fuzz" policy="(eq $ #t)"
+        analysis "mitre/fuzz" policy="(eq #t $)"
         analysis "mitre/review" policy="(lte (divz (count (filter (eq #f) $)) (count $)) 0.05)"
     }
 
