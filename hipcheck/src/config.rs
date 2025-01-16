@@ -369,7 +369,7 @@ pub struct TypoConfig {
 	pub count_threshold: u64,
 
 	/// Path to a "typos file" containing necessary information for typo detection.
-	#[default = "Typos.toml"]
+	#[default = "Typos.kdl"]
 	pub typo_file: String,
 }
 
@@ -378,7 +378,7 @@ pub struct TypoConfig {
 #[serde(default)]
 pub struct LanguagesConfig {
 	/// The file to pull language information from.
-	#[default = "Langs.toml"]
+	#[default = "Langs.kdl"]
 	pub langs_file: String,
 }
 
