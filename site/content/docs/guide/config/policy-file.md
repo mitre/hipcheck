@@ -183,3 +183,19 @@ specific analyses such that if those analyses produce a failed result, the
 overall target of analysis is marked for further investigation regardless of
 the risk score. In this case, the risk score is still calculated and all other
 analyses are still run.
+
+## Macros
+
+The policy file parsing system supports a few simple macros to increase
+flexibility. Macros start with a `#`, followed by a name of two or more
+characters, and then an optional open and closed parentheses containing data.
+
+- `#rel("<PATH>")` - The `#rel` macro takes a KDL string object as a parameter.
+	At parse time, the contained string is interpreted as a path, and that path
+	is interpreted as relative to the directory from which the policy file was
+	loaded. Without using `#rel()`, paths specified in policy files will be
+	interpreted as relative to the directory from which `hc` is	run. Example:
+	`binary-file #rel("Binary.toml")`
+- `#env("<VAR>")` - The `#env` macro takes a KDL string object as a parameter
+ 	and allows for parse-time environment variable resolution. For instance,
+	`api-token #env("API_TOKEN")`

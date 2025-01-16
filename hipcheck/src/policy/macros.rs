@@ -31,6 +31,25 @@ fn rel(opt_var: Option<&str>, file_path: &Path) -> Result<String> {
 	Ok(path_node)
 }
 
+/// Expects a non-None opt_var of format `"<ENV_VAR>"`. Parses to an environment variable name on
+/// the current system and resolves to the value of that env var or returns an error if not found.
+fn env(opt_var: Option<&str>) -> Result<String> {
+	let Some(var) = opt_var else {
+		return Err(hc_error!("#env macro expects an argument"));
+	};
+
+	// Parse `"<PATH"` to a KdlValue and extract contained string
+	let entry = kdl::KdlEntry::parse(var).map_err(|e| hc_error!("{}", e))?;
+	let kdl::KdlValue::String(s) = entry.value() else {
+		return Err(hc_error!("Content of #env macro must be a string!"));
+	};
+
+	let val = std::env::var(s)
+		.map_err(|_| hc_error!("#env macro failed to resolve '{}' to a value", s))?;
+
+	Ok(format!("\"{val}\""))
+}
+
 pub fn preprocess_policy_file(s: &str, file_path: &Path) -> Result<String> {
 	let mut s = s.to_owned();
 	// @Note - continues working until all macros resolved. If a macro returns another
@@ -41,11 +60,13 @@ pub fn preprocess_policy_file(s: &str, file_path: &Path) -> Result<String> {
 		let opt_parens = caps.get(2); // optional value in parentheses
 
 		log::debug!("Handling macro: {}", macro_name.as_str());
+		let opt_var = opt_parens.map(|x| x.as_str());
 
 		// Call the right macro function given the `macro_name`, and get the string
 		// to replace `full` with.
 		let replace = match macro_name.as_str() {
-			"rel" => rel(opt_parens.map(|x| x.as_str()), file_path)?,
+			"rel" => rel(opt_var, file_path)?,
+			"env" => env(opt_var)?,
 			other => {
 				return Err(hc_error!("Unknown policy file macro name '{}'", other));
 			}
