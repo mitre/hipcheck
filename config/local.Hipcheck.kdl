@@ -47,7 +47,7 @@ analyze {
 				commit-percentage 0.0
 	 		}
             analysis "mitre/churn" policy="(lte (divz (count (filter (gt 3) $)) (count $)) 0.02)" {
-				langs-file #rel("Langs.toml")
+				langs-file #rel("Langs.kdl")
 			}
         }
     }

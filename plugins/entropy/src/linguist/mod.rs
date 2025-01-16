@@ -31,8 +31,6 @@ impl SourceFileDetector {
 			// Load the file and parse it.
 			let language_file: LanguageFile = read_kdl(langs_file)
 				.context("failed to read language definitions from langs file")?;
-
-			println!("Language File: {:?}", language_file);
 			
 			// Get the list of extensions from it.
 			let extensions = language_file.into_extensions();

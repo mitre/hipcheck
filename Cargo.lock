@@ -465,8 +465,10 @@ dependencies = [
 name = "churn"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "clap",
  "hipcheck-sdk",
+ "kdl 4.7.1",
  "log",
  "pathbuf",
  "salsa",
