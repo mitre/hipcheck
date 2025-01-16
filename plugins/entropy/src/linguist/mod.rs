@@ -2,12 +2,13 @@
 
 mod db;
 mod fs;
-mod kdl;
+mod kdl_util;
 
 pub use db::{Linguist, LinguistSource};
 
 use anyhow::{Context as _, Result};
 use fs::read_kdl;
+use kdl_util::ParseKdlNode;
 use serde::{de::Visitor, Deserialize, Deserializer};
 use std::{convert::AsRef, fmt, fmt::Formatter, path::Path, result::Result as StdResult};
 
@@ -31,8 +32,11 @@ impl SourceFileDetector {
 			let language_file: LanguageFile = read_kdl(langs_file)
 				.context("failed to read language definitions from langs file")?;
 
+			println!("Language File: {:?}", language_file);
+			
 			// Get the list of extensions from it.
 			let extensions = language_file.into_extensions();
+
 
 			// Return the initialized detector.
 			Ok(SourceFileDetector { extensions })
@@ -70,11 +74,24 @@ struct LanguageFile {
 	languages: Vec<LanguageExtensions>,
 }
 
-#[derive(Debug, Deserialize)]
-struct LanguageExtensions {
-	#[serde(default = "missing_lang_type")]
-	r#type: LanguageType,
-	extensions: Option<Vec<String>>,
+impl ParseKdlNode for LanguageFile {
+
+	fn kdl_key() -> &'static str {
+		"languages"
+	}
+
+	fn parse_node(node: &kdl::KdlNode) -> Option<Self> {
+		if node.name().to_string().as_str() != Self::kdl_key() {
+			return None;
+		}
+
+		let mut languages = Vec::new();
+		for node in node.children()?.nodes() {
+			languages.push(LanguageExtensions::parse_node(node)?);
+		}
+
+		Some(Self { languages })
+	}	
 }
 
 impl LanguageFile {
@@ -93,6 +110,56 @@ impl LanguageFile {
 		result
 	}
 }
+
+#[derive(Debug, Deserialize)]
+struct LanguageExtensions {
+	#[serde(default = "missing_lang_type")]
+	r#type: LanguageType,
+	extensions: Option<Vec<String>>,
+}
+
+impl ParseKdlNode for LanguageExtensions {
+	fn kdl_key() -> &'static str {
+		"language"
+	}
+
+	fn parse_node(node: &kdl::KdlNode) -> Option<Self> {
+		if node.name().to_string().as_str() != Self::kdl_key() {
+			return None;
+		}
+
+		let lanugage_type = node.get("type")?.value().as_string()?;
+		 
+		let r#type = match {
+			match lanugage_type {
+				"data" => Some(LanguageType::Data),
+				"programming" => Some(LanguageType::Programming),
+				"markup" => Some(LanguageType::Markup),
+				"prose" => Some(LanguageType::Prose),
+				_ => None,
+			}
+		} {
+			Some(t) => t,
+			None => return None,
+		};
+
+		let mut extensions = Vec::new();
+		for node in node.children()?.nodes() {
+			if node.name().to_string().as_str() == "extensions" {
+				for entry in node.entries() {
+					extensions.push(entry.value().as_string()?.to_string());
+				}
+			}
+		}
+
+		Some(Self {
+			r#type,
+			extensions: Some(extensions),
+		})
+	}
+}
+
+
 
 #[derive(Debug)]
 enum LanguageType {
