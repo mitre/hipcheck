@@ -17,6 +17,7 @@ use crate::{
 	util::kdl::extract_data,
 };
 use kdl::KdlDocument;
+use miette::Report;
 use serde_json::Value;
 use std::{collections::HashMap, path::Path, str::FromStr};
 
@@ -32,7 +33,10 @@ impl FromStr for PolicyFile {
 
 	fn from_str(s: &str) -> Result<Self> {
 		let document =
-			KdlDocument::from_str(s).map_err(|e| hc_error!("Error parsing policy file: {}", e))?;
+			KdlDocument::from_str(s).map_err(|e| {
+				 let miette_err: Report = e.into();
+				 hc_error!("Error parsing policy file: {:?}", miette_err)
+				})?;
 		let nodes = document.nodes();
 
 		let plugins: PolicyPluginList =
