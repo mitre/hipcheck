@@ -2817,6 +2817,7 @@ dependencies = [
  "anyhow",
  "clap",
  "hipcheck-sdk",
+ "kdl 4.7.1",
  "log",
  "pathbuf",
  "serde",
