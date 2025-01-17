@@ -22,8 +22,6 @@ use url::Url;
 
 const PLUGIN_VERSION: &str = "0.1.0";
 const FUZZ_PLUGIN_VERSION: &str = "0.1.1";
-// Write versioning like the example below [task 718]
-// const FUZZ_PLUGIN_VERSION: &str = "^0.1.1";
 
 /// Converts a Config struct to a PolicyFile struct
 pub fn config_to_policy(config: Config) -> Result<PolicyFile> {
