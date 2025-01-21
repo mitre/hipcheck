@@ -311,9 +311,7 @@ impl CliConfig {
 		CliConfig {
 			path_args: PathArgs {
 				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
-				policy: std::env::current_dir()
-					.ok()
-					.map(|dir| pathbuf![&dir, "Hipcheck.kdl"]),
+				policy: None,
 				exec: None,
 			},
 			deprecated_args: DeprecatedArgs {
