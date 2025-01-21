@@ -2,7 +2,7 @@
 
 //! Plugin for determining if a particular path is a source file
 
-mod fs;
+mod util;
 mod linguist;
 
 use clap::Parser;

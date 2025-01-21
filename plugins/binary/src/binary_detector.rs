@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-	error::{Context, Result},
-	fs::read_toml,
-};
+use crate::error::{Context, Result};
+use crate::util::fs::read_kdl;
+use crate::util::kdl::ParseKdlNode;
 use content_inspector::{inspect, ContentType};
 use serde::{de::Visitor, Deserialize, Deserializer};
 use std::{
@@ -22,11 +21,11 @@ pub struct BinaryFileDetector {
 }
 
 impl BinaryFileDetector {
-	/// Constructs a new `BinaryFileDetector` from the `Binary.toml` file.
+	/// Constructs a new `BinaryFileDetector` from the `Binary.kdl` file.
 	pub fn load<P: AsRef<Path>>(binary_config_file: P) -> crate::error::Result<BinaryFileDetector> {
-		fn inner(binary_config_file: &Path) -> crate::error::Result<BinaryFileDetector> {
-			let extensions_file: ExtensionsFile = read_toml(binary_config_file)
-				.context("failed to read binary type defintions from Binary config file")?;
+		fn inner(binary_config_file: &Path) -> crate::error::Result<BinaryFileDetector> {			
+			let extensions_file: ExtensionsFile = read_kdl(binary_config_file)
+			.context("failed to read binary type definitions from Binary config file: ")?;
 
 			let extensions = extensions_file.into_extensions();
 
@@ -61,15 +60,29 @@ struct ExtensionsFile {
 	formats: Vec<BinaryExtensions>,
 }
 
-#[derive(Debug, Deserialize)]
-struct BinaryExtensions {
-	#[serde(default = "missing_bin_type")]
-	r#type: BinaryType,
-	extensions: Option<Vec<String>>,
+impl ParseKdlNode for ExtensionsFile {
+
+	fn kdl_key() -> &'static str {
+		"format"
+	}
+
+	fn parse_node(node: &kdl::KdlNode) -> Option<Self> {
+		if node.name().to_string().as_str() != Self::kdl_key() {
+			return None;
+		}
+
+		let mut formats = Vec::new();
+		for node in node.children()?.nodes() {
+			formats.push(BinaryExtensions::parse_node(node)?);
+		}
+
+		Some(Self { formats })
+	}
+	
 }
 
 impl ExtensionsFile {
-	/// Collects the known file extensions from Binary.toml
+	/// Collects the known file extensions from Binary.kdl
 	fn into_extensions(self) -> Vec<String> {
 		let mut result = Vec::new();
 		for file_format in self.formats {
@@ -84,6 +97,53 @@ impl ExtensionsFile {
 			}
 		}
 		result
+	}
+}
+
+#[derive(Debug, Deserialize)]
+struct BinaryExtensions {
+	#[serde(default = "missing_bin_type")]
+	r#type: BinaryType,
+	extensions: Option<Vec<String>>,
+}
+
+impl ParseKdlNode for BinaryExtensions {
+	fn kdl_key() -> &'static str {
+		"format"
+	}
+
+	fn parse_node(node: &kdl::KdlNode) -> Option<Self> {
+		if node.name().to_string().as_str() != Self::kdl_key() {
+			return None;
+		}
+
+		let binary_type = node.get("type")?.value().as_string()?;
+		 
+		let r#type = match {
+			match binary_type {
+				"object" => Some(BinaryType::Object),
+				"executable" => Some(BinaryType::Executable),
+				"combination" => Some(BinaryType::Combination),
+				_ => None,
+			}
+		} {
+			Some(t) => t,
+			None => return None,
+		};
+
+		let mut extensions = Vec::new();
+		for node in node.children()?.nodes() {
+			if node.name().to_string().as_str() == "extensions" {
+				for entry in node.entries() {
+					extensions.push(entry.value().as_string()?.to_string());
+				}
+			}
+		}
+
+		Some(Self {
+			r#type,
+			extensions: Some(extensions),
+		})
 	}
 }
 

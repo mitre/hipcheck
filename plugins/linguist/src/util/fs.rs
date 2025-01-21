@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use super::kdl_util::{extract_data, ParseKdlNode};
+use super::kdl::{extract_data, ParseKdlNode};
 use anyhow::{anyhow, Context as _, Result};
 use std::{fs, path::Path, str::FromStr};
 use kdl::KdlDocument;

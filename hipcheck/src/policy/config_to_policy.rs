@@ -359,7 +359,7 @@ fn parse_affiliation(
 		let mut config = PolicyConfig::new();
 		config
 			// Our working .kdl orgs file is not in `config` currently
-			.insert("orgs-file".to_string(), Value::String(file))
+			.insert("orgs-file".to_string(), Value::String(format!("./config/{}", file)))
 			.unwrap();
 
 		// Add the plugin
