@@ -711,7 +711,7 @@ mod test {
 		let mut engine = PluginEngine::mock(mock_responses().unwrap());
 		let output = affiliation(&mut engine, target).await.unwrap();
 
-		let concerns = engine.take_concerns();
+		let concerns = engine.get_concerns();
 
 		assert_eq!(output.len(), 2);
 		let num_affiliated = output.iter().filter(|&n| *n).count();

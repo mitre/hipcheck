@@ -222,7 +222,7 @@ mod test {
 		let num_typos = output.iter().filter(|&n| *n).count();
 		assert_eq!(num_typos, 2);
 
-		let concerns = engine.take_concerns();
+		let concerns = engine.get_concerns();
 		assert!(concerns.contains(&"chakl".to_string()));
 		assert!(concerns.contains(&"reacct".to_string()));
 	}

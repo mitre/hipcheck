@@ -291,13 +291,9 @@ mod tests {
 			version: String::from("0.0.5"),
 			modified: SystemTime::now(),
 		};
-		let mut entries: Vec<PluginCacheEntry> = Vec::new();
-		entries.push(cache_entry_1);
-		entries.push(cache_entry_2);
-		entries.push(cache_entry_3);
-		entries.push(cache_entry_4);
-		entries
+		vec![cache_entry_1, cache_entry_2, cache_entry_3, cache_entry_4]
 	}
+
 	#[test]
 	fn test_scope_works_as_expected() {
 		let time_sort = PluginCacheListScope {

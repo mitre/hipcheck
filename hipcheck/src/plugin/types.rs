@@ -469,7 +469,7 @@ pub struct AwaitingResult {
 	pub publisher: String,
 	pub plugin: String,
 	pub query: String,
-	pub key: Value,
+	pub key: Vec<Value>,
 }
 
 impl From<Query> for AwaitingResult {
@@ -486,7 +486,7 @@ impl From<Query> for AwaitingResult {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QueryResult {
-	pub value: Value,
+	pub value: Vec<Value>,
 	pub concerns: Vec<String>,
 }
 

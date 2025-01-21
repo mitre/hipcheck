@@ -14,7 +14,6 @@ use hipcheck_common::{
 	types::{Query, QueryDirection},
 };
 use serde::Serialize;
-use serde_json::{json, Value};
 use std::sync::Arc;
 use std::{
 	collections::{HashMap, VecDeque},
@@ -58,11 +57,53 @@ impl PluginEngine {
 		mock_responses.into()
 	}
 
+	async fn query_inner(
+		&mut self,
+		target: QueryTarget,
+		input: Vec<JsonValue>,
+	) -> Result<Vec<JsonValue>> {
+		// If doing a mock engine, look to the `mock_responses` field for the query answer
+		if cfg!(feature = "mock_engine") {
+			let mut results = Vec::with_capacity(input.len());
+			for i in input {
+				match self.mock_responses.0.get(&(target.clone(), i)) {
+					Some(res) => {
+						match res {
+							Ok(val) => results.push(val.clone()),
+							// TODO: since Error is not Clone, is there a better way to deal with this
+							Err(_) => return Err(Error::UnexpectedPluginQueryInputFormat),
+						}
+					}
+					None => return Err(Error::UnknownPluginQuery),
+				}
+			}
+			Ok(results)
+		}
+		// Normal execution, send messages to hipcheck core to query other plugin
+		else {
+			let query = Query {
+				id: 0,
+				direction: QueryDirection::Request,
+				publisher: target.publisher,
+				plugin: target.plugin,
+				query: target.query.unwrap_or_else(|| "".to_owned()),
+				key: input,
+				output: vec![],
+				concerns: vec![],
+			};
+			self.send(query).await?;
+			let response = self.recv().await?;
+			match response {
+				Some(response) => Ok(response.output),
+				None => Err(Error::SessionChannelClosed),
+			}
+		}
+	}
+
 	/// Query another Hipcheck plugin `target` with key `input`. On success, the JSONified result
 	/// of the query is returned. `target` will often be a string of the format
 	/// `"publisher/plugin[/query]"`, where the bracketed substring is optional if the plugin's
-	/// default query endpoint is desired. `input` must of a type implementing `Into<JsonValue>`,
-	/// which can be done by deriving or implementing `serde::Serialize`.
+	/// default query endpoint is desired. `input` must be of a type implementing `serde::Serialize`,
 	pub async fn query<T, V>(&mut self, target: T, input: V) -> Result<JsonValue>
 	where
 		T: TryInto<QueryTarget, Error: Into<Error>>,
@@ -70,46 +111,27 @@ impl PluginEngine {
 	{
 		let query_target: QueryTarget = target.try_into().map_err(|e| e.into())?;
 		let input: JsonValue = serde_json::to_value(input).map_err(Error::InvalidJsonInQueryKey)?;
+		// since there input had one value, there will only be one response
+		let mut response = self.query_inner(query_target, vec![input]).await?;
+		Ok(response.pop().unwrap())
+	}
 
-		async fn query_inner(
-			engine: &mut PluginEngine,
-			target: QueryTarget,
-			input: JsonValue,
-		) -> Result<JsonValue> {
-			// If doing a mock engine, look to the `mock_responses` field for the query answer
-			if cfg!(feature = "mock_engine") {
-				match engine.mock_responses.0.get(&(target, input)) {
-					Some(res) => {
-						match res {
-							Ok(val) => Ok(val.clone()),
-							// TODO: since Error is not Clone, is there a better way to deal with this
-							Err(_) => Err(Error::UnexpectedPluginQueryInputFormat),
-						}
-					}
-					None => Err(Error::UnknownPluginQuery),
-				}
-			}
-			// Normal execution, send messages to hipcheck core to query other plugin
-			else {
-				let query = Query {
-					id: 0,
-					direction: QueryDirection::Request,
-					publisher: target.publisher,
-					plugin: target.plugin,
-					query: target.query.unwrap_or_else(|| "".to_owned()),
-					key: input,
-					output: json!(Value::Null),
-					concerns: vec![],
-				};
-				engine.send(query).await?;
-				let response = engine.recv().await?;
-				match response {
-					Some(response) => Ok(response.output),
-					None => Err(Error::SessionChannelClosed),
-				}
-			}
+	/// Query another Hipcheck plugin `target` with Vec of `inputs`. On success, the JSONified result
+	/// of the query is returned. `target` will often be a string of the format
+	/// `"publisher/plugin[/query]"`, where the bracketed substring is optional if the plugin's
+	/// default query endpoint is desired. `input` must be a Vec containing a type which implements `serde::Serialize`,
+	pub async fn batch_query<T, V>(&mut self, target: T, keys: Vec<V>) -> Result<Vec<JsonValue>>
+	where
+		T: TryInto<QueryTarget, Error: Into<Error>>,
+		V: Serialize,
+	{
+		let target: QueryTarget = target.try_into().map_err(|e| e.into())?;
+		let mut input = Vec::with_capacity(keys.len());
+		for key in keys {
+			let jsonified_key = serde_json::to_value(key).map_err(Error::InvalidJsonInQueryKey)?;
+			input.push(jsonified_key);
 		}
-		query_inner(self, query_target, input).await
+		self.query_inner(target, input).await
 	}
 
 	fn id(&self) -> usize {
@@ -173,9 +195,10 @@ impl PluginEngine {
 			publisher_name: P::PUBLISHER.to_owned(),
 			plugin_name: P::NAME.to_owned(),
 			query_name: "".to_owned(),
-			key: json!(Value::Null).to_string(),
-			output: json!(Value::Null).to_string(),
+			key: vec![],
+			output: vec![],
 			concern: self.take_concerns(),
+			split: false,
 		};
 		self.tx
 			.send(Ok(InitiateQueryProtocolResponse { query: Some(query) }))
@@ -208,7 +231,12 @@ impl PluginEngine {
 		}
 
 		let name = query.query;
-		let key = query.key;
+
+		// Per RFD 0009, there should only be one query key per query
+		if query.key.len() != 1 {
+			return Err(Error::UnspecifiedQueryState);
+		}
+		let key = query.key.first().unwrap().clone();
 
 		// if we find the plugin by name, run it
 		// if not, check if there is a default plugin and run that one
@@ -234,8 +262,8 @@ impl PluginEngine {
 			publisher: P::PUBLISHER.to_owned(),
 			plugin: P::NAME.to_owned(),
 			query: name.to_owned(),
-			key: json!(Value::Null),
-			output: value,
+			key: vec![],
+			output: vec![value],
 			concerns: self.take_concerns(),
 		};
 
@@ -271,6 +299,13 @@ impl PluginEngine {
 			engine.concerns.push(concern.to_owned());
 		}
 		inner(self, concern.as_ref())
+	}
+
+	#[cfg(feature = "mock_engine")]
+	#[cfg_attr(docsrs, doc(cfg(feature = "mock_engine")))]
+	/// Exposes the current set of concerns recorded by `PluginEngine`
+	pub fn get_concerns(&self) -> &[String] {
+		&self.concerns
 	}
 
 	fn take_concerns(&mut self) -> Vec<String> {

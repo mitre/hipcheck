@@ -220,7 +220,19 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 			// Determine if analysis passed by evaluating policy expr
 			let passed = {
 				if let Ok(output) = &response {
-					std_exec(policy.clone(), Some(&output.value)).map_err(|e| hc_error!("{}", e))?
+					// by this time, the result cached should have evaluated to a single Value, so
+					// use the first value
+					if output.value.len() != 1 {
+						return Err(hc_error!(
+							"Analysis [{}/{}/{}] output had more than one value",
+							analysis.0.publisher,
+							analysis.0.plugin,
+							analysis.0.query
+						));
+					}
+
+					std_exec(policy.clone(), Some(output.value.first().unwrap()))
+						.map_err(|e| hc_error!("{}", e))?
 				} else {
 					false
 				}
