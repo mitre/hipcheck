@@ -26,7 +26,10 @@ fn rel(opt_var: Option<&str>, file_path: &Path) -> Result<String> {
 	// Dir of policy file + relative path parsed above
 	let new_path = pathbuf![file_path.parent().unwrap(), s];
 
-	let path_node = format!("\"{}\"", new_path.to_string_lossy().into_owned());
+	let path_node = format!("\"{}\"", new_path.to_string_lossy().into_owned())
+		// @Note - necessary because `to_string_lossy()` will insert backslashes on windows and
+		// the KDL parser will complain
+		.replace("\\", "/");
 
 	Ok(path_node)
 }
