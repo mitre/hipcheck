@@ -18,7 +18,7 @@ gix = { version = "0.70.0", default-features = false, features = [
     "max-control",
     "zlib-stock",
 ] }
-jiff = { version = "0.1.14", features = ["serde"] }
+jiff = { version = "0.1.16", features = ["serde"] }
 log = "0.4.22"
 once_cell = "1.10.0"
 schemars = { version = "0.8.21", features = ["url"] }
