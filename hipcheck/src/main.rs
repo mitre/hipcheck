@@ -33,12 +33,12 @@ use crate::{
 	report::report_builder::{build_report, Report},
 	score::score_results,
 	session::Session,
-	setup::{resolve_and_transform_source, SourceType},
+	setup::write_config_binaries,
 	shell::Shell,
 };
 use cli::{
 	CacheArgs, CacheOp, CheckArgs, CliConfig, FullCommands, PluginArgs, SchemaArgs, SchemaCommand,
-	SetupArgs, UpdateArgs,
+	UpdateArgs,
 };
 use config::AnalysisTreeNode;
 use core::fmt;
@@ -89,7 +89,7 @@ fn main() -> ExitCode {
 	match config.subcommand() {
 		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
-		Some(FullCommands::Setup(args)) => return cmd_setup(&args, &config),
+		Some(FullCommands::Setup) => return cmd_setup(&config),
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
 		Some(FullCommands::Cache(args)) => return cmd_cache(args, &config),
@@ -247,61 +247,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	Ok(())
 }
 
-/// Copy individual files in dir instead of entire dir, to avoid users accidentally
-/// overwriting important dirs such as /usr/bin/
-fn copy_dir_contents<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()> {
-	fn inner(from: &Path, to: &Path) -> Result<()> {
-		let src = from.to_path_buf();
-		if !src.is_dir() {
-			return Err(hc_error!("source path must be a directory"));
-		}
-		let dst: PathBuf = to.to_path_buf();
-		if !dst.is_dir() {
-			return Err(hc_error!("target path must be a directory"));
-		}
-
-		for entry in walkdir::WalkDir::new(&src) {
-			let src_f_path = entry?.path().to_path_buf();
-			if src_f_path == src {
-				continue;
-			}
-			let mut dst_f_path = dst.clone();
-			dst_f_path.push(
-				src_f_path
-					.file_name()
-					.ok_or(hc_error!("src dir entry without file name"))?,
-			);
-			// This is ok for now because we only copy files, no dirs
-			std::fs::copy(src_f_path, dst_f_path)?;
-		}
-		Ok(())
-	}
-	inner(from.as_ref(), to.as_ref())
-}
-
-fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
-	// Find or download a Hipcheck bundle source and decompress
-	let source = match resolve_and_transform_source(args) {
-		Err(e) => {
-			Shell::print_error(&e, Format::Human);
-			return ExitCode::FAILURE;
-		}
-		Ok(x) => x,
-	};
-
-	// Derive the config path from the source path
-	let src_conf_path = match &source.path {
-		SourceType::Dir(p) => pathbuf![p.as_path(), "config"],
-		_ => {
-			Shell::print_error(
-				&hc_error!("expected source to be a directory"),
-				Format::Human,
-			);
-			source.cleanup();
-			return ExitCode::FAILURE;
-		}
-	};
-
+fn cmd_setup(config: &CliConfig) -> ExitCode {
 	// Make config dir if not exist
 	let Some(tgt_conf_path) = config.config() else {
 		Shell::print_error(&hc_error!("target config dir not specified"), Format::Human);
@@ -323,10 +269,10 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 		return ExitCode::FAILURE;
 	};
 
-	// Copy local config/data dirs to target locations
-	if let Err(e) = copy_dir_contents(src_conf_path, &abs_conf_path) {
+	// Write config file binaries to target directory
+	if let Err(e) = write_config_binaries(tgt_conf_path) {
 		Shell::print_error(
-			&hc_error!("failed to copy config dir contents: {}", e),
+			&hc_error!("failed to write config binaries to config dir {}", e),
 			Format::Human,
 		);
 		return ExitCode::FAILURE;
@@ -348,8 +294,6 @@ fn cmd_setup(args: &SetupArgs, config: &CliConfig) -> ExitCode {
 	println!("\texport HC_CONFIG={:?}", abs_conf_path);
 
 	println!("Run `hc help` to get started");
-
-	source.cleanup();
 
 	ExitCode::SUCCESS
 }

@@ -52,7 +52,7 @@ Important modules within the `hipcheck/` binary crate include:
 - `session/` - Managing a given Hipcheck `check` execution from start to finish,
 	including plugin retrieval and execution, policy file parsing, analysis,
 	scoring, and report building.
-- `setup.rs` - Implements the `hc setup` subcommand that does one-time actions
+- `setup.rs` - Implements the `hc setup` subcommand that does one-time config file setup
 	as part of a Hipcheck installation.
 - `shell/` - Managing the terminal output of the Hipcheck `hc` process.
 - `source/` - Code for manipulating Git repositories.
