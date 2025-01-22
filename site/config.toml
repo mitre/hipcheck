@@ -34,7 +34,7 @@ nav = [
     { name = "Docs", url = "@/docs/_index.md" },
     { name = "Contribute", url = "@/docs/contributing/_index.md" },
     { name = "Blog", url = "@/blog/_index.md" },
-    { name = "Get Help", url = "https://github.com/mitre/hipcheck/discussions", icon = "life-buoy", external = true },
+    { name = "Help", url = "https://github.com/mitre/hipcheck/discussions", external = true },
     { name = "Install", url = "@/docs/getting-started/install.md", highlight = true, icon = "arrow-down" },
     { url = "https://github.com/mitre/hipcheck", icon = "github", icononly = true },
 ]
@@ -77,4 +77,4 @@ footer = [
 # Set an announcement for the site navigation bar.
 [extra.announce]
 url = "https://hipcheck.mitre.org/blog/hipcheck-3-9-1-release/"
-text = "Introducing Hipcheck 3.9.1"
+text = "v3.9.1"
