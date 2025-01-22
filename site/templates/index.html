@@ -16,16 +16,15 @@
 
 {% block content %}
     <span class="mt-4 text-4xl lg:text-5xl relative z-20 font-medium !leading-tight">
-        Helping maintainers assess
-        <span class="bg-gradient-to-r from-blue-600 via-cyan-600 to-green-600 text-transparent bg-clip-text">software<span class="inline lg:hidden"> </span><span class="hidden lg:inline">&nbsp;</span >packages</span>
-        for
-        <span class="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 text-transparent bg-clip-text">long&nbsp;term&nbsp;risk</span>
+        <span class="bg-gradient-to-r from-blue-600 via-cyan-600 to-green-600 text-transparent bg-clip-text italic font-black">Maximally<span class="inline lg:hidden"> </span><span class="hidden lg:inline">&nbsp;</span>configurable</span>
+        analysis of open source software for
+        <span class="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 text-transparent bg-clip-text italic font-black">long&nbsp;term&nbsp;risk</span>
     </span>
 
     <ul class="list-none ps-0 mt-12 text-lg">
-        <li class="before:inline-block before:top-0 before:left-0 before:w-6 before:h-6 before:-ml-2 before:-mb-1 before:mr-2 before:content-['✓'] before:font-extrabold before:text-green-500 before:text-xl">Filter hundreds of dependencies to a few for review</li>
-        <li class="before:inline-block before:top-0 before:left-0 before:w-6 before:h-6 before:-ml-2 before:-mb-1 before:mr-2 before:content-['✓'] before:font-extrabold before:text-green-500 before:text-xl">Use plugins to run only the analyses you choose</li>
-        <li class="before:inline-block before:top-0 before:left-0 before:w-6 before:h-6 before:-ml-2 before:-mb-1 before:mr-2 before:content-['✓'] before:font-extrabold before:text-green-500 before:text-xl">Configure scoring to decide when to investigate further</li>
+        <li class="before:inline-block before:top-0 before:left-0 before:w-6 before:h-6 before:-ml-2 before:-mb-1 before:mr-2 before:content-['✓'] before:font-extrabold before:text-green-500 before:text-xl">Filter <span class="font-bold italic">hundreds of dependencies</span> to a few for review</li>
+        <li class="before:inline-block before:top-0 before:left-0 before:w-6 before:h-6 before:-ml-2 before:-mb-1 before:mr-2 before:content-['✓'] before:font-extrabold before:text-green-500 before:text-xl">Use plugins to <span class="font-bold italic">run only the analyses you choose</span></li>
+        <li class="before:inline-block before:top-0 before:left-0 before:w-6 before:h-6 before:-ml-2 before:-mb-1 before:mr-2 before:content-['✓'] before:font-extrabold before:text-green-500 before:text-xl">Configure scoring to <span class="font-bold italic">decide when to investigate further</span></li>
     </ul>
 
     {% include "partials/install.tera.html" %}
@@ -33,17 +32,16 @@
     <a href="{{ get_url(path="@/docs/_index.md") }}" class="
             relative z-20
             inline-block
-            font-semibold
+            !font-semibold
             px-5 py-3
             no-underline
-            bg-transparent hover:bg-blue-50 dark:hover:bg-neutral-800
-            border border-neutral-300 hover:border-blue-300 dark:border-neutral-700
-            hover:!text-blue-500
-            rounded-lg
+            bg-blue-500 hover:bg-green-500 dark:hover:bg-neutral-800
+            text-white hover:!text-white
+            rounded-full
             mr-4 mt-8
             top-[-1px]
             ">
-        Read the Docs {{ ic::icon(name="book-open", classes="mt-[-2px] ml-2") }}
+        {{ ic::icon(name="book", classes="!w-5 !h-5 mt-[-2px] mr-1") }} Read the Docs
     </a>
 {% endblock %}
 
