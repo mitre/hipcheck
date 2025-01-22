@@ -368,7 +368,7 @@ fn hc_env_var_value_enum<E: ValueEnum>(name: &'static str) -> Option<E> {
 pub enum FullCommands {
 	Check(CheckArgs),
 	Schema(SchemaArgs),
-	Setup(SetupArgs),
+	Setup,
 	Ready,
 	Update(UpdateArgs),
 	Cache(CacheArgs),
@@ -383,7 +383,7 @@ impl From<&Commands> for FullCommands {
 		match command {
 			Commands::Check(args) => FullCommands::Check(args.clone()),
 			Commands::Schema(args) => FullCommands::Schema(args.clone()),
-			Commands::Setup(args) => FullCommands::Setup(args.clone()),
+			Commands::Setup => FullCommands::Setup,
 			Commands::Ready => FullCommands::Ready,
 			Commands::Scoring => FullCommands::Scoring,
 			Commands::Update(args) => FullCommands::Update(args.clone()),
@@ -400,15 +400,7 @@ pub enum Commands {
 	/// Print the JSON schema for output of a specific `check` command.
 	Schema(SchemaArgs),
 	/// Initialize Hipcheck config file and script file locations.
-	///
-	/// The "destination" directories for configuration files
-	/// Hipcheck needs are determined with the following methods, in
-	/// increasing precedence:
-	///
-	/// 1. Platform-specific defaults
-	/// 2. `HC_CONFIG` environment variable
-	/// 3. `--config` command line flag
-	Setup(SetupArgs),
+	Setup,
 	/// Check if Hipcheck is ready to run.
 	Ready,
 	/// Print the tree used to weight analyses during scoring.
@@ -732,16 +724,6 @@ pub enum SchemaCommand {
 	Pypi,
 	/// Print the JSON schema for running Hipcheck against a source repository
 	Repo,
-}
-
-#[derive(Debug, Clone, clap::Args)]
-pub struct SetupArgs {
-	/// Do not use the network to download setup files.
-	#[clap(short = 'o', long)]
-	pub offline: bool,
-	/// Path to local Hipcheck release archive or directory.
-	#[clap(short = 's', long)]
-	pub source: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, clap::Args)]

@@ -18,7 +18,7 @@ or `hipcheck-update`, due to historic bugs).
 The `hc update` command simply delegates to this separate update program,
 and provides the same interface that this separate update program does.
 In general, you only need to run `hc update` with no arguments, followed
-by `hc setup` to ensure you have the latest configuration and data files.
+by `hc setup` to ensure your configuration and data files are setup.
 
 If you want to specifically download a version besides the most recent
 version of Hipcheck, you can use the following flags:
