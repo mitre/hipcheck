@@ -75,18 +75,17 @@ impl FromStr for Expr {
 }
 
 /// Evaluates `deke` expressions.
-#[cfg(test)]
 pub struct Executor {
 	env: Env<'static>,
 }
 
-#[cfg(test)]
 impl Executor {
 	/// Create an `Executor` with the standard set of functions defined.
 	pub fn std() -> Self {
 		Executor { env: Env::std() }
 	}
 
+	#[cfg(test)]
 	/// Run a `deke` program.
 	pub fn run(&self, raw_program: &str, context: &Value) -> Result<bool> {
 		match self.parse_and_eval(raw_program, context)? {
@@ -153,6 +152,230 @@ impl ExprMutator for Env<'_> {
 			))),
 			Some(expr) => Ok(*expr.to_owned()),
 		}
+	}
+}
+
+/// Return an English language explanation for what a failing plugin was expected to see and what it saw instead
+pub fn parse_failing_expr_to_english(
+	input: &Expr,
+	message: &str,
+	value: &Option<Value>,
+) -> Result<String> {
+	// Create a standard environment, with its list of functions and their English descriptions
+	let env = Env::std();
+	// Store that environment and the plugin explanation message in a struct for English parsing
+	let english = English {
+		env,
+		message: message.to_string(),
+	};
+
+	// Check that the "top level" of the policy expression is a function, then recursively parse that function into an English language description of why the plugin failed
+	if let Expr::Function(original_func) = input {
+		// Get the function's args
+		let args = &original_func.args;
+
+		// Confirm that the outermost function has two arguments
+		if args.len() != 2 {
+			return Err(Error::MissingArgs);
+		}
+
+		// See which of the function's arguments is a primitive (i.e. the top level expected value)
+		// If this is the first argument, swap the order of the arguments before parsing the function to English
+		let func = match (&args[0], &args[1]) {
+			(&Expr::Primitive(_), _) => &original_func.swap_args(),
+			(_, &Expr::Primitive(_)) => original_func,
+			_ => return Err(Error::MissingArgs),
+		};
+
+		// Recursively parse the top level function to English
+		let english_expr = english.visit_function(func)?;
+
+		// Get whichever of the function's arguments is **not** a primitive for evaluation
+		let inner = &func.args[0];
+
+		// Evaluate that argument using the value returned by the plugin to see what the top level operator is comparing the expected value to
+		let inner_value = match value {
+			Some(context) => {
+				format!(
+					"it was {}",
+					match Executor::std().parse_and_eval(&inner.to_string(), context)? {
+						Expr::Primitive(prim) => english.visit_primitive(&prim)?,
+						_ => return Err(Error::BadReturnType(inner.clone())),
+					}
+				)
+			}
+			None => "no value was returned by the query".to_string(),
+		};
+
+		return Ok(format!("Expected {english_expr} but {inner_value}"));
+	}
+
+	Err(Error::MissingIdent)
+}
+
+/// Struct that contains a basic environment, with its English function descriptions, and a plugin explanation message.
+pub struct English<'a> {
+	env: Env<'a>,
+	message: String,
+}
+
+// Trait implementation to return English descriptions of an Expr
+impl ExprVisitor<Result<String>> for English<'_> {
+	/// Parse a function expression into an English string
+	fn visit_function(&self, func: &Function) -> Result<String> {
+		let env = &self.env;
+
+		// Get the function operator from the list of functions in the environment
+		let ident = &func.ident;
+		let fn_name = ident.to_string();
+
+		let function_def = match env.get(&fn_name) {
+			Some(binding) => match binding {
+				Binding::Fn(function_def) => function_def,
+				_ => {
+					return Err(Error::UnknownFunction(format!(
+						"Given function name {} is not a function",
+						fn_name
+					)))
+				}
+			},
+			_ => {
+				return Err(Error::UnknownFunction(format!(
+					"Given function name {} not found in list of functions",
+					fn_name
+				)))
+			}
+		};
+
+		// Convert theoperator to English, with additional phrasing specific to comparison operators in a function
+		let operator = match function_def.name.as_ref() {
+			"gt" | "lt" | "gte" | "lte" | "eq" | "ne" => format!("to be {}", function_def.english),
+			_ => function_def.english,
+		};
+
+		// Get the number of args the function should have
+		let expected_args = function_def.expected_args;
+
+		// Get the funciton's args
+		let args = &func.args;
+
+		// Check for an invalid number of arguments
+		if args.len() < expected_args {
+			return Err(Error::NotEnoughArgs {
+				name: fn_name,
+				expected: expected_args,
+				given: args.len(),
+			});
+		}
+		if args.len() > expected_args {
+			return Err(Error::TooManyArgs {
+				name: fn_name,
+				expected: expected_args,
+				given: args.len(),
+			});
+		}
+
+		if args.len() == 2 {
+			// If there are two arguments, parse a function comparing a pair of some combination of primitives,
+			// JSON pointers, nested functions (including lambdas in the first position), or arrays (in the second position) to English
+			if matches!(args[0], Expr::Array(_)) || matches!(args[1], Expr::Lambda(_)) {
+				return Err(Error::BadType("English::visit_function()"));
+			}
+			let argument_1 = self.visit_expr(&args[0])?;
+			let argument_2 = self.visit_expr(&args[1])?;
+
+			Ok(format!("{} {} {}", argument_1, operator, argument_2))
+		} else {
+			// If there is one argument, parse a function operating on an array, JSON pointer, or a nested function to English
+			if matches!(args[0], Expr::Lambda(_)) {
+				return Err(Error::BadType("English::visit_function()"));
+			}
+			let argument = self.visit_expr(&args[0])?;
+
+			Ok(format!("{} {}", operator, argument))
+		}
+	}
+
+	/// Parse a lambda expression into an English string
+	fn visit_lambda(&self, func: &Lambda) -> Result<String> {
+		let env = &self.env;
+
+		// Get the lambda function from the lambda
+		let function = &func.body;
+		//Get the lambda's function operator from the list of functions in the environment
+		let ident = &function.ident;
+		let fn_name = ident.to_string();
+
+		let function_def = match env.get(&fn_name) {
+			Some(binding) => match binding {
+				Binding::Fn(function_def) => function_def,
+				_ => {
+					return Err(Error::UnknownFunction(format!(
+						"Given function name {} is not a function",
+						fn_name
+					)))
+				}
+			},
+			_ => {
+				return Err(Error::UnknownFunction(format!(
+					"Given function name {} not found in list of functions",
+					fn_name
+				)))
+			}
+		};
+
+		// Convert the operator to English
+		let operator = function_def.english;
+
+		// Get the lambda function's argument and parse it to English
+		// Note: The useful arugment for a lambda function is the *second* argument
+		let args = &function.args;
+		let argument = self.visit_expr(&args[1])?;
+
+		Ok(format!("\"{} {}\"", operator, argument))
+	}
+
+	// Parse a primitive type expression to English
+	fn visit_primitive(&self, prim: &Primitive) -> Result<String> {
+		match prim {
+			Primitive::Bool(true) => Ok("true".to_string()),
+			Primitive::Bool(false) => Ok("false".to_string()),
+			Primitive::Int(i) => Ok(i.to_string()),
+			Primitive::Float(f) => Ok(f.to_string()),
+			Primitive::DateTime(dt) => Ok(dt.to_string()),
+			Primitive::Span(span) => Ok(span.to_string()),
+			_ => Err(Error::BadType("English::visit_primitive()")),
+		}
+	}
+
+	// Parse a primitive type array expression to English
+	fn visit_array(&self, arr: &Array) -> Result<String> {
+		let max_length = 5;
+
+		let elts = &arr.elts;
+
+		let english_elts = match elts.len() > max_length {
+			false => elts
+				.iter()
+				.map(|p| self.visit_primitive(p).unwrap())
+				.collect::<Vec<String>>()
+				.join(","),
+			true => {
+				let mut english_elts = elts[..max_length]
+					.iter()
+					.map(|p| self.visit_primitive(p).unwrap())
+					.collect::<Vec<String>>()
+					.join(",");
+				english_elts.push_str("...");
+				english_elts
+			}
+		};
+		Ok(format!("the array [{}]", english_elts))
+	}
+
+	// Parse a JSON pointer expression into English by returning the explanation message for the plugin
+	fn visit_json_pointer(&self, _func: &JsonPointer) -> Result<String> {
+		Ok(self.message.clone())
 	}
 }
 

@@ -100,7 +100,7 @@ impl Plugin for ReviewPlugin {
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"Percentage of unreviewed commits to the repo".to_string(),
+			"commits to the repo indicating review or not".to_string(),
 		))
 	}
 

@@ -37,7 +37,7 @@ impl Plugin for FuzzAnalysisPlugin {
 	}
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
-		Ok(Some("Does the target repo do fuzzing".to_owned()))
+		Ok(Some("'Does the target repo do fuzzing?'".to_owned()))
 	}
 
 	queries! {}

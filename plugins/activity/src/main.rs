@@ -81,7 +81,7 @@ impl Plugin for ActivityPlugin {
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"Span of time that has elapsed since last activity in repo".to_string(),
+			"span of time that has elapsed since last activity in repo".to_string(),
 		))
 	}
 
