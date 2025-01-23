@@ -144,8 +144,7 @@ impl Plugin for TypoPlugin {
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"Returns whether each of the repository's package dependencies has a typo in its name"
-				.to_string(),
+			"the repository's dependencies flagged as typos".to_string(),
 		))
 	}
 

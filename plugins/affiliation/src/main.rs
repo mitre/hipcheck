@@ -528,8 +528,7 @@ impl Plugin for AffiliationPlugin {
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"Returns whether each of the repository's contributors was flagged as affiliated or not"
-				.to_string(),
+			"the repository's contributors flagged as affiliated".to_string(),
 		))
 	}
 

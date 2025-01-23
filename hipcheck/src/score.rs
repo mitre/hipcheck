@@ -13,6 +13,7 @@ use crate::{
 use indextree::{Arena, NodeId};
 #[cfg(test)]
 use num_traits::identities::Zero;
+use serde_json::Value;
 use std::{collections::HashMap, default::Default};
 
 #[cfg(test)]
@@ -42,6 +43,7 @@ pub struct ScoringResults {
 pub struct PluginAnalysisResult {
 	pub response: Result<QueryResult>,
 	pub policy: Expr,
+	pub value: Option<Value>,
 	pub passed: bool,
 }
 
@@ -218,7 +220,7 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 			);
 
 			// Determine if analysis passed by evaluating policy expr
-			let passed = {
+			let (value, passed) = {
 				if let Ok(output) = &response {
 					// by this time, the result cached should have evaluated to a single Value, so
 					// use the first value
@@ -231,10 +233,13 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 						));
 					}
 
-					std_exec(policy.clone(), Some(output.value.first().unwrap()))
-						.map_err(|e| hc_error!("{}", e))?
+					(
+						Some(output.value.first().unwrap().clone()),
+						std_exec(policy.clone(), Some(output.value.first().unwrap()))
+							.map_err(|e| hc_error!("{}", e))?,
+					)
 				} else {
-					false
+					(None, false)
 				}
 			};
 
@@ -244,6 +249,7 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 				PluginAnalysisResult {
 					response,
 					policy,
+					value,
 					passed,
 				},
 			);

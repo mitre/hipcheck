@@ -210,7 +210,7 @@ impl Plugin for EntropyPlugin {
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"The entropy calculation of each commit in a repo".to_owned(),
+			"the entropy calculation of each commit in the repository".to_owned(),
 		))
 	}
 

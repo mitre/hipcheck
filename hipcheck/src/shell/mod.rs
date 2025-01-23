@@ -382,7 +382,13 @@ fn print_human(report: Report) -> Result<()> {
 				Title::Failed,
 				analysis.statement()
 			);
-			macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
+
+			// If we can parse failed expression to English, print a full English explanation. Otherwise print the default explanation text.
+			if let Ok(failing_explanation) = analysis.failing_explanation() {
+				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", failing_explanation);
+			} else {
+				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
+			}
 
 			for concern in failing_analysis.concerns() {
 				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", concern);
