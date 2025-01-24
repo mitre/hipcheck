@@ -23,4 +23,8 @@ How to start making a new Hipcheck plugin.
 How to use the Rust SDK to create a plugin.
 {% end %}
 
+{% waypoint(title="Packaging and Releasing a Plugin", path="@/docs/guide/making-plugins/release.md", icon="tool") %}
+How to prepare a plugin for use and release.
+{% end %}
+
 </div>
