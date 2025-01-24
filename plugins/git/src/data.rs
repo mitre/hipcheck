@@ -112,12 +112,26 @@ pub struct CommitContributor {
 	pub committer_id: usize,
 }
 
-/// Temporary data structure for looking up the contributors of a commit
+/// Data structure for looking up the contributors of a commit
 #[derive(Debug, Serialize, Clone, PartialEq, Eq, JsonSchema)]
 pub struct CommitContributorView {
 	pub commit: Commit,
 	pub author: Contributor,
 	pub committer: Contributor,
+}
+
+impl From<RawCommit> for CommitContributorView {
+	fn from(value: RawCommit) -> Self {
+		Self {
+			commit: Commit {
+				hash: value.hash,
+				written_on: value.written_on.map(|x| x.to_string()),
+				committed_on: value.committed_on.map(|x| x.to_string()),
+			},
+			author: value.author,
+			committer: value.committer,
+		}
+	}
 }
 
 /// Temporary data structure for looking up the commits associated with a contributor

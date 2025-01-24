@@ -8,7 +8,7 @@ mod git;
 use crate::{
 	data::{
 		Commit, CommitContributor, CommitContributorView, CommitDiff, Contributor, ContributorView,
-		DetailedGitRepo, Diff, RawCommit,
+		DetailedGitRepo, Diff,
 	},
 	git::{
 		get_all_raw_commits, get_commit_diffs, get_commits_from_date, get_contributors, get_diffs,
@@ -19,36 +19,14 @@ use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::LocalGitRepo};
 use jiff::Timestamp;
 use lru::LruCache;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{
 	num::NonZero,
+	str::FromStr,
 	sync::{Mutex, OnceLock},
 };
 
 pub static CACHE: OnceLock<Mutex<GitRawCommitCache>> = OnceLock::new();
-
-/// A locally stored git repo, with a list of additional details
-/// The details will vary based on the query (e.g. a date, a committer e-mail address, a commit hash)
-///
-/// This struct exists for using the temproary "batch" queries until proper batching is implemented
-/// TODO: Remove this struct once batching works
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct BatchGitRepo {
-	/// The local repo
-	local: LocalGitRepo,
-
-	/// Optional additional information for the query
-	pub details: Vec<String>,
-}
-
-/// Returns all raw commits extracted from the repository
-fn local_raw_commits(repo: LocalGitRepo) -> Result<Vec<RawCommit>> {
-	get_all_raw_commits(&repo.path).map_err(|e| {
-		log::error!("failed to get raw commits: {}", e);
-		Error::UnspecifiedQueryState
-	})
-}
 
 /// Returns the date of the most recent commit to a Git repo as `jiff:Timestamp` displayed as a String
 /// (Which means that anything expecting a `Timestamp` must parse the output of this query appropriately)
@@ -126,7 +104,7 @@ async fn commits_from_date(
 	Ok(commits)
 }
 
-/// Returns all contributors to the repository
+/// Returns all unique contributors to the repository
 #[query]
 async fn contributors(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Contributor>> {
 	let path = &repo.path;
@@ -210,86 +188,6 @@ async fn commits_for_contributor(
 	})
 }
 
-use std::{
-	collections::{HashMap, HashSet},
-	str::FromStr,
-};
-
-// Temporary query to call multiple commits_for_contributors() queries until we implement batching
-// TODO: Remove this query once batching works
-#[query]
-async fn batch_commits_for_contributor(
-	_engine: &mut PluginEngine,
-	repo: BatchGitRepo,
-) -> Result<Vec<ContributorView>> {
-	let local = repo.local;
-	let emails = repo.details;
-
-	let mut views = Vec::new();
-
-	let raw_commits = local_raw_commits(local.clone()).map_err(|e| {
-		log::error!("failed to get commits: {}", e);
-		Error::UnspecifiedQueryState
-	})?;
-	let commits: Vec<Commit> = raw_commits
-		.iter()
-		.map(|raw| Commit::from(raw.clone()))
-		.collect();
-	// @Assert - raw_commit and commits idxes correspond
-
-	// Map contributors to the set of commits (by idx) they have contributed to
-	let mut contrib_to_commits: HashMap<Contributor, HashSet<usize>> = HashMap::default();
-	// Map an email to a contributor
-	let mut email_to_contrib: HashMap<String, Contributor> = HashMap::default();
-
-	fn add_contributor(
-		map: &mut HashMap<Contributor, HashSet<usize>>,
-		c: &Contributor,
-		commit_id: usize,
-	) {
-		let cv = match map.get_mut(c) {
-			Some(v) => v,
-			None => {
-				map.insert(c.clone(), HashSet::new());
-				map.get_mut(c).unwrap()
-			}
-		};
-		cv.insert(commit_id);
-	}
-
-	// For each commit, update the contributors' entries in the above maps
-	for (i, commit) in raw_commits.iter().enumerate() {
-		add_contributor(&mut contrib_to_commits, &commit.author, i);
-		email_to_contrib.insert(commit.author.email.clone(), commit.author.clone());
-		add_contributor(&mut contrib_to_commits, &commit.committer, i);
-		email_to_contrib.insert(commit.committer.email.clone(), commit.committer.clone());
-	}
-
-	for email in emails {
-		// Get a contributor from their email
-		let contributor = email_to_contrib
-			.get(&email)
-			.ok_or_else(|| {
-				log::error!("failed to find contributor");
-				Error::UnspecifiedQueryState
-			})?
-			.clone();
-		// Resolve all commits that contributor touched by idx
-		let commits = contrib_to_commits
-			.get(&contributor)
-			.unwrap()
-			.iter()
-			.map(|i| commits.get(*i).unwrap().clone())
-			.collect::<Vec<Commit>>();
-		views.push(ContributorView {
-			contributor,
-			commits,
-		});
-	}
-
-	Ok(views)
-}
-
 /// Returns the contributor view for a given commit (idenftied by hash in the `details` field)
 #[query]
 async fn contributors_for_commit(
@@ -352,51 +250,6 @@ async fn contributors_for_commit(
 		})
 }
 
-// Temporary query to call multiple contributors_for_commit() queries until we implement batching
-// TODO: Remove this query once batching works
-#[query]
-async fn batch_contributors_for_commit(
-	_engine: &mut PluginEngine,
-	repo: BatchGitRepo,
-) -> Result<Vec<CommitContributorView>> {
-	let local = repo.local;
-	let hashes = repo.details;
-
-	let raw_commits = local_raw_commits(local.clone()).map_err(|e| {
-		log::error!("failed to get commits: {}", e);
-		Error::UnspecifiedQueryState
-	})?;
-
-	let mut hash_to_idx: HashMap<String, usize> = HashMap::default();
-	let commit_views: Vec<CommitContributorView> = raw_commits
-		.into_iter()
-		.enumerate()
-		.map(|(i, raw)| {
-			let author = raw.author.clone();
-			let committer = raw.committer.clone();
-			let commit = Commit::from(raw);
-			hash_to_idx.insert(commit.hash.clone(), i);
-			CommitContributorView {
-				commit,
-				author,
-				committer,
-			}
-		})
-		.collect();
-
-	let mut views: Vec<CommitContributorView> = vec![];
-
-	for hash in hashes {
-		let idx = hash_to_idx.get(&hash).ok_or_else(|| {
-			log::error!("hash could not be found in repo");
-			Error::UnspecifiedQueryState
-		})?;
-		views.push(commit_views.get(*idx).unwrap().clone());
-	}
-
-	Ok(views)
-}
-
 /// Internal use function that returns a join table of contributors by commit
 async fn commit_contributors(
 	engine: &mut PluginEngine,
@@ -435,6 +288,25 @@ async fn commit_contributors(
 	Ok(commit_contributors)
 }
 
+/// Returns all of the contributors to a repo, along with how many times each contributor has made
+/// a contribution. A contribution occurs when a contributor authors or commits a commit to the
+/// repo.
+#[query]
+async fn contributor_summary(
+	_engine: &mut PluginEngine,
+	repo: LocalGitRepo,
+) -> Result<Vec<CommitContributorView>> {
+	let commits = get_all_raw_commits(repo.path).map_err(|e| {
+		log::error!("failed to get commits: {}", e);
+		Error::UnspecifiedQueryState
+	})?;
+	let mut commit_contributor_views = Vec::with_capacity(commits.len());
+	for commit in commits {
+		let view = CommitContributorView::from(commit);
+		commit_contributor_views.push(view);
+	}
+	Ok(commit_contributor_views)
+}
 #[derive(Deserialize)]
 struct Config {
 	#[serde(default = "default_commit_cache_size")]
