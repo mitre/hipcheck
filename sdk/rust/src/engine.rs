@@ -165,7 +165,7 @@ impl PluginEngine {
 	/// Query another Hipcheck plugin `target` with Vec of `inputs`. On success, the JSONified result
 	/// of the query is returned. `target` will often be a string of the format
 	/// `"publisher/plugin[/query]"`, where the bracketed substring is optional if the plugin's
-	/// default query endpoint is desired. `input` must be a Vec containing a type which implements `serde::Serialize`,
+	/// default query endpoint is desired. `keys` must be a Vec containing a type which implements `serde::Serialize`,
 	pub async fn batch_query<T, V>(&mut self, target: T, keys: Vec<V>) -> Result<Vec<JsonValue>>
 	where
 		T: TryInto<QueryTarget, Error: Into<Error>>,
