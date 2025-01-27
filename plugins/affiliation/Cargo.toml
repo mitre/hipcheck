@@ -19,7 +19,7 @@ schemars = { version = "0.8.21", features = ["url"] }
 serde = { version = "1.0.215", features = ["derive", "rc"] }
 serde_json = "1.0.134"
 strum = { version = "0.26.3", features = ["derive"] }
-tokio = { version = "1.42.0", features = ["rt"] }
+tokio = { version = "1.43.0", features = ["rt"] }
 
 [dev-dependencies]
 hipcheck-sdk = { version = "0.3.0", path = "../../sdk/rust", features = [
