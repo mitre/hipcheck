@@ -22,7 +22,7 @@ salsa = "0.16.1"
 schemars = "0.8.21"
 serde = "1.0.215"
 serde_json = "1.0.134"
-tokio = { version = "1.42.0", features = ["rt"] }
+tokio = { version = "1.43.0", features = ["rt"] }
 toml = "0.8.19"
 unicode-normalization = "0.1.24"
 
