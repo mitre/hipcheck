@@ -18,3 +18,7 @@ tonic = "0.12.3"
 anyhow = "1.0.95"
 pathbuf = "1.0.0"
 tonic-build = "0.12.3"
+
+[features]
+default = ["rfd9-compat"]
+rfd9-compat = []
