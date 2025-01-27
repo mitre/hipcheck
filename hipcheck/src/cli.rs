@@ -81,6 +81,37 @@ struct OutputArgs {
 	format: Option<Format>,
 }
 
+/// Provenance container. Tracks whether a configuration was explicitly set by a
+/// user, or is from Hipcheck default settings.
+/// Could be made generic, but currently only works for PathBuf.
+#[derive(Debug, Clone)]
+enum Provenance {
+	FromDefaults(PathBuf),
+	FromUser(PathBuf),
+}
+
+impl std::ops::Deref for Provenance {
+	type Target = Path;
+
+	fn deref(&self) -> &Self::Target {
+		use Provenance::*;
+		match self {
+			FromDefaults(path) => path,
+			FromUser(path) => path,
+		}
+	}
+}
+
+impl FromStr for Provenance {
+	type Err = core::convert::Infallible;
+
+	fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+		// Assume that if we are parsing a string, that it was
+		// configuration specified by a user directly.
+		Ok(Self::FromUser(PathBuf::from(s)))
+	}
+}
+
 /// Arguments configuring paths for Hipcheck to use.
 #[derive(Debug, Default, clap::Args, hc::Update)]
 struct PathArgs {
@@ -102,7 +133,7 @@ struct PathArgs {
 		help_heading = "Path Flags",
 		long_help = "Path to the policy file."
 	)]
-	policy: Option<PathBuf>,
+	policy: Option<Provenance>,
 
 	/// Path to the exec config file
 	#[arg(
@@ -136,11 +167,28 @@ struct DeprecatedArgs {
 
 	/// Path to the configuration folder.
 	#[arg(short = 'c', long = "config", hide = true, global = true)]
-	config: Option<PathBuf>,
+	config: Option<Provenance>,
 
 	/// Path to the Hipcheck home folder.
 	#[arg(short = 'H', long = "home", hide = true, global = true)]
 	home: Option<PathBuf>,
+}
+
+/// Select how Hipcheck searches for its configuration.
+/// Hipcheck supports a legacy configuration format called config TOML.
+/// The default system is called a Policy file, in KDL format.
+/// If a user explicitly selects one of these modes, then Hipcheck
+/// will only attempt to use that source of configuration.
+/// Otherwise, Hipcheck will try to use a Policy file, falling back
+/// to config TOML if that fails.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConfigMode {
+	/// Try to load policy first, but fall back to config.
+	PreferPolicy { policy: PathBuf, config: PathBuf },
+	/// Only attempt to load from policy.
+	ForcePolicy { policy: PathBuf },
+	/// Only attempt to load from config.
+	ForceConfig { config: PathBuf },
 }
 
 impl CliConfig {
@@ -159,6 +207,26 @@ impl CliConfig {
 		config.update(&CliConfig::from_env());
 		config.update(&CliConfig::from_cli());
 		config
+	}
+
+	/// Determine which ConfigMode to use, based on the combination of options
+	/// passed to Hipcheck.
+	pub fn config_mode(&self) -> Result<ConfigMode> {
+		match (&self.path_args.policy, &self.deprecated_args.config) {
+			(Some(Provenance::FromUser(policy_path)), _) => Ok(ConfigMode::ForcePolicy {
+				policy: policy_path.to_path_buf(),
+			}),
+			(_, Some(Provenance::FromUser(config_path))) => Ok(ConfigMode::ForceConfig {
+				config: config_path.to_path_buf(),
+			}),
+			(Some(Provenance::FromDefaults(policy_path)), Some(Provenance::FromDefaults(config_path))) => Ok(
+				ConfigMode::PreferPolicy {
+					policy: policy_path.to_path_buf(),
+					config: config_path.to_path_buf(),
+				}
+			),
+			_ => Err(hc_error!("Could not find any source of configuration. Use --policy or --config to configure Hipcheck."))
+		}
 	}
 
 	/// Get the selected subcommand, if any.
@@ -277,7 +345,7 @@ impl CliConfig {
 				exec: None,
 			},
 			deprecated_args: DeprecatedArgs {
-				config: hc_env_var("config"),
+				config: hc_env_var("config").map(Provenance::FromUser),
 				home: hc_env_var("home"),
 				..Default::default()
 			},
@@ -293,12 +361,12 @@ impl CliConfig {
 		CliConfig {
 			path_args: PathArgs {
 				cache: platform_cache(),
-				// There is no central per-user or per-system location for the policy or exec file, so pass a None to never update this field
-				policy: None,
+				policy: platform_config()
+					.map(|dir| Provenance::FromDefaults(pathbuf![&dir, "Hipcheck.kdl"])),
 				exec: None,
 			},
 			deprecated_args: DeprecatedArgs {
-				config: platform_config(),
+				config: platform_config().map(Provenance::FromDefaults),
 				..Default::default()
 			},
 			..Default::default()
@@ -310,11 +378,14 @@ impl CliConfig {
 		CliConfig {
 			path_args: PathArgs {
 				cache: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "cache"]),
-				policy: None,
+				policy: std::env::current_dir()
+					.ok()
+					.map(|dir| Provenance::FromDefaults(pathbuf![&dir, "Hipcheck.kdl"])),
 				exec: None,
 			},
 			deprecated_args: DeprecatedArgs {
-				config: dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]),
+				config: dirs::home_dir()
+					.map(|dir| Provenance::FromDefaults(pathbuf![&dir, "hipcheck", "config"])),
 				..Default::default()
 			},
 			..Default::default()
@@ -1065,6 +1136,13 @@ mod tests {
 		];
 
 		with_env_vars(vars, || {
+			let config_dir = platform_config().unwrap();
+			let path = pathbuf![&config_dir, "Hipcheck.kdl"];
+			let expected = ConfigMode::PreferPolicy {
+				policy: path,
+				config: config_dir,
+			};
+
 			let config = {
 				let mut temp = CliConfig::empty();
 				temp.update(&CliConfig::from_platform());
@@ -1072,7 +1150,7 @@ mod tests {
 				temp
 			};
 
-			assert_eq!(config.config().unwrap(), platform_config().unwrap());
+			assert_eq!(config.config_mode().unwrap(), expected);
 		});
 	}
 
@@ -1109,7 +1187,10 @@ mod tests {
 		];
 
 		with_env_vars(vars, || {
-			let expected = pathbuf![tempdir.path(), "hipcheck"];
+			let path = pathbuf![tempdir.path(), "hipcheck"];
+			let expected = ConfigMode::ForceConfig {
+				config: path.clone(),
+			};
 
 			let config = {
 				let mut temp = CliConfig::empty();
@@ -1117,7 +1198,7 @@ mod tests {
 				temp.update(&CliConfig::from_env());
 				temp.update(&CliConfig {
 					deprecated_args: DeprecatedArgs {
-						config: Some(expected.clone()),
+						config: Some(Provenance::FromUser(path.clone())),
 						..Default::default()
 					},
 					..Default::default()
@@ -1125,7 +1206,7 @@ mod tests {
 				temp
 			};
 
-			assert_eq!(config.config().unwrap(), expected);
+			assert_eq!(config.config_mode().unwrap(), expected);
 		});
 	}
 
@@ -1133,7 +1214,10 @@ mod tests {
 	fn resolve_policy_with_flag() {
 		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 
-		let expected = pathbuf![tempdir.path(), "HipcheckPolicy.kdl"];
+		let path = pathbuf![tempdir.path(), "HipcheckPolicy.kdl"];
+		let expected = ConfigMode::ForcePolicy {
+			policy: path.clone(),
+		};
 
 		let config = {
 			let mut temp = CliConfig::empty();
@@ -1141,7 +1225,7 @@ mod tests {
 			temp.update(&CliConfig::from_env());
 			temp.update(&CliConfig {
 				path_args: PathArgs {
-					policy: Some(expected.clone()),
+					policy: Some(Provenance::FromUser(path.clone())),
 					..Default::default()
 				},
 				..Default::default()
@@ -1149,7 +1233,7 @@ mod tests {
 			temp
 		};
 
-		assert_eq!(config.policy().unwrap(), expected);
+		assert_eq!(config.config_mode().unwrap(), expected);
 	}
 
 	#[test]

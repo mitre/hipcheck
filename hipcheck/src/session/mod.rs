@@ -2,7 +2,7 @@
 
 use crate::{
 	cache::plugin::HcPluginCache,
-	cli::Format,
+	cli::{ConfigMode, Format},
 	config::{
 		Config, ConfigSource, ConfigSourceStorage, RiskConfigQuery, RiskConfigQueryStorage,
 		WeightTreeQueryStorage,
@@ -77,9 +77,8 @@ impl Session {
 	#[allow(clippy::too_many_arguments)]
 	pub fn new(
 		target: &TargetSeed,
-		config_path: Option<PathBuf>,
+		config_mode: ConfigMode,
 		home_dir: Option<PathBuf>,
-		policy_path: Option<PathBuf>,
 		exec_path: Option<PathBuf>,
 		format: Format,
 	) -> StdResult<Session, Error> {
@@ -112,27 +111,25 @@ impl Session {
 		 *  Loading configuration.
 		 *-----------------------------------------------------------------*/
 
-		// Check if a policy file was provided, otherwise convert a deprecated config file to a policy file. If neither was provided, error out.
-		if policy_path.is_some() {
-			let (policy, policy_path) = load_policy_and_data(policy_path.as_deref())?;
+		use ConfigMode::*;
+		match config_mode {
+			PreferPolicy { policy, config } => {
+				let res = use_policy(policy, &mut session);
+				if let Some(err) = res.err() {
+					Shell::print_error(&err, Format::Human);
+					Shell::println(
+						"Warning: failed to load policy; defaulting to config TOML instead",
+					);
 
-			// No config or dir
-			session.set_config_dir(None);
-
-			// Set policy file and its location
-			session.set_policy(Rc::new(policy));
-			session.set_policy_path(Some(Rc::new(policy_path)));
-		} else if config_path.is_some() {
-			let (policy, config_dir) = load_config_and_data(config_path.as_deref())?;
-
-			// Set config dir
-			session.set_config_dir(Some(Rc::new(config_dir)));
-
-			// Set policy file, with no location to represent that none was given
-			session.set_policy(Rc::new(policy));
-			session.set_policy_path(None);
-		} else {
-			return Err(hc_error!("No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."));
+					use_config(config, &mut session)?;
+				}
+			}
+			ForcePolicy { policy } => {
+				use_policy(policy, &mut session)?;
+			}
+			ForceConfig { config } => {
+				use_config(config, &mut session)?;
+			}
 		}
 
 		// Force eval the risk policy expr - wouldn't be necessary if the PolicyFile parsed
@@ -203,6 +200,30 @@ impl Session {
 	}
 }
 
+fn use_config(config_path: PathBuf, session: &mut Session) -> Result<()> {
+	let (policy, config_dir) = load_config_and_data(config_path)?;
+
+	// Set config dir
+	session.set_config_dir(Some(Rc::new(config_dir)));
+
+	// Set policy file, with no location to represent that none was given
+	session.set_policy(Rc::new(policy));
+	session.set_policy_path(None);
+	Ok(())
+}
+
+fn use_policy(policy_path: PathBuf, session: &mut Session) -> Result<()> {
+	let (policy, policy_path) = load_policy_and_data(policy_path)?;
+
+	// No config or dir
+	session.set_config_dir(None);
+
+	// Set policy file and its location
+	session.set_policy(Rc::new(policy));
+	session.set_policy_path(Some(Rc::new(policy_path)));
+	Ok(())
+}
+
 fn load_software_versions() -> Result<(String, String)> {
 	let git_version = get_git_version()?;
 	DependentProgram::Git.check_version(&git_version)?;
@@ -213,7 +234,7 @@ fn load_software_versions() -> Result<(String, String)> {
 	Ok((git_version, npm_version))
 }
 
-pub fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, PathBuf)> {
+pub fn load_config_and_data(config_path: PathBuf) -> Result<(PolicyFile, PathBuf)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("Loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.");
 	// Increment the phase into the "running" stage.
@@ -221,12 +242,8 @@ pub fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, P
 	// Set the spinner phase to tick constantly, 10 times a second.
 	phase.enable_steady_tick(Duration::from_millis(100));
 
-	// Resolve the path to the config file.
-	let valid_config_path = config_path
-	   .ok_or_else(|| hc_error!("Failed to load configuration. Please make sure the path set by the hc_config env variable exists."))?;
-
 	// Load the configuration file.
-	let config = Config::load_from(valid_config_path)
+	let config = Config::load_from(&config_path)
 		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
 
 	// Convert the Config struct to a PolicyFile struct
@@ -234,10 +251,10 @@ pub fn load_config_and_data(config_path: Option<&Path>) -> Result<(PolicyFile, P
 
 	phase.finish_successful();
 
-	Ok((policy, valid_config_path.to_path_buf()))
+	Ok((policy, config_path))
 }
 
-pub fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, PathBuf)> {
+pub fn load_policy_and_data(policy_path: PathBuf) -> Result<(PolicyFile, PathBuf)> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("loading policy and data files");
 	// Increment the phase into the "running" stage.
@@ -245,20 +262,13 @@ pub fn load_policy_and_data(policy_path: Option<&Path>) -> Result<(PolicyFile, P
 	// Set the spinner phase to tick constantly, 10 times a second.
 	phase.enable_steady_tick(Duration::from_millis(100));
 
-	// Resolve the path to the policy file.
-	let valid_policy_path = policy_path.ok_or_else(|| {
-		hc_error!(
-			"Failed to load policy. Please make sure the path set by the --policy flag exists."
-		)
-	})?;
-
 	// Load the policy file.
-	let policy = PolicyFile::load_from(valid_policy_path)
+	let policy = PolicyFile::load_from(&policy_path)
 		.context("Failed to load policy. Please make sure the policy file is in the provided location and is formatted correctly.")?;
 
 	phase.finish_successful();
 
-	Ok((policy, valid_policy_path.to_path_buf()))
+	Ok((policy, policy_path))
 }
 
 fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
