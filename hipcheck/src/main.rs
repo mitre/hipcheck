@@ -37,8 +37,8 @@ use crate::{
 	shell::Shell,
 };
 use cli::{
-	CacheArgs, CacheOp, CheckArgs, CliConfig, FullCommands, PluginArgs, SchemaArgs, SchemaCommand,
-	UpdateArgs,
+	CacheArgs, CacheOp, CheckArgs, CliConfig, ConfigMode, FullCommands, PluginArgs, SchemaArgs,
+	SchemaCommand, UpdateArgs,
 };
 use config::AnalysisTreeNode;
 use core::fmt;
@@ -129,11 +129,18 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 		}
 	};
 
+	let config_mode = match config.config_mode() {
+		Ok(config_mode) => config_mode,
+		Err(e) => {
+			Shell::print_error(&e, Format::Human);
+			return ExitCode::FAILURE;
+		}
+	};
+
 	let report = run(
 		target,
-		config.config().map(ToOwned::to_owned),
+		config_mode,
 		config.cache().map(ToOwned::to_owned),
-		config.policy().map(ToOwned::to_owned),
 		config.exec().map(ToOwned::to_owned),
 		config.format(),
 	);
@@ -750,21 +757,13 @@ impl CheckKind {
 #[allow(clippy::too_many_arguments)]
 fn run(
 	target: TargetSeed,
-	config_path: Option<PathBuf>,
+	config_mode: ConfigMode,
 	home_dir: Option<PathBuf>,
-	policy_path: Option<PathBuf>,
 	exec_path: Option<PathBuf>,
 	format: Format,
 ) -> Result<Report> {
 	// Initialize the session.
-	let session = Session::new(
-		&target,
-		config_path,
-		home_dir,
-		policy_path,
-		exec_path,
-		format,
-	)?;
+	let session = Session::new(&target, config_mode, home_dir, exec_path, format)?;
 
 	// Run analyses against a repo and score the results (score calls analyses that call metrics).
 	let phase = SpinnerPhase::start("analyzing and scoring results");
