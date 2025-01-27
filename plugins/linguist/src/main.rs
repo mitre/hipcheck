@@ -14,6 +14,7 @@ use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
 #[derive(Deserialize)]
 struct Config {
+	#[serde(rename = "langs-file")]
 	langs_file: Option<PathBuf>,
 }
 

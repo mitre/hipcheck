@@ -1,32 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod error;
-mod linguist;
 mod metric;
 mod types;
-mod util;
 
 use crate::{
 	metric::*,
 	types::{CommitChurn, CommitChurnFreq, CommitDiff},
-	util::db::*,
 };
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::Target};
-use linguist::SourceFileDetector;
 use serde::Deserialize;
 use std::{
-	collections::HashMap,
+	collections::{HashMap, HashSet},
 	path::PathBuf,
 	result::Result as StdResult,
-	sync::{Arc, OnceLock},
+	sync::OnceLock,
 };
-use tokio::sync::Mutex;
 
 #[derive(Deserialize)]
 struct RawConfig {
-	#[serde(rename = "langs-file")]
-	langs_file: Option<PathBuf>,
 	#[serde(rename = "churn-freq")]
 	churn_freq: Option<f64>,
 	#[serde(rename = "commit-percentage")]
@@ -40,21 +33,12 @@ struct PolicyExprConf {
 }
 
 struct Config {
-	langs_file: PathBuf,
 	opt_policy: Option<PolicyExprConf>,
 }
 
 impl TryFrom<RawConfig> for Config {
 	type Error = hipcheck_sdk::error::ConfigError;
 	fn try_from(value: RawConfig) -> StdResult<Config, Self::Error> {
-		// Langs file field must always be present
-		let Some(langs_file) = value.langs_file else {
-			return Err(ConfigError::MissingRequiredConfig {
-				field_name: "langs_file".to_owned(),
-				field_type: "string".to_owned(),
-				possible_values: vec![],
-			});
-		};
 		// Default policy expr depends on two fields. If neither present, no default
 		// policy. else make sure both are present
 		let opt_policy = match (value.churn_freq, value.commit_percentage) {
@@ -88,26 +72,46 @@ impl TryFrom<RawConfig> for Config {
 				});
 			}
 		}
-		Ok(Config {
-			langs_file,
-			opt_policy,
-		})
+		Ok(Config { opt_policy })
 	}
 }
 
-pub static DATABASE: OnceLock<Arc<Mutex<Linguist>>> = OnceLock::new();
-
 #[query]
 async fn commit_churns(
-	_engine: &mut PluginEngine,
-	mut commit_diffs: Vec<CommitDiff>,
+	engine: &mut PluginEngine,
+	commit_diffs: Vec<CommitDiff>,
 ) -> Result<Vec<CommitChurnFreq>> {
-	let linguist = DATABASE
-		.get()
-		.ok_or(Error::UnspecifiedQueryState)?
-		.lock()
-		.await;
-	commit_diffs.retain(|x| is_likely_source_file_cd(&linguist, x));
+	let mut possible_source_files = HashSet::<PathBuf>::new();
+	for cd in commit_diffs.iter() {
+		possible_source_files.extend(
+			cd.diff
+				.file_diffs
+				.iter()
+				.map(|y| PathBuf::from(&y.file_name)),
+		);
+	}
+	let psf_vec = possible_source_files.into_iter().collect::<Vec<_>>();
+
+	let psf_val_vec = psf_vec
+		.iter()
+		.map(serde_json::to_value)
+		.collect::<StdResult<Vec<Value>, serde_json::Error>>()
+		.map_err(|_| Error::UnspecifiedQueryState)?;
+
+	let res = engine.batch_query("mitre/linguist", psf_val_vec).await?;
+	let psf_bools: Vec<bool> = serde_json::from_value(serde_json::Value::Array(res))
+		.map_err(|_| Error::UnspecifiedQueryState)?;
+
+	if psf_bools.len() != psf_vec.len() {
+		return Err(Error::UnspecifiedQueryState);
+	}
+
+	let source_files: HashSet<String> = psf_vec
+		.into_iter()
+		.zip(psf_bools.into_iter())
+		.filter_map(|(p, b)| if b { Some(p) } else { None })
+		.map(|p| p.as_path().to_string_lossy().into_owned())
+		.collect();
 
 	let mut commit_churns = Vec::new();
 	let mut total_files_changed: i64 = 0;
@@ -118,8 +122,11 @@ async fn commit_churns(
 			.diff
 			.file_diffs
 			.iter()
-			.filter(|file_diff| linguist.is_likely_source_file(file_diff.file_name.clone()))
+			.filter(|file_diff| source_files.contains(&file_diff.file_name))
 			.collect::<Vec<_>>();
+		if source_files.is_empty() {
+			continue;
+		}
 
 		// Update files changed.
 		let files_changed = source_files.len() as i64;
@@ -256,23 +263,6 @@ impl Plugin for ChurnPlugin {
 			.set(conf.opt_policy)
 			.map_err(|_| ConfigError::Unspecified {
 				message: "plugin was already configured".to_string(),
-			})?;
-
-		// Use the langs file to create a SourceFileDetector and init the salsa db
-		let sfd =
-			SourceFileDetector::load(conf.langs_file).map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
-			})?;
-
-		let mut database = Linguist::new();
-		database.set_source_file_detector(Arc::new(sfd));
-		let global_db = Arc::new(Mutex::new(database));
-
-		// Make the salsa db globally accessible
-		DATABASE
-			.set(global_db)
-			.map_err(|_e| ConfigError::Unspecified {
-				message: "config was already set".to_owned(),
 			})
 	}
 
@@ -325,23 +315,6 @@ async fn main() -> Result<()> {
 mod test {
 	use super::*;
 	use crate::types::{Commit, Diff, FileDiff};
-	use pathbuf::pathbuf;
-
-	fn init_db_if_uninited() {
-		fn create_db() -> Arc<Mutex<Linguist>> {
-			let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-			let langs_path = pathbuf![&manifest_dir, "../../config/Langs.kdl"];
-			let sfd = SourceFileDetector::load(langs_path)
-				.map_err(|e| ConfigError::Unspecified {
-					message: e.to_string(),
-				})
-				.unwrap();
-			let mut database = Linguist::new();
-			database.set_source_file_detector(Arc::new(sfd));
-			Arc::new(Mutex::new(database))
-		}
-		DATABASE.get_or_init(create_db);
-	}
 
 	fn test_data() -> Vec<CommitDiff> {
 		let c1 = Commit {
@@ -415,11 +388,17 @@ mod test {
 		]
 	}
 
+	fn mock_responses() -> StdResult<MockResponses, Error> {
+		let mut mock_responses = MockResponses::new();
+		mock_responses.insert("mitre/linguist", PathBuf::from("foo.java"), Ok(true))?;
+		mock_responses.insert("mitre/linguist", PathBuf::from("bar.java"), Ok(true))?;
+		mock_responses.insert("mitre/linguist", PathBuf::from("baz.java"), Ok(true))?;
+		Ok(mock_responses)
+	}
+
 	#[tokio::test]
 	async fn test_foo() {
-		init_db_if_uninited();
-
-		let mut engine = PluginEngine::mock(MockResponses::new());
+		let mut engine = PluginEngine::mock(mock_responses().unwrap());
 		let key = test_data();
 
 		let freqs = commit_churns(&mut engine, key).await.unwrap();

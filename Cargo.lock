@@ -465,18 +465,14 @@ dependencies = [
 name = "churn"
 version = "0.3.0"
 dependencies = [
- "anyhow",
  "clap",
  "hipcheck-sdk",
- "kdl 4.7.1",
  "log",
  "pathbuf",
- "salsa",
  "schemars",
  "serde",
  "serde_json",
  "tokio",
- "toml",
 ]
 
 [[package]]
@@ -938,22 +934,18 @@ dependencies = [
 name = "entropy"
 version = "0.3.0"
 dependencies = [
- "anyhow",
  "clap",
  "dashmap",
  "finl_unicode",
  "futures",
  "hipcheck-sdk",
- "kdl 4.7.1",
  "ordered-float",
  "pathbuf",
  "rayon",
- "salsa",
  "schemars",
  "serde",
  "serde_json",
  "tokio",
- "toml",
  "unicode-normalization",
 ]
 

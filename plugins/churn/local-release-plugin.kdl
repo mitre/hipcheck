@@ -12,4 +12,5 @@ entrypoint {
 
 dependencies {
   plugin "mitre/git" version="0.0.0" manifest="./plugins/git/local-release-plugin.kdl"
+  plugin "mitre/linguist" version="0.0.0" manifest="./plugins/linguist/local-release-plugin.kdl"
 }

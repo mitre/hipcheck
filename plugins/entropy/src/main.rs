@@ -1,29 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod error;
-mod linguist;
 mod metric;
 mod types;
-mod util;
 
-use crate::{metric::*, types::*, util::db::*};
+use crate::{metric::*, types::*};
 
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::Target};
-use linguist::SourceFileDetector;
 use serde::Deserialize;
-use tokio::sync::Mutex;
 
 use std::{
+	collections::HashSet,
 	path::PathBuf,
 	result::Result as StdResult,
-	sync::{Arc, OnceLock},
+	sync::OnceLock,
 };
 
 #[derive(Deserialize)]
 struct RawConfig {
-	#[serde(rename = "langs-file")]
-	langs_file: Option<PathBuf>,
 	#[serde(rename = "entropy-threshold")]
 	entropy_threshold: Option<f64>,
 	#[serde(rename = "commit-percentage")]
@@ -37,21 +32,12 @@ struct PolicyExprConf {
 }
 
 struct Config {
-	langs_file: PathBuf,
 	opt_policy: Option<PolicyExprConf>,
 }
 
 impl TryFrom<RawConfig> for Config {
 	type Error = hipcheck_sdk::error::ConfigError;
 	fn try_from(value: RawConfig) -> StdResult<Config, Self::Error> {
-		// Langs file field must always be present
-		let Some(langs_file) = value.langs_file else {
-			return Err(ConfigError::MissingRequiredConfig {
-				field_name: "langs-file".to_owned(),
-				field_type: "string".to_owned(),
-				possible_values: vec![],
-			});
-		};
 		// Default policy expr depends on two fields. If neither present, no default
 		// policy. else make sure both are present
 		let opt_policy = match (value.entropy_threshold, value.commit_percentage) {
@@ -85,38 +71,58 @@ impl TryFrom<RawConfig> for Config {
 				});
 			}
 		}
-		Ok(Config {
-			langs_file,
-			opt_policy,
-		})
+		Ok(Config { opt_policy })
 	}
 }
 
-pub static DATABASE: OnceLock<Arc<Mutex<Linguist>>> = OnceLock::new();
-
 #[query]
 async fn commit_entropies(
-	_engine: &mut PluginEngine,
-	commit_diffs: Vec<CommitDiff>,
+	engine: &mut PluginEngine,
+	mut commit_diffs: Vec<CommitDiff>,
 ) -> Result<Vec<CommitEntropy>> {
-	// Calculate the grapheme frequencies for each commit which contains code.
-	let mut filtered: Vec<CommitDiff> = vec![];
-	let linguist = DATABASE
-		.get()
-		.ok_or(Error::UnspecifiedQueryState)?
-		.lock()
-		.await;
-	for cd in commit_diffs.into_iter() {
-		if is_likely_source_file_cd(&linguist, &cd) {
-			filtered.push(cd);
-		}
+	let mut possible_source_files = HashSet::<PathBuf>::new();
+	for cd in commit_diffs.iter() {
+		possible_source_files.extend(
+			cd.diff
+				.file_diffs
+				.iter()
+				.map(|y| PathBuf::from(&y.file_name)),
+		);
 	}
-	let commit_freqs = filtered
-		.iter()
-		.map(|x| grapheme_freqs(&linguist, x))
-		.collect::<Vec<CommitGraphemeFreq>>();
+	let psf_vec = possible_source_files.into_iter().collect::<Vec<_>>();
 
-	drop(linguist);
+	let psf_val_vec = psf_vec
+		.iter()
+		.map(serde_json::to_value)
+		.collect::<StdResult<Vec<Value>, serde_json::Error>>()
+		.map_err(|_| Error::UnspecifiedQueryState)?;
+
+	let res = engine.batch_query("mitre/linguist", psf_val_vec).await?;
+	let psf_bools: Vec<bool> = serde_json::from_value(serde_json::Value::Array(res))
+		.map_err(|_| Error::UnspecifiedQueryState)?;
+
+	if psf_bools.len() != psf_vec.len() {
+		return Err(Error::UnspecifiedQueryState);
+	}
+
+	let source_files: HashSet<String> = psf_vec
+		.into_iter()
+		.zip(psf_bools.into_iter())
+		.filter_map(|(p, b)| if b { Some(p) } else { None })
+		.map(|p| p.as_path().to_string_lossy().into_owned())
+		.collect();
+
+	// Calculate the grapheme frequencies for each commit which contains code.
+	commit_diffs.retain(|cd| {
+			cd.diff
+				.file_diffs
+				.iter()
+				.any(|x| source_files.contains(&x.file_name))
+		});
+	let commit_freqs = commit_diffs
+		.iter()
+		.map(|x| grapheme_freqs(&source_files, x))
+		.collect::<Vec<CommitGraphemeFreq>>();
 
 	// Calculate baseline grapheme frequencies across all commits which contain code.
 	let baseline_freqs = baseline_freqs(&commit_freqs);
@@ -170,21 +176,6 @@ impl Plugin for EntropyPlugin {
 			.set(conf.opt_policy)
 			.map_err(|_| ConfigError::Unspecified {
 				message: "plugin was already configured".to_string(),
-			})?;
-
-		let sfd =
-			SourceFileDetector::load(conf.langs_file).map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
-			})?;
-
-		let mut database = Linguist::new();
-		database.set_source_file_detector(Arc::new(sfd));
-		let global_db = Arc::new(Mutex::new(database));
-
-		DATABASE
-			.set(global_db)
-			.map_err(|_e| ConfigError::Unspecified {
-				message: "config was already set".to_owned(),
 			})
 	}
 
