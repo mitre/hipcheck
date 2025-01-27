@@ -39,7 +39,7 @@ content_inspector = "0.2.4"
 cyclonedx-bom = "0.8.0"
 dotenv = "0.15.0"
 chrono = { version = "0.4.39", features = ["alloc", "serde"] }
-clap = { version = "4.5.23", features = ["derive"] }
+clap = { version = "4.5.27", features = ["derive"] }
 console = { version = "0.15.10", features = ["windows-console-colors"] }
 dashmap = { version = "6.1.0", features = ["rayon", "inline"] }
 dialoguer = "0.11.0"
@@ -107,7 +107,7 @@ schemars = { version = "0.8.21", default-features = false, features = [
     "chrono",
     "url",
 ] }
-semver = "1.0.24"
+semver = "1.0.25"
 serde = { version = "1.0.215", features = ["derive", "rc"] }
 serde_derive = "1.0.137"
 serde_json = "1.0.134"
@@ -118,7 +118,7 @@ tabled = "0.17.0"
 tar = "0.4.43"
 tempfile = "3.14.0"
 term_size = "0.3.2"
-tokio = { version = "1.42.0", features = [
+tokio = { version = "1.43.0", features = [
     "rt",
     "rt-multi-thread",
     "sync",
@@ -136,7 +136,7 @@ ureq = { version = "2.12.1", default-features = false, features = [
 url = { version = "2.5.4", features = ["serde"] }
 walkdir = "2.5.0"
 which = { version = "7.0.1", default-features = false }
-xml-rs = "0.8.24"
+xml-rs = "0.8.25"
 xz2 = "0.1.7"
 zip = "2.2.2"
 zip-extensions = "0.8.1"
@@ -158,4 +158,4 @@ which = { version = "7.0.1", default-features = false }
 [dev-dependencies]
 
 dirs = "6.0.0"
-test-log = "0.2.16"
+test-log = "0.2.17"

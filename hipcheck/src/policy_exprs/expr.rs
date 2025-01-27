@@ -64,6 +64,7 @@ pub type TypeChecker = fn(&[Type]) -> Result<ReturnableType>;
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub struct FunctionDef {
 	pub name: String,
+	pub english: String,
 	pub expected_args: usize,
 	pub ty_checker: TypeChecker,
 	pub op: Op,
@@ -133,6 +134,21 @@ impl Function {
 			args,
 			opt_def: Some(op_info),
 		})
+	}
+
+	// If the function has exactly 2 arguments, switch their order
+	pub fn swap_args(&self) -> Self {
+		let args = &self.args;
+		let new_args = match args.len() {
+			2 => vec![args[1].clone(), args[0].clone()],
+			_ => args.clone(),
+		};
+
+		Function {
+			ident: self.ident.clone(),
+			args: new_args,
+			opt_def: self.opt_def.clone(),
+		}
 	}
 }
 impl From<Function> for Expr {

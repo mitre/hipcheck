@@ -44,7 +44,13 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 					.unwrap_or("no query explanation provided".to_owned());
 
 				builder.add_analysis(
-					Analysis::plugin(name, stored.passed, stored.policy.clone(), message),
+					Analysis::plugin(
+						name,
+						stored.passed,
+						stored.policy.clone(),
+						stored.value.clone(),
+						message,
+					),
 					res.concerns.clone(),
 				)?;
 			}

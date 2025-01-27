@@ -43,6 +43,9 @@ pub enum Error {
 	#[error("expression returned '{0:?}', not a boolean")]
 	DidNotReturnBool(Expr),
 
+	#[error("evaluation of inner expression returned '{0:?}', not a primitive")]
+	BadReturnType(Expr),
+
 	#[error("tried to call unknown function '{0}'")]
 	UnknownFunction(String),
 

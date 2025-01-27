@@ -363,45 +363,45 @@ impl Env<'_> {
 		let mut env = Env::empty();
 
 		// Comparison functions.
-		env.add_fn("gt", gt, 2, ty_comp);
-		env.add_fn("lt", lt, 2, ty_comp);
-		env.add_fn("gte", gte, 2, ty_comp);
-		env.add_fn("lte", lte, 2, ty_comp);
-		env.add_fn("eq", eq, 2, ty_comp);
-		env.add_fn("neq", neq, 2, ty_comp);
+		env.add_fn("gt", "greater than", gt, 2, ty_comp);
+		env.add_fn("lt", "less than", lt, 2, ty_comp);
+		env.add_fn("gte", "greater than or equal to", gte, 2, ty_comp);
+		env.add_fn("lte", "less than or equal to", lte, 2, ty_comp);
+		env.add_fn("eq", "equal to", eq, 2, ty_comp);
+		env.add_fn("neq", "not equal to", neq, 2, ty_comp);
 
 		// Math functions.
-		env.add_fn("add", add, 2, ty_arithmetic_binary_ops);
-		env.add_fn("sub", sub, 2, ty_arithmetic_binary_ops);
-		env.add_fn("divz", divz, 2, ty_divz);
+		env.add_fn("add", "plus", add, 2, ty_arithmetic_binary_ops);
+		env.add_fn("sub", "minus", sub, 2, ty_arithmetic_binary_ops);
+		env.add_fn("divz", "divided by", divz, 2, ty_divz);
 
 		// Additional datetime math functions
-		env.add_fn("duration", duration, 2, ty_duration);
+		env.add_fn("duration", "minus", duration, 2, ty_duration);
 
 		// Logical functions.
-		env.add_fn("and", and, 2, ty_bool_binary);
-		env.add_fn("or", or, 2, ty_bool_binary);
-		env.add_fn("not", not, 1, ty_bool_unary);
+		env.add_fn("and", "and", and, 2, ty_bool_binary);
+		env.add_fn("or", "or", or, 2, ty_bool_binary);
+		env.add_fn("not", "not", not, 1, ty_bool_unary);
 
 		// Array math functions.
-		env.add_fn("max", max, 1, ty_from_first_arr);
-		env.add_fn("min", min, 1, ty_from_first_arr);
-		env.add_fn("avg", avg, 1, ty_avg);
-		env.add_fn("median", median, 1, ty_from_first_arr);
-		env.add_fn("count", count, 1, ty_count);
+		env.add_fn("max", "the maximum of", max, 1, ty_from_first_arr);
+		env.add_fn("min", "the minimum of", min, 1, ty_from_first_arr);
+		env.add_fn("avg", "the mean of", avg, 1, ty_avg);
+		env.add_fn("median", "the median of", median, 1, ty_from_first_arr);
+		env.add_fn("count", "the number of elements in", count, 1, ty_count);
 
 		// Array logic functions.
-		env.add_fn("all", all, 1, ty_higher_order_bool_fn);
-		env.add_fn("nall", nall, 1, ty_higher_order_bool_fn);
-		env.add_fn("some", some, 1, ty_higher_order_bool_fn);
-		env.add_fn("none", none, 1, ty_higher_order_bool_fn);
+		env.add_fn("all", "all of", all, 1, ty_higher_order_bool_fn);
+		env.add_fn("nall", "not all of", nall, 1, ty_higher_order_bool_fn);
+		env.add_fn("some", "some of", some, 1, ty_higher_order_bool_fn);
+		env.add_fn("none", "none of", none, 1, ty_higher_order_bool_fn);
 
 		// Array higher-order functions.
-		env.add_fn("filter", filter, 2, ty_filter);
-		env.add_fn("foreach", foreach, 2, ty_foreach);
+		env.add_fn("filter", "filtered on", filter, 2, ty_filter);
+		env.add_fn("foreach", "each to be", foreach, 2, ty_foreach);
 
 		// Debugging functions.
-		env.add_fn("dbg", dbg, 1, ty_inherit_first);
+		env.add_fn("dbg", "debugging", dbg, 1, ty_inherit_first);
 
 		env
 	}
@@ -423,6 +423,7 @@ impl Env<'_> {
 	pub fn add_fn(
 		&mut self,
 		name: &str,
+		english: &str,
 		op: Op,
 		expected_args: usize,
 		ty_checker: TypeChecker,
@@ -431,6 +432,7 @@ impl Env<'_> {
 			name.to_owned(),
 			Binding::Fn(FunctionDef {
 				name: name.to_owned(),
+				english: english.to_owned(),
 				expected_args,
 				ty_checker,
 				op,

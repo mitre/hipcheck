@@ -113,7 +113,7 @@ impl Plugin for BinaryPlugin {
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"Returns number of detected binary files in a repo".to_owned(),
+			"the number of detected binary files in a repo".to_owned(),
 		))
 	}
 
