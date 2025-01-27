@@ -7,7 +7,7 @@ repository = "https://github.com/mitre/hipcheck"
 publish = false
 
 [dependencies]
-clap = { version = "4.5.23", features = ["derive"] }
+clap = { version = "4.5.27", features = ["derive"] }
 content_inspector = "0.2.4"
 hipcheck-sdk = { version = "0.3.0", path = "../../sdk/rust", features = [
     "macros",
