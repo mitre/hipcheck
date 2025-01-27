@@ -14,6 +14,9 @@ patch {
 	plugin "mitre/github" {
 		api-token-var "HC_GITHUB_TOKEN"
 	}
+	plugin "mitre/linguist" {
+        langs-file #rel("Langs.kdl")
+    }
 }
 
 analyze {
@@ -43,13 +46,10 @@ analyze {
             }
 
             analysis "mitre/entropy" policy="(eq 0 (count (filter (gt 8.0) $)))" {
-				langs-file #rel("Langs.kdl")
 				entropy-threshold 10.0
 				commit-percentage 0.0
 	 		}
-            analysis "mitre/churn" policy="(lte (divz (count (filter (gt 3) $)) (count $)) 0.02)" {
-				langs-file #rel("Langs.kdl")
-			}
+            analysis "mitre/churn" policy="(lte (divz (count (filter (gt 3) $)) (count $)) 0.02)"
         }
     }
 }

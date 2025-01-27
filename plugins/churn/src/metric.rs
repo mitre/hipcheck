@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-	types::*,
-	util::db::{Linguist, LinguistSource},
-};
 use std::iter::Iterator;
-
-/// Check if a commit diff is a likely source file.
-pub fn is_likely_source_file_cd(linguist: &Linguist, commit_diff: &CommitDiff) -> bool {
-	let mut has_source = false;
-	for fd in commit_diff.diff.file_diffs.iter() {
-		has_source |= linguist.is_likely_source_file(fd.file_name.clone());
-	}
-	has_source
-}
 
 /// Calculate the arithmetic mean for a set of floats. Returns an option to account
 /// for the possibility of dividing by zero.

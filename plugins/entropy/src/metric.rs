@@ -1,25 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-	error::*,
-	hc_error,
-	types::*,
-	util::db::{Linguist, LinguistSource},
-};
+use crate::{error::*, hc_error, types::*};
 use dashmap::DashMap;
 use finl_unicode::grapheme_clusters::Graphemes;
 use rayon::prelude::*;
-use std::{collections::HashMap, iter::Iterator, ops::Not};
+use std::{
+	collections::{HashMap, HashSet},
+	iter::Iterator,
+	ops::Not,
+};
 use unicode_normalization::UnicodeNormalization;
-
-/// Check if a commit diff is a likely source file.
-pub fn is_likely_source_file_cd(linguist: &Linguist, commit_diff: &CommitDiff) -> bool {
-	let mut has_source = false;
-	for fd in commit_diff.diff.file_diffs.iter() {
-		has_source |= linguist.is_likely_source_file(fd.file_name.clone());
-	}
-	has_source
-}
 
 /// Calculate the arithmetic mean for a set of floats. Returns an option to account
 /// for the possibility of dividing by zero.
@@ -55,7 +45,10 @@ pub fn std_dev(mean: f64, data: &[f64]) -> Option<f64> {
 }
 
 /// Calculate grapheme frequencies for each commit.
-pub fn grapheme_freqs(linguist: &Linguist, commit_diff: &CommitDiff) -> CommitGraphemeFreq {
+pub fn grapheme_freqs(
+	source_files: &HashSet<String>,
+	commit_diff: &CommitDiff,
+) -> CommitGraphemeFreq {
 	// #[cfg(feature = "print-timings")]
 	// let _0 = crate::benchmarking::print_scope_time!("grapheme_freqs");
 
@@ -69,8 +62,7 @@ pub fn grapheme_freqs(linguist: &Linguist, commit_diff: &CommitDiff) -> CommitGr
 		.iter()
 		.filter(|file_diff| {
 			// Filter out any that are probably not source files, or are empty patches
-			let is_source = linguist.is_likely_source_file(file_diff.file_name.clone());
-			is_source && file_diff.patch.is_empty().not()
+			source_files.contains(&file_diff.file_name) && file_diff.patch.is_empty().not()
 		})
 		.collect();
 	// Use this variable to track the total number of graphemes accross all patches in this commit diff.
