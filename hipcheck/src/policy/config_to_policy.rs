@@ -15,6 +15,8 @@ use crate::{
 	hc_error,
 	plugin::PluginVersion,
 };
+use std::{env, path::PathBuf};
+use walkdir::WalkDir;
 
 use serde_json::Value;
 use std::collections::HashMap;
@@ -177,7 +179,7 @@ fn parse_binary(
 		config
 			.insert(
 				"binary-file".to_string(),
-				Value::String(format!("./config/{}", file)),
+				source_dir(&file),
 			)
 			.unwrap();
 
@@ -318,7 +320,7 @@ fn parse_typo(plugins: &mut PolicyPluginList, attacks: &mut PolicyCategory, typo
 		config
 			.insert(
 				"typo-file".to_string(),
-				Value::String(format!("./config/{}", file)),
+				source_dir(&file),
 			)
 			.unwrap();
 
@@ -360,7 +362,7 @@ fn parse_affiliation(
 		config
 			.insert(
 				"orgs-file".to_string(),
-				Value::String(format!("./config/{}", file)),
+				source_dir(&file),
 			)
 			.unwrap();
 
@@ -401,7 +403,7 @@ fn parse_churn(plugins: &mut PolicyPluginList, commit: &mut PolicyCategory, chur
 		config
 			.insert(
 				"langs-file".to_string(),
-				Value::String("./config/Langs.kdl".to_string()),
+				source_dir(&"Langs.kdl".to_string()),
 			)
 			.unwrap();
 
@@ -446,7 +448,7 @@ fn parse_entropy(
 		config
 			.insert(
 				"langs-file".to_string(),
-				Value::String("./config/Langs.kdl".to_string()),
+				source_dir(&"Langs.kdl".to_string()),
 			)
 			.unwrap();
 
@@ -469,4 +471,33 @@ fn parse_entropy(
 		));
 		commit.push(analysis);
 	}
+}
+
+fn source_dir(config_file: &String) -> serde_json::Value {
+	let file_name = "Hipcheck.toml";
+
+	let curr_dir = env::current_dir().expect("Couldn't resolve current directory");
+	let mut path: Option<PathBuf> = None;
+
+	for entry in WalkDir::new(&curr_dir) {
+		let entry = entry.expect("Error walking directory");
+		// Locate the parent directory of Hipcheck.toml
+		if entry.file_name() == file_name {
+			path = Some(
+				entry
+					.path()
+					.parent()
+					.expect("Failed to get parent")
+					.to_path_buf(),
+			);
+			break;
+		}
+	}
+
+	// Format the file path
+	let mut final_path = path.expect("Hipcheck.toml not found");
+	final_path.push(config_file);
+	let final_string = final_path.to_str().expect("Failed conversion");
+
+	Value::String(final_string.to_string())
 }
