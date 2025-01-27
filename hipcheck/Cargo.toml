@@ -158,4 +158,4 @@ which = { version = "7.0.1", default-features = false }
 [dev-dependencies]
 
 dirs = "6.0.0"
-test-log = "0.2.16"
+test-log = "0.2.17"
