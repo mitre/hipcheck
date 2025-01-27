@@ -8,11 +8,10 @@ use crate::{
 	error::Result,
 	hc_error,
 	plugin::Arch,
-	session::pm,
 	shell::{color_choice::ColorChoice, verbosity::Verbosity},
 	source,
 	target::{
-		LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, TargetSeed,
+		pm, LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, TargetSeed,
 		TargetSeedKind, TargetType, ToTargetSeed, ToTargetSeedKind,
 	},
 };

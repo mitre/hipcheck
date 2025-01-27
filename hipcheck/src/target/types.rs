@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use clap::ValueEnum;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::{
@@ -8,6 +9,17 @@ use std::{
 	path::PathBuf,
 };
 use url::Url;
+
+#[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TargetType {
+	Maven,
+	Npm,
+	Pypi,
+	Repo,
+	Request,
+	Sbom,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Target {

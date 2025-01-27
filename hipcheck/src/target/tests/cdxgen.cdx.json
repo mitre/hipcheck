@@ -1,0 +1,116 @@
+{
+    "bomFormat": "CycloneDX",
+    "specVersion": "1.5",
+    "serialNumber": "urn:uuid:de517446-d9eb-49d0-95fd-dd93c54a88d1",
+    "version": 1,
+    "metadata": {
+      "timestamp": "2024-11-22T20:22:51Z",
+      "tools": {
+        "components": [
+          {
+            "group": "@cyclonedx",
+            "name": "cdxgen",
+            "version": "10.7.1",
+            "purl": "pkg:npm/%40cyclonedx/cdxgen@10.7.1",
+            "type": "application",
+            "bom-ref": "pkg:npm/@cyclonedx/cdxgen@10.7.1",
+            "author": "OWASP Foundation",
+            "publisher": "OWASP Foundation"
+          }
+        ]
+      },
+      "authors": [
+        {
+          "name": "OWASP Foundation"
+        }
+      ],
+      "lifecycles": [
+        {
+          "phase": "build"
+        }
+      ],
+      "component": {
+        "group": "",
+        "name": "github.com/viveksahu26/stree",
+        "version": "",
+        "purl": "pkg:golang/github.com/viveksahu26/stree",
+        "bom-ref": "pkg:golang/github.com/viveksahu26/stree",
+        "scope": "required",
+        "properties": [
+          {
+            "name": "SrcGoMod",
+            "value": "/home/linuzz/go/src/github.com/viveksahu26/stree/go.mod"
+          },
+          {
+            "name": "ModuleGoVersion",
+            "value": "1.21.4"
+          },
+          {
+            "name": "cdx:go:indirect",
+            "value": "false"
+          }
+        ],
+        "type": "application"
+      }
+    },
+    "components": [
+      {
+        "group": "",
+        "name": "github.com/spf13/pflag",
+        "version": "v1.0.5",
+        "scope": "optional",
+        "hashes": [
+          {
+            "alg": "SHA-256",
+            "content": "31c5df227251af3e026575593812dbd1b4d9a844e488084cf48c34cb7027d818"
+          }
+        ],
+        "purl": "pkg:golang/github.com/spf13/pflag@v1.0.5",
+        "type": "library",
+        "bom-ref": "pkg:golang/github.com/spf13/pflag@v1.0.5",
+        "properties": [
+          {
+            "name": "SrcGoMod",
+            "value": "/home/linuzz/go/pkg/mod/cache/download/github.com/spf13/pflag/@v/v1.0.5.mod"
+          },
+          {
+            "name": "ModuleGoVersion",
+            "value": "1.12"
+          },
+          {
+            "name": "cdx:go:indirect",
+            "value": "true"
+          }
+        ]
+      },
+      {
+        "group": "",
+        "name": "github.com/spf13/cobra",
+        "version": "v1.8.1",
+        "scope": "required",
+        "hashes": [
+          {
+            "alg": "SHA-256",
+            "content": "c07c4472e75faa62d86bc8937cbf8eb993db059926be588158a21eccdde40fd6"
+          }
+        ],
+        "purl": "pkg:golang/github.com/spf13/cobra@v1.8.1",
+        "type": "library",
+        "bom-ref": "pkg:golang/github.com/spf13/cobra@v1.8.1",
+        "properties": [
+          {
+            "name": "SrcGoMod",
+            "value": "/home/linuzz/go/pkg/mod/cache/download/github.com/spf13/cobra/@v/v1.8.1.mod"
+          },
+          {
+            "name": "ModuleGoVersion",
+            "value": "1.15"
+          },
+          {
+            "name": "cdx:go:indirect",
+            "value": "false"
+          }
+        ]
+      }
+    ]
+}
