@@ -71,6 +71,9 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 		}
 	};
 
+	let null_key = msg.key.is_empty();
+	let null_output = msg.output.is_empty();
+
 	let mut out: Vec<PluginQuery> = vec![];
 	let mut base: PluginQuery = msg;
 
@@ -111,6 +114,19 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 				break;
 			}
 		}
+
+		// @Compatibility - pre-RFD9 will expect exactly 1 field, if empty, need to increase to empty
+		if cfg!(feature = "rfd9-compat") {
+			// if a key was empty in this query, then insert a null placeholder
+			if chunked_query.key.is_empty() {
+				chunked_query.key.push("".to_owned());
+			}
+			// if an output was empty in this query, then insert a null placeholder
+			if chunked_query.output.is_empty() {
+				chunked_query.output.push("".to_owned());
+			}
+		}
+
 		out.push(chunked_query);
 	}
 
@@ -118,6 +134,25 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 	if let Some(last) = out.last_mut() {
 		last.state = completion_state as i32;
 	}
+
+	// @Compatibility - pre-RFD9 expects concatenation of all `key` fields to be a valid JSON
+	// string, same with `output`. This ensures if either were all blank, at least the first says
+	// "null"
+	if cfg!(feature = "rfd9-compat") && (null_key || null_output) {
+		if let Some(first) = out.first_mut() {
+			if null_key {
+				if let Some(k) = first.key.first_mut() {
+					*k = "null".to_owned()
+				}
+			}
+			if null_output {
+				if let Some(o) = first.output.first_mut() {
+					*o = "null".to_owned()
+				}
+			}
+		}
+	}
+
 	Ok(out)
 }
 
@@ -200,7 +235,16 @@ fn last_field_to_have_content(query: &PluginQuery) -> QueryVecField {
 	if !query.concern.is_empty() {
 		return QueryVecField::Concern;
 	}
-	if !query.output.is_empty() {
+	// @Compatibility - for backwards compatibility, the query.output field will always contain
+	// at least one field. if the length is one and is null, then that is equivalent to an empty
+	// output field
+	if cfg!(feature = "rfd9-compat") {
+		if !(query.output.len() == 1
+			&& (query.output.first().unwrap() == "" || query.output.first().unwrap() == "null"))
+		{
+			return QueryVecField::Output;
+		}
+	} else if !query.output.is_empty() {
 		return QueryVecField::Output;
 	}
 	QueryVecField::Key
@@ -225,6 +269,7 @@ impl QuerySynthesizer {
 			};
 		}
 		let raw = self.raw.as_mut().unwrap(); // We know its `Some`, was set above
+
 		let initial_state: QueryState = raw
 			.state
 			.try_into()
@@ -321,6 +366,7 @@ impl QuerySynthesizer {
 								}
 							}
 						}
+
 						raw.key.extend(next.key);
 						raw.output.extend(next.output);
 						raw.concern.extend(next.concern);
@@ -338,6 +384,7 @@ impl QuerySynthesizer {
 				});
 			}
 		}
+
 		self.raw.take().unwrap().try_into().map(Some)
 	}
 }
@@ -464,6 +511,11 @@ mod test {
 		];
 
 		for (intermediate_state, final_state) in states.into_iter() {
+			let output = if cfg!(feature = "rfd9-compat") {
+				vec!["null".to_owned()]
+			} else {
+				vec![]
+			};
 			let orig_query = PluginQuery {
 				id: 0,
 				state: final_state as i32,
@@ -472,7 +524,7 @@ mod test {
 				query_name: "".to_owned(),
 				// This key will cause the chunk not to occur on a char boundary
 				key: vec![serde_json::to_string("aこれは実験です").unwrap()],
-				output: vec![],
+				output,
 				concern: vec![
 					"< 10".to_owned(),
 					"0123456789".to_owned(),

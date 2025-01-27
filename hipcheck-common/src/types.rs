@@ -4,6 +4,7 @@ use crate::{
 	error::Error,
 	proto::{Query as PluginQuery, QueryState},
 };
+use serde_json::Value;
 
 #[derive(Debug)]
 pub struct Query {
@@ -52,18 +53,40 @@ impl TryFrom<PluginQuery> for Query {
 	fn try_from(value: PluginQuery) -> Result<Query, Self::Error> {
 		let direction = QueryDirection::try_from(value.state())?;
 
-		let mut keys = Vec::with_capacity(value.key.len());
-		for x in value.key.into_iter() {
-			let value = serde_json::from_str(x.as_str()).map_err(Error::InvalidJsonInQueryKey)?;
-			keys.push(value);
+		fn get_fields_rfd9(v: &PluginQuery) -> Result<(Vec<Value>, Vec<Value>), Error> {
+			let mut keys = Vec::with_capacity(v.key.len());
+			for x in v.key.iter() {
+				let value =
+					serde_json::from_str(x.as_str()).map_err(Error::InvalidJsonInQueryKey)?;
+				keys.push(value);
+			}
+
+			let mut outputs = Vec::with_capacity(v.output.len());
+			for x in v.output.iter() {
+				let value =
+					serde_json::from_str(x.as_str()).map_err(Error::InvalidJsonInQueryOutput)?;
+				outputs.push(value);
+			}
+
+			Ok((keys, outputs))
 		}
 
-		let mut outputs = Vec::with_capacity(value.output.len());
-		for x in value.output.into_iter() {
-			let value =
-				serde_json::from_str(x.as_str()).map_err(Error::InvalidJsonInQueryOutput)?;
-			outputs.push(value);
+		fn get_fields_compat(v: &PluginQuery) -> Result<(Vec<Value>, Vec<Value>), Error> {
+			let key = v.key.join("");
+			let output = v.output.join("");
+			let json_key = serde_json::from_str(&key).map_err(Error::InvalidJsonInQueryKey)?;
+			let json_out =
+				serde_json::from_str(&output).map_err(Error::InvalidJsonInQueryOutput)?;
+			Ok((vec![json_key], vec![json_out]))
 		}
+
+		let rfd9_res = get_fields_rfd9(&value);
+
+		let (keys, outputs) = if rfd9_res.is_err() && cfg!(feature = "rfd9-compat") {
+			get_fields_compat(&value)?
+		} else {
+			rfd9_res?
+		};
 
 		Ok(Query {
 			id: value.id as usize,
@@ -90,6 +113,7 @@ impl TryFrom<Query> for PluginQuery {
 				serde_json::to_string(&key).map_err(Error::InvalidJsonInQueryKey)?;
 			keys.push(json_formatted_key);
 		}
+
 		let mut outputs = vec![];
 		for output in value.output {
 			let json_formatted_output =
