@@ -1,0 +1,15 @@
+publisher "mitre"
+name "review"
+version "0.1.0"
+license "Apache-2.0"
+
+entrypoint {
+  on arch="aarch64-apple-darwin" "./target/release/review"
+  on arch="x86_64-apple-darwin" "./target/release/review"
+  on arch="x86_64-unknown-linux-gnu" "./target/release/review"
+  on arch="x86_64-pc-windows-msvc" "./target/release/review.exe"
+}
+
+dependencies {
+  plugin "mitre/github" version="0.1.0" manifest="./plugins/github/local-release-plugin.kdl"
+}
