@@ -2,6 +2,7 @@
 
 //! A task to simulate a CI run locally.
 
+use super::buf::run_buf_lint;
 use anyhow::{anyhow, Error, Result};
 use std::{mem::drop, ops::Not as _};
 use xshell::{cmd, Shell};
@@ -29,6 +30,7 @@ pub fn run() -> Result<()> {
 		task!(run_build),
 		task!(run_test),
 		task!(run_clippy),
+		task!(run_buf_lint),
 		task!(run_xtask_check),
 		task!(done),
 	];
@@ -123,6 +125,7 @@ fn print_versions(sh: &Shell) -> Result<()> {
 	print_fmt_version(sh)?;
 	print_clippy_version(sh)?;
 	print_xtask_version(sh)?;
+	print_buf_version(sh)?;
 
 	Ok(())
 }
@@ -167,6 +170,14 @@ fn print_xtask_version(sh: &Shell) -> Result<()> {
 	.run()
 	.map(drop)
 	.map_err(reason("call to cargo xtask failed. Make sure rust is installed and path to home-dir-here/.cargo/bin is on your path."))
+}
+
+/// Print the version of `buf`
+fn print_buf_version(sh: &Shell) -> Result<()> {
+	cmd!(sh, "buf --version")
+		.run()
+		.map(drop)
+		.map_err(reason("call to buf failed. Make sure buf is installed."))
 }
 
 /// Run `cargo fmt`.
