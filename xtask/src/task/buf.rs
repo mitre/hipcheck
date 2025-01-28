@@ -13,7 +13,7 @@ pub fn run() -> Result<()> {
 
 	let root = workspace::root()?;
 	let config = pathbuf![&root, ".buf.yaml"];
-	let target = pathbuf![&root, "hipcheck", "proto"];
+	let target = pathbuf![&root, "hipcheck-common", "proto"];
 
 	cmd!(sh, "buf lint --config {config} {target}").run()?;
 
