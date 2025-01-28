@@ -1,0 +1,15 @@
+publisher "mitre"
+name "churn"
+version "0.2.0"
+license "Apache-2.0"
+
+entrypoint {
+  on arch="aarch64-apple-darwin" "./target/release/churn"
+  on arch="x86_64-apple-darwin" "./target/release/churn"
+  on arch="x86_64-unknown-linux-gnu" "./target/release/churn"
+  on arch="x86_64-pc-windows-msvc" "./target/release/churn.exe"
+}
+
+dependencies {
+  plugin "mitre/git" version="0.3.0" manifest="./plugins/git/local-release-plugin.kdl"
+}

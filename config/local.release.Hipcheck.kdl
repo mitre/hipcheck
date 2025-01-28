@@ -1,0 +1,55 @@
+
+plugins {
+    plugin "mitre/activity" version="0.2.0" manifest="plugins/activity/local-release-plugin.kdl"
+    plugin "mitre/affiliation" version="0.2.0" manifest="plugins/affiliation/local-release-plugin.kdl"
+    plugin "mitre/binary" version="0.1.0" manifest="plugins/binary/local-release-plugin.kdl"
+    plugin "mitre/churn" version="0.2.0" manifest="plugins/churn/local-release-plugin.kdl"
+    plugin "mitre/entropy" version="0.2.0" manifest="plugins/entropy/local-release-plugin.kdl"
+    plugin "mitre/fuzz" version="0.1.1" manifest="plugins/fuzz/local-release-plugin.kdl"
+    plugin "mitre/review" version="0.1.0" manifest="plugins/review/local-release-plugin.kdl"
+    plugin "mitre/typo" version="0.1.0" manifest="plugins/typo/local-release-plugin.kdl"
+}
+
+patch {
+	plugin "mitre/github" {
+		api-token-var "HC_GITHUB_TOKEN"
+	}
+}
+
+analyze {
+    investigate policy="(gt 0.5 $)"
+    investigate-if-fail "mitre/typo" "mitre/binary"
+
+    category "practices" {
+        analysis "mitre/activity" policy="(lte $ P52w)" weight=3
+        analysis "mitre/binary" {
+			binary-file #rel("Binary.toml")
+			binary-file-threshold 0
+		}
+        analysis "mitre/fuzz" policy="(eq #t $)"
+        analysis "mitre/review" policy="(lte (divz (count (filter (eq #f) $)) (count $)) 0.05)"
+    }
+
+    category "attacks" {
+        analysis "mitre/typo" {
+            typo-file #rel("Typos.toml")
+            count-threshold 0
+        }
+
+        category "commit" {
+            analysis "mitre/affiliation" {
+                orgs-file #rel("Orgs.kdl")
+                count-threshold 0
+            }
+
+            analysis "mitre/entropy" policy="(eq 0 (count (filter (gt 8.0) $)))" {
+				langs-file #rel("Langs.toml")
+				entropy-threshold 10.0
+				commit-percentage 0.0
+	 		}
+            analysis "mitre/churn" policy="(lte (divz (count (filter (gt 3) $)) (count $)) 0.02)" {
+				langs-file #rel("Langs.toml")
+			}
+        }
+    }
+}
