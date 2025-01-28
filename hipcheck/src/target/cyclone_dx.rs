@@ -2,10 +2,14 @@
 
 //! Utilities for extracting repository info from CycloneDX documents.
 
+use super::{
+	pm::{extract_repo_for_maven, extract_repo_for_npm, extract_repo_for_pypi},
+	purl::parse_purl,
+	TargetType,
+};
 use crate::{
 	error::{Context as _, Result},
 	hc_error,
-	session::pm::{extract_repo_for_maven, extract_repo_for_npm, extract_repo_for_pypi},
 };
 use cyclonedx_bom::prelude::*;
 use packageurl::PackageUrl;
@@ -52,85 +56,34 @@ fn extract_download_url(bom: Bom) -> Result<Url> {
         .as_ref()
     )?;
 
-	match purl.ty() {
-		"github" => {
-			// Get GitHub repo URL from pURL
-			// For now we ignore the "version" field, which has GitHub tag information, until Hipcheck can cleanly handle things other than the main/master branch of a repo
-			let mut url = "https://github.com/".to_string();
-			// A repo must have an owner
-			match purl.namespace() {
-				Some(owner) => url.push_str(owner),
-				None => {
-					return Err(hc_error!(
-					"Download location for CycloneDX file is a GitHub repository with no owner."
-				))
-				}
-			}
-			url.push('/');
-			let name = purl.name();
-			url.push_str(name);
-			url.push_str(".git");
-
-			Url::parse(&url).map_err(|e| hc_error!("Cannot parse constructed GitHub repository URL constructed from CycloneDX file download location: {}", e))
+	match parse_purl(&purl) {
+		Some((TargetType::Repo, url)) => Url::parse(&url).map_err(|e| hc_error!("Cannot parse constructed GitHub repository URL constructed from CycloneDX file download location: {}", e)),
+		Some((TargetType::Maven, url)) => extract_repo_for_maven(&url).context("Could not get git repo URL for CycloneDX file's corresponding Maven package",),
+		Some((TargetType::Npm, full_package)) =>  {
+			let split_package: Vec<&str> = full_package.split('@').collect();
+			let package = split_package[0];
+			let version = match split_package.len() {
+				1 => "no version",
+				_ => split_package[1],
+			};
+			extract_repo_for_npm(package, version).context("Could not get git repo URL for CycloneDX file's corresponding NPM package",)
+		},
+		Some((TargetType::Pypi, full_package)) =>  {
+			let split_package: Vec<&str> = full_package.split('@').collect();
+			let package = split_package[0];
+			let version = match split_package.len() {
+				1 => "no version",
+				_ => split_package[1],
+			};
+			extract_repo_for_pypi(package, version).context("Could not get git repo URL for CycloneDX file's corresponding PyPI package",)
+		},
+		_ => match purl.ty() {
+			// It is possible to fail to resolve a URL from a GitHub repo or Maven package while parsing a pURL.
+			// Give a special error message for those cases. Otherwise, assume we have parsed an incompatible pURL type.
+			"github" => Err(hc_error!("Could not determine GitHub reposity download location from CycloneDX file.")),
+			"maven" =>  Err(hc_error!("Could not determine git repo Url from CycloneDX file's corresponding Maven package.")),
+			_ => Err(hc_error!("Download location for CycloneDX file is a pURL for a type not currently supported by Hipcheck.")),
 		}
-		"maven" => {
-			// First construct Maven package POM file URL from pURL as the updated target string
-			// We currently only support parsing Maven packages hosted at repo1.maven.org
-			let mut url = "https://repo1.maven.org/maven2/".to_string();
-			// A package must belong to a group
-			match purl.namespace() {
-				Some(group) => url.push_str(&group.replace('.', "/")),
-				None => {
-					return Err(hc_error!(
-						"Download location for CycloneDX file is a Maven package with no group."
-					))
-				}
-			}
-			url.push('/');
-			let name = purl.name();
-			url.push_str(name);
-			// A package version is needed to construct a URL
-			match purl.version() {
-				Some(version) => {
-					url.push('/');
-					url.push_str(version);
-					url.push('/');
-					let pom_file = format!("{}-{}.pom", name, version);
-					url.push_str(&pom_file);
-				}
-				None => {
-					return Err(hc_error!(
-						"Download location for CycloneDX file is a Maven package with no version."
-					))
-				}
-			}
-
-			// Next attempt to get the git repo URL for the Maven package
-			extract_repo_for_maven(&url).context(
-				"Could not get git repo URL for CycloneDX file's corresponding Maven package",
-			)
-		}
-		"npm" => {
-			// First extract NPM package w/ optional version from the pURL
-			let package = purl.name();
-			let version = purl.version().unwrap_or("no version");
-
-			// Next attempt to get the git repo URL for the NPM package
-			extract_repo_for_npm(package, version).context(
-				"Could not get git repo URL for CycloneDX file's corresponding NPM package",
-			)
-		}
-		"pypi" => {
-			// First extract PyPI package w/ optional version from the pURL
-			let package = purl.name();
-			let version = purl.version().unwrap_or("no version");
-
-			// Next attempt to get the git repo URL for the PyPI package
-			extract_repo_for_pypi(package, version).context(
-				"Could not get git repo URL for CycloneDX file's corresponding PyPI package",
-			)
-		}
-        _ => Err(hc_error!("Download location for CycloneDX file is a pURL for a type not currently supported by Hipcheck."))
 	}
 }
 
@@ -156,9 +109,9 @@ mod tests {
 	use std::path::PathBuf;
 
 	#[test]
-	fn test_extract_url_from_cyclonedx_json() {
+	fn test_extract_github_url_from_cyclonedx_json() {
 		let manifest = env!("CARGO_MANIFEST_DIR");
-		let path: PathBuf = [manifest, "src", "session", "tests", "juiceshop_bom.json"]
+		let path: PathBuf = [manifest, "src", "target", "tests", "juiceshop_bom.json"]
 			.iter()
 			.collect();
 		let json = path.to_str().unwrap();
@@ -170,9 +123,9 @@ mod tests {
 	}
 
 	#[test]
-	fn test_extract_url_from_cyclonedx_xml() {
+	fn test_extract_github_url_from_cyclonedx_xml() {
 		let manifest = env!("CARGO_MANIFEST_DIR");
-		let path: PathBuf = [manifest, "src", "session", "tests", "juiceshop_bom.xml"]
+		let path: PathBuf = [manifest, "src", "target", "tests", "juiceshop_bom.xml"]
 			.iter()
 			.collect();
 		let xml = path.to_str().unwrap();
@@ -180,6 +133,20 @@ mod tests {
 		assert_eq!(
 			url.to_string(),
 			"https://github.com/juice-shop/juice-shop.git".to_string()
+		);
+	}
+
+	#[test]
+	fn test_extract_npm_url_from_cyclonedx_json() {
+		let manifest = env!("CARGO_MANIFEST_DIR");
+		let path: PathBuf = [manifest, "src", "target", "tests", "bats.cdx.json"]
+			.iter()
+			.collect();
+		let json = path.to_str().unwrap();
+		let url = extract_cyclonedx_download_url(json).unwrap();
+		assert_eq!(
+			url.to_string(),
+			"https://github.com/bats-core/bats-core.git".to_string()
 		);
 	}
 }

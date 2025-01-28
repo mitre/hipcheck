@@ -1,0 +1,207 @@
+{
+    "bomFormat": "CycloneDX",
+    "specVersion": "1.4",
+    "serialNumber": "urn:uuid:d9165c21-8a3d-43f2-be84-258484d3baa8",
+    "version": 1,
+    "metadata": {
+      "timestamp": "2023-03-14T11:46:33-05:00",
+      "tools": [
+        {
+          "vendor": "anchore",
+          "name": "syft",
+          "version": "0.74.0"
+        }
+      ],
+      "component": {
+        "bom-ref": "1e88925cdd88d0ae",
+        "type": "container",
+        "name": "niartifacts.jfrog.io/rnd-docker-ci/bats/bats:1.9.0",
+        "version": "sha256:acd28536088c346bc81f1a01d0c4c166d2a244f86ecaa486d92d6edfbf5bd258",
+        "purl": "pkg:npm/bats@1.9.0",
+        "externalReferences": [
+            {
+            "url": "github:bats-core/bats-core",
+            "type": "distribution"
+            },
+            {
+            "url": "https://github.com/bats-core/bats-core#readme",
+            "type": "website"
+            }
+        ]
+      }
+    },
+    "components": [
+      {
+        "bom-ref": "pkg:apk/alpine/.bash-rundeps@20230211.071946?arch=noarch&distro=alpine-3.16.4&package-id=82a36179093bcbf1",
+        "type": "library",
+        "name": ".bash-rundeps",
+        "version": "20230211.071946",
+        "description": "virtual meta package",
+        "cpe": "cpe:2.3:a:.bash-rundeps:.bash-rundeps:20230211.071946:*:*:*:*:*:*:*",
+        "purl": "pkg:apk/alpine/.bash-rundeps@20230211.071946?arch=noarch&distro=alpine-3.16.4",
+        "properties": [
+          {
+            "name": "syft:package:foundBy",
+            "value": "apkdb-cataloger"
+          },
+          {
+            "name": "syft:package:metadataType",
+            "value": "ApkMetadata"
+          },
+          {
+            "name": "syft:package:type",
+            "value": "apk"
+          },
+          {
+            "name": "syft:cpe23",
+            "value": "cpe:2.3:a:.bash-rundeps:.bash_rundeps:20230211.071946:*:*:*:*:*:*:*"
+          },
+          {
+            "name": "syft:cpe23",
+            "value": "cpe:2.3:a:.bash_rundeps:.bash-rundeps:20230211.071946:*:*:*:*:*:*:*"
+          },
+          {
+            "name": "syft:cpe23",
+            "value": "cpe:2.3:a:.bash_rundeps:.bash_rundeps:20230211.071946:*:*:*:*:*:*:*"
+          },
+          {
+            "name": "syft:cpe23",
+            "value": "cpe:2.3:a:.bash:.bash-rundeps:20230211.071946:*:*:*:*:*:*:*"
+          },
+          {
+            "name": "syft:cpe23",
+            "value": "cpe:2.3:a:.bash:.bash_rundeps:20230211.071946:*:*:*:*:*:*:*"
+          },
+          {
+            "name": "syft:location:0:layerID",
+            "value": "sha256:5fdaca3c3bc14382f407b3780143eaf4055ebd09df0a9da29e0f845914658bd0"
+          },
+          {
+            "name": "syft:location:0:path",
+            "value": "/lib/apk/db/installed"
+          },
+          {
+            "name": "syft:metadata:installedSize",
+            "value": "0"
+          },
+          {
+            "name": "syft:metadata:pullChecksum",
+            "value": "Q1LpBTHImWIUibrkRJJPghd5J7FHo="
+          },
+          {
+            "name": "syft:metadata:pullDependencies:0",
+            "value": "so:libc.musl-x86_64.so.1"
+          },
+          {
+            "name": "syft:metadata:pullDependencies:1",
+            "value": "so:libncursesw.so.6"
+          },
+          {
+            "name": "syft:metadata:size",
+            "value": "0"
+          }
+        ]
+      },
+      {
+        "bom-ref": "pkg:apk/alpine/alpine-baselayout@3.2.0-r23?arch=x86_64&distro=alpine-3.16.4&package-id=61eac5ce8105d394",
+        "type": "library",
+        "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
+        "name": "alpine-baselayout",
+        "version": "3.2.0-r23",
+        "description": "Alpine base dir structure and init scripts",
+        "licenses": [
+          {
+            "license": {
+              "id": "GPL-2.0-only"
+            }
+          }
+        ],
+        "cpe": "cpe:2.3:a:alpine-baselayout:alpine-baselayout:3.2.0-r23:*:*:*:*:*:*:*",
+        "purl": "pkg:apk/alpine/alpine-baselayout@3.2.0-r23?arch=x86_64&distro=alpine-3.16.4",
+        "externalReferences": [
+          {
+            "url": "https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout",
+            "type": "distribution"
+          }
+        ],
+        "properties": [
+          {
+            "name": "syft:package:foundBy",
+            "value": "apkdb-cataloger"
+          },
+          {
+            "name": "syft:package:metadataType",
+            "value": "ApkMetadata"
+          },
+          {
+            "name": "syft:package:type",
+            "value": "apk"
+          },
+          {
+            "name": "syft:cpe23",
+            "value": "cpe:2.3:a:alpine-baselayout:alpine_baselayout:3.2.0-r23:*:*:*:*:*:*:*"
+          },
+          {
+            "name": "syft:cpe23",
+            "value": "cpe:2.3:a:alpine_baselayout:alpine-baselayout:3.2.0-r23:*:*:*:*:*:*:*"
+          },
+          {
+            "name": "syft:cpe23",
+            "value": "cpe:2.3:a:alpine_baselayout:alpine_baselayout:3.2.0-r23:*:*:*:*:*:*:*"
+          },
+          {
+            "name": "syft:cpe23",
+            "value": "cpe:2.3:a:alpine:alpine-baselayout:3.2.0-r23:*:*:*:*:*:*:*"
+          },
+          {
+            "name": "syft:cpe23",
+            "value": "cpe:2.3:a:alpine:alpine_baselayout:3.2.0-r23:*:*:*:*:*:*:*"
+          },
+          {
+            "name": "syft:location:0:layerID",
+            "value": "sha256:5fdaca3c3bc14382f407b3780143eaf4055ebd09df0a9da29e0f845914658bd0"
+          },
+          {
+            "name": "syft:location:0:path",
+            "value": "/lib/apk/db/installed"
+          },
+          {
+            "name": "syft:metadata:gitCommitOfApkPort",
+            "value": "348653a9ba0701e8e968b3344e72313a9ef334e4"
+          },
+          {
+            "name": "syft:metadata:installedSize",
+            "value": "348160"
+          },
+          {
+            "name": "syft:metadata:originPackage",
+            "value": "alpine-baselayout"
+          },
+          {
+            "name": "syft:metadata:provides:0",
+            "value": "cmd:mkmntdirs=3.2.0-r23"
+          },
+          {
+            "name": "syft:metadata:pullChecksum",
+            "value": "Q19UI7UxyiUywG6aew9c3lCBPshsE="
+          },
+          {
+            "name": "syft:metadata:pullDependencies:0",
+            "value": "alpine-baselayout-data=3.2.0-r23"
+          },
+          {
+            "name": "syft:metadata:pullDependencies:1",
+            "value": "/bin/sh"
+          },
+          {
+            "name": "syft:metadata:pullDependencies:2",
+            "value": "so:libc.musl-x86_64.so.1"
+          },
+          {
+            "name": "syft:metadata:size",
+            "value": "11136"
+          }
+        ]
+      }
+    ]
+}

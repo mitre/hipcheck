@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{
+	cyclone_dx::extract_cyclonedx_download_url,
+	pm::{detect_and_extract, extract_repo_for_maven},
+	spdx::extract_spdx_download_url,
+};
 use crate::{
 	error::{Context, Result},
 	hc_error,
-	session::{
-		cyclone_dx::extract_cyclonedx_download_url,
-		pm::{detect_and_extract, extract_repo_for_maven},
-		spdx::extract_spdx_download_url,
-	},
 	shell::spinner_phase::SpinnerPhase,
 	source::{
 		build_unknown_remote_clone_dir, clone_local_repo_to_cache, get_remote_repo_from_url, git,
