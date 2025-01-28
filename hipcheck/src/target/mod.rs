@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod cyclone_dx;
+pub mod pm;
+pub mod purl;
 pub mod resolve;
+pub mod spdx;
 pub mod types;
+use purl::parse_purl;
 pub use types::*;
 
 use crate::error::Error;
@@ -21,7 +26,7 @@ pub trait ToTargetSeed {
 	fn to_target_seed(&self) -> Result<TargetSeed, Error>;
 }
 
-#[derive(Debug, Clone, ValueEnum, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TargetType {
 	Maven,
@@ -40,79 +45,7 @@ impl TargetType {
 
 		// Check if the target is a pURL and parse it if it is
 		if let Ok(purl) = PackageUrl::from_str(tgt) {
-			match purl.ty() {
-				"github" => {
-					// Construct GitHub repo URL from pURL as the updated target string
-					// For now we ignore the "version" field, which has GitHub tag information, until Hipcheck can cleanly handle things other than the main/master branch of a repo
-					let mut url = "https://github.com/".to_string();
-					// A repo must have an owner
-					match purl.namespace() {
-						Some(owner) => url.push_str(owner),
-						None => return None,
-					}
-					url.push('/');
-					let name = purl.name();
-					url.push_str(name);
-					url.push_str(".git");
-					Some((Repo, url))
-				}
-				"maven" => {
-					// Construct Maven package POM file URL from pURL as the updated target string
-
-					// We currently only support parsing Maven packages hosted at repo1.maven.org
-					let mut url = "https://repo1.maven.org/maven2/".to_string();
-					// A package must belong to a group
-					match purl.namespace() {
-						Some(group) => url.push_str(&group.replace('.', "/")),
-						None => return None,
-					}
-					url.push('/');
-					let name = purl.name();
-					url.push_str(name);
-					// A package version is needed to construct a URL
-					match purl.version() {
-						Some(version) => {
-							url.push('/');
-							url.push_str(version);
-							url.push('/');
-							let pom_file = format!("{}-{}.pom", name, version);
-							url.push_str(&pom_file);
-						}
-						None => return None,
-					}
-					Some((Maven, url))
-				}
-				"npm" => {
-					// Construct NPM package w/ optional version from pURL as the updated target string
-					let mut package = String::new();
-
-					// Include scope if provided
-					if let Some(scope) = purl.namespace() {
-						package.push_str(scope);
-						package.push('/');
-					}
-					let name = purl.name();
-					package.push_str(name);
-					// Include version if provided
-					if let Some(version) = purl.version() {
-						package.push('@');
-						package.push_str(version);
-					}
-					Some((Npm, package))
-				}
-				"pypi" => {
-					// Construct PyPI package w/optional version from pURL as the updated target string
-					let name = purl.name();
-					let mut package = name.to_string();
-					// Include version if provided
-					if let Some(version) = purl.version() {
-						package.push('@');
-						package.push_str(version);
-					}
-					Some((Pypi, package))
-				}
-				_ => None,
-			}
+			parse_purl(&purl)
 		// Otherwise check if it is a Git VCS URL
 		} else if tgt.starts_with("git+") {
 			// Remove Git prefix

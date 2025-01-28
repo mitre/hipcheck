@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// NOTE: This file is shared as a build-dependency in `build.rs`! This will cause compilation errors when importing crates that are not build-dependencies.
+
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::{
