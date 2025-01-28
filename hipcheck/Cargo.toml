@@ -70,7 +70,7 @@ hipcheck-macros = { path = "../hipcheck-macros", version = "0.3.1" }
 http = "1.2.0"
 indexmap = "2.7.0"
 indextree = "4.7.3"
-indicatif = { version = "0.17.9", features = ["rayon"] }
+indicatif = { version = "0.17.11", features = ["rayon"] }
 itertools = "0.13.0"
 jiff = "0.1.16"
 kdl = "6.2.2"
