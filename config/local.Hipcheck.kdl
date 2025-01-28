@@ -1,12 +1,12 @@
 plugins {
-    plugin "mitre/activity" version="0.2.0" manifest="plugins/activity/local-plugin.kdl"
-    plugin "mitre/affiliation" version="0.2.0" manifest="plugins/affiliation/local-plugin.kdl"
-    plugin "mitre/binary" version="0.1.0" manifest="plugins/binary/local-plugin.kdl"
-    plugin "mitre/churn" version="0.2.0" manifest="plugins/churn/local-plugin.kdl"
-    plugin "mitre/entropy" version="0.2.0" manifest="plugins/entropy/local-plugin.kdl"
-    plugin "mitre/fuzz" version="0.1.1" manifest="plugins/fuzz/local-plugin.kdl"
-    plugin "mitre/review" version="0.1.0" manifest="plugins/review/local-plugin.kdl"
-    plugin "mitre/typo" version="0.1.0" manifest="plugins/typo/local-plugin.kdl"
+    plugin "mitre/activity" version="0.0.0" manifest="plugins/activity/local-plugin.kdl"
+    plugin "mitre/affiliation" version="0.0.0" manifest="plugins/affiliation/local-plugin.kdl"
+    plugin "mitre/binary" version="0.0.0" manifest="plugins/binary/local-plugin.kdl"
+    plugin "mitre/churn" version="0.0.0" manifest="plugins/churn/local-plugin.kdl"
+    plugin "mitre/entropy" version="0.0.0" manifest="plugins/entropy/local-plugin.kdl"
+    plugin "mitre/fuzz" version="0.0.0" manifest="plugins/fuzz/local-plugin.kdl"
+    plugin "mitre/review" version="0.0.0" manifest="plugins/review/local-plugin.kdl"
+    plugin "mitre/typo" version="0.0.0" manifest="plugins/typo/local-plugin.kdl"
 }
 
 patch {
