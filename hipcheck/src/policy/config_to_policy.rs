@@ -447,7 +447,7 @@ fn parse_churn(
 			value_threshold, percent_threshold,
 		);
 		let mut config = PolicyConfig::new();
-		let langs_path = pathbuf![&context.path, "Langs.kdl"];
+		let langs_path = pathbuf![&context.path, "Langs.toml"];
 		config
 			.insert(
 				"langs-file".to_string(),
@@ -494,7 +494,7 @@ fn parse_entropy(
 			value_threshold, percent_threshold
 		);
 		let mut config = PolicyConfig::new();
-		let langs_path = pathbuf![&context.path, "Langs.kdl"];
+		let langs_path = pathbuf![&context.path, "Langs.toml"];
 		config
 			.insert(
 				"langs-file".to_string(),
