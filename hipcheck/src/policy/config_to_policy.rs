@@ -15,16 +15,28 @@ use crate::{
 	hc_error,
 	plugin::PluginVersion,
 };
+use pathbuf::pathbuf;
 
 use serde_json::Value;
-use std::collections::HashMap;
+use std::{
+	collections::HashMap,
+	path::{Path, PathBuf},
+};
 use url::Url;
 
 const PLUGIN_VERSION: &str = "0.1.0";
 const FUZZ_PLUGIN_VERSION: &str = "0.1.1";
 
+struct Context {
+	path: PathBuf,
+}
+
 /// Converts a Config struct to a PolicyFile struct
-pub fn config_to_policy(config: Config) -> Result<PolicyFile> {
+pub fn config_to_policy(config: Config, path: &Path) -> Result<PolicyFile> {
+	let context = Context {
+		path: path.to_owned(),
+	};
+
 	// Get the investigate policy
 	let investigate = get_investigate(&config.risk)?;
 
@@ -33,10 +45,10 @@ pub fn config_to_policy(config: Config) -> Result<PolicyFile> {
 
 	// Add each active analysis to the plugin list and appropriate analysis category
 	// Note that while these parse functions return an analysis category, they update the plugins list when they are called
-	if let Some(practices) = parse_practices(&mut plugins, &config.analysis.practices) {
+	if let Some(practices) = parse_practices(&mut plugins, &context, &config.analysis.practices) {
 		analyze.push(practices);
 	}
-	if let Some(attacks) = parse_attacks(&mut plugins, &config.analysis.attacks) {
+	if let Some(attacks) = parse_attacks(&mut plugins, &context, &config.analysis.attacks) {
 		analyze.push(attacks);
 	}
 
@@ -70,6 +82,7 @@ fn get_investigate(risk: &RiskConfig) -> Result<InvestigatePolicy> {
 /// Adds each active practices analysis to the plugins and practices analysis list
 fn parse_practices(
 	plugins: &mut PolicyPluginList,
+	context: &Context,
 	config: &PracticesConfig,
 ) -> Option<PolicyCategory> {
 	// Only add these analysis if this category is active
@@ -78,11 +91,11 @@ fn parse_practices(
 		let weight = config.weight.try_into().unwrap_or(u16::MAX);
 		let mut practices = PolicyCategory::new("practices".to_string(), Some(weight));
 
-		parse_activity(plugins, &mut practices, &config.activity);
-		parse_binary(plugins, &mut practices, &config.binary);
-		parse_fuzz(plugins, &mut practices, &config.fuzz);
-		parse_identity(plugins, &mut practices, &config.identity);
-		parse_review(plugins, &mut practices, &config.review);
+		parse_activity(plugins, context, &mut practices, &config.activity);
+		parse_binary(plugins, context, &mut practices, &config.binary);
+		parse_fuzz(plugins, context, &mut practices, &config.fuzz);
+		parse_identity(plugins, context, &mut practices, &config.identity);
+		parse_review(plugins, context, &mut practices, &config.review);
 
 		return Some(practices);
 	}
@@ -90,15 +103,19 @@ fn parse_practices(
 }
 
 /// Adds the typo analysis and commit sub-category (if each is active) to the plugins and attacks analysis list
-fn parse_attacks(plugins: &mut PolicyPluginList, config: &AttacksConfig) -> Option<PolicyCategory> {
+fn parse_attacks(
+	plugins: &mut PolicyPluginList,
+	context: &Context,
+	config: &AttacksConfig,
+) -> Option<PolicyCategory> {
 	// Only add the analysis and sub-category if this category is active
 	if config.active {
 		// Cap the weight at 65,533
 		let weight = config.weight.try_into().unwrap_or(u16::MAX);
 		let mut attacks = PolicyCategory::new("attacks".to_string(), Some(weight));
 
-		parse_typo(plugins, &mut attacks, &config.typo);
-		if let Some(commit) = parse_commit(plugins, &config.commit) {
+		parse_typo(plugins, context, &mut attacks, &config.typo);
+		if let Some(commit) = parse_commit(plugins, context, &config.commit) {
 			attacks.push(PolicyCategoryChild::Category(commit));
 		}
 
@@ -108,16 +125,20 @@ fn parse_attacks(plugins: &mut PolicyPluginList, config: &AttacksConfig) -> Opti
 }
 
 /// Adds each active commit analysis to the plugins and commit analysis list
-fn parse_commit(plugins: &mut PolicyPluginList, config: &CommitConfig) -> Option<PolicyCategory> {
+fn parse_commit(
+	plugins: &mut PolicyPluginList,
+	context: &Context,
+	config: &CommitConfig,
+) -> Option<PolicyCategory> {
 	// Only add these analysis if this category is active
 	if config.active {
 		// Cap the weight at 65,533
 		let weight = config.weight.try_into().unwrap_or(u16::MAX);
 		let mut commit = PolicyCategory::new("commit".to_string(), Some(weight));
 
-		parse_affiliation(plugins, &mut commit, &config.affiliation);
-		parse_churn(plugins, &mut commit, &config.churn);
-		parse_entropy(plugins, &mut commit, &config.entropy);
+		parse_affiliation(plugins, context, &mut commit, &config.affiliation);
+		parse_churn(plugins, context, &mut commit, &config.churn);
+		parse_entropy(plugins, context, &mut commit, &config.entropy);
 
 		return Some(commit);
 	}
@@ -129,6 +150,7 @@ fn parse_commit(plugins: &mut PolicyPluginList, config: &CommitConfig) -> Option
 /// Updates the plugin and practices analysis lists with activity policies
 fn parse_activity(
 	plugins: &mut PolicyPluginList,
+	_context: &Context,
 	practices: &mut PolicyCategory,
 	activity: &ActivityConfig,
 ) {
@@ -163,6 +185,7 @@ fn parse_activity(
 /// Updates the plugin and practices analysis lists with binary policies
 fn parse_binary(
 	plugins: &mut PolicyPluginList,
+	context: &Context,
 	practices: &mut PolicyCategory,
 	binary: &BinaryConfig,
 ) {
@@ -173,11 +196,17 @@ fn parse_binary(
 		let threshold = binary.binary_file_threshold;
 		let file = binary.binary_config_file.clone();
 		let expression = format!("(lte $ {})", threshold);
+		let binary_path = pathbuf![&context.path, &file];
 		let mut config = PolicyConfig::new();
 		config
 			.insert(
 				"binary-file".to_string(),
-				Value::String(format!("./config/{}", file)),
+				Value::String(
+					binary_path
+						.to_string_lossy()
+						.into_owned()
+						.replace("\\", "/"),
+				),
 			)
 			.unwrap();
 
@@ -203,7 +232,12 @@ fn parse_binary(
 }
 
 /// Updates the plugin and practices analysis lists with fuzz policies
-fn parse_fuzz(plugins: &mut PolicyPluginList, practices: &mut PolicyCategory, fuzz: &FuzzConfig) {
+fn parse_fuzz(
+	plugins: &mut PolicyPluginList,
+	_context: &Context,
+	practices: &mut PolicyCategory,
+	fuzz: &FuzzConfig,
+) {
 	// If the analysis is active, add the appropriate plugin and analysis policies to the policy file
 	if fuzz.active {
 		// Cap the weight at 65,533
@@ -234,6 +268,7 @@ fn parse_fuzz(plugins: &mut PolicyPluginList, practices: &mut PolicyCategory, fu
 /// Updates the plugin and practices analysis lists with dentity policies
 fn parse_identity(
 	plugins: &mut PolicyPluginList,
+	_context: &Context,
 	practices: &mut PolicyCategory,
 	identity: &IdentityConfig,
 ) {
@@ -271,6 +306,7 @@ fn parse_identity(
 /// Updates the plugin and practices analysis lists with review policies
 fn parse_review(
 	plugins: &mut PolicyPluginList,
+	_context: &Context,
 	practices: &mut PolicyCategory,
 	review: &ReviewConfig,
 ) {
@@ -306,7 +342,12 @@ fn parse_review(
 }
 
 /// Updates the plugin and attacks analysis lists with typo policies
-fn parse_typo(plugins: &mut PolicyPluginList, attacks: &mut PolicyCategory, typo: &TypoConfig) {
+fn parse_typo(
+	plugins: &mut PolicyPluginList,
+	context: &Context,
+	attacks: &mut PolicyCategory,
+	typo: &TypoConfig,
+) {
 	// If the analysis is active, add the appropriate plugin and analysis policies to the policy file
 	if typo.active {
 		// Cap the weight at 65,533
@@ -314,11 +355,12 @@ fn parse_typo(plugins: &mut PolicyPluginList, attacks: &mut PolicyCategory, typo
 		let threshold = typo.count_threshold;
 		let expression = format!("(lte (count (filter (eq #t) $)) {})", threshold);
 		let file = typo.typo_file.clone();
+		let typo_path = pathbuf![&context.path, &file];
 		let mut config = PolicyConfig::new();
 		config
 			.insert(
 				"typo-file".to_string(),
-				Value::String(format!("./config/{}", file)),
+				Value::String(typo_path.to_string_lossy().into_owned().replace("\\", "/")),
 			)
 			.unwrap();
 
@@ -346,6 +388,7 @@ fn parse_typo(plugins: &mut PolicyPluginList, attacks: &mut PolicyCategory, typo
 /// Updates the plugin and commit analysis lists with affiliation policies
 fn parse_affiliation(
 	plugins: &mut PolicyPluginList,
+	context: &Context,
 	commit: &mut PolicyCategory,
 	affiliation: &AffiliationConfig,
 ) {
@@ -356,11 +399,12 @@ fn parse_affiliation(
 		let threshold = affiliation.count_threshold;
 		let expression = format!("(lte (count (filter (eq #t) $)) {})", threshold);
 		let file = affiliation.orgs_file.clone();
+		let aff_path = pathbuf![&context.path, &file];
 		let mut config = PolicyConfig::new();
 		config
 			.insert(
 				"orgs-file".to_string(),
-				Value::String(format!("./config/{}", file)),
+				Value::String(aff_path.to_string_lossy().into_owned().replace("\\", "/")),
 			)
 			.unwrap();
 
@@ -386,7 +430,12 @@ fn parse_affiliation(
 }
 
 /// Updates the plugin and commit analysis lists with churn policies
-fn parse_churn(plugins: &mut PolicyPluginList, commit: &mut PolicyCategory, churn: &ChurnConfig) {
+fn parse_churn(
+	plugins: &mut PolicyPluginList,
+	context: &Context,
+	commit: &mut PolicyCategory,
+	churn: &ChurnConfig,
+) {
 	// If the analysis is active, add the appropriate plugin and analysis policies to the policy file
 	if churn.active {
 		// Cap the weight at 65,533
@@ -398,10 +447,11 @@ fn parse_churn(plugins: &mut PolicyPluginList, commit: &mut PolicyCategory, chur
 			value_threshold, percent_threshold,
 		);
 		let mut config = PolicyConfig::new();
+		let langs_path = pathbuf![&context.path, "Langs.kdl"];
 		config
 			.insert(
 				"langs-file".to_string(),
-				Value::String("./config/Langs.kdl".to_string()),
+				Value::String(langs_path.to_string_lossy().into_owned().replace("\\", "/")),
 			)
 			.unwrap();
 
@@ -429,6 +479,7 @@ fn parse_churn(plugins: &mut PolicyPluginList, commit: &mut PolicyCategory, chur
 /// Updates the plugin and commit analysis lists with entropy policies
 fn parse_entropy(
 	plugins: &mut PolicyPluginList,
+	context: &Context,
 	commit: &mut PolicyCategory,
 	entropy: &EntropyConfig,
 ) {
@@ -443,10 +494,11 @@ fn parse_entropy(
 			value_threshold, percent_threshold
 		);
 		let mut config = PolicyConfig::new();
+		let langs_path = pathbuf![&context.path, "Langs.kdl"];
 		config
 			.insert(
 				"langs-file".to_string(),
-				Value::String("./config/Langs.kdl".to_string()),
+				Value::String(langs_path.to_string_lossy().into_owned().replace("\\", "/")),
 			)
 			.unwrap();
 

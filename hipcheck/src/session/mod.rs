@@ -247,7 +247,7 @@ pub fn load_config_and_data(config_path: PathBuf) -> Result<(PolicyFile, PathBuf
 		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
 
 	// Convert the Config struct to a PolicyFile struct
-	let policy = config_to_policy(config)?;
+	let policy = config_to_policy(config, &config_path)?;
 
 	phase.finish_successful();
 
