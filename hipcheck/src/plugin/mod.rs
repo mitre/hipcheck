@@ -162,7 +162,7 @@ impl HcPluginCore {
 		let mapped_ctxs: Vec<PluginContextWithConfig> = ctxs
 			.into_iter()
 			.map(|c| {
-				let conf = conf_map.remove(&c.plugin.name).unwrap();
+				let conf = conf_map.get(&c.plugin.name).cloned().unwrap();
 				PluginContextWithConfig(c, conf)
 			})
 			.collect();
