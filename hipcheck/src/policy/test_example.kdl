@@ -20,7 +20,7 @@ analyze {
     category "practices" weight=1 {
         analysis "mitre/activity" policy="(lte $ P71w)" weight=1
         analysis "mitre/binary" policy="(lte $ 0)" weight=1 {
-			binary-file "./config/Binary.kdl"
+			binary-file "./config/Binary.toml"
 		}
         analysis "mitre/fuzz" policy="(eq #t $)" weight=1
         analysis "mitre/identity" policy="(lte (divz (count (filter (eq #t) $)) (count $)) 0.2)" weight=1
@@ -29,7 +29,7 @@ analyze {
 
     category "attacks" weight=1 {
         analysis "mitre/typo" policy="(lte (count (filter (eq #t) $)) 0)" weight=1 {
-            typo-file "./config/Typos.kdl"
+            typo-file "./config/Typos.toml"
         }
 
         category "commit" weight=1 {
@@ -38,10 +38,10 @@ analyze {
             }
 
             analysis "mitre/churn" policy="(lte (divz (count (filter (gt 3) $)) (count $)) 0.02)" weight=1 {
-				langs-file "./config/Langs.kdl"
+				langs-file "./config/Langs.toml"
 			}
             analysis "mitre/entropy" policy="(lte (divz (count (filter (gt 10) $)) (count $)) 0)" weight=1 {
-				langs-file "./config/Langs.kdl"
+				langs-file "./config/Langs.toml"
 			}
         }
     }

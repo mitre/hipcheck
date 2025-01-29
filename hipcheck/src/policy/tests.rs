@@ -344,7 +344,8 @@ mod test {
 	fn test_config_to_policy() {
 		let config_path = pathbuf![&env::current_dir().unwrap(), "..", "config"];
 		let config = Config::load_from(&config_path).unwrap();
-		let policy_file = config_to_policy(config).unwrap();
+		let test_cfg_path = pathbuf!["./config"];
+		let policy_file = config_to_policy(config, &test_cfg_path).unwrap();
 
 		let expected_path = pathbuf![
 			&env::current_dir().unwrap(),

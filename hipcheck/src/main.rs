@@ -176,7 +176,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	} else if let Some(c) = config.config() {
 		let config = Config::load_from(c)
 		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
-		config_to_policy(config)?
+		config_to_policy(config, c)?
 	} else {
 		return Err(hc_error!("No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."));
 	};
