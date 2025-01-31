@@ -8,9 +8,6 @@ dist = true
 # The installers to generate for each app
 installers = ["shell", "powershell"]
 
-# Whether to install an updater program
-install-updater = true
-
 # Make sure that both Hipcheck and all the plugins are built with the protobuf
 # compiler present on their platform.
 
