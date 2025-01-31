@@ -2,7 +2,7 @@
 
 FROM node:bookworm-slim
 
-ARG HC_VERSION="3.9.1"
+ARG HC_VERSION="3.10.0"
 
 WORKDIR /app
 

@@ -1,13 +1,13 @@
 plugins {
-    plugin "mitre/activity" version="0.2.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/activity.kdl"
-    plugin "mitre/binary" version="0.1.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/binary.kdl"
-    plugin "mitre/fuzz" version="0.1.1" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/fuzz.kdl"
-    plugin "mitre/identity" version="0.2.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/identity.kdl"
-    plugin "mitre/review" version="0.1.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/review.kdl"
-    plugin "mitre/typo" version="0.1.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/typo.kdl"
-    plugin "mitre/affiliation" version="0.2.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/affiliation.kdl"
-    plugin "mitre/churn" version="0.2.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/churn.kdl"
-    plugin "mitre/entropy" version="0.2.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/entropy.kdl"
+    plugin "mitre/activity" version="0.3.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/activity.kdl"
+    plugin "mitre/binary" version="0.2.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/binary.kdl"
+    plugin "mitre/fuzz" version="0.2.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/fuzz.kdl"
+    plugin "mitre/identity" version="0.3.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/identity.kdl"
+    plugin "mitre/review" version="0.2.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/review.kdl"
+    plugin "mitre/typo" version="0.2.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/typo.kdl"
+    plugin "mitre/affiliation" version="0.3.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/affiliation.kdl"
+    plugin "mitre/churn" version="0.3.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/churn.kdl"
+    plugin "mitre/entropy" version="0.3.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/entropy.kdl"
 }
 patch {
 	plugin "mitre/github" {
@@ -20,7 +20,7 @@ analyze {
     category "practices" weight=1 {
         analysis "mitre/activity" policy="(lte $ P71w)" weight=1
         analysis "mitre/binary" policy="(lte $ 0)" weight=1 {
-			binary-file "./config/Binary.toml"
+			binary-file "./config/Binary.kdl"
 		}
         analysis "mitre/fuzz" policy="(eq #t $)" weight=1
         analysis "mitre/identity" policy="(lte (divz (count (filter (eq #t) $)) (count $)) 0.2)" weight=1
@@ -29,7 +29,7 @@ analyze {
 
     category "attacks" weight=1 {
         analysis "mitre/typo" policy="(lte (count (filter (eq #t) $)) 0)" weight=1 {
-            typo-file "./config/Typos.toml"
+            typo-file "./config/Typos.kdl"
         }
 
         category "commit" weight=1 {
@@ -38,10 +38,10 @@ analyze {
             }
 
             analysis "mitre/churn" policy="(lte (divz (count (filter (gt 3) $)) (count $)) 0.02)" weight=1 {
-				langs-file "./config/Langs.toml"
+				langs-file "./config/Langs.kdl"
 			}
             analysis "mitre/entropy" policy="(lte (divz (count (filter (gt 10) $)) (count $)) 0)" weight=1 {
-				langs-file "./config/Langs.toml"
+				langs-file "./config/Langs.kdl"
 			}
         }
     }
