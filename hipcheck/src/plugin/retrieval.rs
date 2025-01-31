@@ -111,9 +111,10 @@ fn retrieve_plugin_from_network(
 		}
 	}
 	Err(hc_error!(
-		"Could not find download manifest entry for arch '{}' with version '{}'",
+		"Could not find download manifest entry for '{}' [{}] with version '{}'",
+		plugin_id.to_policy_file_plugin_identifier(),
 		current_arch,
-		version.0
+		plugin_id.version().as_ref(),
 	))
 }
 
