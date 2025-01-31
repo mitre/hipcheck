@@ -31,6 +31,7 @@
 
 use crate::error::{ConfigError, Error, Result};
 pub use engine::PluginEngine;
+pub use engine::QueryBuilder;
 use schemars::schema::SchemaObject as JsonSchema;
 use serde_json::Value as JsonValue;
 pub use server::PluginServer;
@@ -66,7 +67,7 @@ pub mod types;
 /// hipcheck_sdk::prelude::*`.
 pub mod prelude {
 	pub use crate::deps::*;
-	pub use crate::engine::PluginEngine;
+	pub use crate::engine::{PluginEngine, QueryBuilder};
 	pub use crate::error::{ConfigError, Error, Result};
 	pub use crate::server::{PluginServer, QueryResult};
 	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
