@@ -4,7 +4,7 @@ description = "SDK for writing Hipcheck plugins in Rust"
 homepage = "https://hipcheck.mitre.org"
 repository = "https://github.com/mitre/hipcheck"
 license = "Apache-2.0"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 
 [dependencies]
