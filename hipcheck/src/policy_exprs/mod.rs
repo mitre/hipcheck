@@ -18,6 +18,10 @@ pub use crate::policy_exprs::{
 };
 use env::Binding;
 pub use expr::{parse, Primitive};
+use jiff::{
+	fmt::friendly::{Designator, Spacing, SpanPrinter},
+	SpanRound, Unit,
+};
 use json_pointer::LookupJsonPointers;
 use serde_json::Value;
 use std::{ops::Deref, str::FromStr, sync::LazyLock};
@@ -343,7 +347,13 @@ impl ExprVisitor<Result<String>> for English<'_> {
 			Primitive::Int(i) => Ok(i.to_string()),
 			Primitive::Float(f) => Ok(f.to_string()),
 			Primitive::DateTime(dt) => Ok(dt.to_string()),
-			Primitive::Span(span) => Ok(span.to_string()),
+			Primitive::Span(span) => {
+				let printer = SpanPrinter::new()
+					.spacing(Spacing::BetweenUnitsAndDesignators)
+					.designator(Designator::Verbose);
+				Ok(printer
+					.span_to_string(&span.round(SpanRound::new().smallest(Unit::Day)).unwrap()))
+			}
 			_ => Err(Error::BadType("English::visit_primitive()")),
 		}
 	}
