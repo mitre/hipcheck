@@ -16,6 +16,7 @@ use Expr::*;
 use Primitive::*;
 
 /// Environment, containing bindings of names to functions and variables.
+#[derive(Clone)]
 pub struct Env<'parent> {
 	/// Map of bindings,.
 	bindings: HashMap<String, Binding>,
