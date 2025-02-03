@@ -18,7 +18,7 @@ serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.134"
 tokio = { version = "1.43.0", features = ["rt"] }
 toml = "0.8.19"
-kdl = "4.7.1"
+kdl = "6.2.2"
 
 [dev-dependencies]
 hipcheck-sdk = { version = "0.3.0", path = "../../sdk/rust", features = [
