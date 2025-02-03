@@ -14,7 +14,7 @@ hipcheck-sdk = { version = "0.3.0", path = "../../sdk/rust", features = [
 jiff = { version = "0.1.16", features = ["serde"] }
 log = "0.4.22"
 schemars = { version = "0.8.21", features = ["url"] }
-serde = { version = "1.0.215", features = ["derive", "rc"] }
+serde = { version = "1.0.217", features = ["derive", "rc"] }
 serde_json = "1.0.134"
 tokio = { version = "1.43.0", features = ["rt"] }
 
