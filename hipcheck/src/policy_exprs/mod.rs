@@ -17,6 +17,7 @@ pub use crate::policy_exprs::{
 	token::LexingError,
 };
 use env::Binding;
+use expr::FunctionDef;
 pub use expr::{parse, Primitive};
 use json_pointer::LookupJsonPointers;
 use serde_json::Value;
@@ -155,17 +156,20 @@ impl ExprMutator for Env<'_> {
 	}
 }
 
-/// Return an English language explanation for what a failing plugin was expected to see and what it saw instead
-pub fn parse_failing_expr_to_english(
+/// Return an English language explanation for a plugin's analysis.
+/// If the analysis succeded, return what it was required to see and what it saw.
+/// If the analysis failed, return what it expected to see and what it saw instead.
+pub fn parse_expr_to_english(
 	input: &Expr,
 	message: &str,
 	value: &Option<Value>,
+	passed: bool,
 ) -> Result<String> {
 	// Create a standard environment, with its list of functions and their English descriptions
 	let env = Env::std();
 	// Store that environment and the plugin explanation message in a struct for English parsing
 	let english = English {
-		env,
+		env: env.clone(),
 		message: message.to_string(),
 	};
 
@@ -187,27 +191,38 @@ pub fn parse_failing_expr_to_english(
 			_ => return Err(Error::MissingArgs),
 		};
 
-		// Recursively parse the top level function to English
-		let english_expr = english.visit_function(func)?;
-
 		// Get whichever of the function's arguments is **not** a primitive for evaluation
 		let inner = &func.args[0];
 
 		// Evaluate that argument using the value returned by the plugin to see what the top level operator is comparing the expected value to
 		let inner_value = match value {
-			Some(context) => {
-				format!(
-					"it was {}",
-					match Executor::std().parse_and_eval(&inner.to_string(), context)? {
-						Expr::Primitive(prim) => english.visit_primitive(&prim)?,
-						_ => return Err(Error::BadReturnType(inner.clone())),
-					}
-				)
-			}
+			Some(context) => match Executor::std().parse_and_eval(&inner.to_string(), context)? {
+				Expr::Primitive(prim) => english.visit_primitive(&prim)?,
+				_ => return Err(Error::BadReturnType(inner.clone())),
+			},
 			None => "no value was returned by the query".to_string(),
 		};
 
-		return Ok(format!("Expected {english_expr} but {inner_value}"));
+		// Format the returned String depending on whether the plugin's analysis succeded or not
+		if passed {
+			// Recursively parse the argument that is not a primitive to English
+			let english_inner = english.visit_expr(inner)?;
+
+			// Parse the top level operator to English
+			let function_def = get_function_def(func, &env)?;
+			let operator = parse_function_operator(&function_def);
+
+			// Parse the top level primitive to English
+			let threshold = english.visit_expr(&func.args[1])?;
+
+			return Ok(format!(
+				"{inner_value} was {english_inner}, which was required {operator} {threshold}"
+			));
+		}
+
+		// Recursively parse the top level function to English
+		let english_expr = english.visit_function(func)?;
+		return Ok(format!("Expected {english_expr} but it was {inner_value}"));
 	}
 
 	Err(Error::MissingIdent)
@@ -225,51 +240,27 @@ impl ExprVisitor<Result<String>> for English<'_> {
 	fn visit_function(&self, func: &Function) -> Result<String> {
 		let env = &self.env;
 
-		// Get the function operator from the list of functions in the environment
-		let ident = &func.ident;
-		let fn_name = ident.to_string();
-
-		let function_def = match env.get(&fn_name) {
-			Some(binding) => match binding {
-				Binding::Fn(function_def) => function_def,
-				_ => {
-					return Err(Error::UnknownFunction(format!(
-						"Given function name {} is not a function",
-						fn_name
-					)))
-				}
-			},
-			_ => {
-				return Err(Error::UnknownFunction(format!(
-					"Given function name {} not found in list of functions",
-					fn_name
-				)))
-			}
-		};
-
-		// Convert theoperator to English, with additional phrasing specific to comparison operators in a function
-		let operator = match function_def.name.as_ref() {
-			"gt" | "lt" | "gte" | "lte" | "eq" | "ne" => format!("to be {}", function_def.english),
-			_ => function_def.english,
-		};
+		// Parse the function operator to English
+		let function_def = get_function_def(func, env)?;
+		let operator = parse_function_operator(&function_def);
 
 		// Get the number of args the function should have
 		let expected_args = function_def.expected_args;
 
-		// Get the funciton's args
+		// Get the function's args
 		let args = &func.args;
 
 		// Check for an invalid number of arguments
 		if args.len() < expected_args {
 			return Err(Error::NotEnoughArgs {
-				name: fn_name,
+				name: func.ident.to_string(),
 				expected: expected_args,
 				given: args.len(),
 			});
 		}
 		if args.len() > expected_args {
 			return Err(Error::TooManyArgs {
-				name: fn_name,
+				name: func.ident.to_string(),
 				expected: expected_args,
 				given: args.len(),
 			});
@@ -302,30 +293,10 @@ impl ExprVisitor<Result<String>> for English<'_> {
 
 		// Get the lambda function from the lambda
 		let function = &func.body;
-		//Get the lambda's function operator from the list of functions in the environment
-		let ident = &function.ident;
-		let fn_name = ident.to_string();
 
-		let function_def = match env.get(&fn_name) {
-			Some(binding) => match binding {
-				Binding::Fn(function_def) => function_def,
-				_ => {
-					return Err(Error::UnknownFunction(format!(
-						"Given function name {} is not a function",
-						fn_name
-					)))
-				}
-			},
-			_ => {
-				return Err(Error::UnknownFunction(format!(
-					"Given function name {} not found in list of functions",
-					fn_name
-				)))
-			}
-		};
-
-		// Convert the operator to English
-		let operator = function_def.english;
+		// Parse the lambda's function operator to English
+		let function_def = get_function_def(function, env)?;
+		let operator = parse_function_operator(&function_def);
 
 		// Get the lambda function's argument and parse it to English
 		// Note: The useful arugment for a lambda function is the *second* argument
@@ -376,6 +347,42 @@ impl ExprVisitor<Result<String>> for English<'_> {
 	// Parse a JSON pointer expression into English by returning the explanation message for the plugin
 	fn visit_json_pointer(&self, _func: &JsonPointer) -> Result<String> {
 		Ok(self.message.clone())
+	}
+}
+
+// Get a function's definition from the environment
+fn get_function_def(func: &Function, env: &Env) -> Result<FunctionDef> {
+	// Get the function operator from the list of functions in the environment
+	let ident = &func.ident;
+	let fn_name = ident.to_string();
+
+	let function_def = match env.get(&fn_name) {
+		Some(binding) => match binding {
+			Binding::Fn(function_def) => function_def,
+			_ => {
+				return Err(Error::UnknownFunction(format!(
+					"Given function name {} is not a function",
+					fn_name
+				)))
+			}
+		},
+		_ => {
+			return Err(Error::UnknownFunction(format!(
+				"Given function name {} not found in list of functions",
+				fn_name
+			)))
+		}
+	};
+
+	Ok(function_def)
+}
+
+// Parse a function's operator to English from its function definition
+fn parse_function_operator(function_def: &FunctionDef) -> String {
+	// Convert the operator to English, with additional phrasing specific to comparison operators in a function
+	match function_def.name.as_ref() {
+		"gt" | "lt" | "gte" | "lte" | "eq" | "ne" => format!("to be {}", function_def.english),
+		_ => function_def.english.clone(),
 	}
 }
 

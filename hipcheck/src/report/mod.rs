@@ -330,16 +330,24 @@ impl Analysis {
 	}
 
 	pub fn explanation(&self) -> String {
-		self.message.clone()
-	}
-
-	pub fn failing_explanation(&self) -> Result<String> {
 		let input = &self.policy_expr;
 		let message = &self.message;
 		let value = &self.value;
-		Ok(policy_exprs::parse_failing_expr_to_english(
-			input, message, value,
-		)?)
+		let passed = self.passed;
+
+		// Try to parse the policy expression to an English language explanation of why the plugin's analysis succeded or failed
+		// If it cannot be parsed, return the default explanation text
+		match policy_exprs::parse_expr_to_english(input, message, value, passed) {
+			Ok(explanation) => explanation,
+			Err(e) => {
+				log::error!(
+					"Could not parse policy expression for {} plugin: {}",
+					&self.name,
+					e
+				);
+				self.message.clone()
+			}
+		}
 	}
 }
 
