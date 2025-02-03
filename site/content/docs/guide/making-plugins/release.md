@@ -1,6 +1,6 @@
 ---
 title: Packaging and Releasing a Plugin
-weight: 3
+weight: 4
 ---
 
 # Packaging and Releasing a Plugin
