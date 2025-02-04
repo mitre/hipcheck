@@ -11,7 +11,7 @@ use crate::{
 	score::*,
 	session::Session,
 	source::SourceQuery,
-	version::VersionQuery,
+	version::hc_version,
 };
 use std::{collections::HashSet, default::Default};
 
@@ -167,7 +167,7 @@ impl<'sess> ReportBuilder<'sess> {
 	pub fn build(self) -> Result<Report> {
 		let repo_name = self.session.name();
 		let repo_head = self.session.head();
-		let hipcheck_version = self.session.hc_version().to_string();
+		let hipcheck_version = hc_version();
 		let analyzed_at = Timestamp::from(self.session.started_at());
 		let passing = self.passing;
 		let failing = self.failing;

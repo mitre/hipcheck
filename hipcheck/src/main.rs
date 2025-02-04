@@ -369,13 +369,11 @@ impl Display for PathCheckError {
 
 fn check_hipcheck_version() -> StdResult<String, VersionCheckError> {
 	let pkg_name = env!("CARGO_PKG_NAME", "can't find Hipcheck package name");
-
 	let version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
-	let version = version::get_version(version).map_err(|_| VersionCheckError {
+	let version = version::parse_hc_version(version).map_err(|_| VersionCheckError {
 		cmd_name: "hc",
 		kind: VersionCheckErrorKind::CmdNotFound,
 	})?;
-
 	Ok(format!("{} {}", pkg_name, version))
 }
 

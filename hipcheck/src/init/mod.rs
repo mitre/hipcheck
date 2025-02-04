@@ -17,6 +17,7 @@ pub fn init() {
 	init_logging();
 	init_libgit2();
 	init_cryptography();
+	init_software_versions();
 }
 
 fn init_shell() {
@@ -46,4 +47,10 @@ fn init_cryptography() {
 	// Install a process-wide default crypto provider.
 	CryptoProvider::install_default(ring::default_provider())
 		.expect("installed process-wide default crypto provider");
+}
+
+fn init_software_versions() {
+	if let Err(e) = crate::version::init_software_versions() {
+		panic!("Error saving off dependent binary versions: {}", e);
+	}
 }

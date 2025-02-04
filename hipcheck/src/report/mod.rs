@@ -15,7 +15,6 @@ use crate::{
 	cli::Format,
 	error::{Context, Error, Result},
 	policy_exprs::{self, std_exec, Expr},
-	version::VersionQuery,
 };
 use chrono::prelude::*;
 use schemars::JsonSchema;
@@ -42,7 +41,7 @@ pub struct Report {
 	pub repo_head: Arc<String>,
 
 	/// The version of Hipcheck used to analyze the repo.
-	pub hipcheck_version: String,
+	pub hipcheck_version: Arc<String>,
 
 	/// When the analysis was performed.
 	pub analyzed_at: Timestamp,
@@ -483,7 +482,7 @@ impl Serialize for Timestamp {
 
 /// Queries for how Hipcheck reports session results
 #[salsa::query_group(ReportParamsStorage)]
-pub trait ReportParams: VersionQuery {
+pub trait ReportParams {
 	/// Returns the time the current Hipcheck session started
 	#[salsa::input]
 	fn started_at(&self) -> DateTime<FixedOffset>;
