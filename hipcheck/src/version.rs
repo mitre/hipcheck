@@ -1,38 +1,75 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::{Context, Result};
+use crate::{
+	error::{Context, Result},
+	util::{command::DependentProgram, git::get_git_version, npm::get_npm_version},
+};
 use semver::Version;
-use std::rc::Rc;
+use std::{sync::Arc, sync::OnceLock};
 
-pub fn get_version(raw_version: &str) -> Result<String> {
-	// Basic algorithm:
-	//     1. Check the version number in `Cargo.toml`.
-	//     2. If it's an "alpha" release, then in addition to printing
-	//        the version number, we should also capture the current "HEAD"
-	//        commit of the repository and output the version identifier
-	//        as `<version number> (<HEAD commit>)`
-
-	let version = Version::parse(raw_version).context("can't parse version in Cargo.toml")?;
-	log::debug!("detected Hipcheck version [version='{:?}']", version);
-	Ok(raw_version.to_string())
+/// struct which holds the version information for binaries relevant to `hc` used in this run
+struct SoftwareVersions {
+	hc: Arc<String>,
+	npm: Arc<String>,
+	git: Arc<String>,
 }
 
-/// Queries for current versions of Hipcheck and tool dependencies
-#[salsa::query_group(VersionQueryStorage)]
-pub trait VersionQuery: salsa::Database {
-	/// Returns the current Hipcheck version
-	#[salsa::input]
-	fn hc_version(&self) -> Rc<String>;
+/// Holds the versions of software used in a particular run of `hc`
+static HC_VERSIONS: OnceLock<SoftwareVersions> = OnceLock::new();
 
-	/// Returns the version of npm currently running on user's machine
-	#[salsa::input]
-	fn npm_version(&self) -> Rc<String>;
+/// Determine the version of all dependent programs, as well as `hc` itself
+pub fn init_software_versions() -> Result<()> {
+	let git_version = get_git_version()?;
+	DependentProgram::Git.check_version(&git_version)?;
 
-	/// Returns the version of eslint currently running on user's machine
-	#[salsa::input]
-	fn eslint_version(&self) -> Rc<String>;
+	let npm_version = get_npm_version()?;
+	DependentProgram::Npm.check_version(&npm_version)?;
 
-	/// Returns the version of git currently running on user's machine
-	#[salsa::input]
-	fn git_version(&self) -> Rc<String>;
+	let raw_hc_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
+	let hc_version = parse_hc_version(raw_hc_version)?;
+
+	HC_VERSIONS.get_or_init(|| SoftwareVersions {
+		hc: Arc::new(hc_version),
+		npm: Arc::new(npm_version),
+		git: Arc::new(git_version),
+	});
+	Ok(())
+}
+
+#[allow(unused)]
+/// retrieve the version of `git` used in this run of `hc`
+pub fn git_version() -> Arc<String> {
+	HC_VERSIONS
+		.get()
+		.expect("'HC_VERSIONS' not initialized")
+		.git
+		.clone()
+}
+
+#[allow(unused)]
+/// retrieve the version of `npm` used in this run of `hc`
+pub fn npm_version() -> Arc<String> {
+	HC_VERSIONS
+		.get()
+		.expect("'HC_VERSIONS' not initialized")
+		.npm
+		.clone()
+}
+
+/// retrieve the version of `hc` used in this run of `hc`
+pub fn hc_version() -> Arc<String> {
+	HC_VERSIONS
+		.get()
+		.expect("'HC_VERSIONS' not initialized")
+		.hc
+		.clone()
+}
+
+/// Parse the version of `hc` to ensure it is semver compliant
+pub fn parse_hc_version(version: &str) -> Result<String> {
+	let hc_version = Version::parse(version)
+		.context("can't parse version in Cargo.toml")?
+		.to_string();
+	log::debug!("detected Hipcheck version [version='{:?}']", hc_version);
+	Ok(hc_version)
 }

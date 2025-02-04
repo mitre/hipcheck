@@ -20,13 +20,10 @@ use crate::{
 		resolve::{TargetResolver, TargetResolverConfig},
 		Target, TargetSeed, TargetSeedKind,
 	},
-	util::command::DependentProgram,
-	util::{git::get_git_version, npm::get_npm_version},
-	version::{VersionQuery, VersionQueryStorage},
 };
 use chrono::prelude::*;
 use std::{
-	env, fmt,
+	fmt,
 	path::{Path, PathBuf},
 	rc::Rc,
 	result::Result as StdResult,
@@ -42,7 +39,6 @@ use std::{
 	RiskConfigQueryStorage,
 	ScoringProviderStorage,
 	SourceQueryStorage,
-	VersionQueryStorage,
 	WeightTreeQueryStorage
 )]
 pub struct Session {
@@ -97,15 +93,6 @@ impl Session {
 		 *-----------------------------------------------------------------*/
 
 		Shell::print_prelude(target.to_string());
-
-		/*===================================================================
-		 *  Loading current versions of needed software git, npm, and eslint into salsa.
-		 *-----------------------------------------------------------------*/
-
-		let (git_version, npm_version) = load_software_versions()?;
-
-		session.set_git_version(Rc::new(git_version));
-		session.set_npm_version(Rc::new(npm_version));
 
 		/*===================================================================
 		 *  Loading configuration.
@@ -163,13 +150,6 @@ impl Session {
 		session.set_target(Arc::new(target));
 
 		/*===================================================================
-		 *  Resolving the Hipcheck version.
-		 *-----------------------------------------------------------------*/
-
-		let raw_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
-		session.set_hc_version(Rc::new(raw_version.to_string()));
-
-		/*===================================================================
 		 *  Remaining input queries.
 		 *-----------------------------------------------------------------*/
 
@@ -222,16 +202,6 @@ fn use_policy(policy_path: PathBuf, session: &mut Session) -> Result<()> {
 	session.set_policy(Rc::new(policy));
 	session.set_policy_path(Some(Rc::new(policy_path)));
 	Ok(())
-}
-
-fn load_software_versions() -> Result<(String, String)> {
-	let git_version = get_git_version()?;
-	DependentProgram::Git.check_version(&git_version)?;
-
-	let npm_version = get_npm_version()?;
-	DependentProgram::Npm.check_version(&npm_version)?;
-
-	Ok((git_version, npm_version))
 }
 
 pub fn load_config_and_data(config_path: PathBuf) -> Result<(PolicyFile, PathBuf)> {
