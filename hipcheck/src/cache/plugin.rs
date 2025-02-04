@@ -177,7 +177,7 @@ impl HcPluginCache {
 		self.path
 			.join(plugin_id.publisher().as_ref())
 			.join(plugin_id.name().as_ref())
-			.join(plugin_id.version().as_ref())
+			.join(plugin_id.version().version.to_string())
 	}
 
 	/// The path to where the `plugin.kdl` file for a specific PluginId will be stored
@@ -260,7 +260,9 @@ impl HcPluginCache {
 		let plugin_id = PluginId::new(
 			PluginPublisher(entry.publisher.to_string()),
 			PluginName(entry.name.to_string()),
-			PluginVersion(entry.version.to_string()),
+			PluginVersion {
+				version: entry.version.clone(),
+			},
 		);
 		let path_to_plugin = self.plugin_download_dir(&plugin_id);
 		let full_path = pathbuf![&self.path, &path_to_plugin];
