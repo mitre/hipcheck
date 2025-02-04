@@ -1,12 +1,12 @@
 plugins {
-    plugin "mitre/activity" version="0.4.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/activity.kdl"
-    plugin "mitre/affiliation" version="0.4.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/affiliation.kdl"
-    plugin "mitre/binary" version="0.3.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/binary.kdl"
-    plugin "mitre/churn" version="0.4.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/churn.kdl"
-    plugin "mitre/entropy" version="0.4.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/entropy.kdl"
-    plugin "mitre/fuzz" version="0.2.1" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/fuzz.kdl"
-    plugin "mitre/review" version="0.3.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/review.kdl"
-    plugin "mitre/typo" version="0.3.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/typo.kdl"
+    plugin "mitre/activity" version="^0.4" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/activity.kdl"
+    plugin "mitre/affiliation" version="^0.4" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/affiliation.kdl"
+    plugin "mitre/binary" version="^0.3" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/binary.kdl"
+    plugin "mitre/churn" version="^0.4" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/churn.kdl"
+    plugin "mitre/entropy" version="^0.4" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/entropy.kdl"
+    plugin "mitre/fuzz" version="^0.2" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/fuzz.kdl"
+    plugin "mitre/review" version="^0.3" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/review.kdl"
+    plugin "mitre/typo" version="^0.3" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/typo.kdl"
 }
 
 patch {

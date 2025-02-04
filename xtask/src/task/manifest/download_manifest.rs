@@ -284,7 +284,6 @@ impl ParseKdlNode for Size {
 ///```
 #[derive(Debug, Clone, Eq)]
 pub struct DownloadManifestEntry {
-	// TODO: make this a SemVer type?
 	/// A `SemVer` version of the plugin. Not a version requirement as in the plugin manifest file,
 	/// but only a specific concrete version
 	pub version: PluginVersion,

@@ -5,7 +5,7 @@
 mod test {
 	use crate::{
 		config::Config,
-		plugin::PluginVersion,
+		plugin::PluginVersionReq,
 		policy::{config_to_policy::config_to_policy, policy_file::*, PolicyFile, PolicyPatchList},
 	};
 	use hipcheck_kdl::kdl::KdlNode;
@@ -17,12 +17,12 @@ mod test {
 
 	#[test]
 	fn test_parsing_plugin() {
-		let data = r#"plugin "mitre/activity" version="0.1.0" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl""#;
+		let data = r#"plugin "mitre/activity" version="^0.1" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl""#;
 		let node = KdlNode::from_str(data).unwrap();
 
 		let expected = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
-			PluginVersion::new("0.1.0".to_string()),
+			PluginVersionReq::new("^0.1").unwrap(),
 			Some(ManifestLocation::Url(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
@@ -37,15 +37,15 @@ mod test {
 	#[test]
 	fn test_parsing_plugin_list() {
 		let data = r#"plugins {
-        plugin "mitre/activity" version="0.1.0" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl"
-        plugin "mitre/binary" version="0.1.1" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl"
+        plugin "mitre/activity" version="^0.1" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl"
+        plugin "mitre/binary" version="^0.1" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl"
         }"#;
 		let node = KdlNode::from_str(data).unwrap();
 
 		let mut expected = PolicyPluginList::new();
 		expected.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
-			PluginVersion::new("0.1.0".to_string()),
+			PluginVersionReq::new("^0.1").unwrap(),
 			Some(ManifestLocation::Url(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
@@ -55,7 +55,7 @@ mod test {
 		));
 		expected.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/binary").unwrap(),
-			PluginVersion::new("0.1.1".to_string()),
+			PluginVersionReq::new("^0.1").unwrap(),
 			Some(ManifestLocation::Url(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl",
@@ -272,8 +272,8 @@ mod test {
 	#[test]
 	fn test_parse_policy_file() {
 		let data = r#"plugins {
-            plugin "mitre/activity" version="0.1.0" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl"
-            plugin "mitre/binary" version="0.1.1" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl"
+            plugin "mitre/activity" version="^0.1" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl"
+            plugin "mitre/binary" version="^0.1" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl"
         }
 
         analyze {
@@ -289,7 +289,7 @@ mod test {
 		let mut plugins = PolicyPluginList::new();
 		plugins.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
-			PluginVersion::new("0.1.0".to_string()),
+			PluginVersionReq::new("^0.1").unwrap(),
 			Some(ManifestLocation::Url(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-activity.kdl",
@@ -299,7 +299,7 @@ mod test {
 		));
 		plugins.push(PolicyPlugin::new(
 			PolicyPluginName::new("mitre/binary").unwrap(),
-			PluginVersion::new("0.1.1".to_string()),
+			PluginVersionReq::new("^0.1").unwrap(),
 			Some(ManifestLocation::Url(
 				Url::parse(
 					"https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-binary.kdl",

@@ -11,6 +11,6 @@ entrypoint {
 }
 
 dependencies {
-  plugin "mitre/git" version="0.4.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/git.kdl"
-  plugin "mitre/linguist" version="0.3.0" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/linguist.kdl"
+  plugin "mitre/git" version="^0.4" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/git.kdl"
+  plugin "mitre/linguist" version="^0.3" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/linguist.kdl"
 }
