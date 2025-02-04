@@ -13,7 +13,6 @@ in a project's history.
 
 | Parameter           | Type     | Explanation   |
 |:--------------------|:---------|:--------------|
-| `langs-file`        | `String` | Path to a file specifying how to infer languages. |
 | `churn-freq`        | `Float`  | Threshold for a Z-score, above which a commit is considered "high churn" |
 | `commit-percentage` | `Float`  | Threshold for a percentage of "high churn" commits permitted. |
 
@@ -30,9 +29,9 @@ in a project's history.
 ## Default Query: `mitre/churn`
 
 Returns an array of churn Z-scores for all commits identified as modifying
-source files. This is not _all_ commits, as the analysis uses heuristics based
-on the provided `langs-file` to identify which files are likely source files,
-and excludes commits which do not modify any likely source files.
+source files. This is not _all_ commits, as the analysis uses the
+`mitre/linguist` plugin to identify which files are likely source files, and
+excludes commits which do not modify any likely source files.
 
 ## Explanation
 
