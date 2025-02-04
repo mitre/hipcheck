@@ -462,7 +462,7 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
 	use std::sync::Arc;
 	use tokio::task::JoinSet;
 
-	let version = PluginVersion("0.0.0".to_string());
+	let version = PluginVersion::new("0.0.0").unwrap();
 	let working_dir = PathBuf::from("./target/debug");
 
 	let entrypoint1 = pathbuf!["dummy_rand_data"];

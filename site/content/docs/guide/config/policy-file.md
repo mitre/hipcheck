@@ -21,14 +21,14 @@ Let's now look at an example policy file to examine its parts more closely:
 
 ```
 plugins {
-    plugin "mitre/activity" version="0.1.0"
-    plugin "mitre/binary" version="0.1.0"
-    plugin "mitre/fuzz" version="0.1.0"
-    plugin "mitre/review" version="0.1.0"
-    plugin "mitre/typo" version="0.1.0"
-    plugin "mitre/affiliation" version="0.1.0"
-    plugin "mitre/entropy" version="0.1.0"
-    plugin "mitre/churn" version="0.1.0"
+    plugin "mitre/activity" version="^0.1"
+    plugin "mitre/binary" version="^0.1"
+    plugin "mitre/fuzz" version="^0.1"
+    plugin "mitre/review" version="^0.1"
+    plugin "mitre/typo" version="^0.1"
+    plugin "mitre/affiliation" version="^0.1"
+    plugin "mitre/entropy" version="^0.1"
+    plugin "mitre/churn" version="^0.1"
 }
 
 analyze {
@@ -74,9 +74,21 @@ This section defines the plugins that will be used to run the analyses
 described in the file. These plugins are defined with a name, version, and an
 optional manifest field (not shown in the example above) which provides a link
 to the plugin's download manifest. For an example of the manifest field, see
-[@Todo - link to For-Developers section]. In the future, when a Hipcheck plugin
-registry is established, the manifest field will become optional. In the
+[here](@/docs/guide/making-plugins/release.md). In the future, when a Hipcheck
+plugin registry is established, the manifest field will become optional. In the
 immediate term it will be practically required.
+
+The `version` field adheres to [SemVer](https://semver.org/) syntax for version
+strings. We've provided additional support for requirement syntax, with version
+prefaced with requirement operators (e.g., `^0.2`) and multiple requirements
+permitted, separated by commas (e.g., `>=1.2.5, <1.5.0`). In the policy file
+example above, the version requirement `^0.1` specifies that any plugin version
+between `0.1.0` (inclusive) and `0.2.0` (exclusive) is acceptable. *NOTE:* If
+an exact version is specified in the `version` field, e.g., `0.2.1`, then a
+plugin with that specific version is required. While the comparison operators
+are the same as those offered by
+[Cargo](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html)
+, this exact version handling deviates from how Cargo specify dependencies.
 
 The `manifest` field can be either a URL to the plugin's **download manifest**,
 or a local path to the plugin's **plugin manifest**. The latter option exists

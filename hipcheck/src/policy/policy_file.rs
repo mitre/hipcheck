@@ -5,7 +5,7 @@
 use crate::{
 	error::Result,
 	hc_error,
-	plugin::{PluginId, PluginName, PluginPublisher, PluginVersion},
+	plugin::{PluginIdVersionRange, PluginName, PluginPublisher, PluginVersionReq},
 };
 use hipcheck_kdl::kdl::KdlNode;
 use hipcheck_kdl::{extract_data, string_newtype_parse_kdl_node, ParseKdlNode};
@@ -33,7 +33,7 @@ impl Display for ManifestLocation {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyPlugin {
 	pub name: PolicyPluginName,
-	pub version: PluginVersion,
+	pub version: PluginVersionReq,
 	pub manifest: Option<ManifestLocation>,
 }
 
@@ -41,7 +41,7 @@ impl PolicyPlugin {
 	#[allow(dead_code)]
 	pub fn new(
 		name: PolicyPluginName,
-		version: PluginVersion,
+		version: PluginVersionReq,
 		manifest: Option<ManifestLocation>,
 	) -> Self {
 		Self {
@@ -51,8 +51,8 @@ impl PolicyPlugin {
 		}
 	}
 
-	pub fn get_plugin_id(&self) -> PluginId {
-		PluginId::new(
+	pub fn get_plugin_id(&self) -> PluginIdVersionRange {
+		PluginIdVersionRange::new(
 			self.name.publisher.clone(),
 			self.name.name.clone(),
 			self.version.clone(),
@@ -80,7 +80,14 @@ impl ParseKdlNode for PolicyPlugin {
 				return None;
 			}
 		};
-		let version = PluginVersion::new(node.get("version")?.as_string()?.to_string());
+
+		let version = match PluginVersionReq::new(node.get("version")?.as_string()?) {
+			Ok(version) => version,
+			Err(e) => {
+				log::error!("{}", e);
+				return None;
+			}
+		};
 
 		// The manifest is technically optional, as there should be a default Hipcheck plugin artifactory sometime in the future
 		// But for now it is essentially mandatory, so a plugin without a manifest will return an error downstream

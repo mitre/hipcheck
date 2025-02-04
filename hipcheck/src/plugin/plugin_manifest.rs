@@ -3,12 +3,13 @@
 use crate::{
 	error::Error,
 	hc_error,
-	plugin::{Arch, PluginId},
+	plugin::{Arch, PluginIdVersionRange},
 	policy::policy_file::ManifestLocation,
 	util::fs::read_string,
 };
 use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
 use hipcheck_kdl::{extract_data, string_newtype_parse_kdl_node, ParseKdlNode, ToKdlNode};
+use semver::{Version, VersionReq};
 use std::{
 	collections::HashMap,
 	ops::Not,
@@ -30,8 +31,101 @@ pub struct PluginName(pub String);
 string_newtype_parse_kdl_node!(PluginName, "name");
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PluginVersion(pub String);
-string_newtype_parse_kdl_node!(PluginVersion, "version");
+pub struct PluginVersion {
+	pub version: Version,
+}
+
+impl PluginVersion {
+	pub fn new(value: &str) -> Result<Self, Error> {
+		let version = Version::parse(value)?;
+		Ok(Self { version })
+	}
+}
+impl ParseKdlNode for PluginVersion {
+	fn kdl_key() -> &'static str {
+		"version"
+	}
+
+	fn parse_node(node: &KdlNode) -> Option<Self> {
+		if node.name().to_string().as_str() != Self::kdl_key() {
+			return None;
+		}
+		// Semver Version
+		let version = Version::parse(node.entries().first()?.value().as_string()?).unwrap();
+		Some(Self { version })
+	}
+}
+
+impl AsRef<Version> for PluginVersion {
+	fn as_ref(&self) -> &Version {
+		&self.version
+	}
+}
+
+impl ToKdlNode for PluginVersion {
+	#[allow(unused)]
+	fn to_kdl_node(&self) -> KdlNode {
+		let mut node = KdlNode::new(Self::kdl_key());
+		node.insert(0, self.version.to_string());
+		node
+	}
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PluginVersionReq {
+	pub version_req: VersionReq,
+}
+
+impl PluginVersionReq {
+	pub fn new(value: &str) -> Result<Self, Error> {
+		// let version_req = VersionReq::parse(value)?;
+		let version_req = validate_version_req(value)?;
+		Ok(Self { version_req })
+	}
+}
+
+fn validate_version_req(version_string: &str) -> Result<VersionReq, Error> {
+	// If an exact version is provided, e.g., "0.4.2", a "=" will be prepended to it to
+	// make the Semver VersionReq object treat the version as an exact version requirement
+	let parsed_req = if Version::parse(version_string).is_ok() {
+		VersionReq::parse(&format!("={}", version_string))
+			.map_err(|e| hc_error!("Invalid version requirement: {}", e))?
+	} else {
+		VersionReq::parse(version_string)
+			.map_err(|e| hc_error!("Invalid version requirement: {}", e))?
+	};
+	Ok(parsed_req)
+}
+
+impl ParseKdlNode for PluginVersionReq {
+	fn kdl_key() -> &'static str {
+		"version"
+	}
+
+	fn parse_node(node: &KdlNode) -> Option<Self> {
+		if node.name().to_string().as_str() != Self::kdl_key() {
+			return None;
+		}
+		// Semver Version Requirement
+		let version_req = VersionReq::parse(node.entries().first()?.value().as_string()?).unwrap();
+		Some(Self { version_req })
+	}
+}
+
+impl AsRef<VersionReq> for PluginVersionReq {
+	fn as_ref(&self) -> &VersionReq {
+		&self.version_req
+	}
+}
+
+impl ToKdlNode for PluginVersionReq {
+	#[allow(unused)]
+	fn to_kdl_node(&self) -> KdlNode {
+		let mut node = KdlNode::new(Self::kdl_key());
+		node.insert(0, self.version_req.to_string());
+		node
+	}
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct License(pub String);
@@ -103,14 +197,14 @@ impl ParseKdlNode for Entrypoints {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PluginDependency {
 	/// identifier for this PluginDependency
-	pub plugin_id: PluginId,
+	pub plugin_id: PluginIdVersionRange,
 	// NOTE: until Hipcheck supports a registry, this is effectively required
 	pub manifest: Option<ManifestLocation>,
 }
 
 impl PluginDependency {
 	#[cfg(test)]
-	pub fn new(plugin_id: PluginId, manifest: Option<ManifestLocation>) -> Self {
+	pub fn new(plugin_id: PluginIdVersionRange, manifest: Option<ManifestLocation>) -> Self {
 		Self {
 			plugin_id,
 			manifest,
@@ -118,8 +212,8 @@ impl PluginDependency {
 	}
 }
 
-impl AsRef<PluginId> for PluginDependency {
-	fn as_ref(&self) -> &PluginId {
+impl AsRef<PluginIdVersionRange> for PluginDependency {
+	fn as_ref(&self) -> &PluginIdVersionRange {
 		&self.plugin_id
 	}
 }
@@ -144,7 +238,14 @@ impl ParseKdlNode for PluginDependency {
 			None => return None,
 		};
 
-		let version = PluginVersion(node.get("version")?.as_string()?.to_string());
+		let version = match PluginVersionReq::new(node.get("version")?.as_string()?) {
+			Ok(version) => version,
+			Err(e) => {
+				log::error!("{}", e);
+				return None;
+			}
+		};
+
 		let manifest = match node.get("manifest") {
 			Some(manifest) => {
 				let manifest_location = manifest.as_string()?;
@@ -156,7 +257,7 @@ impl ParseKdlNode for PluginDependency {
 			}
 			None => None,
 		};
-		let plugin_id = PluginId::new(publisher, name, version);
+		let plugin_id = PluginIdVersionRange::new(publisher, name, version);
 
 		Some(Self {
 			plugin_id,
@@ -186,7 +287,7 @@ impl ToKdlNode for PluginDependencyList {
 		for dep in self.0.iter() {
 			let mut entry = KdlNode::new("plugin");
 			entry.insert(0, dep.plugin_id.to_policy_file_plugin_identifier());
-			entry.insert("version", dep.plugin_id.version().0.as_str());
+			entry.insert("version", dep.plugin_id.version().version_req.to_string());
 			if let Some(manifest) = &dep.manifest {
 				entry.insert("manifest", manifest.to_string());
 			}
@@ -370,7 +471,7 @@ mod test {
 		let data = r#"version "0.1.0""#;
 		let node = KdlNode::from_str(data).unwrap();
 		assert_eq!(
-			PluginVersion::new("0.1.0".to_owned()),
+			PluginVersion::new("0.1.0").unwrap(),
 			PluginVersion::parse_node(&node).unwrap()
 		)
 	}
@@ -461,15 +562,15 @@ mod test {
 
 	#[test]
 	fn test_parsing_plugin_dependency() {
-		let dep = r#"plugin "mitre/git" version="0.1.0" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl""#;
+		let dep = r#"plugin "mitre/git" version="^0.1" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl""#;
 		let node = KdlNode::from_str(dep).unwrap();
 		assert_eq!(
 			PluginDependency::parse_node(&node).unwrap(),
 			PluginDependency::new(
-				PluginId::new(
+				PluginIdVersionRange::new(
 					PluginPublisher("mitre".to_string()),
 					PluginName("git".to_string()),
-					PluginVersion("0.1.0".to_string()),
+					PluginVersionReq::new("^0.1").unwrap(),
 				),
 				Some(ManifestLocation::Url(
 					Url::parse(
@@ -484,16 +585,16 @@ mod test {
 	#[test]
 	fn test_parsing_plugin_dependency_list() {
 		let dependencies = r#"dependencies {
-  plugin "mitre/git" version="0.1.0" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl"
-  plugin "mitre/plugin2" version="0.4.0" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-plugin2.kdl"
+  plugin "mitre/git" version="^0.1" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl"
+  plugin "mitre/plugin2" version="^0.4" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-plugin2.kdl"
 }"#;
 		let node = KdlNode::from_str(dependencies).unwrap();
 		let mut expected = PluginDependencyList::new();
 		expected.push(PluginDependency::new(
-			PluginId::new(
+			PluginIdVersionRange::new(
 				PluginPublisher("mitre".to_string()),
 				PluginName("git".to_string()),
-				PluginVersion("0.1.0".to_string()),
+				PluginVersionReq::new("^0.1").unwrap(),
 			),
 			Some(
 				ManifestLocation::Url(
@@ -506,10 +607,10 @@ mod test {
 			),
 		));
 		expected.push(PluginDependency::new(
-			PluginId::new(
+			PluginIdVersionRange::new(
 				PluginPublisher("mitre".to_string()),
 				PluginName("plugin2".to_string()),
-				PluginVersion("0.4.0".to_string()),
+				PluginVersionReq::new("^0.4").unwrap(),
 			),
 			Some(ManifestLocation::Url(
 				url::Url::parse(
@@ -535,7 +636,7 @@ entrypoint {
 }
 
 dependencies {
-  plugin "mitre/git" version="0.1.0" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl"
+  plugin "mitre/git" version="^0.1" manifest="https://github.com/mitre/hipcheck/blob/main/plugin/dist/mitre-git.kdl"
 }"#;
 		let plugin_manifest = PluginManifest::from_str(file_contents).unwrap();
 
@@ -567,10 +668,10 @@ dependencies {
 
 		let mut dependencies = PluginDependencyList::new();
 		dependencies.push(PluginDependency::new(
-			PluginId::new(
+			PluginIdVersionRange::new(
 				PluginPublisher("mitre".to_string()),
 				PluginName("git".to_string()),
-				PluginVersion("0.1.0".to_string()),
+				PluginVersionReq::new("^0.1").unwrap(),
 			),
 			Some(ManifestLocation::Url(
 				url::Url::parse(
@@ -583,7 +684,7 @@ dependencies {
 		let expected_manifest = PluginManifest {
 			publisher: PluginPublisher::new("mitre".to_owned()),
 			name: PluginName::new("affiliation".to_owned()),
-			version: PluginVersion::new("0.1.0".to_owned()),
+			version: PluginVersion::new("0.1.0").unwrap(),
 			license: License::new("Apache-2.0".to_owned()),
 			entrypoints,
 			dependencies,
@@ -621,10 +722,10 @@ dependencies {
 
 		let mut dependencies = PluginDependencyList::new();
 		dependencies.push(PluginDependency::new(
-			PluginId::new(
+			PluginIdVersionRange::new(
 				PluginPublisher::new("mitre".to_owned()),
 				PluginName::new("git".to_owned()),
-				PluginVersion::new("0.1.0".to_owned()),
+				PluginVersionReq::new("^0.1").unwrap(),
 			),
 			Some(ManifestLocation::Local("./plugins/git/plugin.kdl".into())),
 		));
@@ -632,7 +733,7 @@ dependencies {
 		let plugin_manifest = PluginManifest {
 			publisher: PluginPublisher::new("mitre".to_owned()),
 			name: PluginName::new("activity".to_owned()),
-			version: PluginVersion::new("0.1.0".to_owned()),
+			version: PluginVersion::new("0.1.0").unwrap(),
 			license: License::new("Apache-2.0".to_owned()),
 			entrypoints,
 			dependencies,
@@ -644,5 +745,21 @@ dependencies {
 			plugin_manifest,
 			PluginManifest::from_str(&plugin_manifest_string).unwrap()
 		)
+	}
+
+	#[test]
+	fn validate_accepted_version_reqs() {
+		let version_req = "1.0.0";
+		let parsed_version_req = validate_version_req(version_req).unwrap();
+		assert_eq!(parsed_version_req, VersionReq::parse("=1.0.0").unwrap());
+		let version_req = "^1.0.0";
+		let parsed_version_req = validate_version_req(version_req).unwrap();
+		assert_eq!(parsed_version_req, VersionReq::parse("^1.0.0").unwrap());
+		let version_req = ">=1.2.5, <1.5.0";
+		let parsed_version_req = validate_version_req(version_req).unwrap();
+		assert_eq!(
+			parsed_version_req,
+			VersionReq::parse(">=1.2.5, <1.5.0").unwrap()
+		);
 	}
 }

@@ -235,8 +235,7 @@ impl ParseKdlNode for Size {
 ///```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DownloadManifestEntry {
-	// TODO: make this a SemVer type?
-	/// A `SemVer` version of the plugin. Not a version requirement as in the plugin manifest file,
+	/// A Plugin`SemVer` version of the plugin. Not a version requirement as in the plugin manifest file,
 	/// but only a specific concrete version
 	pub version: PluginVersion,
 	/// The target architecture for a plugin
@@ -264,7 +263,15 @@ impl ParseKdlNode for DownloadManifestEntry {
 			return None;
 		}
 		// Per RFD #0004, version is of type String
-		let version = PluginVersion(node.get("version")?.as_string()?.to_string());
+
+		// Instantiate a PluginVersion from the version string
+		let version = match PluginVersion::new(node.get("version")?.as_string()?) {
+			Ok(version) => version,
+			Err(e) => {
+				log::error!("{}", e);
+				return None;
+			}
+		};
 		// Per RFD #0004, arch is of type String
 		let arch = Arch::from_str(node.get("arch")?.as_string()?).ok()?;
 
@@ -436,7 +443,7 @@ mod test {
 		.unwrap();
 
 		let expected_entry = DownloadManifestEntry {
-			version: PluginVersion(version.to_string()),
+			version: PluginVersion::new(version).unwrap(),
 			arch: Arch::Known(KnownArch::from_str(arch).unwrap()),
 			url: HipcheckUrl::parse(url).unwrap(),
 			hash: HashWithDigest::new(
@@ -477,7 +484,7 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 		let mut entries_iter = entries.iter();
 		assert_eq!(
 			&DownloadManifestEntry {
-				version: PluginVersion("0.1.0".to_owned()),
+				version: PluginVersion::new("0.1.0").unwrap(),
 				arch: Arch::Known(KnownArch::Aarch64AppleDarwin),
 				url: HipcheckUrl::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-aarch64-apple-darwin.tar.xz").unwrap(),
 				hash: HashWithDigest::new(HashAlgorithm::Sha256, "b8e111e7817c4a1eb40ed50712d04e15b369546c4748be1aa8893b553f4e756b".to_owned()),
@@ -490,7 +497,7 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 		);
 		assert_eq!(
 			&DownloadManifestEntry {
-				version: PluginVersion("0.1.0".to_owned()),
+				version: PluginVersion::new("0.1.0").unwrap(),
 				arch: Arch::Known(KnownArch::X86_64AppleDarwin),
 				url: HipcheckUrl::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz").unwrap(),
 				hash: HashWithDigest::new(HashAlgorithm::Sha256, "ddb8c6d26dd9a91e11c99b3bd7ee2b9585aedac6e6df614190f1ba2bfe86dc19".to_owned()),
