@@ -13,7 +13,6 @@ history.
 
 | Parameter           | Type     | Explanation   |
 |:--------------------|:---------|:--------------|
-| `langs-file`        | `String` | Path to a file specifying how to infer languages. |
 | `entropy-threshold` | `Float`  | Threshold for a Z-score, above which a commit is considered "high entropy" |
 | `commit-percentage` | `Float`  | Threshold for a percentage of "high entropy" commits permitted. |
 
@@ -31,7 +30,8 @@ history.
 ## Default Query: `mitre/entropy`
 
 Returns an array of commit entropies for commits identified as impacting
-likely source files.
+likely source files. Uses the `mitre/linguist` plugin to determine the likely
+source files of the repository.
 
 ## Explanation
 
