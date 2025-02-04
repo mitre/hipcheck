@@ -6,7 +6,8 @@ use crate::{
 	hc_error,
 	plugin::{
 		download_manifest::DownloadManifestEntry, get_current_arch, try_get_bin_for_entrypoint,
-		ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest, PluginId, PluginManifest,
+		ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest, PluginId,
+		PluginIdVersionRange, PluginManifest, PluginVersion,
 	},
 	policy::policy_file::{ManifestLocation, PolicyPlugin},
 	util::{fs::file_sha256, http::agent::agent},
@@ -50,15 +51,11 @@ pub fn retrieve_plugins(
 }
 
 fn retrieve_plugin(
-	plugin_id: PluginId,
+	plugin_id: PluginIdVersionRange,
 	manifest_location: &Option<ManifestLocation>,
 	plugin_cache: &HcPluginCache,
 	required_plugins: &mut HashSet<PluginId>,
 ) -> Result<(), Error> {
-	if required_plugins.contains(&plugin_id) {
-		return Ok(());
-	}
-
 	log::debug!(
 		"Retrieving Plugin ID {} from {:?}",
 		plugin_id,
@@ -80,7 +77,17 @@ fn retrieve_plugin(
 			));
 		}
 	};
-	required_plugins.insert(plugin_id);
+	let updated_plugin_id = PluginId::new(
+		plugin_manifest.publisher.clone(),
+		plugin_manifest.name.clone(),
+		plugin_manifest.version.clone(),
+	);
+
+	if required_plugins.contains(&updated_plugin_id) {
+		return Ok(());
+	}
+
+	required_plugins.insert(updated_plugin_id);
 	for dependency in plugin_manifest.dependencies.0 {
 		retrieve_plugin(
 			dependency.as_ref().clone(),
@@ -93,41 +100,88 @@ fn retrieve_plugin(
 }
 
 fn retrieve_plugin_from_network(
-	plugin_id: PluginId,
+	plugin_id: PluginIdVersionRange,
 	plugin_url: &Url,
 	plugin_cache: &HcPluginCache,
 	force: bool,
 ) -> Result<PluginManifest, Error> {
-	// Use existing cache entry if not force
-	let target_manifest = plugin_cache.plugin_kdl(&plugin_id);
-	if target_manifest.is_file() && !force {
-		log::debug!("Using existing entry in cache for {}", &plugin_id);
-		return PluginManifest::from_file(target_manifest);
-	}
-
-	let current_arch = get_current_arch();
-	let version = plugin_id.version();
-	let download_manifest = retrieve_download_manifest(plugin_url)?;
-	for entry in &download_manifest.entries {
-		if entry.arch == current_arch && version == &entry.version {
-			return download_and_unpack_plugin(entry, plugin_id, plugin_cache);
+	// If exact plugin version was provided, use existing cache entry if not force
+	if plugin_id
+		.version()
+		.version_req
+		.comparators
+		.first()
+		.is_some_and(|comp| comp.op == semver::Op::Exact)
+	{
+		let version_req_syntax_string = plugin_id.version().version_req.to_string();
+		let version_syntax_string = version_req_syntax_string
+			.chars()
+			.skip(1)
+			.collect::<String>();
+		let plugin_version = PluginVersion::new(version_syntax_string.as_str())?;
+		let plugin_id_for_cache = PluginId::new(
+			plugin_id.publisher().clone(),
+			plugin_id.name().clone(),
+			plugin_version.clone(),
+		);
+		let target_manifest = plugin_cache.plugin_kdl(&plugin_id_for_cache);
+		if target_manifest.is_file() && !force {
+			log::debug!("Using existing entry in cache for {}", &plugin_id_for_cache);
+			return PluginManifest::from_file(target_manifest);
 		}
 	}
-	Err(hc_error!(
-		"Could not find download manifest entry for '{}' [{}] with version '{}'",
-		plugin_id.to_policy_file_plugin_identifier(),
-		current_arch,
-		plugin_id.version().as_ref(),
-	))
+
+	let download_manifest = retrieve_download_manifest(plugin_url)?;
+	let entry = select_plugin_version(&plugin_id, &download_manifest)?;
+	let updated_plugin_id = PluginId::new(
+		plugin_id.publisher().clone(),
+		plugin_id.name().clone(),
+		entry.version.clone(),
+	);
+	download_and_unpack_plugin(entry, updated_plugin_id, plugin_cache)
+}
+
+fn select_plugin_version<'a>(
+	plugin_id: &'a PluginIdVersionRange,
+	download_manifest: &'a DownloadManifest,
+) -> Result<&'a DownloadManifestEntry, Error> {
+	let current_arch = get_current_arch();
+	let version = plugin_id.version();
+	let latest_version_entry = download_manifest
+		.entries
+		.iter()
+		.filter(|entry| {
+			entry.arch == current_arch && version.version_req.matches(&entry.version.version)
+		})
+		.max_by(|a, b| a.version.version.cmp(&b.version.version));
+
+	if let Some(entry) = latest_version_entry {
+		Ok(entry)
+	} else {
+		Err(hc_error!(
+			"Could not find download manifest entry for '{}' [{}]",
+			plugin_id.to_policy_file_plugin_identifier(),
+			current_arch,
+		))
+	}
 }
 
 /// retrieves a plugin from the local filesystem by copying its `plugin.kdl` and `entrypoint` binary to the plugin_cache
 fn retrieve_local_plugin(
-	plugin_id: PluginId,
+	plugin_id: PluginIdVersionRange,
 	plugin_manifest_path: &PathBuf,
 	plugin_cache: &HcPluginCache,
 ) -> Result<PluginManifest, Error> {
-	let download_dir = plugin_cache.plugin_download_dir(&plugin_id);
+	let mut plugin_manifest = PluginManifest::from_file(plugin_manifest_path)?;
+	let current_arch = get_current_arch();
+	let plugin_version = plugin_manifest.version.clone();
+	let updated_plugin_id = PluginId::new(
+		plugin_id.publisher().clone(),
+		plugin_id.name().clone(),
+		plugin_version,
+	);
+
+	let download_dir = plugin_cache.plugin_download_dir(&updated_plugin_id);
 	std::fs::create_dir_all(&download_dir).map_err(|e| {
 		hc_error!(
 			"Error [{}] creating download directory {}",
@@ -136,24 +190,25 @@ fn retrieve_local_plugin(
 		)
 	})?;
 
-	let mut plugin_manifest = PluginManifest::from_file(plugin_manifest_path)?;
-	let current_arch = get_current_arch();
-
 	let curr_entrypoint = plugin_manifest.get_entrypoint_for(&current_arch)?;
 
 	if let Some(curr_bin) = try_get_bin_for_entrypoint(&curr_entrypoint).0 {
 		// Only do copy if using a path to a binary instead of a PATH-based resolution (i.e.
 		// `docker _`. We wouldn't want to copy the `docker` binary in this case
 		if std::fs::exists(curr_bin)? {
-			let original_entrypoint = plugin_manifest
-				.update_entrypoint(&current_arch, plugin_cache.plugin_download_dir(&plugin_id))?;
+			let original_entrypoint = plugin_manifest.update_entrypoint(
+				&current_arch,
+				plugin_cache.plugin_download_dir(&updated_plugin_id),
+			)?;
 
 			let new_entrypoint = plugin_manifest.get_entrypoint_for(&current_arch)?;
 			// unwrap is safe here, we just updated the entrypoint for current arch
 			let new_bin = try_get_bin_for_entrypoint(&new_entrypoint).0.unwrap();
 
 			// path where the binary for this plugin will get cached
-			let binary_cache_location = plugin_cache.plugin_download_dir(&plugin_id).join(new_bin);
+			let binary_cache_location = plugin_cache
+				.plugin_download_dir(&updated_plugin_id)
+				.join(new_bin);
 
 			// if on windows, first check if we can skip copying. this is because windows won't let
 			// you overwrite a plugin binary that is currently in use (such as when another hc
@@ -176,7 +231,7 @@ fn retrieve_local_plugin(
 		}
 	}
 
-	let plugin_kdl_path = plugin_cache.plugin_kdl(&plugin_id);
+	let plugin_kdl_path = plugin_cache.plugin_kdl(&updated_plugin_id);
 	write_all(&plugin_kdl_path, &plugin_manifest.to_kdl_formatted_string()).map_err(|e| {
 		hc_error!(
 			"Error [{}] writing {}",
@@ -435,4 +490,223 @@ fn retrieve_download_manifest(url: &Url) -> Result<DownloadManifest, Error> {
 	contents.truncate(amount_read);
 	let contents = String::from_utf8_lossy(&contents);
 	DownloadManifest::from_str(&contents)
+}
+
+#[cfg(test)]
+mod test {
+
+	use super::*;
+	use crate::plugin::{PluginName, PluginPublisher, PluginVersion, PluginVersionReq};
+	use std::str::FromStr;
+
+	#[test]
+
+	fn test_versionreq_to_version_above() {
+		let plugin_id = &PluginIdVersionRange::new(
+			PluginPublisher("mitre".to_string()),
+			PluginName("git".to_string()),
+			PluginVersionReq::new("^0.1").unwrap(),
+		);
+		let download_manifest = &DownloadManifest::from_str(
+			r#"plugin version="0.1.0" arch="aarch64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-aarch64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="66ece652f44ff47ad8f5ab45d4de1cde9f35fdc15c7c43b89aebb7203d277e8e"
+				compress format="tar.xz"
+				size bytes=1183768
+			}
+			
+			plugin version="0.1.0" arch="x86_64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="b3c7e463c701988bdb568bf520f71ef7e6fa21b5c5bc68449a53a42e59b575ab"
+				compress format="tar.xz"
+				size bytes=1289520
+			}
+			
+			plugin version="0.1.0" arch="x86_64-pc-windows-msvc" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-pc-windows-msvc.zip"
+				hash alg="SHA256" digest="aea41cd5b91c79432baf0b00b5f85fef33ecaefcc2dfe24028b5d7dbf6e0365c"
+				compress format="zip"
+				size bytes=4322356
+			}
+			
+			plugin version="0.1.0" arch="x86_64-unknown-linux-gnu" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-unknown-linux-gnu.tar.xz"
+				hash alg="SHA256" digest="dfe3f12d5c4b8c9397f69aad40db27978f5777dd16440380e8f35c6ddf65f485"
+				compress format="tar.xz"
+				size bytes=1382112
+			}
+			
+			plugin version="0.1.2" arch="aarch64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-aarch64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="c4285a08a829a18b68e5c678dff00333e1150c00a94c7326eba3970a4519b733"
+				compress format="tar.xz"
+				size bytes=1156136
+			}
+			
+			plugin version="0.1.2" arch="x86_64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-x86_64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="0689448a70e0c01ac62428113760eeb717756ef2b74079c4092996ed2e5d9832"
+				compress format="tar.xz"
+				size bytes=1256796
+			}
+			
+			plugin version="0.1.2" arch="x86_64-pc-windows-msvc" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-x86_64-pc-windows-msvc.zip"
+				hash alg="SHA256" digest="896ae92d03e6452fa25bcec8c54027431d533d41aaf7c0ef954cca0534fae14b"
+				compress format="zip"
+				size bytes=4103220
+			}
+			
+			plugin version="0.1.2" arch="x86_64-unknown-linux-gnu" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-x86_64-unknown-linux-gnu.tar.xz"
+				hash alg="SHA256" digest="f3d74b2d66923413c69826a733e268509e00015044bb4c93a3dbcfbf281ff365"
+				compress format="tar.xz"
+				size bytes=1339456
+			}"#			
+					).unwrap();
+		let entry = select_plugin_version(plugin_id, download_manifest).unwrap();
+		let expected_version = PluginVersion::new("0.1.2").unwrap();
+		println!("Entry Version: {:}", entry.version.version);
+		assert_eq!(entry.version.version, expected_version.version);
+	}
+
+	#[test]
+
+	fn test_versionreq_to_version_below() {
+		let plugin_id = &PluginIdVersionRange::new(
+			PluginPublisher("mitre".to_string()),
+			PluginName("git".to_string()),
+			PluginVersionReq::new("<=0.3.1").unwrap(),
+		);
+		let download_manifest = &DownloadManifest::from_str(
+			r#"plugin version="0.1.55" arch="aarch64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-aarch64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="66ece652f44ff47ad8f5ab45d4de1cde9f35fdc15c7c43b89aebb7203d277e8e"
+				compress format="tar.xz"
+				size bytes=1183768
+			}
+			
+			plugin version="0.1.55" arch="x86_64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="b3c7e463c701988bdb568bf520f71ef7e6fa21b5c5bc68449a53a42e59b575ab"
+				compress format="tar.xz"
+				size bytes=1289520
+			}
+			
+			plugin version="0.1.55" arch="x86_64-pc-windows-msvc" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-pc-windows-msvc.zip"
+				hash alg="SHA256" digest="aea41cd5b91c79432baf0b00b5f85fef33ecaefcc2dfe24028b5d7dbf6e0365c"
+				compress format="zip"
+				size bytes=4322356
+			}
+			
+			plugin version="0.1.55" arch="x86_64-unknown-linux-gnu" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-unknown-linux-gnu.tar.xz"
+				hash alg="SHA256" digest="dfe3f12d5c4b8c9397f69aad40db27978f5777dd16440380e8f35c6ddf65f485"
+				compress format="tar.xz"
+				size bytes=1382112
+			}
+			
+			plugin version="0.3.22" arch="aarch64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-aarch64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="c4285a08a829a18b68e5c678dff00333e1150c00a94c7326eba3970a4519b733"
+				compress format="tar.xz"
+				size bytes=1156136
+			}
+			
+			plugin version="0.3.22" arch="x86_64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-x86_64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="0689448a70e0c01ac62428113760eeb717756ef2b74079c4092996ed2e5d9832"
+				compress format="tar.xz"
+				size bytes=1256796
+			}
+			
+			plugin version="0.3.22" arch="x86_64-pc-windows-msvc" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-x86_64-pc-windows-msvc.zip"
+				hash alg="SHA256" digest="896ae92d03e6452fa25bcec8c54027431d533d41aaf7c0ef954cca0534fae14b"
+				compress format="zip"
+				size bytes=4103220
+			}
+			
+			plugin version="0.3.22" arch="x86_64-unknown-linux-gnu" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-x86_64-unknown-linux-gnu.tar.xz"
+				hash alg="SHA256" digest="f3d74b2d66923413c69826a733e268509e00015044bb4c93a3dbcfbf281ff365"
+				compress format="tar.xz"
+				size bytes=1339456
+			}"#			
+					).unwrap();
+		let entry = select_plugin_version(plugin_id, download_manifest).unwrap();
+		let expected_version = PluginVersion::new("0.1.55").unwrap();
+		println!("Entry Version: {:}", entry.version.version);
+		assert_eq!(entry.version.version, expected_version.version);
+	}
+
+	#[test]
+	fn test_versionreq_to_version_equals() {
+		let plugin_id = &PluginIdVersionRange::new(
+			PluginPublisher("mitre".to_string()),
+			PluginName("git".to_string()),
+			PluginVersionReq::new("=0.2.1").unwrap(),
+		);
+		let download_manifest = &DownloadManifest::from_str(
+			r#"plugin version="0.2.1" arch="aarch64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-aarch64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="66ece652f44ff47ad8f5ab45d4de1cde9f35fdc15c7c43b89aebb7203d277e8e"
+				compress format="tar.xz"
+				size bytes=1183768
+			}
+			
+			plugin version="0.2.1" arch="x86_64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="b3c7e463c701988bdb568bf520f71ef7e6fa21b5c5bc68449a53a42e59b575ab"
+				compress format="tar.xz"
+				size bytes=1289520
+			}
+			
+			plugin version="0.2.1" arch="x86_64-pc-windows-msvc" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-pc-windows-msvc.zip"
+				hash alg="SHA256" digest="aea41cd5b91c79432baf0b00b5f85fef33ecaefcc2dfe24028b5d7dbf6e0365c"
+				compress format="zip"
+				size bytes=4322356
+			}
+			
+			plugin version="0.2.1" arch="x86_64-unknown-linux-gnu" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.1.0/binary-x86_64-unknown-linux-gnu.tar.xz"
+				hash alg="SHA256" digest="dfe3f12d5c4b8c9397f69aad40db27978f5777dd16440380e8f35c6ddf65f485"
+				compress format="tar.xz"
+				size bytes=1382112
+			}
+			
+			plugin version="0.4.8" arch="aarch64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-aarch64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="c4285a08a829a18b68e5c678dff00333e1150c00a94c7326eba3970a4519b733"
+				compress format="tar.xz"
+				size bytes=1156136
+			}
+			
+			plugin version="0.4.8" arch="x86_64-apple-darwin" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-x86_64-apple-darwin.tar.xz"
+				hash alg="SHA256" digest="0689448a70e0c01ac62428113760eeb717756ef2b74079c4092996ed2e5d9832"
+				compress format="tar.xz"
+				size bytes=1256796
+			}
+			
+			plugin version="0.4.8" arch="x86_64-pc-windows-msvc" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-x86_64-pc-windows-msvc.zip"
+				hash alg="SHA256" digest="896ae92d03e6452fa25bcec8c54027431d533d41aaf7c0ef954cca0534fae14b"
+				compress format="zip"
+				size bytes=4103220
+			}
+			
+			plugin version="0.4.8" arch="x86_64-unknown-linux-gnu" {
+				url "https://github.com/mitre/hipcheck/releases/download/binary-v0.2.0/binary-x86_64-unknown-linux-gnu.tar.xz"
+				hash alg="SHA256" digest="f3d74b2d66923413c69826a733e268509e00015044bb4c93a3dbcfbf281ff365"
+				compress format="tar.xz"
+				size bytes=1339456
+			}"#		
+					).unwrap();
+		let entry = select_plugin_version(plugin_id, download_manifest).unwrap();
+		let expected_version = PluginVersion::new("0.2.1").unwrap();
+		assert_eq!(entry.version.version, expected_version.version);
+	}
 }

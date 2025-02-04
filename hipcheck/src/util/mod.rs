@@ -9,3 +9,4 @@ pub mod http;
 pub mod npm;
 #[cfg(test)]
 pub mod test;
+pub mod version;

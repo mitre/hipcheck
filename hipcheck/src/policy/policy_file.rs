@@ -5,7 +5,8 @@
 use crate::{
 	error::Result,
 	hc_error,
-	plugin::{PluginId, PluginName, PluginPublisher, PluginVersion},
+	plugin::{PluginIdVersionRange, PluginName, PluginPublisher, PluginVersionReq},
+	util::version::pre_process_plugin_version_req,
 };
 use hipcheck_kdl::kdl::KdlNode;
 use hipcheck_kdl::{extract_data, string_newtype_parse_kdl_node, ParseKdlNode};
@@ -33,7 +34,7 @@ impl Display for ManifestLocation {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyPlugin {
 	pub name: PolicyPluginName,
-	pub version: PluginVersion,
+	pub version: PluginVersionReq,
 	pub manifest: Option<ManifestLocation>,
 }
 
@@ -41,7 +42,7 @@ impl PolicyPlugin {
 	#[allow(dead_code)]
 	pub fn new(
 		name: PolicyPluginName,
-		version: PluginVersion,
+		version: PluginVersionReq,
 		manifest: Option<ManifestLocation>,
 	) -> Self {
 		Self {
@@ -51,8 +52,8 @@ impl PolicyPlugin {
 		}
 	}
 
-	pub fn get_plugin_id(&self) -> PluginId {
-		PluginId::new(
+	pub fn get_plugin_id(&self) -> PluginIdVersionRange {
+		PluginIdVersionRange::new(
 			self.name.publisher.clone(),
 			self.name.name.clone(),
 			self.version.clone(),
@@ -80,7 +81,14 @@ impl ParseKdlNode for PolicyPlugin {
 				return None;
 			}
 		};
-		let version = PluginVersion::new(node.get("version")?.as_string()?.to_string());
+
+		let version = match pre_process_plugin_version_req(node.get("version")?.as_string()?) {
+			Ok(version) => version,
+			Err(e) => {
+				log::error!("{}", e);
+				return None;
+			}
+		};
 
 		// The manifest is technically optional, as there should be a default Hipcheck plugin artifactory sometime in the future
 		// But for now it is essentially mandatory, so a plugin without a manifest will return an error downstream
@@ -639,5 +647,38 @@ impl ParseKdlNode for PolicyPatchList {
 		}
 
 		Some(plugins)
+	}
+}
+
+#[cfg(test)]
+mod test {
+
+	use semver::VersionReq;
+
+	use super::*;
+
+	#[test]
+	fn test_version_req_pre_processing() {
+		let version_req = "1.0.0";
+		let processed_version_req = pre_process_plugin_version_req(version_req).unwrap();
+		assert_eq!(
+			processed_version_req.version_req,
+			VersionReq::parse("=1.0.0").unwrap()
+		);
+
+		let version_req = "^1.0.0";
+		let processed_version_req = pre_process_plugin_version_req(version_req).unwrap();
+		assert_eq!(
+			processed_version_req.version_req,
+			VersionReq::parse("^1.0.0").unwrap()
+		);
+
+		let version_req = ">=1.2.5, <1.5.0";
+		let processed_version_req = pre_process_plugin_version_req(version_req).unwrap();
+
+		assert_eq!(
+			processed_version_req.version_req,
+			VersionReq::parse(">=1.2.5, <1.5.0").unwrap()
+		);
 	}
 }
