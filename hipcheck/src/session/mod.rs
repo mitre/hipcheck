@@ -103,10 +103,7 @@ impl Session {
 			PreferPolicy { policy, config } => {
 				let res = use_policy(policy, &mut session);
 				if let Some(err) = res.err() {
-					Shell::print_error(&err, Format::Human);
-					Shell::println(
-						"Warning: failed to load policy; defaulting to config TOML instead",
-					);
+					log::error!("Failed to load default policy KDL file; trying legacy config TOML directory instead. Error: {:#?}", err);
 
 					use_config(config, &mut session)?;
 				}
@@ -234,7 +231,7 @@ pub fn load_policy_and_data(policy_path: PathBuf) -> Result<(PolicyFile, PathBuf
 
 	// Load the policy file.
 	let policy = PolicyFile::load_from(&policy_path)
-		.context("Failed to load policy. Please make sure the policy file is in the provided location and is formatted correctly.")?;
+		.with_context(|| format!("Failed to load policy file at path {:?}. Please make sure the policy file is in the provided location and is formatted correctly.", policy_path))?;
 
 	phase.finish_successful();
 
