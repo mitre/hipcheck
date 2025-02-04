@@ -137,6 +137,8 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 		}
 	};
 
+	log::info!("Using configuration source: {}", config_mode);
+
 	let report = run(
 		target,
 		config_mode,

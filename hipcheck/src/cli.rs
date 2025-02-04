@@ -19,6 +19,7 @@ use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
 use std::{
+	fmt::{self, Display, Formatter},
 	path::{Path, PathBuf},
 	str::FromStr,
 };
@@ -189,6 +190,23 @@ pub enum ConfigMode {
 	ForcePolicy { policy: PathBuf },
 	/// Only attempt to load from config.
 	ForceConfig { config: PathBuf },
+}
+
+impl Display for ConfigMode {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		use ConfigMode::*;
+		match &self {
+			PreferPolicy { policy, config } => {
+				write!(f, "Default to Policy KDL file at path:\n{:?}\nFallback Legacy Config TOML directory at path:\n{:?}", policy, config)
+			}
+			ForcePolicy { policy } => {
+				write!(f, "Policy KDL file at path:\n{:?}", policy)
+			}
+			ForceConfig { config } => {
+				write!(f, "Legacy Config TOML directory at path:\n{:?}", config)
+			}
+		}
+	}
 }
 
 impl CliConfig {
