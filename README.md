@@ -3,6 +3,7 @@
 [![License: Apache-2.0](https://img.shields.io/github/license/mitre/hipcheck)][license]
 [![GitHub Release](https://img.shields.io/github/v/release/mitre/hipcheck)][release]
 [![Hipcheck Website](https://img.shields.io/badge/Website-blue)][website]
+![docker build](https://github.com/mitre/hipcheck/actions/workflows/docker.yml/badge.svg)
 
 _Helping maintainers assess software packages for long term risk._
 
