@@ -218,6 +218,7 @@ pub trait Plugin: Send + Sync + 'static {
 	/// empty `name` string. In most cases users should not need to override the default
 	/// implementation.
 	fn default_query(&self) -> Option<DynQuery> {
+		println!("TEMPORARY");
 		self.queries()
 			.find_map(|named| named.is_default().then_some(named.inner))
 	}
