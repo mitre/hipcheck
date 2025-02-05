@@ -24,3 +24,5 @@ targets = [
 ]
 # Whether to install an updater program
 install-updater = true
+# Only build the artifacts we need, instead of the whole workspace
+precise-builds = true
