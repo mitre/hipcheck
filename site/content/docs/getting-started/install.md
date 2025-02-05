@@ -115,6 +115,16 @@ The Hipcheck project maintains an official `Containerfile` which describes
 the Hipcheck container, and publishes images to Docker Hub with each new
 release.
 
+The default Hipcheck `check` invocation includes analyses that require a GitHub
+token in the environment. Once you have generated or otherwise acquired a token,
+forward it to the container during the `run` invocation. Examples are included
+below.
+
+To use a custom policy, you will need to create a [policy file][policy_file] and
+expose the enclosing directory to the container as a mounted volume. Then,
+include `--policy <PATH>` in your `docker run` or `podman run` invocation, where
+`<PATH>` is the path to your mounted policy file **within the container**.
+
 ### Using Docker Hub
 
 Hipcheck publishes container images to Docker Hub under the [`mitre/hipcheck`
@@ -129,13 +139,14 @@ For example, to run a short-lived container with Docker using the most recent
 Hipcheck image, you might run:
 
 ```sh
-$ docker run mitre/hipcheck:latest
+$ export HC_GITHUB_TOKEN=<TOKEN_VALUE>
+$ docker run -e HC_GITHUG_TOKEN=$HC_GITHUB_TOKEN mitre/hipcheck:latest check https://github.com/mitre/hipcheck
 ```
 
 ### Using the `Containerfile`
 
 You can also run Hipcheck from the local `Containerfile`, first by building
-the image, and then by running that image. For example, with Docker:
+the image, and then by running that image. For example, with Podman:
 
 To do this you will need Git to get a local copy of the repository, or to
 download the repository contents from GitHub without the Git history.
@@ -143,10 +154,15 @@ download the repository contents from GitHub without the Git history.
 ```sh
 $ git clone https://github.com/mitre/hipcheck
 $ cd hipcheck
-$ docker build -f dist/Containerfile .
+$ podman build -t hipcheck dist
 ```
 
-This will build the image, which you can then use normally.
+This will build the image, which you can then use normally. For example:
+
+```sh
+$ export HC_GITHUB_TOKEN=<TOKEN_VALUE>
+$ podman run -e HC_GITHUB_TOKEN=$HC_GITHUB_TOKEN localhost/hipcheck:latest check https://github.com/mitre/hipcheck
+```
 
 ## Deprecated Methods
 
@@ -198,3 +214,5 @@ If you want Hipcheck to be able to update itself to newer versions, you'll need
 to install it with an [install script](#install-from-a-pre-built-script) or
 install the self-updater yourself.
 {% end %}
+
+[policy_file]: @/docs/guide/config/policy-file.md
