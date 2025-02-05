@@ -1,3 +1,5 @@
+![docker build](https://github.com/mitre/hipcheck/actions/workflows/docker.yml/badge.svg)
+
 # Hipcheck &#x2713;
 
 [![License: Apache-2.0](https://img.shields.io/github/license/mitre/hipcheck)][license]
