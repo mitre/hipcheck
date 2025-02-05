@@ -290,7 +290,7 @@ impl Plugin for ChurnPlugin {
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"the churn frequency of each commit in the repository".to_owned(),
+			"churn frequencies of each commit in the repository".to_owned(),
 		))
 	}
 
