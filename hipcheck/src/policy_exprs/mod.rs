@@ -238,11 +238,144 @@ pub struct English<'a> {
 	message: String,
 }
 
+impl English<'_> {
+	/// Returns compact English phrases for common policy expressions indicating a filtered count
+	/// These should look like `(count (filter (<operator> <primitive>) $))`
+	fn parse_count_function(&self, func: &Function) -> Option<String> {
+		// The function must have a count operator
+		if func.ident.to_string() != "count" {
+			return None;
+		}
+
+		// The first argument must be another function
+		let Expr::Function(inner_func) = &func.args[0] else {
+			return None;
+		};
+
+		// That inner function must have a filter operator
+		// Include an extra safety check that the function has a second argument
+		if inner_func.ident.to_string() != "filter" || inner_func.args.len() != 2 {
+			return None;
+		}
+
+		// The inner filter function must have a lambda and a JSON pointer as its arguments
+		let (Expr::Lambda(lambda), Expr::JsonPointer(_)) =
+			(&inner_func.args[0], &inner_func.args[1])
+		else {
+			return None;
+		};
+
+		let lambda_func = &lambda.body;
+		let lambda_arg = &lambda_func.args[1];
+
+		// Special case of `(count (filter (eq #t) $))`
+		if lambda_func.ident.to_string() == "eq" {
+			if let Expr::Primitive(Primitive::Bool(bool)) = lambda_arg {
+				if *bool {
+					return Some(format!("the number of {}", self.message.clone()));
+				}
+			}
+		}
+
+		// More general lambda expressions
+		let english_operator = get_function_def(lambda_func, &self.env).ok()?.english;
+		let english_expression = self.visit_expr(lambda_arg).ok()?;
+
+		Some(format!(
+			"the number of {} {} {}",
+			self.message.clone(),
+			english_operator,
+			english_expression
+		))
+	}
+
+	/// Returns compact English phrases for common policy expressions indicating a filtered percent calculation
+	/// These should look like `(divz (count (filter (<operator> <primitive>) $)) (count $))`
+	fn parse_percent_function(&self, func: &Function) -> Option<String> {
+		// The function must have a division operator
+		// Include an extra safety check that the function has a second argument
+		if func.ident.to_string() != "divz" || func.args.len() != 2 {
+			return None;
+		}
+
+		// The arguments of the function must both be other functions
+		let (Expr::Function(num_func), Expr::Function(denom_func)) = (&func.args[0], &func.args[1])
+		else {
+			return None;
+		};
+
+		// Both of those nested functions must have count operators
+		if num_func.ident.to_string() != "count" || denom_func.ident.to_string() != "count" {
+			return None;
+		}
+
+		// The first count function must have another function as its argument
+		// The second count function must have a JSON pointer as its argument
+		let (Expr::Function(inner_func), Expr::JsonPointer(_)) =
+			(&num_func.args[0], &denom_func.args[0])
+		else {
+			return None;
+		};
+
+		// The inner function of the first count funciton must have a filter operator
+		// Include an extra safety check that the function has a second argument
+		if inner_func.ident.to_string() != "filter" || inner_func.args.len() != 2 {
+			return None;
+		}
+		// The inner filter function must have a lamda and a JSON pointer as its arguments
+		let (Expr::Lambda(lambda), Expr::JsonPointer(_)) =
+			(&inner_func.args[0], &inner_func.args[1])
+		else {
+			return None;
+		};
+
+		let lambda_func = &lambda.body;
+		let lambda_arg = &lambda_func.args[1];
+
+		// Special case of `(divz (count (filter (eq #t) $)) (count $))`
+		if lambda_func.ident.to_string() == "eq" {
+			if let Expr::Primitive(Primitive::Bool(bool)) = lambda_arg {
+				if *bool {
+					return Some(format!("the percent of {}", self.message.clone()));
+				}
+			}
+		}
+
+		// More general lambda expressions
+		let english_operator = get_function_def(lambda_func, &self.env).ok()?.english;
+		let english_expression = self.visit_expr(lambda_arg).ok()?;
+
+		Some(format!(
+			"the percent of {} {} {}",
+			self.message.clone(),
+			english_operator,
+			english_expression
+		))
+	}
+}
+
 // Trait implementation to return English descriptions of an Expr
 impl ExprVisitor<Result<String>> for English<'_> {
 	/// Parse a function expression into an English string
 	fn visit_function(&self, func: &Function) -> Result<String> {
 		let env = &self.env;
+
+		// Check for special cases
+		match func.ident.to_string().as_ref() {
+			// Check if the function is a filtered count function, and return a simple English string if it is
+			"count" => {
+				if let Some(count_string) = self.parse_count_function(func) {
+					return Ok(count_string);
+				}
+			}
+			// Check if the function is a percent function, and return a simple English string if it is
+			"divz" => {
+				if let Some(percent_string) = self.parse_percent_function(func) {
+					return Ok(percent_string);
+				}
+			}
+			_ => {}
+		}
 
 		// Parse the function operator to English
 		let function_def = get_function_def(func, env)?;

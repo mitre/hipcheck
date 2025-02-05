@@ -10,12 +10,7 @@ use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::Target};
 use serde::Deserialize;
 
-use std::{
-	collections::HashSet,
-	path::PathBuf,
-	result::Result as StdResult,
-	sync::OnceLock,
-};
+use std::{collections::HashSet, path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
 #[derive(Deserialize)]
 struct RawConfig {
@@ -114,11 +109,11 @@ async fn commit_entropies(
 
 	// Calculate the grapheme frequencies for each commit which contains code.
 	commit_diffs.retain(|cd| {
-			cd.diff
-				.file_diffs
-				.iter()
-				.any(|x| source_files.contains(&x.file_name))
-		});
+		cd.diff
+			.file_diffs
+			.iter()
+			.any(|x| source_files.contains(&x.file_name))
+	});
 	let commit_freqs = commit_diffs
 		.iter()
 		.map(|x| grapheme_freqs(&source_files, x))
@@ -203,7 +198,7 @@ impl Plugin for EntropyPlugin {
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"the entropy calculation of each commit in the repository".to_owned(),
+			"entropy calculations of each commit in the repository".to_owned(),
 		))
 	}
 
