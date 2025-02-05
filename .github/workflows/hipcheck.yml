@@ -45,7 +45,13 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # NOTE: this list of runners is manually synced with the set used by
+        # `dist` and should be kept up to date.  we've purposefully chosen to
+        # use two different versions of macOS here to achieve ARM and x86
+        # support (macos-14 is ARM, macos-13 is x86), since alternative runners
+        # with matching versions aren't all on the free plan for GitHub
+        # Actions.
+        os: [ubuntu-20.04, windows-2019, macos-14, macos-13]
     name: "Test (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
@@ -74,7 +80,7 @@ jobs:
       # Note that this actually runs "cargo check" and doesn't attempt
       # to link the resulting artifacts together.
       - name: Build
-        run: cargo check --verbose --workspace
+        run: cargo build --verbose --workspace
 
       # Test the code.
       - name: Test
@@ -87,3 +93,25 @@ jobs:
       # Run our own checks for licensing and other info.
       - name: Check
         run: cargo xtask check
+
+      # Generate a GitHub API Token for doing Hipcheck runs
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.HIPCHECK_CI_APP_ID }}
+          private-key: ${{ secrets.HIPCHECK_CI_APP_PRIV_KEY }}
+
+      # Run a few variants of Hipcheck
+      - name: Run with Policy
+        env:
+          HC_GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: ./target/debug/hc --policy ./config/Hipcheck.kdl check https://github.com/mitre/hipcheck
+      - name: Run with Local Policy
+        env:
+          HC_GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: ./target/debug/hc --policy ./config/local.Hipcheck.kdl check https://github.com/mitre/hipcheck
+      - name: Run with Config
+        env:
+          HC_GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: ./target/debug/hc --config ./config check https://github.com/mitre/hipcheck
