@@ -54,8 +54,8 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
+ "hipcheck-kdl",
  "hipcheck-sdk",
- "kdl 4.7.1",
  "log",
  "pathbuf",
  "schemars",
@@ -327,8 +327,8 @@ version = "0.2.0"
 dependencies = [
  "clap",
  "content_inspector",
+ "hipcheck-kdl",
  "hipcheck-sdk",
- "kdl 4.7.1",
  "log",
  "pathbuf",
  "schemars",
@@ -2142,6 +2142,7 @@ dependencies = [
  "git2",
  "graphql_client",
  "hipcheck-common",
+ "hipcheck-kdl",
  "hipcheck-macros",
  "http",
  "indexmap 2.7.0",
@@ -2149,7 +2150,6 @@ dependencies = [
  "indicatif",
  "itertools",
  "jiff",
- "kdl 6.2.2",
  "log",
  "logos",
  "maplit",
@@ -2213,6 +2213,13 @@ dependencies = [
  "thiserror 2.0.11",
  "tonic",
  "tonic-build",
+]
+
+[[package]]
+name = "hipcheck-kdl"
+version = "0.1.0"
+dependencies = [
+ "kdl 6.2.2",
 ]
 
 [[package]]
@@ -2820,8 +2827,8 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
+ "hipcheck-kdl",
  "hipcheck-sdk",
- "kdl 4.7.1",
  "log",
  "pathbuf",
  "serde",
@@ -4803,8 +4810,8 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
+ "hipcheck-kdl",
  "hipcheck-sdk",
- "kdl 4.7.1",
  "log",
  "maplit",
  "pathbuf",

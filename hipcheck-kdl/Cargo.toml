@@ -1,0 +1,11 @@
+[package]
+name = "hipcheck-kdl"
+description = "Common KDL functionality used throughout the Hipcheck project"
+repository = "https://github.com/mitre/hipcheck"
+version = "0.1.0"
+license = "Apache-2.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+kdl = "6.2.2"

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{hc_error, Result};
+use hipcheck_kdl::kdl::{KdlEntry, KdlValue};
 use std::{path::Path, sync::LazyLock};
 
 use pathbuf::pathbuf;
@@ -18,8 +19,8 @@ fn rel(opt_var: Option<&str>, file_path: &Path) -> Result<String> {
 	};
 
 	// Parse `"<PATH"` to a KdlValue and extract contained string
-	let entry = kdl::KdlEntry::parse(var).map_err(|e| hc_error!("{}", e))?;
-	let kdl::KdlValue::String(s) = entry.value() else {
+	let entry = KdlEntry::parse(var).map_err(|e| hc_error!("{}", e))?;
+	let KdlValue::String(s) = entry.value() else {
 		return Err(hc_error!("Content of #rel macro must be a string!"));
 	};
 
@@ -42,8 +43,8 @@ fn env(opt_var: Option<&str>) -> Result<String> {
 	};
 
 	// Parse `"<PATH"` to a KdlValue and extract contained string
-	let entry = kdl::KdlEntry::parse(var).map_err(|e| hc_error!("{}", e))?;
-	let kdl::KdlValue::String(s) = entry.value() else {
+	let entry = KdlEntry::parse(var).map_err(|e| hc_error!("{}", e))?;
+	let KdlValue::String(s) = entry.value() else {
 		return Err(hc_error!("Content of #env macro must be a string!"));
 	};
 

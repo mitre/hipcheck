@@ -5,13 +5,10 @@ use crate::{
 	hc_error,
 	plugin::{Arch, PluginId},
 	policy::policy_file::ManifestLocation,
-	string_newtype_parse_kdl_node,
-	util::{
-		fs::read_string,
-		kdl::{extract_data, ParseKdlNode},
-	},
+	util::fs::read_string,
 };
-use kdl::{KdlDocument, KdlNode};
+use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
+use hipcheck_kdl::{extract_data, string_newtype_parse_kdl_node, ParseKdlNode, ToKdlNode};
 use std::{
 	collections::HashMap,
 	ops::Not,
@@ -21,7 +18,6 @@ use std::{
 
 #[cfg(test)]
 use crate::plugin::arch::KnownArch;
-use crate::util::kdl::ToKdlNode;
 
 // NOTE: the implementation in this crate was largely derived from RFD #4
 

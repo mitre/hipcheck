@@ -5,21 +5,47 @@ use crate::plugin::arch::KnownArch;
 use crate::{
 	hc_error,
 	plugin::{arch::Arch, PluginVersion},
-	util::kdl::{extract_data, ParseKdlNode},
 };
-use kdl::{KdlDocument, KdlNode, KdlValue};
-use std::{fmt::Display, str::FromStr};
+use hipcheck_kdl::kdl::{KdlDocument, KdlNode, KdlValue};
+use hipcheck_kdl::{extract_data, ParseKdlNode};
+use std::{fmt::Display, ops::Deref, str::FromStr};
+
+/// newtype wrapper around `url::Url`, which enables implementing `ParseKdlNode`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HipcheckUrl(url::Url);
+
+impl HipcheckUrl {
+	#[allow(unused)]
+	pub fn parse(input: &str) -> Result<Self, url::ParseError> {
+		let url = url::Url::parse(input)?;
+		Ok(Self(url))
+	}
+}
+
+impl Deref for HipcheckUrl {
+	type Target = url::Url;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl Display for HipcheckUrl {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
+	}
+}
 
 // NOTE: the implementation in this crate was largely derived from RFD #0004
 
-impl ParseKdlNode for url::Url {
+impl ParseKdlNode for HipcheckUrl {
 	fn kdl_key() -> &'static str {
 		"url"
 	}
 
 	fn parse_node(node: &KdlNode) -> Option<Self> {
 		let raw_url = node.entries().first()?.value().as_string()?;
-		url::Url::from_str(raw_url).ok()
+		url::Url::from_str(raw_url).map(HipcheckUrl).ok()
 	}
 }
 
@@ -217,7 +243,7 @@ pub struct DownloadManifestEntry {
 	pub arch: Arch,
 	/// The URL of the archive file to download containing the plugin executable artifact and
 	/// plugin manifest.
-	pub url: url::Url,
+	pub url: HipcheckUrl,
 	/// Contains info about what algorithm was used to hash the archive and what the expected
 	/// digest is
 	pub hash: HashWithDigest,
@@ -247,7 +273,7 @@ impl ParseKdlNode for DownloadManifestEntry {
 		let nodes = node.children()?.nodes();
 
 		// extract the url, hash, compress and size from the child
-		let url: url::Url = extract_data(nodes)?;
+		let url: HipcheckUrl = extract_data(nodes)?;
 		let hash: HashWithDigest = extract_data(nodes)?;
 		let compress: Compress = extract_data(nodes)?;
 		let size: Size = extract_data(nodes)?;
@@ -302,7 +328,6 @@ impl FromStr for DownloadManifest {
 mod test {
 	use super::*;
 	use std::str::FromStr;
-	use url::Url;
 
 	#[test]
 	fn test_parsing_hash_algorithm() {
@@ -381,8 +406,8 @@ mod test {
 		let raw_url = "https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz";
 		let node = KdlNode::from_str(format!(r#"url "{}""#, raw_url).as_str()).unwrap();
 		assert_eq!(
-			Url::parse_node(&node).unwrap(),
-			Url::parse(raw_url).unwrap()
+			HipcheckUrl::parse_node(&node).unwrap(),
+			HipcheckUrl::parse(raw_url).unwrap()
 		);
 	}
 
@@ -413,7 +438,7 @@ mod test {
 		let expected_entry = DownloadManifestEntry {
 			version: PluginVersion(version.to_string()),
 			arch: Arch::Known(KnownArch::from_str(arch).unwrap()),
-			url: Url::parse(url).unwrap(),
+			url: HipcheckUrl::parse(url).unwrap(),
 			hash: HashWithDigest::new(
 				HashAlgorithm::try_from(hash_alg).unwrap(),
 				digest.to_string(),
@@ -454,7 +479,7 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 			&DownloadManifestEntry {
 				version: PluginVersion("0.1.0".to_owned()),
 				arch: Arch::Known(KnownArch::Aarch64AppleDarwin),
-				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-aarch64-apple-darwin.tar.xz").unwrap(),
+				url: HipcheckUrl::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-aarch64-apple-darwin.tar.xz").unwrap(),
 				hash: HashWithDigest::new(HashAlgorithm::Sha256, "b8e111e7817c4a1eb40ed50712d04e15b369546c4748be1aa8893b553f4e756b".to_owned()),
 				compress: Compress::new(ArchiveFormat::TarXz),
 				size: Size {
@@ -467,7 +492,7 @@ plugin version="0.1.0" arch="x86_64-apple-darwin" {
 			&DownloadManifestEntry {
 				version: PluginVersion("0.1.0".to_owned()),
 				arch: Arch::Known(KnownArch::X86_64AppleDarwin),
-				url: Url::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz").unwrap(),
+				url: HipcheckUrl::parse("https://github.com/mitre/hipcheck/releases/download/hipcheck-v3.4.0/hipcheck-x86_64-apple-darwin.tar.xz").unwrap(),
 				hash: HashWithDigest::new(HashAlgorithm::Sha256, "ddb8c6d26dd9a91e11c99b3bd7ee2b9585aedac6e6df614190f1ba2bfe86dc19".to_owned()),
                 compress: Compress::new(ArchiveFormat::TarXz),
                 size: Size::new(3_183_768)

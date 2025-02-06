@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use super::kdl::{extract_data, ParseKdlNode};
 use anyhow::{anyhow, Context as _, Result};
-use kdl::KdlDocument;
+use hipcheck_kdl::kdl::KdlDocument;
+use hipcheck_kdl::{extract_data, ParseKdlNode};
 use std::{fs, path::Path, str::FromStr};
 
 /// Read a file to a string.

@@ -7,10 +7,9 @@ mod test {
 		config::Config,
 		plugin::PluginVersion,
 		policy::{config_to_policy::config_to_policy, policy_file::*, PolicyFile, PolicyPatchList},
-		util::kdl::ParseKdlNode,
 	};
-
-	use kdl::KdlNode;
+	use hipcheck_kdl::kdl::KdlNode;
+	use hipcheck_kdl::ParseKdlNode;
 	use pathbuf::pathbuf;
 	use serde_json::Value;
 	use std::{env, str::FromStr};

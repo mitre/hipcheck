@@ -2,9 +2,9 @@
 use crate::error::{Context, Result};
 use crate::hc_error;
 use crate::util::fs::read_kdl;
-use crate::util::kdl::ParseKdlNode;
 use content_inspector::{inspect, ContentType};
-use kdl::KdlDocument;
+use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
+use hipcheck_kdl::ParseKdlNode;
 use serde::{de::Visitor, Deserialize, Deserializer};
 use std::{
 	fmt,
@@ -109,12 +109,12 @@ impl ParseKdlNode for BinaryExtensions {
 		"format"
 	}
 
-	fn parse_node(node: &kdl::KdlNode) -> Option<Self> {
+	fn parse_node(node: &KdlNode) -> Option<Self> {
 		if node.name().to_string().as_str() != Self::kdl_key() {
 			return None;
 		}
 
-		let binary_type = node.get("type")?.value().as_string()?;
+		let binary_type = node.get("type")?.as_string()?;
 
 		let r#type = match binary_type {
 			"object" => Some(BinaryType::Object),
