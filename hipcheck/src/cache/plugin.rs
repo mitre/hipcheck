@@ -26,7 +26,7 @@ use walkdir::{DirEntry, WalkDir};
 pub enum PluginCacheSort {
 	OldestDate, // same as "Oldest" in repo.rs
 	Alpha,
-	NewestVersion, // sorts the versions of the plugins from newest to oldest. Ex: 0.2.1 would come before 0.2.0
+	LatestVersion, // sorts the versions of the plugins from latest to oldest. Ex: 0.2.1 would come before 0.2.0
 }
 
 #[derive(Debug, Clone)]
@@ -109,7 +109,7 @@ impl HcPluginCacheIterator {
 		let relevant_components: &[String] = &components[components.len() - 3..];
 		let plugin_publisher = relevant_components[0].to_owned();
 		let plugin_name = relevant_components[1].to_owned();
-		let plugin_version_string = relevant_components[2].as_str(); // variable for created for convenience.
+		let plugin_version_string = &relevant_components[2]; // variable for created for convenience.
 		let plugin_version_result = Version::parse(plugin_version_string);
 		let plugin_version = match plugin_version_result {
 			Ok(version) => version,
@@ -202,26 +202,28 @@ impl HcPluginCache {
 				(PluginCacheSort::OldestDate, true) => {
 					|a, b| b.modified.partial_cmp(&a.modified).unwrap()
 				}
-				// higher versions will appear first when using the Newest Version filter so the partial_cmp parameters must be reversed
-				(PluginCacheSort::NewestVersion, false) => {
+				// need to reverse the parameters because the LatestVersion sort should return the versions from greatest to least
+				(PluginCacheSort::LatestVersion, false) => {
 					|a, b| b.version.partial_cmp(&a.version).unwrap()
 				}
-				(PluginCacheSort::NewestVersion, true) => {
+				(PluginCacheSort::LatestVersion, true) => {
 					|a, b| a.version.partial_cmp(&b.version).unwrap()
 				}
 			};
 
 		entries.sort_by(|a1: &A, a2: &A| sort_func(a1.borrow(), a2.borrow()));
 	}
-	/// All functions up to list involve deleting entries
+	/// All functions from delete up to filter_function_for_delete_inner involve deleting entries
 	pub fn delete(
 		&mut self,
 		scope: PluginCacheDeleteScope,
-		filter: Option<String>,
+		name: Option<String>,
+		publisher: Option<String>,
+		version: Option<VersionReq>,
 		force: bool,
 	) -> Result<()> {
 		let partitioned_vectors =
-			HcPluginCache::delete_inner(&mut self.entries, scope, filter, force);
+			HcPluginCache::delete_inner(&mut self.entries, scope, name, publisher, version, force);
 		let to_del = partitioned_vectors.0;
 		let to_keep = partitioned_vectors.1;
 		if !to_del.is_empty() {
@@ -255,35 +257,40 @@ impl HcPluginCache {
 	}
 	/// modified internal_delete function from repo.rs
 	fn internal_delete(&mut self, entry: &PluginCacheEntry) -> Result<()> {
-		std::fs::remove_dir_all(self.get_path_to_plugin(entry))?;
+		let mut path_to_version = self.get_path_to_plugin(entry);
+		std::fs::remove_dir_all(path_to_version.clone())?;
+		path_to_version.pop(); // removes the version from the path to get the name of the plugin
+		let mut dir_entries = std::fs::read_dir(&path_to_version)?;
+		if dir_entries.next().is_none() {
+			// removes the name directory if there are no versions
+			std::fs::remove_dir_all(&path_to_version)?;
+		}
 		Ok(())
 	}
-	/// helper function gets path for internal_delete
+	/// helper function gets paths for internal_delete
 	fn get_path_to_plugin(&self, entry: &PluginCacheEntry) -> PathBuf {
 		let plugin_id = PluginId::new(
 			PluginPublisher(entry.publisher.to_string()),
 			PluginName(entry.name.to_string()),
 			PluginVersion(entry.version.to_string()),
 		);
-		let path_to_plugin = self.plugin_download_dir(&plugin_id);
-		let full_path = pathbuf![&self.path, &path_to_plugin];
-		full_path
+		self.plugin_download_dir(&plugin_id)
 	}
 	/// created an inner function for ease of testing and to return the partitioned lists
 	fn delete_inner(
 		entries: &mut Vec<PluginCacheEntry>,
 		scope: PluginCacheDeleteScope,
-		filter: Option<String>,
+		name: Option<String>,
+		publisher: Option<String>,
+		version: Option<VersionReq>,
 		force: bool,
 	) -> (Vec<PluginCacheEntry>, Vec<PluginCacheEntry>) {
 		// Parse filter to regex if provided
 		let opt_pat: Option<Regex> =
-			filter.map(|raw_p| Regex::new(format!("^{raw_p}$").as_str()).unwrap());
-		// similar function to repo.rs but reverses the to_del and to_keep for simplicity
+			name.map(|raw_p| Regex::new(format!("^{raw_p}$").as_str()).unwrap());
 		let (to_del, to_keep): (Vec<PluginCacheEntry>, Vec<PluginCacheEntry>) = match scope {
-			PluginCacheDeleteScope::All => entries.drain(0..).partition(|e| match &opt_pat {
-				Some(pat) => pat.is_match(e.name.as_str()),
-				None => true,
+			PluginCacheDeleteScope::All => entries.drain(..).partition(|e| {
+				HcPluginCache::filter_function_for_delete_inner(e, &opt_pat, &publisher, &version)
 			}),
 			PluginCacheDeleteScope::Group { sort, invert, n } => {
 				// First sort entries in-place in entries
@@ -291,15 +298,14 @@ impl HcPluginCache {
 				let mut hits = 0;
 				// Now get the first N entries that pass filter
 				entries.drain(0..).partition(|e| {
-					let del = match &opt_pat {
-						Some(pat) => pat.is_match(e.name.as_str()),
-						None => true,
-					};
+					let del = HcPluginCache::filter_function_for_delete_inner(
+						e, &opt_pat, &publisher, &version,
+					);
 					// passes filter and below max threshold, delete
 					if del && hits < n {
 						hits += 1;
 						true
-					// put in do_keep
+					// put in to_keep
 					} else {
 						false
 					}
@@ -308,11 +314,27 @@ impl HcPluginCache {
 		};
 		(to_del, to_keep)
 	}
+	/// filter function for partition. Returns false if entries can be kept and true otherwise
+	fn filter_function_for_delete_inner(
+		entry: &PluginCacheEntry,
+		name: &Option<Regex>,
+		publisher: &Option<String>,
+		version: &Option<VersionReq>,
+	) -> bool {
+		// if less than 3 variables are provided, the variable that is not provided should return true by default. The same logic applies when all 3 variables are not provided.
+		// The idea is that if the user does not provide any filter, all entries will be deleted
+		let name_matches = name.as_ref().is_none_or(|n| n.is_match(&entry.name));
+		let version_matches = version.as_ref().is_none_or(|v| v.matches(&entry.version));
+		let publisher_matches = publisher
+			.as_ref()
+			.is_none_or(|p| *p == entry.publisher.as_str());
+		name_matches && version_matches && publisher_matches
+	}
 
 	/// lists all the plugin entries. Works the same as the function in repo.rs except for
 	/// user can filter plugins by version and publisher
 	pub fn list(
-		mut self,
+		&mut self,
 		scope: PluginCacheListScope,
 		name: Option<String>,
 		publisher: Option<String>,
@@ -343,7 +365,7 @@ impl HcPluginCache {
 		let mut filt_entries = entries
 			.iter()
 			.filter(|e| match &opt_pat {
-				Some(pat) => pat.is_match(e.name.as_str()),
+				Some(pat) => pat.is_match(&e.name),
 				None => true, // if there is no regex pattern passed in, the default is true
 			})
 			.filter(|e| match &publisher {
@@ -430,12 +452,12 @@ mod tests {
 			n: None,
 		};
 		let version_sort = PluginCacheListScope {
-			sort: PluginCacheSort::NewestVersion,
+			sort: PluginCacheSort::LatestVersion,
 			invert: false,
 			n: None,
 		};
 		let reverse_version_sort = PluginCacheListScope {
-			sort: PluginCacheSort::NewestVersion,
+			sort: PluginCacheSort::LatestVersion,
 			invert: true,
 			n: None,
 		};
@@ -604,6 +626,91 @@ mod tests {
 		let mut actual_output: Vec<&String> = results.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_output, expected_output);
 	}
+	/// Tests for inner delete helper function
+	#[test]
+	fn test_inner_delete_helper_function() {
+		// copied a cache entry from test_data() for convenience
+		let entry = PluginCacheEntry {
+			publisher: String::from("randomhouse"),
+			name: String::from("bugs bunny"),
+			version: Version::parse("0.2.0").unwrap(),
+			modified: SystemTime::UNIX_EPOCH + Duration::from_secs(3),
+		};
+		/// no parameters passed in
+		assert!(HcPluginCache::filter_function_for_delete_inner(
+			&entry, &None, &None, &None
+		));
+		/// all three parameters are passed in
+		assert!(HcPluginCache::filter_function_for_delete_inner(
+			&entry,
+			&Some(Regex::new("bugs.*").unwrap()),
+			&Some(String::from("randomhouse")),
+			&Some(VersionReq::parse("0.2.0").unwrap())
+		));
+		// name and version passed in
+		assert!(HcPluginCache::filter_function_for_delete_inner(
+			&entry,
+			&Some(Regex::new("bugs.*").unwrap()),
+			&None,
+			&Some(VersionReq::parse(">=0.2.0").unwrap())
+		));
+		// publisher and version passed in
+		assert!(HcPluginCache::filter_function_for_delete_inner(
+			&entry,
+			&None,
+			&Some(String::from("randomhouse")),
+			&Some(VersionReq::parse(">= 0.2.0").unwrap())
+		));
+		// name and publisher passed in
+		assert!(HcPluginCache::filter_function_for_delete_inner(
+			&entry,
+			&Some(Regex::new("bugs.*").unwrap()),
+			&Some(String::from("randomhouse")),
+			&None
+		));
+		// name passed in
+		assert!(HcPluginCache::filter_function_for_delete_inner(
+			&entry,
+			&Some(Regex::new("bugs.*").unwrap()),
+			&None,
+			&None
+		));
+		// publisher passed in
+		assert!(HcPluginCache::filter_function_for_delete_inner(
+			&entry,
+			&None,
+			&Some(String::from("randomhouse")),
+			&None
+		));
+		// version passed in
+		assert!(HcPluginCache::filter_function_for_delete_inner(
+			&entry,
+			&None,
+			&None,
+			&Some(VersionReq::parse(">= 0.2.0").unwrap())
+		));
+		// wrong version passed in
+		assert!(!HcPluginCache::filter_function_for_delete_inner(
+			&entry,
+			&None,
+			&None,
+			&Some(VersionReq::parse("> 0.2.0").unwrap())
+		));
+		// wrong name passed in with correct version
+		assert!(!HcPluginCache::filter_function_for_delete_inner(
+			&entry,
+			&Some(Regex::new("beed.*").unwrap()),
+			&None,
+			&Some(VersionReq::parse(">= 0.2.0").unwrap())
+		));
+		// all 3 parameters passed in with the wrong name
+		assert!(!HcPluginCache::filter_function_for_delete_inner(
+			&entry,
+			&Some(Regex::new("beed.*").unwrap()),
+			&Some(String::from("randomhouse")),
+			&Some(VersionReq::parse(">= 0.2.0").unwrap())
+		));
+	}
 	/// Tests for inner delete logic
 	#[test]
 	fn test_delete_scope_all() {
@@ -611,11 +718,16 @@ mod tests {
 		let entries = &mut test_data();
 		let mut expected_keep = ["affiliation", "bugs bunny", "difference"];
 		let mut expected_delete = ["activity"];
-		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_all, Some(String::from("activity")), false);
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_all,
+			Some(String::from("activity")),
+			None,
+			None,
+			true,
+		);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
-		actual_delete.sort(); // sorting for ease of testing
 		actual_keep.sort();
 		assert_eq!(actual_delete, expected_delete);
 		assert_eq!(actual_keep, expected_keep);
@@ -630,8 +742,14 @@ mod tests {
 		let entries = &mut test_data();
 		let mut expected_keep = ["bugs bunny", "difference"];
 		let mut expected_delete = ["activity", "affiliation"];
-		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_alpha, Some(String::from("a.*")), false);
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_alpha,
+			Some(String::from("a.*")),
+			None,
+			None,
+			false,
+		);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_keep, expected_keep);
@@ -645,8 +763,14 @@ mod tests {
 		let entries = &mut test_data();
 		let mut expected_keep = ["affiliation", "bugs bunny", "difference"];
 		let mut expected_delete = ["activity"];
-		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_alpha, Some(String::from("a.*")), false);
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_alpha,
+			Some(String::from("a.*")),
+			None,
+			None,
+			false,
+		);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_delete, expected_delete);
@@ -661,8 +785,14 @@ mod tests {
 		let entries = &mut test_data();
 		let mut expected_keep = ["difference", "bugs bunny"];
 		let mut expected_delete = ["affiliation", "activity"];
-		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_alpha, Some(String::from("a.*")), false);
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_alpha,
+			Some(String::from("a.*")),
+			None,
+			None,
+			false,
+		);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_delete, expected_delete);
@@ -678,8 +808,14 @@ mod tests {
 		let entries = &mut test_data();
 		let mut expected_keep = ["bugs bunny", "difference"];
 		let mut expected_delete = ["affiliation", "activity"];
-		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_date, Some(String::from("a.*")), false);
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_date,
+			Some(String::from("a.*")),
+			None,
+			None,
+			false,
+		);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_keep, expected_keep);
@@ -693,8 +829,14 @@ mod tests {
 		let entries = &mut test_data();
 		let mut expected_keep = ["activity", "bugs bunny", "difference"];
 		let mut expected_delete = ["affiliation"];
-		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_date, Some(String::from("a.*")), false);
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_date,
+			Some(String::from("a.*")),
+			None,
+			None,
+			false,
+		);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_delete, expected_delete);
@@ -709,8 +851,14 @@ mod tests {
 		let entries = &mut test_data();
 		let mut expected_keep = ["difference", "bugs bunny"];
 		let mut expected_delete = ["activity", "affiliation"];
-		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_date, Some(String::from("a.*")), false);
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_date,
+			Some(String::from("a.*")),
+			None,
+			None,
+			false,
+		);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_delete, expected_delete);
@@ -719,30 +867,42 @@ mod tests {
 	#[test]
 	fn test_delete_sort_by_version() {
 		let delete_version = PluginCacheDeleteScope::Group {
-			sort: PluginCacheSort::NewestVersion,
+			sort: PluginCacheSort::LatestVersion,
 			invert: false,
 			n: 2,
 		};
 		let entries = &mut test_data();
 		let mut expected_keep = ["bugs bunny", "difference"];
 		let mut expected_delete = ["activity", "affiliation"];
-		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_version, Some(String::from("a.*")), false);
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_version,
+			Some(String::from("a.*")),
+			None,
+			None,
+			false,
+		);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_keep, expected_keep);
 
 		// test with n = 1
 		let delete_version = PluginCacheDeleteScope::Group {
-			sort: PluginCacheSort::NewestVersion,
+			sort: PluginCacheSort::LatestVersion,
 			invert: false,
 			n: 1,
 		};
 		let entries = &mut test_data();
 		let mut expected_keep = ["bugs bunny", "affiliation", "difference"];
 		let mut expected_delete = ["activity"];
-		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_version, Some(String::from("a.*")), false);
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_version,
+			Some(String::from("a.*")),
+			None,
+			None,
+			false,
+		);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_delete, expected_delete);
@@ -750,15 +910,21 @@ mod tests {
 
 		// test with reverse
 		let delete_version = PluginCacheDeleteScope::Group {
-			sort: PluginCacheSort::NewestVersion,
+			sort: PluginCacheSort::LatestVersion,
 			invert: true,
 			n: 2,
 		};
 		let entries = &mut test_data();
 		let mut expected_keep = ["difference", "bugs bunny"];
 		let mut expected_delete = ["affiliation", "activity"];
-		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_version, Some(String::from("a.*")), false);
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_version,
+			Some(String::from("a.*")),
+			None,
+			None,
+			false,
+		);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_delete, expected_delete);
@@ -771,17 +937,18 @@ mod tests {
 		let entries = &mut test_data();
 		let mut expected_keep: Vec<&str> = Vec::new();
 		let mut expected_delete = ["activity", "affiliation", "bugs bunny", "difference"];
-		let delete_function = HcPluginCache::delete_inner(entries, delete_all, None, false);
+		let delete_function =
+			HcPluginCache::delete_inner(entries, delete_all, None, None, None, false);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
-		actual_delete.sort();
+		actual_delete.sort(); //sorting for simplicity since deleteScope::All does not specify a sort function
 		assert_eq!(actual_delete, expected_delete);
 		assert_eq!(actual_keep, expected_keep);
 
 		/// Running the no_filter test where the scope is Some. Ensures that nothing should be deleted regardless of the scope.
 		// Version sort
 		let delete_some_version = PluginCacheDeleteScope::Group {
-			sort: PluginCacheSort::NewestVersion,
+			sort: PluginCacheSort::LatestVersion,
 			invert: false,
 			n: 4,
 		};
@@ -789,10 +956,9 @@ mod tests {
 		let mut expected_keep: Vec<&str> = Vec::new();
 		let mut expected_delete = vec!["bugs bunny", "activity", "affiliation", "difference"];
 		let delete_function =
-			HcPluginCache::delete_inner(entries, delete_some_version, None, false);
+			HcPluginCache::delete_inner(entries, delete_some_version, None, None, None, false);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
-		actual_keep.sort();
 		assert_eq!(actual_delete, expected_delete);
 		assert_eq!(actual_keep, expected_keep);
 
@@ -805,7 +971,8 @@ mod tests {
 		let entries = &mut test_data();
 		let mut expected_keep: Vec<&str> = Vec::new();
 		let mut expected_delete = vec!["affiliation", "activity", "bugs bunny", "difference"];
-		let delete_function = HcPluginCache::delete_inner(entries, delete_some_date, None, false);
+		let delete_function =
+			HcPluginCache::delete_inner(entries, delete_some_date, None, None, None, false);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_delete, expected_delete);
@@ -820,43 +987,152 @@ mod tests {
 		let entries = &mut test_data();
 		let mut expected_keep: Vec<&str> = Vec::new();
 		let mut expected_delete = ["activity", "affiliation", "bugs bunny", "difference"];
-		let delete_function = HcPluginCache::delete_inner(entries, delete_some_alpha, None, false);
+		let delete_function =
+			HcPluginCache::delete_inner(entries, delete_some_alpha, None, None, None, false);
 		let mut actual_delete: Vec<&String> = delete_function.0.iter().map(|x| &x.name).collect();
 		let mut actual_keep: Vec<&String> = delete_function.1.iter().map(|x| &x.name).collect();
 		assert_eq!(actual_delete, expected_delete);
 		assert_eq!(actual_keep, expected_keep);
 	}
-	/// tests that the path given to delete_internal() is the correct one.
+	#[test]
+	// test case when there are two plugins with the same name but different versions
+	fn test_delete_correct_version_of_same_name_plugin() {
+		// sorting alphabetically for ease of testing
+		let delete_scope = PluginCacheDeleteScope::Group {
+			sort: PluginCacheSort::Alpha,
+			invert: false,
+			n: 4,
+		};
+		let entries = &mut test_data();
+		let additional_entry = PluginCacheEntry {
+			publisher: String::from("mitre"),
+			name: String::from("difference"),
+			version: Version::parse("0.0.6").unwrap(),
+			modified: SystemTime::now(),
+		};
+		entries.push(additional_entry);
+		// ensures that the correct name and version is deleted
+		let expected_delete_name = ["difference"];
+		let expected_delete_version = [&Version::parse("0.0.6").unwrap()];
+		let expected_keep_name = ["activity", "affiliation", "bugs bunny", "difference"];
+		let expected_keep_version = [
+			&Version::parse("0.1.1").unwrap(),
+			&Version::parse("0.1.0").unwrap(),
+			&Version::parse("0.2.0").unwrap(),
+			&Version::parse("0.0.5").unwrap(),
+		];
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_scope,
+			Some(String::from("difference")),
+			None,
+			Some(VersionReq::parse(">= 0.0.6").unwrap()),
+			false,
+		);
+		let mut actual_delete_name: Vec<&String> =
+			delete_function.0.iter().map(|x| &x.name).collect();
+		let mut actual_keep_name: Vec<&String> =
+			delete_function.1.iter().map(|x| &x.name).collect();
+		let mut actual_delete_version: Vec<&Version> =
+			delete_function.0.iter().map(|x| &x.version).collect();
+		let mut actual_keep_version: Vec<&Version> =
+			delete_function.1.iter().map(|x| &x.version).collect();
+		assert_eq!(actual_delete_name, expected_delete_name);
+		assert_eq!(actual_keep_name, expected_keep_name);
+		assert_eq!(actual_delete_version, expected_delete_version);
+		assert_eq!(actual_keep_version, expected_keep_version);
+	}
+	/// tests that both versions are deleted when a plugin name has two versions and you only specify the name
+	#[test]
+	fn test_delete_both_versions_of_same_plugin() {
+		let delete_scope = PluginCacheDeleteScope::Group {
+			sort: PluginCacheSort::Alpha,
+			invert: false,
+			n: 4,
+		};
+		let entries = &mut test_data();
+		let additional_entry = PluginCacheEntry {
+			publisher: String::from("mitre"),
+			name: String::from("difference"),
+			version: Version::parse("0.0.6").unwrap(),
+			modified: SystemTime::now(),
+		};
+		entries.push(additional_entry);
+		// ensures that the correct name and version is deleted
+		let expected_delete_name = ["difference", "difference"];
+		let expected_delete_version = [
+			&Version::parse("0.0.5").unwrap(),
+			&Version::parse("0.0.6").unwrap(),
+		];
+		let expected_keep_name = ["activity", "affiliation", "bugs bunny"];
+		let expected_keep_version = [
+			&Version::parse("0.1.1").unwrap(),
+			&Version::parse("0.1.0").unwrap(),
+			&Version::parse("0.2.0").unwrap(),
+		];
+		let delete_function = HcPluginCache::delete_inner(
+			entries,
+			delete_scope,
+			Some(String::from("difference")),
+			None,
+			None,
+			false,
+		);
+		let mut actual_delete_name: Vec<&String> =
+			delete_function.0.iter().map(|x| &x.name).collect();
+		let mut actual_keep_name: Vec<&String> =
+			delete_function.1.iter().map(|x| &x.name).collect();
+		let mut actual_delete_version: Vec<&Version> =
+			delete_function.0.iter().map(|x| &x.version).collect();
+		let mut actual_keep_version: Vec<&Version> =
+			delete_function.1.iter().map(|x| &x.version).collect();
+		assert_eq!(actual_delete_name, expected_delete_name);
+		assert_eq!(actual_keep_name, expected_keep_name);
+		assert_eq!(actual_delete_version, expected_delete_version);
+		assert_eq!(actual_keep_version, expected_keep_version);
+	}
+	/// Tests check that the correct paths to the plugin name and version are returned
 	#[test]
 	fn test_get_correct_path_to_deletion() {
 		let path = std::env::current_dir().unwrap();
 		let entries = test_data();
 		let mut hc_plugin_cache = HcPluginCache::new_for_test(path.as_path(), entries);
 		let entry = &test_data()[0];
-		let actual_path = hc_plugin_cache.get_path_to_plugin(entry);
-		let mut expected_path = hc_plugin_cache.path;
-		let expected_path = pathbuf![
-			&expected_path,
+		let mut actual_version_path = hc_plugin_cache.get_path_to_plugin(entry);
+		let expected_version_path = pathbuf![
+			&hc_plugin_cache.path,
 			&entry.publisher,
 			&entry.name,
 			&entry.version.to_string()
 		];
-		assert_eq!(actual_path, expected_path);
-
-		// Test for incorrect case, wrong entry being passed to get_actual_path
+		let expected_name_path = pathbuf![&hc_plugin_cache.path, &entry.publisher, &entry.name];
+		assert_eq!(actual_version_path, expected_version_path);
+		let mut actual_name_path = actual_version_path.clone();
+		actual_name_path.pop();
+		assert_eq!(expected_name_path, actual_name_path);
+	}
+	#[test]
+	fn test_with_incorrect_path_to_deletion() {
 		let path = std::env::current_dir().unwrap();
 		let entries = test_data();
 		let mut hc_plugin_cache = HcPluginCache::new_for_test(path.as_path(), entries);
 		let correct_entry = &test_data()[0];
 		let incorrect_entry = &test_data()[1];
-		let actual_path = hc_plugin_cache.get_path_to_plugin(incorrect_entry);
-		let mut expected_path = hc_plugin_cache.path;
-		let expected_path = pathbuf![
-			&expected_path,
+		let actual_version_path = hc_plugin_cache.get_path_to_plugin(incorrect_entry);
+		let expected_version_path = pathbuf![
+			&hc_plugin_cache.path,
 			&correct_entry.publisher,
 			&correct_entry.name,
 			&correct_entry.version.to_string()
 		];
-		assert_ne!(actual_path, expected_path);
+		let expected_name_path = pathbuf![
+			&hc_plugin_cache.path,
+			&correct_entry.publisher,
+			&correct_entry.name
+		];
+		assert_ne!(actual_version_path, expected_version_path);
+		let mut actual_name_path = actual_version_path.clone();
+		actual_name_path.pop();
+		assert_ne!(expected_name_path, actual_name_path);
 	}
 }

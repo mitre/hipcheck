@@ -23,7 +23,7 @@ mod util;
 mod version;
 
 use crate::{
-	cache::repo::HcRepoCache,
+	cache::{plugin::HcPluginCache, repo::HcRepoCache},
 	cli::Format,
 	config::{normalized_unresolved_analysis_tree_from_policy, Config},
 	error::{Context as _, Error, Result},
@@ -37,8 +37,8 @@ use crate::{
 	shell::Shell,
 };
 use cli::{
-	CacheArgs, CacheOp, CheckArgs, CliConfig, ConfigMode, FullCommands, PluginArgs, SchemaArgs,
-	SchemaCommand, UpdateArgs,
+	CacheOp, CachePluginArgs, CacheTargetArgs, CheckArgs, CliConfig, ConfigMode, FullCommands,
+	PluginArgs, PluginOp, SchemaArgs, SchemaCommand, UpdateArgs,
 };
 use config::AnalysisTreeNode;
 use core::fmt;
@@ -92,7 +92,8 @@ fn main() -> ExitCode {
 		Some(FullCommands::Setup) => return cmd_setup(&config),
 		Some(FullCommands::Ready) => cmd_ready(&config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
-		Some(FullCommands::Cache(args)) => return cmd_cache(args, &config),
+		Some(FullCommands::CacheTarget(args)) => return cmd_cache_target(args, &config),
+		Some(FullCommands::CachePlugin(args)) => return cmd_cache_plugin(args, &config),
 		Some(FullCommands::Plugin(args)) => return cmd_plugin(args, &config),
 		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
@@ -644,7 +645,7 @@ fn updater_command(command_name: &str, args: &UpdateArgs) -> Command {
 	command
 }
 
-fn cmd_cache(args: CacheArgs, config: &CliConfig) -> ExitCode {
+fn cmd_cache_target(args: CacheTargetArgs, config: &CliConfig) -> ExitCode {
 	let Some(path) = config.cache() else {
 		println!("cache path must be defined by cmdline arg or $HC_CACHE env var");
 		return ExitCode::FAILURE;
@@ -664,6 +665,43 @@ fn cmd_cache(args: CacheArgs, config: &CliConfig) -> ExitCode {
 			filter,
 			force,
 		} => cache.delete(scope, filter, force),
+	};
+	drop(cache);
+	if let Err(e) = res {
+		println!("{e}");
+		ExitCode::FAILURE
+	} else {
+		ExitCode::SUCCESS
+	}
+}
+
+fn cmd_cache_plugin(args: CachePluginArgs, config: &CliConfig) -> ExitCode {
+	let Some(path) = config.cache() else {
+		println!("cache path must be defined by cmdline arg or $HC_CACHE env var");
+		return ExitCode::FAILURE;
+	};
+	let op: PluginOp = match args.try_into() {
+		Ok(o) => o,
+		Err(e) => {
+			println!("{e}");
+			return ExitCode::FAILURE;
+		}
+	};
+	let mut cache = HcPluginCache::new(path);
+	let res = match op {
+		PluginOp::List {
+			scope,
+			name,
+			publisher,
+			version,
+		} => cache.list(scope, name, publisher, version),
+		PluginOp::Delete {
+			scope,
+			name,
+			publisher,
+			version,
+			force,
+		} => cache.delete(scope, name, publisher, version, force),
 	};
 	drop(cache);
 	if let Err(e) = res {
