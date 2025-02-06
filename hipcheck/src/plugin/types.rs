@@ -128,17 +128,16 @@ impl ConfigError {
 impl std::fmt::Display for ConfigError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> StdResult<(), std::fmt::Error> {
 		use ConfigErrorType::*;
-		let msg = match &self.message {
-			Some(s) => format!(": {s}"),
-			None => "".to_owned(),
-		};
 		let err = match self.error {
-			Unknown => "unknown configuration error occurred",
+			Unknown => "configuration error",
 			MissingRequiredConfig => "configuration is missing required fields",
 			UnrecognizedConfig => "configuration contains unrecognized fields",
 			InvalidConfigValue => "configuration contains invalid values",
 		};
-		write!(f, "{}{}", msg, err)
+		match &self.message {
+			Some(msg) => write!(f, "{}: {}", err, msg),
+			None => write!(f, "{}", err),
+		}
 	}
 }
 

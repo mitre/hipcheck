@@ -33,16 +33,16 @@ impl TryFrom<RawConfig> for Config {
 	fn try_from(value: RawConfig) -> StdResult<Config, ConfigError> {
 		if let Some(atv) = value.api_token_var {
 			let api_token =
-				std::env::var(atv.as_str()).map_err(|_e| ConfigError::InvalidConfigValue {
+				std::env::var(&atv).map_err(|_e| ConfigError::InvalidConfigValue {
 					field_name: "api-token-var".to_owned(),
-					value: atv,
-					reason: "could not find an env var with that name".to_owned(),
+					value: atv.clone(),
+					reason: format!("Could not find an environment variable with the name \"{}\". This environment variable must contain a GitHub API token.", atv),
 				})?;
 			Ok(Config { api_token })
 		} else {
 			Err(ConfigError::MissingRequiredConfig {
 				field_name: "api-token-var".to_owned(),
-				field_type: "name of env var containing GitHub API token".to_owned(),
+				field_type: "name of environment variable containing GitHub API token".to_owned(),
 				possible_values: vec![],
 			})
 		}

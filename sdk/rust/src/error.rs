@@ -190,7 +190,7 @@ impl From<ConfigError> for SetConfigurationResponse {
 			},
 			ConfigError::Unspecified { message } => SetConfigurationResponse {
 				status: ConfigurationStatus::Unspecified as i32,
-				message: format!("unknown error; {message}"),
+				message,
 			},
 		}
 	}

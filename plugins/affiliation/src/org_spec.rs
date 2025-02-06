@@ -9,6 +9,7 @@ use crate::{
 use anyhow::{anyhow, Context as _, Result};
 use hipcheck_kdl::extract_data;
 use hipcheck_kdl::kdl::KdlDocument;
+use miette::Report;
 use serde::Deserialize;
 use std::{cell::RefCell, collections::HashMap, path::Path, str::FromStr};
 
@@ -55,7 +56,10 @@ impl FromStr for OrgSpec {
 
 	fn from_str(s: &str) -> Result<Self> {
 		let document =
-			KdlDocument::from_str(s).map_err(|e| anyhow!("Error parsing org spec file: {}", e))?;
+			// Print miette::Report with Debug for full help text
+			KdlDocument::from_str(s).map_err(|e|
+				 anyhow!("File doesn't parse as valid KDL:\n{:?}", Report::from(e))
+			)?;
 		let nodes = document.nodes();
 
 		let strategy: Strategy =
@@ -73,7 +77,9 @@ impl OrgSpec {
 			return Err(anyhow!("Org spec path must be a file, not a directory."));
 		}
 		file::exists(org_spec_path)?;
-		let org_spec = OrgSpec::from_str(&file::read_string(org_spec_path)?)?;
+		let org_spec_contents = file::read_string(org_spec_path)?;
+		let org_spec = OrgSpec::from_str(&org_spec_contents)
+			.with_context(|| format!("failed to read org spec file at path {:?}", org_spec_path))?;
 
 		Ok(org_spec)
 	}
