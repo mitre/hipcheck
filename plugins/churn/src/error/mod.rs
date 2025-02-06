@@ -77,6 +77,10 @@ impl Error {
 	pub fn chain(&self) -> Chain {
 		Chain::new(self)
 	}
+
+	pub fn to_string_pretty_multiline(&self) -> String {
+		format!("{:#?}", self)
+	}
 }
 
 /// Allows use of `?` operator on query system entry.

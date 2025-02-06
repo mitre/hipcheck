@@ -43,7 +43,7 @@ impl Plugin for LinguistPlugin {
 			})?;
 		let sfd = match conf.langs_file {
 			Some(p) => SourceFileDetector::load(p).map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: e.to_string_pretty_multiline(),
 			})?,
 			None => {
 				return Err(ConfigError::MissingRequiredConfig {

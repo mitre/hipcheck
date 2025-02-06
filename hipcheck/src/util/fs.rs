@@ -52,10 +52,7 @@ pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
 pub fn exists<P: AsRef<Path>>(path: P) -> Result<()> {
 	fn inner(path: &Path) -> Result<()> {
 		if path.exists().not() {
-			Err(hc_error!(
-				"'{}' not found at current directory",
-				path.display()
-			))
+			Err(hc_error!("'{}' not found", path.display()))
 		} else {
 			Ok(())
 		}

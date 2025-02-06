@@ -5,6 +5,7 @@ use crate::util::fs::read_kdl;
 use content_inspector::{inspect, ContentType};
 use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
 use hipcheck_kdl::ParseKdlNode;
+use miette::Report;
 use serde::{de::Visitor, Deserialize, Deserializer};
 use std::{
 	fmt,
@@ -26,8 +27,12 @@ impl BinaryFileDetector {
 	/// Constructs a new `BinaryFileDetector` from the `Binary.kdl` file.
 	pub fn load<P: AsRef<Path>>(binary_config_file: P) -> crate::error::Result<BinaryFileDetector> {
 		fn inner(binary_config_file: &Path) -> crate::error::Result<BinaryFileDetector> {
-			let extensions_file = read_kdl(binary_config_file)
-				.context("failed to read binary type definitions from Binary config file: ")?;
+			let extensions_file = read_kdl(binary_config_file).with_context(|| {
+				format!(
+					"failed to read binary type definitions from Binary config file at path {:?}",
+					binary_config_file
+				)
+			})?;
 
 			let extensions = extensions_file.into_extensions();
 
@@ -67,7 +72,8 @@ impl FromStr for ExtensionsFile {
 
 	fn from_str(s: &str) -> StdResult<Self, Self::Err> {
 		let document = KdlDocument::from_str(s)
-			.map_err(|e| hc_error!("Error parsing Binary.kdl file: {}", e.to_string()))?;
+			// Print miette::Report with Debug for full help text
+			.map_err(|e| hc_error!("File doesn't parse as valid KDL:\n{:?}", Report::from(e)))?;
 		let mut formats = vec![];
 		for node in document.nodes() {
 			if let Some(entry) = BinaryExtensions::parse_node(node) {

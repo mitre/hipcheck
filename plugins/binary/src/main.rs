@@ -95,7 +95,7 @@ impl Plugin for BinaryPlugin {
 		// Use the langs file to create a SourceFileDetector and init the salsa db
 		let bfd =
 			BinaryFileDetector::load(conf.binary_file).map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: e.to_string_pretty_multiline(),
 			})?;
 
 		// Make the salsa db globally accessible

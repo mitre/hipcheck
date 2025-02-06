@@ -50,17 +50,15 @@ impl TryFrom<RawConfig> for Config {
 		if let Some(ofv) = value.orgs_file_path {
 			// Get the Orgs file path and confirm it exists
 			let orgs_file = PathBuf::from(&ofv);
-			file::exists(&orgs_file).map_err(|_e| ConfigError::InvalidConfigValue {
-				field_name: "orgs-file".to_owned(),
-				value: ofv.clone(),
-				reason: "could not find an orgs file with that name".to_owned(),
+			file::exists(&orgs_file).map_err(|_e| ConfigError::Unspecified {
+				// Print error with Debug for full context
+				message: format!("could not find an orgs file at path {:?}", ofv),
 			})?;
 			// Parse the Orgs file and construct an OrgSpec.
 			let orgs_spec =
-				OrgSpec::load_from(&orgs_file).map_err(|e| ConfigError::InvalidConfigValue {
-					field_name: "orgs-file".to_owned(),
-					value: ofv.clone(),
-					reason: format!("Failed to load org spec: {}", e),
+				OrgSpec::load_from(&orgs_file).map_err(|e| ConfigError::Unspecified {
+					// Print error with Debug for full context
+					message: format!("{:?}", e),
 				})?;
 			Ok(Config {
 				orgs_spec,

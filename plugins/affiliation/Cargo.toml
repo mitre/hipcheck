@@ -14,6 +14,7 @@ hipcheck-sdk = { version = "0.3.0", path = "../../sdk/rust", features = [
     "macros",
 ] }
 log = "0.4.22"
+miette = { version = "7.4.0", features = ["fancy"] }
 pathbuf = "1.0.0"
 schemars = { version = "0.8.21", features = ["url"] }
 serde = { version = "1.0.217", features = ["derive", "rc"] }

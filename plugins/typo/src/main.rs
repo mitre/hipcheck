@@ -46,11 +46,11 @@ impl TryFrom<RawConfig> for Config {
 		// Parse typo TOML file
 		let typo_path = PathBuf::from(raw_typo_path);
 		let typo_file = TypoFile::load_from(&typo_path).map_err(|e| {
-			log::error!("failed to load typo file: {}", e);
-			ConfigError::InvalidConfigValue {
-				field_name: "typo-file".to_owned(),
-				value: "string".to_owned(),
-				reason: format!("failed to load typo file: {}", e),
+			// Print error with Debug for full context
+			log::error!("{:?}", e);
+			ConfigError::Unspecified {
+				// Print error with Debug for full context
+				message: format!("{:?}", e),
 			}
 		})?;
 

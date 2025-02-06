@@ -35,7 +35,8 @@ impl ParseKdlNode for TypoFile {
 impl TypoFile {
 	pub fn load_from(typo_path: &Path) -> Result<TypoFile> {
 		file::exists(typo_path).context("typo file does not exist")?;
-		let typo_file = file::read_kdl(typo_path).context("failed to open typo file")?;
+		let typo_file = file::read_kdl(typo_path)
+			.with_context(|| format!("failed to read typo file at path {:?}", typo_path))?;
 
 		Ok(typo_file)
 	}

@@ -5,6 +5,7 @@ use crate::hc_error;
 use crate::util::fs::read_kdl;
 use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
 use hipcheck_kdl::ParseKdlNode;
+use miette::Report;
 use serde::{de::Visitor, Deserialize, Deserializer};
 use std::{
 	convert::AsRef, fmt, fmt::Formatter, path::Path, result::Result as StdResult, str::FromStr,
@@ -27,8 +28,12 @@ impl SourceFileDetector {
 	pub fn load<P: AsRef<Path>>(langs_file: P) -> Result<SourceFileDetector> {
 		fn inner(langs_file: &Path) -> Result<SourceFileDetector> {
 			// Load the file and parse it.
-			let language_file: LanguageFile = read_kdl(langs_file)
-				.context("failed to read language definitions from langs file")?;
+			let language_file: LanguageFile = read_kdl(langs_file).with_context(|| {
+				format!(
+					"failed to read language definitions from langs file at path {:?}",
+					langs_file
+				)
+			})?;
 
 			// Get the list of extensions from it.
 			let extensions = language_file.into_extensions();
@@ -74,7 +79,8 @@ impl FromStr for LanguageFile {
 
 	fn from_str(s: &str) -> StdResult<Self, Self::Err> {
 		let document = KdlDocument::from_str(s)
-			.map_err(|e| hc_error!("Error parsing Langs.kdl file: {}", e.to_string()))?;
+			// Print miette::Report with Debug for full help text
+			.map_err(|e| hc_error!("File doesn't parse as valid KDL:\n{:?}", Report::from(e)))?;
 		let mut languages = vec![];
 		for node in document.nodes() {
 			if let Some(entry) = LanguageExtensions::parse_node(node) {
