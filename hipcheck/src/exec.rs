@@ -1,15 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // reference hipcheck/src/plugin/plugin_manifest.rs
-use crate::{
-	error::Result,
-	hc_error,
-	plugin::PluginExecutor,
-	util::{
-		fs::read_string,
-		kdl::{extract_data, ParseKdlNode},
-	},
-};
-use kdl::{KdlDocument, KdlNode, KdlValue};
+use crate::{error::Result, hc_error, plugin::PluginExecutor, util::fs::read_string};
+use hipcheck_kdl::kdl::{KdlDocument, KdlNode, KdlValue};
+use hipcheck_kdl::{extract_data, ParseKdlNode};
 use std::{env, path::Path, str::FromStr};
 
 #[derive(Clone, Debug, Eq, PartialEq)]

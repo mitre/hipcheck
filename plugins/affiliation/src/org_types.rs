@@ -2,9 +2,9 @@
 
 //! Subtypes of an organization specification, with KDL parsing functions
 
-use crate::{string_newtype_parse_kdl_node, util::kdl::ParseKdlNode};
 use anyhow::{anyhow, Context as _, Result};
-use kdl::KdlNode;
+use hipcheck_kdl::kdl::KdlNode;
+use hipcheck_kdl::{string_newtype_parse_kdl_node, ParseKdlNode};
 use serde::Deserialize;
 use std::str::FromStr;
 use strum::EnumString;
@@ -218,7 +218,7 @@ impl ParseKdlNode for Org {
 		}
 
 		let name = node.entries().first()?.value().as_string()?.to_string();
-		let country = node.get("country")?.value().as_string()?.to_string();
+		let country = node.get("country")?.as_string()?.to_string();
 
 		let mut children = Vec::new();
 		for node in node.children()?.nodes() {

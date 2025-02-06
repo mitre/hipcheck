@@ -9,10 +9,10 @@ publish = false
 [dependencies]
 anyhow = "1.0.95"
 clap = { version = "4.5.27", features = ["derive"] }
+hipcheck-kdl = { version = "0.1.0", path = "../../hipcheck-kdl" }
 hipcheck-sdk = { version = "0.3.0", path = "../../sdk/rust", features = [
     "macros",
 ] }
-kdl = "4.7.1"
 log = "0.4.22"
 pathbuf = "1.0.0"
 schemars = { version = "0.8.21", features = ["url"] }

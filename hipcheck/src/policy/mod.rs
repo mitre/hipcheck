@@ -14,9 +14,9 @@ use crate::{
 	hc_error,
 	policy::policy_file::{PolicyAnalyze, PolicyPatchList, PolicyPluginList, PolicyPluginName},
 	util::fs as file,
-	util::kdl::extract_data,
 };
-use kdl::KdlDocument;
+use hipcheck_kdl::extract_data;
+use hipcheck_kdl::kdl::KdlDocument;
 use serde_json::Value;
 use std::{collections::HashMap, path::Path, str::FromStr};
 

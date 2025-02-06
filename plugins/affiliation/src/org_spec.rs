@@ -4,10 +4,11 @@
 
 use crate::{
 	org_types::{Mode, OrgList, Strategy},
-	util::{fs as file, kdl::extract_data},
+	util::fs as file,
 };
 use anyhow::{anyhow, Context as _, Result};
-use kdl::KdlDocument;
+use hipcheck_kdl::extract_data;
+use hipcheck_kdl::kdl::KdlDocument;
 use serde::Deserialize;
 use std::{cell::RefCell, collections::HashMap, path::Path, str::FromStr};
 

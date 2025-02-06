@@ -6,7 +6,6 @@ pub mod command;
 pub mod fs;
 pub mod git;
 pub mod http;
-pub mod kdl;
 pub mod npm;
 #[cfg(test)]
 pub mod test;

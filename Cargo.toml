@@ -14,6 +14,7 @@ resolver = "2"
 members = [
     "hipcheck",
     "hipcheck-common",
+    "hipcheck-kdl",
     "hipcheck-macros",
     "hipcheck-sdk-macros",
     "sdk/rust",

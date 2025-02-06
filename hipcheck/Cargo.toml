@@ -66,6 +66,7 @@ graphql_client = "0.14.0"
 # People building from Crates.io will use the published version.
 #
 # See: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#multiple-locations
+hipcheck-kdl = { version = "0.1.0", path = "../hipcheck-kdl" }
 hipcheck-macros = { path = "../hipcheck-macros", version = "0.3.1" }
 http = "1.2.0"
 indexmap = "2.7.0"
@@ -73,7 +74,6 @@ indextree = "4.7.3"
 indicatif = { version = "0.17.11", features = ["rayon"] }
 itertools = "0.13.0"
 jiff = "0.1.16"
-kdl = "6.2.2"
 log = "0.4.22"
 logos = "0.15.0"
 maplit = "1.0.2"
@@ -141,7 +141,9 @@ xz2 = "0.1.7"
 zip = "2.2.2"
 zip-extensions = "0.8.1"
 zstd = "0.13.2"
-hipcheck-common = { version = "0.2.0", path = "../hipcheck-common", features = ["rfd9-compat"] }
+hipcheck-common = { version = "0.2.0", path = "../hipcheck-common", features = [
+    "rfd9-compat",
+] }
 serde_with = "3.12.0"
 
 [build-dependencies]

@@ -6,11 +6,9 @@ use crate::{
 	error::Result,
 	hc_error,
 	plugin::{PluginId, PluginName, PluginPublisher, PluginVersion},
-	string_newtype_parse_kdl_node,
-	util::kdl::{extract_data, ParseKdlNode, ToKdlNode},
 };
-
-use kdl::KdlNode;
+use hipcheck_kdl::kdl::KdlNode;
+use hipcheck_kdl::{extract_data, string_newtype_parse_kdl_node, ParseKdlNode};
 use serde_json::Value;
 use std::{collections::HashMap, fmt, fmt::Display, path::PathBuf};
 use url::Url;
@@ -159,8 +157,8 @@ impl ParseKdlNode for PolicyPluginList {
 	}
 }
 
-fn try_to_serde_json(value: &kdl::KdlValue) -> Result<Value> {
-	use kdl::KdlValue::*;
+fn try_to_serde_json(value: &hipcheck_kdl::kdl::KdlValue) -> Result<Value> {
+	use hipcheck_kdl::kdl::KdlValue::*;
 	let value = value.clone();
 	Ok(match value {
 		String(s) => Value::String(s),

@@ -3,9 +3,10 @@
 use crate::{
 	types::{Homoglyphs, KeyboardLayout, NpmDependencies, Typo},
 	util::fs as file,
-	util::kdl::ParseKdlNode,
 };
 use anyhow::{Context as _, Result};
+use hipcheck_kdl::kdl::KdlNode;
+use hipcheck_kdl::ParseKdlNode;
 use std::{collections::HashMap, path::Path};
 
 #[derive(Debug)]
@@ -18,7 +19,7 @@ impl ParseKdlNode for TypoFile {
 		"languages"
 	}
 
-	fn parse_node(node: &kdl::KdlNode) -> Option<Self> {
+	fn parse_node(node: &KdlNode) -> Option<Self> {
 		if node.name().to_string().as_str() != Self::kdl_key() {
 			return None;
 		}
@@ -51,7 +52,7 @@ impl ParseKdlNode for Language {
 		""
 	}
 
-	fn parse_node(node: &kdl::KdlNode) -> Option<Self> {
+	fn parse_node(node: &KdlNode) -> Option<Self> {
 		let language = match node.name().to_string().as_str() {
 			"javascript" => LanguageType::Javascript,
 			_ => return None,
