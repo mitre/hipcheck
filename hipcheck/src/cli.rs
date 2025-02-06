@@ -3,9 +3,11 @@
 //! Data structures for Hipcheck's main CLI.
 
 use crate::{
-	cache::repo::{RepoCacheDeleteScope, RepoCacheListScope, RepoCacheSort},
-	error::Context,
-	error::Result,
+	cache::{
+		plugin::{PluginCacheDeleteScope, PluginCacheListScope, PluginCacheSort},
+		repo::{RepoCacheDeleteScope, RepoCacheListScope, RepoCacheSort},
+	},
+	error::{Context, Result},
 	hc_error,
 	plugin::Arch,
 	shell::{color_choice::ColorChoice, verbosity::Verbosity},
@@ -18,6 +20,7 @@ use crate::{
 use clap::{Parser as _, ValueEnum};
 use hipcheck_macros as hc;
 use pathbuf::pathbuf;
+use semver::VersionReq;
 use std::{
 	fmt::{self, Display, Formatter},
 	path::{Path, PathBuf},
@@ -459,7 +462,8 @@ pub enum FullCommands {
 	Setup,
 	Ready,
 	Update(UpdateArgs),
-	Cache(CacheArgs),
+	CacheTarget(CacheTargetArgs),
+	CachePlugin(CachePluginArgs),
 	Plugin(PluginArgs),
 	PrintConfig,
 	PrintCache,
@@ -475,7 +479,15 @@ impl From<&Commands> for FullCommands {
 			Commands::Ready => FullCommands::Ready,
 			Commands::Scoring => FullCommands::Scoring,
 			Commands::Update(args) => FullCommands::Update(args.clone()),
-			Commands::Cache(args) => FullCommands::Cache(args.clone()),
+			Commands::Cache(args) => match &args.subcmd {
+				CacheSubcmds::Target(cache_target_args) => {
+					FullCommands::CacheTarget(cache_target_args.clone())
+				}
+
+				CacheSubcmds::Plugin(cache_plugin_args) => {
+					FullCommands::CachePlugin(cache_plugin_args.clone())
+				}
+			},
 			Commands::Plugin(args) => FullCommands::Plugin(args.clone()),
 		}
 	}
@@ -495,10 +507,8 @@ pub enum Commands {
 	Scoring,
 	/// Run Hipcheck self-updater, if installed
 	Update(UpdateArgs),
-	/// Manage Hipcheck cache
+	/// Manage Hipcheck repo or plugin cache
 	Cache(CacheArgs),
-	/// Execute temporary code for exercising plugin engine
-	#[command(hide = true)]
 	Plugin(PluginArgs),
 }
 
@@ -840,20 +850,34 @@ impl<T: Clone> Update for Option<T> {
 		}
 	}
 }
-
+/// subcommands for cache
 #[derive(Debug, Clone, clap::Parser)]
+#[command(arg_required_else_help = true)]
 pub struct CacheArgs {
 	#[clap(subcommand)]
 	pub subcmd: CacheSubcmds,
 }
-impl TryFrom<CacheArgs> for CacheOp {
+#[derive(Debug, Clone, clap::Subcommand)]
+#[command(arg_required_else_help = true)]
+pub enum CacheSubcmds {
+	/// Manipulates repo cache
+	Target(CacheTargetArgs),
+	/// Manipulates plugin cache
+	Plugin(CachePluginArgs),
+}
+#[derive(Debug, Clone, clap::Parser)]
+pub struct CacheTargetArgs {
+	#[clap(subcommand)]
+	pub subcmd: CacheTargetSubcmds,
+}
+impl TryFrom<CacheTargetArgs> for CacheOp {
 	type Error = crate::error::Error;
-	fn try_from(value: CacheArgs) -> Result<Self> {
+	fn try_from(value: CacheTargetArgs) -> Result<Self> {
 		value.subcmd.try_into()
 	}
 }
 
-// The target struct to which a CacheArgs instance must be translated
+// The target struct to which a CacheTargetArgs instance must be translated
 #[derive(Debug, Clone)]
 pub enum CacheOp {
 	List {
@@ -869,16 +893,16 @@ pub enum CacheOp {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 #[command(arg_required_else_help = true)]
-pub enum CacheSubcmds {
-	/// List existing caches.
+pub enum CacheTargetSubcmds {
+	/// List cached targets.
 	List(CliCacheListArgs),
-	/// Delete existing caches.
+	/// Delete cached targets.
 	Delete(CliCacheDeleteArgs),
 }
-impl TryFrom<CacheSubcmds> for CacheOp {
+impl TryFrom<CacheTargetSubcmds> for CacheOp {
 	type Error = crate::error::Error;
-	fn try_from(value: CacheSubcmds) -> Result<Self> {
-		use CacheSubcmds::*;
+	fn try_from(value: CacheTargetSubcmds) -> Result<Self> {
+		use CacheTargetSubcmds::*;
 		match value {
 			List(args) => Ok(args.into()),
 			Delete(args) => args.try_into(),
@@ -967,7 +991,7 @@ impl TryFrom<CliCacheDeleteArgs> for CacheOp {
 	fn try_from(value: CliCacheDeleteArgs) -> Result<Self> {
 		if value.strategy.is_empty() && value.filter.is_none() {
 			return Err(hc_error!(
-				"`hc cache delete` without args is not allowed. please \
+				"`hc cache target delete` without args is not allowed. please \
                 tailor the operation with flags, or use `-s all` to delete all \
                 entries"
 			));
@@ -1024,13 +1048,211 @@ impl TryFrom<Vec<String>> for RepoCacheDeleteScope {
 		}
 	}
 }
+#[derive(Debug, Clone, clap::Parser)]
+pub struct CachePluginArgs {
+	#[clap(subcommand)]
+	pub subcmd: CachePluginSubcmds,
+}
+impl TryFrom<CachePluginArgs> for PluginOp {
+	type Error = crate::error::Error;
+	fn try_from(value: CachePluginArgs) -> Result<Self> {
+		value.subcmd.try_into()
+	}
+}
+// The target struct to which a PluginTargetArgs instance must be translated
+#[derive(Debug, Clone)]
+pub enum PluginOp {
+	List {
+		scope: PluginCacheListScope,
+		name: Option<String>,
+		publisher: Option<String>,
+		version: Option<VersionReq>,
+	},
+	Delete {
+		scope: PluginCacheDeleteScope,
+		name: Option<String>,
+		publisher: Option<String>,
+		version: Option<VersionReq>,
+		force: bool,
+	},
+}
+#[derive(Debug, Clone, clap::Subcommand)]
+#[command(arg_required_else_help = true)]
+pub enum CachePluginSubcmds {
+	/// List cached plugins.
+	List(CliPluginListArgs),
+	/// Delete cached plugins.
+	Delete(CliPluginDeleteArgs),
+}
 
+impl TryFrom<CachePluginSubcmds> for PluginOp {
+	type Error = crate::error::Error;
+	fn try_from(value: CachePluginSubcmds) -> Result<Self> {
+		use CachePluginSubcmds::*;
+		match value {
+			List(args) => Ok(args.into()),
+			Delete(args) => args.try_into(),
+		}
+	}
+}
+// CLI version of cache::PluginCacheSort with `invert` field expanded to different
+// named sort strategies
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum PluginSortStrategy {
+	/// Oldest dated entries first
+	Oldest,
+	/// Newest dated entries first
+	Newest,
+	/// Entries sorted alphabetically
+	Alpha,
+	/// Entries sorted reverse-alphabetically
+	Ralpha,
+	/// Newest version entries first
+	Latest,
+	/// Oldest version entries first
+	Rlatest,
+}
+impl PluginSortStrategy {
+	pub fn to_plugin_sort(&self) -> (PluginCacheSort, bool) {
+		use PluginSortStrategy::*;
+		match self {
+			Oldest => (PluginCacheSort::OldestDate, false),
+			Newest => (PluginCacheSort::OldestDate, true),
+			Alpha => (PluginCacheSort::Alpha, false),
+			Ralpha => (PluginCacheSort::Alpha, true),
+			Latest => (PluginCacheSort::LatestVersion, false),
+			Rlatest => (PluginCacheSort::LatestVersion, true),
+		}
+	}
+}
+// Args for `hc cache list`
+#[derive(Debug, Clone, clap::Args)]
+pub struct CliPluginListArgs {
+	/// Sorting strategy for the list, default is 'alpha'
+	#[arg(short = 's', long, default_value = "alpha")]
+	pub strategy: PluginSortStrategy,
+	/// Filter plugins by their name.
+	#[arg(short = 'N', long = "name")]
+	pub name: Option<String>,
+	/// Filter plugins by their publisher.
+	#[arg(short = 'P', long = "publisher")]
+	pub publisher: Option<String>,
+	/// Filter plugins by a SemVer-compatible version requirement
+	#[arg(short = 'V', long = "version")]
+	pub version: Option<VersionReq>,
+	/// Max number of entries to display
+	#[arg(short = 'm', long)]
+	pub max: Option<usize>,
+}
+impl From<CliPluginListArgs> for PluginOp {
+	fn from(value: CliPluginListArgs) -> Self {
+		let (sort, invert) = value.strategy.to_plugin_sort();
+		let scope = PluginCacheListScope {
+			sort,
+			invert,
+			n: value.max,
+		};
+		PluginOp::List {
+			scope,
+			name: value.name,
+			publisher: value.publisher,
+			version: value.version,
+		}
+	}
+}
+// Args for `hc cache plugin delete`
+#[derive(Debug, Clone, clap::Args)]
+pub struct CliPluginDeleteArgs {
+	/// Sorting strategy for deletion. Args of the form 'all|{<STRAT> [N]}'. Where <STRAT> is the
+	/// same set of strategies for `hc cache list`. If [N], the max number of entries to delete is
+	/// omitted, it will default to 1.
+	#[arg(short = 's', long, num_args=1..=2, value_delimiter = ' ')]
+	pub strategy: Vec<String>,
+	/// Consider only entries matching this name
+	#[arg(short = 'N', long = "name")]
+	pub name: Option<String>,
+	/// Consider only entries matching this publisher.
+	#[arg(short = 'P', long = "publisher")]
+	pub publisher: Option<String>,
+	/// Consider only entries matching this version requirement. Must be formatted as a SemVer-compatible version requirement (ex: ">= 0.3.2") or version number. If formatted as a version requirement, must be in quotation marks
+	#[arg(short = 'V', long = "version")]
+	pub version: Option<VersionReq>,
+	/// Do not prompt user to confirm the entries to delete
+	#[arg(long, default_value_t = false)]
+	pub force: bool,
+}
+impl TryFrom<CliPluginDeleteArgs> for PluginOp {
+	type Error = crate::error::Error;
+	fn try_from(value: CliPluginDeleteArgs) -> Result<Self> {
+		if value.strategy.is_empty()
+			&& value.name.is_none()
+			&& value.version.is_none()
+			&& value.publisher.is_none()
+		{
+			return Err(hc_error!(
+				"`hc cache plugin delete` without args is not allowed. please \
+                tailor the operation with flags, or use `-s all` to delete all \
+                entries"
+			));
+		}
+		let scope: PluginCacheDeleteScope = value.strategy.try_into()?;
+		Ok(PluginOp::Delete {
+			scope,
+			name: value.name,
+			publisher: value.publisher,
+			version: value.version,
+			force: value.force,
+		})
+	}
+}
+// A valid cli string for Plugin CacheDeleteScope may be:
+//  1. "all"
+//  2. "<SORT> <N>", where <SORT> is one of the CliSortStrategy variants, <N> is
+//      number of entries
+//  3. "<SORT>", same as #2 but <N> defaults to 1
+impl TryFrom<Vec<String>> for PluginCacheDeleteScope {
+	type Error = crate::error::Error;
+	fn try_from(value: Vec<String>) -> Result<Self> {
+		if value.len() > 2 {
+			return Err(hc_error!("strategy takes at most two tokens"));
+		}
+		let Some(raw_spec) = value.first() else {
+			return Ok(PluginCacheDeleteScope::All);
+		};
+		if raw_spec.to_lowercase() == "all" {
+			if let Some(n) = value.get(1) {
+				return Err(hc_error!(
+					"unnecessary additional token '{}' after 'all'",
+					n
+				));
+			}
+			Ok(PluginCacheDeleteScope::All)
+		} else {
+			let strat = PluginSortStrategy::from_str(raw_spec, true).or(Err(hc_error!(
+				"'{}' is not a valid sort strategy. strategies include {}, or 'all'",
+				raw_spec,
+				PluginSortStrategy::value_variants()
+					.iter()
+					.map(|s| format!("'{s:?}'").to_lowercase())
+					.collect::<Vec<String>>()
+					.join(", "),
+			)))?;
+			let (sort, invert) = strat.to_plugin_sort();
+			let n: usize = match value.get(1) {
+				Some(raw_n) => raw_n
+					.parse::<usize>()
+					.context("max entry token is not a valid unsigned int")?,
+				None => 1,
+			};
+			Ok(PluginCacheDeleteScope::Group { sort, invert, n })
+		}
+	}
+}
 #[derive(Debug, Clone, clap::Args)]
 pub struct PluginArgs {
 	#[arg(long = "async")]
 	pub asynch: bool,
 }
-
 /// The format to report results in.
 #[derive(Debug, Default, Clone, Copy, clap::ValueEnum)]
 pub enum Format {
