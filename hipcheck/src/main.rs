@@ -771,7 +771,7 @@ fn run(
 	// Enable steady ticking on the spinner, since we currently don't increment it manually.
 	phase.enable_steady_tick(Duration::from_millis(250));
 
-	let scoring = score_results(&phase, &session)?;
+	let scoring = score_results(&phase, &session, session.target())?;
 
 	phase.finish_successful();
 

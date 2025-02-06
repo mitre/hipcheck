@@ -15,7 +15,6 @@ use crate::{
 	report::{ReportParams, ReportParamsStorage},
 	score::ScoringProviderStorage,
 	shell::{spinner_phase::SpinnerPhase, Shell},
-	source::{SourceQuery, SourceQueryStorage},
 	target::{
 		resolve::{TargetResolver, TargetResolverConfig},
 		Target, TargetSeed, TargetSeedKind,
@@ -38,12 +37,13 @@ use std::{
 	ReportParamsStorage,
 	RiskConfigQueryStorage,
 	ScoringProviderStorage,
-	SourceQueryStorage,
 	WeightTreeQueryStorage
 )]
 pub struct Session {
 	// Query storage.
 	storage: salsa::Storage<Self>,
+	// what is being investigated during the session
+	target: Option<Target>,
 }
 
 // Required by our query groups
@@ -84,8 +84,10 @@ impl Session {
 
 		// Input query setters are implemented on `Session`, not
 		// `salsa::Storage<Session>`
+
 		let mut session = Session {
 			storage: Default::default(),
+			target: None,
 		};
 
 		/*===================================================================
@@ -142,9 +144,8 @@ impl Session {
 		/*===================================================================
 		 *  Resolving the source.
 		 *-----------------------------------------------------------------*/
-
 		let target = load_target(target, &home)?;
-		session.set_target(Arc::new(target));
+		session.set_target(target);
 
 		/*===================================================================
 		 *  Remaining input queries.
@@ -173,7 +174,45 @@ impl Session {
 		let core = start_plugins(policy.as_ref(), &plugin_cache, executor)?;
 		session.set_core(core);
 
+		assert!(session.target.is_some());
 		Ok(session)
+	}
+
+	fn set_target(&mut self, target: Target) {
+		self.target = Some(target);
+	}
+
+	/// target of this analysis
+	///
+	/// NOTE: This will panic if self.target is None
+	pub fn target(&self) -> Target {
+		// self.target cannot be None if a Session was constructed
+		self.target
+			.as_ref()
+			.expect("session.target should not be None")
+			.clone()
+	}
+
+	/// git ref of the HEAD commit being analyzed
+	pub fn head(&self) -> Arc<String> {
+		Arc::new(self.target().local.git_ref.clone())
+	}
+
+	/// name of the repository being analyzed
+	pub fn name(&self) -> Arc<String> {
+		// In the future may want to augment Target/LocalGitRepo with a
+		// "name" field. For now, treat the dir name of the repo as the name
+		Arc::new(
+			self.target()
+				.local
+				.path
+				.as_path()
+				.file_name()
+				.unwrap()
+				.to_str()
+				.unwrap()
+				.to_owned(),
+		)
 	}
 }
 

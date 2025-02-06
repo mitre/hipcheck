@@ -8,7 +8,7 @@ use crate::{
 	plugin::QueryResult,
 	policy_exprs::{std_exec, Expr},
 	shell::spinner_phase::SpinnerPhase,
-	source::SourceQuery,
+	target::Target,
 };
 use indextree::{Arena, NodeId};
 #[cfg(test)]
@@ -65,7 +65,7 @@ pub struct Score {
 }
 
 #[salsa::query_group(ScoringProviderStorage)]
-pub trait ScoringProvider: HcEngine + WeightTreeProvider + SourceQuery {}
+pub trait ScoringProvider: HcEngine + WeightTreeProvider {}
 
 #[cfg(test)]
 fn normalize_st_internal(node: NodeId, tree: &mut Arena<ScoreTreeNode>) -> f64 {
@@ -189,7 +189,11 @@ pub struct ScoreTreeNode {
 	pub weight: f64,
 }
 
-pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<ScoringResults> {
+pub fn score_results(
+	_phase: &SpinnerPhase,
+	db: &dyn ScoringProvider,
+	target: Target,
+) -> Result<ScoringResults> {
 	// Scoring should be performed by the construction of a "score tree" where scores are the
 	// nodes and weights are the edges. The leaves are the analyses themselves, which either
 	// pass (a score of 0) or fail (a score of 1). These are then combined with the other
@@ -204,7 +208,7 @@ pub fn score_results(_phase: &SpinnerPhase, db: &dyn ScoringProvider) -> Result<
 
 	// RFD4 analysis style - get all "leaf" analyses and call through plugin architecture
 	let plugin_score_tree = {
-		let target_json = serde_json::to_value(db.target().as_ref())?;
+		let target_json = serde_json::to_value(target)?;
 
 		for analysis in analysis_tree.get_analyses() {
 			let policy = analysis.1.ok_or(hc_error!(

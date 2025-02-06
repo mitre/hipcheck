@@ -10,7 +10,6 @@ use crate::{
 	policy::policy_file::PolicyPluginName,
 	score::*,
 	session::Session,
-	source::SourceQuery,
 	version::hc_version,
 };
 use std::{collections::HashSet, default::Default};
