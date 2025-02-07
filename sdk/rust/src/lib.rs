@@ -131,7 +131,7 @@ impl TryInto<QueryTarget> for &str {
 	}
 }
 
-/// Descrbies the signature of a particular `NamedQuery`.
+/// Describes the signature of a particular `NamedQuery`.
 ///
 /// Instances of this type are usually created by the default implementation of `Plugin::schemas()`
 /// and would not need to be created by hand unless you are doing something very unorthodox.
@@ -231,4 +231,20 @@ pub trait Plugin: Send + Sync + 'static {
 			output_schema: query.inner.output_schema(),
 		})
 	}
+}
+
+/// Initializes `env_logger` for plugin logging via the `log` crate facade.
+///
+/// Initializes an `env_longer` which writes log messages produced via the standard `log`crate macros to stdout/stderr. 
+/// These plugin logs are then piped to Hipcheck core's stdout/stderr log output during execution. 
+/// 
+/// `env_logger` adheres to the standard Hipcheck logging standards, using the `HC_LOG` and `HC_LOG_STYLE`
+/// environment variables. 
+/// 
+/// init_logger() is enabled as a default feature, but could be disabled and replaced by setting `default-features = false`
+/// in the `dependencies` section of a plugin's `Cargo.toml`.
+#[cfg(feature = "init_logger")]
+pub fn init_logger() {
+	let env = env_logger::Env::new().filter("HC_LOG").write_style("HC_LOG_STYLE");
+	env_logger::Builder::from_env(env).init();
 }

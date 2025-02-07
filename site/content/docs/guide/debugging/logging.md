@@ -87,5 +87,4 @@ with the log messages.
 
 ## Where do Logs Write?
 
-Log messages output to `stderr`. They can be redirected using standard shell redirection
-techniques.
+Log messages of Hipcheck and its plugins output to Hipcheck core's `stderr`. They can be redirected using standard shell redirection techniques.

@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	engine::HcSessionSocket,
-	error::{Error, Result},
-	Plugin, QuerySchema,
+	engine::HcSessionSocket, error::{Error, Result}, Plugin, QuerySchema
 };
 use hipcheck_common::proto::{
 	plugin_service_server::{PluginService, PluginServiceServer},
@@ -32,6 +30,10 @@ pub struct PluginServer<P> {
 impl<P: Plugin> PluginServer<P> {
 	/// Create a new plugin server for the provided plugin.
 	pub fn register(plugin: P) -> PluginServer<P> {
+		#[cfg(feature = "init_logger")]
+		{
+			crate::init_logger();
+		}
 		PluginServer {
 			plugin: Arc::new(plugin),
 		}

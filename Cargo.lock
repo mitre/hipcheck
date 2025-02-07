@@ -950,6 +950,7 @@ dependencies = [
  "finl_unicode",
  "futures",
  "hipcheck-sdk",
+ "log",
  "ordered-float",
  "pathbuf",
  "rayon",
@@ -1192,6 +1193,7 @@ version = "0.2.0"
 dependencies = [
  "clap",
  "hipcheck-sdk",
+ "log",
  "serde",
  "serde_json",
  "tokio",
@@ -2255,6 +2257,7 @@ version = "0.3.1"
 dependencies = [
  "anyhow",
  "console",
+ "env_logger",
  "futures",
  "hipcheck-common",
  "hipcheck-sdk-macros",

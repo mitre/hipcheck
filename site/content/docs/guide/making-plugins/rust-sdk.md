@@ -245,3 +245,11 @@ on the returned `PluginServer` instance. This function will not return until
 the gRPC channel with Hipcheck core is closed.
 
 And that's all there is to it! Happy plugin development!
+
+### Note on Plugin Logging
+
+Plugins use the SDK's [init_logger](https://docs.rs/hipcheck-sdk/latest/hipcheck_sdk/fn.init_logger.html) default feature to set up an `env_logger`, which logs messages using Rust’s `log` crate macros like `info!()` and `error!()`. It also uses Hipcheck's logging environmental variables.
+
+To enable logging in your plugin, call `hipcheck_sdk::init_logger();` in your application and all produced log messages will be shown in the `stderr` of Hipcheck core. 
+
+If you prefer a different logger, disable the default feature by setting `default-features = false` in the plugin's `Cargo.toml` dependencies section.

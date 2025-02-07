@@ -8,7 +8,7 @@ use crate::{
 use futures::future::join_all;
 use hipcheck_common::proto::plugin_service_client::PluginServiceClient;
 use rand::Rng;
-use std::{ffi::OsString, ops::Range, path::Path, process::Command};
+use std::{ffi::OsString, ops::Range, path::Path, process::{Command, Stdio}};
 use tokio::time::{sleep_until, Duration, Instant};
 
 #[derive(Clone, Debug)]
@@ -151,9 +151,9 @@ impl PluginExecutor {
 			let Ok(mut proc) = Command::new(&canon_bin_path)
 				.env("PATH", &cmd_path)
 				.args(spawn_args)
-				// @Temporary - directly forward stdout/stderr from plugin to shell
-				.stdout(std::io::stdout())
-				.stderr(std::io::stderr())
+				// directly forward stdout/stderr from plugin to shell with logging levels
+				.stdout(Stdio::inherit())
+				.stderr(Stdio::inherit())
 				.spawn()
 			else {
 				spawn_attempts += 1;
