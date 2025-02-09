@@ -2,6 +2,7 @@
 
 use crate::{
 	hc_error,
+	plugin::PluginVersion,
 	policy_exprs::{std_parse, Expr},
 	Result,
 };
@@ -33,6 +34,7 @@ pub type HcPluginClient = PluginServiceClient<Channel>;
 #[derive(Clone, Debug)]
 pub struct Plugin {
 	pub name: String,
+	pub version: PluginVersion,
 	pub working_dir: PathBuf,
 	pub entrypoint: String,
 }
@@ -272,6 +274,15 @@ impl PluginContext {
 		});
 
 		Ok(Box::new(stream))
+	}
+
+	/// Helper function to call self.initialize, and always pass the Plugin metadata
+	/// back in the return value.
+	/// This makes it possible to track which plugins failed when joining them
+	/// with a JoinSet, which otherwise loses information about plugin identity.
+	pub async fn init_return_plugin(self, config: Value) -> (Plugin, Result<PluginTransport>) {
+		let plugin = self.plugin.clone();
+		(plugin, self.initialize(config).await)
 	}
 
 	/// Consume the builder and run the query protocol.

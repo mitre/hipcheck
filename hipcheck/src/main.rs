@@ -28,7 +28,7 @@ use crate::{
 	config::{normalized_unresolved_analysis_tree_from_policy, Config},
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
-	plugin::{try_set_arch, Plugin, PluginWithConfig},
+	plugin::{try_set_arch, Plugin, PluginVersion, PluginWithConfig},
 	policy::{config_to_policy, PolicyFile},
 	report::report_builder::{build_report, Report},
 	score::score_results,
@@ -443,17 +443,20 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
 	use std::sync::Arc;
 	use tokio::task::JoinSet;
 
+	let version = PluginVersion("0.0.0".to_string());
 	let working_dir = PathBuf::from("./target/debug");
 
 	let entrypoint1 = pathbuf!["dummy_rand_data"];
 	let entrypoint2 = pathbuf!["dummy_sha256"];
 	let plugin1 = Plugin {
 		name: "dummy/rand_data".to_owned(),
+		version: version.clone(),
 		working_dir: working_dir.clone(),
 		entrypoint: entrypoint1.display().to_string(),
 	};
 	let plugin2 = Plugin {
 		name: "dummy/sha256".to_owned(),
+		version: version.clone(),
 		working_dir: working_dir.clone(),
 		entrypoint: entrypoint2.display().to_string(),
 	};

@@ -35,6 +35,9 @@ pub fn retrieve_plugins(
 
 	let mut required_plugins = HashSet::new();
 
+	let num_plugins = policy_plugins.len();
+	log::info!("Retrieving {} plugins", num_plugins);
+
 	for policy_plugin in policy_plugins.iter() {
 		retrieve_plugin(
 			policy_plugin.get_plugin_id(),
