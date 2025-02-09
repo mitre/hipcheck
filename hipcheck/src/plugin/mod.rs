@@ -19,6 +19,7 @@ pub use plugin_manifest::{
 };
 pub use retrieval::retrieve_plugins;
 use serde_json::Value;
+use std::fmt::Write as _;
 use std::{collections::HashMap, ops::Not};
 use tokio::sync::Mutex;
 
@@ -31,7 +32,7 @@ pub async fn initialize_plugins(
 		.into_iter()
 		.map(Into::<(PluginContext, Value)>::into)
 	{
-		set.spawn(p.initialize(c));
+		set.spawn(p.init_return_plugin(c));
 	}
 
 	let mut inited: Vec<PluginTransport> = vec![];
@@ -39,23 +40,26 @@ pub async fn initialize_plugins(
 
 	while let Some(res) = set.join_next().await {
 		// @Todo - what is the cleanup if the tokio func fails?
-		let init_res = res?;
+		let (plugin, init_res) = res?;
 
 		// Instead of immediately erroring, we need to finish
 		// initializing all plugins so they shut down properly
 		match init_res {
 			Ok(pt) => inited.push(pt),
-			Err(e) => failures.push(e),
+			Err(e) => failures.push((plugin, e)),
 		};
 	}
 
 	if failures.is_empty().not() {
-		let mut err = "Failures occurred during plugin initialization:".to_owned();
-		for x in failures {
-			err += "\n";
-			err += x.to_string().as_str();
+		let mut plugin_errors = "Failures occurred during plugin initialization:".to_owned();
+		for (plugin, err) in failures {
+			write!(
+				plugin_errors,
+				"\nPlugin '{}:{}': {}",
+				plugin.name, plugin.version.0, err
+			)?;
 		}
-		Err(hc_error!("{}", err))
+		Err(hc_error!("{}", plugin_errors))
 	} else {
 		Ok(inited)
 	}

@@ -66,6 +66,9 @@ impl PluginExecutor {
 	}
 
 	pub async fn start_plugins(&self, plugins: Vec<Plugin>) -> Result<Vec<PluginContext>> {
+		let num_plugins = plugins.len();
+		log::info!("Starting {} plugins", num_plugins);
+
 		join_all(plugins.into_iter().map(|p| self.start_plugin(p)))
 			.await
 			.into_iter()

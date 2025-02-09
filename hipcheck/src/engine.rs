@@ -269,6 +269,7 @@ pub fn start_plugins(
 
 		let plugin = Plugin {
 			name: plugin_id.to_policy_file_plugin_identifier(),
+			version: plugin_id.version().clone(),
 			working_dir,
 			entrypoint,
 		};
