@@ -2,7 +2,7 @@
 
 //! A query group for accessing Git repository data.
 
-use crate::target::{RemoteGitRepo, Target};
+use crate::target::{KnownRemote, RemoteGitRepo, Target};
 use std::{path::PathBuf, sync::Arc};
 
 /// Queries for accessing info about a Git source
@@ -20,6 +20,8 @@ pub trait SourceQuery: salsa::Database {
 	fn head(&self) -> Arc<String>;
 	/// Returns the repository name
 	fn name(&self) -> Arc<String>;
+	/// Returns the repository owner/maintainer
+	fn owner(&self) -> Option<Arc<String>>;
 	/// Returns the repository url
 	fn url(&self) -> Option<Arc<String>>;
 }
@@ -62,6 +64,14 @@ fn name(db: &dyn SourceQuery) -> Arc<String> {
 			.unwrap()
 			.to_owned(),
 	)
+}
+
+fn owner(db: &dyn SourceQuery) -> Option<Arc<String>> {
+	let target = db.target();
+	// Gets the owner if there is a known GitHub remote repository
+	let KnownRemote::GitHub { owner, repo: _ } =
+		target.as_ref().remote.as_ref()?.known_remote.as_ref()?;
+	Some(Arc::new(owner.to_string()))
 }
 
 fn url(db: &dyn SourceQuery) -> Option<Arc<String>> {

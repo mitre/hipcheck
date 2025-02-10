@@ -222,7 +222,7 @@ impl Shell {
 		}
 	}
 
-	/// Print a hipcheck [Error]. Human readable errors will go to the standard error, JSON will go to the standard output.
+	/// Print a hipcheck [Error]. Human readable errors will go to the standard error, JSON (regular or full) will go to the standard output.
 	pub fn print_error(err: &Error, format: Format) {
 		match format {
 			Format::Human => {
@@ -239,7 +239,7 @@ impl Shell {
 				macros::eprintln!();
 			}
 
-			Format::Json => {
+			_ => {
 				// Construct a JSON value from an error.
 				let current = err.to_string();
 				let context = err
@@ -275,6 +275,7 @@ impl Shell {
 	pub fn print_report(report: Report, format: Format) -> Result<()> {
 		match format {
 			Format::Json => print_json(report),
+			Format::Debug => print_json(report),
 			Format::Human => print_human(report),
 		}
 	}

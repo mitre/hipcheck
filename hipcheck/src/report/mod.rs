@@ -37,6 +37,9 @@ pub struct Report {
 	/// The name of the repository being analyzed.
 	pub repo_name: Arc<String>,
 
+	/// Optional owner/maintainer of the repo
+	pub repo_owner: Option<Arc<String>>,
+
 	/// The HEAD commit hash of the repository during analysis.
 	pub repo_head: Arc<String>,
 
@@ -284,13 +287,23 @@ pub struct Analysis {
 	#[schemars(schema_with = "String::json_schema")]
 	policy_expr: Expr,
 
-	/// The value returned by the analysis, if any, that was used in computing the policy expression
+	/// The value returned by the analysis, if it exists
+	///
+	/// This will be set to `None` and not printed unless "debug JSON" format is used
 	///
 	/// We use this when printing the result to help explain to the user
 	/// *why* an analysis failed.
+	#[serde(skip_serializing_if = "Option::is_none")]
 	value: Option<Value>,
 
-	/// The default query explanation pulled from RPC with the plugin.
+	/// The value returned by the analysis after being computed in the policy expression, if it exists
+	///
+	/// We also use this when printing the result to help explain to the user
+	/// *why* an analysis failed.
+	final_value: Option<String>,
+
+	/// Either an English language explanation of why the plugin succeded or failed or the default query explanation (if an English explanation could not be constructed)
+	/// The default explanation is pulled from RPC with the plugin.
 	message: String,
 }
 
@@ -304,14 +317,45 @@ impl Analysis {
 		name: String,
 		passed: bool,
 		policy_expr: Expr,
-		value: Option<Value>,
-		message: String,
+		init_value: Option<Value>,
+		full_value: bool,
+		default_message: String,
 	) -> Self {
+		// Try to parse the policy expression to an English language explanation of why the plugin's analysis succeded or failed
+		// If it cannot be parsed, return the default explanation text
+		// At the same time, compute the raw value returned by the plugin in the policy expression and get that value, if it exists
+		let (message, final_value) = match policy_exprs::parse_expr_to_english(
+			&policy_expr,
+			&default_message,
+			&init_value,
+			passed,
+		) {
+			Ok(explanation) => explanation,
+			Err(e) => {
+				log::error!(
+					"Could not parse policy expression for {} plugin: {}",
+					&name,
+					e
+				);
+				(
+					default_message.clone(),
+					init_value.as_ref().map(|v| v.to_string()),
+				)
+			}
+		};
+
+		// If not using "debug JSON" format, do not use the raw plugin output values
+		let value = match full_value {
+			true => init_value,
+			false => None,
+		};
+
 		Analysis {
 			name,
 			passed,
 			policy_expr,
 			value,
+			final_value,
 			message,
 		}
 	}
@@ -329,24 +373,7 @@ impl Analysis {
 	}
 
 	pub fn explanation(&self) -> String {
-		let input = &self.policy_expr;
-		let message = &self.message;
-		let value = &self.value;
-		let passed = self.passed;
-
-		// Try to parse the policy expression to an English language explanation of why the plugin's analysis succeded or failed
-		// If it cannot be parsed, return the default explanation text
-		match policy_exprs::parse_expr_to_english(input, message, value, passed) {
-			Ok(explanation) => explanation,
-			Err(e) => {
-				log::error!(
-					"Could not parse policy expression for {} plugin: {}",
-					&self.name,
-					e
-				);
-				self.message.clone()
-			}
-		}
+		self.message.clone()
 	}
 }
 
