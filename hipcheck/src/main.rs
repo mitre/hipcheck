@@ -32,6 +32,7 @@ use crate::{
 	policy::{config_to_policy, PolicyFile},
 	report::report_builder::{build_report, Report},
 	score::score_results,
+	session::ReadySession,
 	session::Session,
 	setup::write_config_binaries,
 	shell::Shell,
@@ -314,6 +315,7 @@ struct ReadyChecks {
 	npm_version_check: StdResult<String, VersionCheckError>,
 	cache_path_check: StdResult<PathBuf, PathCheckError>,
 	policy_path_check: StdResult<PathBuf, PathCheckError>,
+	plugin_check: StdResult<(), Error>,
 }
 
 impl ReadyChecks {
@@ -324,6 +326,7 @@ impl ReadyChecks {
 			&& self.npm_version_check.is_ok()
 			&& self.cache_path_check.is_ok()
 			&& self.policy_path_check.is_ok()
+			&& self.plugin_check.is_ok()
 	}
 }
 
@@ -436,6 +439,20 @@ fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	}
 
 	Ok(path.to_owned())
+}
+
+fn check_plugins(config: &CliConfig) -> StdResult<(), Error> {
+	let config_mode = config.config_mode()?;
+
+	log::info!("Using configuration source: {}", config_mode);
+
+	ReadySession::new(
+		config_mode,
+		config.cache().map(ToOwned::to_owned),
+		config.exec().map(ToOwned::to_owned),
+		config.format(),
+	)
+	.map(|_| ())
 }
 
 fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
@@ -569,6 +586,7 @@ fn cmd_ready(config: &CliConfig) {
 		npm_version_check: check_npm_version(),
 		cache_path_check: check_cache_path(config),
 		policy_path_check: check_policy_path(config),
+		plugin_check: check_plugins(config),
 	};
 
 	match &ready.hipcheck_version_check {
@@ -594,6 +612,14 @@ fn cmd_ready(config: &CliConfig) {
 	match &ready.policy_path_check {
 		Ok(path) => println!("{:<17} {}", "Policy Path:", path.display()),
 		Err(e) => println!("{:<17} {}", "Policy Path:", e),
+	}
+
+	match &ready.plugin_check {
+		Ok(_) => println!("{:<17} All started successfully", "Plugins:"),
+		Err(e) => println!(
+			"{:<17} Some plugins did not start successfully\n\n{}",
+			"Plugins:", e
+		),
 	}
 
 	if ready.is_ready() {
