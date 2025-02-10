@@ -1036,6 +1036,8 @@ pub struct PluginArgs {
 pub enum Format {
 	/// JSON format.
 	Json,
+	/// JSON format with raw analysis values
+	Debug,
 	/// Human-readable format.
 	#[default]
 	Human,

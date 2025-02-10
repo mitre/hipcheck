@@ -160,7 +160,8 @@ impl ExprMutator for Env<'_> {
 	}
 }
 
-/// Return an English language explanation for a plugin's analysis.
+/// Return an English language explanation for a plugin's analysis **and** the calculated value used in the policy expression.
+///
 /// If the analysis succeded, return what it was required to see and what it saw.
 /// If the analysis failed, return what it expected to see and what it saw instead.
 pub fn parse_expr_to_english(
@@ -168,7 +169,7 @@ pub fn parse_expr_to_english(
 	message: &str,
 	value: &Option<Value>,
 	passed: bool,
-) -> Result<String> {
+) -> Result<(String, Option<String>)> {
 	// Create a standard environment, with its list of functions and their English descriptions
 	let env = Env::std();
 	// Store that environment and the plugin explanation message in a struct for English parsing
@@ -201,10 +202,10 @@ pub fn parse_expr_to_english(
 		// Evaluate that argument using the value returned by the plugin to see what the top level operator is comparing the expected value to
 		let inner_value = match value {
 			Some(context) => match Executor::std().parse_and_eval(&inner.to_string(), context)? {
-				Expr::Primitive(prim) => english.visit_primitive(&prim)?,
+				Expr::Primitive(prim) => Some(english.visit_primitive(&prim)?),
 				_ => return Err(Error::BadReturnType(inner.clone())),
 			},
-			None => "no value was returned by the query".to_string(),
+			None => None,
 		};
 
 		// Format the returned String depending on whether the plugin's analysis succeded or not
@@ -219,14 +220,28 @@ pub fn parse_expr_to_english(
 			// Parse the top level primitive to English
 			let threshold = english.visit_expr(&func.args[1])?;
 
-			return Ok(format!(
-				"{inner_value} was {english_inner}, which was required {operator} {threshold}"
+			return Ok((
+				format!(
+					"{} was {english_inner}, which was required {operator} {threshold}",
+					inner_value
+						.clone()
+						.unwrap_or("no value was returned by the query".to_string())
+				),
+				inner_value,
 			));
 		}
 
 		// Recursively parse the top level function to English
 		let english_expr = english.visit_function(func)?;
-		return Ok(format!("Expected {english_expr} but it was {inner_value}"));
+		return Ok((
+			format!(
+				"Expected {english_expr} but it was {}",
+				inner_value
+					.clone()
+					.unwrap_or("no value was returned by the query".to_string())
+			),
+			inner_value,
+		));
 	}
 
 	Err(Error::MissingIdent)

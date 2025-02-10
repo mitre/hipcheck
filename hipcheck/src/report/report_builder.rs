@@ -38,6 +38,9 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 
 		match &stored.response {
 			Ok(res) => {
+				// Check if we are using "debug JSON" formatting, which includes the raw plugin output values in the JSON
+				let full_value = matches!(session.format(), Format::Debug);
+
 				// This is the "explanation" pulled from the new gRPC call.
 				let message = session
 					.default_query_explanation(analysis.publisher.clone(), analysis.plugin.clone())?
@@ -49,6 +52,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 						stored.passed,
 						stored.policy.clone(),
 						stored.value.clone(),
+						full_value,
 						message,
 					),
 					res.concerns.clone(),
@@ -166,6 +170,7 @@ impl<'sess> ReportBuilder<'sess> {
 	/// or building will fail.
 	pub fn build(self) -> Result<Report> {
 		let repo_name = self.session.name();
+		let repo_owner = self.session.owner();
 		let repo_head = self.session.head();
 		let hipcheck_version = hc_version();
 		let analyzed_at = Timestamp::from(self.session.started_at());
@@ -204,6 +209,7 @@ impl<'sess> ReportBuilder<'sess> {
 
 		let report = Report {
 			repo_name,
+			repo_owner,
 			repo_head,
 			hipcheck_version,
 			analyzed_at,
