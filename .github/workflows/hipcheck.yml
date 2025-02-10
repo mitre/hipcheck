@@ -38,7 +38,7 @@ permissions:
   contents: read
 
 env:
-  RUSTFLAGS: -Dwarnings
+  RUSTFLAGS: -Dwarnings -C debuginfo=0 -C strip=symbols
   CARGO_TERM_COLOR: always
 
 jobs:
@@ -82,7 +82,7 @@ jobs:
       # Try building every crate in the workspace, without debug symbols to
       # hopefully reduce build times
       - name: Build
-        run: RUSTFLAGS="-C debuginfo=0 -C strip=symbols" cargo build --verbose --workspace
+        run: cargo build --verbose --workspace
 
       # Test the code.
       - name: Test
