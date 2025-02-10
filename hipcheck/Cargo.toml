@@ -85,7 +85,7 @@ ordered-float = { version = "4.5.0", features = ["serde"] }
 packageurl = "0.4.1"
 paste = "1.0.7"
 pathbuf = "1.0.0"
-petgraph = { version = "0.6.0", features = ["serde-1"] }
+petgraph = { version = "0.7.1", features = ["serde-1"] }
 prost = "0.13.4"
 rand = "0.8.5"
 rayon = "1.10.0"
