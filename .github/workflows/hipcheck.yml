@@ -100,12 +100,12 @@ jobs:
       - name: Run with Policy
         env:
           HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./target/debug/hc --policy ./config/Hipcheck.kdl check https://github.com/mitre/hipcheck
+        run: ./target/release/hc --policy ./config/Hipcheck.kdl check https://github.com/mitre/hipcheck
       - name: Run with Local Policy
         env:
           HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./target/debug/hc --policy ./config/local.Hipcheck.kdl check https://github.com/mitre/hipcheck
+        run: ./target/release/hc --policy ./config/local.release.Hipcheck.kdl check https://github.com/mitre/hipcheck
       - name: Run with Config
         env:
           HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./target/debug/hc --config ./config check https://github.com/mitre/hipcheck
+        run: ./target/release/hc --config ./config check https://github.com/mitre/hipcheck
