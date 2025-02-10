@@ -31,6 +31,7 @@ struct SessionBuilder {
 	policy_file: Option<PolicyFile>,
 	target: Option<Target>,
 	exec_config: Option<ExecConfig>,
+	core: Option<Arc<HcPluginCore>>,
 	format: Format,
 	started_at: chrono::DateTime<Local>,
 }
@@ -44,6 +45,7 @@ impl SessionBuilder {
 			policy_file: None,
 			target: None,
 			exec_config: None,
+			core: None,
 			format,
 			started_at: start_time,
 		}
@@ -57,6 +59,10 @@ impl SessionBuilder {
 	fn set_cache_dir(&mut self, cache_dir: PathBuf) -> &mut Self {
 		self.cache_dir = Some(cache_dir);
 		self
+	}
+
+	fn get_cache_dir(&self) -> Option<&PathBuf> {
+		self.cache_dir.as_ref()
 	}
 
 	fn set_policy(&mut self, policy_file: PolicyFile) -> &mut Self {
@@ -87,7 +93,12 @@ impl SessionBuilder {
 		self.exec_config.as_ref()
 	}
 
-	fn build(self, core: Arc<HcPluginCore>) -> Result<Session> {
+	fn set_core(&mut self, core: Arc<HcPluginCore>) -> &mut Self {
+		self.core = Some(core);
+		self
+	}
+
+	fn build(self) -> Result<Session> {
 		let target = match self.target {
 			Some(target) => target,
 			None => return Err(hc_error!("Missing Target")),
@@ -103,6 +114,11 @@ impl SessionBuilder {
 			None => return Err(hc_error!("Missing PolicyFile")),
 		};
 
+		let core = match self.core {
+			Some(core) => core,
+			None => return Err(hc_error!("Missing HcPluginCore")),
+		};
+
 		let mut session = Session {
 			storage: Default::default(),
 			target,
@@ -113,6 +129,31 @@ impl SessionBuilder {
 		};
 		// ensure core is set, needed by salsa
 		session.set_core(core);
+		Ok(session)
+	}
+
+	fn build_ready(self) -> Result<ReadySession> {
+		if self.target.is_some() {
+			return Err(hc_error!("Target should not be set for ReadySession"));
+		};
+
+		let exec_config = match self.exec_config {
+			Some(c) => c,
+			None => return Err(hc_error!("Missing ExecConfig")),
+		};
+
+		let policy_file = match self.policy_file {
+			Some(policy_file) => policy_file,
+			None => return Err(hc_error!("Missing PolicyFile")),
+		};
+
+		let session = ReadySession {
+			policy_file,
+			exec_config,
+			started_at: self.started_at,
+			format: self.format,
+		};
+
 		Ok(session)
 	}
 }
@@ -152,18 +193,6 @@ impl fmt::Debug for Session {
 }
 
 impl Session {
-	// Note that error handling in the constructor for `Session` is a little awkward.
-	// This is because we want to be able to hand back the `Shell` passed in if setup
-	// fails, so instead of using the `?` operator, we need to do the returning manually.
-	//
-	// You may think we could use `map_err` and the question mark operator to bundle
-	// the shell with whatever error we have and hand them back, but unfortunately this
-	// doesn't work. When you use `shell` in the `map_err` closure, you're moving it
-	// unconditionally, even though `map_err`'s closure is only run in the case of
-	// an error (in which case you're also returning early), the Rust compiler isn't
-	// smart enough to figure that out. Maybe this will improve in the future, but for
-	// now, we have to do it by hand.
-
 	/// Construct a new `Session` which owns all the data needed in later phases.
 	#[allow(clippy::too_many_arguments)]
 	pub fn new(
@@ -174,90 +203,24 @@ impl Session {
 		format: Format,
 	) -> StdResult<Session, Error> {
 		/*===================================================================
-		 *  Setting up the session builder
-		 *-----------------------------------------------------------------*/
-
-		let mut session_builder = SessionBuilder::new(chrono::Local::now(), format);
-
-		/*===================================================================
 		 * Printing the prelude.
 		 *-----------------------------------------------------------------*/
 
 		Shell::print_prelude(target.to_string());
 
-		/*===================================================================
-		 *  Loading configuration.
-		 *-----------------------------------------------------------------*/
-
-		use ConfigMode::*;
-		let config_msg = match config_mode {
-			PreferPolicy { policy, config } => match use_policy(policy, &mut session_builder) {
-				Err(err) => {
-					log::info!("Failed to load default policy KDL file; trying legacy config TOML directory instead. Error: {:#?}", err);
-
-					use_config(config, &mut session_builder)?
-				}
-				Ok(s) => s,
-			},
-			ForcePolicy { policy } => use_policy(policy, &mut session_builder)?,
-			ForceConfig { config } => use_config(config, &mut session_builder)?,
-		};
-		Shell::print_config(config_msg);
-
-		// Force eval the risk policy expr - wouldn't be necessary if the PolicyFile parsed
-		let _ = session_builder
-			.get_policy()
-			.ok_or_else(|| hc_error!("PolicyFile not set yet"))?
-			.risk_policy()?;
-
-		/*===================================================================
-		 *  Load the Exec Configuration
-		 *-----------------------------------------------------------------*/
-		let exec = load_exec_config(exec_path.as_deref())?;
-		session_builder.set_exec_config(exec);
-
-		/*===================================================================
-		 *  Resolving the Hipcheck home.
-		 *-----------------------------------------------------------------*/
-
-		let home = home_dir
-			.as_deref()
-			.map(ToOwned::to_owned)
-			.ok_or_else(|| hc_error!("can't find cache directory"))?;
-		session_builder.set_cache_dir(home.clone());
-		let plugin_cache = HcPluginCache::new(&home);
+		let mut session_builder = setup_base_session(config_mode, home_dir, exec_path, format)?;
 
 		/*===================================================================
 		 *  Resolving the source.
 		 *-----------------------------------------------------------------*/
-		let target = load_target(target, &home)?;
+
+		let home = session_builder.get_cache_dir().ok_or_else(|| {
+			hc_error!("Internal error: SessionBuilder doesn't have cache_dir set")
+		})?;
+		let target = load_target(target, home)?;
 		session_builder.set_target(target);
 
-		/*===================================================================
-		 *  Plugin startup.
-		 *-----------------------------------------------------------------*/
-
-		// The fact that we set the policy above to be accessible through the salsa
-		// infrastructure would suggest that plugin startup should also be done
-		// through salsa. Our goal is to produce an HcPluginCore instance, which
-		// has all the plugins up and running. However, HcPluginCore does not impl
-		// equal, and the idea of memoizing/invalidating it does not make sense.
-		// Thus, we will do the plugin startup here.
-
-		let policy = session_builder
-			.get_policy()
-			.ok_or_else(|| hc_error!("PolicyFile not set"))?
-			.clone();
-
-		let exec_config = session_builder
-			.get_exec_config()
-			.ok_or_else(|| hc_error!("ExecConfig not set"))?
-			.clone();
-
-		let executor = ExecConfig::get_plugin_executor(&exec_config)?;
-
-		let core = start_plugins(&policy, &plugin_cache, executor)?;
-		session_builder.build(core)
+		session_builder.build()
 	}
 
 	/// target of this analysis
@@ -308,6 +271,119 @@ impl Session {
 	pub fn format(&self) -> Format {
 		self.format
 	}
+}
+
+/// A subset of Session that's used for the `hc ready` command.
+/// It doesn't include a target or support for queries.
+#[allow(unused)]
+pub struct ReadySession {
+	/// format to display results in to end-user
+	format: Format,
+	/// policy file used to configure session
+	policy_file: PolicyFile,
+	/// configuration for plugins
+	exec_config: ExecConfig,
+	/// when session started
+	started_at: DateTime<Local>,
+}
+
+impl ReadySession {
+	/// Construct a new `ReadySession` which owns all the data needed in later phases.
+	pub fn new(
+		config_mode: ConfigMode,
+		home_dir: Option<PathBuf>,
+		exec_path: Option<PathBuf>,
+		format: Format,
+	) -> StdResult<ReadySession, Error> {
+		let session_builder = setup_base_session(config_mode, home_dir, exec_path, format)?;
+		session_builder.build_ready()
+	}
+}
+
+/// Set up a `SessionBuilder`, with everything but the target.
+/// This allows the setup logic to be shared between `hc check`
+/// and `hc ready`, since `hc ready` does not use a target.
+fn setup_base_session(
+	config_mode: ConfigMode,
+	home_dir: Option<PathBuf>,
+	exec_path: Option<PathBuf>,
+	format: Format,
+) -> StdResult<SessionBuilder, Error> {
+	/*===================================================================
+	 *  Setting up the session builder
+	 *-----------------------------------------------------------------*/
+
+	let mut session_builder = SessionBuilder::new(chrono::Local::now(), format);
+
+	/*===================================================================
+	 *  Loading configuration.
+	 *-----------------------------------------------------------------*/
+
+	use ConfigMode::*;
+	let config_msg = match config_mode {
+		PreferPolicy { policy, config } => match use_policy(policy, &mut session_builder) {
+			Err(err) => {
+				log::info!("Failed to load default policy KDL file; trying legacy config TOML directory instead. Error: {:#?}", err);
+
+				use_config(config, &mut session_builder)?
+			}
+			Ok(s) => s,
+		},
+		ForcePolicy { policy } => use_policy(policy, &mut session_builder)?,
+		ForceConfig { config } => use_config(config, &mut session_builder)?,
+	};
+	Shell::print_config(config_msg);
+
+	// Force eval the risk policy expr - wouldn't be necessary if the PolicyFile parsed
+	let _ = session_builder
+		.get_policy()
+		.ok_or_else(|| hc_error!("PolicyFile not set yet"))?
+		.risk_policy()?;
+
+	/*===================================================================
+	 *  Load the Exec Configuration
+	 *-----------------------------------------------------------------*/
+	let exec = load_exec_config(exec_path.as_deref())?;
+	session_builder.set_exec_config(exec);
+
+	/*===================================================================
+	 *  Resolving the Hipcheck home.
+	 *-----------------------------------------------------------------*/
+
+	let home = home_dir
+		.as_deref()
+		.map(ToOwned::to_owned)
+		.ok_or_else(|| hc_error!("can't find cache directory"))?;
+	session_builder.set_cache_dir(home.clone());
+	let plugin_cache = HcPluginCache::new(&home);
+
+	/*===================================================================
+	 *  Plugin startup.
+	 *-----------------------------------------------------------------*/
+
+	// The fact that we set the policy above to be accessible through the salsa
+	// infrastructure would suggest that plugin startup should also be done
+	// through salsa. Our goal is to produce an HcPluginCore instance, which
+	// has all the plugins up and running. However, HcPluginCore does not impl
+	// equal, and the idea of memoizing/invalidating it does not make sense.
+	// Thus, we will do the plugin startup here.
+
+	let policy = session_builder
+		.get_policy()
+		.ok_or_else(|| hc_error!("PolicyFile not set"))?
+		.clone();
+
+	let exec_config = session_builder
+		.get_exec_config()
+		.ok_or_else(|| hc_error!("ExecConfig not set"))?
+		.clone();
+
+	let executor = ExecConfig::get_plugin_executor(&exec_config)?;
+
+	let core = start_plugins(&policy, &plugin_cache, executor)?;
+	session_builder.set_core(core);
+
+	Ok(session_builder)
 }
 
 fn use_config(config_path: PathBuf, session_builder: &mut SessionBuilder) -> Result<String> {
