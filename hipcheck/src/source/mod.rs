@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod git;
-pub mod query;
 
-pub use crate::source::query::*;
 use crate::{
 	error::{Context, Error, Result},
 	hc_error,

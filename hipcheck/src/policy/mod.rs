@@ -13,6 +13,7 @@ use crate::{
 	error::Result,
 	hc_error,
 	policy::policy_file::{PolicyAnalyze, PolicyPatchList, PolicyPluginList, PolicyPluginName},
+	policy_exprs::{std_parse, Expr},
 	util::fs as file,
 };
 use hipcheck_kdl::extract_data;
@@ -53,6 +54,13 @@ impl FromStr for PolicyFile {
 }
 
 impl PolicyFile {
+	/// retrieve the risk policy expression from a PolicyFile
+	pub fn risk_policy(&self) -> Result<Expr> {
+		let expr_str = self.analyze.investigate_policy.0.as_str();
+		std_parse(expr_str)
+			.map_err(|e| hc_error!("Malformed risk policy expression '{}': {}", expr_str, e))
+	}
+
 	/// Load policy from the given file.
 	pub fn load_from(policy_path: &Path) -> Result<PolicyFile> {
 		if policy_path.is_dir() {
