@@ -5,14 +5,14 @@
 use crate::{
 	engine::HcEngine,
 	error::{Context, Result},
-	exec::ExecConfig,
 	hc_error,
 	policy::{
 		policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild},
 		PolicyFile,
 	},
-	policy_exprs::{std_parse, Expr},
+	policy_exprs::Expr,
 	score::*,
+	session::Session,
 	util::fs as file,
 	F64,
 };
@@ -21,12 +21,7 @@ use num_traits::identities::Zero;
 use pathbuf::pathbuf;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
-use std::{
-	collections::HashMap,
-	default::Default,
-	path::{Path, PathBuf},
-	rc::Rc,
-};
+use std::{collections::HashMap, default::Default, path::Path, rc::Rc};
 
 impl Config {
 	/// Load configuration from the given directory.
@@ -441,40 +436,6 @@ mod de {
 	}
 }
 
-/// Query for accessing a source of Hipcheck config data
-#[salsa::query_group(ConfigSourceStorage)]
-pub trait ConfigSource: salsa::Database {
-	/// Returns the directory containing the config file (deprecated)
-	#[salsa::input]
-	fn config_dir(&self) -> Option<Rc<PathBuf>>;
-	/// Returns the input `Policy File` struct
-	#[salsa::input]
-	fn policy(&self) -> Rc<PolicyFile>;
-	/// Returns the location of the policy file
-	#[salsa::input]
-	fn policy_path(&self) -> Option<Rc<PathBuf>>;
-	/// Returns the input `Exec Config` struct
-	#[salsa::input]
-	fn exec_config(&self) -> Rc<ExecConfig>;
-	/// Returns the token set in HC_GITHUB_TOKEN env var
-	#[salsa::input]
-	fn github_api_token(&self) -> Option<Rc<String>>;
-	/// Returns the directory being used to hold cache data
-	#[salsa::input]
-	fn cache_dir(&self) -> Rc<PathBuf>;
-	/// Returns the analysis tree as-is, i.e. without resolving policy expressions with plugins
-	fn unresolved_analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
-	/// Returns a weight-normalized version of `unresolved_analysis_tree()`
-	fn normalized_unresolved_analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
-}
-
-/// Query for accessing the risk threshold config
-#[salsa::query_group(RiskConfigQueryStorage)]
-pub trait RiskConfigQuery: ConfigSource {
-	/// Returns the risk policy expr
-	fn risk_policy(&self) -> Result<Rc<Expr>>;
-}
-
 pub static DEFAULT_QUERY: &str = "";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -759,19 +720,13 @@ pub fn unresolved_analysis_tree_from_policy(policy: &PolicyFile) -> Result<Analy
 	Ok(tree)
 }
 
-pub fn unresolved_analysis_tree(db: &dyn ConfigSource) -> Result<Rc<AnalysisTree>> {
-	let policy = db.policy();
-	unresolved_analysis_tree_from_policy(&policy).map(Rc::new)
+pub fn unresolved_analysis_tree(session: &Session) -> Result<Rc<AnalysisTree>> {
+	let policy = session.policy_file();
+	unresolved_analysis_tree_from_policy(policy).map(Rc::new)
 }
 
-#[salsa::query_group(WeightTreeQueryStorage)]
-pub trait WeightTreeProvider: ConfigSource + HcEngine {
-	/// Returns the normalized weight tree including resolved policy expressions
-	fn analysis_tree(&self) -> Result<Rc<AnalysisTree>>;
-}
-
-pub fn analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<AnalysisTree>> {
-	let unresolved_tree = db.normalized_unresolved_analysis_tree()?;
+pub fn analysis_tree(session: &Session) -> Result<Rc<AnalysisTree>> {
+	let unresolved_tree = normalized_unresolved_analysis_tree(session)?;
 	let mut res_tree: AnalysisTree = (*unresolved_tree).clone();
 
 	// If the policy is empty, try to look up from plugin engine
@@ -779,7 +734,7 @@ pub fn analysis_tree(db: &dyn WeightTreeProvider) -> Result<Rc<AnalysisTree>> {
 		if let AnalysisTreeNode::Analysis { analysis, .. } = node {
 			let a: &Analysis = &analysis.0;
 			if analysis.1.is_none() {
-				analysis.1 = Some(db.default_policy_expr(a.publisher.clone(), a.plugin.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file", a.publisher.clone(), a.plugin.clone()))?);
+				analysis.1 = Some(session.default_policy_expr(a.publisher.clone(), a.plugin.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file", a.publisher.clone(), a.plugin.clone()))?);
 			}
 		}
 		Ok(())
@@ -815,25 +770,9 @@ pub fn normalized_unresolved_analysis_tree_from_policy(
 	Ok(Rc::new(tree))
 }
 
-pub fn normalized_unresolved_analysis_tree(db: &dyn ConfigSource) -> Result<Rc<AnalysisTree>> {
-	let tree = db.unresolved_analysis_tree();
-	let mut norm_tree: AnalysisTree = (*tree?).clone();
+pub fn normalized_unresolved_analysis_tree(session: &Session) -> Result<Rc<AnalysisTree>> {
+	let tree = unresolved_analysis_tree(session)?;
+	let mut norm_tree: AnalysisTree = (*tree).clone();
 	normalize_at_internal(norm_tree.root, &mut norm_tree.tree);
 	Ok(Rc::new(norm_tree))
-}
-
-// Derived query implementations
-
-// In general, these simply return the value of a particular field in
-// one of the `Config` child structs.  When the type of the desired
-// field is `String`, it is returned wrapped in an `Rc`.  This is
-// done to keep Salsa's cloning cheap.
-
-fn risk_policy(db: &dyn RiskConfigQuery) -> Result<Rc<Expr>> {
-	let policy = db.policy();
-	let expr_str = policy.analyze.investigate_policy.0.as_str();
-	let expr = std_parse(expr_str)
-		.map_err(|e| hc_error!("Malformed risk policy expression '{}': {}", expr_str, e))?;
-
-	Ok(Rc::new(expr))
 }

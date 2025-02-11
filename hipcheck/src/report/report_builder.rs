@@ -2,7 +2,6 @@
 
 pub use crate::report::*;
 use crate::{
-	config::{ConfigSource, RiskConfigQuery},
 	engine::HcEngine,
 	error::{Error, Result},
 	hc_error,
@@ -10,7 +9,6 @@ use crate::{
 	policy::policy_file::PolicyPluginName,
 	score::*,
 	session::Session,
-	source::SourceQuery,
 	version::hc_version,
 };
 use std::{collections::HashSet, default::Default};
@@ -66,7 +64,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 
 	builder
 		.set_risk_score(scoring.score.total)
-		.set_risk_policy(session.risk_policy()?.as_ref().clone());
+		.set_risk_policy(session.policy_file().risk_policy()?);
 
 	let report = builder.build()?;
 
@@ -103,8 +101,8 @@ impl<'sess> ReportBuilder<'sess> {
 	/// Initiate building a new `Report`.
 	pub fn for_session(session: &'sess Session) -> ReportBuilder<'sess> {
 		// Get investigate_if_failed hashset from policy
-		let policy = session.policy();
-		let investigate_if_failed = policy
+		let policy_file = session.policy_file();
+		let investigate_if_failed = policy_file
 			.analyze
 			.if_fail
 			.as_ref()
@@ -173,7 +171,7 @@ impl<'sess> ReportBuilder<'sess> {
 		let repo_owner = self.session.owner();
 		let repo_head = self.session.head();
 		let hipcheck_version = hc_version();
-		let analyzed_at = Timestamp::from(self.session.started_at());
+		let analyzed_at = Timestamp(self.session.started_at());
 		let passing = self.passing;
 		let failing = self.failing;
 		let errored = self.errored;

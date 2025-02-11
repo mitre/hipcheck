@@ -506,15 +506,3 @@ impl Serialize for Timestamp {
 		serializer.serialize_str(&self.0.to_rfc3339())
 	}
 }
-
-/// Queries for how Hipcheck reports session results
-#[salsa::query_group(ReportParamsStorage)]
-pub trait ReportParams {
-	/// Returns the time the current Hipcheck session started
-	#[salsa::input]
-	fn started_at(&self) -> DateTime<FixedOffset>;
-
-	/// Returns the format of the final report
-	#[salsa::input]
-	fn format(&self) -> Format;
-}
