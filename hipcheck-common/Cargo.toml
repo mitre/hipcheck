@@ -8,7 +8,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.95"
-log = "0.4.22"
+log = "0.4.25"
 prost = "0.13.4"
 serde_json = "1.0.134"
 thiserror = "2.0.11"

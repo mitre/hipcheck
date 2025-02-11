@@ -24,7 +24,7 @@ schemars = { version = "0.8.21", features = ["url"] }
 hipcheck-sdk-macros = { path = "../../hipcheck-sdk-macros", version = "0.1.0", optional = true }
 typify-macro = "0.2.0"
 url = { version = "2.5.4", features = ["serde"] }
-log = "0.4.22"
+log = "0.4.25"
 hipcheck-common = { version = "0.2.0", path = "../../hipcheck-common" }
 console = "0.15.10"
 

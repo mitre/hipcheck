@@ -74,7 +74,7 @@ indextree = "4.7.3"
 indicatif = { version = "0.17.11", features = ["rayon"] }
 itertools = "0.13.0"
 jiff = "0.1.16"
-log = "0.4.22"
+log = "0.4.25"
 logos = "0.15.0"
 maplit = "1.0.2"
 miette = { version = "7.4.0", features = ["fancy"] }
