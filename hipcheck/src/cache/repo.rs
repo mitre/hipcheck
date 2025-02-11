@@ -46,52 +46,52 @@ pub struct RepoCacheListScope {
 #[derive(Debug, Clone, Tabled)]
 struct RepoCacheEntry {
 	pub name: String,
-	#[tabled(display_with("Self::display_parent", self), rename = "path")]
+	#[tabled(display("display_parent"), rename = "path")]
 	pub parent: PathBuf,
 	pub commit: String,
-	#[tabled(display_with("Self::display_size", self))]
+	#[tabled(display("display_size"))]
 	pub size: usize,
-	#[tabled(display_with("Self::display_modified", self))]
+	#[tabled(display("display_modified"))]
 	pub modified: SystemTime,
 }
-impl RepoCacheEntry {
-	// Helper funcs for displaying CacheEntry using `tabled` crate
-	fn display_parent(&self) -> String {
-		self.parent
-			.clone()
-			.into_os_string()
-			.into_string()
-			.unwrap_or("<DISPLAY_ERROR>".to_owned())
-			.to_string()
-	}
-	fn display_modified(&self) -> String {
-		let Ok(dur) = self.modified.duration_since(SystemTime::UNIX_EPOCH) else {
-			return "<DISPLAY_ERROR>".to_owned();
-		};
-		let Some(dt) = chrono::DateTime::<chrono::offset::Utc>::from_timestamp(
-			dur.as_secs() as i64,
-			dur.subsec_nanos(),
-		) else {
-			return "<DISPLAY_ERROR>".to_owned();
-		};
-		let chars = dt.to_rfc2822().chars().collect::<Vec<char>>();
-		// Remove unnecessary " +0000" from end of rfc datetime str
-		chars[..chars.len() - 6].iter().collect()
-	}
-	fn display_size(&self) -> String {
-		static ONE_KB: f64 = 1000.0;
-		static ONE_MB: f64 = ONE_KB * 1000.0;
-		static ONE_GB: f64 = ONE_MB * 1000.0;
-		let e_size = self.size as f64;
-		if e_size > ONE_GB {
-			format!("{:.2} GB", e_size / ONE_GB)
-		} else if e_size > ONE_MB {
-			format!("{:.2} MB", e_size / ONE_MB)
-		} else if e_size > ONE_KB {
-			format!("{:.2} KB", e_size / ONE_KB)
-		} else {
-			format!("{:.0} B", e_size)
-		}
+
+// Helper funcs for displaying CacheEntry using `tabled` crate
+fn display_parent(parent: &Path) -> String {
+	parent
+		.as_os_str()
+		.to_str()
+		.unwrap_or("<DISPLAY_ERROR>")
+		.to_string()
+}
+
+fn display_modified(modified: &SystemTime) -> String {
+	let Ok(dur) = modified.duration_since(SystemTime::UNIX_EPOCH) else {
+		return "<DISPLAY_ERROR>".to_owned();
+	};
+	let Some(dt) = chrono::DateTime::<chrono::offset::Utc>::from_timestamp(
+		dur.as_secs() as i64,
+		dur.subsec_nanos(),
+	) else {
+		return "<DISPLAY_ERROR>".to_owned();
+	};
+	let chars = dt.to_rfc2822().chars().collect::<Vec<char>>();
+	// Remove unnecessary " +0000" from end of rfc datetime str
+	chars[..chars.len() - 6].iter().collect()
+}
+
+fn display_size(size: &usize) -> String {
+	static ONE_KB: f64 = 1000.0;
+	static ONE_MB: f64 = ONE_KB * 1000.0;
+	static ONE_GB: f64 = ONE_MB * 1000.0;
+	let e_size = *size as f64;
+	if e_size > ONE_GB {
+		format!("{:.2} GB", e_size / ONE_GB)
+	} else if e_size > ONE_MB {
+		format!("{:.2} MB", e_size / ONE_MB)
+	} else if e_size > ONE_KB {
+		format!("{:.2} KB", e_size / ONE_KB)
+	} else {
+		format!("{:.0} B", e_size)
 	}
 }
 

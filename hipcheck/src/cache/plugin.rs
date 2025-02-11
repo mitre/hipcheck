@@ -51,26 +51,23 @@ pub struct PluginCacheEntry {
 	pub publisher: String,
 	pub name: String,
 	pub version: Version,
-	#[tabled(display_with("Self::display_modified", self), rename = "last_modified")]
+	#[tabled(display("display_modified"), rename = "last_modified")]
 	pub modified: SystemTime,
 }
 
-impl PluginCacheEntry {
-	// copied the function from repo for simplicity
-	pub fn display_modified(&self) -> String {
-		let Ok(dur) = self.modified.duration_since(SystemTime::UNIX_EPOCH) else {
-			return "<DISPLAY_ERROR>".to_owned();
-		};
-		let Some(dt) = chrono::DateTime::<chrono::offset::Utc>::from_timestamp(
-			dur.as_secs() as i64,
-			dur.subsec_nanos(),
-		) else {
-			return "<DISPLAY_ERROR>".to_owned();
-		};
-		let chars = dt.to_rfc2822().chars().collect::<Vec<char>>();
-		// Remove unnecessary " +0000" from end of rfc datetime str
-		chars[..chars.len() - 6].iter().collect()
-	}
+fn display_modified(e: &SystemTime) -> String {
+	let Ok(dur) = e.duration_since(SystemTime::UNIX_EPOCH) else {
+		return "<DISPLAY_ERROR>".to_owned();
+	};
+	let Some(dt) = chrono::DateTime::<chrono::offset::Utc>::from_timestamp(
+		dur.as_secs() as i64,
+		dur.subsec_nanos(),
+	) else {
+		return "<DISPLAY_ERROR>".to_owned();
+	};
+	let chars = dt.to_rfc2822().chars().collect::<Vec<char>>();
+	// Remove unnecessary " +0000" from end of rfc datetime str
+	chars[..chars.len() - 6].iter().collect()
 }
 
 struct HcPluginCacheIterator {
