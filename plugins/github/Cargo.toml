@@ -13,7 +13,7 @@ graphql_client = "0.14.0"
 hipcheck-sdk = { version = "0.3.0", path = "../../sdk/rust", features = [
     "macros",
 ] }
-log = "0.4.22"
+log = "0.4.25"
 # Exactly matching the version of rustls used by ureq
 # Get rid of default features since we don't use the AWS backed crypto
 # provider (we use ring) and it breaks stuff on windows.
