@@ -190,22 +190,19 @@ impl Session {
 		 *-----------------------------------------------------------------*/
 
 		use ConfigMode::*;
-		match config_mode {
-			PreferPolicy { policy, config } => {
-				let res = use_policy(policy, &mut session_builder);
-				if let Some(err) = res.err() {
-					log::error!("Failed to load default policy KDL file; trying legacy config TOML directory instead. Error: {:#?}", err);
+		let config_msg = match config_mode {
+			PreferPolicy { policy, config } => match use_policy(policy, &mut session_builder) {
+				Err(err) => {
+					log::info!("Failed to load default policy KDL file; trying legacy config TOML directory instead. Error: {:#?}", err);
 
-					use_config(config, &mut session_builder)?;
+					use_config(config, &mut session_builder)?
 				}
-			}
-			ForcePolicy { policy } => {
-				use_policy(policy, &mut session_builder)?;
-			}
-			ForceConfig { config } => {
-				use_config(config, &mut session_builder)?;
-			}
-		}
+				Ok(s) => s,
+			},
+			ForcePolicy { policy } => use_policy(policy, &mut session_builder)?,
+			ForceConfig { config } => use_config(config, &mut session_builder)?,
+		};
+		Shell::print_config(config_msg);
 
 		// Force eval the risk policy expr - wouldn't be necessary if the PolicyFile parsed
 		let _ = session_builder
@@ -313,48 +310,57 @@ impl Session {
 	}
 }
 
-fn use_config(config_path: PathBuf, session_builder: &mut SessionBuilder) -> Result<()> {
-	let (policy, config_dir) = load_config_and_data(config_path)?;
+fn use_config(config_path: PathBuf, session_builder: &mut SessionBuilder) -> Result<String> {
+	let policy = load_config_and_data(&config_path)?;
+
+	let out = format!(
+		"using policy derived from config dir at {}",
+		config_path.display()
+	);
 
 	// Set config dir
 	session_builder
-		.set_config_dir(Some(config_dir))
+		.set_config_dir(Some(config_path))
 		.set_policy(policy)
 		.set_policy_path(None);
-	Ok(())
+
+	Ok(out)
 }
 
-fn use_policy(policy_path: PathBuf, session_builder: &mut SessionBuilder) -> Result<()> {
-	let (policy, policy_path) = load_policy_and_data(policy_path)?;
+fn use_policy(policy_path: PathBuf, session_builder: &mut SessionBuilder) -> Result<String> {
+	let policy = load_policy_and_data(&policy_path)?;
+
+	let out = format!("using policy located at {}", policy_path.display());
+
 	// No config dir
 	session_builder
 		.set_config_dir(None)
 		.set_policy(policy)
 		.set_policy_path(Some(policy_path));
-	Ok(())
+	Ok(out)
 }
 
-pub fn load_config_and_data(config_path: PathBuf) -> Result<(PolicyFile, PathBuf)> {
+pub fn load_config_and_data(config_path: &Path) -> Result<PolicyFile> {
 	// Start the phase.
-	let phase = SpinnerPhase::start("Loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.");
+	let phase = SpinnerPhase::start("loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.");
 	// Increment the phase into the "running" stage.
 	phase.inc();
 	// Set the spinner phase to tick constantly, 10 times a second.
 	phase.enable_steady_tick(Duration::from_millis(100));
 
 	// Load the configuration file.
-	let config = Config::load_from(&config_path)
+	let config = Config::load_from(config_path)
 		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
 
 	// Convert the Config struct to a PolicyFile struct
-	let policy = config_to_policy(config, &config_path)?;
+	let policy = config_to_policy(config, config_path)?;
 
 	phase.finish_successful();
 
-	Ok((policy, config_path))
+	Ok(policy)
 }
 
-pub fn load_policy_and_data(policy_path: PathBuf) -> Result<(PolicyFile, PathBuf)> {
+pub fn load_policy_and_data(policy_path: &Path) -> Result<PolicyFile> {
 	// Start the phase.
 	let phase = SpinnerPhase::start("loading policy and data files");
 	// Increment the phase into the "running" stage.
@@ -363,12 +369,12 @@ pub fn load_policy_and_data(policy_path: PathBuf) -> Result<(PolicyFile, PathBuf
 	phase.enable_steady_tick(Duration::from_millis(100));
 
 	// Load the policy file.
-	let policy = PolicyFile::load_from(&policy_path)
+	let policy = PolicyFile::load_from(policy_path)
 		.with_context(|| format!("Failed to load policy file at path {:?}. Please make sure the policy file is in the provided location and is formatted correctly.", policy_path))?;
 
 	phase.finish_successful();
 
-	Ok((policy, policy_path))
+	Ok(policy)
 }
 
 fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {

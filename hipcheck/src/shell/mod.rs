@@ -222,6 +222,16 @@ impl Shell {
 		}
 	}
 
+    /// Print "Config {msg}" with the proper color/styling.
+    pub fn print_config(source: impl AsRef<str>) {
+		match Shell::get_verbosity() {
+			Verbosity::Normal => {
+				macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Config, source.as_ref());
+			}
+			Verbosity::Quiet | Verbosity::Silent => {}
+        }
+    }
+
 	/// Print a hipcheck [Error]. Human readable errors will go to the standard error, JSON (regular or full) will go to the standard output.
 	pub fn print_error(err: &Error, format: Format) {
 		match format {
@@ -452,6 +462,8 @@ enum Title {
 	Analyzing,
 	/// "Analyzed"
 	Analyzed,
+	/// "Config"
+	Config,
 	/// The name of the section.
 	Section(&'static str),
 	/// An analysis passed.
@@ -479,6 +491,7 @@ impl Title {
 		match self {
 			Analyzing => "Analyzing",
 			Analyzed => "Analyzed",
+			Config => "Config",
 			Section(s) => s,
 			Passed => "+",
 			Failed => "-",
@@ -497,7 +510,7 @@ impl Title {
 
 		let color = match self {
 			Analyzed | Section(..) => Some(Blue),
-			Analyzing | Done => Some(Cyan),
+			Analyzing | Done | Config => Some(Cyan),
 			InProgress => Some(Magenta),
 			Passed | Pass => Some(Green),
 			Failed | Investigate => Some(Red),
