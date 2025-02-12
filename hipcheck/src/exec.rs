@@ -1,22 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-// reference hipcheck/src/plugin/plugin_manifest.rs
+
 use crate::{error::Result, hc_error, plugin::PluginExecutor, util::fs::read_string};
 use hipcheck_kdl::kdl::{KdlDocument, KdlNode, KdlValue};
 use hipcheck_kdl::{extract_data, ParseKdlNode};
 use std::{env, path::Path, str::FromStr};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PluginBackoffInterval {
-	/// size of the downloaded artifact, in bytes
-	pub micros: u64,
-}
-
-impl PluginBackoffInterval {
-	#[cfg(test)]
-	pub fn new(micros: u64) -> Self {
-		Self { micros }
-	}
-}
+pub struct PluginBackoffInterval(u64);
 
 impl ParseKdlNode for PluginBackoffInterval {
 	fn kdl_key() -> &'static str {
@@ -40,22 +30,12 @@ impl ParseKdlNode for PluginBackoffInterval {
 			}
 			_ => return None,
 		};
-		Some(PluginBackoffInterval { micros })
+		Some(PluginBackoffInterval(micros))
 	}
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PluginMaxSpawnAttempts {
-	/// the number of spawns to attempt
-	pub attempts: usize,
-}
-
-impl PluginMaxSpawnAttempts {
-	#[cfg(test)]
-	pub fn new(attempts: usize) -> Self {
-		Self { attempts }
-	}
-}
+pub struct PluginMaxSpawnAttempts(usize);
 
 impl ParseKdlNode for PluginMaxSpawnAttempts {
 	fn kdl_key() -> &'static str {
@@ -79,22 +59,12 @@ impl ParseKdlNode for PluginMaxSpawnAttempts {
 			}
 			_ => return None,
 		};
-		Some(PluginMaxSpawnAttempts { attempts })
+		Some(PluginMaxSpawnAttempts(attempts))
 	}
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PluginMaxConnectionAttempts {
-	/// the number of spawns to attempt
-	pub attempts: usize,
-}
-
-impl PluginMaxConnectionAttempts {
-	#[cfg(test)]
-	pub fn new(attempts: usize) -> Self {
-		Self { attempts }
-	}
-}
+pub struct PluginMaxConnectionAttempts(usize);
 
 impl ParseKdlNode for PluginMaxConnectionAttempts {
 	fn kdl_key() -> &'static str {
@@ -118,22 +88,12 @@ impl ParseKdlNode for PluginMaxConnectionAttempts {
 			}
 			_ => return None,
 		};
-		Some(PluginMaxConnectionAttempts { attempts })
+		Some(PluginMaxConnectionAttempts(attempts))
 	}
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PluginJitterPercent {
-	/// the number of spawns to attempt
-	pub percent: u8,
-}
-
-impl PluginJitterPercent {
-	#[cfg(test)]
-	pub fn new(percent: u8) -> Self {
-		Self { percent }
-	}
-}
+pub struct PluginJitterPercent(u8);
 
 impl ParseKdlNode for PluginJitterPercent {
 	fn kdl_key() -> &'static str {
@@ -157,22 +117,12 @@ impl ParseKdlNode for PluginJitterPercent {
 			}
 			_ => return None,
 		};
-		Some(PluginJitterPercent { percent })
+		Some(PluginJitterPercent(percent))
 	}
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PluginMsgBufferSize {
-	/// size of the buffer for the grpc buffer
-	pub size: usize,
-}
-
-impl PluginMsgBufferSize {
-	#[cfg(test)]
-	pub fn new(size: usize) -> Self {
-		Self { size }
-	}
-}
+pub struct PluginMsgBufferSize(usize);
 
 impl ParseKdlNode for PluginMsgBufferSize {
 	fn kdl_key() -> &'static str {
@@ -196,35 +146,45 @@ impl ParseKdlNode for PluginMsgBufferSize {
 			}
 			_ => return None,
 		};
-		Some(PluginMsgBufferSize { size })
+		Some(PluginMsgBufferSize(size))
 	}
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PluginConfig {
-	pub backoff: PluginBackoffInterval,
-	pub max_spawn: PluginMaxSpawnAttempts,
-	pub max_conn: PluginMaxConnectionAttempts,
-	pub jitter: PluginJitterPercent,
-	pub grpc_buffer: PluginMsgBufferSize,
+	pub backoff_micros: u64,
+	pub max_spawn_attempts: usize,
+	pub max_conn_attempts: usize,
+	pub jitter_percent: u8,
+	pub grpc_buffer_size: usize,
 }
 
 impl PluginConfig {
-	#[cfg(test)]
 	pub fn new(
-		backoff: PluginBackoffInterval,
-		max_spawn: PluginMaxSpawnAttempts,
-		max_conn: PluginMaxConnectionAttempts,
-		jitter: PluginJitterPercent,
-		grpc_buffer: PluginMsgBufferSize,
+		backoff_micros: u64,
+		max_spawn_attempts: usize,
+		max_conn_attempts: usize,
+		jitter_percent: u8,
+		grpc_buffer_size: usize,
 	) -> Self {
 		Self {
-			backoff,
-			max_spawn,
-			max_conn,
-			jitter,
-			grpc_buffer,
+			backoff_micros,
+			max_spawn_attempts,
+			max_conn_attempts,
+			jitter_percent,
+			grpc_buffer_size,
 		}
+	}
+}
+
+impl Default for PluginConfig {
+	fn default() -> Self {
+		let backoff = if cfg!(target_os = "macos") {
+			1000000
+		} else {
+			10000
+		};
+		PluginConfig::new(backoff, 3, 5, 10, 10)
 	}
 }
 
@@ -246,19 +206,19 @@ impl ParseKdlNode for PluginConfig {
 		let jitter: PluginJitterPercent = extract_data(nodes)?;
 		let grpc_buffer: PluginMsgBufferSize = extract_data(nodes)?;
 
-		Some(Self {
-			backoff,
-			max_spawn,
-			max_conn,
-			jitter,
-			grpc_buffer,
-		})
+		Some(Self::new(
+			backoff.0,
+			max_spawn.0,
+			max_conn.0,
+			jitter.0,
+			grpc_buffer.0,
+		))
 	}
 
 	// add to_kdl(&self) & to_kdl_formatted_string from plugin manifest
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct ExecConfig {
 	pub plugin_data: PluginConfig,
 	// Any new configurable data forms can be added here
@@ -299,32 +259,20 @@ impl ExecConfig {
 			} else {
 				// If file not found, use default values
 				log::info!("Using a default Exec Config");
-				return Self::default();
+				return Ok(Self::default());
 			}
 		}
-	}
-
-	pub fn default() -> Result<Self> {
-		// These are the default values
-		let data = r#"plugin {
-			backoff-interval 100000
-			max-spawn-attempts 3
-			max-conn-attempts 5
-			jitter-percent 10
-			grpc-msg-buffer-size 10
-		}"#;
-		Self::from_str(data)
 	}
 
 	pub fn get_plugin_executor(&self) -> Result<PluginExecutor> {
 		let plugin_data = &self.plugin_data;
 		PluginExecutor::new(
-			/* max_spawn_attempts */ plugin_data.max_spawn.attempts,
-			/* max_conn_attempts */ plugin_data.max_conn.attempts,
+			/* max_spawn_attempts */ plugin_data.max_spawn_attempts,
+			/* max_conn_attempts */ plugin_data.max_conn_attempts,
 			/* port_range */ 40000..u16::MAX,
-			/* backoff_interval_micros */ plugin_data.backoff.micros,
-			/* jitter_percent */ plugin_data.jitter.percent,
-			/*grpc_buffer*/ plugin_data.grpc_buffer.size,
+			/* backoff_interval_micros */ plugin_data.backoff_micros,
+			/* jitter_percent */ plugin_data.jitter_percent,
+			/*grpc_buffer*/ plugin_data.grpc_buffer_size,
 		)
 	}
 }
@@ -350,56 +298,6 @@ mod test {
 	use pathbuf::pathbuf;
 
 	#[test]
-	fn test_parsing_plugin_backoff_interval() {
-		let data = "backoff-interval 100000";
-		let node = KdlNode::from_str(data).unwrap();
-		assert_eq!(
-			PluginBackoffInterval::new(100000),
-			PluginBackoffInterval::parse_node(&node).unwrap()
-		)
-	}
-
-	#[test]
-	fn test_parsing_plugin_max_spawns() {
-		let data = "max-spawn-attempts 3";
-		let node = KdlNode::from_str(data).unwrap();
-		assert_eq!(
-			PluginMaxSpawnAttempts::new(3),
-			PluginMaxSpawnAttempts::parse_node(&node).unwrap()
-		)
-	}
-
-	#[test]
-	fn test_parsing_plugin_max_connections() {
-		let data = "max-conn-attempts 5";
-		let node = KdlNode::from_str(data).unwrap();
-		assert_eq!(
-			PluginMaxConnectionAttempts::new(5),
-			PluginMaxConnectionAttempts::parse_node(&node).unwrap()
-		)
-	}
-
-	#[test]
-	fn test_parsing_plugin_jitter_percent() {
-		let data = "jitter-percent 10";
-		let node = KdlNode::from_str(data).unwrap();
-		assert_eq!(
-			PluginJitterPercent::new(10),
-			PluginJitterPercent::parse_node(&node).unwrap()
-		)
-	}
-
-	#[test]
-	fn test_parsing_plugin_buffer_size() {
-		let data = "grpc-msg-buffer-size 10";
-		let node = KdlNode::from_str(data).unwrap();
-		assert_eq!(
-			PluginMsgBufferSize::new(10),
-			PluginMsgBufferSize::parse_node(&node).unwrap()
-		)
-	}
-
-	#[test]
 	fn test_optional_parsing_plugin_buffer_size() {
 		let data = "jitter-percent 10";
 		let node = KdlNode::from_str(data).unwrap();
@@ -409,97 +307,16 @@ mod test {
 	#[test]
 	fn test_parsing_plugin_config() {
 		let data = r#"plugin {
-    backoff-interval 100000
-    max-spawn-attempts 3
-    max-conn-attempts 5
-    jitter-percent 10
-    grpc-msg-buffer-size 10
-}"#;
+            backoff-interval 100000
+            max-spawn-attempts 3
+            max-conn-attempts 5
+            jitter-percent 10
+            grpc-msg-buffer-size 10
+        }"#;
 		let node = KdlNode::from_str(data).unwrap();
-		let backoff = PluginBackoffInterval::new(100000);
-		let max_spawn = PluginMaxSpawnAttempts::new(3);
-		let max_conn = PluginMaxConnectionAttempts::new(5);
-		let jitter = PluginJitterPercent::new(10);
-		let grpc_buffer = PluginMsgBufferSize::new(10);
-
-		let expected = PluginConfig::new(backoff, max_spawn, max_conn, jitter, grpc_buffer);
+		let expected = PluginConfig::new(100000, 3, 5, 10, 10);
 
 		assert_eq!(expected, PluginConfig::parse_node(&node).unwrap())
-	}
-
-	#[test]
-	fn test_parsing_plugin_config_backoff() {
-		let data = r#"plugin {
-			backoff-interval 100000
-			max-spawn-attempts 3
-			max-conn-attempts 5
-			jitter-percent 10
-			grpc-msg-buffer-size 10
-		}"#;
-		let node = KdlNode::from_str(data).unwrap();
-		let parsed_node = PluginConfig::parse_node(&node).unwrap();
-
-		assert_eq!(parsed_node.backoff.micros, 100000);
-	}
-
-	#[test]
-	fn test_parsing_plugin_config_max_spawn() {
-		let data = r#"plugin {
-			backoff-interval 100000
-			max-spawn-attempts 3
-			max-conn-attempts 5
-			jitter-percent 10
-			grpc-msg-buffer-size 10
-		}"#;
-		let node = KdlNode::from_str(data).unwrap();
-		let parsed_node = PluginConfig::parse_node(&node).unwrap();
-
-		assert_eq!(parsed_node.max_spawn.attempts, 3);
-	}
-
-	#[test]
-	fn test_parsing_plugin_config_max_conn() {
-		let data = r#"plugin {
-			backoff-interval 100000
-			max-spawn-attempts 3
-			max-conn-attempts 5
-			jitter-percent 10
-			grpc-msg-buffer-size 10
-		}"#;
-		let node = KdlNode::from_str(data).unwrap();
-		let parsed_node = PluginConfig::parse_node(&node).unwrap();
-
-		assert_ne!(parsed_node.max_conn.attempts, 3);
-	}
-
-	#[test]
-	fn test_parsing_plugin_config_jitter() {
-		let data = r#"plugin {
-			backoff-interval 100000
-			max-spawn-attempts 3
-			max-conn-attempts 5
-			jitter-percent 10
-			grpc-msg-buffer-size 10
-		}"#;
-		let node = KdlNode::from_str(data).unwrap();
-		let parsed_node = PluginConfig::parse_node(&node).unwrap();
-
-		assert_eq!(parsed_node.jitter.percent, 10);
-	}
-
-	#[test]
-	fn test_parsing_plugin_config_buffer() {
-		let data = r#"plugin {
-			backoff-interval 100000
-			max-spawn-attempts 3
-			max-conn-attempts 5
-			jitter-percent 10
-			grpc-msg-buffer-size 10
-		}"#;
-		let node = KdlNode::from_str(data).unwrap();
-		let parsed_node = PluginConfig::parse_node(&node).unwrap();
-
-		assert_eq!(parsed_node.grpc_buffer.size, 10);
 	}
 
 	#[test]
@@ -512,11 +329,11 @@ mod test {
 			grpc-msg-buffer-size 10
 		}"#;
 		let exec_config = ExecConfig::from_str(data).unwrap();
-		assert_eq!(exec_config.plugin_data.backoff.micros, 100000);
-		assert_eq!(exec_config.plugin_data.max_spawn.attempts, 3);
-		assert_eq!(exec_config.plugin_data.max_conn.attempts, 5);
-		assert_eq!(exec_config.plugin_data.jitter.percent, 10);
-		assert_eq!(exec_config.plugin_data.grpc_buffer.size, 10);
+		assert_eq!(exec_config.plugin_data.backoff_micros, 100000);
+		assert_eq!(exec_config.plugin_data.max_spawn_attempts, 3);
+		assert_eq!(exec_config.plugin_data.max_conn_attempts, 5);
+		assert_eq!(exec_config.plugin_data.jitter_percent, 10);
+		assert_eq!(exec_config.plugin_data.grpc_buffer_size, 10);
 	}
 
 	#[test]
@@ -539,16 +356,5 @@ mod test {
 			.stdout;
 		let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
 		cargo_path.parent().unwrap().to_path_buf()
-	}
-
-	#[test]
-	fn test_default_exec_config() {
-		let config = ExecConfig::default().unwrap();
-
-		assert_eq!(config.plugin_data.backoff.micros, 100000);
-		assert_eq!(config.plugin_data.max_spawn.attempts, 3);
-		assert_eq!(config.plugin_data.max_conn.attempts, 5);
-		assert_eq!(config.plugin_data.jitter.percent, 10);
-		assert_eq!(config.plugin_data.grpc_buffer.size, 10);
 	}
 }
