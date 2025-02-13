@@ -5,6 +5,8 @@ name: Website Deploy
 on:
   push:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 # Sets permissions of the `GITHUB_TOKEN` to allow deployment to GitHub Pages

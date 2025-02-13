@@ -33,6 +33,8 @@ on:
       - "hipcheck-common/**"
       - "hipcheck-macros/**"
       - "hipcheck-sdk-macros/**"
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
