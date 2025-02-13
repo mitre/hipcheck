@@ -1,10 +1,13 @@
 import { setupTheme } from "./theme.ts";
 
+
+
 /**
  * Run all page setup operations, initializing all interactive widgets.
  */
 function setup() {
   setupTheme();
+
 }
 
 /**
