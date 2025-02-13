@@ -96,7 +96,6 @@ struct Args {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
-	hipcheck_sdk::init_logger();
 	let args = Args::try_parse().unwrap();
 	PluginServer::register(ActivityPlugin {})
 		.listen(args.port)
