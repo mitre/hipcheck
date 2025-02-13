@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - "site/**"
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
