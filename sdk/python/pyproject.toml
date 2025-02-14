@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hipcheck_sdk"
+version = "0.1.0"
+dependencies = [
+	"asyncio",
+	"grpc",
+	"pydantic",
+]
