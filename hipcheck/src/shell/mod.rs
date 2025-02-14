@@ -222,15 +222,15 @@ impl Shell {
 		}
 	}
 
-    /// Print "Config {msg}" with the proper color/styling.
-    pub fn print_config(source: impl AsRef<str>) {
+	/// Print "Config {msg}" with the proper color/styling.
+	pub fn print_config(source: impl AsRef<str>) {
 		match Shell::get_verbosity() {
 			Verbosity::Normal => {
 				macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Config, source.as_ref());
 			}
 			Verbosity::Quiet | Verbosity::Silent => {}
-        }
-    }
+		}
+	}
 
 	/// Print a hipcheck [Error]. Human readable errors will go to the standard error, JSON (regular or full) will go to the standard output.
 	pub fn print_error(err: &Error, format: Format) {

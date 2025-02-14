@@ -26,6 +26,7 @@ use crate::{
 	cache::repo::HcRepoCache,
 	cli::Format,
 	config::{normalized_unresolved_analysis_tree_from_policy, Config},
+	engine::HcEngine,
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
 	plugin::{try_set_arch, Plugin, PluginVersion, PluginWithConfig},
@@ -456,7 +457,7 @@ fn check_plugins(config: &CliConfig) -> StdResult<(), Error> {
 }
 
 fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
-	use crate::engine::{async_query, HcEngine, HcEngineImpl};
+	use crate::engine::{async_query, HcEngineImpl, PluginCore};
 	use std::sync::Arc;
 	use tokio::task::JoinSet;
 
