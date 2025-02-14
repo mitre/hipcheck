@@ -1,0 +1,11 @@
+publisher "mitre"
+name "example"
+version "0.0.0"
+license "Apache-2.0"
+
+entrypoint {
+  on arch="aarch64-apple-darwin" "uv run --project sdk/python sdk/python/tests/example-plugin/main.py"
+  on arch="x86_64-apple-darwin" "uv run --project sdk/python sdk/python/tests/example-plugin/main.py"
+  on arch="x86_64-unknown-linux-gnu" "uv run --project sdk/python sdk/python/tests/example-plugin/main.py"
+  on arch="x86_64-pc-windows-msvc" "uv run --project sdk/python sdk/python/tests/example-plugin/main.py"
+}
