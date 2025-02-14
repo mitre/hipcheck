@@ -37,3 +37,11 @@ flamegraph.svg
 # Editor-specific directory for Zed
 .zed
 
+# Python environment dir
+venv
+
+# Python pycache and SDK build dirs
+__pycache__
+sdk/python/build/
+sdk/python/dist/
+sdk/python/hipcheck_sdk.egg-info/
