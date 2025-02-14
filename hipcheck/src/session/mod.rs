@@ -4,7 +4,7 @@ use crate::{
 	cache::plugin::HcPluginCache,
 	cli::{ConfigMode, Format},
 	config::Config,
-	engine::{start_plugins, HcEngine, HcEngineStorage, HcPluginCore},
+	engine::{start_plugins, HcPluginCore, PluginCore},
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
 	hc_error,
@@ -119,16 +119,15 @@ impl SessionBuilder {
 			None => return Err(hc_error!("Missing HcPluginCore")),
 		};
 
-		let mut session = Session {
+		let session = Session {
 			storage: Default::default(),
 			target,
 			policy_file,
 			exec_config,
 			started_at: self.started_at,
 			format: self.format,
+			core,
 		};
-		// ensure core is set, needed by salsa
-		session.set_core(core);
 		Ok(session)
 	}
 
@@ -159,7 +158,8 @@ impl SessionBuilder {
 }
 
 /// Immutable configuration and base data for a run of Hipcheck.
-#[salsa::database(HcEngineStorage)]
+#[salsa::db]
+#[derive(Clone)]
 pub struct Session {
 	/// Query storage (used by salsa)
 	storage: salsa::Storage<Self>,
@@ -173,10 +173,24 @@ pub struct Session {
 	exec_config: ExecConfig,
 	/// when session started
 	started_at: DateTime<Local>,
+	/// core handle to plugins
+	core: Arc<HcPluginCore>,
 }
 
 // Required by our query groups
-impl salsa::Database for Session {}
+#[salsa::db]
+impl salsa::Database for Session {
+	fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
+		let event = event();
+		log::debug!("{:?}", event);
+	}
+}
+
+impl PluginCore for Session {
+	fn core(&self) -> Arc<HcPluginCore> {
+		self.core.clone()
+	}
+}
 
 // Cannot be derived because `salsa::Storage` does not implement it
 impl fmt::Debug for Session {
@@ -188,6 +202,7 @@ impl fmt::Debug for Session {
 			.field("policy_file", &self.policy_file)
 			.field("exec_config", &self.exec_config)
 			.field("started_at", &self.started_at)
+			.field("core", &self.core)
 			.finish()
 	}
 }

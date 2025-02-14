@@ -17,25 +17,42 @@ use serde_json::Value;
 use std::sync::{Arc, LazyLock};
 use tokio::runtime::{Handle, Runtime};
 
-// Salsa doesn't natively support async functions, so our recursive `query()` function that
-// interacts with plugins (which use async) has to get a handle to the underlying runtime,
-// spawn and block on a task to query the plugin, then choose whether to recurse or return.
+mod salsa_cache;
 
 static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| Runtime::new().unwrap());
 
-#[salsa::query_group(HcEngineStorage)]
-pub trait HcEngine: salsa::Database {
-	#[salsa::input]
+/// Provides access to all of the running plugins
+pub trait PluginCore {
 	fn core(&self) -> Arc<HcPluginCore>;
+}
 
-	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<Expr>>;
+#[salsa::db]
+pub trait HcEngine: salsa::Database + PluginCore {
+	/// Retrieve the default policy expression for a plugin, if there is one
+	fn default_policy_expr(&self, publisher: String, plugin: String) -> Result<Option<Expr>> {
+		let core = self.core();
+		let key = get_plugin_key(publisher.as_str(), plugin.as_str());
+		let Some(p_handle) = core.plugins.get(&key) else {
+			return Err(hc_error!("No such plugin {}", key));
+		};
+		Ok(p_handle.get_default_policy_expr().cloned())
+	}
 
+	/// Retrieve the default query explanation for a plugin, if there is one
 	fn default_query_explanation(
 		&self,
 		publisher: String,
 		plugin: String,
-	) -> Result<Option<String>>;
+	) -> Result<Option<String>> {
+		let core = self.core();
+		let key = get_plugin_key(publisher.as_str(), plugin.as_str());
+		let Some(p_handle) = core.plugins.get(&key) else {
+			return Err(hc_error!("Plugin '{}' not found", key,));
+		};
+		Ok(p_handle.get_default_query_explanation().cloned())
+	}
 
+	/// query a plugin and return the result
 	fn query(
 		&self,
 		publisher: String,
@@ -45,91 +62,22 @@ pub trait HcEngine: salsa::Database {
 	) -> Result<QueryResult>;
 }
 
-fn default_policy_expr(
-	db: &dyn HcEngine,
-	publisher: String,
-	plugin: String,
-) -> Result<Option<Expr>> {
-	let core = db.core();
-	let key = get_plugin_key(publisher.as_str(), plugin.as_str());
-	let Some(p_handle) = core.plugins.get(&key) else {
-		return Err(hc_error!("No such plugin {}", key));
-	};
-	Ok(p_handle.get_default_policy_expr().cloned())
-}
-
-fn default_query_explanation(
-	db: &dyn HcEngine,
-	publisher: String,
-	plugin: String,
-) -> Result<Option<String>> {
-	let core = db.core();
-	let key = get_plugin_key(publisher.as_str(), plugin.as_str());
-	let Some(p_handle) = core.plugins.get(&key) else {
-		return Err(hc_error!("Plugin '{}' not found", key,));
-	};
-	Ok(p_handle.get_default_query_explanation().cloned())
-}
-
-fn query(
-	db: &dyn HcEngine,
-	publisher: String,
-	plugin: String,
-	query: String,
-	key: Value,
-) -> Result<QueryResult> {
-	let hash_key = get_plugin_key(publisher.as_str(), plugin.as_str());
-
-	#[cfg(feature = "print-timings")]
-	let _0 = crate::benchmarking::print_scope_time!(format!("{}/{}", &hash_key, &query));
-
-	let runtime = RUNTIME.handle();
-	let core = db.core();
-
-	// Find the plugin
-	let Some(p_handle) = core.plugins.get(&hash_key) else {
-		return Err(hc_error!("No such plugin {}", hash_key));
-	};
-	// Initiate the query. If remote closed or we got our response immediately,
-	// return
-	let mut ar = match runtime.block_on(p_handle.query(query, key))? {
-		PluginResponse::RemoteClosed => {
-			return Err(hc_error!("Plugin channel closed unexpected"));
-		}
-		PluginResponse::Completed(v) => return Ok(v),
-		PluginResponse::AwaitingResult(a) => a,
-	};
-	// Otherwise, the plugin needs more data to continue. Recursively query
-	// (with salsa memo-ization) to get the needed data, and resume our
-	// current query by providing the plugin the answer.
-	loop {
-		log::trace!("Query needs more info, recursing...");
-		let mut answers = vec![];
-
-		// per RFD 0009, each key will be used to query `salsa` independently
-		for key in ar.key.clone() {
-			// since one key is used to query `salsa`, there will only be one value returned and
-			// the `pop().unwrap() is safe`
-			let value = db
-				.query(
-					ar.publisher.clone(),
-					ar.plugin.clone(),
-					ar.query.clone(),
-					key,
-				)?
-				.value
-				.pop()
-				.unwrap();
-			answers.push(value);
-		}
-		log::trace!("Got answer, resuming");
-		ar = match runtime.block_on(p_handle.resume_query(ar, answers))? {
-			PluginResponse::RemoteClosed => {
-				return Err(hc_error!("Plugin channel closed unexpected"));
-			}
-			PluginResponse::Completed(v) => return Ok(v),
-			PluginResponse::AwaitingResult(a) => a,
-		};
+/// `HcEngineImpl` and `Session` are able to share this default implementation and are
+/// able to take advantage of salsa caching when making a query
+#[salsa::db]
+impl<T: Sized + salsa::Database + PluginCore> HcEngine for T {
+	fn query(
+		&self,
+		publisher: String,
+		plugin: String,
+		query: String,
+		key: Value,
+	) -> Result<QueryResult> {
+		let publisher = salsa_cache::SalsaPublisher::new(self, publisher);
+		let plugin = salsa_cache::SalsaPlugin::new(self, plugin);
+		let query = salsa_cache::SalsaQuery::new(self, query);
+		let key = salsa_cache::SalsaKey::new(self, key);
+		salsa_cache::query_with_salsa(self, publisher, plugin, query, key)
 	}
 }
 
@@ -201,19 +149,26 @@ pub fn async_query(
 	.boxed()
 }
 
-#[salsa::database(HcEngineStorage)]
+#[salsa::db]
+#[derive(Clone)]
 pub struct HcEngineImpl {
 	// Query storage
 	storage: salsa::Storage<Self>,
+	// handle to the plugins
+	core: Arc<HcPluginCore>,
 }
 
-impl salsa::Database for HcEngineImpl {}
+#[salsa::db]
+impl salsa::Database for HcEngineImpl {
+	fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
+		let event = event();
+		log::debug!("{:?}", event);
+	}
+}
 
-impl salsa::ParallelDatabase for HcEngineImpl {
-	fn snapshot(&self) -> salsa::Snapshot<Self> {
-		salsa::Snapshot::new(HcEngineImpl {
-			storage: self.storage.snapshot(),
-		})
+impl PluginCore for HcEngineImpl {
+	fn core(&self) -> Arc<HcPluginCore> {
+		self.core.clone()
 	}
 }
 
@@ -226,10 +181,10 @@ impl HcEngineImpl {
 		let runtime = RUNTIME.handle();
 		log::info!("Starting HcPluginCore");
 		let core = runtime.block_on(HcPluginCore::new(executor, plugins))?;
-		let mut engine = HcEngineImpl {
+		let engine = HcEngineImpl {
 			storage: Default::default(),
+			core: Arc::new(core),
 		};
-		engine.set_core(Arc::new(core));
 		Ok(engine)
 	}
 	pub fn runtime() -> &'static Handle {
