@@ -19,7 +19,7 @@ pathbuf = "1.0.0"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.134"
 tokio = { version = "1.43.0", features = ["rt"] }
-toml = "0.8.19"
+toml = "0.8.20"
 
 [dev-dependencies]
 hipcheck-sdk = { version = "0.3.0", path = "../../sdk/rust", features = [
