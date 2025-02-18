@@ -335,7 +335,7 @@ impl Plugin for GitPlugin {
 
 		CACHE
 			.set(Mutex::new(LruCache::new(NonZero::new(cache_size).unwrap())))
-			.map_err(|_e| ConfigError::Unspecified {
+			.map_err(|_e| ConfigError::InternalError {
 				message: "config was already set".to_owned(),
 			})
 	}

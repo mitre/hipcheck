@@ -32,12 +32,11 @@ impl TryFrom<RawConfig> for Config {
 	type Error = ConfigError;
 	fn try_from(value: RawConfig) -> StdResult<Config, ConfigError> {
 		if let Some(atv) = value.api_token_var {
-			let api_token =
-				std::env::var(&atv).map_err(|_e| ConfigError::InvalidConfigValue {
-					field_name: "api-token-var".to_owned(),
-					value: atv.clone(),
-					reason: format!("Could not find an environment variable with the name \"{}\". This environment variable must contain a GitHub API token.", atv),
-				})?;
+			let api_token = std::env::var(&atv).map_err(|_e| ConfigError::EnvVarNotSet {
+				env_var_name: atv.clone(),
+				field_name: "api-token-var".to_owned(),
+				purpose: "This environment variable must contain a GitHub API token.".to_owned(),
+			})?;
 			Ok(Config { api_token })
 		} else {
 			Err(ConfigError::MissingRequiredConfig {
@@ -129,7 +128,7 @@ impl Plugin for GithubAPIPlugin {
 				message: e.to_string(),
 			})?
 			.try_into()?;
-		CONFIG.set(conf).map_err(|_e| ConfigError::Unspecified {
+		CONFIG.set(conf).map_err(|_e| ConfigError::InternalError {
 			message: "config was already set".to_owned(),
 		})
 	}

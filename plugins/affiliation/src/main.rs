@@ -50,13 +50,13 @@ impl TryFrom<RawConfig> for Config {
 		if let Some(ofv) = value.orgs_file_path {
 			// Get the Orgs file path and confirm it exists
 			let orgs_file = PathBuf::from(&ofv);
-			file::exists(&orgs_file).map_err(|_e| ConfigError::Unspecified {
-				// Print error with Debug for full context
-				message: format!("could not find an orgs file at path {:?}", ofv),
+			file::exists(&orgs_file).map_err(|_e| ConfigError::FileNotFound {
+				file_path: ofv.clone(),
 			})?;
 			// Parse the Orgs file and construct an OrgSpec.
 			let orgs_spec =
-				OrgSpec::load_from(&orgs_file).map_err(|e| ConfigError::Unspecified {
+				OrgSpec::load_from(&orgs_file).map_err(|e| ConfigError::ParseError {
+					source: format!("OrgSpec file at {}", ofv),
 					// Print error with Debug for full context
 					message: format!("{:?}", e),
 				})?;
@@ -288,13 +288,13 @@ impl Plugin for AffiliationPlugin {
 		// Store the policy conf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
 			.set(conf.count_threshold)
-			.map_err(|_| ConfigError::Unspecified {
+			.map_err(|_| ConfigError::InternalError {
 				message: "plugin was already configured".to_string(),
 			})?;
 
 		ORGSSPEC
 			.set(conf.orgs_spec)
-			.map_err(|_e| ConfigError::Unspecified {
+			.map_err(|_e| ConfigError::InternalError {
 				message: "orgs spec was already set".to_owned(),
 			})
 	}

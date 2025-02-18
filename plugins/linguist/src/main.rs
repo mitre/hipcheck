@@ -42,7 +42,8 @@ impl Plugin for LinguistPlugin {
 				message: e.to_string(),
 			})?;
 		let sfd = match conf.langs_file {
-			Some(p) => SourceFileDetector::load(p).map_err(|e| ConfigError::Unspecified {
+			Some(p) => SourceFileDetector::load(&p).map_err(|e| ConfigError::ParseError {
+				source: format!("Language definitions file at {}", p.display()),
 				message: e.to_string_pretty_multiline(),
 			})?,
 			None => {
@@ -53,7 +54,7 @@ impl Plugin for LinguistPlugin {
 				});
 			}
 		};
-		DETECTOR.set(sfd).map_err(|_e| ConfigError::Unspecified {
+		DETECTOR.set(sfd).map_err(|_e| ConfigError::InternalError {
 			message: "config was already set".to_owned(),
 		})
 	}

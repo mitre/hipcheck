@@ -48,7 +48,8 @@ impl TryFrom<RawConfig> for Config {
 		let typo_file = TypoFile::load_from(&typo_path).map_err(|e| {
 			// Print error with Debug for full context
 			log::error!("{:?}", e);
-			ConfigError::Unspecified {
+			ConfigError::ParseError {
+				source: format!("Typo file at path {}", typo_path.display()),
 				// Print error with Debug for full context
 				message: format!("{:?}", e),
 			}
@@ -125,13 +126,13 @@ impl Plugin for TypoPlugin {
 		// Store the policy conf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
 			.set(conf.count_threshold)
-			.map_err(|_| ConfigError::Unspecified {
+			.map_err(|_| ConfigError::InternalError {
 				message: "plugin was already configured".to_string(),
 			})?;
 
 		TYPOFILE
 			.set(conf.typo_file)
-			.map_err(|_e| ConfigError::Unspecified {
+			.map_err(|_e| ConfigError::InternalError {
 				message: "config was already set".to_owned(),
 			})
 	}

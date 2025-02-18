@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::{Context, Result};
+use crate::error::Result;
 use crate::hc_error;
 use crate::util::fs::read_kdl;
 use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
@@ -28,12 +28,7 @@ impl SourceFileDetector {
 	pub fn load<P: AsRef<Path>>(langs_file: P) -> Result<SourceFileDetector> {
 		fn inner(langs_file: &Path) -> Result<SourceFileDetector> {
 			// Load the file and parse it.
-			let language_file: LanguageFile = read_kdl(langs_file).with_context(|| {
-				format!(
-					"failed to read language definitions from langs file at path {:?}",
-					langs_file
-				)
-			})?;
+			let language_file: LanguageFile = read_kdl(langs_file)?;
 
 			// Get the list of extensions from it.
 			let extensions = language_file.into_extensions();

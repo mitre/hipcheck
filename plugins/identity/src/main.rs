@@ -115,7 +115,7 @@ impl Plugin for IdentityPlugin {
 			})?;
 		self.policy_conf
 			.set(conf.percent_threshold)
-			.map_err(|_| ConfigError::Unspecified {
+			.map_err(|_| ConfigError::InternalError {
 				message: "plugin was already configured".to_string(),
 			})?;
 		Ok(())

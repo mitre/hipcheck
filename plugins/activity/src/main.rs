@@ -65,7 +65,7 @@ impl Plugin for ActivityPlugin {
 			serde_json::from_value::<Config>(config).map_err(|e| ConfigError::Unspecified {
 				message: e.to_string(),
 			})?;
-		CONFIG.set(conf).map_err(|_e| ConfigError::Unspecified {
+		CONFIG.set(conf).map_err(|_e| ConfigError::InternalError {
 			message: "config was already set".to_owned(),
 		})
 	}

@@ -78,8 +78,7 @@ impl OrgSpec {
 		}
 		file::exists(org_spec_path)?;
 		let org_spec_contents = file::read_string(org_spec_path)?;
-		let org_spec = OrgSpec::from_str(&org_spec_contents)
-			.with_context(|| format!("failed to read org spec file at path {:?}", org_spec_path))?;
+		let org_spec = OrgSpec::from_str(&org_spec_contents)?;
 
 		Ok(org_spec)
 	}

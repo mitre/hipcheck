@@ -88,18 +88,22 @@ impl Plugin for BinaryPlugin {
 		// Store the policy conf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
 			.set(conf.opt_threshold)
-			.map_err(|_| ConfigError::Unspecified {
+			.map_err(|_| ConfigError::InternalError {
 				message: "plugin was already configured".to_string(),
 			})?;
 
 		// Use the langs file to create a SourceFileDetector and init the salsa db
 		let bfd =
-			BinaryFileDetector::load(conf.binary_file).map_err(|e| ConfigError::Unspecified {
+			BinaryFileDetector::load(&conf.binary_file).map_err(|e| ConfigError::ParseError {
+				source: format!(
+					"Binary type definitions file at {}",
+					conf.binary_file.display()
+				),
 				message: e.to_string_pretty_multiline(),
 			})?;
 
 		// Make the salsa db globally accessible
-		DETECTOR.set(bfd).map_err(|_e| ConfigError::Unspecified {
+		DETECTOR.set(bfd).map_err(|_e| ConfigError::InternalError {
 			message: "config was already set".to_owned(),
 		})
 	}

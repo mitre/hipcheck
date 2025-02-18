@@ -169,7 +169,7 @@ impl Plugin for EntropyPlugin {
 		// Store the PolicyExprConf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
 			.set(conf.opt_policy)
-			.map_err(|_| ConfigError::Unspecified {
+			.map_err(|_| ConfigError::InternalError {
 				message: "plugin was already configured".to_string(),
 			})
 	}
