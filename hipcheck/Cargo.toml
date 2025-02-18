@@ -69,7 +69,7 @@ graphql_client = "0.14.0"
 hipcheck-kdl = { version = "0.1.0", path = "../hipcheck-kdl" }
 hipcheck-macros = { path = "../hipcheck-macros", version = "0.3.1" }
 http = "1.2.0"
-indexmap = "2.7.0"
+indexmap = "2.7.1"
 indextree = "4.7.3"
 indicatif = { version = "0.17.11", features = ["rayon"] }
 itertools = "0.13.0"
