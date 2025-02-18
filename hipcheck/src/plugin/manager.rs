@@ -165,7 +165,7 @@ impl PluginExecutor {
 			let mut opt_grpc: Option<HcPluginClient> = None;
 			while conn_attempts < self.max_conn_attempts {
 				// Jitter could be positive or negative, so mult by 2 to cover both sides
-				let jitter: i32 = rand::thread_rng().gen_range(0..(2 * self.jitter_percent)) as i32;
+				let jitter: i32 = rand::rng().random_range(0..(2 * self.jitter_percent)) as i32;
 				// Then subtract by self.jitter_percent to center around 0, and add to 100%
 				let jitter_percent = 1.0 + ((jitter - (self.jitter_percent as i32)) as f64 / 100.0);
 				// Once we are confident this math works, we can remove this
