@@ -108,6 +108,16 @@ enum ConfigurationStatus {
     CONFIGURATION_STATUS_UNRECOGNIZED_CONFIGURATION = 3;
     // The user provided a configuration item whose value is invalid.
     CONFIGURATION_STATUS_INVALID_CONFIGURATION_VALUE = 4;
+    // The plugin encountered an internal error, probably due to incorrect assumptions.
+    CONFIGURATION_STATUS_INTERNAL_ERROR = 5;
+    // A necessary plugin input file was not found.
+    CONFIGURATION_STATUS_FILE_NOT_FOUND = 6;
+    // The plugin's input data could not be parsed correctly.
+    CONFIGURATION_STATUS_PARSE_ERROR = 7;
+    // An environment variable needed by the plugin was not set.
+    CONFIGURATION_STATUS_ENV_VAR_NOT_SET = 8;
+    // The plugin could not find or run a needed program.
+    CONFIGURATION_STATUS_MISSING_PROGRAM = 9;
 }
 
 /*===========================================================================

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-use crate::error::{Context, Result};
+use crate::error::Result;
 use crate::hc_error;
 use crate::util::fs::read_kdl;
 use content_inspector::{inspect, ContentType};
@@ -27,12 +27,7 @@ impl BinaryFileDetector {
 	/// Constructs a new `BinaryFileDetector` from the `Binary.kdl` file.
 	pub fn load<P: AsRef<Path>>(binary_config_file: P) -> crate::error::Result<BinaryFileDetector> {
 		fn inner(binary_config_file: &Path) -> crate::error::Result<BinaryFileDetector> {
-			let extensions_file = read_kdl(binary_config_file).with_context(|| {
-				format!(
-					"failed to read binary type definitions from Binary config file at path {:?}",
-					binary_config_file
-				)
-			})?;
+			let extensions_file = read_kdl(binary_config_file)?;
 
 			let extensions = extensions_file.into_extensions();
 
