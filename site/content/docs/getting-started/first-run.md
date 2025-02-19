@@ -3,6 +3,14 @@ title: "Quickstart: Your First Analysis"
 weight: 3
 ---
 
+# Configuration Test: Run `hc ready`
+
+Before running an analysis, you may find it useful to check that Hipcheck has
+everything it needs to run and the plugins are configured correctly. You can do
+this by running [`hc ready`](@/docs/guide/cli/hc-ready.md). This is an optional
+step that performs a subset of the work that `hc check` would do to prepare for
+analysis, and exits without loading a target.
+
 # Quickstart: Your First Analysis
 
 With Hipcheck installed, let's use it to analyze something! To do that, we'll
