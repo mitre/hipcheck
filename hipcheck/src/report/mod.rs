@@ -25,7 +25,6 @@ use std::{
 	fmt,
 	fmt::{Display, Formatter},
 	iter::Iterator,
-	ops::Not as _,
 	result::Result as StdResult,
 	sync::Arc,
 };
@@ -62,58 +61,6 @@ pub struct Report {
 	pub recommendation: Recommendation,
 }
 
-impl Report {
-	/// Get the repository that was analyzed.
-	pub fn analyzed(&self) -> String {
-		format!("{} ({})", self.repo_name, self.repo_head)
-	}
-
-	/// Get the version of Hipcheck used for the analysis.
-	pub fn using(&self) -> String {
-		format!("using Hipcheck {}", self.hipcheck_version)
-	}
-
-	// Get the time that the analysis occured.
-	pub fn at_time(&self) -> String {
-		format!("on {}", self.analyzed_at)
-	}
-
-	/// Check if there are passing analyses.
-	pub fn has_passing_analyses(&self) -> bool {
-		self.passing.is_empty().not()
-	}
-
-	/// Check if there are failing analyses.
-	pub fn has_failing_analyses(&self) -> bool {
-		self.failing.is_empty().not()
-	}
-
-	/// Check if there are errored analyses.
-	pub fn has_errored_analyses(&self) -> bool {
-		self.errored.is_empty().not()
-	}
-
-	/// Get an iterator over all passing analyses.
-	pub fn passing_analyses(&self) -> impl Iterator<Item = &Analysis> {
-		self.passing.iter().map(|a| &a.0)
-	}
-
-	/// Get an iterator over all failing analyses.
-	pub fn failing_analyses(&self) -> impl Iterator<Item = &FailingAnalysis> {
-		self.failing.iter()
-	}
-
-	/// Get an iterator over all errored analyses.
-	pub fn errored_analyses(&self) -> impl Iterator<Item = &ErroredAnalysis> {
-		self.errored.iter()
-	}
-
-	/// Get the final recommendation.
-	pub fn recommendation(&self) -> &Recommendation {
-		&self.recommendation
-	}
-}
-
 /// An analysis which passed.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(transparent)]
@@ -147,14 +94,6 @@ impl FailingAnalysis {
 	pub fn new(analysis: Analysis, concerns: Vec<String>) -> Result<FailingAnalysis> {
 		Ok(FailingAnalysis { analysis, concerns })
 	}
-
-	pub fn analysis(&self) -> &Analysis {
-		&self.analysis
-	}
-
-	pub fn concerns(&self) -> impl Iterator<Item = &String> {
-		self.concerns.iter()
-	}
 }
 
 /// Is the concern list empty?
@@ -179,25 +118,6 @@ impl ErroredAnalysis {
 			analysis,
 			error: ErrorReport::from(error),
 		}
-	}
-
-	pub fn top_msg(&self) -> String {
-		format!("{} analysis error: {}", self.analysis, self.error.msg)
-	}
-
-	pub fn source_msgs(&self) -> Vec<String> {
-		let mut msgs = Vec::new();
-
-		try_add_msg(&mut msgs, &self.error.source);
-
-		msgs
-	}
-}
-
-fn try_add_msg(msgs: &mut Vec<String>, error_report: &Option<Box<ErrorReport>>) {
-	if let Some(error_report) = error_report {
-		msgs.push(error_report.msg.clone());
-		try_add_msg(msgs, &error_report.source);
 	}
 }
 
@@ -363,18 +283,6 @@ impl Analysis {
 	pub fn is_passing(&self) -> bool {
 		self.passed
 	}
-
-	pub fn statement(&self) -> String {
-		if self.is_passing() {
-			format!("'{}' passed, {}", self.name, self.policy_expr)
-		} else {
-			format!("'{}' failed, {}", self.name, self.policy_expr)
-		}
-	}
-
-	pub fn explanation(&self) -> String {
-		self.message.clone()
-	}
 }
 
 /// Value and threshold for counting-based analyses.
@@ -421,13 +329,6 @@ impl Recommendation {
 			risk_score,
 			risk_policy,
 		})
-	}
-
-	pub fn statement(&self) -> String {
-		format!(
-			"risk rated as {:.2}, policy was {}",
-			self.risk_score.0, self.risk_policy.expr
-		)
 	}
 }
 
