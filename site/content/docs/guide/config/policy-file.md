@@ -14,6 +14,9 @@ each analysis when calculating a final score. In this way, Hipcheck provides
 users extensive flexibility in both defining risk and the set of measurements
 used to evaluate it.
 
+While editing the policy file, it may be useful to check it by running
+[`hc ready --policy <POLICY_FILE_PATH>`](@/docs/guide/cli/hc-ready.md).
+
 Let's now look at an example policy file to examine its parts more closely:
 
 ```

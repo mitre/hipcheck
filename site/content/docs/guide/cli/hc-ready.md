@@ -11,6 +11,16 @@ This is intended to help the user debug issues with a Hipcheck installation,
 including problems like missing configuration files, inaccessible config,
 data, or cache paths, missing authentication tokens, and more.
 
+`hc ready` starts all the plugins specified in the
+[policy file](@/docs/guide/config/policy-file.md) and confirms that initial
+configuration is successful. If `hc ready` doesn't report any problems with
+plugins, that means they are installed, runnable by Hipcheck, and are able to
+load their configuration without issues.
+
+Since `hc ready` does not involve the analysis subsystem like
+[`hc check`](@/docs/guide/cli/hc-check.md) does, it will not expose plugin
+issues that would only occur while analyzing a target.
+
 `hc ready` has no special flags currently, and only accepts the
 [General Flags](@/docs/guide/cli/general-flags.md) that _all_ Hipcheck
 commands accept.
