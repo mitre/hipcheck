@@ -9,9 +9,9 @@ use crate::{
 };
 use console::{Emoji, Style, Term};
 use indicatif::{MultiProgress, ProgressDrawTarget};
+use minijinja::Environment;
 use std::{
-	fmt,
-	fmt::{Alignment, Debug, Display, Formatter},
+	fmt::{self, Alignment, Debug, Display, Formatter},
 	io::Write,
 	sync::{OnceLock, RwLock},
 };
@@ -42,6 +42,45 @@ pub const LEFT_COL_WIDTH: usize = 20;
 
 /// Empty static string used for drawing padding.
 const EMPTY: &str = "";
+
+/// MiniJinja template for human-readable output
+const TEMPLATE: &str = r#"
+{{ title("Analyzed") }} '{{ repo_name }}' ({{ repo_head }})
+{{ indent() }} using Hipcheck {{ hipcheck_version }}
+{{ indent() }} at {{ analyzed_at|datetimeformat(format="[weekday repr:short] [month repr:long] [day padding:none], [year] at [hour padding:none repr:12]:[minute][period case:lower]") }}
+
+{% if passing -%}
+{{ title("PassingSection") }}
+{% for passed in passing  -%}
+{{ title("Passed") }} {{ passed.name }} passed, {{ passed.policy_expr }}
+{{ indent() }} {{ passed.message  }}
+{% for concern in passed.concerns -%}
+{{ indent() }} {{ concern  }}
+{% endfor %}
+{% endfor %}
+{%- endif -%}
+{% if failing -%}
+{{ title("FailingSection") }}
+{% for failed in failing  -%}
+{{ title("Failed") }} {{ failed.name }} failed, {{ failed.policy_expr }}
+{{ indent() }} {{ failed.message  }}
+{% for concern in failed.concerns -%}
+{{ indent() }} {{ concern  }}
+{% endfor %}
+{% endfor %}
+{%- endif -%}
+{% if errored -%}
+{{ title("ErroredSection") }}
+{% for error in errored  -%}
+{{ title("Errored") }} {{ error.analysis }} error: {{ error.error.msg }}
+{% endfor %}
+{% endif -%}
+{{ title("RecommendationSection") }}
+{% if recommendation.kind == "Pass" -%}
+{{ title("Pass") }} risk rated as {{ recommendation.risk_score }}, policy was {{ recommendation.risk_policy }}
+{% elif recommendation.kind == "Investigate" -%}
+{{ title("Investigate") }} risk rated as {{ recommendation.risk_score }}, policy was {{ recommendation.risk_policy }}
+{%- endif %}"#;
 
 /// Type interface to the global shell used to produce output in the user's terminal.
 #[derive(Debug)]
@@ -302,154 +341,46 @@ fn print_json(report: Report) -> Result<()> {
 }
 
 fn print_human(report: Report) -> Result<()> {
-	// Go through each part and print them individually.
+	// Turn the JSON serializable report into a human readable terminal output
 
 	//      Analyzed '<repo_name>' (<repo_head>)
 	//               using Hipcheck <hipcheck_version>
 	//               at <analyzed_at:pretty_print>
 	//
 	//       Passing
-	//            + no concerning contributors
-	//               0 found, 0 permitted
-	//            + no unusually large commits
-	//               0% of commits are unusually large, 2% permitted
-	//            + commits usually merged by someone other than the author
-	//               0% of commits merged by author, 20% permitted
+	//            + mitre/affiliation passed, (lte (count (filter (eq #t) $)) 0)
+	//              0 was the number of the repository's contributors flagged as affiliated, which was required to be less than or equal to 0
+	//            + mitre/churn passed, (lte (divz (count (filter (gt 3) $)) (count $)) 0.02)
+	//              0 was the percent of churn frequencies of each commit in the repository greater than 3, which was required to be less than or equal to 0.02
+	//            + mitre/identity passed, (lte (divz (count (filter (eq #t) $)) (count $)) 0.02)
+	//              0 was the percent of commits merged by their own author, which was required to be less than or equal to 0.02
 	//
 	//       Failing
-	//            - too many unusual-looking commits
-	//               1% of commits look unusual, 0% permitted
-	//               entropy scores over 3.0 are considered unusual
+	//            - mitre/entropy failed, (eq 0 (count (filter (gt 8) $)))
+	//              Expected the number of entropy calculations of each commit in the repository greater than 8 to be equal to 0, but it was 2
 	//
-	//              356828346723752 "fixing something" (entropy score: 5.4)
-	//              abab563268c3543 "adding a new block" (entropy score: 3.2)
-	//
-	//           - hasn't been updated in 136 weeks
-	//              require updates in the last 71 weeks
+	//            - mitre/activity failed, (lte $ P364D)
+	//              Expected span of time that has elapsed since last activity in repo to be less than or equal to 364 days but it was 952 days
 	//
 	//        Errored
-	//           ? review analysis failed to get pull request reviews
-	//              cause: missing GitHub token with permissions for accessing public repository data in config
-	//           ? typo analysis failed to get dependencies
-	//              cause: can't identify a known language in the repository
+	//            ? mitre/review error: missing GitHub token with permissions for accessing public repository data in config
+	//
+	//            ? mitre/typo error: can't identify a known language in the repository
 	//
 	// Recommendation
-	//           PASS risk rated as 0.4 (acceptable below 0.5)
+	//           PASS risk rated as 0.4, policy was (gt 0.5 $)
 
-	/*===============================================================================
-	 * Header
-	 *
-	 * Says what we're analyzing, what version of Hipcheck we're using, and when
-	 * we're doing the analysis.
-	 */
-
-	// Start with an empty line.
-	macros::println!();
-	// What repo we analyzed.
-	macros::println!("{:>LEFT_COL_WIDTH$} {}", Title::Analyzed, report.analyzed());
-	// With what version of hipcheck.
-	macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.using());
-	// At what time.
-	macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", report.at_time());
-	// Space between this and analyses.
-	macros::println!();
-
-	/*===============================================================================
-	 * Passing analyses
-	 *
-	 * Says what analyses passed and why.
-	 */
-
-	if report.has_passing_analyses() {
-		macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Passing"));
-
-		for analysis in report.passing_analyses() {
-			macros::println!(
-				"{:>LEFT_COL_WIDTH$} {}",
-				Title::Passed,
-				analysis.statement()
-			);
-
-			// If we can parse a successful expression to English, print a full English explanation. Otherwise print the default explanation text.
-			macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
-
-			// Empty line at end to space out analyses.
-			macros::println!();
-		}
-	}
-
-	/*===============================================================================
-	 * Failing analyses
-	 *
-	 * Says what analyses failed, why, and what information might be relevant to
-	 * check in detail.
-	 */
-
-	if report.has_failing_analyses() {
-		macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Failing"));
-
-		for failing_analysis in report.failing_analyses() {
-			let analysis = failing_analysis.analysis();
-
-			macros::println!(
-				"{:>LEFT_COL_WIDTH$} {}",
-				Title::Failed,
-				analysis.statement()
-			);
-
-			// If we can parse a failed expression to English, print a full English explanation. Otherwise print the default explanation text.
-			macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", analysis.explanation());
-
-			for concern in failing_analysis.concerns() {
-				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {}", concern);
-			}
-
-			// Newline at the end for spacing.
-			macros::println!();
-		}
-	}
-
-	/*===============================================================================
-	 * Errored analyses
-	 *
-	 * Says what analyses encountered errors and what those errors were.
-	 */
-
-	if report.has_errored_analyses() {
-		macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Errored"));
-
-		for errored_analysis in report.errored_analyses() {
-			macros::println!(
-				"{:>LEFT_COL_WIDTH$} {}",
-				Title::Errored,
-				errored_analysis.top_msg()
-			);
-
-			for msg in &errored_analysis.source_msgs() {
-				macros::println!("{EMPTY:LEFT_COL_WIDTH$} {msg}");
-			}
-
-			// Newline for spacing.
-			macros::println!();
-		}
-	}
-
-	/*===============================================================================
-	 * Recommendation
-	 *
-	 * Says what Hipcheck's final recommendation is for the target of analysis.
-	 */
-
-	let recommendation = report.recommendation();
-
-	macros::println!("{:>LEFT_COL_WIDTH$}", Title::Section("Recommendation"));
-	macros::println!(
-		"{:>LEFT_COL_WIDTH$} {}",
-		Title::from(recommendation.kind),
-		recommendation.statement()
-	);
-	// Newline for spacing.
-	macros::println!();
+	// Create the MiniJinja environment
+	let mut env = Environment::new();
+	// Add additional filters and functions
+	minijinja_contrib::add_to_environment(&mut env);
+	env.add_function("title", print_title);
+	env.add_function("indent", indent);
+	// Add template
+	env.add_template("human", TEMPLATE)?;
+	// Print the report as formatted in the template
+	let template = env.get_template("human")?;
+	macros::println!("{}", template.render(report)?);
 
 	Ok(())
 }
@@ -464,8 +395,14 @@ enum Title {
 	Analyzed,
 	/// "Config"
 	Config,
-	/// The name of the section.
-	Section(&'static str),
+	/// "Passing"
+	PassingSection,
+	/// "Failing"
+	FailingSection,
+	/// "Errored"
+	ErroredSection,
+	/// "Recommendation"
+	RecommendationSection,
 	/// An analysis passed.
 	Passed,
 	/// An analysis failed.
@@ -492,7 +429,10 @@ impl Title {
 			Analyzing => "Analyzing",
 			Analyzed => "Analyzed",
 			Config => "Config",
-			Section(s) => s,
+			PassingSection => "Passing",
+			FailingSection => "Failing",
+			ErroredSection => "Errored",
+			RecommendationSection => "Recommendation",
 			Passed => "+",
 			Failed => "-",
 			Errored => "?",
@@ -509,7 +449,9 @@ impl Title {
 		use Title::*;
 
 		let color = match self {
-			Analyzed | Section(..) => Some(Blue),
+			Analyzed | PassingSection | FailingSection | ErroredSection | RecommendationSection => {
+				Some(Blue)
+			}
 			Analyzing | Done | Config => Some(Cyan),
 			InProgress => Some(Magenta),
 			Passed | Pass => Some(Green),
@@ -547,6 +489,27 @@ impl Display for Title {
 			}
 		}
 	}
+}
+
+fn print_title(title: &str) -> String {
+	match title {
+		"Analyzed" => format!("{:>LEFT_COL_WIDTH$}", Title::Analyzed),
+		"PassingSection" => format!("{:>LEFT_COL_WIDTH$}", Title::PassingSection),
+		"FailingSection" => format!("{:>LEFT_COL_WIDTH$}", Title::FailingSection),
+		"ErroredSection" => format!("{:>LEFT_COL_WIDTH$}", Title::ErroredSection),
+		"RecommendationSection" => format!("{:>LEFT_COL_WIDTH$}", Title::RecommendationSection),
+		"Passed" => format!("{:>LEFT_COL_WIDTH$}", Title::Passed),
+		"Failed" => format!("{:>LEFT_COL_WIDTH$}", Title::Failed),
+		"Errored" => format!("{:>LEFT_COL_WIDTH$}", Title::Errored),
+		"Pass" => format!("{:>LEFT_COL_WIDTH$}", Title::Pass),
+		"Investigate" => format!("{:>LEFT_COL_WIDTH$}", Title::Investigate),
+		// Returns an empty String on a failed match because a minijinja function cannot return a Result or Option
+		_ => "".to_string(),
+	}
+}
+
+fn indent() -> String {
+	format!("{:>LEFT_COL_WIDTH$}", "")
 }
 
 /// Convert an [Alignment] from [std::fmt] to [console::Alignment] trivially, using a match arm.
