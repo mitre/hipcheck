@@ -1,6 +1,6 @@
 [package]
 name = "binary"
-version = "0.2.0"
+version = "0.3.0"
 license = "Apache-2.0"
 edition = "2021"
 repository = "https://github.com/mitre/hipcheck"
@@ -10,7 +10,7 @@ publish = false
 clap = { version = "4.5.27", features = ["derive"] }
 content_inspector = "0.2.4"
 hipcheck-kdl = { version = "0.1.0", path = "../../hipcheck-kdl" }
-hipcheck-sdk = { version = "0.3.0", path = "../../sdk/rust", features = [
+hipcheck-sdk = { version = "0.4.0", path = "../../sdk/rust", features = [
     "macros",
 ] }
 log = "0.4.25"
@@ -24,6 +24,6 @@ toml = "0.8.20"
 walkdir = "2.5.0"
 
 [dev-dependencies]
-hipcheck-sdk = { version = "0.3.0", path = "../../sdk/rust", features = [
+hipcheck-sdk = { version = "0.4.0", path = "../../sdk/rust", features = [
     "mock_engine",
 ] }
