@@ -12,7 +12,7 @@ use hipcheck_sdk::{
 };
 use pathbuf::pathbuf;
 use serde::Deserialize;
-use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};
+use std::{ops::Not, path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
 pub static DETECTOR: OnceLock<BinaryFileDetector> = OnceLock::new();
 
@@ -92,11 +92,22 @@ impl Plugin for BinaryPlugin {
 				message: "plugin was already configured".to_string(),
 			})?;
 
+		if std::fs::exists(&conf.binary_file)
+			.map_err(|e| ConfigError::InternalError {
+				message: format!("failed to check file existence: {e}"),
+			})?
+			.not()
+		{
+			return Err(ConfigError::FileNotFound {
+				file_path: format!("{}", conf.binary_file.display()),
+			});
+		}
+
 		// Use the langs file to create a SourceFileDetector and init the salsa db
 		let bfd =
 			BinaryFileDetector::load(&conf.binary_file).map_err(|e| ConfigError::ParseError {
 				source: format!(
-					"Binary type definitions file at {}",
+					"binary file type definitions at {}",
 					conf.binary_file.display()
 				),
 				message: e.to_string_pretty_multiline(),
