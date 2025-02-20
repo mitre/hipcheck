@@ -395,7 +395,13 @@ fn setup_base_session(
 
 	let executor = ExecConfig::get_plugin_executor(&exec_config)?;
 
+	// Start plugins and display as such to users
+	let phase = SpinnerPhase::start("starting plugins");
+	phase.inc();
+	phase.enable_steady_tick(Duration::from_millis(100));
 	let core = start_plugins(&policy, &plugin_cache, executor)?;
+	phase.finish_successful();
+
 	session_builder.set_core(core);
 
 	Ok(session_builder)

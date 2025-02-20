@@ -101,7 +101,12 @@ impl Plugin for DependenciesPlugin {
 	const NAME: &'static str = "npm";
 
 	fn set_config(&self, _config: Value) -> std::result::Result<(), ConfigError> {
-		Ok(())
+		match get_npm_version() {
+			Err(_) => Err(ConfigError::MissingProgram {
+				program_name: "npm".to_owned(),
+			}),
+			Ok(_) => Ok(()),
+		}
 	}
 
 	fn default_policy_expr(&self) -> hipcheck_sdk::prelude::Result<String> {
