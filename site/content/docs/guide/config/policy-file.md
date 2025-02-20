@@ -18,14 +18,14 @@ Let's now look at an example policy file to examine its parts more closely:
 
 ```
 plugins {
-    plugin "mitre/activity" version="0.1.0"
-    plugin "mitre/binary" version="0.1.0"
-    plugin "mitre/fuzz" version="0.1.0"
-    plugin "mitre/review" version="0.1.0"
-    plugin "mitre/typo" version="0.1.0"
-    plugin "mitre/affiliation" version="0.1.0"
-    plugin "mitre/entropy" version="0.1.0"
-    plugin "mitre/churn" version="0.1.0"
+    plugin "mitre/activity" version="^0.1"
+    plugin "mitre/binary" version="^0.1"
+    plugin "mitre/fuzz" version="^0.1"
+    plugin "mitre/review" version="^0.1"
+    plugin "mitre/typo" version="^0.1"
+    plugin "mitre/affiliation" version="^0.1"
+    plugin "mitre/entropy" version="^0.1"
+    plugin "mitre/churn" version="^0.1"
 }
 
 analyze {
@@ -74,6 +74,13 @@ to the plugin's download manifest. For an example of the manifest field, see
 [@Todo - link to For-Developers section]. In the future, when a Hipcheck plugin
 registry is established, the manifest field will become optional. In the
 immediate term it will be practically required.
+
+The `version` field adheres to [SemVer](https://semver.org/) version requirement syntax.
+In the policy file example above, the version requirement `^0.1` specifies that any plugin
+version between `0.1.0` (inclusive) and `0.2.0` (exclusive) is acceptable. *NOTE:* If an exact
+version is specified in the `version` field, e.g., `0.2.1`, then a plugin with that specific
+version is required. This exact version handling deviates from how some package managers such
+as [Cargo](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html) specify dependencies.
 
 The `manifest` field can be either a URL to the plugin's **download manifest**,
 or a local path to the plugin's **plugin manifest**. The latter option exists
