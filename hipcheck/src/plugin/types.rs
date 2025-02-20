@@ -97,18 +97,27 @@ pub enum ConfigErrorType {
 	MissingRequiredConfig = 2,
 	UnrecognizedConfig = 3,
 	InvalidConfigValue = 4,
+	InternalError = 5,
+	FileNotFound = 6,
+	ParseError = 7,
+	EnvVarNotSet = 8,
+	MissingProgram = 9,
 }
 
 impl TryFrom<ConfigurationStatus> for ConfigErrorType {
 	type Error = crate::error::Error;
 	fn try_from(value: ConfigurationStatus) -> Result<Self> {
-		use ConfigErrorType::*;
 		use ConfigurationStatus::*;
 		Ok(match value as i32 {
-			x if x == Unspecified as i32 => Unknown,
-			x if x == MissingRequiredConfiguration as i32 => MissingRequiredConfig,
-			x if x == UnrecognizedConfiguration as i32 => UnrecognizedConfig,
-			x if x == InvalidConfigurationValue as i32 => InvalidConfigValue,
+			x if x == Unspecified as i32 => ConfigErrorType::Unknown,
+			x if x == MissingRequiredConfiguration as i32 => ConfigErrorType::MissingRequiredConfig,
+			x if x == UnrecognizedConfiguration as i32 => ConfigErrorType::UnrecognizedConfig,
+			x if x == InvalidConfigurationValue as i32 => ConfigErrorType::InvalidConfigValue,
+			x if x == InternalError as i32 => ConfigErrorType::InternalError,
+			x if x == FileNotFound as i32 => ConfigErrorType::FileNotFound,
+			x if x == ParseError as i32 => ConfigErrorType::ParseError,
+			x if x == EnvVarNotSet as i32 => ConfigErrorType::EnvVarNotSet,
+			x if x == MissingProgram as i32 => ConfigErrorType::MissingProgram,
 			x => {
 				return Err(hc_error!("status value '{}' is not an error", x));
 			}
@@ -135,6 +144,11 @@ impl std::fmt::Display for ConfigError {
 			MissingRequiredConfig => "configuration is missing required fields",
 			UnrecognizedConfig => "configuration contains unrecognized fields",
 			InvalidConfigValue => "configuration contains invalid values",
+			InternalError => "plugin experienced an internal error",
+			FileNotFound => "a necessary file was not found",
+			ParseError => "plugin failed to parse data",
+			EnvVarNotSet => "a necessary environment variable was not set",
+			MissingProgram => "plugin could not find or run a needed program",
 		};
 		match &self.message {
 			Some(msg) => write!(f, "{}: {}", err, msg),

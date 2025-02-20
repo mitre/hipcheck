@@ -156,8 +156,6 @@ pub enum ConfigError {
 	EnvVarNotSet {
 		/// Name of the environment variable
 		env_var_name: String,
-		/// Config field that set the variable name
-		field_name: String,
 		/// Message describing what the environment variable should contain
 		purpose: String,
 	},
@@ -175,7 +173,7 @@ impl From<ConfigError> for SetConfigurationResponse {
 				reason,
 			} => SetConfigurationResponse {
 				status: ConfigurationStatus::InvalidConfigurationValue as i32,
-				message: format!("invalid value '{value}' for '{field_name}', reason: '{reason}'"),
+				message: format!("'{value}' for '{field_name}', reason: '{reason}'"),
 			},
 			ConfigError::MissingRequiredConfig {
 				field_name,
@@ -185,7 +183,7 @@ impl From<ConfigError> for SetConfigurationResponse {
 				status: ConfigurationStatus::MissingRequiredConfiguration as i32,
 				message: {
 					let mut message = format!(
-						"missing required config item '{field_name}' of type '{field_type}'"
+						"'{field_name}' of type '{field_type}'"
 					);
 
 					if possible_values.is_empty().not() {
@@ -204,7 +202,7 @@ impl From<ConfigError> for SetConfigurationResponse {
 				status: ConfigurationStatus::UnrecognizedConfiguration as i32,
 				message: {
 					let mut message =
-						format!("unrecognized field '{field_name}' with value '{field_value}'");
+						format!("'{field_name}' with value '{field_value}'");
 
 					if possible_confusables.is_empty().not() {
 						message.push_str("; possible field names: ");
@@ -220,30 +218,29 @@ impl From<ConfigError> for SetConfigurationResponse {
 			},
 			ConfigError::InternalError { message } => SetConfigurationResponse {
 				status: ConfigurationStatus::InternalError as i32,
-				message: format!("The plugin encountered an error, probably due to incorrect assumptions: {message}"),
+				message: format!("the plugin encountered an error, probably due to incorrect assumptions: {message}"),
 			},
 			ConfigError::FileNotFound { file_path } => SetConfigurationResponse {
 				status: ConfigurationStatus::FileNotFound as i32,
-				message: format!("File not found at path {file_path}"),
+				message: file_path,
 			},
 			ConfigError::ParseError {
 				source,
 				message,
 			} => SetConfigurationResponse {
 				status: ConfigurationStatus::ParseError as i32,
-				message: format!("The plugin's data from \"{source}\" could not be parsed correctly: {message}"),
+				message: format!("{source} could not be parsed correctly: {message}"),
 			},
 			ConfigError::EnvVarNotSet {
 				env_var_name,
-				field_name,
 				purpose,
 			} => SetConfigurationResponse {
 				status: ConfigurationStatus::EnvVarNotSet as i32,
-				message: format!("Could not find an environment variable with the name \"{env_var_name}\" (set by config field '{field_name}'). Purpose: {purpose}"),
+				message: format!("\"{env_var_name}\". Purpose: {purpose}"),
 			},
 			ConfigError::MissingProgram { program_name } => SetConfigurationResponse {
 				status: ConfigurationStatus::MissingProgram as i32,
-				message: format!("The plugin could not find or run a needed program: {program_name}"),
+				message: program_name,
 			},
 		}
 	}

@@ -626,7 +626,7 @@ fn cmd_ready(config: &CliConfig) {
 	if ready.is_ready() {
 		println!("Hipcheck is ready to run!");
 	} else {
-		println!("Hipheck is NOT ready to run");
+		println!("Hipcheck is NOT ready to run");
 	}
 }
 

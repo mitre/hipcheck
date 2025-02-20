@@ -34,7 +34,6 @@ impl TryFrom<RawConfig> for Config {
 		if let Some(atv) = value.api_token_var {
 			let api_token = std::env::var(&atv).map_err(|_e| ConfigError::EnvVarNotSet {
 				env_var_name: atv.clone(),
-				field_name: "api-token-var".to_owned(),
 				purpose: "This environment variable must contain a GitHub API token.".to_owned(),
 			})?;
 			Ok(Config { api_token })
