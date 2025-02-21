@@ -13,6 +13,7 @@ use git2::{
 	AnnotatedCommit, Branch, FetchOptions, Progress, Reference, RemoteCallbacks, Repository,
 };
 use std::{cell::OnceCell, io::Write, path::Path};
+use gix::{bstr::ByteSlice, refs::FullName, remote, ObjectId};
 use url::Url;
 
 /// Construct the remote callbacks object uesd when making callinging into [git2].
@@ -78,20 +79,18 @@ fn make_remote_callbacks() -> RemoteCallbacks<'static> {
 	});
 
 	callbacks
+/// default options to use when fetching a repo with `gix`
+fn fetch_options(url: &Url, dest: &Path) -> gix::clone::PrepareFetch {
+	gix::clone::PrepareFetch::new(
+		url.as_str(),
+		dest,
+		gix::create::Kind::WithWorktree,
+		gix::create::Options::default(),
+		gix::open::Options::default(),
+	)
+	.expect("fetch options must be valid to perform a clone")
 }
 
-/// Build fetch options for [git2] using [make_remote_callbacks].
-fn make_fetch_opts() -> FetchOptions<'static> {
-	let mut fetch_opts = FetchOptions::new();
-
-	fetch_opts
-		// Use the remote callbacks for transfer.
-		.remote_callbacks(make_remote_callbacks())
-		// Don't download any tags.
-		.download_tags(git2::AutotagOption::None);
-
-	fetch_opts
-}
 
 fn make_checkout_builder() -> CheckoutBuilder<'static> {
 	// Create a struct to hold callbacks while doing git checkout.
@@ -242,20 +241,18 @@ pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<String> {
 	Ok(ret_str)
 }
 
-/// Do a `git fetch` for all remotes in the repo.
+/// Perform a `git fetch` for all remotes in the repo.
 pub fn fetch(repo_path: &Path) -> HcResult<()> {
-	// Open the repo with git2.
-	let repo: Repository = Repository::open(repo_path)?;
-
-	// Do a general `git fetch` to get all new refs/tags
-	let remotes = repo.remotes()?;
-	for remote_name_str in remotes.into_iter().flatten() {
-		let mut remote = repo.find_remote(remote_name_str)?;
-		let refspecs = remote.fetch_refspecs()?;
-		let rs_arr = refspecs.into_iter().flatten().collect::<Vec<&str>>();
-		// Fetch the updated remote.
-		remote.fetch(rs_arr.as_slice(), Some(&mut make_fetch_opts()), None)?;
+	log::debug!("Fetching: {:?}", repo_path);
+	let repo = gix::open(repo_path)?;
+	let remote_names = repo.remote_names();
+	for remote_name in remote_names {
+		log::trace!("Attempt to fetch remote: {}", remote_name.as_bstr());
+		let remote = repo.find_remote(remote_name.as_bstr())?;
+		remote
+			.connect(gix::remote::Direction::Fetch)?
+			.prepare_fetch(gix::progress::Discard, Default::default())?
+			.receive(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
 	}
-
 	Ok(())
 }
