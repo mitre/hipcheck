@@ -47,12 +47,12 @@ env_logger = { version = "0.11.6" }
 flate2 = "1.1.0"
 fs_extra = "1.3.0"
 futures = "0.3.31"
-# Vendor libgit2 and openssl so that they will be statically included
-# and not cause problems on certain systems that might not have one or
-# the other.
-git2 = { version = "0.20.1", features = [
-    "vendored-libgit2",
-    "vendored-openssl",
+gix = { version = "0.70.0", features = [
+    "basic",
+    "max-control",
+    "zlib-stock",
+    # use reqwest/rustls to avoid needing openssl
+    "blocking-http-transport-reqwest-rust-tls",
 ] }
 # Include with both a `path` and `version` reference.
 # Local builds will use the `path` dependency, which may be a newer
@@ -106,9 +106,16 @@ spdx-rs = "0.5.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
 tabled = "0.18.0"
-tar = "0.4.44"
-tempfile = "3.17.1"
-tokio = { version = "1.44.1", features = ["rt", "rt-multi-thread", "sync", "time", "process", "fs"] }
+tar = "0.4.43"
+tempfile = "3.17.0"
+tokio = { version = "1.44.1", features = [
+    "rt",
+    "rt-multi-thread",
+    "sync",
+    "time",
+    "process",
+    "fs",
+] }
 tokio-stream = "0.1.17"
 toml = "0.8.20"
 tonic = "0.13.0"

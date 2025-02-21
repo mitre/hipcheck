@@ -2,7 +2,6 @@
 
 use crate::{error::Result, hc_error};
 use dialoguer::Confirm;
-use git2::Repository;
 use pathbuf::pathbuf;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -162,15 +161,12 @@ impl HcRepoCacheIterator {
 			.to_str()
 			.unwrap()
 			.to_owned();
-		let repo = Repository::open(path)?;
-		let commit = repo
+		let commit = gix::open(path)?
 			.head()?
-			.peel_to_commit()?
-			.as_object()
-			.short_id()?
-			.as_str()
-			.unwrap()
-			.to_owned();
+			.id()
+			.ok_or_else(|| hc_error!("HEAD does not have an ID"))?
+			.shorten()?
+			.to_string();
 		let modified = get_last_modified_or_now(path);
 		let cache_subdir = pathbuf![path.strip_prefix(self.root.as_path()).unwrap()];
 		let mut parent = cache_subdir.clone();
