@@ -54,3 +54,31 @@ plugin version="0.2.0" arch="x86_64-unknown-linux-gnu" {
     compress format="tar.xz"
     size bytes=1190188
 }
+
+plugin version="0.3.0" arch="aarch64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/linguist-v0.3.0/linguist-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="c28b303332a49b329fd50d3848fe48e031a39819734caf620677ae2ae8e1b5d1"
+    compress format="tar.xz"
+    size bytes=1133156
+}
+
+plugin version="0.3.0" arch="x86_64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/linguist-v0.3.0/linguist-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="c3890dacefd1acd933d6d4a7e8d191666bd6f1f8cbb8ced7d0762c2312493fdf"
+    compress format="tar.xz"
+    size bytes=1232576
+}
+
+plugin version="0.3.0" arch="x86_64-pc-windows-msvc" {
+    url "https://github.com/mitre/hipcheck/releases/download/linguist-v0.3.0/linguist-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="c89f63285409c59e2f076f3180ca905861c747c2019ae44807f0118af5b61e61"
+    compress format="zip"
+    size bytes=3980957
+}
+
+plugin version="0.3.0" arch="x86_64-unknown-linux-gnu" {
+    url "https://github.com/mitre/hipcheck/releases/download/linguist-v0.3.0/linguist-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="528876821b0b7ecc4b020285a159f4bf88d036bffe447acc62da438c5a8ab8cd"
+    compress format="tar.xz"
+    size bytes=1309444
+}
