@@ -49,13 +49,24 @@ pub fn config_to_policy(config: Config, path: &Path) -> Result<PolicyFile> {
 		analyze.push(attacks);
 	}
 
-	let patch = PolicyPatchList(vec![PolicyPatch::new(
-		PolicyPluginName::new("mitre/github")?,
-		PolicyConfig(HashMap::from_iter(vec![(
-			"api-token-var".to_owned(),
-			Value::String("HC_GITHUB_TOKEN".to_owned()),
-		)])),
-	)]);
+	let langs_path = pathbuf![&context.path, "Langs.kdl"];
+
+	let patch = PolicyPatchList(vec![
+		PolicyPatch::new(
+			PolicyPluginName::new("mitre/github")?,
+			PolicyConfig(HashMap::from_iter(vec![(
+				"api-token-var".to_owned(),
+				Value::String("HC_GITHUB_TOKEN".to_owned()),
+			)])),
+		),
+		PolicyPatch::new(
+			PolicyPluginName::new("mitre/linguist")?,
+			PolicyConfig(HashMap::from_iter(vec![(
+				"langs-file".to_owned(),
+				Value::String(langs_path.to_string_lossy().into_owned().replace("\\", "/")),
+			)])),
+		),
+	]);
 
 	Ok(PolicyFile {
 		plugins,
@@ -161,7 +172,7 @@ fn parse_activity(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/activity").unwrap(),
-			PluginVersion::new("0.3.0".to_string()),
+			PluginVersion::new("0.4.0".to_string()),
 			Some(ManifestLocation::Url(
 				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/activity.kdl").unwrap(),
 			)),
@@ -210,7 +221,7 @@ fn parse_binary(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/binary").unwrap(),
-			PluginVersion::new("0.2.0".to_string()),
+			PluginVersion::new("0.3.0".to_string()),
 			Some(ManifestLocation::Url(
 				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/binary.kdl").unwrap(),
 			)),
@@ -244,7 +255,7 @@ fn parse_fuzz(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/fuzz").unwrap(),
-			PluginVersion::new("0.2.0".to_string()),
+			PluginVersion::new("0.2.1".to_string()),
 			Some(ManifestLocation::Url(
 				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/fuzz.kdl").unwrap(),
 			)),
@@ -282,7 +293,7 @@ fn parse_identity(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/identity").unwrap(),
-			PluginVersion::new("0.3.0".to_string()),
+			PluginVersion::new("0.4.0".to_string()),
 			Some(ManifestLocation::Url(
 				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/identity.kdl").unwrap(),
 			)),
@@ -320,7 +331,7 @@ fn parse_review(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/review").unwrap(),
-			PluginVersion::new("0.2.0".to_string()),
+			PluginVersion::new("0.3.0".to_string()),
 			Some(ManifestLocation::Url(
 				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/review.kdl").unwrap(),
 			)),
@@ -364,7 +375,7 @@ fn parse_typo(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/typo").unwrap(),
-			PluginVersion::new("0.2.0".to_string()),
+			PluginVersion::new("0.3.0".to_string()),
 			Some(ManifestLocation::Url(
 				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/typo.kdl").unwrap(),
 			)),
@@ -408,7 +419,7 @@ fn parse_affiliation(
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/affiliation").unwrap(),
-			PluginVersion::new("0.3.0".to_string()),
+			PluginVersion::new("0.4.0".to_string()),
 			Some(ManifestLocation::Url(
 				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/affiliation.kdl").unwrap(),
 			)),
@@ -429,7 +440,7 @@ fn parse_affiliation(
 /// Updates the plugin and commit analysis lists with churn policies
 fn parse_churn(
 	plugins: &mut PolicyPluginList,
-	context: &Context,
+	_context: &Context,
 	commit: &mut PolicyCategory,
 	churn: &ChurnConfig,
 ) {
@@ -443,19 +454,11 @@ fn parse_churn(
 			"(lte (divz (count (filter (gt {}) $)) (count $)) {})",
 			value_threshold, percent_threshold,
 		);
-		let mut config = PolicyConfig::new();
-		let langs_path = pathbuf![&context.path, "Langs.kdl"];
-		config
-			.insert(
-				"langs-file".to_string(),
-				Value::String(langs_path.to_string_lossy().into_owned().replace("\\", "/")),
-			)
-			.unwrap();
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/churn").unwrap(),
-			PluginVersion::new("0.3.0".to_string()),
+			PluginVersion::new("0.4.0".to_string()),
 			Some(ManifestLocation::Url(
 				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/churn.kdl").unwrap(),
 			)),
@@ -467,7 +470,7 @@ fn parse_churn(
 			PolicyPluginName::new("mitre/churn").unwrap(),
 			Some(expression),
 			Some(weight),
-			Some(config),
+			None,
 		));
 		commit.push(analysis);
 	}
@@ -476,7 +479,7 @@ fn parse_churn(
 /// Updates the plugin and commit analysis lists with entropy policies
 fn parse_entropy(
 	plugins: &mut PolicyPluginList,
-	context: &Context,
+	_context: &Context,
 	commit: &mut PolicyCategory,
 	entropy: &EntropyConfig,
 ) {
@@ -490,19 +493,11 @@ fn parse_entropy(
 			"(lte (divz (count (filter (gt {}) $)) (count $)) {})",
 			value_threshold, percent_threshold
 		);
-		let mut config = PolicyConfig::new();
-		let langs_path = pathbuf![&context.path, "Langs.kdl"];
-		config
-			.insert(
-				"langs-file".to_string(),
-				Value::String(langs_path.to_string_lossy().into_owned().replace("\\", "/")),
-			)
-			.unwrap();
 
 		// Add the plugin
 		let plugin = PolicyPlugin::new(
 			PolicyPluginName::new("mitre/entropy").unwrap(),
-			PluginVersion::new("0.3.0".to_string()),
+			PluginVersion::new("0.4.0".to_string()),
 			Some(ManifestLocation::Url(
 				Url::parse("https://hipcheck.mitre.org/dl/plugin/mitre/entropy.kdl").unwrap(),
 			)),
@@ -514,7 +509,7 @@ fn parse_entropy(
 			PolicyPluginName::new("mitre/entropy").unwrap(),
 			Some(expression),
 			Some(weight),
-			Some(config),
+			None,
 		));
 		commit.push(analysis);
 	}
