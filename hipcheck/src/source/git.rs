@@ -14,6 +14,7 @@ use git2::{
 };
 use std::{cell::OnceCell, io::Write, path::Path};
 use gix::{bstr::ByteSlice, refs::FullName, remote, ObjectId};
+use std::path::Path;
 use url::Url;
 
 /// Construct the remote callbacks object uesd when making callinging into [git2].
@@ -124,13 +125,13 @@ fn make_checkout_builder() -> CheckoutBuilder<'static> {
 
 /// Clone a repo from the given url to a destination path in the filesystem.
 pub fn clone(url: &Url, dest: &Path) -> HcResult<()> {
-	log::debug!("remote repository cloning url is {}", url);
-
-	RepoBuilder::new()
-		.with_checkout(make_checkout_builder())
-		.fetch_options(make_fetch_opts())
-		.clone(url.as_str(), dest)?;
-
+	log::debug!("attempting to clone {} to {:?}", url.as_str(), dest);
+	std::fs::create_dir_all(dest)?;
+	let mut fetch_options = fetch_options(url, dest);
+	let (mut checkout, _) = fetch_options
+		.fetch_then_checkout(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
+	let _ = checkout.main_worktree(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
+	log::info!("Successfully cloned {} to {:?}", url.as_str(), dest);
 	Ok(())
 }
 
