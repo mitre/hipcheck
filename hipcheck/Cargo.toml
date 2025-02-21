@@ -52,12 +52,12 @@ finl_unicode = { version = "1.3.0", default-features = false, features = [
 flate2 = "1.0.35"
 fs_extra = "1.3.0"
 futures = "0.3.31"
-# Vendor libgit2 and openssl so that they will be statically included
-# and not cause problems on certain systems that might not have one or
-# the other.
-git2 = { version = "0.20.0", features = [
-    "vendored-libgit2",
-    "vendored-openssl",
+gix = { version = "0.70.0", features = [
+    "basic",
+    "max-control",
+    "zlib-stock",
+    # use reqwest/rustls to avoid needing openssl
+    "blocking-http-transport-reqwest-rust-tls",
 ] }
 graphql_client = "0.14.0"
 # Include with both a `path` and `version` reference.
