@@ -84,11 +84,13 @@ system path, followed by some number of arguments. For example, if your plugin
 is an executable file, the entrypoint string may be as simple as
 `"<PLUGIN_FILE_NAME> [ARGS}"`, as above.  If your plugin were a Python script,
 the entrypoint string may be `"python3 <PLUGIN_PY_FILE>" [ARGS]`. If your plugin
-code is represented by a container image, you may use `"podman <IMAGE_FILE>
-[ARGS]"` or `"docker <IMAGE_FILE> [ARGS]"`. Whatever it is, at runtime Hipcheck
-will append ` --port <PORT>` to this string to tell the plugin which port to
-listen on, so you will need to ensure that the behavior of your entrypoint
-string can handle this addition.
+code is represented by a container image, your entrypoint can be a shell script
+that will load your image file and format your run command to include port 
+mapping as `docker run -p "$PORT":50051 <IMAGE_FILE> [ARGS]` or 
+`podman run -p "$PORT":50051 <IMAGE_FILE> [ARGS]`. Whatever it is, at runtime 
+Hipcheck will append ` --port <PORT>` to the entrypoint to tell the plugin 
+which port to listen on, so you will need to ensure that the behavior of your
+entrypoint string can handle this addition.
 
 You may have as many or as few entries in the `entrypoint` section of the plugin
 manifest. If you are doing a [local deployment](#local-deployment), you may

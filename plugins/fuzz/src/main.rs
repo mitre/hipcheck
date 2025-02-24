@@ -50,7 +50,7 @@ impl Plugin for FuzzAnalysisPlugin {
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
 	PluginServer::register(FuzzAnalysisPlugin {})
-		.listen(args.port)
+		.listen_local(args.port)
 		.await
 }
 

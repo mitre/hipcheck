@@ -17,16 +17,42 @@ use hipcheck_common::proto::{
 	SetConfigurationRequest as SetConfigurationReq,
 	SetConfigurationResponse as SetConfigurationResp,
 };
-use std::{result::Result as StdResult, sync::Arc};
+use log::error;
+use std::{
+	net::{Ipv4Addr, SocketAddr},
+	result::Result as StdResult,
+	sync::Arc,
+};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream as RecvStream;
 use tonic::{transport::Server, Code, Request as Req, Response as Resp, Status, Streaming};
+
+#[derive(Debug, Clone)]
+pub enum Host {
+	// 127.0.0.1
+	Loopback,
+	// 0.0.0.0
+	Any,
+	// Any other IP address.
+	Other(Ipv4Addr),
+}
+
+impl Host {
+	fn to_socket_addr(&self, port: u16) -> SocketAddr {
+		match self {
+			Host::Loopback => SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), port),
+			Host::Any => SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), port),
+			Host::Other(ip) => SocketAddr::new((*ip).into(), port),
+		}
+	}
+}
 
 /// Runs the Hipcheck plugin protocol based on the user's implementation of the `Plugin` trait.
 ///
 /// This struct implements the underlying gRPC protocol that is not exposed to the plugin author.
 pub struct PluginServer<P> {
 	plugin: Arc<P>,
+	curr_host: Host,
 }
 
 impl<P: Plugin> PluginServer<P> {
@@ -34,17 +60,24 @@ impl<P: Plugin> PluginServer<P> {
 	pub fn register(plugin: P) -> PluginServer<P> {
 		PluginServer {
 			plugin: Arc::new(plugin),
+			curr_host: Host::Any, // default
 		}
 	}
 
+	/// Run the plugin server on the loopback address and provided port.
+	pub async fn listen_local(self, port: u16) -> Result<()> {
+		self.listen(Host::Loopback, port).await
+	}
+
 	/// Run the plugin server on the provided port.
-	pub async fn listen(self, port: u16) -> Result<()> {
+	pub async fn listen(mut self, host: Host, port: u16) -> Result<()> {
+		self.curr_host = host.clone();
 		let service = PluginServiceServer::new(self);
-		let host = format!("127.0.0.1:{}", port).parse().unwrap();
+		let host_addr = host.to_socket_addr(port);
 
 		Server::builder()
 			.add_service(service)
-			.serve(host)
+			.serve(host_addr)
 			.await
 			.map_err(Error::FailedToStartServer)?;
 
@@ -168,16 +201,28 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 	) -> QueryResult<Resp<Self::InitiateQueryProtocolStream>> {
 		let rx = req.into_inner();
 		// TODO: - make channel size configurable
-		let (tx, out_rx) = mpsc::channel::<QueryResult<InitiateQueryProtocolResp>>(10);
+		let (tx, out_rx) = match self.curr_host {
+			Host::Loopback => mpsc::channel::<QueryResult<InitiateQueryProtocolResp>>(10),
+			_ => mpsc::channel::<QueryResult<InitiateQueryProtocolResp>>(100),
+		};
 
 		let cloned_plugin = self.plugin.clone();
-
+		let tx_clone = tx.clone();
 		tokio::spawn(async move {
 			let mut channel = HcSessionSocket::new(tx, rx);
 			if let Err(e) = channel.run(cloned_plugin).await {
-				panic!("Error: {e}");
+				error!("Channel error: {e}");
+				if !tx_clone.is_closed() {
+					if let Err(send_err) = tx_clone
+						.send(Err(tonic::Status::internal(format!("Session error: {e}"))))
+						.await
+					{
+						error!("Failed to send error through channel: {send_err}");
+					}
+				}
 			}
 		});
+
 		Ok(Resp::new(RecvStream::new(out_rx)))
 	}
 }

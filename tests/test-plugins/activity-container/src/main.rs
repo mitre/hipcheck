@@ -58,14 +58,14 @@ struct ActivityPlugin;
 impl Plugin for ActivityPlugin {
 	const PUBLISHER: &'static str = "mitre";
 
-	const NAME: &'static str = "activity";
+	const NAME: &'static str = "activity-container";
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		let conf =
 			serde_json::from_value::<Config>(config).map_err(|e| ConfigError::Unspecified {
 				message: e.to_string(),
 			})?;
-		CONFIG.set(conf).map_err(|_e| ConfigError::InternalError {
+		CONFIG.set(conf).map_err(|_e| ConfigError::Unspecified {
 			message: "config was already set".to_owned(),
 		})
 	}
@@ -94,14 +94,15 @@ struct Args {
 	port: u16,
 
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
-	unknown_args: Vec<String>,
+	unknown_args: Vec<String>
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
+	log::info!("Activity container plugin is registering {:?}", args);
 	PluginServer::register(ActivityPlugin {})
-		.listen_local(args.port)
+		.listen(Host::Any, args.port)
 		.await
 }
 
@@ -115,6 +116,7 @@ mod test {
 
 	fn repo() -> LocalGitRepo {
 		LocalGitRepo {
+			// This is a dummy path for testing
 			path: "/home/users/me/.cache/hipcheck/clones/github/expressjs/express/".to_string(),
 			git_ref: "main".to_string(),
 		}
