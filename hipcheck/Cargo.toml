@@ -77,7 +77,7 @@ jiff = "0.1.16"
 log = "0.4.25"
 logos = "0.15.0"
 maplit = "1.0.2"
-miette = { version = "7.4.0", features = ["fancy"] }
+miette = { version = "7.5.0", features = ["fancy"] }
 minijinja = "2.7.0"
 minijinja-contrib = { version ="2.7.0", features = ["datetime"] }
 nom = "7.1.3"
