@@ -151,7 +151,7 @@ serde_with = "3.12.0"
 
 [build-dependencies]
 
-anyhow = "1.0.95"
+anyhow = "1.0.96"
 pathbuf = "1.0.0"
 schemars = { version = "0.8.21", features = ["chrono", "url"] }
 serde = { version = "1.0.217", features = ["derive"] }
