@@ -1,0 +1,14 @@
+publisher "mitre"
+name "activity-container"
+version "0.0.0"
+license "Apache-2.0"
+
+entrypoint {
+  on arch="aarch64-apple-darwin" "activity-container-deploy.sh"
+  on arch="x86_64-apple-darwin" "activity-container-deploy.sh"
+  on arch="x86_64-unknown-linux-gnu" "activity-container-deploy.sh"
+}
+
+dependencies {
+  plugin "mitre/git" version="0.0.0" manifest="./plugins/git/local-plugin.kdl"
+}
