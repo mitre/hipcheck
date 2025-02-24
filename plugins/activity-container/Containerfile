@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+
+FROM debian:bookworm-slim
+
+# Install dependencies for downloading and installing grpcurl
+RUN apt-get update && apt-get install -y \
+    curl \
+    ca-certificates \
+    file \
+    iproute2 \
+    bash \
+    && apt-get clean
+
+# Update CA certificates to ensure proper SSL verification
+RUN update-ca-certificates
+
+
+WORKDIR /app
+
+COPY ../../target/debug/activity /app/activity
+
+RUN chmod +x /app/activity
+
+EXPOSE 50051
+
+ENTRYPOINT ["/app/activity", "--port", "50051"]

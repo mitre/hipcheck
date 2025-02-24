@@ -22,11 +22,16 @@ use serde_json::Value;
 use std::fmt::Write as _;
 use std::{collections::HashMap, ops::Not};
 use tokio::sync::Mutex;
+// use tokio::time::{timeout, Duration};
 
 pub async fn initialize_plugins(
 	plugins: Vec<PluginContextWithConfig>,
 ) -> Result<Vec<PluginTransport>> {
+	// Configure timeout for each plugin initialization
+	// const INIT_TIMEOUT: Duration = Duration::from_secs(30);
+
 	let mut set = tokio::task::JoinSet::new();
+	// let mut plugin_contexts = Vec::new();
 
 	for (p, c) in plugins
 		.into_iter()
@@ -35,10 +40,66 @@ pub async fn initialize_plugins(
 		set.spawn(p.init_return_plugin(c));
 	}
 
+	// Keep track of plugin contexts for better error reporting
+	// for (p, c) in plugins
+	//     .into_iter()
+	//     .map(Into::<(PluginContext, Value)>::into)
+	// {
+	//     plugin_contexts.push(p);
+	//     // Create separately to avoid reference issues
+	//     // let plugin_context = *plugin_contexts.last().clone().unwrap();
+	// 	let plugin_context = p.clone();
+
+	// 	set.spawn(async move {
+	// 		match timeout(INIT_TIMEOUT, plugin_context.init_return_plugin(c)).await {
+	// 			Ok(init_result) => init_result,
+	// 			Err(_) => {
+	// 				let plugin = plugin_context.plugin.clone();
+	// 				(plugin, Err(hc_error!("Plugin initialization timed out")))
+	// 			}
+	// 		}
+	// 	});
+
+	//     // set.spawn(async move {
+	//     //     match timeout(INIT_TIMEOUT, plugin_context.init_return_plugin(c)).await {
+	//     //         Ok(init_result) => init_result,
+	//     //         Err(_) => {
+	//     //             // Create timeout error result
+	//     //             let plugin = plugin_context.plugin.clone();
+	//     //             (plugin, Err(hc_error!("Plugin initialization timed out")))
+	//     //         }
+	//     //     }
+	//     // });
+	// }
+
+	// for (p, c) in plugins.into_iter().map(Into::<(PluginContext, Value)>::into) {
+	// 	set.spawn(async move {
+	// 		let result = timeout(INIT_TIMEOUT, p.init_return_plugin(c)).await;
+	// 		let plugin = p.plugin.clone();
+	// 		match result {
+	// 			Ok(init_result) => Ok((plugin, init_result)),
+	// 			Err(_) => Err(hc_error!("Plugin initialization timed out")),
+	// 		}
+	// 	});
+	// }
+
 	let mut inited: Vec<PluginTransport> = vec![];
 	let mut failures: Vec<_> = vec![];
 
 	while let Some(res) = set.join_next().await {
+		// match res {
+		// 	Ok(Ok((plugin, (_plugin, init_res)))) => match init_res {
+		// 		Ok(pt) => inited.push(pt),
+		// 		Err(e) => failures.push((plugin, e)),
+		// 	},
+		// 	Ok(Err(err)) => {
+		// 		eprintln!("Plugin initialization error: {:?}", err);
+		// 	}
+		// 	Err(join_err) => {
+		// 		eprintln!("Task failed due to JoinError: {:?}", join_err);
+		// 	}
+		// }
+
 		// @Todo - what is the cleanup if the tokio func fails?
 		let (plugin, init_res) = res?;
 
