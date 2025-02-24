@@ -10,7 +10,6 @@ license = "Apache-2.0"
 proc-macro = true
 
 [dependencies]
-anyhow = "1.0.96"
 convert_case = "0.7.1"
 log = "0.4.25"
 proc-macro2 = "1.0.93"

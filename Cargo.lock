@@ -352,7 +352,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "toml",
  "walkdir",
 ]
 
@@ -485,7 +484,6 @@ dependencies = [
  "clap",
  "hipcheck-sdk",
  "log",
- "pathbuf",
  "schemars",
  "serde",
  "serde_json",
@@ -891,18 +889,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
 
 [[package]]
-name = "duct"
-version = "0.13.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4ab5718d1224b63252cd0c6f74f6480f9ffeb117438a2e0f5cf6d9a4798929c"
-dependencies = [
- "libc",
- "once_cell",
- "os_pipe",
- "shared_child",
-]
-
-[[package]]
 name = "dummy_rand_data"
 version = "0.1.0"
 dependencies = [
@@ -965,8 +951,6 @@ dependencies = [
  "finl_unicode",
  "futures",
  "hipcheck-sdk",
- "ordered-float",
- "pathbuf",
  "rayon",
  "schemars",
  "serde",
@@ -1058,12 +1042,6 @@ name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
-
-[[package]]
-name = "fixedbitset"
-version = "0.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "flate2"
@@ -1264,11 +1242,9 @@ dependencies = [
  "lru",
  "once_cell",
  "schemars",
- "semver",
  "serde",
  "serde_json",
  "tokio",
- "which",
 ]
 
 [[package]]
@@ -2159,44 +2135,35 @@ dependencies = [
  "chrono",
  "clap",
  "console",
- "content_inspector",
  "cyclonedx-bom",
  "dashmap",
  "dialoguer",
  "dirs",
  "dotenv",
- "duct",
  "env_logger",
- "finl_unicode",
  "flate2",
  "fs_extra",
  "futures",
  "git2",
- "graphql_client",
  "hipcheck-common",
  "hipcheck-kdl",
  "hipcheck-macros",
  "http",
- "indexmap 2.7.1",
  "indextree",
  "indicatif",
  "itertools",
  "jiff",
  "log",
  "logos",
- "maplit",
  "miette 7.4.0",
  "minijinja",
  "minijinja-contrib",
  "nom",
  "num-traits",
- "num_enum",
  "once_cell",
  "ordered-float",
  "packageurl",
- "paste",
  "pathbuf",
- "petgraph 0.7.1",
  "prost",
  "rand 0.9.0",
  "rayon",
@@ -2216,15 +2183,12 @@ dependencies = [
  "tabled",
  "tar",
  "tempfile",
- "term_size",
  "test-log",
  "thiserror 2.0.11",
  "tokio",
  "tokio-stream",
  "toml",
  "tonic",
- "tonic-build",
- "unicode-normalization",
  "ureq",
  "url",
  "walkdir",
@@ -2232,7 +2196,6 @@ dependencies = [
  "xml-rs",
  "xz2",
  "zip",
- "zip-extensions",
  "zstd",
 ]
 
@@ -2271,7 +2234,6 @@ name = "hipcheck-sdk"
 version = "0.4.0"
 dependencies = [
  "anyhow",
- "console",
  "futures",
  "hipcheck-common",
  "hipcheck-sdk-macros",
@@ -2295,7 +2257,6 @@ dependencies = [
 name = "hipcheck-sdk-macros"
 version = "0.1.2"
 dependencies = [
- "anyhow",
  "convert_case",
  "log",
  "proc-macro2",
@@ -2585,7 +2546,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "toml",
 ]
 
 [[package]]
@@ -2867,7 +2827,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "toml",
 ]
 
 [[package]]
@@ -3255,27 +3214,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num_enum"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e613fc340b2220f734a8595782c551f1250e969d87d3be1ae0579e8d4065179"
-dependencies = [
- "num_enum_derive",
-]
-
-[[package]]
-name = "num_enum_derive"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
-dependencies = [
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "syn 2.0.96",
-]
-
-[[package]]
 name = "number_prefix"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3342,16 +3280,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "os_pipe"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29d73ba8daf8fac13b0501d1abeddcfe21ba7401ada61a819144b6c2a4f32209"
-dependencies = [
- "libc",
- "windows-sys 0.52.0",
-]
-
-[[package]]
 name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3408,12 +3336,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "paste"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
-
-[[package]]
 name = "pathbuf"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3441,20 +3363,8 @@ version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
 dependencies = [
- "fixedbitset 0.4.2",
+ "fixedbitset",
  "indexmap 2.7.1",
-]
-
-[[package]]
-name = "petgraph"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3672b37090dbd86368a4145bc067582552b29c27377cad4e0a306c97f9bd7772"
-dependencies = [
- "fixedbitset 0.5.7",
- "indexmap 2.7.1",
- "serde",
- "serde_derive",
 ]
 
 [[package]]
@@ -3524,15 +3434,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proc-macro-crate"
-version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d37c51ca738a55da99dc0c4a34860fd675453b8b36209178c2249bb13651284"
-dependencies = [
- "toml_edit 0.21.1",
-]
-
-[[package]]
 name = "proc-macro-error-attr2"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3595,7 +3496,7 @@ dependencies = [
  "log",
  "multimap",
  "once_cell",
- "petgraph 0.6.5",
+ "petgraph",
  "prettyplease",
  "prost",
  "prost-types",
@@ -4197,16 +4098,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shared_child"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0d94659ad3c2137fef23ae75b03d5241d633f8acded53d672decfa0e6e0caef"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "shell-words"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4484,16 +4375,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "term_size"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e4129646ca0ed8f45d09b929036bafad5377103edd06e50bf574b353d2b08d9"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "terminal_size"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4701,7 +4582,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_edit 0.22.24",
+ "toml_edit",
 ]
 
 [[package]]
@@ -4711,17 +4592,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0dd7358ecb8fc2f8d014bf86f6f638ce72ba252a2c3a2572f2a795f1d23efb41"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "toml_edit"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a8534fd7f78b5405e860340ad6575217ce99f38d4d5c8f2442cb5ecb50090e1"
-dependencies = [
- "indexmap 2.7.1",
- "toml_datetime",
- "winnow 0.5.40",
 ]
 
 [[package]]
@@ -4937,7 +4807,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "toml",
  "url",
 ]
 
@@ -5333,15 +5202,6 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
 name = "winnow"
-version = "0.5.40"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f593a95398737aeed53e489c785df13f3618e41dbcd6718c6addbf1395aa6876"
-dependencies = [
- "memchr",
-]
-
-[[package]]
-name = "winnow"
 version = "0.6.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39281189af81c07ec09db316b302a3e67bf9bd7cbf6c820b50e35fee9c2fa980"
@@ -5605,15 +5465,6 @@ dependencies = [
  "zeroize",
  "zopfli",
  "zstd",
-]
-
-[[package]]
-name = "zip-extensions"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "386508a00aae1d8218b9252a41f59bba739ccee3f8e420bb90bcb1c30d960d4a"
-dependencies = [
- "zip",
 ]
 
 [[package]]
