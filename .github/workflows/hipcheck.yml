@@ -13,26 +13,8 @@ name: Hipcheck
 on:
   push:
     branches: [main]
-    paths:
-      - "config/**"
-      - "hipcheck/**"
-      - "plugins/**"
-      - "xtask/**"
-      - "sdk/rust/**"
-      - "hipcheck-common/**"
-      - "hipcheck-macros/**"
-      - "hipcheck-sdk-macros/**"
   pull_request:
     branches: [main]
-    paths:
-      - "config/**"
-      - "hipcheck/**"
-      - "plugins/**"
-      - "xtask/**"
-      - "sdk/rust/**"
-      - "hipcheck-common/**"
-      - "hipcheck-macros/**"
-      - "hipcheck-sdk-macros/**"
   merge_group:
     types: [checks_requested]
 
@@ -44,7 +26,34 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # job to run change detection
+  changes:
+    runs-on: ubuntu-latest
+    # Required permissions
+    permissions:
+      pull-requests: read
+    # Set job outputs to values from filter step
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+    # For pull requests it's not necessary to checkout the code
+    - uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          code:
+            - "config/**"
+            - "hipcheck/**"
+            - "plugins/**"
+            - "xtask/**"
+            - "sdk/rust/**"
+            - "hipcheck-common/**"
+            - "hipcheck-macros/**"
+            - "hipcheck-sdk-macros/**"
+            - 'backend/**'
   test:
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     strategy:
       matrix:
         # NOTE: this list of runners is manually synced with the set used by
