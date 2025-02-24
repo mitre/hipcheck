@@ -26,34 +26,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # job to run change detection
-  changes:
-    runs-on: ubuntu-latest
-    # Required permissions
-    permissions:
-      pull-requests: read
-    # Set job outputs to values from filter step
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-    steps:
-    # For pull requests it's not necessary to checkout the code
-    - uses: dorny/paths-filter@v3
-      id: filter
-      with:
-        filters: |
-          code:
-            - "config/**"
-            - "hipcheck/**"
-            - "plugins/**"
-            - "xtask/**"
-            - "sdk/rust/**"
-            - "hipcheck-common/**"
-            - "hipcheck-macros/**"
-            - "hipcheck-sdk-macros/**"
-            - 'backend/**'
   test:
-    needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
     strategy:
       matrix:
         # NOTE: this list of runners is manually synced with the set used by
@@ -72,51 +45,75 @@ jobs:
     steps:
       # Get the repo, get Rust, get `cargo-nextest`, setup caching.
       - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - "config/**"
+              - "hipcheck/**"
+              - "plugins/**"
+              - "xtask/**"
+              - "sdk/rust/**"
+              - "hipcheck-common/**"
+              - "hipcheck-macros/**"
+              - "hipcheck-sdk-macros/**"
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.filter.outputs.code == 'true'
       - uses: taiki-e/install-action@nextest
+        if: steps.filter.outputs.code == 'true'
       - uses: swatinem/rust-cache@v2
+        if: steps.filter.outputs.code == 'true'
         with:
           key: ${{ matrix.os }}
 
       # Install the protobuf compiler
-      - if: runner.os == 'Linux'
+      - if: runner.os == 'Linux' && steps.filter.outputs.code == 'true'
         run: sudo apt-get install -y protobuf-compiler
-      - if: runner.os == 'macOS'
+      - if: runner.os == 'macOS' && steps.filter.outputs.code == 'true'
         run: brew install protobuf
-      - if: runner.os == 'Windows'
+      - if: runner.os == 'Windows' && steps.filter.outputs.code == 'true'
         run: choco install protoc
 
       # Print dependency info (useful for debugging)
       - name: Dependency Tree
+        if: steps.filter.outputs.code == 'true'
         run: cargo tree
 
       # Try building every crate in the workspace, without debug symbols to
       # hopefully reduce build times
       - name: Build
+        if: steps.filter.outputs.code == 'true'
         run: cargo build --verbose --workspace
 
       # Test the code.
       - name: Test
+        if: steps.filter.outputs.code == 'true'
         run: cargo nextest r --verbose --workspace
 
       # Run the linter.
       - name: Lint
+        if: steps.filter.outputs.code == 'true'
         run: cargo clippy --verbose --workspace
 
       # Run our own checks for licensing and other info.
       - name: Check
+        if: steps.filter.outputs.code == 'true'
         run: cargo xtask check
 
       # Run a few variants of Hipcheck
       - name: Run with Policy
+        if: steps.filter.outputs.code == 'true'
         env:
           HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./target/debug/hc --policy ./config/Hipcheck.kdl check https://github.com/mitre/hipcheck
       - name: Run with Local Policy
+        if: steps.filter.outputs.code == 'true'
         env:
           HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./target/debug/hc --policy ./config/local.Hipcheck.kdl check https://github.com/mitre/hipcheck
       - name: Run with Config
+        if: steps.filter.outputs.code == 'true'
         env:
           HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./target/debug/hc --config ./config check https://github.com/mitre/hipcheck
