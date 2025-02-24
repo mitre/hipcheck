@@ -22,6 +22,7 @@ members = [
     "plugins/github",
     "plugins/npm",
     "plugins/activity",
+    "plugins/activity-container",
     "plugins/affiliation",
     "plugins/binary",
     "plugins/churn",
