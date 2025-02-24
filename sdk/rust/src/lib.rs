@@ -69,7 +69,7 @@ pub mod prelude {
 	pub use crate::deps::*;
 	pub use crate::engine::{PluginEngine, QueryBuilder};
 	pub use crate::error::{ConfigError, Error, Result};
-	pub use crate::server::{PluginServer, QueryResult};
+	pub use crate::server::{Host, PluginServer, QueryResult};
 	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
 	// Re-export macros
 	#[cfg(feature = "macros")]

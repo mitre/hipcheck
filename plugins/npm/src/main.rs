@@ -133,6 +133,6 @@ struct Args {
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
 	PluginServer::register(DependenciesPlugin {})
-		.listen(args.port)
+		.listen_local(args.port)
 		.await
 }

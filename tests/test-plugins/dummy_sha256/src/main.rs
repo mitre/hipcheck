@@ -47,5 +47,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(Sha256Plugin).listen(args.port).await
+	PluginServer::register(Sha256Plugin)
+		.listen_local(args.port)
+		.await
 }
