@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+COPY ../../target/debug/activity /app/activity
+
+RUN chmod +x /app/activity
+
+EXPOSE 50051
+
+ENTRYPOINT ["/app/activity", "--port", "50051"]

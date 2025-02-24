@@ -40,7 +40,7 @@ impl<P: Plugin> PluginServer<P> {
 	/// Run the plugin server on the provided port.
 	pub async fn listen(self, port: u16) -> Result<()> {
 		let service = PluginServiceServer::new(self);
-		let host = format!("127.0.0.1:{}", port).parse().unwrap();
+		let host = format!("0.0.0.0:{}", port).parse().unwrap();
 
 		Server::builder()
 			.add_service(service)
@@ -168,16 +168,25 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 	) -> QueryResult<Resp<Self::InitiateQueryProtocolStream>> {
 		let rx = req.into_inner();
 		// TODO: - make channel size configurable
-		let (tx, out_rx) = mpsc::channel::<QueryResult<InitiateQueryProtocolResp>>(10);
+		let (tx, out_rx) = mpsc::channel::<QueryResult<InitiateQueryProtocolResp>>(100);
 
 		let cloned_plugin = self.plugin.clone();
-
+		let tx_clone = tx.clone();
 		tokio::spawn(async move {
 			let mut channel = HcSessionSocket::new(tx, rx);
 			if let Err(e) = channel.run(cloned_plugin).await {
-				panic!("Error: {e}");
+				eprintln!("Channel error: {e}");
+				if !tx_clone.is_closed() {
+					if let Err(send_err) = tx_clone
+						.send(Err(tonic::Status::internal(format!("Session error: {e}"))))
+						.await
+					{
+						eprintln!("Failed to send error through channel: {send_err}");
+					}
+				}
 			}
 		});
+
 		Ok(Resp::new(RecvStream::new(out_rx)))
 	}
 }

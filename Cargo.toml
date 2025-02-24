@@ -33,6 +33,7 @@ members = [
     "plugins/typo",
     "test-plugins/dummy_rand_data",
     "test-plugins/dummy_sha256",
+    "test-plugins/activity-container",
     "xtask",
 ]
 
