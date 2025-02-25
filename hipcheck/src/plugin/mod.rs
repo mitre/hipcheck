@@ -8,7 +8,12 @@ mod plugin_manifest;
 mod retrieval;
 mod types;
 
-pub use crate::plugin::{get_plugin_key, manager::*, plugin_id::PluginId, types::*};
+pub use crate::plugin::{
+	get_plugin_key,
+	manager::*,
+	plugin_id::{PluginId, PluginIdVersionRange},
+	types::*,
+};
 use crate::policy_exprs::Expr;
 use crate::{error::Result, hc_error};
 pub use arch::{get_current_arch, try_set_arch, Arch};
@@ -16,6 +21,7 @@ pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, Hash
 use hipcheck_common::types::{Query, QueryDirection};
 pub use plugin_manifest::{
 	try_get_bin_for_entrypoint, PluginManifest, PluginName, PluginPublisher, PluginVersion,
+	PluginVersionReq,
 };
 pub use retrieval::retrieve_plugins;
 use serde_json::Value;
@@ -56,7 +62,7 @@ pub async fn initialize_plugins(
 			write!(
 				plugin_errors,
 				"\nPlugin '{}:{}': {}",
-				plugin.name, plugin.version.0, err
+				plugin.name, plugin.version.version, err
 			)?;
 		}
 		Err(hc_error!("{}", plugin_errors))
