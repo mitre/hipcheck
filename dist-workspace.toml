@@ -26,3 +26,17 @@ targets = [
 install-updater = true
 # Only build the artifacts we need, instead of the whole workspace
 precise-builds = true
+
+# NOTE: MUST be synced manually with runners in `.github/workflows/hipcheck.yml`
+[dist.github-custom-runners]
+# Ensure Apple Silicon macOS builds run natively rather than cross-compiling
+# from x86. Also makes sure our Apple Silicon macOS release builds match the
+# runner used for regular CI testing.
+aarch64-apple-darwin = "macos-14"
+# Update our Ubuntu release runs away from Ubuntu 20.04, which is now being
+# sunset by GitHub. They only track the last two LTS Ubuntu releases for free
+# runners, and with 24.04 out they're sunsetting 20.04. We're *just* moving to
+# 22.04, since releases compiled against 22.04's glibc should be forwards-
+# compatible with 24.04, but if we built on 24.04 the glibc *would not* be
+# backwards-compatible.
+x86_64-unknown-linux-gnu = "ubuntu-22.04"
