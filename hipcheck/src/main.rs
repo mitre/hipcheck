@@ -40,7 +40,7 @@ use crate::{
 };
 use cli::{
 	CacheOp, CachePluginArgs, CacheTargetArgs, CheckArgs, CliConfig, ConfigMode, FullCommands,
-	PluginArgs, PluginOp, SchemaArgs, SchemaCommand, UpdateArgs,
+	PluginArgs, PluginOp, ReadyArgs, SchemaArgs, SchemaCommand, UpdateArgs,
 };
 use config::AnalysisTreeNode;
 use core::fmt;
@@ -92,7 +92,7 @@ fn main() -> ExitCode {
 		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
 		Some(FullCommands::Setup) => return cmd_setup(&config),
-		Some(FullCommands::Ready) => cmd_ready(&config),
+		Some(FullCommands::Ready(args)) => return cmd_ready(&args, &config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
 		Some(FullCommands::CacheTarget(args)) => return cmd_cache_target(args, &config),
 		Some(FullCommands::CachePlugin(args)) => return cmd_cache_plugin(args, &config),
@@ -581,7 +581,14 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
 	ExitCode::SUCCESS
 }
 
-fn cmd_ready(config: &CliConfig) {
+fn cmd_ready(args: &ReadyArgs, config: &CliConfig) -> ExitCode {
+	// Before we start plugins, set the user-provided arch
+	if let Some(arch) = &args.arch {
+		if let Err(e) = try_set_arch(arch) {
+			Shell::print_error(&e, Format::Human);
+			return ExitCode::FAILURE;
+		}
+	}
 	let ready = ReadyChecks {
 		hipcheck_version_check: check_hipcheck_version(),
 		git_version_check: check_git_version(),
@@ -626,8 +633,10 @@ fn cmd_ready(config: &CliConfig) {
 
 	if ready.is_ready() {
 		println!("Hipcheck is ready to run!");
+		ExitCode::SUCCESS
 	} else {
 		println!("Hipcheck is NOT ready to run");
+		ExitCode::FAILURE
 	}
 }
 
