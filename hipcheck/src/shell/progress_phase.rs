@@ -80,6 +80,17 @@ impl ProgressPhase {
 		Self { name, bar }
 	}
 
+	/// Create a new progress bar with no length and attach it to the global [Shell]'s multi-progress.
+	///
+	/// By default this uses a "bytes" styling for the progress bar.
+	pub fn no_length(name: impl Into<Arc<str>>) -> Self {
+		let bar = ProgressBar::no_length().with_style(get_bytes_style().clone());
+		Shell::progress_bars().add(bar.clone());
+		let name = name.into();
+		bar.set_message(format!("{name}"));
+		bar.set_prefix(ROCKET_SHIP.to_string());
+		Self { name, bar }
+	}
 	/// Create a new progress bar and attach it to the global [Shell]'s multi-progress.
 	/// This phase will draw with the current position and total length represented as a number of bytes.
 	///
@@ -159,6 +170,12 @@ impl ProgressPhase {
 	/// Check if this phase is finished.
 	pub fn is_finished(&self) -> bool {
 		self.bar.is_finished()
+	}
+}
+
+impl AsRef<ProgressBar> for ProgressPhase {
+	fn as_ref(&self) -> &ProgressBar {
+		&self.bar
 	}
 }
 

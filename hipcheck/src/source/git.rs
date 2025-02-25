@@ -10,21 +10,18 @@ use crate::{
 use console::Term;
 use gix::{
 	bstr::ByteSlice,
-	progress::{prodash::progress::Step, MessageLevel, StepShared, Unit},
+	progress::{prodash::progress::Step, StepShared, Unit},
 	refs::FullName,
-	remote, NestedProgress, ObjectId,
+	remote, NestedProgress, ObjectId, Progress, Repository,
 };
 use std::{
 	io::Write,
 	path::Path,
 	sync::{atomic::Ordering, Arc},
-	usize,
 };
 use url::Url;
 
-// const UPDATE_STDOUT_EVERY_MS: u64 = 1;
-const SEPARATOR: &str = "::";
-
+/// struct for updating progress of git operations
 struct GitProgress {
 	name: String,
 	id: gix::progress::Id,
@@ -36,61 +33,42 @@ struct GitProgress {
 }
 
 impl GitProgress {
-	fn new() -> Self {
-		Self::default()
+	fn new(id: gix::progress::Id) -> Self {
+		Self {
+			verbosity: Shell::get_verbosity(),
+			step: Arc::default(),
+			name: String::with_capacity(128),
+			max: None,
+			unit: None,
+			id,
+			progress_phase: None,
+		}
 	}
 
-	// fn write_to_shell_stdout(&self, level: MessageLevel, message: String) {
-	// 	if matches!(self.verbosity, Verbosity::Quiet | Verbosity::Silent) {
-	// 		return;
-	// 	}
-	// 	// only need to capture DONE messages
-	// 	if matches!(level, MessageLevel::Failure | MessageLevel::Info) {
-	// 		return;
-	// 	}
-	//
-	// 	// let step = self.step.load(Ordering::Relaxed);
-	// 	// if there is a message, use that, otherwise generate one based on available data
-	// 	// let message = message.unwrap_or_else(|| match (self.max, &self.unit) {
-	// 	// 	(max, Some(unit)) => {
-	// 	// 		format!("{}:: -> {}", self.name, unit.display(step, max, None))
-	// 	// 	}
-	// 	// 	(Some(max), None) => {
-	// 	// 		let perc = (step as f32 / max as f32) * 100.0;
-	// 	// 		format!("{}: {:03.0}% {}/{}", self.name, perc, step, max)
-	// 	// 	}
-	// 	// 	(None, None) => format!("{}: {}", self.name, step),
-	// 	// });
-	// 	//
-	// 	// WithSidebands::with_progress_handler(parent, handle_progress)
-	//
-	// 	Shell::in_suspend(|| {
-	// 		let mut stdout = Term::stdout();
-	// 		// stdout.clear_line().expect("could not clear line on stdout");
-	// 		writeln!(&mut stdout, "remote: {}: {}", self.name, message)
-	// 			.expect("could not write to stdout");
-	// 		stdout.flush().expect("could not flush stdout");
-	// 	})
-	// }
+	/// If the Shell allows writing to stdout, display message to stdout
+	fn write_to_shell_stdout(&self, message: String) {
+		if matches!(self.verbosity, Verbosity::Quiet | Verbosity::Silent) {
+			return;
+		}
+		Shell::in_suspend(|| {
+			let mut stdout = Term::stdout();
+			stdout.clear_line().expect("could not clear line on stdout");
+			writeln!(&mut stdout, "remote: {}: {}", self.name, message)
+				.expect("could not write to stdout");
+			stdout.flush().expect("could not flush stdout");
+		})
+	}
 }
 
 impl Default for GitProgress {
 	fn default() -> Self {
-		Self {
-			verbosity: Shell::get_verbosity(),
-			step: Arc::default(),
-			name: String::new(),
-			max: None,
-			unit: None,
-			id: gix::progress::UNKNOWN,
-			progress_phase: None,
-		}
+		Self::new(gix::progress::UNKNOWN)
 	}
 }
 
 impl gix::Count for GitProgress {
 	fn set(&self, step: Step) {
-		self.step.store(step, Ordering::SeqCst);
+		self.step.store(step, Ordering::Relaxed);
 		if let Some(progress) = &self.progress_phase {
 			progress.set_position(step as u64);
 		}
@@ -120,62 +98,52 @@ impl gix::progress::Progress for GitProgress {
 	) {
 		self.max = max;
 		self.unit = unit;
-		// only initialize the progress bar if the Verbosity is normal
-		if matches!(self.verbosity, Verbosity::Normal) {
-			if let Some(max) = self.max {
-				self.progress_phase = Some(ProgressPhase::start(max as u64, self.name.as_str()));
+		if self.max.is_none() && self.unit.is_none() {
+			if let Some(progress) = self.progress_phase.take() {
+				Shell::progress_bars().remove(progress.as_ref());
 			}
+			return;
+		}
+
+		// only set the progress bar if there is not one yet
+		if self.progress_phase.is_none() && matches!(self.verbosity, Verbosity::Normal) {
+			let progress_phase = if let Some(max) = self.max {
+				ProgressPhase::start(max as u64, self.name.as_str())
+			} else {
+				ProgressPhase::no_length(self.name.as_str())
+			};
+			self.progress_phase = Some(progress_phase);
 		}
 	}
 
 	fn set_name(&mut self, name: String) {
-		self.name = self
-			.name
-			.split(SEPARATOR)
-			.next()
-			.map(|parent| format!("{}{}{}", parent, SEPARATOR, name))
-			.unwrap_or_else(|| name)
+		self.name = name;
+		if let Some(progress) = &self.progress_phase {
+			progress.update_status(self.name.as_str());
+		}
 	}
 
 	fn name(&self) -> Option<String> {
-		self.name.split(SEPARATOR).nth(1).map(ToOwned::to_owned)
+		Some(self.name.clone())
 	}
 
 	fn id(&self) -> gix::progress::Id {
 		self.id
 	}
 
-	fn message(&self, level: gix::progress::MessageLevel, message: String) {
-		// self.write_to_shell_stdout(level, message);
+	fn message(&self, _level: gix::progress::MessageLevel, message: String) {
+		self.write_to_shell_stdout(message);
 	}
 
 	fn unit(&self) -> Option<Unit> {
 		self.unit.clone()
 	}
 
-	fn max(&self) -> Option<gix::progress::prodash::progress::Step> {
-		self.max
-	}
-
 	fn done(&self, message: String) {
+		self.write_to_shell_stdout(message);
 		if let Some(progress) = &self.progress_phase {
-			// progress.update_status(message);
-			if let Some(max) = self.max {
-				progress.set_position(max as u64);
-			}
-			progress.finish_successful(true);
+			progress.finish_successful(false);
 		}
-	}
-
-	fn set_max(&mut self, max: Option<gix::progress::prodash::progress::Step>) -> Option<Step> {
-		let prev_max = self.max.take();
-		self.max = max;
-		if let Some(new_max) = max {
-			if let Some(progress) = &self.progress_phase {
-				progress.set_length(new_max as u64);
-			}
-		}
-		prev_max
 	}
 }
 
@@ -191,20 +159,9 @@ impl NestedProgress for GitProgress {
 		name: impl Into<String>,
 		id: gix::progress::Id,
 	) -> Self::SubProgress {
-		let name = if self.name.is_empty() {
-			name.into()
-		} else {
-			format!("{}{}{}", self.name, SEPARATOR, name.into())
-		};
-		GitProgress {
-			name,
-			id,
-			step: Default::default(),
-			max: None,
-			unit: None,
-			verbosity: Shell::get_verbosity(),
-			progress_phase: None,
-		}
+		let mut progress = GitProgress::new(id);
+		progress.set_name(name.into());
+		progress
 	}
 }
 
@@ -270,15 +227,16 @@ fn fast_forward_to_hash(
 }
 
 /// Clone a repo from the given url to a destination path in the filesystem.
-pub fn clone(url: &Url, dest: &Path) -> HcResult<()> {
+pub fn clone(url: &Url, dest: &Path) -> HcResult<Repository> {
 	log::debug!("attempting to clone {} to {:?}", url.as_str(), dest);
 	std::fs::create_dir_all(dest)?;
 	let mut fetch_options = fetch_options(url, dest);
+	let mut progress = GitProgress::default();
 	let (mut checkout, _) =
-		fetch_options.fetch_then_checkout(GitProgress::new(), &gix::interrupt::IS_INTERRUPTED)?;
-	let _ = checkout.main_worktree(GitProgress::new(), &gix::interrupt::IS_INTERRUPTED)?;
+		fetch_options.fetch_then_checkout(&mut progress, &gix::interrupt::IS_INTERRUPTED)?;
+	let (repo, _) = checkout.main_worktree(&mut progress, &gix::interrupt::IS_INTERRUPTED)?;
 	log::info!("Successfully cloned {} to {:?}", url.as_str(), dest);
-	Ok(())
+	Ok(repo)
 }
 
 /// For a given repo, checkout a particular ref in a detached HEAD state.
@@ -338,6 +296,7 @@ pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<gix::Obje
 	Err(HcError::msg("target is ambiguous"))
 }
 
+/// TODO: fix screen flicker / decoding not updating
 /// TODO: redo commit history to add support for fetch/clone/checkout separately
 /// TODO: add support for visual progress indicators
 /// Perform a `git fetch` for all remotes in the repo.
@@ -345,13 +304,14 @@ pub fn fetch(repo_path: &Path) -> HcResult<()> {
 	log::debug!("Fetching: {:?}", repo_path);
 	let repo = gix::open(repo_path)?;
 	let remote_names = repo.remote_names();
+	// let mut progress = GitProgress::new(FETCH_ID);
 	for remote_name in remote_names {
 		log::trace!("Attempt to fetch remote: {}", remote_name.as_bstr());
 		let remote = repo.find_remote(remote_name.as_bstr())?;
 		remote
 			.connect(gix::remote::Direction::Fetch)?
-			.prepare_fetch(GitProgress::new(), Default::default())?
-			.receive(GitProgress::new(), &gix::interrupt::IS_INTERRUPTED)?;
+			.prepare_fetch(gix::progress::Discard, Default::default())?
+			.receive(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
 	}
 	Ok(())
 }
