@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-
 use super::{
-	cyclone_dx::extract_cyclonedx_download_url,
+	cyclone_dx::{extract_cyclonedx_download_url, BomTarget},
 	pm::{detect_and_extract, extract_repo_for_maven},
 	spdx::extract_spdx_download_url,
 };
@@ -283,22 +282,32 @@ impl ResolveRepo for MavenPackage {
 
 impl ResolveRepo for Sbom {
 	fn resolve(self, t: &mut TargetResolver) -> Result<LocalGitRepo> {
+		// Attempt to get the download location for the local SBOM package, using the function
+		// appropriate to the SBOM standard.
 		let source = self.path.to_str().ok_or(hc_error!(
 			"SBOM path contained one or more invalid characters"
 		))?;
-		// Attempt to get the download location for the local SBOM package, using the function
-		// appropriate to the SBOM standard
-		let download_url = match self.standard {
-			SbomStandard::Spdx => Url::parse(&extract_spdx_download_url(source)?)?,
-			SbomStandard::CycloneDX => extract_cyclonedx_download_url(source)?,
+		let bom_target = match self.standard {
+			// converts the result from extract_spdx_download_url into the url variant of BomTarget
+			// to make converting the bom target easier
+			SbomStandard::Spdx => {
+				let url = Url::parse(&extract_spdx_download_url(source)?)?;
+				Ok(BomTarget::Url(url))
+			}
+			SbomStandard::CycloneDX => extract_cyclonedx_download_url(source),
 		};
-
-		// Create a Target for a remote git repo originating with an SBOM
-		let sbom_git_repo = get_remote_repo_from_url(download_url)?;
-
-		t.remote = Some(sbom_git_repo.clone());
-
-		sbom_git_repo.resolve(t)
+		match bom_target {
+			Ok(BomTarget::Url(url)) => {
+				let sbom_git_repo = get_remote_repo_from_url(url)?;
+				t.remote = Some(sbom_git_repo.clone());
+				sbom_git_repo.resolve(t)
+			}
+			Ok(BomTarget::Package(package)) => {
+				t.package = Some(package.clone());
+				package.resolve(t)
+			}
+			Err(error) => Err(hc_error!("Error, failed to parse package or url {}", error)),
+		}
 	}
 }
 
