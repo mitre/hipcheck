@@ -107,6 +107,11 @@ impl ProgressPhase {
 		self.bar.inc(amount)
 	}
 
+	/// Set the new length for the progress bar
+	pub fn set_length(&self, new_length: u64) {
+		self.bar.set_length(new_length);
+	}
+
 	/// Set the current amount of progress made.
 	pub fn set_position(&self, new_position: u64) {
 		if self.bar.position() == 0 && new_position > 0 {
