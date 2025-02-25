@@ -460,7 +460,7 @@ pub enum FullCommands {
 	Check(CheckArgs),
 	Schema(SchemaArgs),
 	Setup,
-	Ready,
+	Ready(ReadyArgs),
 	Update(UpdateArgs),
 	CacheTarget(CacheTargetArgs),
 	CachePlugin(CachePluginArgs),
@@ -476,7 +476,7 @@ impl From<&Commands> for FullCommands {
 			Commands::Check(args) => FullCommands::Check(args.clone()),
 			Commands::Schema(args) => FullCommands::Schema(args.clone()),
 			Commands::Setup => FullCommands::Setup,
-			Commands::Ready => FullCommands::Ready,
+			Commands::Ready(args) => FullCommands::Ready(args.clone()),
 			Commands::Scoring => FullCommands::Scoring,
 			Commands::Update(args) => FullCommands::Update(args.clone()),
 			Commands::Cache(args) => match &args.subcmd {
@@ -502,7 +502,7 @@ pub enum Commands {
 	/// Initialize Hipcheck config file and script file locations.
 	Setup,
 	/// Check if Hipcheck is ready to run.
-	Ready,
+	Ready(ReadyArgs),
 	/// Print the tree used to weight analyses during scoring.
 	Scoring,
 	/// Run Hipcheck self-updater, if installed
@@ -822,6 +822,12 @@ pub enum SchemaCommand {
 	Pypi,
 	/// Print the JSON schema for running Hipcheck against a source repository
 	Repo,
+}
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct ReadyArgs {
+	#[arg(long = "arch", value_parser = Arch::from_str)]
+	pub arch: Option<Arch>,
 }
 
 #[derive(Debug, Clone, clap::Args)]
