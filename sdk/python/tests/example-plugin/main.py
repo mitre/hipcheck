@@ -2,6 +2,8 @@ import asyncio
 import argparse
 import os
 
+from typing import Optional
+
 # from ..context import hipcheck_sdk
 from hipcheck_sdk.error import *
 from hipcheck_sdk.engine import PluginEngine
@@ -45,6 +47,12 @@ class ExamplePlugin(Plugin):
             raise InvalidConfigValue('binary-file', binary_file, f"{e}")
 
         DETECTOR = data
+
+    def default_policy_expr(self) -> Optional[str]:
+        if self.opt_threshold is None:
+            return None
+        else:
+            return f"(lte $ {self.opt_threshold})"
 
 
 

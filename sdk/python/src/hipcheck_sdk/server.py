@@ -43,6 +43,41 @@ class Plugin(ABC):
                 return q
         return None
 
+class HcSessionSocket:
+
+    def __init__(self, stream, context):
+        self.stream = stream
+        self.context = context
+        self.out = asyncio.Queue()
+
+    def get_queue(self):
+        return self.out
+
+    async def run(self):
+        # Outstanding issue in tonic crate used by Hipcheck core for gRPC:
+        #   https://github.com/hyperium/tonic/issues/515
+        # We have to send *something* otherwise the stream creation gets
+        # blocked on the tonic side.
+        query = gen.Query(
+                id=0,
+                state=gen.QueryState.QUERY_STATE_UNSPECIFIED,
+                publisher_name="",
+                plugin_name="",
+                query_name="",
+                key="",
+                output="",
+                split=False)
+        await self.out.put(query)
+
+        async for request in self.stream:
+            query = request.query
+            print("Got query id: ", query.id)
+            query.state = gen.QueryState.QUERY_STATE_COMPLETE
+            query.output = query.key
+            query.key = ""
+            await self.out.put(query)
+
+
 class PluginServer(gen.PluginServiceServicer):
 
     def __init__(self, plugin: Plugin):
@@ -52,18 +87,14 @@ class PluginServer(gen.PluginServiceServicer):
         return PluginServer(plugin)
 
     def listen(self, port: int):
-        # async def inner(s: PluginServer, port: int):
-        #     server = grpc.aio.server() # concurrent.futures.ThreadPoolExecutor(max_workers=10))
-        #     gen.add_PluginServiceServicer_to_server(self, server)
-        #     server.add_insecure_port(f"[::]:{port}")
-        #     await server.start()
-        #     await server.wait_for_termination()
-        # asyncio.run(inner(self, port))
-        server = grpc.server(concurrent.futures.ThreadPoolExecutor(max_workers=10))
-        gen.add_PluginServiceServicer_to_server(self, server)
-        server.add_insecure_port(f"[::]:{port}")
-        server.start()
-        server.wait_for_termination()
+        async def inner(s: PluginServer, port: int):
+            server = grpc.aio.server()
+            # concurrent.futures.ThreadPoolExecutor(max_workers=10))
+            gen.add_PluginServiceServicer_to_server(self, server)
+            server.add_insecure_port(f"[::]:{port}")
+            await server.start()
+            await server.wait_for_termination()
+        asyncio.run(inner(self, port))
 
     def GetQuerySchemas(self, request, context):
         for q in self.plugin.queries():
@@ -93,32 +124,43 @@ class PluginServer(gen.PluginServiceServicer):
         return gen.ExplainDefaultQueryResponse(
                 explanation=self.plugin.explain_default_query())
 
-    def InitiateQueryProtocol(self, stream, context):
+    async def InitiateQueryProtocol(self, stream, context):
         # Outstanding issue in tonic crate used by Hipcheck core for gRPC:
         #   https://github.com/hyperium/tonic/issues/515
         # We have to send *something* otherwise the stream creation gets
         # blocked on the tonic side.
-        query = gen.Query(
-                id=0,
-                state=gen.QueryState.QUERY_STATE_UNSPECIFIED,
-                publisher_name="",
-                plugin_name="",
-                query_name="",
-                key="",
-                output="",
-                split=False)
-        yield gen.InitiateQueryProtocolResponse(query=query)
-        def inner(stream, context):
-            for request in stream:
-                query = request.query
-                print("Got query id: ", query.id)
-                query.state = gen.QueryState.QUERY_STATE_COMPLETE
-                query.output = query.key
-                query.key = ""
-                yield gen.InitiateQueryProtocolResponse(query=query)
-        res = inner(stream, context)
-        print(type(res))
-        return res
+        session_socket = HcSessionSocket(stream, context)
+        out_queue = session_socket.get_queue()
+
+        socket_task = asyncio.create_task(session_socket.run())
+        while True:
+            query = await out_queue.get()
+            yield gen.InitiateQueryProtocolResponse(query=query)
+            out_queue.task_done()
+#
+#
+#             async for out in out_queue:
+#                 yield gen.InitiateQueryProtocolResponse(query=query)
+#
+#        async def inner(stream, context):
+#            query = gen.Query(
+#                    id=0,
+#                    state=gen.QueryState.QUERY_STATE_UNSPECIFIED,
+#                    publisher_name="",
+#                    plugin_name="",
+#                    query_name="",
+#                    key="",
+#                    output="",
+#                    split=False)
+#            yield gen.InitiateQueryProtocolResponse(query=query)
+#            for request in stream:
+#                query = request.query
+#                print("Got query id: ", query.id)
+#                query.state = gen.QueryState.QUERY_STATE_COMPLETE
+#                query.output = query.key
+#                query.key = ""
+#                yield gen.InitiateQueryProtocolResponse(query=query)
+#        return inner(stream, context)
     # async def InitiateQueryProtocol(self, stream, context):
     #     print(stream)
     #     async for request in stream:
