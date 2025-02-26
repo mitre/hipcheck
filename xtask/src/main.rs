@@ -3,9 +3,12 @@
 mod task;
 mod workspace;
 
-use clap::Parser as _;
+use clap::{
+	builder::{IntoResettable, PossibleValue, Resettable, Str},
+	Parser as _,
+};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use std::process::ExitCode;
+use std::{fmt::Display, process::ExitCode};
 
 fn main() -> ExitCode {
 	let args = Args::parse();
@@ -19,6 +22,7 @@ fn main() -> ExitCode {
 		.init();
 
 	let result = match args.command {
+		Commands::Build(args) => task::build::run(args),
 		Commands::Buf => task::buf::run(),
 		Commands::Check => task::check::run(),
 		Commands::Ci => task::ci::run(),
@@ -39,6 +43,27 @@ fn main() -> ExitCode {
 	}
 }
 
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum HelpHeading {
+	Args,
+}
+
+impl Display for HelpHeading {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			HelpHeading::Args => write!(f, "Arguments"),
+		}
+	}
+}
+
+impl IntoResettable<Str> for HelpHeading {
+	fn into_resettable(self) -> clap::builder::Resettable<Str> {
+		match self {
+			HelpHeading::Args => Resettable::Value(Str::from(self.to_string())),
+		}
+	}
+}
+
 /// Hipcheck development task runner.
 #[derive(Debug, clap::Parser)]
 #[clap(about, version, long_about = None, propagate_version = true)]
@@ -52,21 +77,80 @@ struct Args {
 
 #[derive(Debug, clap::Subcommand)]
 enum Commands {
-	/// Run a variety of quality checks
+	/// Rebuild parts of the workspace.
+	Build(BuildArgs),
+	/// Lint the Hipcheck plugin gRPC definition.
+	Buf,
+	/// Run a variety of quality checks.
 	Check,
-	/// Simulate a CI run locally
+	/// Simulate a CI run locally.
 	Ci,
-	/// Generate a draft CHANGELOG
+	/// Generate a draft CHANGELOG.
 	Changelog(ChangelogArgs),
-	/// Interact with Hipcheck RFDs
+	/// Update the plugin download manifests after a new release.
+	Manifest,
+	/// Interact with Hipcheck RFDs.
 	Rfd(RfdArgs),
 	/// Work with the Hipcheck website.
 	Site(SiteArgs),
-	/// Lint the Hipcheck plugin gRPC definition.
-	Buf,
-	/// Update the plugin download manifests in the local repo based on
-	/// output from the GitHub Releases API
-	Manifest,
+}
+
+#[derive(Debug, clap::Args)]
+struct BuildArgs {
+	/// The build profile to use.
+	#[clap(long = "profile", default_value_t, help_heading = HelpHeading::Args)]
+	profile: BuildProfile,
+
+	/// What to build in the workspace.
+	#[clap(short = 'p', long = "pkg", default_values_t = default_pkg(), help_heading = HelpHeading::Args)]
+	pkg: Vec<BuildPkg>,
+}
+
+fn default_pkg() -> impl IntoIterator<Item = BuildPkg> {
+	vec![BuildPkg::All]
+}
+
+#[derive(Debug, Clone, Copy, Default, clap::ValueEnum)]
+enum BuildProfile {
+	/// Debug mode.
+	#[default]
+	Debug,
+	/// Release mode.
+	Release,
+	/// Distribution mode.
+	///
+	/// Used for prebuilt binaries on releases.
+	Dist,
+}
+
+impl Display for BuildProfile {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", display_for_value_enum(self).get_name())
+	}
+}
+
+#[derive(Debug, Clone, Copy, Default, clap::ValueEnum)]
+enum BuildPkg {
+	/// Rebuild the whole workspace.
+	#[default]
+	All,
+	/// Rebuild Hipcheck core.
+	Core,
+	/// Rebuild the Rust SDK.
+	Sdk,
+	/// Rebuild all plugins.
+	Plugins,
+}
+
+impl Display for BuildPkg {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", display_for_value_enum(self).get_name())
+	}
+}
+
+fn display_for_value_enum<T: clap::ValueEnum>(t: &T) -> PossibleValue {
+	t.to_possible_value()
+		.unwrap_or_else(|| PossibleValue::new("<skipped>"))
 }
 
 #[derive(Debug, clap::Args)]
