@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import sys
 dir_path = os.path.dirname(os.path.realpath(__file__))

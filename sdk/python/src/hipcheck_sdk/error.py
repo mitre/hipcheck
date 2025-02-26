@@ -1,8 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+
 from dataclasses import dataclass
 
 import hipcheck_sdk.gen as gen
 
 class SdkError(Exception):
+    pass
+
+@dataclass
+class UnspecifiedQueryState(SdkError):
+    pass
+
+@dataclass
+class UnexpectedRequestInProgress(SdkError):
+    pass
+
+@dataclass
+class UnexpectedReplyInProgress(SdkError):
+    pass
+
+@dataclass
+class ReceivedReplyWhenExpectingSubmitChunk(SdkError):
+    pass
+
+@dataclass
+class ReceivedSubmitWhenExpectingReplyChunk(SdkError):
+    pass
+
+@dataclass
+class InvalidJsonInQueryKey(SdkError):
+    pass
+
+@dataclass
+class InvalidJsonInQueryOutput(SdkError):
+    pass
+
+@dataclass
+class MoreAfterQueryComplete(SdkError):
+    id: int
+
+@dataclass
+class FailedToSendQueryFromSessionToServer(SdkError):
+    pass
+
+@dataclass
+class UnknownPluginQuery(SdkError):
+    pass
+
+@dataclass
+class InvalidQueryTargetFormat(SdkError):
     pass
 
 class ConfigError(Exception):

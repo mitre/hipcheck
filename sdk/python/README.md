@@ -1,5 +1,15 @@
+**NOTE**: This package is not ready for public use. We have published this
+package on PyPI to reserve the package name.
+
 You must have `uv` installed. Installation instructions can be found
 [here](https://docs.astral.sh/uv/getting-started/installation/).
+
+# Running unit tests
+
+From `sdk/python`, run
+```bash
+uv run pytest ./tests
+```
 
 # Testing example plugin listening on port
 

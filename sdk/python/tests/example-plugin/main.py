@@ -1,8 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+
 import asyncio
 import argparse
 import os
 
-# from ..context import hipcheck_sdk
+from typing import Optional
+
 from hipcheck_sdk.error import *
 from hipcheck_sdk.engine import PluginEngine
 from hipcheck_sdk.server import Plugin, PluginServer, query, Union
@@ -11,8 +14,16 @@ DETECTOR = None
 
 @query(default=True)
 async def my_query(engine: PluginEngine, key: int) -> int:
-    print("Running!. Key: ", key)
-    return key
+    reduced_num = key % 7
+
+    engine.record_concern("This is a test")
+
+    value = await engine.query("dummy/sha256/sha256", [reduced_num])
+
+    engine.record_concern("This is a test2")
+
+    return value[0]
+
 
 class ExamplePlugin(Plugin):
 
@@ -45,6 +56,12 @@ class ExamplePlugin(Plugin):
             raise InvalidConfigValue('binary-file', binary_file, f"{e}")
 
         DETECTOR = data
+
+    def default_policy_expr(self) -> Optional[str]:
+        if self.opt_threshold is None:
+            return None
+        else:
+            return f"(lte $ {self.opt_threshold})"
 
 
 
