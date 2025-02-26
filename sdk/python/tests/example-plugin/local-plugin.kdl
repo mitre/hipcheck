@@ -1,0 +1,11 @@
+publisher "mitre"
+name "example"
+version "0.0.0"
+license "Apache-2.0"
+
+entrypoint {
+  on arch="aarch64-apple-darwin" "run.sh"
+  on arch="x86_64-apple-darwin" "run.sh"
+  on arch="x86_64-unknown-linux-gnu" "run.sh"
+  on arch="x86_64-pc-windows-msvc" "source venv/bin/activate && python3 sdk/python/src/example.py"
+}

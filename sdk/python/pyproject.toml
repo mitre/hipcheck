@@ -1,0 +1,20 @@
+[project]
+name = "hipcheck-sdk"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "jlanson", email = "jlanson@mitre.org" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "asyncio>=3.4.3",
+    "grpcio>=1.70.0",
+    "grpcio-tools>=1.70.0",
+    "pydantic>=2.10.6",
+    "wheel>=0.45.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
