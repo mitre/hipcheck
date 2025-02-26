@@ -117,7 +117,7 @@ impl TryFrom<Query> for PluginQuery {
 		let mut outputs = vec![];
 		for output in value.output {
 			let json_formatted_output =
-				serde_json::to_string(&output).map_err(Error::InvalidJsonInQueryKey)?;
+				serde_json::to_string(&output).map_err(Error::InvalidJsonInQueryOutput)?;
 			outputs.push(json_formatted_output);
 		}
 

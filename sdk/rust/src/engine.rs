@@ -273,7 +273,7 @@ impl PluginEngine {
 		};
 
 		if query.direction == QueryDirection::Response {
-			return Err(Error::ReceivedSubmitWhenExpectingReplyChunk);
+			return Err(Error::ReceivedReplyWhenExpectingRequest);
 		}
 
 		let name = query.query;

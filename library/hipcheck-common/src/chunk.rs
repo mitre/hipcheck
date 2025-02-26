@@ -29,7 +29,7 @@ enum DrainedString {
 
 /// Try to drain `max` bytes from `buf`, or the full string, whichever is shortest.
 /// If `max` bytes is somewhere within `buf` but lands within a char boundary,
-/// walk backwards to the start of the previous char. Returns the substring
+/// walk backwards to the end of the previous char. Returns the substring
 /// drained from `buf`.
 fn drain_at_most_n_bytes(mut buf: String, max: usize) -> DrainedString {
 	let mut to_drain = std::cmp::min(buf.bytes().len(), max);
@@ -498,7 +498,6 @@ mod test {
 		assert!(!split);
 		assert!(source.is_empty());
 		assert!(made_progress);
-		assert_eq!(source.len(), 0);
 		assert_eq!(sink.len(), 1);
 	}
 

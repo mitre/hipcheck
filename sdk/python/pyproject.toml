@@ -1,20 +1,33 @@
 [project]
 name = "hipcheck-sdk"
 version = "0.1.0"
-description = "Add your description here"
+description = "An SDK for developing Hipcheck plugins"
 readme = "README.md"
 authors = [
-    { name = "jlanson", email = "jlanson@mitre.org" }
+    { name = "j-lanson", email = "jlanson@mitre.org" }
 ]
 requires-python = ">=3.10"
-license-files = ["LICENSE.md"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+
 dependencies = [
     "asyncio>=3.4.3",
+    "coverage>=7.6.12",
     "grpcio>=1.70.0",
     "grpcio-tools>=1.70.0",
+    "logging>=0.4.9.6",
     "pydantic>=2.10.6",
+    "pytest>=8.3.5",
     "wheel>=0.45.1",
 ]
+
+[project.urls]
+Homepage = "https://hipcheck.mitre.org/"
+Issues = "https://github.com/mitre/hipcheck/issues"
 
 [build-system]
 requires = ["hatchling"]
