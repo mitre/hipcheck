@@ -2,6 +2,7 @@ from abc import ABC
 from typing import List, Dict, Union, Optional
 import concurrent
 import time
+import signal
 
 import asyncio
 import grpc
@@ -53,30 +54,55 @@ class HcSessionSocket:
     def get_queue(self):
         return self.out
 
-    async def run(self):
+    async def run_inner(self):
         # Outstanding issue in tonic crate used by Hipcheck core for gRPC:
         #   https://github.com/hyperium/tonic/issues/515
         # We have to send *something* otherwise the stream creation gets
         # blocked on the tonic side.
+        # ID currently 0 so that it gets ignored by Hipcheck core, but that's
+        #   a bit hacky.
         query = gen.Query(
                 id=0,
                 state=gen.QueryState.QUERY_STATE_UNSPECIFIED,
                 publisher_name="",
                 plugin_name="",
                 query_name="",
-                key="",
-                output="",
+                key=[],
+                output=[],
                 split=False)
         await self.out.put(query)
 
         async for request in self.stream:
             query = request.query
             print("Got query id: ", query.id)
-            query.state = gen.QueryState.QUERY_STATE_COMPLETE
-            query.output = query.key
-            query.key = ""
+            query.state = gen.QueryState.QUERY_STATE_REPLY_COMPLETE
+            query.output.append(query.key[0])
+            dir(query.key)
+            query.key.clear()
+            print("Python handler putting query resp")
             await self.out.put(query)
+            print("Python handler finished putting")
+        print("Stream closed, exiting")
 
+    async def run(self):
+        try:
+            await self.run_inner()
+        except Exception as e:
+            query = gen.Query(
+                id=1,
+                state=gen.QueryState.QUERY_STATE_UNSPECIFIED,
+                publisher_name="",
+                plugin_name="",
+                query_name="",
+                key=[""],
+                output=[f"HcSessionSocket error: {e}"],
+                split=False)
+            await self.out.put(query)
+        finally:
+            # Shut down queue so that PluginServer also closes.
+            # queue.shutdown() available in 3.13, but we are using
+            # a sentinel None value for now
+            await self.out.put(None)
 
 class PluginServer(gen.PluginServiceServicer):
 
@@ -88,12 +114,38 @@ class PluginServer(gen.PluginServiceServicer):
 
     def listen(self, port: int):
         async def inner(s: PluginServer, port: int):
+            # Create server
             server = grpc.aio.server()
-            # concurrent.futures.ThreadPoolExecutor(max_workers=10))
             gen.add_PluginServiceServicer_to_server(self, server)
             server.add_insecure_port(f"[::]:{port}")
             await server.start()
-            await server.wait_for_termination()
+
+            # Define handler func to stop server
+            async def stop_server():
+                print("Stopping server")
+                await server.stop(1)
+
+            # Register handler
+            loop = asyncio.get_event_loop()
+            for signame in ('SIGINT', 'SIGTERM'):
+                loop.add_signal_handler(getattr(signal, signame),
+                        lambda: asyncio.create_task(stop_server()))
+            s.stop_queue = asyncio.Queue()
+
+            # Wait for either the server to terminate, or for a single queue object
+            #   that notifies us to stop the server
+            wait_server_task = asyncio.create_task(server.wait_for_termination())
+            notify_stop_task = asyncio.create_task(self.stop_queue.get())
+            done, pending = await asyncio.wait([wait_server_task, notify_stop_task],
+                    return_when=asyncio.FIRST_COMPLETED)
+
+            # If the "wait for server" task is still pending, we got notifed by the stop_queue,
+            #   so trigger server shutdown
+            if wait_server_task in pending:
+                await stop_server()
+                # Now that we have called server.stop, the wait_server task should finish quickly
+                await wait_server_task
+
         asyncio.run(inner(self, port))
 
     def GetQuerySchemas(self, request, context):
@@ -125,63 +177,19 @@ class PluginServer(gen.PluginServiceServicer):
                 explanation=self.plugin.explain_default_query())
 
     async def InitiateQueryProtocol(self, stream, context):
-        # Outstanding issue in tonic crate used by Hipcheck core for gRPC:
-        #   https://github.com/hyperium/tonic/issues/515
-        # We have to send *something* otherwise the stream creation gets
-        # blocked on the tonic side.
         session_socket = HcSessionSocket(stream, context)
         out_queue = session_socket.get_queue()
 
         socket_task = asyncio.create_task(session_socket.run())
         while True:
             query = await out_queue.get()
+            # In 3.13 there is QueueShutDown to signal this, but
+            #   to not require 3.13 we are using a sentinel 'None'
+            #   value instead
+            if query is None:
+                break
             yield gen.InitiateQueryProtocolResponse(query=query)
             out_queue.task_done()
-#
-#
-#             async for out in out_queue:
-#                 yield gen.InitiateQueryProtocolResponse(query=query)
-#
-#        async def inner(stream, context):
-#            query = gen.Query(
-#                    id=0,
-#                    state=gen.QueryState.QUERY_STATE_UNSPECIFIED,
-#                    publisher_name="",
-#                    plugin_name="",
-#                    query_name="",
-#                    key="",
-#                    output="",
-#                    split=False)
-#            yield gen.InitiateQueryProtocolResponse(query=query)
-#            for request in stream:
-#                query = request.query
-#                print("Got query id: ", query.id)
-#                query.state = gen.QueryState.QUERY_STATE_COMPLETE
-#                query.output = query.key
-#                query.key = ""
-#                yield gen.InitiateQueryProtocolResponse(query=query)
-#        return inner(stream, context)
-    # async def InitiateQueryProtocol(self, stream, context):
-    #     print(stream)
-    #     async for request in stream:
-    #         query = request.query
-    #         print("Got query id: ", query.id)
-    #         query.state = gen.QueryState.QUERY_STATE_COMPLETE
-    #         query.output = query.key
-    #         query.key = ""
-    #         yield gen.InitiateQueryProtocolResponse(query)
-
-        # print(dir(stream))
-        # request = await stream.recv()
-        # await stream.send_message(gen.InitiateQueryProtocolResponse(query))
-        # session_tracker: Dict[int,
-
-        # for request in request_iterator:
-        #     query = request.query
-            # Add to existing session queue or create new one
-
-            # For all available messages from each plugin, yield message
-            # Might need to do chunking here instead of in session
-
-        # print("InitQueryProtocol", type(request_iterator), type(context))
-        # pass
+        # We currently have the semantics that when the query protocol
+        # with HC core closes, the plugin must shut down.
+        await self.stop_queue.put(None)
