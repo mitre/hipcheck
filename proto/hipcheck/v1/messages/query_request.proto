@@ -1,8 +1,0 @@
-syntax = "proto3";
-package hipcheck.v1;
-
-import "query.proto";
-
-message QueryRequest {
-    Query query = 1;
-}

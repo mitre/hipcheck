@@ -1,9 +1,0 @@
-syntax = "proto3";
-package hipcheck.v1;
-
-import "empty.proto";
-
-message SetConfigResponse {
-    // No actual data returned. Errors handled with normal gRPC error system.
-    Empty empty = 1;
-}

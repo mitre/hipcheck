@@ -18,11 +18,11 @@ tokio = { version = "1.43.0", features = ["rt"] }
 tokio-stream = "0.1.17"
 tonic = "0.12.3"
 schemars = { version = "0.8.21", features = ["url"] }
-hipcheck-sdk-macros = { path = "../../hipcheck-sdk-macros", version = "0.1.2", optional = true }
+hipcheck-sdk-macros = { path = "../../library/hipcheck-sdk-macros", version = "0.1.2", optional = true }
 typify-macro = "0.2.0"
 url = { version = "2.5.4", features = ["serde"] }
 log = "0.4.25"
-hipcheck-common = { version = "0.3.0", path = "../../hipcheck-common" }
+hipcheck-common = { version = "0.3.0", path = "../../library/hipcheck-common" }
 
 [features]
 macros = ["dep:hipcheck-sdk-macros"]
