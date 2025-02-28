@@ -10,3 +10,4 @@ pub mod ci;
 pub mod manifest;
 pub mod rfd;
 pub mod site;
+pub mod validate;
