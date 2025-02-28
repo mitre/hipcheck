@@ -4,7 +4,9 @@ use crate::{
 	error::Error,
 	proto::{Query as PluginQuery, QueryState},
 };
+use serde::Deserialize;
 use serde_json::Value;
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug)]
 pub struct Query {
@@ -132,5 +134,42 @@ impl TryFrom<Query> for PluginQuery {
 			concern: value.concerns,
 			split: false,
 		})
+	}
+}
+
+#[derive(Debug, Deserialize, PartialEq, Clone, clap::ValueEnum)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum LogLevel {
+	Off,
+	Error,
+	Warn,
+	Info,
+	Debug,
+	Trace,
+}
+impl LogLevel {
+	pub fn level_from_str(s: &str) -> Result<LogLevel, String> {
+		match s.trim().to_lowercase().as_str() {
+			"off" => Ok(LogLevel::Off),
+			"error" => Ok(LogLevel::Error),
+			"warn" => Ok(LogLevel::Warn),
+			"info" => Ok(LogLevel::Info),
+			"debug" => Ok(LogLevel::Debug),
+			"trace" => Ok(LogLevel::Trace),
+			_ => Err(format!("Invalid log level: {}", s.trim())),
+		}
+	}
+}
+
+impl Display for LogLevel {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		match &self {
+			LogLevel::Off => write!(f, "off"),
+			LogLevel::Error => write!(f, "error"),
+			LogLevel::Warn => write!(f, "warn"),
+			LogLevel::Info => write!(f, "info"),
+			LogLevel::Debug => write!(f, "debug"),
+			LogLevel::Trace => write!(f, "trace"),
+		}
 	}
 }

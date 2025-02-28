@@ -9,7 +9,7 @@ use crate::{
 	types::{CommitChurn, CommitChurnFreq, CommitDiff},
 };
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target};
+use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
 use serde::Deserialize;
 use std::{
 	collections::{HashMap, HashSet},
@@ -136,11 +136,11 @@ async fn commit_churns(
 		let mut lines_changed: i64 = 0;
 		for file_diff in &source_files {
 			lines_changed += file_diff.additions.ok_or_else(|| {
-				log::error!("GitHub commits can't be used for churn");
+				tracing::error!("GitHub commits can't be used for churn");
 				Error::UnspecifiedQueryState
 			})?;
 			lines_changed += file_diff.deletions.ok_or_else(|| {
-				log::error!("GitHub commits can't be used for churn");
+				tracing::error!("GitHub commits can't be used for churn");
 				Error::UnspecifiedQueryState
 			})?;
 		}
@@ -203,19 +203,19 @@ async fn commit_churns(
 	let churns: Vec<_> = commit_churn_freqs.iter().map(|c| c.churn).collect();
 
 	let mean = mean(&churns).ok_or_else(|| {
-		log::error!("failed to get mean churn value");
+		tracing::error!("failed to get mean churn value");
 		Error::UnspecifiedQueryState
 	})?;
 	let std_dev = std_dev(mean, &churns).ok_or_else(|| {
-		log::error!("failed to get churn standard deviation");
+		tracing::error!("failed to get churn standard deviation");
 		Error::UnspecifiedQueryState
 	})?;
 
-	log::trace!("mean of churn scores [mean='{}']", mean);
-	log::trace!("standard deviation of churn scores [stddev='{}']", std_dev);
+	tracing::trace!("mean of churn scores [mean='{}']", mean);
+	tracing::trace!("standard deviation of churn scores [stddev='{}']", std_dev);
 
 	if std_dev == 0.0 {
-		log::error!("not enough commits to calculate churn");
+		tracing::error!("not enough commits to calculate churn");
 		return Err(Error::UnspecifiedQueryState);
 	}
 
@@ -223,7 +223,7 @@ async fn commit_churns(
 		commit_churn_freq.churn = (commit_churn_freq.churn - mean) / std_dev;
 	}
 
-	log::info!("completed churn metric");
+	tracing::info!("completed churn metric");
 
 	Ok(commit_churn_freqs)
 }
@@ -302,6 +302,9 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value_t=LogLevel::Error)]
+	log_level: LogLevel,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
 }
@@ -309,7 +312,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(ChurnPlugin::default())
+	PluginServer::register(ChurnPlugin::default(), args.log_level)
 		.listen_local(args.port)
 		.await
 }

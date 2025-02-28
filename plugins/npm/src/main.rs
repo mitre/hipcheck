@@ -8,7 +8,7 @@ use crate::{
 	util::command::check_version,
 };
 use clap::Parser;
-use hipcheck_sdk::prelude::*;
+use hipcheck_sdk::{prelude::*, LogLevel};
 use pathbuf::pathbuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -40,7 +40,7 @@ impl NpmDependencies {
 			language @ Lang::JavaScript => {
 				let deps = get_dependencies(repo, version)
 					.map_err(|e| {
-						log::error!("{}", e);
+						tracing::error!("{}", e);
 						Error::UnspecifiedQueryState
 					})?
 					.into_iter()
@@ -48,7 +48,7 @@ impl NpmDependencies {
 				Ok(NpmDependencies { language, deps })
 			}
 			Lang::Unknown => {
-				log::error!("can't identify a known language in the repository");
+				tracing::error!("can't identify a known language in the repository");
 				Err(Error::UnspecifiedQueryState)
 			}
 		}
@@ -81,11 +81,11 @@ async fn dependencies(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<
 	let path = &repo.path;
 
 	let npm_version = get_npm_version().map_err(|e| {
-		log::error!("{}", e);
+		tracing::error!("{}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	check_version(&npm_version).map_err(|e| {
-		log::error!("{}", e);
+		tracing::error!("{}", e);
 		Error::UnspecifiedQueryState
 	})?;
 
@@ -125,6 +125,9 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value_t=LogLevel::Error)]
+	log_level: LogLevel,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
 }
@@ -132,7 +135,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(DependenciesPlugin {})
+	PluginServer::register(DependenciesPlugin {}, args.log_level)
 		.listen_local(args.port)
 		.await
 }

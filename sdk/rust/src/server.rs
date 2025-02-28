@@ -5,19 +5,22 @@ use crate::{
 	error::{Error, Result},
 	Plugin, QuerySchema,
 };
-use hipcheck_common::proto::{
-	plugin_service_server::{PluginService, PluginServiceServer},
-	ConfigurationStatus, ExplainDefaultQueryRequest as ExplainDefaultQueryReq,
-	ExplainDefaultQueryResponse as ExplainDefaultQueryResp,
-	GetDefaultPolicyExpressionRequest as GetDefaultPolicyExpressionReq,
-	GetDefaultPolicyExpressionResponse as GetDefaultPolicyExpressionResp,
-	GetQuerySchemasRequest as GetQuerySchemasReq, GetQuerySchemasResponse as GetQuerySchemasResp,
-	InitiateQueryProtocolRequest as InitiateQueryProtocolReq,
-	InitiateQueryProtocolResponse as InitiateQueryProtocolResp,
-	SetConfigurationRequest as SetConfigurationReq,
-	SetConfigurationResponse as SetConfigurationResp,
+use hipcheck_common::{
+	proto::{
+		plugin_service_server::{PluginService, PluginServiceServer},
+		ConfigurationStatus, ExplainDefaultQueryRequest as ExplainDefaultQueryReq,
+		ExplainDefaultQueryResponse as ExplainDefaultQueryResp,
+		GetDefaultPolicyExpressionRequest as GetDefaultPolicyExpressionReq,
+		GetDefaultPolicyExpressionResponse as GetDefaultPolicyExpressionResp,
+		GetQuerySchemasRequest as GetQuerySchemasReq,
+		GetQuerySchemasResponse as GetQuerySchemasResp,
+		InitiateQueryProtocolRequest as InitiateQueryProtocolReq,
+		InitiateQueryProtocolResponse as InitiateQueryProtocolResp,
+		SetConfigurationRequest as SetConfigurationReq,
+		SetConfigurationResponse as SetConfigurationResp,
+	},
+	types::LogLevel,
 };
-use log::error;
 use std::{
 	net::{Ipv4Addr, SocketAddr},
 	result::Result as StdResult,
@@ -26,6 +29,7 @@ use std::{
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream as RecvStream;
 use tonic::{transport::Server, Code, Request as Req, Response as Resp, Status, Streaming};
+use tracing::error;
 
 #[derive(Debug, Clone)]
 pub enum Host {
@@ -57,7 +61,13 @@ pub struct PluginServer<P> {
 
 impl<P: Plugin> PluginServer<P> {
 	/// Create a new plugin server for the provided plugin.
-	pub fn register(plugin: P) -> PluginServer<P> {
+	pub fn register(plugin: P, log_level_opt: impl Into<Option<LogLevel>>) -> PluginServer<P> {
+		#[cfg(feature = "log_forwarding")]
+		{
+			let log_level = log_level_opt.into().unwrap_or(LogLevel::Error);
+			crate::init_tracing_logger(log_level);
+		}
+
 		PluginServer {
 			plugin: Arc::new(plugin),
 			curr_host: Host::Any, // default

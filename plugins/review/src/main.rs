@@ -4,7 +4,7 @@
 
 use anyhow::Context as _;
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target};
+use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{result::Result as StdResult, sync::OnceLock};
@@ -32,16 +32,16 @@ pub struct PullReview {
 /// Returns whether each commit in a repo was merged with a review
 #[query(default)]
 async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
-	log::debug!("running review metric");
+	tracing::debug!("running review metric");
 
 	// Confirm that the target is a GitHub repo
 	let Some(remote) = value.remote else {
-		log::error!("target repository does not have a remote repository URL");
+		tracing::error!("target repository does not have a remote repository URL");
 		return Err(Error::UnexpectedPluginQueryInputFormat);
 	};
 
 	let Some(known_remote) = remote.known_remote else {
-		log::error!("target repository is not a GitHub repository or else is missing GitHub repo information");
+		tracing::error!("target repository is not a GitHub repository or else is missing GitHub repo information");
 		return Err(Error::UnexpectedPluginQueryInputFormat);
 	};
 
@@ -54,14 +54,14 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	let pull_requests: Vec<PullRequest> =
 		serde_json::from_value(value).map_err(Error::InvalidJsonInQueryOutput)?;
 
-	log::trace!("got pull requests [requests='{:#?}']", pull_requests);
+	tracing::trace!("got pull requests [requests='{:#?}']", pull_requests);
 
 	// Create a Vec big enough to hold every single pull request
 	let mut pull_reviews = Vec::with_capacity(pull_requests.len());
 
 	pull_reviews.extend(pull_requests.into_iter().map(|pr| pr.reviews > 0));
 
-	log::info!("completed review query");
+	tracing::info!("completed review query");
 
 	Ok(pull_reviews)
 }
@@ -86,7 +86,7 @@ impl Plugin for ReviewPlugin {
 
 	fn default_policy_expr(&self) -> Result<String> {
 		let Some(conf) = CONFIG.get() else {
-			log::error!("tried to access config before set by Hipcheck core!");
+			tracing::error!("tried to access config before set by Hipcheck core!");
 			return Err(Error::UnspecifiedQueryState);
 		};
 
@@ -112,6 +112,9 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value_t=LogLevel::Error)]
+	log_level: LogLevel,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
 }
@@ -119,7 +122,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(ReviewPlugin {})
+	PluginServer::register(ReviewPlugin {}, args.log_level)
 		.listen_local(args.port)
 		.await
 }

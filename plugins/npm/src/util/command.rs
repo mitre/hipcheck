@@ -44,7 +44,7 @@ fn parse_version(version: &str) -> Result<Version> {
 		.ok_or_else(|| anyhow!("failed to find a npm version"))?
 		.as_str();
 
-	log::debug!("{} version detected [version='npm']", version);
+	tracing::debug!("{} version detected [version='npm']", version);
 
 	Ok(Version::parse(version)?)
 }
@@ -55,18 +55,18 @@ where
 	I: IntoIterator<Item = S> + Copy,
 	S: AsRef<OsStr>,
 {
-	log::debug!("logging npm CLI args");
+	tracing::debug!("logging npm CLI args");
 
 	// https://doc.rust-lang.org/std/env/fn.args.html
 	for arg in env::args() {
-		log::debug!("npm CLI environment arg [arg='{}']", arg);
+		tracing::debug!("npm CLI environment arg [arg='{}']", arg);
 	}
 
-	log::debug!("npm CLI executable location [path='{}']", command_path);
+	tracing::debug!("npm CLI executable location [path='{}']", command_path);
 
 	log_each_arg(args);
 
-	log::debug!("done logging npm CLI args");
+	tracing::debug!("done logging npm CLI args");
 }
 
 pub fn log_each_arg<I, S>(args: I)
@@ -80,6 +80,6 @@ where
 			.to_str()
 			.unwrap_or("argument for command could not be logged.");
 
-		log::debug!("npm CLI argument [name='{}', value='{}']", index, arg_val);
+		tracing::debug!("npm CLI argument [name='{}', value='{}']", index, arg_val);
 	}
 }
