@@ -11,7 +11,7 @@ proc-macro = true
 
 [dependencies]
 convert_case = "0.7.1"
-log = "0.4.25"
+tracing = "0.1"
 proc-macro2 = "1.0.94"
 quote = "1.0.38"
 syn = { version = "2.0.96", features = ["full", "printing"] }

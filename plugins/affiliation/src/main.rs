@@ -175,7 +175,7 @@ impl<'haystack> Affiliator<'haystack> {
 	/// Construct a new Affiliator from a given OrgSpec (built from an Orgs.kdl file).
 	fn from_spec(spec: &'haystack OrgSpec) -> Result<Affiliator<'haystack>> {
 		let patterns = spec.patterns().map_err(|e| {
-			log::error!("failed to get patterns for org spec to check against {}", e);
+			tracing::error!("failed to get patterns for org spec to check against {}", e);
 			Error::UnspecifiedQueryState
 		})?;
 		let mode = spec.mode();
@@ -216,11 +216,11 @@ impl<'a> ContributorFrequencyMap<'a> {
 /// A `true` entry corresponds to an affiliated contributor
 #[query(default)]
 async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
-	log::debug!("running affiliation query");
+	tracing::debug!("running affiliation query");
 
 	// Get the OrgSpec.
 	let org_spec = &ORGSSPEC.get().ok_or_else(|| {
-		log::error!("tried to access config before set by Hipcheck core!");
+		tracing::error!("tried to access config before set by Hipcheck core!");
 		Error::UnspecifiedQueryState
 	})?;
 
@@ -231,13 +231,13 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 	let contributors_value = engine.query("mitre/git/contributor_summary", repo).await?;
 	let contributors: Vec<CommitContributorView> = serde_json::from_value(contributors_value)
 		.map_err(|e| {
-			log::error!("Error parsing output from mitre/git/contributor_summary: {e}");
+			tracing::error!("Error parsing output from mitre/git/contributor_summary: {e}");
 			Error::UnexpectedPluginQueryInputFormat
 		})?;
 
 	// Use the OrgSpec to build an Affiliator.
 	let affiliator = Affiliator::from_spec(org_spec).map_err(|e| {
-		log::error!("failed to build affiliation checker from org spec: {}", e);
+		tracing::error!("failed to build affiliation checker from org spec: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 
@@ -264,7 +264,7 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 			*affiliations.get_mut(idx).unwrap() = true;
 		}
 	}
-	log::info!("completed affiliation metric");
+	tracing::info!("completed affiliation metric");
 	Ok(affiliations)
 }
 
@@ -325,6 +325,9 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value = "OFF")]
+	log_level: String,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
 }
@@ -332,7 +335,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(AffiliationPlugin::default())
+	PluginServer::register(AffiliationPlugin::default(), &args.log_level)
 		.listen(args.port)
 		.await
 }

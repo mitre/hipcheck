@@ -268,7 +268,7 @@ pub fn queries(_item: TokenStream) -> TokenStream {
 		};
 		agg.extend(out);
 	}
-	log::info!(
+	tracing::debug!(
 		"Auto-generating Plugin::queries() with {} detected queries",
 		q_lock.len()
 	);

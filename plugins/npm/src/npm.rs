@@ -72,7 +72,7 @@ pub fn get_npm_version() -> Result<String> {
 }
 
 fn generate_package_lock_file(package_dir: &Path, version: String) -> Result<()> {
-	log::debug!("generating lock file [path={}]", package_dir.display());
+	tracing::debug!("generating lock file [path={}]", package_dir.display());
 
 	NpmCommand::for_package(
 		package_dir,
@@ -157,7 +157,7 @@ impl NpmCommand {
 	{
 		check_version(&version)?;
 
-		log::debug!("minimum version in use [min='npm', version='{}']", &version);
+		tracing::debug!("minimum version in use [min='npm', version='{}']", &version);
 
 		NpmCommand::internal(Some(pkg_path), Out::Null, args)
 	}
@@ -213,7 +213,7 @@ impl NpmCommand {
 		if output.status.success() {
 			return Ok(output_text);
 		}
-		log::debug!("npm output_text [output_text='{}']", output_text);
+		tracing::debug!("npm output_text [output_text='{}']", output_text);
 
 		match String::from_utf8(output.stderr) {
 			Ok(msg) if msg.is_empty().not() => {
