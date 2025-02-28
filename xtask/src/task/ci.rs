@@ -231,12 +231,15 @@ fn run_clippy(sh: &Shell) -> Result<()> {
 		.map_err(reason("call to cargo clippy failed"))
 }
 
-/// Run `cargo xtask check`.
+/// Run `cargo xtask validate`.
 fn run_xtask_check(sh: &Shell) -> Result<()> {
-	cmd!(sh, "cargo run --package xtask --bin xtask --quiet -- check")
-		.run()
-		.map(drop)
-		.map_err(reason("call to cargo xtask failed"))
+	cmd!(
+		sh,
+		"cargo run --package xtask --bin xtask --quiet -- validate"
+	)
+	.run()
+	.map(drop)
+	.map_err(reason("call to cargo xtask failed"))
 }
 
 /// Tell the user we're done.

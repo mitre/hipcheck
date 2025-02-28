@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+mod build;
+mod string;
 mod task;
 mod workspace;
 
@@ -23,8 +25,9 @@ fn main() -> ExitCode {
 
 	let result = match args.command {
 		Commands::Build(args) => task::build::run(args),
+		Commands::Check(args) => task::check::run(args),
 		Commands::Buf => task::buf::run(),
-		Commands::Check => task::check::run(),
+		Commands::Validate => task::validate::run(),
 		Commands::Ci => task::ci::run(),
 		Commands::Changelog(args) => task::changelog::run(args),
 		Commands::Rfd(args) => task::rfd::run(args),
@@ -77,12 +80,14 @@ struct Args {
 
 #[derive(Debug, clap::Subcommand)]
 enum Commands {
-	/// Rebuild parts of the workspace.
+	/// Rebuild crates in the workspace.
 	Build(BuildArgs),
+	/// Check compilation for crates in the workspace.
+	Check(BuildArgs),
 	/// Lint the Hipcheck plugin gRPC definition.
 	Buf,
 	/// Run a variety of quality checks.
-	Check,
+	Validate,
 	/// Simulate a CI run locally.
 	Ci,
 	/// Generate a draft CHANGELOG.
