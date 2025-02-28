@@ -48,11 +48,10 @@ flate2 = "1.0.35"
 fs_extra = "1.3.0"
 futures = "0.3.31"
 gix = { version = "0.70.0", features = [
-    "basic",
     "max-control",
-    "zlib-stock",
     # use reqwest/rustls to avoid needing openssl
     "blocking-http-transport-reqwest-rust-tls",
+    "zlib-stock"
 ] }
 # Include with both a `path` and `version` reference.
 # Local builds will use the `path` dependency, which may be a newer
@@ -78,7 +77,14 @@ once_cell = "1.20.3"
 ordered-float = { version = "5.0.0", features = ["serde"] }
 packageurl = "0.4.1"
 pathbuf = "1.0.0"
-prost = "0.13.5"
+prodash = { version = "29.0.0", default-features = false, features = [
+    "render-line",
+    "render-line-autoconfigure",
+    "render-line-crossterm",
+    "unit-bytes",
+    "unit-duration",
+    "unit-human",
+] }
 rand = "0.9.0"
 rayon = "1.10.0"
 regex = "1.11.1"

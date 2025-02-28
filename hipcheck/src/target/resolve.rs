@@ -11,7 +11,7 @@ use crate::{
 	shell::spinner_phase::SpinnerPhase,
 	source::{
 		build_unknown_remote_clone_dir, clone_local_repo_to_cache, get_remote_repo_from_url, git,
-		try_resolve_remote_for_local,
+		try_resolve_remote_for_local, GitProgressRenderHandle,
 	},
 	target::types::*,
 };
@@ -67,6 +67,17 @@ impl TargetResolver {
 	pub fn update_status(&self, status: impl Display) {
 		if let Some(phase) = &self.config.phase {
 			phase.update_status(status);
+		}
+	}
+
+	/// Hide the progress bar temporarily, execute `f`, then redraw the progress bar
+	///
+	/// Useful for external code that writes to the standard output.
+	pub fn suspend_status<F: FnOnce() -> R, R>(&self, f: F) -> R {
+		if let Some(phase) = &self.config.phase {
+			phase.suspend(f)
+		} else {
+			f()
 		}
 	}
 
@@ -235,15 +246,24 @@ impl ResolveRepo for RemoteGitRepo {
 			}
 		};
 
-		// Clone remote repo if not exists
-		if path.exists().not() {
-			t.update_status("cloning");
-			git::clone(&self.url, &path).context("failed to clone remote repository")?;
-		} else {
-			t.update_status("pulling");
-		}
-		// Whether we cloned or not, we need to fetch so we get tags
-		git::fetch(&path).context("failed to fetch updates from remote repository")?;
+		// NOTE: suspend_status is needed, otherwise the Shell ProgressBars and progress bars
+		// tracking git operation progress fight over the terminal
+		t.suspend_status(|| -> std::result::Result<(), crate::Error> {
+			// when this goes out of scope, the render thread will die
+			let progress_root = prodash::tree::Root::new();
+			// do not drop this until the end of the scope, otherwise the render thread will die
+			let _handle = GitProgressRenderHandle::new(progress_root.clone());
+
+			// Clone remote repo if not exists
+			if path.exists().not() {
+				git::clone(&self.url, &path, progress_root.clone())
+					.context("failed to clone remote repository")?;
+			}
+			// Whether we cloned or not, we need to fetch so we get tags
+			git::fetch(&path, progress_root.clone())
+				.context("failed to fetch updates from remote repository")?;
+			Ok(())
+		})?;
 
 		let refspec = t.get_checkout_target(&path)?;
 		let git_ref = git::checkout(&path, refspec)?.to_string();
