@@ -55,9 +55,7 @@ jobs:
               - "plugins/**"
               - "xtask/**"
               - "sdk/rust/**"
-              - "hipcheck-common/**"
-              - "hipcheck-macros/**"
-              - "hipcheck-sdk-macros/**"
+              - "library/**"
       - uses: dtolnay/rust-toolchain@stable
         if: steps.filter.outputs.code == 'true'
       - uses: taiki-e/install-action@nextest

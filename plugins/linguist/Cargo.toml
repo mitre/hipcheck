@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 clap = { version = "4.5.27", features = ["derive"] }
-hipcheck-kdl = { version = "0.1.0", path = "../../hipcheck-kdl" }
+hipcheck-kdl = { version = "0.1.0", path = "../../library/hipcheck-kdl" }
 hipcheck-sdk = { version = "0.4.0", path = "../../sdk/rust", features = [
     "macros",
 ] }

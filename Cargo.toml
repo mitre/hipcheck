@@ -13,10 +13,10 @@ resolver = "2"
 # Members of the workspace.
 members = [
     "hipcheck",
-    "hipcheck-common",
-    "hipcheck-kdl",
-    "hipcheck-macros",
-    "hipcheck-sdk-macros",
+    "library/hipcheck-common",
+    "library/hipcheck-kdl",
+    "library/hipcheck-macros",
+    "library/hipcheck-sdk-macros",
     "sdk/rust",
     "plugins/git",
     "plugins/github",
@@ -31,8 +31,8 @@ members = [
     "plugins/linguist",
     "plugins/review",
     "plugins/typo",
-    "test-plugins/dummy_rand_data",
-    "test-plugins/dummy_sha256",
+    "tests/test-plugins/dummy_rand_data",
+    "tests/test-plugins/dummy_sha256",
     "xtask",
 ]
 

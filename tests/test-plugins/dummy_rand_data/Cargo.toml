@@ -7,8 +7,11 @@ publish = false
 
 [dependencies]
 clap = { version = "4.5.27", features = ["derive"] }
-hipcheck-sdk = { path = "../../sdk/rust", features = ["macros"] }
+hipcheck-sdk = { path = "../../../sdk/rust", features = ["macros"] }
 tokio = { version = "1.43.0", features = ["rt"] }
 
 [dev-dependencies]
-hipcheck-sdk = { path = "../../sdk/rust", features = ["macros", "mock_engine"] }
+hipcheck-sdk = { path = "../../../sdk/rust", features = [
+    "macros",
+    "mock_engine",
+] }

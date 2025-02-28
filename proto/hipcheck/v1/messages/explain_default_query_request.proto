@@ -1,8 +1,0 @@
-syntax = "proto3";
-package hipcheck.v1;
-
-import "empty.proto";
-
-message ExplainDefaultQueryRequest {
-    Empty empty = 1;
-}
