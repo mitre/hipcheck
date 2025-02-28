@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod git;
+mod progress;
 
 use crate::{
 	error::{Context, Error, Result},
@@ -11,6 +12,8 @@ use crate::{
 use pathbuf::pathbuf;
 use std::path::{Path, PathBuf};
 use url::{Host, Url};
+
+pub use progress::GitProgressRenderHandle;
 
 /// Creates a RemoteGitRepo struct from a given git URL by idenfitying if it is from a known host (currently only GitHub) or not
 pub fn get_remote_repo_from_url(url: Url) -> Result<RemoteGitRepo> {

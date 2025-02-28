@@ -13,7 +13,7 @@ hipcheck-sdk = { version = "0.5.0", path = "../../sdk/rust", features = [
     "macros",
 ] }
 lru = "0.13.0"
-gix = { version = "0.70.0", default-features = false, features = [
+gix = { version = "0.71.0", default-features = false, features = [
     "basic",
     "max-control",
     "zlib-stock",

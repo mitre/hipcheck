@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-
-//! Git related types and implementations for pulling/cloning source repos.
-
 use crate::{
 	error::{Error as HcError, Result as HcResult},
 	hc_error,
 };
-use gix::{bstr::ByteSlice, refs::FullName, remote, ObjectId};
-use std::path::Path;
+use gix::{bstr::ByteSlice, refs::FullName, remote, ObjectId, Repository};
+use std::{path::Path, sync::Arc};
 use url::Url;
 
 /// default options to use when fetching a repo with `gix`
@@ -22,9 +19,9 @@ fn fetch_options(url: &Url, dest: &Path) -> gix::clone::PrepareFetch {
 	.expect("fetch options must be valid to perform a clone")
 }
 
-/// fast-forward HEAD of current repo to a new_commit
+/// fast-forward HEAD of repo to a new object ID (SHA1)
 ///
-/// returns new ObjectId (hash) of updated HEAD upon success
+/// returns new ObjectId (SHA1) of updated HEAD upon success
 fn fast_forward_to_hash(
 	repo: &gix::Repository,
 	current_head: gix::Head,
@@ -35,7 +32,7 @@ fn fast_forward_to_hash(
 		.ok_or_else(|| hc_error!("Could not determine hash of current HEAD"))?;
 
 	if current_id == new_object_id {
-		log::debug!("skipping fast-forward, IDs match");
+		log::debug!("skipping fast-forward, HEAD already correct");
 		return Ok(current_id.into());
 	}
 	let edit = gix::refs::transaction::RefEdit {
@@ -72,15 +69,20 @@ fn fast_forward_to_hash(
 }
 
 /// Clone a repo from the given url to a destination path in the filesystem.
-pub fn clone(url: &Url, dest: &Path) -> HcResult<()> {
+pub fn clone(
+	url: &Url,
+	dest: &Path,
+	progress_root: Arc<prodash::tree::Root>,
+) -> HcResult<Repository> {
+	let mut progress = progress_root.add_child("clone");
 	log::debug!("attempting to clone {} to {:?}", url.as_str(), dest);
 	std::fs::create_dir_all(dest)?;
 	let mut fetch_options = fetch_options(url, dest);
-	let (mut checkout, _) = fetch_options
-		.fetch_then_checkout(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
-	let _ = checkout.main_worktree(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
-	log::info!("Successfully cloned {} to {:?}", url.as_str(), dest);
-	Ok(())
+	let (mut checkout, _) =
+		fetch_options.fetch_then_checkout(&mut progress, &gix::interrupt::IS_INTERRUPTED)?;
+	let (repo, _) = checkout.main_worktree(&mut progress, &gix::interrupt::IS_INTERRUPTED)?;
+	log::debug!("Successfully cloned {} to {:?}", url.as_str(), dest);
+	Ok(repo)
 }
 
 /// For a given repo, checkout a particular ref in a detached HEAD state.
@@ -140,10 +142,9 @@ pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<gix::Obje
 	Err(HcError::msg("target is ambiguous"))
 }
 
-/// TODO: redo commit history to add support for fetch/clone/checkout separately
-/// TODO: add support for visual progress indicators
 /// Perform a `git fetch` for all remotes in the repo.
-pub fn fetch(repo_path: &Path) -> HcResult<()> {
+pub fn fetch(repo_path: &Path, progress_root: Arc<prodash::tree::Root>) -> HcResult<()> {
+	let mut progress = progress_root.add_child("fetch");
 	log::debug!("Fetching: {:?}", repo_path);
 	let repo = gix::open(repo_path)?;
 	let remote_names = repo.remote_names();
@@ -152,8 +153,8 @@ pub fn fetch(repo_path: &Path) -> HcResult<()> {
 		let remote = repo.find_remote(remote_name.as_bstr())?;
 		remote
 			.connect(gix::remote::Direction::Fetch)?
-			.prepare_fetch(gix::progress::Discard, Default::default())?
-			.receive(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
+			.prepare_fetch(&mut progress, Default::default())?
+			.receive(&mut progress, &gix::interrupt::IS_INTERRUPTED)?;
 	}
 	Ok(())
 }

@@ -125,6 +125,13 @@ impl SpinnerPhase {
 
 		self.bar.finish_and_clear()
 	}
+
+	/// Hide the progress bar temporarily, execute `f`, then redraw the progress bar
+	///
+	/// Useful for external code that writes to the standard output.
+	pub fn suspend<F: FnOnce() -> R, R>(&self, f: F) -> R {
+		self.bar.suspend(f)
+	}
 }
 
 /// A spinner phase tracking an [Iterator].
