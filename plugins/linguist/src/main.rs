@@ -7,7 +7,7 @@ mod linguist;
 mod util;
 
 use clap::Parser;
-use hipcheck_sdk::prelude::*;
+use hipcheck_sdk::{prelude::*, LogLevel};
 use linguist::SourceFileDetector;
 use serde::Deserialize;
 use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};
@@ -75,6 +75,9 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value_t=LogLevel::Error)]
+	log_level: LogLevel,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
 }
@@ -82,7 +85,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(LinguistPlugin {})
+	PluginServer::register(LinguistPlugin {}, args.log_level)
 		.listen_local(args.port)
 		.await
 }

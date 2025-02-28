@@ -16,7 +16,7 @@ use crate::{
 	},
 };
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::LocalGitRepo};
+use hipcheck_sdk::{prelude::*, types::LocalGitRepo, LogLevel};
 use jiff::Timestamp;
 use lru::LruCache;
 use serde::Deserialize;
@@ -38,12 +38,12 @@ async fn last_commit_date(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Res
 		Some(commit) => match commit.written_on {
 			Ok(date) => Ok(date.to_string()),
 			Err(e) => {
-				log::error!("{}", e);
+				tracing::error!("{}", e);
 				Err(Error::UnspecifiedQueryState)
 			}
 		},
 		None => {
-			log::error!("no commits");
+			tracing::error!("no commits");
 			Err(Error::UnspecifiedQueryState)
 		}
 	}
@@ -54,7 +54,7 @@ async fn last_commit_date(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Res
 async fn diffs(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Diff>> {
 	let path = &repo.path;
 	let diffs = get_diffs(path).map_err(|e| {
-		log::error!("{}", e);
+		tracing::error!("{}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	Ok(diffs)
@@ -65,7 +65,7 @@ async fn diffs(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Dif
 async fn commits(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Commit>> {
 	let path = &repo.path;
 	let raw_commits = get_all_raw_commits(path).map_err(|e| {
-		log::error!("failed to get raw commits: {}", e);
+		tracing::error!("failed to get raw commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	let commits = raw_commits.into_iter().map(Commit::from).collect();
@@ -83,17 +83,17 @@ async fn commits_from_date(
 	let path = &repo.local.path;
 	let date = match repo.details {
 		Some(date) => Timestamp::from_str(&date).map_err(|e| {
-			log::error!("Failed to convert to jiff::Timestamp: {}", e);
+			tracing::error!("Failed to convert to jiff::Timestamp: {}", e);
 			Error::UnspecifiedQueryState
 		})?,
 		None => {
-			log::error!("No date provided");
+			tracing::error!("No date provided");
 			return Err(Error::UnspecifiedQueryState);
 		}
 	};
 	// The called function will return an error if the date is not formatted correctly, so we do not need to check for ahead of time
 	let raw_commits_from_date = get_commits_from_date(path, date).map_err(|e| {
-		log::error!("failed to get raw commits from date: {}", e);
+		tracing::error!("failed to get raw commits from date: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	let commits = raw_commits_from_date
@@ -109,7 +109,7 @@ async fn commits_from_date(
 async fn contributors(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Contributor>> {
 	let path = &repo.path;
 	let contributors = get_contributors(path).map_err(|e| {
-		log::error!("failed to get contributors: {}", e);
+		tracing::error!("failed to get contributors: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	Ok(contributors)
@@ -119,7 +119,7 @@ async fn contributors(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<
 #[query]
 async fn commit_diffs(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<CommitDiff>> {
 	let commit_diffs = get_commit_diffs(&repo.path).map_err(|e| {
-		log::error!("Error finding commit diffs: {}", e);
+		tracing::error!("Error finding commit diffs: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	Ok(commit_diffs)
@@ -135,23 +135,23 @@ async fn commits_for_contributor(
 	let email = match repo.details {
 		Some(ref email) => email.clone(),
 		None => {
-			log::error!("No contributor e-mail address provided");
+			tracing::error!("No contributor e-mail address provided");
 			return Err(Error::UnspecifiedQueryState);
 		}
 	};
 
 	let all_commits = commits(engine, local.clone()).await.map_err(|e| {
-		log::error!("failed to get commits: {}", e);
+		tracing::error!("failed to get commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	let contributors = contributors(engine, local.clone()).await.map_err(|e| {
-		log::error!("failed to get contributors: {}", e);
+		tracing::error!("failed to get contributors: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	let commit_contributors = commit_contributors(engine, local.clone())
 		.await
 		.map_err(|e| {
-			log::error!("failed to get join table: {}", e);
+			tracing::error!("failed to get join table: {}", e);
 			Error::UnspecifiedQueryState
 		})?;
 
@@ -160,7 +160,7 @@ async fn commits_for_contributor(
 		.iter()
 		.position(|c| c.email == email)
 		.ok_or_else(|| {
-			log::error!("failed to find contributor");
+			tracing::error!("failed to find contributor");
 			Error::UnspecifiedQueryState
 		})?;
 
@@ -198,29 +198,29 @@ async fn contributors_for_commit(
 	let hash = match repo.details {
 		Some(ref hash) => hash.clone(),
 		None => {
-			log::error!("No commit hash provided");
+			tracing::error!("No commit hash provided");
 			return Err(Error::UnspecifiedQueryState);
 		}
 	};
 
 	let commits = commits(engine, local.clone()).await.map_err(|e| {
-		log::error!("failed to get commits: {}", e);
+		tracing::error!("failed to get commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	let contributors = contributors(engine, local.clone()).await.map_err(|e| {
-		log::error!("failed to get contributors: {}", e);
+		tracing::error!("failed to get contributors: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	let commit_contributors = commit_contributors(engine, local.clone())
 		.await
 		.map_err(|e| {
-			log::error!("failed to get join table: {}", e);
+			tracing::error!("failed to get join table: {}", e);
 			Error::UnspecifiedQueryState
 		})?;
 
 	// Get the index of the commit
 	let commit_id = commits.iter().position(|c| c.hash == hash).ok_or_else(|| {
-		log::error!("failed to find contributor");
+		tracing::error!("failed to find contributor");
 		Error::UnspecifiedQueryState
 	})?;
 
@@ -245,7 +245,7 @@ async fn contributors_for_commit(
 			}
 		})
 		.ok_or_else(|| {
-			log::error!("failed to find contributor info");
+			tracing::error!("failed to find contributor info");
 			Error::UnspecifiedQueryState
 		})
 }
@@ -257,11 +257,11 @@ async fn commit_contributors(
 ) -> Result<Vec<CommitContributor>> {
 	let path = &repo.path;
 	let contributors = contributors(engine, repo.clone()).await.map_err(|e| {
-		log::error!("failed to get contributors: {}", e);
+		tracing::error!("failed to get contributors: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	let raw_commits = get_all_raw_commits(path).map_err(|e| {
-		log::error!("failed to get raw commits: {}", e);
+		tracing::error!("failed to get raw commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 
@@ -297,7 +297,7 @@ async fn contributor_summary(
 	repo: LocalGitRepo,
 ) -> Result<Vec<CommitContributorView>> {
 	let commits = get_all_raw_commits(repo.path).map_err(|e| {
-		log::error!("failed to get commits: {}", e);
+		tracing::error!("failed to get commits: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
 	let mut commit_contributor_views = Vec::with_capacity(commits.len());
@@ -356,6 +356,9 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value_t=LogLevel::Error)]
+	log_level: LogLevel,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
 }
@@ -363,7 +366,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(GitPlugin {})
+	PluginServer::register(GitPlugin {}, args.log_level)
 		.listen_local(args.port)
 		.await
 }

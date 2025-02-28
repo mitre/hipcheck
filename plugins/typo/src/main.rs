@@ -13,7 +13,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context as _};
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target};
+use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
 use serde::Deserialize;
 use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
@@ -47,7 +47,7 @@ impl TryFrom<RawConfig> for Config {
 		let typo_path = PathBuf::from(raw_typo_path);
 		let typo_file = TypoFile::load_from(&typo_path).map_err(|e| {
 			// Print error with Debug for full context
-			log::error!("{:?}", e);
+			tracing::error!("{:?}", e);
 			ConfigError::ParseError {
 				source: format!("Typo file at path {}", typo_path.display()),
 				// Print error with Debug for full context
@@ -66,7 +66,7 @@ impl TryFrom<RawConfig> for Config {
 
 #[query(default)]
 async fn typo(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
-	log::debug!("running typo query");
+	tracing::debug!("running typo query");
 
 	// Get the typo file.
 	let typo_file = TYPOFILE
@@ -100,7 +100,7 @@ async fn typo(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 		engine.record_concern(concern);
 	}
 
-	log::info!("completed typo query");
+	tracing::info!("completed typo query");
 
 	Ok(typos)
 }
@@ -157,6 +157,9 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value_t=LogLevel::Error)]
+	log_level: LogLevel,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
 }
@@ -164,7 +167,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(TypoPlugin::default())
+	PluginServer::register(TypoPlugin::default(), args.log_level)
 		.listen_local(args.port)
 		.await
 }

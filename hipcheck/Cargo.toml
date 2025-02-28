@@ -110,6 +110,7 @@ tokio = { version = "1.44.0", features = [
     "rt-multi-thread",
     "sync",
     "time",
+    "process"
 ] }
 tokio-stream = "0.1.17"
 toml = "0.8.20"

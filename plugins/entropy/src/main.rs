@@ -7,7 +7,7 @@ mod types;
 use crate::{metric::*, types::*};
 
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target};
+use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
 use serde::Deserialize;
 
 use std::{collections::HashSet, path::PathBuf, result::Result as StdResult, sync::OnceLock};
@@ -210,6 +210,9 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value_t=LogLevel::Error)]
+	log_level: LogLevel,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
 }
@@ -217,7 +220,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(EntropyPlugin::default())
+	PluginServer::register(EntropyPlugin::default(), args.log_level)
 		.listen_local(args.port)
 		.await
 }

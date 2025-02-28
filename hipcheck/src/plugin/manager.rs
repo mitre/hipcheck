@@ -3,13 +3,116 @@
 use crate::{
 	hc_error,
 	plugin::{try_get_bin_for_entrypoint, HcPluginClient, Plugin, PluginContext},
+	policy::policy_file::PolicyPluginName,
 	Result,
 };
 use futures::future::join_all;
-use hipcheck_common::proto::plugin_service_client::PluginServiceClient;
+use hipcheck_common::{proto::plugin_service_client::PluginServiceClient, types::LogLevel};
+use log::{debug, error, info, trace, warn};
 use rand::Rng;
-use std::{ffi::OsString, ops::Range, path::Path, process::Command};
-use tokio::time::{sleep_until, Duration, Instant};
+use serde::Deserialize;
+use std::{collections::HashMap, env, ffi::OsString, ops::Range, path::Path, sync::LazyLock};
+use tokio::process::Command;
+use tokio::{
+	io::{AsyncBufReadExt, BufReader},
+	time::{sleep_until, Duration, Instant},
+};
+
+static PLUGIN_LOG_SETTINGS: LazyLock<PluginLogLevels> =
+	LazyLock::new(PluginLogLevels::new_from_env);
+
+/// structs for deserializing plugin logs
+#[derive(Debug, Deserialize)]
+struct LogEvent {
+	level: LogLevel,
+	fields: LogFields,
+	target: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct LogFields {
+	message: String,
+}
+
+pub struct PluginLogLevels {
+	plugin_wide_level: LogLevel,
+	plugin_level_map: HashMap<String, LogLevel>,
+}
+impl PluginLogLevels {
+	/// Parses HC_LOG env var to fetch log level for each plugin as Struct
+	pub fn new_from_env() -> Self {
+		// default level to error when var unset
+		let mut plugin_wide_level = LogLevel::Error;
+		let mut plugin_level_map: HashMap<String, LogLevel> = HashMap::new();
+
+		let Ok(rust_log) = env::var("HC_LOG") else {
+			return PluginLogLevels {
+				plugin_wide_level,
+				plugin_level_map,
+			};
+		};
+
+		let settings: Vec<&str> = rust_log.split(',').collect();
+		let mut plugin_wide_set = false;
+
+		for setting in settings {
+			let parts: Vec<&str> = setting.split('=').collect();
+
+			match (parts.first(), parts.get(1)) {
+				(Some(module), Some(level)) => {
+					let log_level = match LogLevel::level_from_str(level) {
+						Ok(level) => level,
+						Err(e) => {
+							log::error!("{}", e);
+							continue;
+						}
+					};
+
+					if *module == "plugin" {
+						// e.g. HC_LOG="plugin=info"
+						// plugin wide log level is set, overriding global level
+						plugin_wide_level = log_level;
+						plugin_wide_set = true;
+					} else {
+						// e.g. HC_LOG="plugin::typo=info"
+						// plugin specific log level is found
+						plugin_level_map.insert(module.to_string(), log_level);
+					}
+				}
+				(Some(level), _) => {
+					// e.g. HC_LOG="info"
+					let log_level = match LogLevel::level_from_str(level) {
+						Ok(level) => level,
+						Err(e) => {
+							log::error!("{}", e);
+							continue;
+						}
+					};
+					// Global log level used for plugins, if no plugin wide found
+					if !plugin_wide_set {
+						plugin_wide_level = log_level;
+					}
+				}
+				(None, _) => log::error!("Incomplete HC_LOG var set"),
+			}
+		}
+		PluginLogLevels {
+			plugin_wide_level,
+			plugin_level_map,
+		}
+	}
+
+	/// Retrieves the log level for a given plugin, using most specific level available
+	fn get_log_level_for_module(&self, plugin_name: &str) -> &LogLevel {
+		// use plugin specific
+		if let Some(level) = self.plugin_level_map.get(plugin_name) {
+			level
+		} else {
+			// use plugin wide
+			&self.plugin_wide_level
+		}
+	}
+}
 
 #[derive(Clone, Debug)]
 pub struct PluginExecutor {
@@ -63,6 +166,52 @@ impl PluginExecutor {
 		}
 
 		Err(hc_error!("Failed to find available port"))
+	}
+
+	/// Launches async forwarding of plugin logs to program output.
+	fn forward_plugin_logs(
+		&self,
+		reader: impl tokio::io::AsyncRead + Unpin + Send + 'static,
+		plugin_title: String,
+	) {
+		tokio::spawn(async move {
+			let reader = BufReader::new(reader);
+			let mut lines = reader.lines();
+			// parse plugin log json lines to LogEvent objects and output the messages
+			loop {
+				match lines.next_line().await {
+					Ok(Some(line)) => {
+						if let Ok(event) = serde_json::from_str::<LogEvent>(&line) {
+							let message = event.fields.message;
+							let event_target = match event.target.contains("hipcheck_sdk") {
+								true => {
+									format!("plugin::{}::{}", plugin_title, event.target)
+								}
+								false => format!("plugin::{}", event.target),
+							};
+							match event.level {
+								LogLevel::Error => error!(target: &event_target, "{}", message),
+								LogLevel::Warn => warn!(target: &event_target, "{}", message),
+								LogLevel::Info => info!(target: &event_target, "{}", message),
+								LogLevel::Debug => debug!(target: &event_target, "{}", message),
+								LogLevel::Trace => trace!(target: &event_target, "{}", message),
+								LogLevel::Off => {}
+							};
+						}
+						// drop plugin logs without message
+					}
+					Ok(None) => {
+						break;
+					}
+					Err(e) => {
+						log::error!(
+							"I/O erorr occured while listening for logs from {plugin_title}: {e}"
+						);
+						break;
+					}
+				};
+			}
+		});
 	}
 
 	pub async fn start_plugins(&self, plugins: Vec<Plugin>) -> Result<Vec<PluginContext>> {
@@ -146,14 +295,26 @@ impl PluginExecutor {
 			spawn_args.push("--port");
 			spawn_args.push(port_str.as_str());
 
+			// pass logging level for plugin
+			let plugin_title = PolicyPluginName::new(&plugin.name)
+				.expect("plugin name")
+				.name
+				.0;
+			let plugin_path = format!("plugin::{}", plugin_title);
+			let plugin_log_level = PLUGIN_LOG_SETTINGS.get_log_level_for_module(&plugin_path);
+			let plugin_log_level_str = plugin_log_level.to_string();
+			spawn_args.push("--log-level");
+			spawn_args.push(&plugin_log_level_str);
+
 			// Spawn plugin process
 			log::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
 			let Ok(mut proc) = Command::new(&canon_bin_path)
 				.env("PATH", &cmd_path)
 				.args(spawn_args)
-				// @Temporary - directly forward stdout/stderr from plugin to shell
-				.stdout(std::io::stdout())
-				.stderr(std::io::stderr())
+				// pipe output to tokio task for plugin log forwarding
+				.stdout(std::process::Stdio::piped())
+				.stderr(std::process::Stdio::piped())
+				.kill_on_drop(true)
 				.spawn()
 			else {
 				spawn_attempts += 1;
@@ -190,12 +351,19 @@ impl PluginExecutor {
 			// If opt_grpc is None, we did not manage to connect to the plugin. Kill it
 			// and try again
 			let Some(grpc) = opt_grpc else {
-				if let Err(e) = proc.kill() {
-					println!("Failed to kill child process for plugin: {e}");
+				if let Err(e) = proc.kill().await {
+					log::error!("Failed to kill child process for plugin: {e}");
 				}
 				spawn_attempts += 1;
 				continue;
 			};
+
+			let plugin_stdout = proc.stdout.take().expect("Failed to capture plugin stdout");
+			let plugin_stderr = proc.stderr.take().expect("Failed to capture plugin stderr");
+
+			self.forward_plugin_logs(plugin_stdout, plugin_title.clone());
+			self.forward_plugin_logs(plugin_stderr, plugin_title.clone());
+
 			// We now have an open gRPC connection to our plugin process
 			return Ok(PluginContext {
 				plugin: plugin.clone(),
@@ -209,5 +377,58 @@ impl PluginExecutor {
 			"Reached max spawn attempts for plugin {}",
 			plugin.name
 		))
+	}
+}
+
+/// Test Plugin log level parsing
+#[cfg(test)]
+mod tests {
+	use hipcheck_common::types::LogLevel;
+
+	use super::PluginLogLevels;
+	use crate::util::test::with_env_vars;
+
+	#[test]
+	fn plugin_wide_log_level() {
+		let vars = vec![("HC_LOG", Some("plugin::git=trace,plugin=debug,off"))];
+
+		with_env_vars(vars, || {
+			let plugin_log_settings = PluginLogLevels::new_from_env();
+
+			assert_eq!(
+				&LogLevel::Debug,
+				plugin_log_settings.get_log_level_for_module("plugin::affiliation")
+			);
+			assert_eq!(
+				&LogLevel::Trace,
+				plugin_log_settings.get_log_level_for_module("plugin::git")
+			);
+			assert_eq!(
+				&LogLevel::Debug,
+				plugin_log_settings.get_log_level_for_module("typo")
+			);
+		});
+	}
+
+	#[test]
+	fn plugin_specific_log_level() {
+		let vars = vec![("HC_LOG", Some("plugin::affiliation=info,plugin::git=trace"))];
+
+		with_env_vars(vars, || {
+			let plugin_log_settings = PluginLogLevels::new_from_env();
+
+			assert_eq!(
+				&LogLevel::Info,
+				plugin_log_settings.get_log_level_for_module("plugin::affiliation")
+			);
+			assert_eq!(
+				&LogLevel::Trace,
+				plugin_log_settings.get_log_level_for_module("plugin::git")
+			);
+			assert_eq!(
+				&LogLevel::Error,
+				plugin_log_settings.get_log_level_for_module("typo")
+			);
+		});
 	}
 }
