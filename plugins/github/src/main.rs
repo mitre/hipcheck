@@ -62,14 +62,14 @@ fn get_github_agent<'a>(owner: &'a str, repo: &'a str) -> Result<GitHub<'a>> {
 		CONFIG
 			.get()
 			.ok_or_else(|| {
-				log::error!("tried to access config before set by Hipcheck core!");
+				tracing::error!("tried to access config before set by Hipcheck core!");
 				Error::UnspecifiedQueryState
 			})?
 			.api_token
 			.as_str(),
 	)
 	.map_err(|e| {
-		log::error!("{}", e);
+		tracing::error!("{}", e);
 		Error::UnspecifiedQueryState
 	})
 }
@@ -82,7 +82,7 @@ async fn pr_reviews(_engine: &mut PluginEngine, key: KnownRemote) -> Result<Vec<
 	let results = get_github_agent(owner, repo)?
 		.get_reviews_for_pr()
 		.map_err(|e| {
-			log::error!("{}", e);
+			tracing::error!("{}", e);
 			Error::UnspecifiedQueryState
 		})?
 		.into_iter()
@@ -103,7 +103,7 @@ async fn has_fuzz(_engine: &mut PluginEngine, key: RemoteGitRepo) -> Result<bool
 	};
 	let url = Rc::new(key.url.to_string());
 	get_github_agent(owner, repo)?.fuzz_check(url).map_err(|e| {
-		log::error!("{}", e);
+		tracing::error!("{}", e);
 		Error::UnspecifiedQueryState
 	})
 }
@@ -112,6 +112,9 @@ async fn has_fuzz(_engine: &mut PluginEngine, key: RemoteGitRepo) -> Result<bool
 struct Args {
 	#[arg(long)]
 	port: u16,
+	
+	#[arg(long, default_value = "OFF")]
+	log_level: String,
 
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
@@ -149,7 +152,7 @@ impl Plugin for GithubAPIPlugin {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(GithubAPIPlugin {})
+	PluginServer::register(GithubAPIPlugin {}, &args.log_level)
 		.listen(args.port)
 		.await
 }

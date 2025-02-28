@@ -131,7 +131,7 @@ impl TryInto<QueryTarget> for &str {
 	}
 }
 
-/// Descrbies the signature of a particular `NamedQuery`.
+/// Describes the signature of a particular `NamedQuery`.
 ///
 /// Instances of this type are usually created by the default implementation of `Plugin::schemas()`
 /// and would not need to be created by hand unless you are doing something very unorthodox.
@@ -231,4 +231,22 @@ pub trait Plugin: Send + Sync + 'static {
 			output_schema: query.inner.output_schema(),
 		})
 	}
+}
+
+/// Initializes `tracing-subscriber` for plugin logging via the `tracing` crate.
+///
+/// Initializes an `tracing-subscriber` which writes log messages produced via the `tracing`crate macros to stdout/stderr.
+/// These plugin logs are then piped to Hipcheck core's stdout/stderr log output during execution.
+///
+/// `tracing-subscriber` uses an `EnvFilter` to filter logs to up to the log-level passed as argument `log-level`
+/// to the plugin by `HC Core`.
+///
+/// init_logger() is enabled as a default feature, but could be disabled and replaced by setting `default-features = false`
+/// in the `dependencies` section of a plugin's `Cargo.toml` prior to compilation.
+#[cfg(feature = "init_logger")]
+pub fn init_logger(log_level: &str) {
+	tracing_subscriber::fmt()
+		.json()
+		.with_env_filter(log_level)
+		.init();
 }

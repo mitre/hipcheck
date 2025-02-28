@@ -22,13 +22,12 @@ use std::{
 	ops::Not as _,
 	path::PathBuf,
 	pin::Pin,
-	process::Child,
 	result::Result as StdResult,
 };
+use tokio::process::Child;
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{transport::Channel, Code, Status};
-
 pub type HcPluginClient = PluginServiceClient<Channel>;
 
 #[derive(Clone, Debug)]
@@ -345,13 +344,6 @@ impl PluginContext {
 			tx,
 			rx: Mutex::new(MultiplexedQueryReceiver::new(rx)),
 		})
-	}
-}
-impl Drop for PluginContext {
-	fn drop(&mut self) {
-		if let Err(e) = self.proc.kill() {
-			println!("Failed to kill child: {e}");
-		}
 	}
 }
 

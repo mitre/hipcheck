@@ -31,7 +31,12 @@ pub struct PluginServer<P> {
 
 impl<P: Plugin> PluginServer<P> {
 	/// Create a new plugin server for the provided plugin.
-	pub fn register(plugin: P) -> PluginServer<P> {
+	pub fn register(plugin: P, log_level: &str) -> PluginServer<P> {
+		#[cfg(feature = "init_logger")]
+		{
+			crate::init_logger(log_level);
+		}
+
 		PluginServer {
 			plugin: Arc::new(plugin),
 		}

@@ -24,13 +24,17 @@ schemars = { version = "0.8.21", features = ["url"] }
 hipcheck-sdk-macros = { path = "../../hipcheck-sdk-macros", version = "0.1.2", optional = true }
 typify-macro = "0.2.0"
 url = { version = "2.5.4", features = ["serde"] }
-log = "0.4.25"
+tracing = { version= "0.1", optional = true }
+tracing-subscriber = { version="0.3", features=["env-filter", "json"], optional = true }
 hipcheck-common = { version = "0.3.0", path = "../../hipcheck-common" }
+console = "0.15.10"
 
 [features]
+default = ["init_logger"]
 macros = ["dep:hipcheck-sdk-macros"]
 mock_engine = []
 print-timings = []
+init_logger = ["tracing", "tracing-subscriber"]
 
 [package.metadata.docs.rs]
 all-features = true

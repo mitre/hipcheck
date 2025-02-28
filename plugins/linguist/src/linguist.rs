@@ -106,7 +106,7 @@ impl LanguageFile {
 			}
 		}
 
-		log::trace!("linguist known code extensions [exts='{:#?}']", result);
+		tracing::trace!("linguist known code extensions [exts='{:#?}']", result);
 
 		result
 	}
