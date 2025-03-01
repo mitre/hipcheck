@@ -8,6 +8,6 @@
     "ghcr.io/devcontainers/features/node:1": {}
   },
   "postCreateCommand": {
-    "openssl": "sudo apt-get install libssl-dev protobuf-compiler"
+    "openssl": "sudo apt-get install libssl-dev protobuf-compiler mold"
   }
 }

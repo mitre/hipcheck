@@ -69,7 +69,7 @@ jobs:
 
       # Install the protobuf compiler
       - if: runner.os == 'Linux' && steps.filter.outputs.code == 'true'
-        run: sudo apt-get install -y protobuf-compiler
+        run: sudo apt-get install -y protobuf-compiler mold
       - if: runner.os == 'macOS' && steps.filter.outputs.code == 'true'
         run: brew install protobuf
       - if: runner.os == 'Windows' && steps.filter.outputs.code == 'true'
