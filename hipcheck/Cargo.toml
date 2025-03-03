@@ -129,7 +129,7 @@ which = { version = "7.0.2", default-features = false }
 xml-rs = "0.8.25"
 xz2 = "0.1.7"
 zip = "2.2.2"
-zstd = "0.13.2"
+zstd = "0.13.3"
 hipcheck-common = { version = "0.3.0", path = "../hipcheck-common", features = [
     "rfd9-compat",
 ] }
