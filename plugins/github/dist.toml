@@ -20,6 +20,7 @@ include = ["plugin.kdl"]
 
 [dist.dependencies.apt]
 protobuf-compiler = "*"
+mold = "*"
 
 [dist.dependencies.homebrew]
 protobuf = "*"
