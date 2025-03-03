@@ -19,6 +19,9 @@ async fn fuzz(engine: &mut PluginEngine, key: Target) -> Result<Value> {
 struct Args {
 	#[arg(long)]
 	port: u16,
+
+	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
+	unknown_args: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
