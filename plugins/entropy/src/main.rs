@@ -209,6 +209,9 @@ impl Plugin for EntropyPlugin {
 struct Args {
 	#[arg(long)]
 	port: u16,
+
+	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
+	unknown_args: Vec<String>,
 }
 
 #[tokio::main(flavor = "current_thread")]
