@@ -107,7 +107,7 @@ sha256 = { version = "1.5.0", default-features = false }
 smart-default = "0.7.1"
 spdx-rs = "0.5.0"
 tabled = "0.18.0"
-tar = "0.4.43"
+tar = "0.4.44"
 tempfile = "3.17.0"
 tokio = { version = "1.43.0", features = [
     "rt",
