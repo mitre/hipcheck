@@ -10,7 +10,6 @@ dependencies = [
  "hipcheck-sdk",
  "jiff",
  "log",
- "schemars",
  "serde",
  "serde_json",
  "tokio",
@@ -345,10 +344,8 @@ dependencies = [
  "content_inspector",
  "hipcheck-kdl",
  "hipcheck-sdk",
- "log",
  "miette 7.4.0",
  "pathbuf",
- "schemars",
  "serde",
  "serde_json",
  "tokio",
@@ -892,10 +889,8 @@ checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
 name = "dummy_rand_data"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "clap",
  "hipcheck-sdk",
- "rand 0.9.0",
  "tokio",
 ]
 
@@ -949,7 +944,6 @@ dependencies = [
  "clap",
  "dashmap",
  "finl_unicode",
- "futures",
  "hipcheck-sdk",
  "rayon",
  "schemars",
@@ -1185,7 +1179,6 @@ version = "0.2.2"
 dependencies = [
  "clap",
  "hipcheck-sdk",
- "serde",
  "serde_json",
  "tokio",
 ]
@@ -1240,7 +1233,6 @@ dependencies = [
  "jiff",
  "log",
  "lru",
- "once_cell",
  "schemars",
  "serde",
  "serde_json",
@@ -1278,7 +1270,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "ureq",
- "url",
 ]
 
 [[package]]
@@ -2129,14 +2120,12 @@ name = "hipcheck"
 version = "3.11.0"
 dependencies = [
  "anyhow",
- "async-stream",
  "base64 0.22.1",
  "blake3",
  "chrono",
  "clap",
  "console",
  "cyclonedx-bom",
- "dashmap",
  "dialoguer",
  "dirs",
  "dotenv",
@@ -2164,7 +2153,6 @@ dependencies = [
  "ordered-float 5.0.0",
  "packageurl",
  "pathbuf",
- "prost",
  "rand 0.9.0",
  "rayon",
  "regex",
@@ -2174,7 +2162,6 @@ dependencies = [
  "schemars",
  "semver",
  "serde",
- "serde_derive",
  "serde_json",
  "serde_with",
  "sha256",
@@ -2204,7 +2191,6 @@ name = "hipcheck-common"
 version = "0.3.0"
 dependencies = [
  "anyhow",
- "log",
  "pathbuf",
  "prost",
  "serde_json",
@@ -2237,11 +2223,8 @@ dependencies = [
  "futures",
  "hipcheck-common",
  "hipcheck-sdk-macros",
- "indexmap 2.7.1",
  "jiff",
  "log",
- "prost",
- "rand 0.9.0",
  "schemars",
  "serde",
  "serde_json",
@@ -2826,7 +2809,6 @@ dependencies = [
 name = "linguist"
 version = "0.3.1"
 dependencies = [
- "anyhow",
  "clap",
  "hipcheck-kdl",
  "hipcheck-sdk",
@@ -4825,7 +4807,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "url",
 ]
 
 [[package]]

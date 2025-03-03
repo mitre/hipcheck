@@ -10,7 +10,6 @@ publish = false
 clap = { version = "4.5.27", features = ["derive"] }
 dashmap = { version = "6.1.0", features = ["inline", "rayon"] }
 finl_unicode = { version = "1.3.0", features = ["grapheme_clusters"] }
-futures = "0.3.31"
 hipcheck-sdk = { version = "0.4.0", path = "../../sdk/rust", features = [
     "macros",
 ] }

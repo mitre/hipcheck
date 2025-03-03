@@ -8,7 +8,6 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.96"
-log = "0.4.25"
 prost = "0.13.5"
 serde_json = "1.0.139"
 thiserror = "2.0.11"
@@ -22,3 +21,6 @@ tonic-build = "0.12.3"
 [features]
 default = ["rfd9-compat"]
 rfd9-compat = []
+
+[package.metadata.cargo-machete]
+ignored = ["prost", "tonic"]
