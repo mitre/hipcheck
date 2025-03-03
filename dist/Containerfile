@@ -8,7 +8,7 @@ WORKDIR /app
 
 RUN set -eux \
     && apt-get update \
-    && apt-get install --no-install-recommends -y ca-certificates git curl xz-utils \
+    && apt-get install --no-install-recommends -y ca-certificates git curl xz-utils mold \
     && rm -rf /var/lib/apt/lists/* \
     && adduser --disabled-password hc_user \
     && chown -R hc_user /app
