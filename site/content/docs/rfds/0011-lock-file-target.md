@@ -104,11 +104,19 @@ for allowing us one day to support different policy files against different
 repos produced by a multi-repo target seed, since the policy file is also stored
 within the session object.
 
-If we keep `Target` as a field of `Session`, we want to arrive at a design where
-we can call `session.run()` and get a JSON report. Or if we have persistent
-sessions, we want `session.run(target: Target)`, also producing a JSON report.
-In either case, the decision about output format should probably be removed from
-within `Session` (all output types start as a JSON report now anyway).
+A refactored Session object ready for parallelization should have the
+following:
+- A `storage` field to contains the `salsa` query storage.
+- An `Arc<HcPluginCore>` handle to communicate with a set of plugins.
+- A `Shell` handle it will use for all output. In parallelized contexts the
+  Shell object can refrain from printing anything to output.
+- A re-usable `fn run(target: Target, policy: Policy, clear_db: bool) ->
+  JsonValue` that returns the raw JSON report.
+
+With the above changes, the decision about output format is moved to the calling
+function, so we can, for example, decide to create a summary (for multi-target
+seeds) or a detailed human-readable report on the shell (for a single-target
+seed).
 
 ## Parallelization
 
@@ -116,12 +124,13 @@ Naturally, if Hipcheck is running against tens or hundreds of repositories, it
 will be slow to analyze them all in serial. The `salsa` crate we use for
 memoization does not support asynchronous functions, however we likely don't
 want memoziation to be shared between targets in the first place. Therefore, we
-could imagine a design where we create a pool of `tokio::Task` objects that each
-get a separate target-less (see above) `Session` object on initialization, then
-make synchronous calls to their own memoized `query()` function, with the
-different tasks' output finally aggregating into a `HashMap<Target, Report>`. If
-we create a pool of tasks smaller than the number of targets, the existing
-session in a task that gets a new target must first clear its memoziation cache.
+could imagine a design where we create a pool of threads or `tokio::Task`
+objects that each get a separate target-less (see above) `Session` object on
+initialization, then make synchronous calls to their own memoized `query()`
+function, with the different tasks' output finally aggregating into a
+`HashMap<(Target, Policy), Report>`. If we create a pool of tasks smaller than
+the number of targets, the existing session in a task that gets a new target
+must first clear its memoziation cache.
 
 As an alternative to intra-process parallelization with async code, we could
 spawn Hipcheck subprocesses that each communicate with their own copies of the
