@@ -141,6 +141,12 @@ hipcheck-common = { version = "0.3.0", path = "../hipcheck-common", features = [
 ] }
 serde_with = "3.12.0"
 
+[dependencies.reqwest]
+optional = true
+version = "0.12"
+default-features = false
+features = ["blocking", "gzip", "http2", "rustls-tls-native-roots"]
+
 [build-dependencies]
 
 anyhow = "1.0.96"
