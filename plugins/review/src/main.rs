@@ -32,7 +32,7 @@ pub struct PullReview {
 /// Returns whether each commit in a repo was merged with a review
 #[query(default)]
 async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
-	tracing::debug!("running review metric");
+	tracing::debug!("running review query");
 
 	// Confirm that the target is a GitHub repo
 	let Some(remote) = value.remote else {

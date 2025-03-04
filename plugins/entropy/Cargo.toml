@@ -14,6 +14,7 @@ futures = "0.3.31"
 hipcheck-sdk = { version = "0.4.0", path = "../../sdk/rust", features = [
     "macros",
 ] }
+tracing = "0.1"
 rayon = "1.10.0"
 schemars = "0.8.21"
 serde = "1.0.217"

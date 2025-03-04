@@ -48,7 +48,7 @@ async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 		tracing::error!("{}", e);
 		Error::UnspecifiedQueryState
 	})?;
-
+	tracing::info!("completed activity query");
 	Ok(time_since_last_commit.to_string())
 }
 

@@ -76,6 +76,8 @@ async fn commit_identity(engine: &mut PluginEngine, key: DetailedGitRepo) -> Res
 
 #[query(default)]
 async fn identity(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
+	tracing::debug!("running identity query");
+
 	// Get the commits for the source.
 	let repo = key.local;
 	let value = engine
@@ -95,6 +97,8 @@ async fn identity(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
 		};
 		res.push(commit_identity(engine, key).await?);
 	}
+
+	tracing::info!("completed identity query");
 	Ok(res)
 }
 

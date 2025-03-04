@@ -17,7 +17,7 @@ use tokio::{
 	time::{sleep_until, Duration, Instant},
 };
 
-// structs for deserializing plugin logs
+/// structs for deserializing plugin logs
 #[derive(Debug, Deserialize)]
 struct LogEvent {
 	level: String,

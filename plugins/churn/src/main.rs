@@ -81,6 +81,8 @@ async fn commit_churns(
 	engine: &mut PluginEngine,
 	commit_diffs: Vec<CommitDiff>,
 ) -> Result<Vec<CommitChurnFreq>> {
+	tracing::debug!("running churn query");
+	
 	let mut possible_source_files = HashSet::<PathBuf>::new();
 	for cd in commit_diffs.iter() {
 		possible_source_files.extend(
@@ -223,8 +225,7 @@ async fn commit_churns(
 		commit_churn_freq.churn = (commit_churn_freq.churn - mean) / std_dev;
 	}
 
-	tracing::info!("completed churn metric");
-
+	tracing::info!("completed churn query");
 	Ok(commit_churn_freqs)
 }
 

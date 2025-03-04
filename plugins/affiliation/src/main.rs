@@ -264,7 +264,7 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 			*affiliations.get_mut(idx).unwrap() = true;
 		}
 	}
-	tracing::info!("completed affiliation metric");
+	tracing::info!("completed affiliation query");
 	Ok(affiliations)
 }
 

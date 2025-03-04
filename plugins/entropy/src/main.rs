@@ -75,6 +75,8 @@ async fn commit_entropies(
 	engine: &mut PluginEngine,
 	mut commit_diffs: Vec<CommitDiff>,
 ) -> Result<Vec<CommitEntropy>> {
+	tracing::debug!("running entropy query");
+
 	let mut possible_source_files = HashSet::<PathBuf>::new();
 	for cd in commit_diffs.iter() {
 		possible_source_files.extend(
@@ -132,6 +134,7 @@ async fn commit_entropies(
 	// PANIC: It is safe to unwrap here, because the entropy scores will always be valid floating point numbers if we get to this point
 	commit_entropies.sort_by(|a, b| b.entropy.partial_cmp(&a.entropy).unwrap());
 
+	tracing::info!("completed entropy query");
 	// Convert to Z-scores and return results.
 	z_scores(commit_entropies).map_err(|_| Error::UnspecifiedQueryState)
 }
