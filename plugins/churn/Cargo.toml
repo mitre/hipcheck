@@ -16,6 +16,7 @@ schemars = "0.8.21"
 serde = "1.0.217"
 serde_json = "1.0.139"
 tokio = { version = "1.43.0", features = ["rt"] }
+hipcheck-workspace-hack = { version = "0.1", path = "../../library/hipcheck-workspace-hack" }
 
 [dev-dependencies]
 hipcheck-sdk = { version = "0.4.0", path = "../../sdk/rust", features = [
