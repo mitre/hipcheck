@@ -89,7 +89,7 @@ rustls = { version = "0.23.10", default-features = false, features = [
     "ring",
 ] }
 rustls-native-certs = "0.8.1"
-salsa = { git = "https://github.com/mitre/salsa.git", tag = "hipcheck-v3.11.0" }
+salsa = "0.18.0"
 schemars = { version = "0.8.21", default-features = false, features = [
     "derive",
     "preserve_order",
