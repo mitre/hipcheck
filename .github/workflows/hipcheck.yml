@@ -60,6 +60,10 @@ jobs:
         if: steps.filter.outputs.code == 'true'
       - uses: taiki-e/install-action@nextest
         if: steps.filter.outputs.code == 'true'
+      - name: Install cargo-hakari
+        uses: taiki-e/install-action@955a6ff1416eae278c9f833008a9beb4b7f9afe3 # v2
+        with:
+          tool: cargo-hakari
       - uses: swatinem/rust-cache@v2
         if: steps.filter.outputs.code == 'true'
         with:
@@ -77,6 +81,14 @@ jobs:
       - name: Dependency Tree
         if: steps.filter.outputs.code == 'true'
         run: cargo tree
+
+      # Validate 'cargo hakari' is up to date and set up correctly
+      - name: Check workspace-hack is up to date
+        if: steps.filter.outputs.code == 'true'
+        run: cargo hakari generate --diff
+      - name: Check all crates depend on workspace-hack
+        if: steps.filter.outputs.code == 'true'
+        run: cargo hakari manage-deps --dry-run
 
       # Try building every crate in the workspace, without debug symbols to
       # hopefully reduce build times

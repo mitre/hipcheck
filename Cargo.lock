@@ -8,6 +8,7 @@ version = "0.4.1"
 dependencies = [
  "clap",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "jiff",
  "log",
  "serde",
@@ -55,6 +56,7 @@ dependencies = [
  "clap",
  "hipcheck-kdl",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "log",
  "miette 7.4.0",
  "pathbuf",
@@ -338,6 +340,7 @@ dependencies = [
  "content_inspector",
  "hipcheck-kdl",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "miette 7.4.0",
  "pathbuf",
  "serde",
@@ -483,6 +486,7 @@ version = "0.4.1"
 dependencies = [
  "clap",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "log",
  "schemars",
  "serde",
@@ -894,6 +898,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "tokio",
 ]
 
@@ -903,6 +908,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "sha2",
  "tokio",
 ]
@@ -948,6 +954,7 @@ dependencies = [
  "dashmap",
  "finl_unicode",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "rayon",
  "schemars",
  "serde",
@@ -1182,6 +1189,7 @@ version = "0.2.2"
 dependencies = [
  "clap",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "serde_json",
  "tokio",
 ]
@@ -1246,6 +1254,7 @@ dependencies = [
  "clap",
  "gix",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "jiff",
  "log",
  "lru",
@@ -1278,6 +1287,7 @@ dependencies = [
  "clap",
  "graphql_client",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "log",
  "rustls",
  "rustls-native-certs",
@@ -1286,6 +1296,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "ureq",
+ "url",
 ]
 
 [[package]]
@@ -2153,6 +2164,7 @@ dependencies = [
  "hipcheck-common",
  "hipcheck-kdl",
  "hipcheck-macros",
+ "hipcheck-workspace-hack",
  "http",
  "indextree",
  "indicatif",
@@ -2207,6 +2219,7 @@ name = "hipcheck-common"
 version = "0.3.0"
 dependencies = [
  "anyhow",
+ "hipcheck-workspace-hack",
  "pathbuf",
  "prost",
  "serde_json",
@@ -2219,6 +2232,7 @@ dependencies = [
 name = "hipcheck-kdl"
 version = "0.1.0"
 dependencies = [
+ "hipcheck-workspace-hack",
  "kdl 6.2.2",
 ]
 
@@ -2226,6 +2240,7 @@ dependencies = [
 name = "hipcheck-macros"
 version = "0.3.3"
 dependencies = [
+ "hipcheck-workspace-hack",
  "proc-macro2",
  "quote",
  "syn 2.0.96",
@@ -2239,6 +2254,7 @@ dependencies = [
  "futures",
  "hipcheck-common",
  "hipcheck-sdk-macros",
+ "hipcheck-workspace-hack",
  "jiff",
  "log",
  "schemars",
@@ -2257,10 +2273,71 @@ name = "hipcheck-sdk-macros"
 version = "0.1.2"
 dependencies = [
  "convert_case",
+ "hipcheck-workspace-hack",
  "log",
  "proc-macro2",
  "quote",
  "syn 2.0.96",
+]
+
+[[package]]
+name = "hipcheck-workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bitflags 2.6.0",
+ "byteorder",
+ "bytes",
+ "cc",
+ "chrono",
+ "clap",
+ "clap_builder",
+ "dashmap",
+ "digest",
+ "either",
+ "flate2",
+ "form_urlencoded",
+ "futures-channel",
+ "futures-sink",
+ "futures-task",
+ "futures-util",
+ "getrandom 0.2.15",
+ "getrandom 0.3.1",
+ "hashbrown 0.14.5",
+ "hashbrown 0.15.2",
+ "idna",
+ "indexmap 1.9.3",
+ "itertools 0.13.0",
+ "jiff",
+ "libc",
+ "libz-sys",
+ "linux-raw-sys",
+ "log",
+ "memchr",
+ "miette 7.4.0",
+ "minimal-lexical",
+ "nom",
+ "num-traits",
+ "percent-encoding",
+ "prost",
+ "regex",
+ "regex-automata 0.4.8",
+ "regex-syntax 0.8.5",
+ "rustix",
+ "schemars",
+ "semver",
+ "serde",
+ "sha2",
+ "smallvec",
+ "syn 2.0.96",
+ "tokio",
+ "tokio-stream",
+ "unicode-normalization",
+ "url",
+ "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
+ "winnow 0.6.22",
+ "zeroize",
 ]
 
 [[package]]
@@ -2540,6 +2617,7 @@ version = "0.4.1"
 dependencies = [
  "clap",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "log",
  "schemars",
  "serde",
@@ -2828,6 +2906,7 @@ dependencies = [
  "clap",
  "hipcheck-kdl",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "log",
  "miette 7.4.0",
  "pathbuf",
@@ -3133,6 +3212,7 @@ dependencies = [
  "anyhow",
  "clap",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "log",
  "pathbuf",
  "regex",
@@ -3749,6 +3829,7 @@ dependencies = [
  "anyhow",
  "clap",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "log",
  "schemars",
  "serde",
@@ -4839,6 +4920,7 @@ dependencies = [
  "clap",
  "hipcheck-kdl",
  "hipcheck-sdk",
+ "hipcheck-workspace-hack",
  "log",
  "maplit",
  "miette 7.4.0",
@@ -4846,6 +4928,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -5389,6 +5472,7 @@ dependencies = [
  "convert_case",
  "env_logger",
  "glob",
+ "hipcheck-workspace-hack",
  "itertools 0.14.0",
  "kdl 4.7.1",
  "log",

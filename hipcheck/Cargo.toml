@@ -130,6 +130,7 @@ hipcheck-common = { version = "0.3.0", path = "../library/hipcheck-common", feat
     "rfd9-compat",
 ] }
 serde_with = "3.12.0"
+hipcheck-workspace-hack = { version = "0.1", path = "../library/hipcheck-workspace-hack" }
 
 [build-dependencies]
 

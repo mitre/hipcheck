@@ -17,6 +17,7 @@ members = [
     "library/hipcheck-kdl",
     "library/hipcheck-macros",
     "library/hipcheck-sdk-macros",
+    "library/hipcheck-workspace-hack",
     "sdk/rust",
     "plugins/git",
     "plugins/github",

@@ -23,6 +23,7 @@ typify-macro = "0.2.0"
 url = { version = "2.5.4", features = ["serde"] }
 log = "0.4.25"
 hipcheck-common = { version = "0.3.0", path = "../../library/hipcheck-common" }
+hipcheck-workspace-hack = { version = "0.1", path = "../../library/hipcheck-workspace-hack" }
 
 [features]
 macros = ["dep:hipcheck-sdk-macros"]
