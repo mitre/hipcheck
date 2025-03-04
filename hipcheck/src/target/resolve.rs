@@ -248,22 +248,22 @@ impl ResolveRepo for RemoteGitRepo {
 
 		// NOTE: suspend_status is needed, otherwise the Shell ProgressBars and progress bars
 		// tracking git operation progress fight over the terminal
-		t.suspend_status(|| -> std::result::Result<(), crate::Error> {
-			// when this goes out of scope, the render thread will die
-			let progress_root = prodash::tree::Root::new();
-			// do not drop this until the end of the scope, otherwise the render thread will die
-			let _handle = GitProgressRenderHandle::new(progress_root.clone());
+		// t.suspend_status(|| -> std::result::Result<(), crate::Error> {
+		// when this goes out of scope, the render thread will die
+		let progress_root = prodash::tree::Root::new();
+		// do not drop this until the end of the scope, otherwise the render thread will die
+		let _handle = GitProgressRenderHandle::new(progress_root.clone());
 
-			// Clone remote repo if not exists
-			if path.exists().not() {
-				git::clone(&self.url, &path, progress_root.clone())
-					.context("failed to clone remote repository")?;
-			}
-			// Whether we cloned or not, we need to fetch so we get tags
-			git::fetch(&path, progress_root.clone())
-				.context("failed to fetch updates from remote repository")?;
-			Ok(())
-		})?;
+		// Clone remote repo if not exists
+		if path.exists().not() {
+			git::clone(&self.url, &path, progress_root.clone())
+				.context("failed to clone remote repository")?;
+		}
+		// Whether we cloned or not, we need to fetch so we get tags
+		git::fetch(&path, progress_root.clone())
+			.context("failed to fetch updates from remote repository")?;
+		// 	Ok(())
+		// })?;
 
 		let refspec = t.get_checkout_target(&path)?;
 		let git_ref = git::checkout(&path, refspec)?.to_string();

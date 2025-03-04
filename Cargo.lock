@@ -2104,6 +2104,9 @@ name = "gix-trace"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c396a2036920c69695f760a65e7f2677267ccf483f25046977d87e4cb2665f7"
+dependencies = [
+ "tracing-core",
+]
 
 [[package]]
 name = "gix-transport"

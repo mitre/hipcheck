@@ -51,7 +51,9 @@ gix = { version = "0.70.0", features = [
     "max-control",
     # use reqwest/rustls to avoid needing openssl
     "blocking-http-transport-reqwest-rust-tls",
-    "zlib-stock"
+    "zlib-stock",
+    # TODO: remove this
+    "tracing"
 ] }
 # Include with both a `path` and `version` reference.
 # Local builds will use the `path` dependency, which may be a newer
