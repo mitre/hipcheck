@@ -110,3 +110,31 @@ plugin version="0.4.0" arch="x86_64-unknown-linux-gnu" {
     compress format="tar.xz"
     size bytes=1215860
 }
+
+plugin version="0.4.1" arch="aarch64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/identity-v0.4.1/identity-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="e3ec1bce8d93185acfe1644fa8ed14767540c3e3c11407eb7f89f26ebfd935d2"
+    compress format="tar.xz"
+    size bytes=1049912
+}
+
+plugin version="0.4.1" arch="x86_64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/identity-v0.4.1/identity-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="4c1c9ca2e21acf40f2a2da51cf47bf4e85b9e05ac43916e67cea9373a293e0f5"
+    compress format="tar.xz"
+    size bytes=1141656
+}
+
+plugin version="0.4.1" arch="x86_64-pc-windows-msvc" {
+    url "https://github.com/mitre/hipcheck/releases/download/identity-v0.4.1/identity-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="04772ed4f6adf6554553a360432c3462b47491dcda4b8ceccc931deb8b45197a"
+    compress format="zip"
+    size bytes=3760927
+}
+
+plugin version="0.4.1" arch="x86_64-unknown-linux-gnu" {
+    url "https://github.com/mitre/hipcheck/releases/download/identity-v0.4.1/identity-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="22062ac411d38bd5a3c35e48058c75c9beca08a877cb4df9ab93119243db0af7"
+    compress format="tar.xz"
+    size bytes=1212492
+}
