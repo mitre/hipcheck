@@ -16,19 +16,17 @@ pr-run-mode = "plan"
 # Path that installers should place binaries in
 install-path = ["~/.local/bin", "~/.hipcheck/bin"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = [
-    "aarch64-apple-darwin",
-    "x86_64-apple-darwin",
-    "x86_64-unknown-linux-gnu",
-    "x86_64-pc-windows-msvc",
-]
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
 # Whether to install an updater program
 install-updater = true
-# Only build the artifacts we need, instead of the whole workspace
+# Build only the required packages, and individually
 precise-builds = true
+# The installers to generate for each app
+installers = []
 
 # NOTE: MUST be synced manually with runners in `.github/workflows/hipcheck.yml`
 [dist.github-custom-runners]
+global = "ubuntu-22.04"
 # Ensure Apple Silicon macOS builds run natively rather than cross-compiling
 # from x86. Also makes sure our Apple Silicon macOS release builds match the
 # runner used for regular CI testing.
