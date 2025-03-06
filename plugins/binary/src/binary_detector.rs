@@ -43,7 +43,7 @@ impl BinaryFileDetector {
 	pub fn is_likely_binary_file<P: AsRef<Path>>(&self, file_name: P) -> bool {
 		fn inner(binary_file_detector: &BinaryFileDetector, file_name: &Path) -> bool {
 			let extension = match file_name.extension() {
-				Some(e) => format!(".{}", e.to_string_lossy()),
+				Some(e) => format!("{}", e.to_string_lossy()),
 				None => return true,
 			};
 			for ext in &binary_file_detector.extensions {
