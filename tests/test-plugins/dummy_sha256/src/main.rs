@@ -40,6 +40,9 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value = "OFF")]
+	log_level: String,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
 }
@@ -47,5 +50,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(Sha256Plugin).listen(args.port).await
+	PluginServer::register(Sha256Plugin, &args.log_level)
+		.listen(args.port)
+		.await
 }

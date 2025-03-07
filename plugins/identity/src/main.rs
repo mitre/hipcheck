@@ -66,7 +66,7 @@ async fn commit_identity(engine: &mut PluginEngine, key: DetailedGitRepo) -> Res
 		.query("mitre/git/contributors_for_commit", key)
 		.await
 		.map_err(|e| {
-			log::error!("failed to get last commits for identity metric: {}", e);
+			tracing::error!("failed to get last commits for identity metric: {}", e);
 			Error::UnspecifiedQueryState
 		})?;
 	let ccv = serde_json::from_value::<CommitContributorView>(value)
@@ -82,7 +82,7 @@ async fn identity(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
 		.query("mitre/git/commits", repo.clone())
 		.await
 		.map_err(|e| {
-			log::error!("failed to get last commits for identity metric: {}", e);
+			tracing::error!("failed to get last commits for identity metric: {}", e);
 			Error::UnspecifiedQueryState
 		})?;
 	let commits: Vec<Commit> =
@@ -149,6 +149,9 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value = "OFF")]
+	log_level: String,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
 	unknown_args: Vec<String>,
 }
@@ -156,7 +159,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	PluginServer::register(IdentityPlugin::default())
+	PluginServer::register(IdentityPlugin::default(), &args.log_level)
 		.listen(args.port)
 		.await
 }
