@@ -14,9 +14,10 @@ use crate::{
 
 use clap::Parser;
 use hipcheck_sdk::{
+	macros::PluginConfig,
 	prelude::*,
 	types::{LocalGitRepo, Target},
-	LogLevel,
+	LogLevel, PluginConfig,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -30,49 +31,10 @@ use std::{
 
 pub static ORGSSPEC: OnceLock<OrgSpec> = OnceLock::new();
 
-#[derive(Debug, Deserialize)]
+#[derive(PluginConfig, Debug)]
 struct Config {
-	orgs_spec: OrgSpec,
-	// Maximum number of concerningly affilaited contributors permitted in a default query
+	orgs_file: PathBuf,
 	count_threshold: Option<u64>,
-}
-
-#[derive(Debug, Deserialize)]
-struct RawConfig {
-	#[serde(rename = "orgs-file")]
-	orgs_file_path: Option<String>,
-	#[serde(rename = "count-threshold")]
-	count_threshold: Option<u64>,
-}
-
-impl TryFrom<RawConfig> for Config {
-	type Error = ConfigError;
-	fn try_from(value: RawConfig) -> StdResult<Config, ConfigError> {
-		if let Some(ofv) = value.orgs_file_path {
-			// Get the Orgs file path and confirm it exists
-			let orgs_file = PathBuf::from(&ofv);
-			file::exists(&orgs_file).map_err(|_e| ConfigError::FileNotFound {
-				file_path: ofv.clone(),
-			})?;
-			// Parse the Orgs file and construct an OrgSpec.
-			let orgs_spec =
-				OrgSpec::load_from(&orgs_file).map_err(|e| ConfigError::ParseError {
-					source: format!("OrgSpec file at {}", ofv),
-					// Print error with Debug for full context
-					message: format!("{:?}", e),
-				})?;
-			Ok(Config {
-				orgs_spec,
-				count_threshold: value.count_threshold,
-			})
-		} else {
-			Err(ConfigError::MissingRequiredConfig {
-				field_name: "orgs-file".to_owned(),
-				field_type: "string".to_owned(),
-				possible_values: vec![],
-			})
-		}
-	}
 }
 
 /// A locally stored git repo, with optional additional details
@@ -280,11 +242,20 @@ impl Plugin for AffiliationPlugin {
 	const NAME: &'static str = "affiliation";
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
-		let conf: Config = serde_json::from_value::<RawConfig>(config)
-			.map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
-			})?
-			.try_into()?;
+		// Deserialize and validate the config struct
+		let conf = Config::deserialize(&config)?;
+
+		file::exists(&conf.orgs_file).map_err(|_e| ConfigError::FileNotFound {
+			file_path: conf.orgs_file.to_string_lossy().into(),
+		})?;
+
+		// Parse the Orgs file and construct an OrgSpec.
+		let orgs_spec =
+			OrgSpec::load_from(&conf.orgs_file).map_err(|e| ConfigError::ParseError {
+				source: format!("OrgSpec file at {}", conf.orgs_file.to_string_lossy()),
+				// Print error with Debug for full context
+				message: format!("{:?}", e),
+			})?;
 
 		// Store the policy conf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
@@ -294,7 +265,7 @@ impl Plugin for AffiliationPlugin {
 			})?;
 
 		ORGSSPEC
-			.set(conf.orgs_spec)
+			.set(orgs_spec)
 			.map_err(|_e| ConfigError::InternalError {
 				message: "orgs spec was already set".to_owned(),
 			})

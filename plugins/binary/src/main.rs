@@ -7,45 +7,19 @@ mod util;
 use crate::binary_detector::{detect_binary_files, BinaryFileDetector};
 use clap::Parser;
 use hipcheck_sdk::{
+	macros::PluginConfig,
 	prelude::*,
 	types::{LocalGitRepo, Target},
-	LogLevel,
+	LogLevel, PluginConfig,
 };
 use pathbuf::pathbuf;
-use serde::Deserialize;
 use std::{ops::Not, path::PathBuf, result::Result as StdResult, sync::OnceLock};
-
 pub static DETECTOR: OnceLock<BinaryFileDetector> = OnceLock::new();
 
-#[derive(Deserialize)]
-struct RawConfig {
-	#[serde(rename = "binary-file")]
-	binary_file: Option<PathBuf>,
-	#[serde(rename = "binary-file-threshold")]
-	binary_file_threshold: Option<u64>,
-}
-
+#[derive(PluginConfig, Debug)]
 struct Config {
 	binary_file: PathBuf,
-	opt_threshold: Option<u64>,
-}
-
-impl TryFrom<RawConfig> for Config {
-	type Error = hipcheck_sdk::error::ConfigError;
-	fn try_from(value: RawConfig) -> StdResult<Config, Self::Error> {
-		let Some(binary_file) = value.binary_file else {
-			return Err(ConfigError::MissingRequiredConfig {
-				field_name: "binary-file".to_owned(),
-				field_type: "string".to_owned(),
-				possible_values: vec![],
-			});
-		};
-		let opt_threshold = value.binary_file_threshold;
-		Ok(Config {
-			binary_file,
-			opt_threshold,
-		})
-	}
+	binary_file_threshold: Option<u64>,
 }
 
 #[query]
@@ -84,15 +58,11 @@ impl Plugin for BinaryPlugin {
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		// Deserialize and validate the config struct
-		let conf: Config = serde_json::from_value::<RawConfig>(config)
-			.map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
-			})?
-			.try_into()?;
+		let conf = Config::deserialize(&config)?;
 
 		// Store the policy conf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
-			.set(conf.opt_threshold)
+			.set(conf.binary_file_threshold)
 			.map_err(|_| ConfigError::InternalError {
 				message: "plugin was already configured".to_string(),
 			})?;

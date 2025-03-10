@@ -9,8 +9,7 @@ use crate::{
 	types::{CommitChurn, CommitChurnFreq, CommitDiff},
 };
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
-use serde::Deserialize;
+use hipcheck_sdk::{macros::PluginConfig, prelude::*, types::Target, LogLevel, PluginConfig};
 use std::{
 	collections::{HashMap, HashSet},
 	path::PathBuf,
@@ -18,11 +17,9 @@ use std::{
 	sync::OnceLock,
 };
 
-#[derive(Deserialize)]
+#[derive(PluginConfig, Debug)]
 struct RawConfig {
-	#[serde(rename = "churn-freq")]
 	churn_freq: Option<f64>,
-	#[serde(rename = "commit-percentage")]
 	commit_percentage: Option<f64>,
 }
 
@@ -256,11 +253,7 @@ impl Plugin for ChurnPlugin {
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		// Deserialize and validate the config struct
-		let conf: Config = serde_json::from_value::<RawConfig>(config)
-			.map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
-			})?
-			.try_into()?;
+		let conf: Config = RawConfig::deserialize(&config)?.try_into()?;
 
 		// Store the PolicyExprConf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
