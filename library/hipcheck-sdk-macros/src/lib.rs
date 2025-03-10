@@ -6,7 +6,7 @@ use proc_macro2::Span;
 use std::ops::Not;
 use std::sync::{LazyLock, Mutex};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Error, Ident, ItemFn, Meta, PatType};
+use syn::{parse_macro_input, Data, DeriveInput, Error, Ident, ItemFn, Meta, PatType};
 
 static QUERIES: LazyLock<Mutex<Vec<NamedQuerySpec>>> = LazyLock::new(|| Mutex::new(vec![]));
 
@@ -279,4 +279,110 @@ pub fn queries(_item: TokenStream) -> TokenStream {
 		}
 	};
 	proc_macro::TokenStream::from(out)
+}
+
+/// Generates a derived macro implementation of the `PluginConfig` trait to
+/// deserialize each plugin config field derived from the Policy File.
+/// Config-related errors are handled by the `ConfigError` crate to generate
+/// specific error messages that detail the plugin, field, and type expected from
+/// the Policy File.
+#[proc_macro_derive(PluginConfig)]
+pub fn derive_plugin_config(input: TokenStream) -> TokenStream {
+	// Parse the input struct
+	let input = parse_macro_input!(input as DeriveInput);
+
+	// Extract the RawConfig struct name
+	let struct_name = &input.ident;
+
+	let Data::Struct(syn::DataStruct { fields, .. }) = &input.data else {
+		// Return an error if the macro is used on something other than a struct
+		return syn::Error::new(input.span(), "PluginConfig can only be derived for structs")
+			.to_compile_error()
+			.into();
+	};
+
+	// Helper function to convert field names to dashed strings
+	fn to_dashed_field_name(field: &syn::Field) -> String {
+		field.ident.as_ref().unwrap().to_string().replace("_", "-")
+	}
+
+	// Generate deserialization logic for each field
+	let field_deserialization: Vec<_> = fields
+		.iter()
+		.map(|field| {
+			let field_name = field.ident.as_ref().unwrap();
+			let field_name_str = to_dashed_field_name(field);
+			let field_type = &field.ty;
+
+			quote::quote! {
+				let #field_name = if let Some(value) = config.remove(#field_name_str) {
+					// Map contained value, return an error if an invalid value is provided for the field
+					serde_json::from_value::<#field_type>(value.clone()).map_err(|_| {
+						ConfigError::InvalidConfigValue {
+							field_name: #field_name_str.to_owned(),
+							value: format!("{:?}", value),
+							reason: format!(
+								"Expected type: {}, but got: {:?}",
+								stringify!(#field_type),
+								value
+							),
+						}
+					})?
+				} else {
+					// Try deserializing from null. If it works, value's type indicates it was
+					// optional. If this fails, missing required config.
+					serde_json::from_value::<#field_type>(serde_json::Value::Null).map_err(|_| {
+						ConfigError::MissingRequiredConfig {
+							field_name: #field_name_str.to_owned(),
+							field_type: stringify!(#field_type).to_owned(),
+							possible_values: vec![],
+						}
+					})?
+				};
+			}
+		})
+		.collect();
+
+	// After the expected fields are extracted, there should be no remaining fields in the config map
+	let validate_fields = quote::quote! {
+		if let Some((unexpected_key, value)) = config.iter().next() {
+			// Return an error if any remaining key/value pair in map
+			return Err(ConfigError::UnrecognizedConfig {
+				field_name: unexpected_key.to_string(),
+				field_value: format!("{:?}", value),
+				possible_confusables: vec![],
+			});
+		}
+	};
+
+	// Generate code to initialize the struct fields
+	let initialize_struct: Vec<_> = fields
+		.iter()
+		.map(|field| {
+			let field_name = field.ident.as_ref().unwrap();
+			quote::quote! {
+				#field_name
+			}
+		})
+		.collect();
+
+	// Generate the implementation of the PluginConfig trait
+	let impl_block = quote::quote! {
+		impl<'de> PluginConfig<'de> for #struct_name {
+			fn deserialize(conf_ref: &serde_json::Value) -> StdResult<Self, ConfigError> {
+				let mut conf_owned = conf_ref.clone();
+				let mut dummy = serde_json::Map::new();
+				let config = conf_owned.as_object_mut().unwrap_or(&mut dummy);
+
+				#(#field_deserialization)* // Deserialize each field
+				#validate_fields
+				Ok(Self {
+					#(#initialize_struct),* // Initialize each field
+				})
+			}
+		}
+	};
+
+	// Return the generated TokenStream
+	proc_macro::TokenStream::from(impl_block)
 }

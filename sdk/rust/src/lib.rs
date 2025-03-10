@@ -46,6 +46,16 @@ pub mod macros {
 	pub use hipcheck_sdk_macros::*;
 }
 
+/// The trait used to deserialized plugin config input from the Policy File.
+/// The trait is applied to a plugin RawConfig struct and works in tandem with
+/// the derive_plugin_config procedural macro re-imported to this sdk crate
+/// via hipcheck_sdk_macros.
+pub trait PluginConfig<'de> {
+	fn deserialize(config: &serde_json::Value) -> StdResult<Self, ConfigError>
+	where
+		Self: Sized;
+}
+
 #[cfg(feature = "print-timings")]
 mod benchmarking;
 

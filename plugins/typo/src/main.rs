@@ -13,55 +13,15 @@ use crate::{
 };
 use anyhow::{anyhow, Context as _};
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
-use serde::Deserialize;
+use hipcheck_sdk::{macros::PluginConfig, prelude::*, types::Target, LogLevel, PluginConfig};
 use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
 pub static TYPOFILE: OnceLock<TypoFile> = OnceLock::new();
 
-#[derive(Deserialize)]
-struct RawConfig {
-	#[serde(rename = "typo-file")]
-	typo_file_path: Option<String>,
-	#[serde(rename = "count-threshold")]
-	count_threshold: Option<u64>,
-}
-
+#[derive(PluginConfig, Debug)]
 struct Config {
-	typo_file: TypoFile,
+	typo_file: PathBuf,
 	count_threshold: Option<u64>,
-}
-
-impl TryFrom<RawConfig> for Config {
-	type Error = hipcheck_sdk::error::ConfigError;
-	fn try_from(value: RawConfig) -> StdResult<Config, Self::Error> {
-		// Get path to typo TOML file
-		let Some(raw_typo_path) = value.typo_file_path else {
-			return Err(ConfigError::MissingRequiredConfig {
-				field_name: "typo-file".to_owned(),
-				field_type: "string".to_owned(),
-				possible_values: vec![],
-			});
-		};
-		// Parse typo TOML file
-		let typo_path = PathBuf::from(raw_typo_path);
-		let typo_file = TypoFile::load_from(&typo_path).map_err(|e| {
-			// Print error with Debug for full context
-			tracing::error!("{:?}", e);
-			ConfigError::ParseError {
-				source: format!("Typo file at path {}", typo_path.display()),
-				// Print error with Debug for full context
-				message: format!("{:?}", e),
-			}
-		})?;
-
-		let count_threshold = value.count_threshold;
-
-		Ok(Config {
-			typo_file,
-			count_threshold,
-		})
-	}
 }
 
 #[query(default)]
@@ -116,11 +76,18 @@ impl Plugin for TypoPlugin {
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		// Deserialize and validate the config struct
-		let conf: Config = serde_json::from_value::<RawConfig>(config)
-			.map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
-			})?
-			.try_into()?;
+		let conf = Config::deserialize(&config)?;
+
+		// Parse typo TOML file
+		let typo_file = TypoFile::load_from(&conf.typo_file).map_err(|e| {
+			// Print error with Debug for full context
+			tracing::error!("{:?}", e);
+			ConfigError::ParseError {
+				source: format!("Typo file at path {}", conf.typo_file.display()),
+				// Print error with Debug for full context
+				message: format!("{:?}", e),
+			}
+		})?;
 
 		// Store the policy conf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
@@ -130,7 +97,7 @@ impl Plugin for TypoPlugin {
 			})?;
 
 		TYPOFILE
-			.set(conf.typo_file)
+			.set(typo_file)
 			.map_err(|_e| ConfigError::InternalError {
 				message: "config was already set".to_owned(),
 			})

@@ -25,7 +25,7 @@ pub fn run(args: BuildArgs) -> Result<()> {
 	let builder_args = resolve_builder_args(&pkgs, &args.profile, args.timings);
 
 	debug!("checking packages: {}", list_with_commas(&pkgs));
-	debug!("using profile: {}", args.profile.to_string());
+	debug!("using profile: {}", args.profile);
 
 	let sh = Shell::new()?;
 	cmd!(sh, "cargo check {builder_args...}").run()?;
