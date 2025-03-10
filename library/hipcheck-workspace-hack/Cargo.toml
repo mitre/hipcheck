@@ -23,7 +23,7 @@ clap = { version = "4.5.27", features = ["cargo", "derive", "string"] }
 clap_builder = { version = "4.5.27", default-features = false, features = ["cargo", "color", "help", "std", "string", "suggestions", "usage"] }
 dashmap = { version = "6.1.0", default-features = false, features = ["inline", "raw-api", "rayon"] }
 digest = { version = "0.10.7", features = ["mac", "std"] }
-either = { version = "1.15.0" }
+either = { version = "1.15.0", features = ["use_std"] }
 flate2 = { version = "1.1.0", features = ["zlib"] }
 form_urlencoded = { version = "1.2.1", default-features = false, features = ["std"] }
 futures-channel = { version = "0.3.31", features = ["sink"] }
@@ -71,7 +71,7 @@ clap = { version = "4.5.27", features = ["cargo", "derive", "string"] }
 clap_builder = { version = "4.5.27", default-features = false, features = ["cargo", "color", "help", "std", "string", "suggestions", "usage"] }
 dashmap = { version = "6.1.0", default-features = false, features = ["inline", "raw-api", "rayon"] }
 digest = { version = "0.10.7", features = ["mac", "std"] }
-either = { version = "1.15.0" }
+either = { version = "1.15.0", features = ["use_std"] }
 flate2 = { version = "1.1.0", features = ["zlib"] }
 form_urlencoded = { version = "1.2.1", default-features = false, features = ["std"] }
 futures-channel = { version = "0.3.31", features = ["sink"] }
