@@ -14,9 +14,10 @@ use crate::{
 
 use clap::Parser;
 use hipcheck_sdk::{
+	macros::PluginConfig,
 	prelude::*,
 	types::{LocalGitRepo, Target},
-	LogLevel,
+	LogLevel, PluginConfig,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -37,18 +38,16 @@ struct Config {
 	count_threshold: Option<u64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(PluginConfig, Debug)]
 struct RawConfig {
-	#[serde(rename = "orgs-file")]
-	orgs_file_path: Option<String>,
-	#[serde(rename = "count-threshold")]
+	orgs_file: Option<String>,
 	count_threshold: Option<u64>,
 }
 
 impl TryFrom<RawConfig> for Config {
 	type Error = ConfigError;
 	fn try_from(value: RawConfig) -> StdResult<Config, ConfigError> {
-		if let Some(ofv) = value.orgs_file_path {
+		if let Some(ofv) = value.orgs_file {
 			// Get the Orgs file path and confirm it exists
 			let orgs_file = PathBuf::from(&ofv);
 			file::exists(&orgs_file).map_err(|_e| ConfigError::FileNotFound {
@@ -280,9 +279,10 @@ impl Plugin for AffiliationPlugin {
 	const NAME: &'static str = "affiliation";
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
-		let conf: Config = serde_json::from_value::<RawConfig>(config)
+		// Deserialize and validate the config struct
+		let conf: Config = RawConfig::deserialize(&config)
 			.map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: format!("{:#?}", e),
 			})?
 			.try_into()?;
 

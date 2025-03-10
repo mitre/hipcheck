@@ -103,7 +103,7 @@ impl ParseKdlNode for PolicyPlugin {
 					log::error!(
 						"Unable to parse provided manifest URL {} for plugin {} in the policy file",
 						raw_url,
-						name.to_string()
+						name
 					);
 					return None;
 				}

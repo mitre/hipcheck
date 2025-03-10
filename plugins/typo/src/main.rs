@@ -13,17 +13,14 @@ use crate::{
 };
 use anyhow::{anyhow, Context as _};
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
-use serde::Deserialize;
+use hipcheck_sdk::{macros::PluginConfig, prelude::*, types::Target, LogLevel, PluginConfig};
 use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
 pub static TYPOFILE: OnceLock<TypoFile> = OnceLock::new();
 
-#[derive(Deserialize)]
+#[derive(PluginConfig, Debug)]
 struct RawConfig {
-	#[serde(rename = "typo-file")]
-	typo_file_path: Option<String>,
-	#[serde(rename = "count-threshold")]
+	typo_file: Option<String>,
 	count_threshold: Option<u64>,
 }
 
@@ -36,7 +33,7 @@ impl TryFrom<RawConfig> for Config {
 	type Error = hipcheck_sdk::error::ConfigError;
 	fn try_from(value: RawConfig) -> StdResult<Config, Self::Error> {
 		// Get path to typo TOML file
-		let Some(raw_typo_path) = value.typo_file_path else {
+		let Some(raw_typo_path) = value.typo_file else {
 			return Err(ConfigError::MissingRequiredConfig {
 				field_name: "typo-file".to_owned(),
 				field_type: "string".to_owned(),
@@ -116,9 +113,9 @@ impl Plugin for TypoPlugin {
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		// Deserialize and validate the config struct
-		let conf: Config = serde_json::from_value::<RawConfig>(config)
+		let conf: Config = RawConfig::deserialize(&config)
 			.map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: format!("{:#?}", e),
 			})?
 			.try_into()?;
 

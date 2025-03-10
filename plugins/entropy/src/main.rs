@@ -7,16 +7,13 @@ mod types;
 use crate::{metric::*, types::*};
 
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
-use serde::Deserialize;
+use hipcheck_sdk::{macros::PluginConfig, prelude::*, types::Target, LogLevel, PluginConfig};
 
 use std::{collections::HashSet, path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
-#[derive(Deserialize)]
+#[derive(PluginConfig, Debug)]
 struct RawConfig {
-	#[serde(rename = "entropy-threshold")]
 	entropy_threshold: Option<f64>,
-	#[serde(rename = "commit-percentage")]
 	commit_percentage: Option<f64>,
 }
 
@@ -166,9 +163,9 @@ impl Plugin for EntropyPlugin {
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		// Deserialize and validate the config struct
-		let conf: Config = serde_json::from_value::<RawConfig>(config)
+		let conf: Config = RawConfig::deserialize(&config)
 			.map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: format!("{:#?}", e),
 			})?
 			.try_into()?;
 

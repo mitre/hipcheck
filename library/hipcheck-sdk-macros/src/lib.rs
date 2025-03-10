@@ -6,7 +6,7 @@ use proc_macro2::Span;
 use std::ops::Not;
 use std::sync::{LazyLock, Mutex};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Error, Ident, ItemFn, Meta, PatType};
+use syn::{parse_macro_input, Data, DeriveInput, Error, Ident, ItemFn, Meta, PatType};
 
 static QUERIES: LazyLock<Mutex<Vec<NamedQuerySpec>>> = LazyLock::new(|| Mutex::new(vec![]));
 
@@ -279,4 +279,89 @@ pub fn queries(_item: TokenStream) -> TokenStream {
 		}
 	};
 	proc_macro::TokenStream::from(out)
+}
+
+/// Generates a derived macro implementation of the `PluginConfig` trait to
+/// deserialize each plugin config field derived from the Policy File.
+/// Config-related errors are handled by the `ConfigError` crate to generate
+/// specific error messages that detail the plugin, field, and type expected from
+/// the Policy File.
+#[proc_macro_derive(PluginConfig)]
+pub fn derive_plugin_config(input: TokenStream) -> TokenStream {
+	// Parse the input struct
+	let input = parse_macro_input!(input as DeriveInput);
+
+	// Extract the RawConfig struct name
+	let struct_name = &input.ident;
+
+	match &input.data {
+		Data::Struct(syn::DataStruct { fields, .. }) => {
+			// Iterate through the RawConfig fields
+			let field_deserialization: Vec<_> = fields
+				.iter()
+				.map(|field| {
+					// Get the field name
+					let field_name = field.ident.as_ref().unwrap();
+					// Rename the field name to use dashes instead of underscores
+					let field_name_str = field_name.to_string().replace("_", "-");
+					// Get the type of the field
+					let field_type = &field.ty;
+
+					// Deserialize each field from config object and handle errors
+					quote::quote! {
+						let #field_name = config.get(#field_name_str)
+						.map(|value| {
+							serde_json::from_value::<#field_type>(value.clone()).map_err(|_| {
+								ConfigError::InvalidConfigValue {
+									field_name: #field_name_str.to_owned(),
+									value: format!("{:?}", value),
+									reason: format!(
+										"Expected type: {}, but got: {:?}",
+										stringify!(#field_type),
+										value
+									),
+								}
+							})
+						})
+						// Convert Option<Result<T>, E> to Result<Option<T>, E>
+						.transpose()?
+						// Set the field to None if the value is not found
+						.unwrap_or(None);
+					}
+				})
+				.collect();
+
+			// Generate code to initialize the struct fields
+			let initialize_struct: Vec<_> = fields
+				.iter()
+				.map(|field| {
+					let field_name = field.ident.as_ref().unwrap(); // Get the field name
+					quote::quote! {
+						#field_name: #field_name
+					}
+				})
+				.collect();
+
+			// Generate the implementation of the PluginConfig trait
+			let impl_block = quote::quote! {
+				impl<'de> PluginConfig<'de> for #struct_name {
+					fn deserialize(config: &serde_json::Value) -> StdResult<Self, ConfigError> {
+						#(#field_deserialization)* // Deserialize each field
+						Ok(Self {
+							#(#initialize_struct),* // Initialize each field
+						})
+					}
+				}
+			};
+
+			// Return the generated TokenStream
+			proc_macro::TokenStream::from(impl_block)
+		}
+		_ => {
+			// Return an error if the macro is used on something other than a struct
+			syn::Error::new(input.span(), "PluginConfig can only be derived for structs")
+				.to_compile_error()
+				.into()
+		}
+	}
 }
