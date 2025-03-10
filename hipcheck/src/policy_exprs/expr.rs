@@ -11,7 +11,7 @@ use nom::{
 	branch::alt,
 	combinator::{all_consuming, map},
 	multi::many0,
-	sequence::tuple,
+	Parser,
 	Finish as _, IResult,
 };
 use ordered_float::NotNan;
@@ -568,41 +568,41 @@ fn parse_primitive(input: Input<'_>) -> IResult<Input<'_>, Primitive> {
 		parse_bool,
 		parse_datetime,
 		parse_span,
-	))(input)
+	)).parse(input)
 }
 
 /// Parse an array.
 fn parse_array(input: Input<'_>) -> IResult<Input<'_>, Expr> {
-	let parser = tuple((Token::OpenBrace, many0(parse_primitive), Token::CloseBrace));
+	let parser = (Token::OpenBrace, many0(parse_primitive), Token::CloseBrace);
 	let mut parser = map(parser, |(_, inner, _)| Array::new(inner).into());
-	parser(input)
+	parser.parse(input)
 }
 
 /// Parse an expression.
 fn parse_expr(input: Input<'_>) -> IResult<Input<'_>, Expr> {
 	let primitive = map(parse_primitive, Expr::Primitive);
-	alt((primitive, parse_array, parse_function, parse_json_pointer))(input)
+	alt((primitive, parse_array, parse_function, parse_json_pointer)).parse(input)
 }
 
 /// Parse a function call.
 fn parse_function(input: Input<'_>) -> IResult<Input<'_>, Expr> {
-	let parser = tuple((
+	let parser = (
 		Token::OpenParen,
 		parse_ident,
 		many0(parse_expr),
 		Token::CloseParen,
-	));
+	);
 	let mut parser = map(parser, |(_, ident, args, _)| {
 		Function::new(Ident(ident), args).into()
 	});
-	parser(input)
+	parser.parse(input)
 }
 
 pub fn parse(input: &str) -> Result<Expr> {
 	let tokens = Tokens::new(input);
 	let mut parser = all_consuming(parse_expr);
 
-	match parser(tokens).finish() {
+	match parser.parse(tokens).finish() {
 		Ok((rest, expr)) if rest.is_empty() => Ok(expr),
 		Ok(_) => Err(Error::IncompleteParse(nom::Needed::Unknown)),
 		Err(err) => {

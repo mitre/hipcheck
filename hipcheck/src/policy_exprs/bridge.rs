@@ -14,7 +14,7 @@
 
 use core::fmt;
 use logos::{Lexer, Logos, Span, SpannedIter};
-use nom::{InputIter, InputLength, InputTake};
+use nom::Input;
 
 /// A [`logos::Lexer`] wrapper than can be used as an input for
 /// [nom](https://docs.rs/nom/7.0.0/nom/index.html).
@@ -154,22 +154,50 @@ where
 	}
 }
 
-impl<'i, T> InputIter for Tokens<'i, T>
+impl<'i, T> Input for Tokens<'i, T>
 where
 	T: Logos<'i, Source = str> + Clone,
 	T::Extras: Default + Clone,
 {
 	type Item = (ParseResult<'i, T>, Span);
-	type Iter = IndexIterator<'i, T>;
-	type IterElem = SpannedIter<'i, T>;
+	type Iter = SpannedIter<'i, T>;
+	type IterIndices = IndexIterator<'i, T>;
 
-	fn iter_indices(&self) -> Self::Iter {
+	fn input_len(&self) -> usize {
+		self.len()
+	}
+
+	fn take(&self, count: usize) -> Self {
+		Tokens {
+			lexer: Lexer::new(&self.lexer.source()[..count]),
+		}
+	}
+
+	fn take_from(&self, index: usize) -> Self {
+		Tokens {
+			lexer: Lexer::new(&self.lexer.source()[index..]),
+		}
+	}
+
+	fn take_split(&self, count: usize) -> (Self, Self) {
+		let (a, b) = self.lexer.source().split_at(count);
+		(
+			Tokens {
+				lexer: Lexer::new(a),
+			},
+			Tokens {
+				lexer: Lexer::new(b),
+			},
+		)
+	}
+
+	fn iter_indices(&self) -> Self::IterIndices {
 		IndexIterator {
 			logos: self.lexer.clone(),
 		}
 	}
 
-	fn iter_elements(&self) -> Self::IterElem {
+	fn iter_elements(&self) -> Self::Iter {
 		self.lexer.clone().spanned()
 	}
 
@@ -197,42 +225,9 @@ where
 	}
 }
 
-impl<'i, T> InputLength for Tokens<'i, T>
-where
-	T: Logos<'i, Source = str> + Clone,
-	T::Extras: Default + Clone,
-{
-	fn input_len(&self) -> usize {
-		self.len()
-	}
-}
-
-impl<'i, T> InputTake for Tokens<'i, T>
-where
-	T: Logos<'i, Source = str>,
-	T::Extras: Default,
-{
-	fn take(&self, count: usize) -> Self {
-		Tokens {
-			lexer: Lexer::new(&self.lexer.source()[..count]),
-		}
-	}
-
-	fn take_split(&self, count: usize) -> (Self, Self) {
-		let (a, b) = self.lexer.source().split_at(count);
-		(
-			Tokens {
-				lexer: Lexer::new(a),
-			},
-			Tokens {
-				lexer: Lexer::new(b),
-			},
-		)
-	}
-}
-
 #[macro_export]
 #[doc(hidden)]
+
 macro_rules! token_parser {
     (
         token: $token_ty:ty $(,)?
@@ -240,7 +235,7 @@ macro_rules! token_parser {
         $crate::token_parser!(
             token: $token_ty,
             error<'source>(input, token): ::nom::error::Error<$crate::policy_exprs::Tokens<'source, $token_ty>> =
-                nom::error::Error::new(input, nom::error::ErrorKind::IsA),
+			nom::Mode::bind(|| nom::error::Error::new(input, nom::error::ErrorKind::IsA)),
         );
     };
 
@@ -259,16 +254,16 @@ macro_rules! token_parser {
         error<$lt:lifetime>($input:ident, $token:ident): $error_ty:ty = $error:expr $(,)?
     ) => {
         #[allow(unused)]
-        impl<$lt> ::nom::Parser<
-            $crate::policy_exprs::Tokens<$lt, $token_ty>,
-            &$lt str,
-            $error_ty,
-        > for $token_ty {
-            fn parse(
+        impl<$lt> ::nom::Parser<$crate::policy_exprs::Tokens<$lt, $token_ty>> for $token_ty {
+			type Output = &$lt str;
+			type Error = $error_ty;
+
+			fn process<O: nom::OutputMode>(
                 &mut self,
                 $input: $crate::policy_exprs::Tokens<$lt, $token_ty>,
-            ) -> ::nom::IResult<
-                $crate::policy_exprs::Tokens<$lt, $token_ty>,
+            ) -> ::nom::PResult<
+                O,
+				$crate::policy_exprs::Tokens<$lt, $token_ty>,
                 &$lt str,
                 $error_ty,
             > {
@@ -289,6 +284,32 @@ macro_rules! token_parser {
                     },
                 }
             }
+
+            // fn parse(
+            //     &mut self,
+            //     $input: $crate::policy_exprs::Tokens<$lt, $token_ty>,
+            // ) -> ::nom::IResult<
+            //     $crate::policy_exprs::Tokens<$lt, $token_ty>,
+            //     &$lt str,
+            //     $error_ty,
+            // > {
+            //     match $input.peek() {
+            //         ::std::option::Option::Some((::std::result::Result::Ok(__token), __s)) if __token == *self => {
+            //             ::std::result::Result::Ok(($input.advance(), __s))
+            //         }
+            //         ::std::option::Option::Some((::std::result::Result::Err(__err), __s)) => {
+            //             // Technically this could just be the subsequent case as well, but I am
+            //             // deciding to distinguish it here.
+            //             ::std::result::Result::Err(::nom::Err::Error($error))
+            //         }
+            //         _ => {
+            //             // This was in the original code. It appears to be unused, but I am leaving it here
+            //             // as a sort of Chesterton's Fence situation.
+            //             let $token = self;
+            //             ::std::result::Result::Err(::nom::Err::Error($error))
+            //         },
+            //     }
+            // }
         }
     };
 }
