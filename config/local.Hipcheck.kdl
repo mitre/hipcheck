@@ -26,7 +26,7 @@ analyze {
         analysis "mitre/activity" policy="(lte $ P52w)" weight=3
         analysis "mitre/binary" {
             binary-file #rel("Binary.kdl")
-            binary-file-threshold 0
+            binary-file-threshold 0.5
 		}
         analysis "mitre/fuzz" policy="(eq #t $)"
         analysis "mitre/review" policy="(lte (divz (count (filter (eq #f) $)) (count $)) 0.05)"
