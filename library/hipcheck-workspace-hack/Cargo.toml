@@ -65,7 +65,7 @@ zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
 ahash = { version = "0.8.11" }
 byteorder = { version = "1.5.0" }
 bytes = { version = "1.6.1" }
-cc = { version = "1.1.15", default-features = false, features = ["parallel"] }
+cc = { version = "1.2.16", default-features = false, features = ["parallel"] }
 chrono = { version = "0.4.39", features = ["serde"] }
 clap = { version = "4.5.27", features = ["cargo", "derive", "string"] }
 clap_builder = { version = "4.5.27", default-features = false, features = ["cargo", "color", "help", "std", "string", "suggestions", "usage"] }

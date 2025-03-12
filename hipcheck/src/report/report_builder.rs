@@ -42,7 +42,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 				// This is the "explanation" pulled from the new gRPC call.
 				let message = session
 					.default_query_explanation(analysis.publisher.clone(), analysis.plugin.clone())?
-					.unwrap_or("no query explanation provided".to_owned());
+					.unwrap_or("output".to_owned());
 
 				builder.add_analysis(
 					Analysis::plugin(
