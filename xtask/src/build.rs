@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{BuildPkg, BuildProfile};
 use std::{collections::BTreeSet, fmt::Display};
 
