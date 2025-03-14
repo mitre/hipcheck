@@ -2,7 +2,7 @@
 # This installer delegates to the "real" installer included with each new
 # release of Hipcheck.
 
-$hc_version = "3.11.0"
+$hc_version = "3.12.0"
 $repo = "https://github.com/mitre/hipcheck"
 $installer = "$repo/releases/download/hipcheck-v${hc_version}/hipcheck-installer.ps1"
 
