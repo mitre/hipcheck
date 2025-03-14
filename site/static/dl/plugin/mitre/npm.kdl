@@ -110,3 +110,31 @@ plugin version="0.3.1" arch="x86_64-unknown-linux-gnu" {
     compress format="tar.xz"
     size bytes=1612284
 }
+
+plugin version="0.4.0" arch="aarch64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/npm-v0.4.0/npm-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="1a50fe76d6d8275da22ae2fc90fc1fdf0b9068e4f2211b2431c964991ac4ca6c"
+    compress format="tar.xz"
+    size bytes=1634760
+}
+
+plugin version="0.4.0" arch="x86_64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/npm-v0.4.0/npm-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="049b7037126e1eef43e7f80d84b6efec0152abd9032bacfd9a1988a8eb96c85b"
+    compress format="tar.xz"
+    size bytes=1808008
+}
+
+plugin version="0.4.0" arch="x86_64-pc-windows-msvc" {
+    url "https://github.com/mitre/hipcheck/releases/download/npm-v0.4.0/npm-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="8efbfbc1c15ed025e96ad24676a353fe4c84d29c54f63f6a7d124fca104efa97"
+    compress format="zip"
+    size bytes=6512250
+}
+
+plugin version="0.4.0" arch="x86_64-unknown-linux-gnu" {
+    url "https://github.com/mitre/hipcheck/releases/download/npm-v0.4.0/npm-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="04531d0ae9fb03a932f8f83734dd482a38ce64358e7160e00c5594ffeb15f9f5"
+    compress format="tar.xz"
+    size bytes=1968992
+}
