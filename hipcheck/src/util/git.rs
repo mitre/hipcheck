@@ -13,7 +13,7 @@ pub fn get_git_version() -> Result<String> {
 	let raw_output = GitCommand::new_repo(["--version"])?
 		.output()
 		.context("git version command failed")?;
-	log::debug!("get_git_version [raw_output='{}']", raw_output);
+	tracing::debug!("get_git_version [raw_output='{}']", raw_output);
 	Ok(raw_output)
 }
 

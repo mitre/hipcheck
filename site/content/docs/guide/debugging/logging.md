@@ -5,10 +5,9 @@ weight: 2
 
 # Logging
 
-Hipcheck logging is controlled with two environment variables:
+Hipcheck logging is controlled by the environment variable:
 
 * `HC_LOG` configures what should be logged.
-* `HC_LOG_STYLE` configures the format of the log output.
 
 ## Filtering Log Messages
 
@@ -78,12 +77,6 @@ could run:
 $ # The "/message" indicates to search for the "message" string
 $ HC_LOG=hc::shell=trace,salsa=off/message hc check -t npm express
 ```
-
-## Controlling Log Style
-
-Log style is controlled with the `HC_LOG_STYLE` environment variable. The acceptable
-values are `always`, `auto`, or `never`, and they control whether to try outputting color codes
-with the log messages.
 
 ## Where do Logs Write?
 

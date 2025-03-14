@@ -70,6 +70,6 @@ pub fn parse_hc_version(version: &str) -> Result<String> {
 	let hc_version = Version::parse(version)
 		.context("can't parse version in Cargo.toml")?
 		.to_string();
-	log::debug!("detected Hipcheck version [version='{:?}']", hc_version);
+	tracing::debug!("detected Hipcheck version [version='{:?}']", hc_version);
 	Ok(hc_version)
 }

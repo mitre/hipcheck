@@ -18,7 +18,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	#[cfg(feature = "print-timings")]
 	let _0 = crate::benchmarking::print_scope_time!("build_report");
 
-	log::debug!("building final report");
+	tracing::debug!("building final report");
 
 	// This function needs to:
 	//
@@ -68,7 +68,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 
 	let report = builder.build()?;
 
-	log::info!("built final report");
+	tracing::info!("built final report");
 
 	Ok(report)
 }

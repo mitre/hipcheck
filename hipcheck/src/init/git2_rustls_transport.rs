@@ -28,7 +28,7 @@ pub fn register() {
 	// SAFETY: This function needs to be synchronized with creations of transports.
 	// Since we only create 1 custom transport, this should be safe.
 	REGISTER.call_once(|| unsafe {
-		log::debug!("Registering custom rustls based transport for http(s) prefixes");
+		tracing::debug!("Registering custom rustls based transport for http(s) prefixes");
 		// Note that we have to use prefixes without the `://` at the end of them otherwise libgit2 will get confused and
 		// ignore/not use them.
 		transport::register("https", make_transport).unwrap();

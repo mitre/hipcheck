@@ -89,7 +89,7 @@ pub fn query_with_salsa(
 	// (with salsa memo-ization) to get the needed data, and resume our
 	// current query by providing the plugin the answer.
 	loop {
-		log::trace!("Query needs more info, recursing...");
+		tracing::trace!("Query needs more info, recursing...");
 		let mut answers = vec![];
 
 		// per RFD 0009, each key will be used to query `salsa` independently
@@ -108,7 +108,7 @@ pub fn query_with_salsa(
 				.unwrap();
 			answers.push(value);
 		}
-		log::trace!("Got answer, resuming");
+		tracing::trace!("Got answer, resuming");
 		ar = match runtime.block_on(p_handle.resume_query(ar, answers))? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));

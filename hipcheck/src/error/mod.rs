@@ -63,7 +63,7 @@ impl Error {
 	{
 		let message: Cow<'static, str> = context.into();
 
-		log::trace!(
+		tracing::trace!(
 			"adding context to error [context: {}, error: {}]",
 			message,
 			self.head
@@ -219,7 +219,7 @@ impl<'e> Iterator for Chain<'e> {
 	fn next(&mut self) -> Option<Self::Item> {
 		match self.current {
 			Some(node) => {
-				log::trace!("error in chain [error: {}]", node);
+				tracing::trace!("error in chain [error: {}]", node);
 
 				self.current = node.next.as_deref();
 				Some(node)

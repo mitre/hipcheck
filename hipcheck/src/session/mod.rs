@@ -182,7 +182,7 @@ pub struct Session {
 impl salsa::Database for Session {
 	fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
 		let event = event();
-		log::debug!("{:?}", event);
+		tracing::debug!("{:?}", event);
 	}
 }
 
@@ -338,7 +338,7 @@ fn setup_base_session(
 	let config_msg = match config_mode {
 		PreferPolicy { policy, config } => match use_policy(policy, &mut session_builder) {
 			Err(err) => {
-				log::info!("Failed to load default policy KDL file; trying legacy config TOML directory instead. Error: {:#?}", err);
+				tracing::info!("Failed to load default policy KDL file; trying legacy config TOML directory instead. Error: {:#?}", err);
 
 				use_config(config, &mut session_builder)?
 			}

@@ -270,7 +270,7 @@ impl CliConfig {
 			(None, Some(quiet)) => Verbosity::use_quiet(quiet),
 			(Some(verbosity), None) => verbosity,
 			(Some(verbosity), Some(_quiet)) => {
-				log::warn!("verbosity specified with both -v/--verbosity and -q/--quiet; prefer -v/--verbosity");
+				tracing::warn!("verbosity specified with both -v/--verbosity and -q/--quiet; prefer -v/--verbosity");
 				verbosity
 			}
 		}
@@ -288,7 +288,7 @@ impl CliConfig {
 			(None, Some(json)) => Format::use_json(json),
 			(Some(format), None) => format,
 			(Some(format), Some(_json)) => {
-				log::warn!(
+				tracing::warn!(
 					"format specified with both -f/--format and -j/--json; prefer -f/--format"
 				);
 				format
@@ -303,7 +303,7 @@ impl CliConfig {
 			(None, Some(home)) => Some(home),
 			(Some(cache), None) => Some(cache),
 			(Some(cache), Some(_home)) => {
-				log::warn!("cache directory specified with both -C/--cache and -H/--home; prefer -C/--cache");
+				tracing::warn!("cache directory specified with both -C/--cache and -H/--home; prefer -C/--cache");
 				Some(cache)
 			}
 		}

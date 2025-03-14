@@ -24,7 +24,7 @@ pub fn run(args: RfdArgs) -> Result<()> {
 /// List all the RFDs checked into the repo.
 fn list() -> Result<()> {
 	for rfd in rfds()? {
-		log::warn!("RFD #{}: {}", rfd.id_string, rfd.title);
+		tracing::warn!("RFD #{}: {}", rfd.id_string, rfd.title);
 	}
 
 	Ok(())
@@ -54,7 +54,7 @@ fn new(args: NewRfdArgs) -> Result<()> {
 	file.flush()
 		.context("failed to flush writes to RFD file to disk")?;
 
-	log::warn!(
+	tracing::warn!(
 		"created draft RFD #{}: \"{}\", at '{}'",
 		id,
 		args.title,
@@ -134,7 +134,7 @@ impl Iterator for RfdIter {
 				let raw_file_name = match path.file_name() {
 					Some(file_name) => file_name,
 					None => {
-						log::warn!("path has no file name: {}", path.display());
+						tracing::warn!("path has no file name: {}", path.display());
 						return self.next();
 					}
 				};
@@ -143,7 +143,7 @@ impl Iterator for RfdIter {
 				let file_name = match raw_file_name.to_str() {
 					Some(file_name) => file_name,
 					None => {
-						log::warn!(
+						tracing::warn!(
 							"file name is not UTF-8: {}",
 							raw_file_name.to_string_lossy()
 						);
@@ -160,7 +160,7 @@ impl Iterator for RfdIter {
 				let (id_string, name) = match file_name.split_once('-') {
 					Some(pair) => pair,
 					None => {
-						log::warn!("invalid RFD file name found: {}", file_name);
+						tracing::warn!("invalid RFD file name found: {}", file_name);
 						return self.next();
 					}
 				};
@@ -175,7 +175,7 @@ impl Iterator for RfdIter {
 				let id = match id_string.trim_start_matches('0').parse().ok() {
 					Some(id) => id,
 					None => {
-						log::warn!("invalid ID found: {}", id_string);
+						tracing::warn!("invalid ID found: {}", id_string);
 						return self.next();
 					}
 				};
@@ -192,7 +192,7 @@ impl Iterator for RfdIter {
 				Some(rfd)
 			}
 			Some(Err(e)) => {
-				log::warn!("{}", e);
+				tracing::warn!("{}", e);
 				self.next()
 			}
 			None => None,

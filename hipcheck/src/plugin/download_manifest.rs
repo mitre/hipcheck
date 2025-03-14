@@ -268,7 +268,7 @@ impl ParseKdlNode for DownloadManifestEntry {
 		let version = match PluginVersion::new(node.get("version")?.as_string()?) {
 			Ok(version) => version,
 			Err(e) => {
-				log::error!("{}", e);
+				tracing::error!("{}", e);
 				return None;
 			}
 		};

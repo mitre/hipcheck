@@ -987,7 +987,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6dc8c8ff84895b051f07a0e65f975cf225131742531338752abfb324e4449ff"
 dependencies = [
  "log",
- "regex",
 ]
 
 [[package]]
@@ -1005,7 +1004,6 @@ dependencies = [
  "anstream",
  "anstyle",
  "env_filter",
- "humantime",
  "log",
 ]
 
@@ -2173,7 +2171,6 @@ dependencies = [
  "dialoguer",
  "dirs",
  "dotenv",
- "env_logger",
  "flate2",
  "fs_extra",
  "futures",
@@ -2187,7 +2184,6 @@ dependencies = [
  "indicatif",
  "itertools 0.13.0",
  "jiff",
- "log",
  "logos",
  "miette 7.4.0",
  "minijinja",
@@ -2221,6 +2217,9 @@ dependencies = [
  "tokio-stream",
  "toml",
  "tonic",
+ "tracing",
+ "tracing-core",
+ "tracing-subscriber",
  "ureq",
  "url",
  "walkdir",
@@ -2333,7 +2332,6 @@ dependencies = [
  "libc",
  "libz-sys",
  "linux-raw-sys",
- "log",
  "memchr",
  "miette 7.4.0",
  "minimal-lexical",
@@ -2425,12 +2423,6 @@ name = "httpdate"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
-
-[[package]]
-name = "humantime"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
@@ -5724,12 +5716,10 @@ dependencies = [
  "clap",
  "clap-verbosity-flag",
  "convert_case",
- "env_logger",
  "glob",
  "hipcheck-workspace-hack",
  "itertools 0.14.0",
  "kdl 4.7.1",
- "log",
  "pathbuf",
  "pep440_rs",
  "pyproject-toml",
@@ -5739,6 +5729,9 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+ "tracing",
+ "tracing-core",
+ "tracing-subscriber",
  "ureq",
  "url",
  "which",

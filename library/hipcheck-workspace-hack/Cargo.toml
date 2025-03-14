@@ -37,7 +37,6 @@ indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2.7.1", features 
 itertools = { version = "0.13.0" }
 jiff = { version = "0.1.16", features = ["serde"] }
 libz-sys = { version = "1.1.20", default-features = false, features = ["libc"] }
-log = { version = "0.4.25", default-features = false, features = ["std"] }
 memchr = { version = "2.7.4", features = ["use_std"] }
 miette = { version = "7.4.0", features = ["fancy"] }
 minimal-lexical = { version = "0.2.1", default-features = false, features = ["std"] }
@@ -85,7 +84,6 @@ indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2.7.1", features 
 itertools = { version = "0.13.0" }
 jiff = { version = "0.1.16", features = ["serde"] }
 libz-sys = { version = "1.1.20", default-features = false, features = ["libc"] }
-log = { version = "0.4.25", default-features = false, features = ["std"] }
 memchr = { version = "2.7.4", features = ["use_std"] }
 miette = { version = "7.4.0", features = ["fancy"] }
 minimal-lexical = { version = "0.2.1", default-features = false, features = ["std"] }

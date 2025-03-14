@@ -186,7 +186,7 @@ impl ParseKdlNode for Entrypoints {
 				.to_string();
 
 			if let Err(_e) = entrypoints.insert(arch.clone(), entrypoint) {
-				log::error!("Duplicate entrypoint detected for [{}]", arch);
+				tracing::error!("Duplicate entrypoint detected for [{}]", arch);
 				return None;
 			}
 		}
@@ -241,7 +241,7 @@ impl ParseKdlNode for PluginDependency {
 		let version = match PluginVersionReq::new(node.get("version")?.as_string()?) {
 			Ok(version) => version,
 			Err(e) => {
-				log::error!("{}", e);
+				tracing::error!("{}", e);
 				return None;
 			}
 		};

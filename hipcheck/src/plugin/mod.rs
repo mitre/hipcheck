@@ -139,7 +139,7 @@ impl ActivePlugin {
 			concerns: vec![],
 		};
 
-		log::trace!("Resuming query");
+		tracing::trace!("Resuming query");
 
 		Ok(self.channel.query(query).await?.into())
 	}

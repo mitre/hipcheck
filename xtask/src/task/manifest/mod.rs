@@ -29,7 +29,7 @@ pub fn run() -> Result<()> {
 		if diff_vec.is_empty() {
 			continue;
 		}
-		log::info!(
+		tracing::info!(
 			"Updating download manifest for '{}' with {} new entries",
 			name,
 			diff_vec.len()

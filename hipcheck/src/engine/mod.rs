@@ -101,7 +101,7 @@ pub fn async_query(
 		};
 		// Initiate the query. If remote closed or we got our response immediately,
 		// return
-		log::trace!("Querying: {query}, key: {key:?}");
+		tracing::trace!("Querying: {query}, key: {key:?}");
 		let mut ar = match p_handle.query(query, key).await? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));
@@ -115,7 +115,7 @@ pub fn async_query(
 		// (with salsa memo-ization) to get the needed data, and resume our
 		// current query by providing the plugin the answer.
 		loop {
-			log::trace!("Awaiting result, now recursing");
+			tracing::trace!("Awaiting result, now recursing");
 			let mut answers = vec![];
 			// per RFD 0009, each key will be used to query `salsa` independently
 			for key in ar.key.clone() {
@@ -134,7 +134,7 @@ pub fn async_query(
 				.unwrap();
 				answers.push(value);
 			}
-			log::trace!("Resuming query with answers {:#?}", answers);
+			tracing::trace!("Resuming query with answers {:#?}", answers);
 			ar = match p_handle.resume_query(ar, answers).await? {
 				PluginResponse::RemoteClosed => {
 					return Err(hc_error!("Plugin channel closed unexpected"));
@@ -162,7 +162,7 @@ pub struct HcEngineImpl {
 impl salsa::Database for HcEngineImpl {
 	fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
 		let event = event();
-		log::debug!("{:?}", event);
+		tracing::debug!("{:?}", event);
 	}
 }
 
@@ -179,7 +179,7 @@ impl HcEngineImpl {
 	// independent of Salsa.
 	pub fn new(executor: PluginExecutor, plugins: Vec<PluginWithConfig>) -> Result<Self> {
 		let runtime = RUNTIME.handle();
-		log::info!("Starting HcPluginCore");
+		tracing::info!("Starting HcPluginCore");
 		let core = runtime.block_on(HcPluginCore::new(executor, plugins))?;
 		let engine = HcEngineImpl {
 			storage: Default::default(),

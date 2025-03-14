@@ -7,8 +7,8 @@ use crate::{
 };
 use anyhow::Result;
 use itertools::Itertools;
-use log::debug;
 use std::collections::BTreeSet;
+use tracing::debug;
 use xshell::{cmd, Shell};
 
 /// Run the build command.

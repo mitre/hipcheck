@@ -125,7 +125,7 @@ fn make_checkout_builder() -> CheckoutBuilder<'static> {
 
 /// Clone a repo from the given url to a destination path in the filesystem.
 pub fn clone(url: &Url, dest: &Path) -> HcResult<()> {
-	log::debug!("remote repository cloning url is {}", url);
+	tracing::debug!("remote repository cloning url is {}", url);
 
 	RepoBuilder::new()
 		.with_checkout(make_checkout_builder())

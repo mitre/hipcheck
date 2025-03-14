@@ -387,12 +387,12 @@ impl Drop for HcRepoCache {
 		let data = match serde_json::to_string(&hc_disk_cache) {
 			Ok(d) => d,
 			Err(e) => {
-				log::debug!("Failed to jsonify Hipcheck cache info: {e}");
+				tracing::debug!("Failed to jsonify Hipcheck cache info: {e}");
 				return;
 			}
 		};
 		if let Err(e) = fs::write(file_path, data) {
-			log::debug!("Failed to write Hipcheck cache info: {e}");
+			tracing::debug!("Failed to write Hipcheck cache info: {e}");
 		}
 	}
 }
