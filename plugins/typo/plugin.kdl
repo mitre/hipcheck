@@ -1,6 +1,6 @@
 publisher "mitre"
 name "typo"
-version "0.3.1"
+version "0.4.0"
 license "Apache-2.0"
 
 entrypoint {
@@ -11,5 +11,5 @@ entrypoint {
 }
 
 dependencies {
-  plugin "mitre/npm" version="^0.3" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/npm.kdl"
+  plugin "mitre/npm" version="^0.4" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/npm.kdl"
 }
