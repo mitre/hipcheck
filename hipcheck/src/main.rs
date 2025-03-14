@@ -140,7 +140,7 @@ fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
 		}
 	};
 
-	log::info!("Using configuration source: {}", config_mode);
+	tracing::info!("Using configuration source: {}", config_mode);
 
 	let report = run(
 		target,
@@ -446,7 +446,7 @@ fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 fn check_plugins(config: &CliConfig) -> StdResult<(), Error> {
 	let config_mode = config.config_mode()?;
 
-	log::info!("Using configuration source: {}", config_mode);
+	tracing::info!("Using configuration source: {}", config_mode);
 
 	ReadySession::new(
 		config_mode,

@@ -70,7 +70,7 @@ impl NpmCommand {
 		if output.status.success() {
 			return Ok(output_text);
 		}
-		log::debug!(
+		tracing::debug!(
 			"{} output_text [output_text='{}']",
 			DependentProgram::Npm,
 			output_text

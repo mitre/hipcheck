@@ -34,7 +34,7 @@ pub fn try_resolve_remote_for_local(local: &Path) -> Result<RemoteGitRepo> {
 	let url = {
 		let symbolic_ref = get_symbolic_ref(local)?;
 
-		log::trace!("local source has symbolic ref [ref='{:?}']", symbolic_ref);
+		tracing::trace!("local source has symbolic ref [ref='{:?}']", symbolic_ref);
 
 		if symbolic_ref.is_empty() {
 			return Err(Error::msg("no symbolic ref found"));
@@ -42,7 +42,7 @@ pub fn try_resolve_remote_for_local(local: &Path) -> Result<RemoteGitRepo> {
 
 		let upstream = get_upstream_for_ref(local, &symbolic_ref)?;
 
-		log::trace!("local source has upstream [upstream='{:?}']", upstream);
+		tracing::trace!("local source has upstream [upstream='{:?}']", upstream);
 
 		if upstream.is_empty() {
 			return Err(Error::msg("no upstream found"));
@@ -51,7 +51,7 @@ pub fn try_resolve_remote_for_local(local: &Path) -> Result<RemoteGitRepo> {
 		let remote = get_remote_from_upstream(&upstream)
 			.ok_or_else(|| hc_error!("failed to get remote name from upstream '{}'", upstream))?;
 
-		log::trace!("local source has remote [remote='{:?}']", remote);
+		tracing::trace!("local source has remote [remote='{:?}']", remote);
 
 		if remote.is_empty() {
 			return Err(Error::msg("no remote found"));
@@ -59,7 +59,7 @@ pub fn try_resolve_remote_for_local(local: &Path) -> Result<RemoteGitRepo> {
 
 		let raw = get_url_for_remote(local, remote)?;
 
-		log::trace!("local source remote has url [url='{}']", raw);
+		tracing::trace!("local source remote has url [url='{}']", raw);
 
 		if raw.is_empty() {
 			return Err(Error::msg("no URL found for remote"));

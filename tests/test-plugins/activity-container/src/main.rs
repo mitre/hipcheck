@@ -19,7 +19,7 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 /// (Which means that anything expecting a `Span` must parse the output of this query appropriately)
 #[query(default)]
 async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
-	log::debug!("running activity query");
+	tracing::debug!("running activity query");
 
 	let repo = target.local;
 
@@ -31,7 +31,7 @@ async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 		.query("mitre/git/last_commit_date", repo)
 		.await
 		.map_err(|e| {
-			log::error!("failed to get last commit date for activity metric: {}", e);
+			tracing::error!("failed to get last commit date for activity metric: {}", e);
 			Error::UnspecifiedQueryState
 		})?;
 
@@ -39,13 +39,13 @@ async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 		return Err(Error::UnexpectedPluginQueryInputFormat);
 	};
 	let last_commit_date: Timestamp = date_string.parse().map_err(|e| {
-		log::error!("{}", e);
+		tracing::error!("{}", e);
 		Error::UnspecifiedQueryState
 	})?;
 
 	// Get the time between the most recent commit and today.
 	let time_since_last_commit = today.since(last_commit_date).map_err(|e| {
-		log::error!("{}", e);
+		tracing::error!("{}", e);
 		Error::UnspecifiedQueryState
 	})?;
 
@@ -72,7 +72,7 @@ impl Plugin for ActivityPlugin {
 
 	fn default_policy_expr(&self) -> Result<String> {
 		let Some(conf) = CONFIG.get() else {
-			log::error!("tried to access config before set by Hipcheck core!");
+			tracing::error!("tried to access config before set by Hipcheck core!");
 			return Err(Error::UnspecifiedQueryState);
 		};
 
@@ -100,7 +100,7 @@ struct Args {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
-	log::info!("Activity container plugin is registering {:?}", args);
+	tracing::info!("Activity container plugin is registering {:?}", args);
 	PluginServer::register(ActivityPlugin {})
 		.listen(Host::Any, args.port)
 		.await

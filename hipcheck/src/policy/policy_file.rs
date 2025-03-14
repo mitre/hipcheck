@@ -76,7 +76,7 @@ impl ParseKdlNode for PolicyPlugin {
 		let name = match PolicyPluginName::new(full_name) {
 			Ok(name) => name,
 			Err(e) => {
-				log::error!("{}", e);
+				tracing::error!("{}", e);
 				return None;
 			}
 		};
@@ -84,7 +84,7 @@ impl ParseKdlNode for PolicyPlugin {
 		let version = match PluginVersionReq::new(node.get("version")?.as_string()?) {
 			Ok(version) => version,
 			Err(e) => {
-				log::error!("{}", e);
+				tracing::error!("{}", e);
 				return None;
 			}
 		};
@@ -100,7 +100,7 @@ impl ParseKdlNode for PolicyPlugin {
 				} else if path.exists() {
 					Some(ManifestLocation::Local(path))
 				} else {
-					log::error!(
+					tracing::error!(
 						"Unable to parse provided manifest URL {} for plugin {} in the policy file",
 						raw_url,
 						name.to_string()
@@ -225,13 +225,15 @@ impl ParseKdlNode for PolicyConfig {
 					.insert(
 						description.clone(),
 						try_to_serde_json(info.value()).unwrap_or_else(|e| {
-							log::error!("error converting KDL node to serde_json::Value: {e:?}");
+							tracing::error!(
+								"error converting KDL node to serde_json::Value: {e:?}"
+							);
 							Value::Null
 						}),
 					)
 					.is_err()
 				{
-					log::error!(
+					tracing::error!(
 						"Duplicate configuration information detected for {}",
 						description
 					);
@@ -282,7 +284,7 @@ impl ParseKdlNode for PolicyAnalysis {
 		let name = match PolicyPluginName::new(full_name) {
 			Ok(name) => name,
 			Err(e) => {
-				log::error!("{}", e);
+				tracing::error!("{}", e);
 				return None;
 			}
 		};
@@ -608,7 +610,7 @@ impl ParseKdlNode for PolicyPatch {
 		let name = match PolicyPluginName::new(full_name) {
 			Ok(name) => name,
 			Err(e) => {
-				log::error!("{}", e);
+				tracing::error!("{}", e);
 				return None;
 			}
 		};

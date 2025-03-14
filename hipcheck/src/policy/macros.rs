@@ -63,7 +63,7 @@ pub fn preprocess_policy_file(s: &str, file_path: &Path) -> Result<String> {
 		let macro_name = caps.get(1).unwrap(); // the name of the macro
 		let opt_parens = caps.get(2); // optional value in parentheses
 
-		log::debug!("Handling macro: {}", macro_name.as_str());
+		tracing::debug!("Handling macro: {}", macro_name.as_str());
 		let opt_var = opt_parens.map(|x| x.as_str());
 
 		// Call the right macro function given the `macro_name`, and get the string

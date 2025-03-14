@@ -53,7 +53,7 @@ pub fn run(args: SiteServeArgs) -> Result<()> {
 	];
 
 	// Let the user know the site is up.
-	log::info!("Serving at 'localhost:1111'. Press Ctrl-C to stop.");
+	tracing::info!("Serving at 'localhost:1111'. Press Ctrl-C to stop.");
 
 	// Wait for the subcommands and report errors.
 	let mut error = false;
@@ -62,13 +62,13 @@ pub fn run(args: SiteServeArgs) -> Result<()> {
 			Ok(Ok(_)) => {}
 			Ok(Err(err)) => {
 				for err in err.chain() {
-					log::error!("{}: {}", handle.0, err);
+					tracing::error!("{}: {}", handle.0, err);
 				}
 
 				error = true;
 			}
 			Err(_) => {
-				log::error!("an unknown error occured");
+				tracing::error!("an unknown error occured");
 				error = true;
 			}
 		}

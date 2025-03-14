@@ -114,7 +114,7 @@ fn parse_version(program: DependentProgram, version: &str) -> Result<Version> {
 		.ok_or_else(|| hc_error!("failed to find a {} version", program))?
 		.as_str();
 
-	log::debug!("{} version detected [version='{}']", program, version);
+	tracing::debug!("{} version detected [version='{}']", program, version);
 
 	Ok(Version::parse(version)?)
 }
@@ -127,19 +127,19 @@ where
 {
 	let program = Git;
 
-	log::debug!("logging {} CLI args", program);
+	tracing::debug!("logging {} CLI args", program);
 
 	for arg in env::args() {
-		log::debug!("{} CLI environment arg [arg='{}']", program, arg);
+		tracing::debug!("{} CLI environment arg [arg='{}']", program, arg);
 	}
 
-	log::debug!("{} CLI executable location [path='{}']", program, git_path);
+	tracing::debug!("{} CLI executable location [path='{}']", program, git_path);
 
-	log::debug!("{} CLI repository location [path='{}']", program, repo_path);
+	tracing::debug!("{} CLI repository location [path='{}']", program, repo_path);
 
 	log_each_arg(args, program);
 
-	log::debug!("done logging {} CLI args", DependentProgram::Git);
+	tracing::debug!("done logging {} CLI args", DependentProgram::Git);
 }
 
 /// print command line args as well as commands and args for npm and other non git commands
@@ -148,14 +148,14 @@ where
 	I: IntoIterator<Item = S> + Copy,
 	S: AsRef<OsStr>,
 {
-	log::debug!("logging {} CLI args", &program);
+	tracing::debug!("logging {} CLI args", &program);
 
 	// https://doc.rust-lang.org/std/env/fn.args.html
 	for arg in env::args() {
-		log::debug!("{} CLI environment arg [arg='{}']", program, arg);
+		tracing::debug!("{} CLI environment arg [arg='{}']", program, arg);
 	}
 
-	log::debug!(
+	tracing::debug!(
 		"{} CLI executable location [path='{}']",
 		program,
 		command_path
@@ -163,7 +163,7 @@ where
 
 	log_each_arg(args, program);
 
-	log::debug!("done logging {} CLI args", &program);
+	tracing::debug!("done logging {} CLI args", &program);
 }
 
 pub fn log_each_arg<I, S>(args: I, program: DependentProgram)
@@ -177,7 +177,7 @@ where
 			.to_str()
 			.unwrap_or("argument for command could not be logged.");
 
-		log::debug!(
+		tracing::debug!(
 			"{} CLI argument [name='{}', value='{}']",
 			program,
 			index,

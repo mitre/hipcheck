@@ -1351,6 +1351,6 @@ fn dbg(env: &Env, args: &[Expr]) -> Result<Expr> {
 	check_num_args(name, args, 1)?;
 	let arg = &args[0];
 	let result = env.visit_expr(arg.clone())?;
-	log::debug!("{arg} = {result}");
+	tracing::debug!("{arg} = {result}");
 	Ok(result)
 }

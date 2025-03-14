@@ -304,7 +304,7 @@ impl Shell {
 					}
 				});
 
-				log::trace!("writing message part [part='{:?}']", error_json);
+				tracing::trace!("writing message part [part='{:?}']", error_json);
 
 				// Suspend the progress bars to print the JSON.
 				Shell::in_suspend(|| {

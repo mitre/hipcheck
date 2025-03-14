@@ -37,7 +37,7 @@ pub fn run() -> Result<()> {
 
 	for (name, task) in tasks {
 		if let Err(e) = task(&sh) {
-			log::error!("task: {}, error: {}", name, e);
+			tracing::error!("task: {}, error: {}", name, e);
 		}
 	}
 
@@ -107,7 +107,7 @@ fn check_target_matches_ci(sh: &Shell) -> Result<()> {
 
 	// Warn if they're different.
 	if toolchain != ci_toolchain {
-		log::error!(
+		tracing::error!(
 			"CI and host toolchains don't match! CI toolchain is {}, current host is {}",
 			ci_toolchain,
 			toolchain
@@ -244,7 +244,7 @@ fn run_xtask_check(sh: &Shell) -> Result<()> {
 
 /// Tell the user we're done.
 fn done(_sh: &Shell) -> Result<()> {
-	log::info!(
+	tracing::info!(
 		"task: {}, message: All checks passed! You can expect to pass CI now.",
 		"Done"
 	);

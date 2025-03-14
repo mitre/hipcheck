@@ -97,7 +97,7 @@ impl TargetResolver {
 				}
 				// No version was specified. Try to figure out the tag representing the latest version in the repo
 				else if let Some(cmt) = {
-					log::debug!("Package specified without version, trying to determine latest version tag in repo");
+					tracing::debug!("Package specified without version, trying to determine latest version tag in repo");
 					try_find_commit_for_latest_version_tag(&repo)?
 				} {
 					cmt
@@ -177,19 +177,19 @@ impl ResolveRepo for LocalGitRepo {
 		// If not already in cache, clone to cache
 		if self.path.starts_with(cache_path).not() {
 			t.update_status("copying repo to cache");
-			log::debug!("Copying local repo to cache");
+			tracing::debug!("Copying local repo to cache");
 			self.path = clone_local_repo_to_cache(&self.path, &t.get_config().cache)?;
 		} else {
-			log::debug!("Local repo path already in cache");
+			tracing::debug!("Local repo path already in cache");
 		};
 
 		// Ref we try to checkout is either from self or t
 		let init_ref = if self.git_ref.is_empty().not() {
-			log::debug!("Targeting existing `git_ref` field '{}'", &self.git_ref);
+			tracing::debug!("Targeting existing `git_ref` field '{}'", &self.git_ref);
 			Some(self.git_ref.clone())
 		} else {
 			let refspec = t.get_checkout_target(&self.path)?;
-			log::debug!(
+			tracing::debug!(
 				"Existing `git_ref` field was empty, using git_ref '{:?}'",
 				refspec
 			);
@@ -199,7 +199,7 @@ impl ResolveRepo for LocalGitRepo {
 		// Checkout specified ref
 		self.git_ref = git::checkout(&self.path, init_ref)?;
 
-		log::debug!("Resolved git ref was '{}'", &self.git_ref);
+		tracing::debug!("Resolved git ref was '{}'", &self.git_ref);
 
 		// If not descendant of remote, try to resolve a remote
 		if t.remote.is_none() {
@@ -207,7 +207,7 @@ impl ResolveRepo for LocalGitRepo {
 			t.remote = match try_resolve_remote_for_local(&self.path) {
 				Ok(remote) => Some(remote),
 				Err(err) => {
-					log::debug!("failed to get remote [err='{}']", err);
+					tracing::debug!("failed to get remote [err='{}']", err);
 					None
 				}
 			};
@@ -246,7 +246,7 @@ impl ResolveRepo for RemoteGitRepo {
 
 		let refspec = t.get_checkout_target(&path)?;
 		let git_ref = git::checkout(&path, refspec)?;
-		log::debug!("Resolved git ref was '{}'", &git_ref);
+		tracing::debug!("Resolved git ref was '{}'", &git_ref);
 
 		let local = LocalGitRepo { path, git_ref };
 
@@ -318,7 +318,7 @@ fn fuzzy_match_package_version<'a>(
 	let version = &package.version;
 	let pkg_name = &package.name;
 
-	log::debug!("Fuzzy matching package version '{version}'");
+	tracing::debug!("Fuzzy matching package version '{version}'");
 
 	let potential_tags = [
 		version.clone(),
@@ -334,11 +334,11 @@ fn fuzzy_match_package_version<'a>(
 	let mut opt_tgt_ref: Option<AnnotatedCommit> = None;
 	for tag_str in potential_tags {
 		if let Ok(obj) = repo.revparse_single(&tag_str) {
-			log::debug!("revparse_single succeeded on '{}'", tag_str);
+			tracing::debug!("revparse_single succeeded on '{}'", tag_str);
 			opt_tgt_ref = Some(repo.find_annotated_commit(obj.peel_to_commit()?.id())?);
 			break;
 		} else {
-			log::trace!("Tried and failed to find a tag '{tag_str}' in repo");
+			tracing::trace!("Tried and failed to find a tag '{tag_str}' in repo");
 		}
 	}
 
@@ -348,7 +348,7 @@ fn fuzzy_match_package_version<'a>(
 		));
 	};
 
-	log::debug!("Resolved to commit: {}", tgt_ref.id());
+	tracing::debug!("Resolved to commit: {}", tgt_ref.id());
 
 	Ok(tgt_ref)
 }
@@ -386,19 +386,19 @@ fn try_find_commit_for_latest_version_tag(
 
 	// Get the tag of the highest version and convert to an AnnotatedCommit
 	if let Some((_, tag_str)) = tags.first() {
-		log::debug!("Determined '{tag_str}' to be the tag for the newest version");
+		tracing::debug!("Determined '{tag_str}' to be the tag for the newest version");
 		if let Ok(obj) = repo.revparse_single(tag_str) {
-			log::debug!("revparse_single succeeded on '{tag_str}'");
+			tracing::debug!("revparse_single succeeded on '{tag_str}'");
 			Ok(Some(
 				repo.find_annotated_commit(obj.peel_to_commit()?.id())?,
 			))
 		} else {
 			let err_msg = format!("Failed to get commit for known tag '{}' in repo", tag_str);
-			log::error!("{err_msg}");
+			tracing::error!("{err_msg}");
 			Err(hc_error!("{}", err_msg))
 		}
 	} else {
-		log::debug!("No tags containing semver-compatible version numbers detected in repo");
+		tracing::debug!("No tags containing semver-compatible version numbers detected in repo");
 		Ok(None)
 	}
 }

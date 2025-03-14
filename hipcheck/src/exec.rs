@@ -240,7 +240,7 @@ impl ExecConfig {
 		let file_path = file.as_path();
 		if file_path.exists() {
 			// Parse found file
-			log::info!("Using Exec Config at {:?}", file_path);
+			tracing::info!("Using Exec Config at {:?}", file_path);
 			return Self::from_file(file_path);
 		}
 
@@ -251,14 +251,14 @@ impl ExecConfig {
 			let target_ref = target_path.as_path();
 			if target_ref.exists() {
 				// Parse found file
-				log::info!("Using Exec Config at {:?}", target_ref);
+				tracing::info!("Using Exec Config at {:?}", target_ref);
 				return Self::from_file(target_ref);
 			}
 			if let Some(parent) = curr_dir.parent() {
 				curr_dir = parent.to_path_buf();
 			} else {
 				// If file not found, use default values
-				log::info!("Using a default Exec Config");
+				tracing::info!("Using a default Exec Config");
 				return Ok(Self::default());
 			}
 		}

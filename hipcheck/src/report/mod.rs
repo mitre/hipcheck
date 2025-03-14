@@ -147,7 +147,7 @@ fn source_is_none(source: &Option<Box<ErrorReport>>) -> bool {
 
 impl From<&Error> for ErrorReport {
 	fn from(error: &Error) -> ErrorReport {
-		log::trace!("detailed error for report [error: {:#?}]", error);
+		tracing::trace!("detailed error for report [error: {:#?}]", error);
 
 		let mut errors = error
 			.chain()
@@ -252,7 +252,7 @@ impl Analysis {
 		) {
 			Ok(explanation) => explanation,
 			Err(e) => {
-				log::error!(
+				tracing::error!(
 					"Could not parse policy expression for {} plugin: {}",
 					&name,
 					e

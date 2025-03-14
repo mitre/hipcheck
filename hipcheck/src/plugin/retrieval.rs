@@ -37,7 +37,7 @@ pub fn retrieve_plugins(
 	let mut required_plugins = HashSet::new();
 
 	let num_plugins = policy_plugins.len();
-	log::info!("Retrieving {} plugins", num_plugins);
+	tracing::info!("Retrieving {} plugins", num_plugins);
 
 	for policy_plugin in policy_plugins.iter() {
 		retrieve_plugin(
@@ -56,7 +56,7 @@ fn retrieve_plugin(
 	plugin_cache: &HcPluginCache,
 	required_plugins: &mut HashSet<PluginId>,
 ) -> Result<(), Error> {
-	log::debug!(
+	tracing::debug!(
 		"Retrieving Plugin ID {} from {:?}",
 		plugin_id,
 		manifest_location
@@ -126,7 +126,7 @@ fn retrieve_plugin_from_network(
 		);
 		let target_manifest = plugin_cache.plugin_kdl(&plugin_id_for_cache);
 		if target_manifest.is_file() && !force {
-			log::debug!("Using existing entry in cache for {}", &plugin_id_for_cache);
+			tracing::debug!("Using existing entry in cache for {}", &plugin_id_for_cache);
 			return PluginManifest::from_file(target_manifest);
 		}
 	}

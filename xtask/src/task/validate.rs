@@ -21,7 +21,7 @@ use std::{
 
 /// Print list of validation failures for packages in the workspace.
 pub fn run() -> Result<()> {
-	log::info!("beginning validation");
+	tracing::info!("beginning validation");
 
 	let workspace = Workspace::resolve()?;
 	let findings = Findings::for_workspace(&workspace);
@@ -31,9 +31,9 @@ pub fn run() -> Result<()> {
 		&& findings.config_findings.is_empty()
 		&& findings.source_findings.is_empty()
 	{
-		log::info!("all checks passed!");
+		tracing::info!("all checks passed!");
 	} else {
-		log::info!("not all checks passed");
+		tracing::info!("not all checks passed");
 	}
 	Ok(())
 }
@@ -124,7 +124,7 @@ impl<'work> Findings<'work> {
 			};
 
 			for finding in findings.iter() {
-				log::error!(
+				tracing::error!(
 					"package: {}, package_path: {}, package_language: {}, name: {:?}, desc: {}",
 					package.name,
 					package_path.display(),
@@ -139,7 +139,7 @@ impl<'work> Findings<'work> {
 			let config_path = config.strip_prefix(&self.workspace.root)?;
 
 			for finding in findings.iter() {
-				log::error!(
+				tracing::error!(
 					"config_path: {}, name: {:?}, desc: {}",
 					config_path.display(),
 					finding,
@@ -156,7 +156,7 @@ impl<'work> Findings<'work> {
 			};
 			for (file, finding) in findings.iter() {
 				let source_path = file.strip_prefix(&self.workspace.root)?;
-				log::error!(
+				tracing::error!(
 					"package: {}, package_path: {}, package_language: {}, source: {}, name: {:?}, desc: {}",
 					package.name,
 					package_path.display(),
@@ -255,12 +255,12 @@ fn validate_crate(krate: &Package) -> PackageFindingsSet {
 
 	let mut findings = BTreeSet::new();
 
-	log::info!("validating crate '{}' doesn't specify authors", krate.name);
+	tracing::info!("validating crate '{}' doesn't specify authors", krate.name);
 	if crate_has_authors(manifest) {
 		findings.insert(HasAuthors);
 	}
 
-	log::info!(
+	tracing::info!(
 		"validating crate '{}' doesn't specify license_file",
 		krate.name
 	);
@@ -268,7 +268,7 @@ fn validate_crate(krate: &Package) -> PackageFindingsSet {
 		findings.insert(PackageIssues::LicensePresent);
 	}
 
-	log::info!(
+	tracing::info!(
 		"validating crate '{}' specifies the correct license",
 		krate.name
 	);
@@ -276,7 +276,7 @@ fn validate_crate(krate: &Package) -> PackageFindingsSet {
 		findings.insert(LicenseInvalid);
 	}
 
-	log::info!("validating crate '{}' uses the correct edition", krate.name);
+	tracing::info!("validating crate '{}' uses the correct edition", krate.name);
 	if crate_uses_wrong_edition(manifest) {
 		findings.insert(Not2021Edition);
 	}
@@ -324,7 +324,7 @@ fn validate_pyproject(pyproject: &Package) -> PackageFindingsSet {
 		panic!()
 	};
 
-	log::info!(
+	tracing::info!(
 		"validating Python project '{}' specifies authors",
 		pyproject.name
 	);
@@ -332,7 +332,7 @@ fn validate_pyproject(pyproject: &Package) -> PackageFindingsSet {
 		findings.insert(MissingAuthors);
 	}
 
-	log::info!(
+	tracing::info!(
 		"validating Python project '{}' doesn't specify license_file",
 		pyproject.name
 	);
@@ -340,7 +340,7 @@ fn validate_pyproject(pyproject: &Package) -> PackageFindingsSet {
 		findings.insert(PackageIssues::NoDuplicateLicense);
 	}
 
-	log::info!(
+	tracing::info!(
 		"validating Python project '{}' specifies the correct license",
 		pyproject.name
 	);
@@ -348,7 +348,7 @@ fn validate_pyproject(pyproject: &Package) -> PackageFindingsSet {
 		findings.insert(LicenseInvalid);
 	}
 
-	log::info!(
+	tracing::info!(
 		"validating Python project '{}' uses the correct version",
 		pyproject.name
 	);
@@ -419,7 +419,7 @@ fn validate_config(config: &Path) -> ConfigFindingsSet {
 
 	let mut findings = BTreeSet::new();
 
-	log::info!("validating config file '{}' syntax", config.display());
+	tracing::info!("validating config file '{}' syntax", config.display());
 	if let Err(msg) = config_syntax_invalid(config) {
 		findings.insert(InvalidSyntax(msg));
 	}
@@ -476,7 +476,7 @@ fn validate_sources(package: &Package) -> SourceFindingsSet {
 	for path_result in rust_globber.chain(py_globber) {
 		match path_result {
 			Ok(path) => {
-				log::info!(
+				tracing::info!(
 					"validating source file '{}' includes an SPDX license comment",
 					path.display()
 				);
@@ -485,7 +485,7 @@ fn validate_sources(package: &Package) -> SourceFindingsSet {
 				}
 			}
 			Err(e) => {
-				log::warn!(
+				tracing::warn!(
 					"warn: failed to check glob against path: {}",
 					e.path().display()
 				);
