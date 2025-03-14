@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "activity"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "clap",
  "hipcheck-sdk",
@@ -50,7 +50,7 @@ dependencies = [
 
 [[package]]
 name = "affiliation"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -334,7 +334,7 @@ checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
 
 [[package]]
 name = "binary"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "clap",
  "content_inspector",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "churn"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "clap",
  "hipcheck-sdk",
@@ -949,7 +949,7 @@ dependencies = [
 
 [[package]]
 name = "entropy"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "clap",
  "dashmap",
@@ -1186,7 +1186,7 @@ dependencies = [
 
 [[package]]
 name = "fuzz"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "clap",
  "hipcheck-sdk",
@@ -1249,7 +1249,7 @@ checksum = "40ecd4077b5ae9fd2e9e169b102c6c330d0605168eb0e8bf79952b256dbefffd"
 
 [[package]]
 name = "git"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1282,7 +1282,7 @@ dependencies = [
 
 [[package]]
 name = "github"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2619,7 +2619,7 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "identity"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "clap",
  "hipcheck-sdk",
@@ -2907,7 +2907,7 @@ dependencies = [
 
 [[package]]
 name = "linguist"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "clap",
  "hipcheck-kdl",
@@ -3213,7 +3213,7 @@ dependencies = [
 
 [[package]]
 name = "npm"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3879,7 +3879,7 @@ dependencies = [
 
 [[package]]
 name = "review"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -5007,7 +5007,7 @@ dependencies = [
 
 [[package]]
 name = "typo"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",

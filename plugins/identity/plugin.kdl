@@ -1,6 +1,6 @@
 publisher "mitre"
 name "identity"
-version "0.4.1"
+version "0.5.0"
 license "Apache-2.0"
 
 entrypoint {
@@ -11,5 +11,5 @@ entrypoint {
 }
 
 dependencies {
-    plugin "mitre/git" version="^0.4" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/git.kdl"
+    plugin "mitre/git" version="^0.5" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/git.kdl"
 }
