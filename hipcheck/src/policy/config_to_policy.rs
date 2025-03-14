@@ -24,15 +24,15 @@ use std::{
 };
 use url::Url;
 
-const ACTIVITY_PLUGIN_VERSION: &str = "^0.4";
-const BINARY_PLUGIN_VERSION: &str = "^0.3";
-const FUZZ_PLUGIN_VERSION: &str = "^0.2";
-const IDENTITY_PLUGIN_VERSION: &str = "^0.4";
-const REVIEW_PLUGIN_VERSION: &str = "^0.3";
-const TYPO_PLUGIN_VERSION: &str = "^0.3";
-const AFFILIATION_PLUGIN_VERSION: &str = "^0.4";
-const CHURN_PLUGIN_VERSION: &str = "^0.4";
-const ENTROPY_PLUGIN_VERSION: &str = "^0.4";
+const ACTIVITY_PLUGIN_VERSION: &str = "^0.5";
+const BINARY_PLUGIN_VERSION: &str = "^0.4";
+const FUZZ_PLUGIN_VERSION: &str = "^0.3";
+const IDENTITY_PLUGIN_VERSION: &str = "^0.5";
+const REVIEW_PLUGIN_VERSION: &str = "^0.4";
+const TYPO_PLUGIN_VERSION: &str = "^0.4";
+const AFFILIATION_PLUGIN_VERSION: &str = "^0.5";
+const CHURN_PLUGIN_VERSION: &str = "^0.5";
+const ENTROPY_PLUGIN_VERSION: &str = "^0.5";
 
 struct Context {
 	path: PathBuf,
