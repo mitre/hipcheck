@@ -10,7 +10,7 @@ publish = false
 anyhow = "1.0.96"
 clap = { version = "4.5.27", features = ["derive"] }
 hipcheck-kdl = { version = "0.1.0", path = "../../library/hipcheck-kdl" }
-hipcheck-sdk = { version = "0.4.0", path = "../../sdk/rust", features = [
+hipcheck-sdk = { version = "0.5.0", path = "../../sdk/rust", features = [
     "macros",
 ] }
 tracing = "0.1"
@@ -24,6 +24,6 @@ url = "2.5.4"
 hipcheck-workspace-hack = { version = "0.1", path = "../../library/hipcheck-workspace-hack" }
 
 [dev-dependencies]
-hipcheck-sdk = { version = "0.4.0", path = "../../sdk/rust", features = [
+hipcheck-sdk = { version = "0.5.0", path = "../../sdk/rust", features = [
     "mock_engine",
 ] }

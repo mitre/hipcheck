@@ -59,7 +59,7 @@ git2 = { version = "0.20.0", features = [
 #
 # See: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#multiple-locations
 hipcheck-kdl = { version = "0.1.0", path = "../library/hipcheck-kdl" }
-hipcheck-macros = { path = "../library/hipcheck-macros", version = "0.3.1" }
+hipcheck-macros = { path = "../library/hipcheck-macros", version = "0.3.4" }
 http = "1.2.0"
 indextree = "4.7.3"
 indicatif = { version = "0.17.11", features = ["rayon"] }
@@ -127,7 +127,7 @@ xml-rs = "0.8.25"
 xz2 = "0.1.7"
 zip = "2.2.2"
 zstd = "0.13.3"
-hipcheck-common = { version = "0.3.0", path = "../library/hipcheck-common", features = [
+hipcheck-common = { version = "0.4.0", path = "../library/hipcheck-common", features = [
     "rfd9-compat",
 ] }
 serde_with = "3.12.0"
