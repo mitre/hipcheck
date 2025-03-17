@@ -204,7 +204,7 @@ pub fn checkout(repo_path: &Path, refspec: Option<String>) -> HcResult<String> {
 			// Get name of default branch for remote
 			let mut remote = repo.find_remote(remotes.first().unwrap())?;
 			remote.connect(git2::Direction::Fetch)?;
-			let default = remote.default_branch()?;
+			let default = remote.default_branch().context("Unable to establish default branch for repo. If you are analyzing an older ref for a local repo, please use the '--ref' flag.")?;
 			// Get the <NAME> in "refs/heads/<NAME>" for remote
 			let default_name = default.as_str().unwrap();
 			let (_, remote_branch_name) = default_name.rsplit_once('/').unwrap();
