@@ -710,13 +710,10 @@ fn add_category(
 
 // Lowest-level function to turn a PolicyFile into an AnalysisTree
 pub fn unresolved_analysis_tree_from_policy(policy: &PolicyFile) -> Result<AnalysisTree> {
-	let mut tree = AnalysisTree::new("risk");
+	let mut tree = AnalysisTree::new(&policy.analyze.root.name);
 	let root = tree.root;
-
-	for c in policy.analyze.categories.iter() {
-		add_category(&mut tree, root, c)?;
-	}
-
+	add_category(&mut tree, root, &policy.analyze.root)?;
+	
 	Ok(tree)
 }
 

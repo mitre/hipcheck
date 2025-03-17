@@ -479,7 +479,7 @@ impl ParseKdlNode for InvestigateIfFail {
 pub struct PolicyAnalyze {
 	pub investigate_policy: InvestigatePolicy,
 	pub if_fail: Option<InvestigateIfFail>,
-	pub categories: Vec<PolicyCategory>,
+	pub root: PolicyCategory,
 }
 
 impl PolicyAnalyze {
@@ -488,7 +488,7 @@ impl PolicyAnalyze {
 		Self {
 			investigate_policy,
 			if_fail,
-			categories: Vec::new(),
+			root: PolicyCategory::new("risk".to_string(), None),
 		}
 	}
 
@@ -498,25 +498,34 @@ impl PolicyAnalyze {
 		if_fail: Option<InvestigateIfFail>,
 		capacity: usize,
 	) -> Self {
+		let mut root = PolicyCategory::new("risk".to_string(), None);
+		root.children = Vec::<PolicyCategoryChild>::with_capacity(capacity);
+
 		Self {
 			investigate_policy,
 			if_fail,
-			categories: Vec::with_capacity(capacity),
+			root,
 		}
 	}
 
 	#[allow(dead_code)]
 	pub fn push(&mut self, category: PolicyCategory) {
-		self.categories.push(category);
+		self.root
+			.children
+			.push(PolicyCategoryChild::Category(category));
 	}
 
 	#[allow(dead_code)]
 	pub fn pop(&mut self) -> Option<PolicyCategory> {
-		self.categories.pop()
+		match self.root.children.pop() {
+			Some(PolicyCategoryChild::Category(c)) => Some(c),
+			_ => None
+		}
 	}
 
 	pub fn find_analysis_by_name(&self, name: &str) -> Option<PolicyAnalysis> {
-		self.categories
+		self.root
+			.children
 			.iter()
 			.find_map(|category| category.find_analysis_by_name(name))
 	}
@@ -537,12 +546,18 @@ impl ParseKdlNode for PolicyAnalyze {
 		let investigate_policy: InvestigatePolicy = extract_data(nodes)?;
 		let if_fail: Option<InvestigateIfFail> = extract_data(nodes);
 
-		let mut categories = Vec::new();
+		let mut root = PolicyCategory::new("risk".to_string(), None);
 
 		for node in nodes {
 			if node.name().to_string().as_str() == "category" {
 				if let Some(category) = PolicyCategory::parse_node(node) {
-					categories.push(category);
+					root.children.push(PolicyCategoryChild::Category(category));
+				}
+			}
+			if node.name().to_string().as_str() == "analysis" {
+				if let Some(analysis) = PolicyAnalysis::parse_node(node) {
+					root.children
+						.push(PolicyCategoryChild::Analysis(analysis.clone()));
 				}
 			}
 		}
@@ -550,7 +565,7 @@ impl ParseKdlNode for PolicyAnalyze {
 		Some(Self {
 			investigate_policy,
 			if_fail,
-			categories,
+			root,
 		})
 	}
 }
