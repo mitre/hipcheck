@@ -2,7 +2,8 @@
 
 //! Globally defined agent containing system TLS Certs.
 
-use rustls::{ClientConfig, RootCertStore};
+use rustls::ClientConfig;
+use rustls_platform_verifier::ConfigVerifierExt;
 use std::sync::{Arc, OnceLock};
 use ureq::{Agent, AgentBuilder};
 
@@ -15,17 +16,8 @@ static AGENT: OnceLock<Agent> = OnceLock::new();
 /// - If native certs cannot be loaded the first time this function is called.
 pub fn agent() -> &'static Agent {
 	AGENT.get_or_init(|| {
-		// Retrieve system certs
-		let mut roots = RootCertStore::empty();
-		let native_certs =
-			rustls_native_certs::load_native_certs().expect("should load native certs");
-		roots.add_parsable_certificates(native_certs);
-
-		// Add certs to connection configuration
-		let tls_config = ClientConfig::builder()
-			.with_root_certificates(roots)
-			.with_no_client_auth();
-
+		// Create connection configuration with system certs retrieved by rustls platform verifier
+		let tls_config = ClientConfig::with_platform_verifier();
 		// Construct agent
 		AgentBuilder::new().tls_config(Arc::new(tls_config)).build()
 	})
