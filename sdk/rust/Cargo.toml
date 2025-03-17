@@ -21,7 +21,7 @@ tokio-stream = "0.1.17"
 tonic = "0.12.3"
 schemars = { version = "0.8.22", features = ["url"] }
 hipcheck-sdk-macros = { path = "../../library/hipcheck-sdk-macros", version = "0.1.3", optional = true }
-typify-macro = "0.2.0"
+typify-macro = "0.3.0"
 url = { version = "2.5.4", features = ["serde"] }
 tracing = { version= "0.1", optional = true }
 tracing-subscriber = { version="0.3", features=["env-filter", "json"], optional = true }
