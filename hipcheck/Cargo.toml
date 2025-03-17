@@ -37,7 +37,7 @@ blake3 = "1.5.5"
 cyclonedx-bom = "0.8.0"
 dotenv = "0.15.0"
 chrono = { version = "0.4.39", features = ["alloc", "serde"] }
-clap = { version = "4.5.27", features = ["derive"] }
+clap = { version = "4.5.32", features = ["derive"] }
 console = { version = "0.15.11", features = ["windows-console-colors"] }
 dialoguer = "0.11.0"
 dirs = "6.0.0"
