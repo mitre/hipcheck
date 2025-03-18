@@ -63,6 +63,13 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 	let (in_progress_state, completion_state) = match msg.state() {
 		// if the message gets chunked, then it must either be a reply or submission that is in process
 		QueryState::Unspecified => return Err(anyhow!("msg in Unspecified query state")),
+		QueryState::Error => {
+			return Err(anyhow!(
+				// Cal TODO review whether this is the best approach
+				"msg is errored; error = '{}'",
+				msg.error.unwrap_or("".to_owned())
+			))
+		}
 		QueryState::SubmitInProgress | QueryState::SubmitComplete => {
 			(QueryState::SubmitInProgress, QueryState::SubmitComplete)
 		}
@@ -98,6 +105,9 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 			output: vec![],
 			concern: vec![],
 			split: false,
+			// Cal TODO is error always none here?
+			// if so, comment why
+			error: None,
 		};
 
 		for (source, sink) in [
@@ -530,6 +540,9 @@ mod test {
 					"< 10#2".to_owned(),
 				],
 				split: false,
+				// Cal TODO is error always none here?
+				// if so, comment why
+				error: None,
 			};
 			let res = match chunk_with_size(orig_query.clone(), 10) {
 				Ok(r) => r,

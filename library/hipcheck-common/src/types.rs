@@ -32,6 +32,8 @@ impl TryFrom<QueryState> for QueryDirection {
 	fn try_from(value: QueryState) -> Result<Self, Self::Error> {
 		match value {
 			QueryState::Unspecified => Err(Error::UnspecifiedQueryState),
+			// Cal TODO use correct error type instead of UnspecifiedQueryState
+			QueryState::Error => Err(Error::UnspecifiedQueryState),
 			QueryState::SubmitInProgress => Err(Error::UnexpectedRequestInProgress),
 			QueryState::SubmitComplete => Ok(QueryDirection::Request),
 			QueryState::ReplyInProgress => Err(Error::UnexpectedReplyInProgress),
@@ -133,6 +135,7 @@ impl TryFrom<Query> for PluginQuery {
 			output: outputs,
 			concern: value.concerns,
 			split: false,
+			error: None, // TODO actually pass error
 		})
 	}
 }

@@ -245,6 +245,7 @@ impl PluginEngine {
 			output: vec![],
 			concern: self.take_concerns(),
 			split: false,
+			error: None, // Cal TODO send error string
 		};
 		self.tx
 			.send(Ok(InitiateQueryProtocolResponse { query: Some(query) }))
