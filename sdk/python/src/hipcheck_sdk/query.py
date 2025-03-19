@@ -9,6 +9,7 @@ import pydantic
 
 from hipcheck_sdk.engine import PluginEngine
 
+
 # Class to encapsulate information about a `@query`-decorated function, thus
 # declared to be an endpoint for this plugin.
 @dataclass
@@ -23,13 +24,14 @@ class Endpoint:
     output_schema: dict
 
     def is_default(self):
-        return name == ''
+        return name == ""
 
 
 # A global registry of all detected `@query`-decorated functions in this plugin.
 # Used by the default `Plugin` class implementation to implement `queries()` and
 # `schemas()` functions.
 query_registry: Dict[str, Endpoint] = {}
+
 
 # Gets the JSON Schema for a Python object type. If the type is a child of
 # pydantic.BaseModel, use that. Otherwise, try to derive the schema.
@@ -39,6 +41,7 @@ def get_json_schema_for_type(ty):
     else:
         adapter = pydantic.TypeAdapter(ty)
         return adapter.json_schema()
+
 
 # Add the function to `query_registry`. If `key_schema` or `output_schema` are None,
 # try to derive the schema.
@@ -57,9 +60,11 @@ def register_query(func, default, key_schema, output_schema):
         key_schema = get_json_schema_for_type(key_hint)
 
     if output_schema is None:
-        if 'return' not in hints:
-            raise TypeError("cannot deduce query output type without return type hint on signature")
-        out_hint = hints['return']
+        if "return" not in hints:
+            raise TypeError(
+                "cannot deduce query output type without return type hint on signature"
+            )
+        out_hint = hints["return"]
         output_schema = get_json_schema_for_type(out_hint)
 
     key = func.__name__
@@ -68,6 +73,7 @@ def register_query(func, default, key_schema, output_schema):
             raise TypeError("default query already defined")
         key = ""
     query_registry[key] = Endpoint(key, func, key_schema, output_schema)
+
 
 # Decorator function for query endpoints. Endpoint functions must have the following
 # signature:
@@ -82,11 +88,14 @@ def query(f_py=None, default=False, key_schema=None, output_schema=None):
     global query_registry
     assert callable(f_py) or f_py is None
     registry = {}
+
     def _decorator(func):
         register_query(func, default, key_schema, output_schema)
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
+
         return wrapper
+
     return _decorator(f_py) if callable(f_py) else _decorator

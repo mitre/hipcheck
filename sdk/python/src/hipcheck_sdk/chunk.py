@@ -15,7 +15,7 @@ from hipcheck_sdk import enabled
 
 # Max size of a single GRPC message (4 MB)
 GRPC_MAX_SIZE_BYTES: int = 1024 * 1024 * 4
-GRPC_EFFECTIVE_MAX_SIZE: int = GRPC_MAX_SIZE_BYTES - 1024 # Minus one KB
+GRPC_EFFECTIVE_MAX_SIZE: int = GRPC_MAX_SIZE_BYTES - 1024  # Minus one KB
 
 
 class QueryDirection(Enum):
@@ -101,14 +101,14 @@ class Query:
         key, output = rfd9_res
 
         return Query(
-                id=raw.id,
-                direction=direction,
-                publisher=raw.publisher_name,
-                plugin=raw.plugin_name,
-                query=raw.query_name,
-                key=key,
-                output=output,
-                concerns=list(raw.concern)
+            id=raw.id,
+            direction=direction,
+            publisher=raw.publisher_name,
+            plugin=raw.plugin_name,
+            query=raw.query_name,
+            key=key,
+            output=output,
+            concerns=list(raw.concern),
         )
 
     def try_into(self) -> gen.Query:
@@ -129,15 +129,16 @@ class Query:
                 raise InvalidJsonInQueryOutput()
 
         raw = gen.Query(
-                id=self.id,
-                state=state,
-                publisher_name=self.publisher,
-                plugin_name=self.plugin,
-                query_name=self.query,
-                key=keys,
-                output=outputs,
-                concern=self.concerns,
-                split=False)
+            id=self.id,
+            state=state,
+            publisher_name=self.publisher,
+            plugin_name=self.plugin,
+            query_name=self.query,
+            key=keys,
+            output=outputs,
+            concern=self.concerns,
+            split=False,
+        )
         return raw
 
 
@@ -146,7 +147,7 @@ class Query:
 # backwards to the end of the previous char. Returns a tuple containing the substring
 # drained from `buf`, and (optionally) the un-drained substring of buf.
 def drain_at_most_n_bytes(buf: str, max_bytes: int) -> Tuple[str, Optional[str]]:
-    buf_bytes = [x.encode('utf-8') for x in buf]
+    buf_bytes = [x.encode("utf-8") for x in buf]
     buf_len = sum([len(x) for x in buf_bytes])
 
     to_drain = min(buf_len, max_bytes)
@@ -173,7 +174,9 @@ def all_chunkable_data_consumed(msg: gen.Query) -> bool:
 # `True` -> a partial string was written to sink, indicating `split=true` for this message and no more data can
 #   be fit into this gRPC message
 # `False` - > only complete strings were written to sink, indicating `split=false` for this message
-def drain_vec_string(source: List[str], sink: List[str], remaining: int, made_progress: bool) -> Tuple[bool, bool]:
+def drain_vec_string(
+    source: List[str], sink: List[str], remaining: int, made_progress: bool
+) -> Tuple[bool, bool]:
     while len(source) > 0:
         s_to_drain = source.pop(0)
         drained_portion, remainder = drain_at_most_n_bytes(s_to_drain, remaining)
@@ -232,11 +235,17 @@ def chunk_with_size(msg: gen.Query, max_est_size: int) -> List[gen.Query]:
             publisher_name=base.publisher_name,
             plugin_name=base.plugin_name,
             query_name=base.query_name,
-            split=False
+            split=False,
         )
 
-        for (source, sink) in [(base.key, chunked_query.key), (base.output, chunked_query.output), (base.concern, chunked_query.concern)]:
-            made_progress, split_occurred = drain_vec_string(source, sink, remaining, made_progress)
+        for source, sink in [
+            (base.key, chunked_query.key),
+            (base.output, chunked_query.output),
+            (base.concern, chunked_query.concern),
+        ]:
+            made_progress, split_occurred = drain_vec_string(
+                source, sink, remaining, made_progress
+            )
             if split_occurred:
                 chunked_query.split = True
                 break
@@ -281,8 +290,10 @@ def prepare(query: Query) -> List[gen.Query]:
 
 # Determine whether or not the given 'QueryState' represents an intermediate state
 def in_progress_state(state: gen.QueryState) -> bool:
-    return state in [gen.QUERY_STATE_REPLY_IN_PROGRESS,
-            gen.QUERY_STATE_SUBMIT_IN_PROGRESS]
+    return state in [
+        gen.QUERY_STATE_REPLY_IN_PROGRESS,
+        gen.QUERY_STATE_SUBMIT_IN_PROGRESS,
+    ]
 
 
 # Represents the 3 fields in a `gen.Query` that hold repeated string data
@@ -290,6 +301,7 @@ class QueryVecField(Enum):
     KEY = 1
     OUTPUT = 2
     CONCERN = 3
+
 
 # Determines which field of `gen.Query` is the "latest" one with data
 def last_field_to_have_content(query: gen.Query) -> QueryVecField:
@@ -308,7 +320,6 @@ def last_field_to_have_content(query: gen.Query) -> QueryVecField:
 
 
 class QuerySynthesizer:
-
     def __init__(self):
         self.raw: Optional[gen.Query] = None
 
@@ -323,13 +334,14 @@ class QuerySynthesizer:
 
         # @Invariant - self.raw is now not None
 
-        initial_state: gen.QueryState = self.raw.state;
-
+        initial_state: gen.QueryState = self.raw.state
         current_state: gen.QueryState = initial_state
 
         # holds whether the last message was split, if it was then it holds the "latest" field
         # with data that should have the first element of the next message appended to it
-        last_message_split = last_field_to_have_content(self.raw) if self.raw.split else None
+        last_message_split = (
+            last_field_to_have_content(self.raw) if self.raw.split else None
+        )
 
         # If response is the first of a set of chunks, handle
         if in_progress_state(current_state):
@@ -342,22 +354,45 @@ class QuerySynthesizer:
                 current_state = next_chunk.state
 
                 match (initial_state, current_state):
-                    case (gen.QUERY_STATE_UNSPECIFIED, _) | (gen.QUERY_STATE_REPLY_COMPLETE, _) | (gen.QUERY_STATE_SUBMIT_COMPLETE, _):
+                    case (
+                        (gen.QUERY_STATE_UNSPECIFIED, _)
+                        | (gen.QUERY_STATE_REPLY_COMPLETE, _)
+                        | (gen.QUERY_STATE_SUBMIT_COMPLETE, _)
+                    ):
                         raise UnspecifiedQueryState()
                     case (_, gen.QUERY_STATE_UNSPECIFIED):
                         raise UnspecifiedQueryState()
                     # error out if expecting a Submit messages and a Reply is received
-                    case (gen.QUERY_STATE_SUBMIT_IN_PROGRESS, gen.QUERY_STATE_REPLY_IN_PROGRESS) | (gen.QUERY_STATE_SUBMIT_IN_PROGRESS, gen.QUERY_STATE_REPLY_COMPLETE):
+                    case (
+                        gen.QUERY_STATE_SUBMIT_IN_PROGRESS,
+                        gen.QUERY_STATE_REPLY_IN_PROGRESS,
+                    ) | (
+                        gen.QUERY_STATE_SUBMIT_IN_PROGRESS,
+                        gen.QUERY_STATE_REPLY_COMPLETE,
+                    ):
                         raise ReceivedReplyWhenExpectingSubmitChunk()
                     # error out if expecting a Submit messages and a Reply is received
-                    case (gen.QUERY_STATE_REPLY_IN_PROGRESS, gen.QUERY_STATE_SUBMIT_IN_PROGRESS) | (gen.QUERY_STATE_REPLY_IN_PROGRESS, gen.QUERY_STATE_SUBMIT_COMPLETE):
+                    case (
+                        gen.QUERY_STATE_REPLY_IN_PROGRESS,
+                        gen.QUERY_STATE_SUBMIT_IN_PROGRESS,
+                    ) | (
+                        gen.QUERY_STATE_REPLY_IN_PROGRESS,
+                        gen.QUERY_STATE_SUBMIT_COMPLETE,
+                    ):
                         raise ReceivedSubmitWhenExpectingReplyChunk()
                     # otherwise we got an expected message type
                     case (_, _):
-                        if current_state in [gen.QUERY_STATE_REPLY_COMPLETE, gen.QUERY_STATE_SUBMIT_COMPLETE]:
+                        if current_state in [
+                            gen.QUERY_STATE_REPLY_COMPLETE,
+                            gen.QUERY_STATE_SUBMIT_COMPLETE,
+                        ]:
                             self.raw.state = current_state
 
-                        next_message_split = last_field_to_have_content(next_chunk) if next_chunk.split else None
+                        next_message_split = (
+                            last_field_to_have_content(next_chunk)
+                            if next_chunk.split
+                            else None
+                        )
 
                         # if the last message set `split = true`, then the first element in the
                         # "next" message must be appended to the last message of the "latest"
@@ -366,11 +401,17 @@ class QuerySynthesizer:
                             case None:
                                 pass
                             case QueryVecField.KEY:
-                                self.raw.key[len(self.raw.key) - 1] += next_chunk.key.pop(0)
+                                self.raw.key[len(self.raw.key) - 1] += (
+                                    next_chunk.key.pop(0)
+                                )
                             case QueryVecField.OUTPUT:
-                                self.raw.output[len(self.raw.output) - 1] += next_chunk.output.pop(0)
+                                self.raw.output[len(self.raw.output) - 1] += (
+                                    next_chunk.output.pop(0)
+                                )
                             case QueryVecField.CONCERN:
-                                self.raw.concern[len(self.raw.concern) - 1] += next_chunk.concern.pop(0)
+                                self.raw.concern[len(self.raw.concern) - 1] += (
+                                    next_chunk.concern.pop(0)
+                                )
 
                         self.raw.key.extend(next_chunk.key)
                         self.raw.output.extend(next_chunk.output)
@@ -386,6 +427,4 @@ class QuerySynthesizer:
             except StopIteration:
                 pass
 
-
         return Query.try_from(self.raw)
-
