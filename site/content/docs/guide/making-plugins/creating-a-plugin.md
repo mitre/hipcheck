@@ -30,5 +30,10 @@ argument, enabling Hipcheck to centrally manage the ports plugins are listening
 on. The port provided via this CLI argument must be the port the running plugin
 process listens on for gRPC requests, and on which it returns responses.
 
+Hipcheck core may also optionally pass a `--log-level <LEVEL>` field with any of
+the following values: `off, error, warn, info, debug, trace`. Plugins are
+expected to initialize their logging subsystem to correspond with the specified
+log level.
+
 Once started, the plugin should continue running, listening for gRPC requests
 from Hipcheck, until shut down by the Hipcheck process.
