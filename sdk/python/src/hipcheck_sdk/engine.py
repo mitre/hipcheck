@@ -15,6 +15,7 @@ from hipcheck_sdk.error import *
 
 logger = logging.getLogger(__name__)
 
+
 # Split `s` at first instance of `delim`. Return substring before
 # `delim`. If `delim` does not exist, second tuple element is None,
 # else it is everything after the first `delim` occurence.
@@ -23,6 +24,7 @@ def split_once(s: str, delim: str) -> Tuple[str, Optional[str]]:
     if len(res) != 2:
         res.append(None)
     return tuple(res)
+
 
 # Return a tuple of (publisher, plugin, endpoint_name) from a target
 # string (e.g. "mitre/example/query"). If no endpoint_name given,
@@ -66,18 +68,19 @@ class QueryBuilder:
 #  This struct invokes the `func` field of an `Endpoint`, passing a handle to itself. This
 #  allows the query logic to request information from other Hipcheck plugins in order to complete.
 class PluginEngine:
-
     def __init__(
-            self,
-            session_id: int = 0,
-            tx: asyncio.Queue = None,
-            rx: asyncio.Queue = None,
-            drop_tx: asyncio.Queue = None,
-            mock_responses: Optional[Dict[Tuple[str, object], object]] = None
+        self,
+        session_id: int = 0,
+        tx: asyncio.Queue = None,
+        rx: asyncio.Queue = None,
+        drop_tx: asyncio.Queue = None,
+        mock_responses: Optional[Dict[Tuple[str, object], object]] = None,
     ):
         nones = [v is None for v in [tx, rx, drop_tx]]
         if any(nones) and not all(nones):
-            raise UnspecifiedConfigError(msg="tx, rx, and drop_tx must all be None or all be asyncio.Queue objects")
+            raise UnspecifiedConfigError(
+                msg="tx, rx, and drop_tx must all be None or all be asyncio.Queue objects"
+            )
 
         self.id: int = session_id
         self.tx: asyncio.Queue = tx
@@ -122,7 +125,7 @@ class PluginEngine:
                 query=name,
                 key=keys,
                 output=[],
-                concerns=[]
+                concerns=[],
             )
 
             await self.send(query)
@@ -144,7 +147,6 @@ class PluginEngine:
     # endpoint is desired. `keys` must be a list containing a objects that can be serialized using `json.dumps()`.
     async def batch_query(self, target: str, keys: List[object]) -> List[object]:
         return await self.query_inner(target, keys)
-
 
     async def recv_raw(self) -> Optional[List[gen.Query]]:
         out = []
@@ -173,7 +175,6 @@ class PluginEngine:
 
         return out
 
-
     async def send_session_error(self, plugin):
         query = gen.Query(
             id=self.id,
@@ -182,14 +183,13 @@ class PluginEngine:
             plugin_name=plugin.name,
             query_name="",
             concern=self.take_concerns(),
-            split=False
+            split=False,
         )
         await self.tx.put(query)
 
-
     async def recv(self) -> Optional[Query]:
         synth = QuerySynthesizer()
-        res: Optional[Query] = None;
+        res: Optional[Query] = None
         while res is None:
             opt_msg_chunks = await self.recv_raw()
             if opt_msg_chunks is None:
@@ -197,7 +197,6 @@ class PluginEngine:
             msg_chunks = opt_msg_chunks
             res = synth.add(msg_chunks)
         return res
-
 
     # Records a string-like concern that will be emitted in the final Hipcheck report.
     # Intended for use within a `@query`-decorated function.
@@ -211,7 +210,7 @@ class PluginEngine:
 
     # Send a gRPC query from plugin to the hipcheck server
     async def send(self, query: Query):
-        query.id = self.id # incoming id value is just a placeholder
+        query.id = self.id  # incoming id value is just a placeholder
         for pq in prepare(query):
             await self.tx.put(pq)
 
@@ -242,7 +241,7 @@ class PluginEngine:
             query=name,
             key=[],
             output=[value],
-            concerns=self.take_concerns()
+            concerns=self.take_concerns(),
         )
 
         await self.send(out)
@@ -263,4 +262,3 @@ class PluginEngine:
             await self.send_session_error(plugin)
         # except asyncio.QueueShutDown:
         #     return
-

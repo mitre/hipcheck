@@ -12,22 +12,31 @@ import grpc
 import json
 
 import hipcheck_sdk.gen as gen
-from hipcheck_sdk.error import ConfigError, to_set_config_response, ReceivedReplyWhenExpectingSubmitChunk
+from hipcheck_sdk.error import (
+    ConfigError,
+    to_set_config_response,
+    ReceivedReplyWhenExpectingSubmitChunk,
+)
 from hipcheck_sdk.query import Endpoint, query, query_registry
 from hipcheck_sdk.engine import PluginEngine
 from hipcheck_sdk.chunk import Query
 
 logger = logging.getLogger(__name__)
 
-class Plugin(ABC):
 
+class Plugin(ABC):
     # Ensure that subclasses have required class variables `name` and `publisher`
     def __init_subclass__(cls, **kwargs):
-        for required in ('name', 'publisher',):
+        for required in (
+            "name",
+            "publisher",
+        ):
             try:
                 getattr(cls, required)
             except AttributeError:
-                raise TypeError(f"Can't instantiate abstract class {cls.__name__} without {required} attribute defined")
+                raise TypeError(
+                    f"Can't instantiate abstract class {cls.__name__} without {required} attribute defined"
+                )
         return super().__init_subclass__(**kwargs)
 
     # Handle setting configuration. The `config` parameter is a dict of `str, str` pairs.
@@ -69,7 +78,6 @@ class Plugin(ABC):
 # the session ends, they put their ID on the `self.drop` Queue, so this object can
 # clear their state from `self.sessions`.
 class HcSessionSocket:
-
     def __init__(self, stream, context):
         self.stream = stream
         self.context = context
@@ -86,7 +94,9 @@ class HcSessionSocket:
             session_id = await self.drop.get()
             val = self.sessions.pop(session_id)
             if val is None:
-                logger.warning("HcSessionSocket got request to drop a session that does not exist")
+                logger.warning(
+                    "HcSessionSocket got request to drop a session that does not exist"
+                )
                 continue
             task, queue = val
             await task
@@ -97,7 +107,10 @@ class HcSessionSocket:
         if query.id in self.sessions.keys():
             return self.sessions[query.id][1]
 
-        if query.state in [gen.QueryState.QUERY_STATE_SUBMIT_IN_PROGRESS, gen.QueryState.QUERY_STATE_SUBMIT_COMPLETE]:
+        if query.state in [
+            gen.QueryState.QUERY_STATE_SUBMIT_IN_PROGRESS,
+            gen.QueryState.QUERY_STATE_SUBMIT_COMPLETE,
+        ]:
             return None
 
         raise ReceivedReplyWhenExpectingSubmitChunk()
@@ -110,14 +123,15 @@ class HcSessionSocket:
         # ID currently 0 so that it gets ignored by Hipcheck core, but that's
         #   a bit hacky.
         query = gen.Query(
-                id=0,
-                state=gen.QueryState.QUERY_STATE_UNSPECIFIED,
-                publisher_name="",
-                plugin_name="",
-                query_name="",
-                key=[],
-                output=[],
-                split=False)
+            id=0,
+            state=gen.QueryState.QUERY_STATE_UNSPECIFIED,
+            publisher_name="",
+            plugin_name="",
+            query_name="",
+            key=[],
+            output=[],
+            split=False,
+        )
         await self.out.put(query)
 
         async for request in self.stream:
@@ -135,10 +149,8 @@ class HcSessionSocket:
             else:
                 engine_queue = asyncio.Queue()
                 session = PluginEngine(
-                        session_id=query.id,
-                        tx=self.out,
-                        rx=engine_queue,
-                        drop_tx=self.drop)
+                    session_id=query.id, tx=self.out, rx=engine_queue, drop_tx=self.drop
+                )
                 await engine_queue.put(query)
 
                 task = asyncio.create_task(session.handle_session(plugin))
@@ -160,7 +172,8 @@ class HcSessionSocket:
                 query_name="",
                 key=[""],
                 output=[f"HcSessionSocket error: {e}"],
-                split=False)
+                split=False,
+            )
             await self.out.put(query)
         finally:
             # Shut down queue so that PluginServer also closes.
@@ -170,14 +183,13 @@ class HcSessionSocket:
 
 
 class PluginServer(gen.PluginServiceServicer):
-
     def __init__(self, plugin: Plugin):
         self.plugin = plugin
 
     def register(plugin: Plugin):
         return PluginServer(plugin)
 
-    def listen(self, port: int, host='127.0.0.1'):
+    def listen(self, port: int, host="127.0.0.1"):
         async def inner(s: PluginServer, port: int):
             # Create server
             server = grpc.aio.server()
@@ -191,17 +203,20 @@ class PluginServer(gen.PluginServiceServicer):
 
             # Register handler
             loop = asyncio.get_event_loop()
-            for signame in ('SIGINT', 'SIGTERM'):
-                loop.add_signal_handler(getattr(signal, signame),
-                        lambda: asyncio.create_task(stop_server()))
+            for signame in ("SIGINT", "SIGTERM"):
+                loop.add_signal_handler(
+                    getattr(signal, signame), lambda: asyncio.create_task(stop_server())
+                )
             s.stop_queue = asyncio.Queue()
 
             # Wait for either the server to terminate, or for a single queue object
             #   that notifies us to stop the server
             wait_server_task = asyncio.create_task(server.wait_for_termination())
             notify_stop_task = asyncio.create_task(self.stop_queue.get())
-            done, pending = await asyncio.wait([wait_server_task, notify_stop_task],
-                    return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(
+                [wait_server_task, notify_stop_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
 
             # If the "wait for server" task is still pending, we got notifed by the stop_queue,
             #   so trigger server shutdown
@@ -217,28 +232,28 @@ class PluginServer(gen.PluginServiceServicer):
             key_schema = json.dumps(q.key_schema)
             output_schema = json.dumps(q.output_schema)
             yield gen.GetQuerySchemasResponse(
-                    query_name=q.name,
-                    key_schema=key_schema,
-                    output_schema=output_schema)
+                query_name=q.name, key_schema=key_schema, output_schema=output_schema
+            )
 
     def SetConfiguration(self, request, context):
         config = json.loads(request.configuration)
         try:
             result = self.plugin.set_config(config)
             return gen.SetConfigurationResponse(
-                    status=gen.ConfigurationStatus.CONFIGURATION_STATUS_NONE,
-                    message=""
-                )
+                status=gen.ConfigurationStatus.CONFIGURATION_STATUS_NONE, message=""
+            )
         except ConfigError as e:
             return to_set_config_response(e)
 
     def GetDefaultPolicyExpression(self, request, context):
         return gen.GetDefaultPolicyExpressionResponse(
-                policy_expression=self.plugin.default_policy_expr())
+            policy_expression=self.plugin.default_policy_expr()
+        )
 
     def ExplainDefaultQuery(self, request, context):
         return gen.ExplainDefaultQueryResponse(
-                explanation=self.plugin.explain_default_query())
+            explanation=self.plugin.explain_default_query()
+        )
 
     async def InitiateQueryProtocol(self, stream, context):
         session_socket = HcSessionSocket(stream, context)
