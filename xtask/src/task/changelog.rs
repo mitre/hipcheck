@@ -2,7 +2,6 @@
 
 use crate::ChangelogArgs;
 use anyhow::{Context, Result};
-use log::LevelFilter;
 use xshell::{cmd, Shell};
 
 /// Execute the changelog task.
@@ -20,13 +19,13 @@ pub fn run(args: ChangelogArgs) -> Result<()> {
 	// Warn the user about what version we're bumping to.
 	//
 	// Avoid running the extra external command if we won't see the result.
-	if log::max_level() >= LevelFilter::Warn {
+	if tracing::max_level_hint() >= LevelFilter::Warn {
 		let new_version = {
 			let full = cmd!(sh, "git cliff --bumped-version").read()?;
 			full.strip_prefix("hipcheck-").unwrap_or(&full).to_owned()
 		};
 
-		log::warn!(
+		tracing::warn!(
 			"bumping to {}; this may not be the version you want",
 			new_version
 		);
@@ -44,6 +43,6 @@ pub fn run(args: ChangelogArgs) -> Result<()> {
 		.ignore_stderr()
 		.run()?;
 
-	log::warn!("finished; check {} to proceed", output);
+	tracing::warn!("finished; check {} to proceed", output);
 	Ok(())
 }

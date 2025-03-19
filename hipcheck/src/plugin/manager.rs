@@ -8,7 +8,6 @@ use crate::{
 };
 use futures::future::join_all;
 use hipcheck_common::{proto::plugin_service_client::PluginServiceClient, types::LogLevel};
-use log::{debug, error, info, trace, warn};
 use rand::Rng;
 use serde::Deserialize;
 use std::{collections::HashMap, env, ffi::OsString, ops::Range, path::Path, sync::LazyLock};
@@ -63,7 +62,7 @@ impl PluginLogLevels {
 					let log_level = match LogLevel::level_from_str(level) {
 						Ok(level) => level,
 						Err(e) => {
-							log::error!("{}", e);
+							tracing::error!("{}", e);
 							continue;
 						}
 					};
@@ -84,7 +83,7 @@ impl PluginLogLevels {
 					let log_level = match LogLevel::level_from_str(level) {
 						Ok(level) => level,
 						Err(e) => {
-							log::error!("{}", e);
+							tracing::error!("{}", e);
 							continue;
 						}
 					};
@@ -93,7 +92,7 @@ impl PluginLogLevels {
 						plugin_wide_level = log_level;
 					}
 				}
-				(None, _) => log::error!("Incomplete HC_LOG var set"),
+				(None, _) => tracing::error!("Incomplete HC_LOG var set"),
 			}
 		}
 		PluginLogLevels {
@@ -178,6 +177,8 @@ impl PluginExecutor {
 			let reader = BufReader::new(reader);
 			let mut lines = reader.lines();
 			// parse plugin log json lines to LogEvent objects and output the messages
+
+			// create new tracing_subscriber with no target
 			loop {
 				match lines.next_line().await {
 					Ok(Some(line)) => {
@@ -190,11 +191,14 @@ impl PluginExecutor {
 								false => format!("plugin::{}", event.target),
 							};
 							match event.level {
-								LogLevel::Error => error!(target: &event_target, "{}", message),
-								LogLevel::Warn => warn!(target: &event_target, "{}", message),
-								LogLevel::Info => info!(target: &event_target, "{}", message),
-								LogLevel::Debug => debug!(target: &event_target, "{}", message),
-								LogLevel::Trace => trace!(target: &event_target, "{}", message),
+								// use custom field instead of target?
+
+								// create target statically from plugin_title? is that possible?
+								LogLevel::Error => tracing::error!(target: &event_target, "{}", message),
+								LogLevel::Warn => tracing::warn!(plugin_target = &event_target, "{}", message),
+								LogLevel::Info => tracing::info!(plugin_target = &event_target, "{}", message),
+								LogLevel::Debug => tracing::debug!(plugin_target = &event_target, "{}", message),
+								LogLevel::Trace => tracing::trace!(plugin_target = &event_target, "{}", message),
 								LogLevel::Off => {}
 							};
 						}
@@ -204,7 +208,7 @@ impl PluginExecutor {
 						break;
 					}
 					Err(e) => {
-						log::error!(
+						tracing::error!(
 							"I/O erorr occured while listening for logs from {plugin_title}: {e}"
 						);
 						break;
@@ -216,7 +220,7 @@ impl PluginExecutor {
 
 	pub async fn start_plugins(&self, plugins: Vec<Plugin>) -> Result<Vec<PluginContext>> {
 		let num_plugins = plugins.len();
-		log::info!("Starting {} plugins", num_plugins);
+		tracing::info!("Starting {} plugins", num_plugins);
 
 		join_all(plugins.into_iter().map(|p| self.start_plugin(p)))
 			.await
@@ -278,7 +282,7 @@ impl PluginExecutor {
 			));
 		};
 
-		log::debug!(
+		tracing::debug!(
 			"Starting plugin '{}' at '{:?}'",
 			plugin.name,
 			&canon_bin_path
@@ -307,7 +311,7 @@ impl PluginExecutor {
 			spawn_args.push(&plugin_log_level_str);
 
 			// Spawn plugin process
-			log::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
+			tracing::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
 			let Ok(mut proc) = Command::new(&canon_bin_path)
 				.env("PATH", &cmd_path)
 				.args(spawn_args)
@@ -352,7 +356,7 @@ impl PluginExecutor {
 			// and try again
 			let Some(grpc) = opt_grpc else {
 				if let Err(e) = proc.kill().await {
-					log::error!("Failed to kill child process for plugin: {e}");
+					tracing::error!("Failed to kill child process for plugin: {e}");
 				}
 				spawn_attempts += 1;
 				continue;

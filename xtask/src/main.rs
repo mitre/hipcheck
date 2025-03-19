@@ -11,17 +11,19 @@ use clap::{
 };
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use std::{fmt::Display, process::ExitCode};
+use tracing_subscriber::EnvFilter;
 
 fn main() -> ExitCode {
 	let args = Args::parse();
 
-	env_logger::Builder::new()
-		.filter_level(args.verbose.log_level_filter())
-		.format_timestamp(None)
-		.format_module_path(false)
-		.format_target(false)
-		.format_indent(Some(8))
-		.init();
+	// env_logger::Builder::new()
+	// 	.filter_level(args.verbose.log_level_filter())
+	// 	.format_timestamp(None)
+	// 	.format_module_path(false)
+	// 	.format_target(false)
+	// 	.format_indent(Some(8))
+	// 	.init();
+	tracing_subscriber::fmt().with_env_filter(filter).init();
 
 	let result = match args.command {
 		Commands::Build(args) => task::build::run(args),
@@ -40,7 +42,7 @@ fn main() -> ExitCode {
 	match result {
 		Ok(_) => ExitCode::SUCCESS,
 		Err(e) => {
-			log::error!("{}", e);
+			tracing::error!("{}", e);
 			ExitCode::FAILURE
 		}
 	}
