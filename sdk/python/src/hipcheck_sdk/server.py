@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from abc import ABC
-from typing import List, Dict, Union, Optional
-import concurrent
-import time
+from typing import List, Dict, Optional
 import signal
 import logging
 
@@ -17,7 +15,7 @@ from hipcheck_sdk.error import (
     to_set_config_response,
     ReceivedReplyWhenExpectingSubmitChunk,
 )
-from hipcheck_sdk.query import Endpoint, query, query_registry
+from hipcheck_sdk.query import Endpoint, query_registry
 from hipcheck_sdk.engine import PluginEngine
 from hipcheck_sdk.chunk import Query
 
@@ -25,8 +23,12 @@ logger = logging.getLogger(__name__)
 
 
 class Plugin(ABC):
-    # Ensure that subclasses have required class variables `name` and `publisher`
     def __init_subclass__(cls, **kwargs):
+        """
+        Ensure that subclasses have required class variables `name` and `publisher`
+
+        :meta private:
+        """
         for required in (
             "name",
             "publisher",
@@ -39,32 +41,59 @@ class Plugin(ABC):
                 )
         return super().__init_subclass__(**kwargs)
 
-    # Handle setting configuration. The `config` parameter is a dict of `str, str` pairs.
-    # Allowed to raise a ConfigError.
-    def set_config(self, config: dict):
+    def set_config(self, config: Dict[str, object]):
+        """
+        Configure the plugin according to the fields received from the policy
+        file used for this analysis.
+
+        :param dict config: The configuration key-value map
+        :raises ConfigError: The `config` value was invalid
+        """
         pass
 
-    # Get the plugin's default policy expression. This will only ever be called after
-    # `Plugin.set_config()`. For more information on policy expression syntax, see the Hipcheck
-    # website.
     def default_policy_expr(self) -> Optional[str]:
+        """
+        Return the plugin's default policy expression. This will only ever be
+        called after `Plugin.set_config()`. This should only be overriden if
+        the plugin defines a default query endpoint. For more information on
+        policy expression syntax, see the Hipcheck website.
+
+        :return: The default policy expression
+        """
         return None
 
-    # Get an unstructured description of what is returned by the plugin's default query.
     def explain_default_query(self) -> Optional[str]:
+        """
+        This should only be overriden if the plugin defines a default query
+        endpoint.
+
+        :return: An unstructured description of what is returned by the plugin's
+        default query endpoint.
+        """
         return None
 
-    # Get all the queries supported by the plugin. Each query endpoint in a plugin is a
-    # function decorated with `@query`. This function returns an iterator containing one
-    # `Endpoint` instance for each `@query` function defined in this plugin and imported
-    # when the plugin server starts.
     def queries(self) -> List[Endpoint]:
+        """
+        Get all the queries supported by the plugin. Each query endpoint in a
+        plugin is a function decorated with `@query`. This function returns
+        an iterator containing one `Endpoint` instance for each `@query`
+        function defined in this plugin and imported when the plugin server
+        starts.
+
+        :return: A list of detected query endpoints.
+
+        :meta private:
+        """
         global query_registry
         return list(query_registry.values())
 
-    # Get the plugin's default query, if it has one. The default query is a `@query`
-    # function with `default=True` in the decorator arguments.
     def default_query(self) -> Optional[Endpoint]:
+        """
+        Get the plugin's default query, if it has one. The default query is a
+        `@query` function with `default=True` in the decorator arguments.
+
+        :return: The endpoint instance marked default, if one exists else None
+        """
         queries = self.queries()
         for q in queries:
             if name.is_default():
@@ -78,6 +107,9 @@ class Plugin(ABC):
 # the session ends, they put their ID on the `self.drop` Queue, so this object can
 # clear their state from `self.sessions`.
 class HcSessionSocket:
+    """
+    :meta private:
+    """
     def __init__(self, stream, context):
         self.stream = stream
         self.context = context
@@ -183,13 +215,32 @@ class HcSessionSocket:
 
 
 class PluginServer(gen.PluginServiceServicer):
+    """
+    The server object which runs a plugin class implementation
+    """
     def __init__(self, plugin: Plugin):
+        """
+        :meta private:
+        """
         self.plugin = plugin
 
     def register(plugin: Plugin):
+        """
+        Set the server to use `plugin` as its implementation
+
+        :param Plugin plugin: The plugin instance with which to run
+        """
         return PluginServer(plugin)
 
     def listen(self, port: int, host="127.0.0.1"):
+        """
+        Start the plugin listening for an incoming gRPC connection from Hipcheck core
+
+        :param int port: The port on which to listen
+        :param str host: The host IP on which to listen. Defaults to loopback, for plugins
+            that will be run in a docker container you will need to change it to listen on
+            all network interfaces, e.g. '0.0.0.0'.
+        """
         async def inner(s: PluginServer, port: int):
             # Create server
             server = grpc.aio.server()
@@ -228,6 +279,9 @@ class PluginServer(gen.PluginServiceServicer):
         asyncio.run(inner(self, port))
 
     def GetQuerySchemas(self, request, context):
+        """
+        :meta private:
+        """
         for q in self.plugin.queries():
             key_schema = json.dumps(q.key_schema)
             output_schema = json.dumps(q.output_schema)
@@ -236,6 +290,9 @@ class PluginServer(gen.PluginServiceServicer):
             )
 
     def SetConfiguration(self, request, context):
+        """
+        :meta private:
+        """
         config = json.loads(request.configuration)
         try:
             result = self.plugin.set_config(config)
@@ -246,16 +303,25 @@ class PluginServer(gen.PluginServiceServicer):
             return to_set_config_response(e)
 
     def GetDefaultPolicyExpression(self, request, context):
+        """
+        :meta private:
+        """
         return gen.GetDefaultPolicyExpressionResponse(
             policy_expression=self.plugin.default_policy_expr()
         )
 
     def ExplainDefaultQuery(self, request, context):
+        """
+        :meta private:
+        """
         return gen.ExplainDefaultQueryResponse(
             explanation=self.plugin.explain_default_query()
         )
 
     async def InitiateQueryProtocol(self, stream, context):
+        """
+        :meta private:
+        """
         session_socket = HcSessionSocket(stream, context)
         out_queue = session_socket.get_queue()
 

@@ -45,3 +45,4 @@ __pycache__
 sdk/python/build/
 sdk/python/dist/
 sdk/python/hipcheck_sdk.egg-info/
+sdk/python/docs/build/

@@ -2,18 +2,20 @@
 
 import functools
 import typing
-from typing import Dict, Callable
+from typing import Dict, Optional, Callable
 from dataclasses import dataclass
 
 import pydantic
 
-from hipcheck_sdk.engine import PluginEngine
 
-
-# Class to encapsulate information about a `@query`-decorated function, thus
-# declared to be an endpoint for this plugin.
 @dataclass
 class Endpoint:
+    """
+    Class to encapsulate information about a `@query`-decorated function, thus
+    declared to be an endpoint for this plugin.
+
+    :meta private:
+    """
     # The name of the endpoint. If the default endpoint, name is ""
     name: str
     # The actual function that implements this endpoint
@@ -24,7 +26,7 @@ class Endpoint:
     output_schema: dict
 
     def is_default(self):
-        return name == ""
+        return self.name == ""
 
 
 # A global registry of all detected `@query`-decorated functions in this plugin.
@@ -33,9 +35,16 @@ class Endpoint:
 query_registry: Dict[str, Endpoint] = {}
 
 
-# Gets the JSON Schema for a Python object type. If the type is a child of
-# pydantic.BaseModel, use that. Otherwise, try to derive the schema.
-def get_json_schema_for_type(ty):
+def get_json_schema_for_type(ty: type) -> dict:
+    """
+    Gets the JSON Schema for a Python object type. If the type is a child of
+    pydantic.BaseModel, use that. Otherwise, try to derive the schema.
+
+    :param type ty: The type for which to derive a JSON schema
+    :return: A jsonable dict representing the schema for `ty`
+
+    :meta private:
+    """
     if issubclass(ty, pydantic.BaseModel):
         return ty.model_json_schema()
     else:
@@ -43,9 +52,13 @@ def get_json_schema_for_type(ty):
         return adapter.json_schema()
 
 
-# Add the function to `query_registry`. If `key_schema` or `output_schema` are None,
-# try to derive the schema.
 def register_query(func, default, key_schema, output_schema):
+    """
+    Add the function to `query_registry`. If `key_schema` or `output_schema`
+    are None, try to derive the schema.
+
+    :meta private:
+    """
     global query_registry
 
     # Validate that func has 2 positional args
@@ -75,19 +88,24 @@ def register_query(func, default, key_schema, output_schema):
     query_registry[key] = Endpoint(key, func, key_schema, output_schema)
 
 
-# Decorator function for query endpoints. Endpoint functions must have the following
-# signature:
-#   async fn <QUERY_NAME>(engine: hipcheck_sdk.engine.PluginEngine, key: <TYPE>) -> <TYPE>
-#
-# The decorator allows arguments: `default: bool` to indicate the query should be the
-# default query for the plugin; `key_schema: Optional[dict]` to denote the expected
-# key JSON schema; `output_schema`, works the same as `key_schema` for output. If
-# `key_schema` and/or `output_schema` are left blank, they are derived from the type
-# hints on the function. Otherwise an error is raised.
-def query(f_py=None, default=False, key_schema=None, output_schema=None):
+def query(f_py=None, default: bool = False, key_schema: Optional[dict] = None, output_schema=None):
+    """
+    Decorator function for query endpoints. Endpoint functions must have the
+    following signature:
+      async fn <QUERY_NAME>(engine: hipcheck_sdk.engine.PluginEngine, key: <TYPE>) -> <TYPE>
+
+    :param bool default: Whether this endpoint is the default for the plugin
+    :param dict key_schema: A jsonable dict representing the schema for the key
+        to this enpdpoint. If `None`, derive from type hint on key parameter of
+        function.
+    :param dict output_schema: A jsonable dict representing the schema for the
+        return value of this endpoint. If `None`, derive from type hint on
+        return value of function.
+    :raises TypeError: The function lacked type hints or a JSON schema could
+        not be derived from them
+    """
     global query_registry
     assert callable(f_py) or f_py is None
-    registry = {}
 
     def _decorator(func):
         register_query(func, default, key_schema, output_schema)

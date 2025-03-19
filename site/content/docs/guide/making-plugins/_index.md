@@ -18,9 +18,12 @@ rest of this section details the protocols plugins are expected to follow.
 How to start making a new Hipcheck plugin.
 {% end %}
 
-
 {% waypoint(title="The Rust Plugin SDK", path="@/docs/guide/making-plugins/rust-sdk.md", icon="tool") %}
 How to use the Rust SDK to create a plugin.
+{% end %}
+
+{% waypoint(title="The Python Plugin SDK", path="@/docs/guide/making-plugins/rust-sdk.md", icon="tool") %}
+How to use the Python SDK to create a plugin.
 {% end %}
 
 {% waypoint(title="The Query Protocol", path="@/docs/guide/making-plugins/query-protocol.md", icon="tool") %}

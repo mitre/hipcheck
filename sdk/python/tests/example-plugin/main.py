@@ -7,8 +7,7 @@ import os
 from typing import Optional
 
 from hipcheck_sdk.error import *
-from hipcheck_sdk.engine import PluginEngine
-from hipcheck_sdk.server import Plugin, PluginServer, query, Union
+from hipcheck_sdk import PluginEngine, Plugin, query, run_server_for
 
 DETECTOR = None
 
@@ -71,7 +70,4 @@ class ExamplePlugin(Plugin):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="ExamplePlugin")
-    parser.add_argument("-p", "--port", type=int)
-    args = parser.parse_args()
-    PluginServer.register(ExamplePlugin()).listen(args.port)
+    run_server_for(ExamplePlugin())
