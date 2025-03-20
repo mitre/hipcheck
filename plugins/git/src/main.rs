@@ -32,11 +32,15 @@ pub static CACHE: OnceLock<Mutex<GitRawCommitCache>> = OnceLock::new();
 /// (Which means that anything expecting a `Timestamp` must parse the output of this query appropriately)
 #[query]
 async fn last_commit_date(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<String> {
+	tracing::info!("running last_commit_date query");
 	let path = &repo.path;
 	let last_commit = get_latest_commit(path)?;
 	match last_commit {
 		Some(commit) => match commit.written_on {
-			Ok(date) => Ok(date.to_string()),
+			Ok(date) => {
+				tracing::info!("completed last_commit_date query");
+				Ok(date.to_string())
+			}
 			Err(e) => {
 				tracing::error!("{}", e);
 				Err(Error::UnspecifiedQueryState)
@@ -52,17 +56,20 @@ async fn last_commit_date(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Res
 /// Returns all diffs extracted from the repository
 #[query]
 async fn diffs(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Diff>> {
+	tracing::info!("running diffs query");
 	let path = &repo.path;
 	let diffs = get_diffs(path).map_err(|e| {
 		tracing::error!("{}", e);
 		Error::UnspecifiedQueryState
 	})?;
+	tracing::info!("completed diffs query");
 	Ok(diffs)
 }
 
 /// Returns all commits extracted from the repository
 #[query]
 async fn commits(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Commit>> {
+	tracing::info!("running commits query");
 	let path = &repo.path;
 	let raw_commits = get_all_raw_commits(path).map_err(|e| {
 		tracing::error!("failed to get raw commits: {}", e);
@@ -70,6 +77,7 @@ async fn commits(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<C
 	})?;
 	let commits = raw_commits.into_iter().map(Commit::from).collect();
 
+	tracing::info!("completed commits query");
 	Ok(commits)
 }
 
@@ -80,6 +88,7 @@ async fn commits_from_date(
 	_engine: &mut PluginEngine,
 	repo: DetailedGitRepo,
 ) -> Result<Vec<Commit>> {
+	tracing::info!("running commits_from_date query");
 	let path = &repo.local.path;
 	let date = match repo.details {
 		Some(date) => Timestamp::from_str(&date).map_err(|e| {
@@ -101,27 +110,32 @@ async fn commits_from_date(
 		.map(Commit::from)
 		.collect();
 
+	tracing::info!("completed commits_from_date query");
 	Ok(commits)
 }
 
 /// Returns all unique contributors to the repository
 #[query]
 async fn contributors(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<Contributor>> {
+	tracing::info!("running contributors query");
 	let path = &repo.path;
 	let contributors = get_contributors(path).map_err(|e| {
 		tracing::error!("failed to get contributors: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
+	tracing::info!("completed contributors query");
 	Ok(contributors)
 }
 
 /// Returns all commit-diff pairs
 #[query]
 async fn commit_diffs(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<Vec<CommitDiff>> {
+	tracing::info!("running commit_diffs query");
 	let commit_diffs = get_commit_diffs(&repo.path).map_err(|e| {
 		tracing::error!("Error finding commit diffs: {}", e);
 		Error::UnspecifiedQueryState
 	})?;
+	tracing::info!("completed commit_diffs query");
 	Ok(commit_diffs)
 }
 
@@ -131,6 +145,7 @@ async fn commits_for_contributor(
 	engine: &mut PluginEngine,
 	repo: DetailedGitRepo,
 ) -> Result<ContributorView> {
+	tracing::info!("running commits_for_contributor query");
 	let local = repo.local;
 	let email = match repo.details {
 		Some(ref email) => email.clone(),
@@ -182,6 +197,7 @@ async fn commits_for_contributor(
 		})
 		.collect();
 
+	tracing::info!("completed commits_for_contributor query");
 	Ok(ContributorView {
 		contributor,
 		commits,
@@ -194,6 +210,7 @@ async fn contributors_for_commit(
 	engine: &mut PluginEngine,
 	repo: DetailedGitRepo,
 ) -> Result<CommitContributorView> {
+	tracing::info!("running contributors_for_commit query");
 	let local = repo.local;
 	let hash = match repo.details {
 		Some(ref hash) => hash.clone(),
@@ -228,7 +245,7 @@ async fn contributors_for_commit(
 	let commit = commits[commit_id].clone();
 
 	// Find the author and committer for that commit
-	commit_contributors
+	let contrib_for_commit = commit_contributors
 		.iter()
 		.find(|com_con| com_con.commit_id == commit_id)
 		.map(|com_con| {
@@ -247,7 +264,9 @@ async fn contributors_for_commit(
 		.ok_or_else(|| {
 			tracing::error!("failed to find contributor info");
 			Error::UnspecifiedQueryState
-		})
+		});
+	tracing::info!("completed contributors_for_commit query");
+	contrib_for_commit
 }
 
 /// Internal use function that returns a join table of contributors by commit
@@ -296,6 +315,7 @@ async fn contributor_summary(
 	_engine: &mut PluginEngine,
 	repo: LocalGitRepo,
 ) -> Result<Vec<CommitContributorView>> {
+	tracing::info!("running contributor_summary query");
 	let commits = get_all_raw_commits(repo.path).map_err(|e| {
 		tracing::error!("failed to get commits: {}", e);
 		Error::UnspecifiedQueryState
@@ -305,6 +325,7 @@ async fn contributor_summary(
 		let view = CommitContributorView::from(commit);
 		commit_contributor_views.push(view);
 	}
+	tracing::info!("completed contributor_summary query");
 	Ok(commit_contributor_views)
 }
 #[derive(Deserialize)]

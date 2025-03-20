@@ -20,7 +20,7 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 /// (Which means that anything expecting a `Span` must parse the output of this query appropriately)
 #[query(default)]
 async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
-	tracing::debug!("running activity query");
+	tracing::info!("running activity query");
 
 	let repo = target.local;
 
@@ -28,6 +28,7 @@ async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 	let today = Timestamp::now();
 
 	// Get the date of the most recent commit.
+	tracing::trace!("querying mitre/git/last_commit_date");
 	let value = engine
 		.query("mitre/git/last_commit_date", repo)
 		.await
@@ -50,6 +51,7 @@ async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 		Error::UnspecifiedQueryState
 	})?;
 
+	tracing::info!("completed activity query");
 	Ok(time_since_last_commit.to_string())
 }
 

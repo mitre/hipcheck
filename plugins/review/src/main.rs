@@ -32,7 +32,7 @@ pub struct PullReview {
 /// Returns whether each commit in a repo was merged with a review
 #[query(default)]
 async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
-	tracing::debug!("running review metric");
+	tracing::info!("running review query");
 
 	// Confirm that the target is a GitHub repo
 	let Some(remote) = value.remote else {
@@ -46,6 +46,7 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	};
 
 	// Get a list of all pull requests to the repo, with their corresponding number of reviews
+	tracing::trace!("querying mitre/github/pr_reviews");
 	let value = engine
 		.query("mitre/github/pr_reviews", known_remote)
 		.await
@@ -62,7 +63,6 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	pull_reviews.extend(pull_requests.into_iter().map(|pr| pr.reviews > 0));
 
 	tracing::info!("completed review query");
-
 	Ok(pull_reviews)
 }
 

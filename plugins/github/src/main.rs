@@ -77,6 +77,7 @@ fn get_github_agent<'a>(owner: &'a str, repo: &'a str) -> Result<GitHub<'a>> {
 
 #[query]
 async fn pr_reviews(_engine: &mut PluginEngine, key: KnownRemote) -> Result<Vec<PullRequest>> {
+	tracing::info!("running pr_reviews query");
 	let (owner, repo) = match &key {
 		KnownRemote::GitHub { owner, repo } => (owner, repo),
 	};
@@ -93,20 +94,25 @@ async fn pr_reviews(_engine: &mut PluginEngine, key: KnownRemote) -> Result<Vec<
 		})
 		.collect();
 
+	tracing::info!("completed pr_reviews query");
 	Ok(results)
 }
 
 #[query(default)]
 async fn has_fuzz(_engine: &mut PluginEngine, key: RemoteGitRepo) -> Result<bool> {
+	tracing::info!("running has_fuzz query");
 	let (owner, repo) = match &key.known_remote {
 		Some(KnownRemote::GitHub { owner, repo }) => (owner.as_str(), repo.as_str()),
 		None => ("", ""),
 	};
 	let url = Rc::new(key.url.to_string());
-	get_github_agent(owner, repo)?.fuzz_check(url).map_err(|e| {
+	let with_fuzz = get_github_agent(owner, repo)?.fuzz_check(url).map_err(|e| {
 		tracing::error!("{}", e);
 		Error::UnspecifiedQueryState
-	})
+	});
+
+	tracing::info!("completed has_fuzz query");
+	with_fuzz
 }
 
 #[derive(Parser, Debug)]
