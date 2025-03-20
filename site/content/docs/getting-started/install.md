@@ -66,8 +66,17 @@ To build Hipcheck from source, you'll need:
 - A Rust toolchain: see the [official Rust installation instructions](https://www.rust-lang.org/tools/install)
 - The `protoc` compiler: see the [installation instructions](https://grpc.io/docs/protoc-installation/)
 
+If building for `x86_64_unknown_linux_gnu`, then you will also need:
+- The `mold` linker: see the [installation instructions](https://github.com/rui314/mold?tab=readme-ov-file#installation)
+
+If you wish to disable use of `mold`, then open `.cargo/config.toml` inside the repository and remove the following lines:
+```toml
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+```
+
 If you _only_ want to build from source without configuring the build in any
-way, you can use `cargo install` to install Hipcheck into a Cargo0-specific
+way, you can use `cargo install` to install Hipcheck into a Cargo-specific
 binary directory with the source found from Crates.io.
 
 ```sh
