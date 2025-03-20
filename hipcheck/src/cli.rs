@@ -519,7 +519,7 @@ pub enum Commands {
 #[command(subcommand_negates_reqs = true)]
 #[command(arg_required_else_help = true)]
 pub struct CheckArgs {
-	/// The ref of the target to analyze
+	/// The ref (e.g. commit hash, branch, tag) of the target to analyze
 	#[clap(long = "ref")]
 	pub refspec: Option<String>,
 

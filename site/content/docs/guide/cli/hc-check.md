@@ -21,18 +21,20 @@ Arguments:
   <TARGET>  The target package, URL, commit, etc. for Hipcheck to analyze. If ambiguous, the -t flag must be set
 
 Options:
-  -t, --target <TARGET_TYPE>  [possible values: maven, npm, pypi, repo, request, spdx]
+      --ref <REFSPEC>         The ref (e.g. commit hash, branch, tag) of the target to analyze
+      --arch <ARCH>
+  -t, --target <TARGET_TYPE>  [possible values: maven, npm, pypi, repo, request, sbom]
   -h, --help                  Print help (see more with '--help')
 
 Output Flags:
   -v, --verbosity <VERBOSITY>  How verbose to be [possible values: quiet, normal]
   -k, --color <COLOR>          When to use color [possible values: always, never, auto]
-  -f, --format <FORMAT>        What format to use [possible values: json, human]
+  -f, --format <FORMAT>        What format to use [possible values: json, debug, human]
 
 Path Flags:
-  -c, --config <CONFIG>  Path to the configuration folder
-  -d, --data <DATA>      Path to the data folder
   -C, --cache <CACHE>    Path to the cache folder
+  -p, --policy <POLICY>  Path to the policy file
+  -e, --exec <EXEC>      Path to the exec config file
 ```
 
 The only positional argument is the `<TARGET>`, as explains in [the Targets
@@ -56,8 +58,25 @@ If you attempt to run `hc check` with an ambiguous target specifier, Hipcheck
 will produce an error telling you to use the `-t`/`--target` flag to manually
 specify the target type.
 
+The `--ref` flag enables users to analyze a specific subset of a git repository's history.
+A valid `--ref` is any git identifier that can be resolved to a specific commit.
+Examples of git references include commit hashes, tags, remote tracking branches,
+local branches and HEAD.
+
+If the user wants to override the architecture detection feature of hipcheck,
+which is used in plugin selection, then use the `--arch` flag. This flag
+takes a target triple argument. In general, hipcheck uses the same target triples as
+[those tracked by the Rust programming language project][target-triples]. Currently,
+hipcheck supports the following target triples:
+
+- `aarch64-apple-darwin` - MacOS running on aarch64
+- `x86_64-apple-darwin` - MacOS running on x86_64
+- `x86_64-unknown-linux-gnu` - Linux running on x86_64 with glibc 2.17+
+- `x86_64-pc-windows-msvc` - Windows with Microsoft Visual C++ running on x86_64
+
 Besides this flag, all other flags are general flags which Hipcheck accepts
 for every command. See [General Flags](@/docs/guide/cli/general-flags.md)
 for more information.
 
 [target]: @/docs/guide/concepts/targets.md
+[target-triples]: https://doc.rust-lang.org/beta/rustc/platform-support.html
