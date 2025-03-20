@@ -137,8 +137,7 @@ impl Plugin for IdentityPlugin {
 
 	fn explain_default_query(&self) -> Result<Option<String>> {
 		Ok(Some(
-			"Returns whether each commit in the repo was commited and authored by the same person"
-				.to_owned(),
+			"commits in the repo authored and commited by the same person".to_owned(),
 		))
 	}
 
