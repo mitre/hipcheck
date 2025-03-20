@@ -22,10 +22,14 @@ static DETECTOR: OnceLock<SourceFileDetector> = OnceLock::new();
 
 #[query(default)]
 async fn is_likely_source_file(_engine: &mut PluginEngine, value: PathBuf) -> Result<bool> {
+	tracing::debug!("running is_likely_source_file query");
 	let Some(sfd) = DETECTOR.get() else {
 		return Err(Error::UnspecifiedQueryState);
 	};
-	Ok(sfd.is_likely_source_file(value))
+	let is_source = sfd.is_likely_source_file(value);
+
+	tracing::debug!("completed is_likely_source_file query");
+	Ok(is_source)
 }
 
 #[derive(Clone, Debug)]

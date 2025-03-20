@@ -78,6 +78,7 @@ impl Lang {
 /// Returns the NPM dependencies for the repo
 #[query]
 async fn dependencies(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<NpmDependencies> {
+	tracing::info!("running dependencies query");
 	let path = &repo.path;
 
 	let npm_version = get_npm_version().map_err(|e| {
@@ -89,7 +90,10 @@ async fn dependencies(_engine: &mut PluginEngine, repo: LocalGitRepo) -> Result<
 		Error::UnspecifiedQueryState
 	})?;
 
-	NpmDependencies::resolve(path, npm_version.to_string())
+	let npm_depend = NpmDependencies::resolve(path, npm_version.to_string());
+
+	tracing::info!("completed dependencies query");
+	npm_depend
 }
 
 #[derive(Clone, Debug)]

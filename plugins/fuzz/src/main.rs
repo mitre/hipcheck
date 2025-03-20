@@ -8,8 +8,12 @@ use std::result::Result as StdResult;
 /// Returns whether the target's remote repo uses Google's OSS fuzzing
 #[query(default)]
 async fn fuzz(engine: &mut PluginEngine, key: Target) -> Result<Value> {
+	tracing::info!("running fuzz query");
 	if let Some(remote) = &key.remote {
-		engine.query("mitre/github", remote.clone()).await
+		tracing::trace!("querying mitre/github/has_fuzz");
+		let fuzz = engine.query("mitre/github", remote.clone()).await;
+		tracing::info!("completed fuzz query");
+		fuzz
 	} else {
 		Err(Error::UnexpectedPluginQueryInputFormat)
 	}

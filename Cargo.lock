@@ -977,6 +977,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
  "unicode-normalization",
 ]
 
@@ -1209,6 +1210,7 @@ dependencies = [
  "hipcheck-workspace-hack",
  "serde_json",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
