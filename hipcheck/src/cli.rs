@@ -520,8 +520,8 @@ pub enum Commands {
 #[command(arg_required_else_help = true)]
 pub struct CheckArgs {
 	/// The ref (e.g. commit hash, branch, tag) of the target to analyze
-	#[clap(long = "ref")]
-	pub refspec: Option<String>,
+	#[clap(long = "ref", value_name = "REF")]
+	pub git_ref: Option<String>,
 
 	#[clap(subcommand)]
 	command: Option<CheckCommand>,
@@ -608,7 +608,7 @@ impl ToTargetSeed for CheckArgs {
 		let command = self.command()?;
 		let target = TargetSeed {
 			kind: command.to_target_seed_kind()?,
-			refspec: self.refspec.clone(),
+			refspec: self.git_ref.clone(),
 			specifier: command.get_specifier().to_owned(),
 		};
 		// Validate
