@@ -63,6 +63,8 @@ impl Display for Commit {
 
 #[query]
 async fn commit_identity(engine: &mut PluginEngine, key: DetailedGitRepo) -> Result<bool> {
+	tracing::info!("running commit_identity query");
+	tracing::trace!("querying mitre/git/contributors_for_commit");
 	let value = engine
 		.query("mitre/git/contributors_for_commit", key)
 		.await
@@ -72,13 +74,16 @@ async fn commit_identity(engine: &mut PluginEngine, key: DetailedGitRepo) -> Res
 		})?;
 	let ccv = serde_json::from_value::<CommitContributorView>(value)
 		.map_err(Error::InvalidJsonInQueryOutput)?;
+	tracing::info!("completed commit_identity query");
 	Ok(ccv.author == ccv.committer)
 }
 
 #[query(default)]
 async fn identity(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
+	tracing::info!("running identity query");
 	// Get the commits for the source.
 	let repo = key.local;
+	tracing::trace!("querying mitre/git/commits");
 	let value = engine
 		.query("mitre/git/commits", repo.clone())
 		.await
@@ -96,6 +101,7 @@ async fn identity(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
 		};
 		res.push(commit_identity(engine, key).await?);
 	}
+	tracing::info!("completed identity query");
 	Ok(res)
 }
 

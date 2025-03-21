@@ -519,9 +519,9 @@ pub enum Commands {
 #[command(subcommand_negates_reqs = true)]
 #[command(arg_required_else_help = true)]
 pub struct CheckArgs {
-	/// The ref of the target to analyze
-	#[clap(long = "ref")]
-	pub refspec: Option<String>,
+	/// The ref (e.g. commit hash, branch, tag) of the target to analyze
+	#[clap(long = "ref", value_name = "REF")]
+	pub git_ref: Option<String>,
 
 	#[clap(subcommand)]
 	command: Option<CheckCommand>,
@@ -604,18 +604,51 @@ impl CheckArgs {
 	}
 }
 impl ToTargetSeed for CheckArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed> {
-		let command = self.command()?;
+	fn to_target_seed(&mut self) -> Result<TargetSeed> {
+		let mut command = self.command()?;
+		let mut refspec = self.git_ref.clone();
+		let specifier = command.get_specifier().to_owned();
+
+		// If the target is a remote VCS URL, clean it up now so we can save the ref spec information
+		if matches!(command, CheckCommand::Repo(_)) && specifier.starts_with("git+") {
+			// Remove git prefix
+			let spec_trimmed = &specifier.replace("git+", "");
+			// Remove any git ref information that trails the end of the URL and set the ref_spec equal to that ref
+			if let Some((url, vcs_refspec)) = spec_trimmed.split_once(".git@") {
+				// Check if the user also provided a ref, and error if it does not agree with the inferred ref
+				refspec = Some(vcs_refspec.to_string());
+				// Restore ".git" to the end of the URL, since we did not intend to remove that part
+				command = CheckCommand::Repo(CheckRepoArgs {
+					source: format!("{url}.git"),
+				})
+			} else {
+				command = CheckCommand::Repo(CheckRepoArgs {
+					source: spec_trimmed.to_string(),
+				});
+			}
+		}
+
 		let target = TargetSeed {
 			kind: command.to_target_seed_kind()?,
-			refspec: self.refspec.clone(),
-			specifier: command.get_specifier().to_owned(),
+			refspec,
+			specifier,
 		};
 		// Validate
 		if let Some(refspec) = &target.refspec {
+			// Validate for package
 			if let TargetSeedKind::Package(p) = &target.kind {
 				if p.has_version() && &p.version != refspec {
 					return Err(hc_error!("ambiguous version for package target: package target specified {}, but refspec flag specified {}. please specify only one.", p.version, refspec));
+				}
+			}
+
+			// Validate for VCS URL
+			if let Some(init_ref) = &self.git_ref {
+				if init_ref != refspec {
+					return Err(hc_error!(
+						"Provided ref_spec '{}' does not match the ref spec, '{}', inferred from the target '{}'. Check that you have specified the correct ref and provided the intended target.",
+						init_ref, refspec, &target.specifier
+					));
 				}
 			}
 		};
@@ -1599,7 +1632,7 @@ mod tests {
 
 	#[test]
 	fn test_deductive_check_repo_vcs_https() {
-		let url = "https://github.com/mitre/hipcheck.git".to_string();
+		let url = "git+https://github.com/mitre/hipcheck.git".to_string();
 		let cmd = get_check_cmd_from_cli(vec![
 			"hc",
 			"check",
@@ -1614,7 +1647,7 @@ mod tests {
 
 	#[test]
 	fn test_deductive_check_repo_vcs_ssh() {
-		let url = "ssh://git@github.com/mitre/hipcheck.git".to_string();
+		let url = "git+ssh://git@github.com/mitre/hipcheck.git".to_string();
 		let cmd = get_check_cmd_from_cli(vec![
 			"hc",
 			"check",

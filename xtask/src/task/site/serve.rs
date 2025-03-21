@@ -29,9 +29,19 @@ macro_rules! cmd {
 /// Execute the `site serve` task.
 pub fn run(args: SiteServeArgs) -> Result<()> {
 	// Check our dependencies.
-	which::which("tailwindcss").context("`site serve` requires `tailwindcss` to be installed")?;
+	let tailwind_path = which::which("tailwindcss")
+		.context("`site serve` requires `tailwindcss` to be installed")?;
 	which::which("zola").context("`site serve` requires `zola` to be installed")?;
 	which::which("deno").context("`site serve` requires `deno` to be installed")?;
+
+	// verify tailwindcss is version 3.x
+	{
+		let sh = Shell::new()?;
+		let output = xshell::cmd!(sh, "{tailwind_path} --help").output()?.stdout;
+		if !String::from_utf8_lossy(&output).contains("tailwindcss v3.") {
+			return Err(anyhow::anyhow!("tailwindcss must be version 3.x"));
+		}
+	}
 
 	// When building for a dev environment, specify the base_url explicitly.
 	// Otherwise use the default one from the Zola configuration.

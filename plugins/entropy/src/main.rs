@@ -75,6 +75,7 @@ async fn commit_entropies(
 	engine: &mut PluginEngine,
 	mut commit_diffs: Vec<CommitDiff>,
 ) -> Result<Vec<CommitEntropy>> {
+	tracing::info!("running commit_entropies query");
 	let mut possible_source_files = HashSet::<PathBuf>::new();
 	for cd in commit_diffs.iter() {
 		possible_source_files.extend(
@@ -92,6 +93,7 @@ async fn commit_entropies(
 		.collect::<StdResult<Vec<Value>, serde_json::Error>>()
 		.map_err(|_| Error::UnspecifiedQueryState)?;
 
+	tracing::trace!("querying mitre/linguist/is_likely_source_file");
 	let res = engine.batch_query("mitre/linguist", psf_val_vec).await?;
 	let psf_bools: Vec<bool> = serde_json::from_value(serde_json::Value::Array(res))
 		.map_err(|_| Error::UnspecifiedQueryState)?;
@@ -132,21 +134,27 @@ async fn commit_entropies(
 	// PANIC: It is safe to unwrap here, because the entropy scores will always be valid floating point numbers if we get to this point
 	commit_entropies.sort_by(|a, b| b.entropy.partial_cmp(&a.entropy).unwrap());
 
+	tracing::info!("completed commit_entropies query");
 	// Convert to Z-scores and return results.
 	z_scores(commit_entropies).map_err(|_| Error::UnspecifiedQueryState)
 }
 
 #[query(default)]
 async fn entropy(engine: &mut PluginEngine, value: Target) -> Result<Vec<f64>> {
+	tracing::info!("running entropy query");
 	let local = value.local;
+	tracing::trace!("querying mitre/git/commit_diffs");
 	let val_commits = engine.query("mitre/git/commit_diffs", local).await?;
 	let commits: Vec<CommitDiff> =
 		serde_json::from_value(val_commits).map_err(Error::InvalidJsonInQueryOutput)?;
-	Ok(commit_entropies(engine, commits)
+	let commit_entropies = commit_entropies(engine, commits)
 		.await?
 		.iter()
 		.map(|o| o.entropy)
-		.collect())
+		.collect();
+
+	tracing::info!("completed entropy query");
+	Ok(commit_entropies)
 }
 
 #[derive(Clone, Debug, Default)]

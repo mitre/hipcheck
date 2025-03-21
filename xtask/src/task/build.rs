@@ -22,7 +22,7 @@ pub fn run(args: BuildArgs) -> Result<()> {
 		.unique()
 		.collect::<BTreeSet<_>>();
 
-	let builder_args = resolve_builder_args(&pkgs, &args.profile);
+	let builder_args = resolve_builder_args(&pkgs, &args.profile, args.timings);
 
 	debug!("rebuilding packages: {}", list_with_commas(&pkgs));
 	debug!("using profile: {}", args.profile.to_string());

@@ -50,6 +50,7 @@ impl TryFrom<RawConfig> for Config {
 
 #[query]
 async fn files(_engine: &mut PluginEngine, value: LocalGitRepo) -> Result<Vec<PathBuf>> {
+	tracing::info!("running files query");
 	let bfd = DETECTOR.get().ok_or(Error::UnspecifiedQueryState)?;
 	let repo = pathbuf![&value.path];
 	let out: Vec<PathBuf> = detect_binary_files(&repo)
@@ -57,15 +58,18 @@ async fn files(_engine: &mut PluginEngine, value: LocalGitRepo) -> Result<Vec<Pa
 		.into_iter()
 		.filter(|f| bfd.is_likely_binary_file(f))
 		.collect();
+	tracing::info!("completed files query");
 	Ok(out)
 }
 
 #[query(default)]
 async fn binary(engine: &mut PluginEngine, value: Target) -> Result<usize> {
+	tracing::info!("running binary query");
 	let paths = files(engine, value.local).await?;
 	paths.iter().for_each(|f| {
 		engine.record_concern(format!("Found binary file at '{}'", f.to_string_lossy()))
 	});
+	tracing::info!("completed binary query");
 	Ok(paths.len())
 }
 

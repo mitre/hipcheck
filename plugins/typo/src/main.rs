@@ -66,7 +66,7 @@ impl TryFrom<RawConfig> for Config {
 
 #[query(default)]
 async fn typo(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
-	tracing::debug!("running typo query");
+	tracing::info!("running typo query");
 
 	// Get the typo file.
 	let typo_file = TYPOFILE
@@ -74,6 +74,7 @@ async fn typo(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 		.ok_or_else(|| anyhow!("could not find typo file"))?;
 
 	// Get the repo's dependencies
+	tracing::trace!("querying mitre/npm/dependencies");
 	let value = engine
 		.query("mitre/npm/dependencies", value.local)
 		.await
@@ -101,7 +102,6 @@ async fn typo(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	}
 
 	tracing::info!("completed typo query");
-
 	Ok(typos)
 }
 

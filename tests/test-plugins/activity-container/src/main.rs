@@ -49,6 +49,7 @@ async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 		Error::UnspecifiedQueryState
 	})?;
 
+	log::debug!("completed activity query");
 	Ok(time_since_last_commit.to_string())
 }
 
