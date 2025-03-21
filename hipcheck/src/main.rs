@@ -89,7 +89,7 @@ fn main() -> ExitCode {
 	}
 
 	match config.subcommand() {
-		Some(FullCommands::Check(args)) => return cmd_check(&args, &config),
+		Some(FullCommands::Check(mut args)) => return cmd_check(&mut args, &config),
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
 		Some(FullCommands::Setup) => return cmd_setup(&config),
 		Some(FullCommands::Ready(args)) => return cmd_ready(&args, &config),
@@ -116,7 +116,7 @@ fn main() -> ExitCode {
 }
 
 /// Run the `check` command.
-fn cmd_check(args: &CheckArgs, config: &CliConfig) -> ExitCode {
+fn cmd_check(args: &mut CheckArgs, config: &CliConfig) -> ExitCode {
 	// Before we do any analysis, set the user-provided arch
 	if let Some(arch) = &args.arch {
 		if let Err(e) = try_set_arch(arch) {
