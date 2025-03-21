@@ -23,7 +23,7 @@ pub trait ToTargetSeedKind {
 }
 
 pub trait ToTargetSeed {
-	fn to_target_seed(&self) -> Result<TargetSeed, Error>;
+	fn to_target_seed(&mut self) -> Result<TargetSeed, Error>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Serialize)]
@@ -53,21 +53,14 @@ impl TargetType {
 			// If the URL is not correctly formatted, we cannot identify the target type
 			if let Ok(vcs_url) = Url::parse(&tgt_trimmed) {
 				match vcs_url.scheme() {
-					// If the URL is for a file, trim the file scheme idenfifier and return the presumptive file path
+					// If the URL is for a file, trim the file scheme identifier and return the presumptive file path
 					// If the path is not valid, we will handle that error later
 					"file" => {
 						let filepath = vcs_url.path().to_string();
 						Some((Repo, filepath))
 					}
-					// If the scheme is anything other than a file (e.g. https, ssh) clean up and return the repo URL
-					_ => {
-						// Remove any git ref information that trails the end of the URL
-						let mut url =
-							tgt_trimmed.split(".git").collect::<Vec<&str>>()[0].to_string();
-						// Restore ".git" to the end of the URL, since we did not intend to remove that part
-						url.push_str(".git");
-						Some((Repo, url))
-					}
+					// If the scheme is anything other than a file (e.g. https, ssh) return the repo URL, which we will clean up later
+					_ => Some((Repo, tgt.to_string())),
 				}
 			} else {
 				None

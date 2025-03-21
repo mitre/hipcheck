@@ -713,7 +713,7 @@ pub fn unresolved_analysis_tree_from_policy(policy: &PolicyFile) -> Result<Analy
 	let mut tree = AnalysisTree::new(&policy.analyze.root.name);
 	let root = tree.root;
 	add_category(&mut tree, root, &policy.analyze.root)?;
-	
+
 	Ok(tree)
 }
 
