@@ -7,6 +7,7 @@ use std::{collections::BTreeSet, fmt::Display};
 pub fn resolve_builder_args(
 	pkgs: &BTreeSet<Pkg>,
 	profile: &BuildProfile,
+	timings: bool,
 ) -> impl IntoIterator<Item = String> {
 	// Each pkg produces two arguments, plus max two for the profile.
 	let mut builder_args = Vec::with_capacity((pkgs.len() * 2) + 2);
@@ -15,6 +16,10 @@ pub fn resolve_builder_args(
 
 	for pkg in pkgs {
 		builder_args.extend([String::from("-p"), pkg.to_string()]);
+	}
+
+	if timings {
+		builder_args.extend([String::from("--timings")]);
 	}
 
 	builder_args

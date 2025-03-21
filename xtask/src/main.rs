@@ -109,6 +109,10 @@ struct BuildArgs {
 	/// What to build in the workspace.
 	#[clap(short = 'p', long = "pkg", default_values_t = default_pkg(), help_heading = HelpHeading::Args)]
 	pkg: Vec<BuildPkg>,
+
+	/// Whether or not to add `--timings` to the cargo command
+	#[clap(long = "timings", help_heading = HelpHeading::Args)]
+	timings: bool,
 }
 
 fn default_pkg() -> impl IntoIterator<Item = BuildPkg> {
