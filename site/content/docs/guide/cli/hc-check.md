@@ -21,7 +21,7 @@ Arguments:
   <TARGET>  The target package, URL, commit, etc. for Hipcheck to analyze. If ambiguous, the -t flag must be set
 
 Options:
-      --ref <REFSPEC>         The ref (e.g. commit hash, branch, tag) of the target to analyze
+      --ref <REF>             The ref (e.g. commit hash, branch, tag) of the target to analyze
       --arch <ARCH>
   -t, --target <TARGET_TYPE>  [possible values: maven, npm, pypi, repo, request, sbom]
   -h, --help                  Print help (see more with '--help')
