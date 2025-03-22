@@ -6,13 +6,13 @@ pub mod purl;
 pub mod resolve;
 pub mod spdx;
 pub mod types;
-use purl::parse_purl;
 pub use types::*;
 
 use crate::error::Error;
 
 use clap::ValueEnum;
 use packageurl::PackageUrl;
+use purl::parse_purl;
 use serde::Serialize;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -22,8 +22,32 @@ pub trait ToTargetSeedKind {
 	fn to_target_seed_kind(&self) -> Result<TargetSeedKind, Error>;
 }
 
+impl ToTargetSeedKind for SingleTargetSeedKind {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind, crate::error::Error> {
+		Ok(TargetSeedKind::Single(self.clone()))
+	}
+}
+
+impl ToTargetSeedKind for MultiTargetSeedKind {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind, crate::error::Error> {
+		Ok(TargetSeedKind::Multi(self.clone()))
+	}
+}
+
 pub trait ToTargetSeed {
 	fn to_target_seed(&self) -> Result<TargetSeed, Error>;
+}
+
+impl ToTargetSeed for SingleTargetSeed {
+	fn to_target_seed(&self) -> Result<TargetSeed, Error> {
+		Ok(TargetSeed::Single(self.clone()))
+	}
+}
+
+impl ToTargetSeed for MultiTargetSeed {
+	fn to_target_seed(&self) -> Result<TargetSeed, Error> {
+		Ok(TargetSeed::Multi(self.clone()))
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Serialize)]

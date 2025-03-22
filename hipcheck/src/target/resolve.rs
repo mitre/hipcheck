@@ -52,7 +52,7 @@ pub struct TargetResolver {
 	// Leaving these top fields private allows us to prevent mutation in
 	// `ResolveRepo` trait impls below
 	config: TargetResolverConfig,
-	seed: TargetSeed,
+	seed: SingleTargetSeed,
 	pub local: Option<LocalGitRepo>,
 	pub remote: Option<RemoteGitRepo>,
 	pub package: Option<Package>,
@@ -75,7 +75,7 @@ impl TargetResolver {
 	}
 
 	/// Accessor method to ensure immutability of `seed` field
-	pub fn get_seed(&self) -> &TargetSeed {
+	pub fn get_seed(&self) -> &SingleTargetSeed {
 		&self.seed
 	}
 
@@ -109,7 +109,7 @@ impl TargetResolver {
 			};
 			Some(format!("{}", cmt.id()))
 		} else {
-			use TargetSeedKind::*;
+			use SingleTargetSeedKind::*;
 			match &self.seed.kind {
 				LocalRepo(_) => None,
 				RemoteRepo(_) => Some("origin/HEAD".to_owned()),
@@ -122,7 +122,10 @@ impl TargetResolver {
 	}
 
 	/// Main function entrypoint for the resolution algorithm
-	pub fn resolve(config: TargetResolverConfig, seed: TargetSeed) -> Result<Target> {
+	pub fn resolve(config: TargetResolverConfig, seed: SingleTargetSeed) -> Result<Target> {
+		#[cfg(feature = "print-timings")]
+		let _0 = crate::benchmarking::print_scope_time!("resolve_target");
+
 		let mut resolver = TargetResolver {
 			config,
 			seed: seed.clone(),
@@ -132,7 +135,7 @@ impl TargetResolver {
 			maven: None,
 			sbom: None,
 		};
-		use TargetSeedKind::*;
+		use SingleTargetSeedKind::*;
 		// Resolution logic depends on seed
 		let local = match seed.kind {
 			Sbom(sbom) => {
@@ -400,5 +403,20 @@ fn try_find_commit_for_latest_version_tag(
 	} else {
 		log::debug!("No tags containing semver-compatible version numbers detected in repo");
 		Ok(None)
+	}
+}
+
+impl TargetSeed {
+	pub fn get_targets(
+		&self,
+		config: TargetResolverConfig,
+	) -> Result<impl Iterator<Item = Target>> {
+		let targets = match self {
+			TargetSeed::Single(single_target_seed) => {
+				vec![TargetResolver::resolve(config, single_target_seed.clone())?]
+			}
+			TargetSeed::Multi(_mulit_target_speed) => todo!(),
+		};
+		Ok(targets.into_iter())
 	}
 }
