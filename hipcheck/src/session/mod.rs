@@ -11,8 +11,7 @@ use crate::{
 	policy::{config_to_policy, PolicyFile},
 	shell::{spinner_phase::SpinnerPhase, Shell},
 	target::{
-		resolve::{TargetResolver, TargetResolverConfig},
-		KnownRemote, Target, TargetSeed, TargetSeedKind,
+		resolve::TargetResolverConfig, KnownRemote, SingleTargetSeedKind, Target, TargetSeed,
 	},
 };
 use chrono::prelude::*;
@@ -232,6 +231,7 @@ impl Session {
 		let home = session_builder.get_cache_dir().ok_or_else(|| {
 			hc_error!("Internal error: SessionBuilder doesn't have cache_dir set")
 		})?;
+
 		let target = load_target(target, home)?;
 		session_builder.set_target(target);
 
@@ -506,32 +506,37 @@ fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
 
 fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	// Resolve the source specifier into an actual source.
-	let phase_desc = match seed.kind {
-		TargetSeedKind::LocalRepo(_) | TargetSeedKind::RemoteRepo(_) => {
-			"resolving git repository target"
+	match seed {
+		TargetSeed::Single(single_target_seed) => {
+			let phase_desc = match single_target_seed.kind {
+				SingleTargetSeedKind::LocalRepo(_) | SingleTargetSeedKind::RemoteRepo(_) => {
+					"resolving git repository target"
+				}
+				SingleTargetSeedKind::Package(_) => "resolving package target",
+				SingleTargetSeedKind::Sbom(_) => "parsing SBOM document",
+				SingleTargetSeedKind::MavenPackage(_) => "resolving maven package target",
+			};
+			let phase = SpinnerPhase::start(phase_desc);
+
+			// Set the phase to tick steadily 10 times a second.
+			phase.enable_steady_tick(Duration::from_millis(100));
+			let config = TargetResolverConfig {
+				phase: Some(phase.clone()),
+				cache: PathBuf::from(home),
+			};
+
+			let mut targets = seed.get_targets(config)?.collect::<Vec<Target>>();
+			if targets.len() != 1 {
+				log::error!("load_target produced {} targets, expected 1", targets.len());
+				return Err(hc_error!(
+					"TargetSeed::Single did not produce exactly one target"
+				));
+			}
+			// SAFETY: if this is reached it is known that the length of target is exactly 1
+			let target = targets.pop().unwrap();
+			phase.finish_successful();
+			Ok(target)
 		}
-		TargetSeedKind::Package(_) => "resolving package target",
-		TargetSeedKind::Sbom(_) => "parsing SBOM document",
-		TargetSeedKind::MavenPackage(_) => "resolving maven package target",
-	};
-
-	let phase = SpinnerPhase::start(phase_desc);
-	// Set the phase to tick steadily 10 times a second.
-	phase.enable_steady_tick(Duration::from_millis(100));
-	let target = resolve_target(seed, &phase, home)?;
-	phase.finish_successful();
-
-	Ok(target)
-}
-
-/// Resolves the target specifier into an actual target.
-fn resolve_target(seed: &TargetSeed, phase: &SpinnerPhase, home: &Path) -> Result<Target> {
-	#[cfg(feature = "print-timings")]
-	let _0 = crate::benchmarking::print_scope_time!("resolve_target");
-
-	let conf = TargetResolverConfig {
-		phase: Some(phase.clone()),
-		cache: PathBuf::from(home),
-	};
-	TargetResolver::resolve(conf, seed.clone())
+		TargetSeed::Multi(_multi_target_seed) => todo!(),
+	}
 }
