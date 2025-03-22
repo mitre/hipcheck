@@ -545,7 +545,7 @@ fn is_none_or_empty(s: Option<&str>) -> bool {
 mod tests {
 	use crate::{
 		cli::{CheckNpmArgs, CheckPypiArgs},
-		target::{TargetSeedKind, ToTargetSeedKind},
+		target::{SingleTargetSeedKind, TargetSeedKind, ToTargetSeedKind},
 	};
 
 	// Note this useful idiom: importing names from outer (for mod tests) scope.
@@ -563,7 +563,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -591,7 +591,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -619,7 +619,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -647,7 +647,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -675,7 +675,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -703,7 +703,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -732,7 +732,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -764,7 +764,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -792,7 +792,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -820,7 +820,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -848,7 +848,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -876,7 +876,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -904,7 +904,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {
@@ -932,7 +932,7 @@ mod tests {
 		}
 		.to_target_seed_kind()
 		.unwrap();
-		if let TargetSeedKind::Package(package) = target_seed {
+		if let TargetSeedKind::Single(SingleTargetSeedKind::Package(package)) = target_seed {
 			assert_eq!(
 				package,
 				Package {

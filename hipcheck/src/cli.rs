@@ -13,8 +13,9 @@ use crate::{
 	shell::{color_choice::ColorChoice, verbosity::Verbosity},
 	source,
 	target::{
-		pm, LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, TargetSeed,
-		TargetSeedKind, TargetType, ToTargetSeed, ToTargetSeedKind,
+		pm, LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, SingleTargetSeed,
+		SingleTargetSeedKind, TargetSeed, TargetSeedKind, TargetType, ToTargetSeed,
+		ToTargetSeedKind,
 	},
 };
 use clap::{Parser as _, ValueEnum};
@@ -606,22 +607,26 @@ impl CheckArgs {
 impl ToTargetSeed for CheckArgs {
 	fn to_target_seed(&self) -> Result<TargetSeed> {
 		let command = self.command()?;
-		let target = TargetSeed {
-			kind: command.to_target_seed_kind()?,
-			refspec: self.git_ref.clone(),
-			specifier: command.get_specifier().to_owned(),
-		};
-		// Validate
-		if let Some(refspec) = &target.refspec {
-			if let TargetSeedKind::Package(p) = &target.kind {
-				if p.has_version() && &p.version != refspec {
-					return Err(hc_error!("ambiguous version for package target: package target specified {}, but refspec flag specified {}. please specify only one.", p.version, refspec));
-				}
-			}
-		};
 
-		// TargetSeed is valid
-		Ok(target)
+		match command.to_target_seed_kind()? {
+			TargetSeedKind::Single(single_target_seed_kind) => {
+				let seed = SingleTargetSeed {
+					kind: single_target_seed_kind,
+					refspec: self.git_ref.clone(),
+					specifier: command.get_specifier().to_owned(),
+				};
+				// validate
+				if let Some(refspec) = &seed.refspec {
+					if let SingleTargetSeedKind::Package(p) = &seed.kind {
+						if p.has_version() && &p.version != refspec {
+							return Err(hc_error!("ambiguous version for package target: package target specified {}, but refspec flag specified {}. please specify only one.", p.version, refspec));
+						}
+					}
+				};
+				Ok(TargetSeed::Single(seed))
+			}
+			TargetSeedKind::Multi(_multi_target_seed_kind) => todo!(),
+		}
 	}
 }
 
@@ -681,7 +686,9 @@ impl ToTargetSeedKind for CheckMavenArgs {
 		// Confirm that the provided URL is valid.
 		let url = Url::parse(arg)
 			.map_err(|e| hc_error!("The provided Maven URL {} is not a valid URL. {}", arg, e))?;
-		Ok(TargetSeedKind::MavenPackage(MavenPackage { url }))
+		Ok(TargetSeedKind::Single(SingleTargetSeedKind::MavenPackage(
+			MavenPackage { url },
+		)))
 	}
 }
 
@@ -707,12 +714,14 @@ impl ToTargetSeedKind for CheckNpmArgs {
 		})
 		.unwrap();
 
-		Ok(TargetSeedKind::Package(Package {
-			purl,
-			name,
-			version,
-			host: PackageHost::Npm,
-		}))
+		Ok(TargetSeedKind::Single(SingleTargetSeedKind::Package(
+			Package {
+				purl,
+				name,
+				version,
+				host: PackageHost::Npm,
+			},
+		)))
 	}
 }
 
@@ -737,12 +746,14 @@ impl ToTargetSeedKind for CheckPypiArgs {
 		})
 		.unwrap();
 
-		Ok(TargetSeedKind::Package(Package {
-			purl,
-			name,
-			version,
-			host: PackageHost::PyPI,
-		}))
+		Ok(TargetSeedKind::Single(SingleTargetSeedKind::Package(
+			Package {
+				purl,
+				name,
+				version,
+				host: PackageHost::PyPI,
+			},
+		)))
 	}
 }
 
@@ -756,14 +767,18 @@ impl ToTargetSeedKind for CheckRepoArgs {
 	fn to_target_seed_kind(&self) -> Result<TargetSeedKind> {
 		if let Ok(url) = Url::parse(&self.source) {
 			let remote_repo = source::get_remote_repo_from_url(url)?;
-			Ok(TargetSeedKind::RemoteRepo(remote_repo))
+			Ok(TargetSeedKind::Single(SingleTargetSeedKind::RemoteRepo(
+				remote_repo,
+			)))
 		} else {
 			let path = Path::new(&self.source).canonicalize()?;
 			if path.exists() {
-				Ok(TargetSeedKind::LocalRepo(LocalGitRepo {
-					path,
-					git_ref: "".to_owned(),
-				}))
+				Ok(TargetSeedKind::Single(SingleTargetSeedKind::LocalRepo(
+					LocalGitRepo {
+						path,
+						git_ref: "".to_owned(),
+					},
+				)))
 			} else {
 				Err(hc_error!("Provided target repository could not be identified as either a remote url or path to a local file"))
 			}
@@ -782,19 +797,19 @@ impl ToTargetSeedKind for CheckSbomArgs {
 		let path = PathBuf::from(&self.path);
 		if path.exists() {
 			if self.path.ends_with(".spdx") {
-				Ok(TargetSeedKind::Sbom(Sbom {
+				Ok(TargetSeedKind::Single(SingleTargetSeedKind::Sbom(Sbom {
 					path,
 					standard: SbomStandard::Spdx,
-				}))
+				})))
 			} else if self.path.ends_with("bom.json")
 				|| self.path.ends_with(".cdx.json")
 				|| self.path.ends_with("bom.xml")
 				|| self.path.ends_with(".cdx.xml")
 			{
-				Ok(TargetSeedKind::Sbom(Sbom {
+				Ok(TargetSeedKind::Single(SingleTargetSeedKind::Sbom(Sbom {
 					path,
 					standard: SbomStandard::CycloneDX,
-				}))
+				})))
 			} else {
 				Err(hc_error!(
 					"The provided SBOM file is not an SPDX or CycloneDX file type"

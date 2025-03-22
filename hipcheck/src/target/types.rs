@@ -115,7 +115,7 @@ impl Display for SbomStandard {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TargetSeedKind {
+pub enum SingleTargetSeedKind {
 	LocalRepo(LocalGitRepo),
 	RemoteRepo(RemoteGitRepo),
 	Package(Package),
@@ -124,15 +124,40 @@ pub enum TargetSeedKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TargetSeed {
-	pub kind: TargetSeedKind,
+pub struct SingleTargetSeed {
+	pub kind: SingleTargetSeedKind,
 	pub refspec: Option<String>,
 	pub specifier: String,
 }
 
-impl Display for TargetSeedKind {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MultiTargetSeedKind {
+	// CargoToml(PathBuf),
+	// GoMod(PathBuf),
+	// PackageJson(PathBuf),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MultiTargetSeed {
+	pub kind: MultiTargetSeedKind,
+	pub specifier: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TargetSeedKind {
+	Single(SingleTargetSeedKind),
+	Multi(MultiTargetSeedKind),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TargetSeed {
+	Single(SingleTargetSeed),
+	Multi(MultiTargetSeed),
+}
+
+impl Display for SingleTargetSeedKind {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		use TargetSeedKind::*;
+		use SingleTargetSeedKind::*;
 		match self {
 			LocalRepo(repo) => write!(f, "local repo at {}", repo.path.display()),
 			RemoteRepo(remote) => match &remote.known_remote {
@@ -158,8 +183,12 @@ impl Display for TargetSeedKind {
 		}
 	}
 }
+
 impl Display for TargetSeed {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		self.kind.fmt(f)
+		match self {
+			TargetSeed::Single(x) => x.kind.fmt(f),
+			TargetSeed::Multi(_x) => unimplemented!(),
+		}
 	}
 }
