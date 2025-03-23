@@ -35,6 +35,7 @@ fn main() -> ExitCode {
 			SiteCommand::Serve(args) => task::site::serve::run(args),
 		},
 		Commands::Manifest => task::manifest::run(),
+		Commands::Benchmark => task::benchmark::run(),
 	};
 
 	match result {
@@ -98,6 +99,8 @@ enum Commands {
 	Rfd(RfdArgs),
 	/// Work with the Hipcheck website.
 	Site(SiteArgs),
+	/// Run benchmark suite (currently x86_linux only)
+	Benchmark,
 }
 
 #[derive(Debug, clap::Args)]

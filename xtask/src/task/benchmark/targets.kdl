@@ -1,0 +1,19 @@
+targets {
+    // git repository with 700 commits
+    repo {
+        name: "mitre/hipcheck"
+        url: "https://github.com/mitre/hipcheck"
+        ref: "hipcheck-v3.11.0"
+    }
+    // Python repo with approximately 36000 commits
+    repo {
+        name: "numpy"
+        url: "https://pypi.org/project/numpy"
+        ref: "v2.2.3"
+    }
+}
+
+settings {
+    // number of `hc check` to run for each target repository
+    runs: 3
+}

@@ -64,7 +64,11 @@ pub fn query_with_salsa(
 	);
 
 	#[cfg(feature = "print-timings")]
-	let _0 = crate::benchmarking::print_scope_time!(format!("{}/{}", &hash_key, &query_value));
+	let _0 = crate::benchmarking::print_scope_time!(format!(
+		"{}/{}",
+		&hash_key,
+		&query.clone_from_salsa_db(engine).as_str()
+	));
 
 	let runtime = RUNTIME.handle();
 	let core = engine.core();

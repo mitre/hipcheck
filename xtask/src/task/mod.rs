@@ -2,6 +2,7 @@
 
 //! Commands supported by 'xtask'
 
+pub mod benchmark;
 pub mod buf;
 pub mod build;
 pub mod changelog;
