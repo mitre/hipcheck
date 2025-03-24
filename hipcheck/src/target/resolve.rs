@@ -154,6 +154,10 @@ impl TargetResolver {
 				resolver.remote = Some(repo.clone());
 				repo.resolve(&mut resolver)
 			}
+			VcsUrl(vcs) => {
+				resolver.remote = Some(vcs.remote.clone());
+				vcs.remote.resolve(&mut resolver)
+			}
 			LocalRepo(local) => {
 				resolver.local = Some(local.clone());
 				local.resolve(&mut resolver)

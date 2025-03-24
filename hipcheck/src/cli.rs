@@ -15,7 +15,7 @@ use crate::{
 	target::{
 		pm, LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, SingleTargetSeed,
 		SingleTargetSeedKind, TargetSeed, TargetSeedKind, TargetType, ToTargetSeed,
-		ToTargetSeedKind,
+		ToTargetSeedKind, VcsUrl,
 	},
 };
 use clap::{Parser as _, ValueEnum};
@@ -605,24 +605,44 @@ impl CheckArgs {
 	}
 }
 impl ToTargetSeed for CheckArgs {
-	fn to_target_seed(&self) -> Result<TargetSeed> {
+	fn to_target_seed(&mut self) -> Result<TargetSeed> {
 		let command = self.command()?;
 
 		match command.to_target_seed_kind()? {
 			TargetSeedKind::Single(single_target_seed_kind) => {
-				let seed = SingleTargetSeed {
-					kind: single_target_seed_kind,
-					refspec: self.git_ref.clone(),
-					specifier: command.get_specifier().to_owned(),
-				};
-				// validate
-				if let Some(refspec) = &seed.refspec {
-					if let SingleTargetSeedKind::Package(p) = &seed.kind {
-						if p.has_version() && &p.version != refspec {
-							return Err(hc_error!("ambiguous version for package target: package target specified {}, but refspec flag specified {}. please specify only one.", p.version, refspec));
+				let mut refspec = self.git_ref.clone();
+				// Validate refspec not contradicted by target ref information
+				if let Some(init_ref) = &refspec {
+					// Validate for package
+					if let SingleTargetSeedKind::Package(p) = &single_target_seed_kind {
+						if p.has_version() && &p.version != init_ref {
+							return Err(hc_error!("ambiguous version for package target: package target specified {}, but refspec flag specified {}. please specify only one.", p.version, init_ref));
 						}
 					}
+					// Validate for VCS URL
+					else if let SingleTargetSeedKind::VcsUrl(vcs) = &single_target_seed_kind {
+						if let Some(git_ref) = &vcs.git_ref {
+							if git_ref != init_ref {
+								return Err(hc_error!(
+								"Provided ref_spec '{}' does not match the ref spec, '{}', inferred from the target '{}'. Check that you have specified the correct ref and provided the intended target.",
+								init_ref, git_ref, &command.get_specifier()
+							));
+							}
+						}
+					}
+				} else {
+					// If no --ref is set and the target seed is a VCS URL, get the ref from that
+					if let SingleTargetSeedKind::VcsUrl(vcs) = &single_target_seed_kind {
+						refspec = vcs.git_ref.clone();
+					}
+				}
+
+				let seed = SingleTargetSeed {
+					kind: single_target_seed_kind,
+					refspec: refspec.to_owned(),
+					specifier: command.get_specifier().to_string(),
 				};
+
 				Ok(TargetSeed::Single(seed))
 			}
 			TargetSeedKind::Multi(_multi_target_seed_kind) => todo!(),
@@ -765,24 +785,60 @@ pub struct CheckRepoArgs {
 
 impl ToTargetSeedKind for CheckRepoArgs {
 	fn to_target_seed_kind(&self) -> Result<TargetSeedKind> {
-		if let Ok(url) = Url::parse(&self.source) {
+		// First check if this is a git VCS URL
+		if self.source.starts_with("git+") {
+			let mut git_ref = None;
+			// Remove git prefix
+			let mut spec_trimmed = self.source.replace("git+", "");
+
+			// We check that the VCS URL is valid when inferring a VCS URL target; this should only error when `hc check repo` is used
+			let url = Url::parse(&spec_trimmed).context(format!(
+				"Provided target repository {} is not a valid VCS URL",
+				self.source
+			))?;
+			match url.scheme() {
+				// If the URL is for a file, trim the file scheme identifier and usethe presumptive file path
+				"file" => {
+					let filepath = url.path().replace("file://", "");
+					to_local_repo(&filepath)
+				}
+				_ => {
+					// Remove any git ref information that trails the end of the URL and set the ref_spec equal to that ref
+					if let Some((repo_url, vcs_refspec)) = spec_trimmed.split_once(".git@") {
+						git_ref = Some(vcs_refspec.to_string());
+						// Restore ".git" to the end of the URL, since we did not intend to remove that part
+						spec_trimmed = format!("{repo_url}.git");
+					}
+					let remote = source::get_remote_repo_from_url(Url::parse(&spec_trimmed)?)?;
+					Ok(TargetSeedKind::Single(SingleTargetSeedKind::VcsUrl(
+						VcsUrl { remote, git_ref },
+					)))
+				}
+			}
+		// Next check if it is a repo URL
+		} else if let Ok(url) = Url::parse(&self.source) {
 			let remote_repo = source::get_remote_repo_from_url(url)?;
 			Ok(TargetSeedKind::Single(SingleTargetSeedKind::RemoteRepo(
 				remote_repo,
 			)))
+		// Otherwise treat it as local file
 		} else {
-			let path = Path::new(&self.source).canonicalize()?;
-			if path.exists() {
-				Ok(TargetSeedKind::Single(SingleTargetSeedKind::LocalRepo(
-					LocalGitRepo {
-						path,
-						git_ref: "".to_owned(),
-					},
-				)))
-			} else {
-				Err(hc_error!("Provided target repository could not be identified as either a remote url or path to a local file"))
-			}
+			to_local_repo(&self.source)
 		}
+	}
+}
+
+fn to_local_repo(source: &String) -> Result<TargetSeedKind> {
+	let path = Path::new(&source).canonicalize()?;
+	if path.exists() {
+		Ok(TargetSeedKind::Single(SingleTargetSeedKind::LocalRepo(
+			LocalGitRepo {
+				path,
+				git_ref: "".to_owned(),
+			},
+		)))
+	} else {
+		Err(hc_error!("Provided target repository could not be identified as either a remote url or path to a local file"))
 	}
 }
 
@@ -1614,7 +1670,7 @@ mod tests {
 
 	#[test]
 	fn test_deductive_check_repo_vcs_https() {
-		let url = "https://github.com/mitre/hipcheck.git".to_string();
+		let url = "git+https://github.com/mitre/hipcheck.git".to_string();
 		let cmd = get_check_cmd_from_cli(vec![
 			"hc",
 			"check",
@@ -1629,7 +1685,7 @@ mod tests {
 
 	#[test]
 	fn test_deductive_check_repo_vcs_ssh() {
-		let url = "ssh://git@github.com/mitre/hipcheck.git".to_string();
+		let url = "git+ssh://git@github.com/mitre/hipcheck.git".to_string();
 		let cmd = get_check_cmd_from_cli(vec![
 			"hc",
 			"check",
@@ -1644,7 +1700,7 @@ mod tests {
 
 	#[test]
 	fn test_deductive_check_repo_filepath() {
-		let path = "/home/me/projects/hipcheck".to_string();
+		let path = "git+file:///home/me/projects/hipcheck".to_string();
 		let cmd =
 			get_check_cmd_from_cli(vec!["hc", "check", "git+file:///home/me/projects/hipcheck"]);
 		assert!(matches!(cmd, Ok(CheckCommand::Repo(..))));

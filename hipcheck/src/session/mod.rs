@@ -509,9 +509,9 @@ fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 	match seed {
 		TargetSeed::Single(single_target_seed) => {
 			let phase_desc = match single_target_seed.kind {
-				SingleTargetSeedKind::LocalRepo(_) | SingleTargetSeedKind::RemoteRepo(_) => {
-					"resolving git repository target"
-				}
+				SingleTargetSeedKind::LocalRepo(_)
+				| SingleTargetSeedKind::RemoteRepo(_)
+				| SingleTargetSeedKind::VcsUrl(_) => "resolving git repository target",
 				SingleTargetSeedKind::Package(_) => "resolving package target",
 				SingleTargetSeedKind::Sbom(_) => "parsing SBOM document",
 				SingleTargetSeedKind::MavenPackage(_) => "resolving maven package target",
