@@ -9,7 +9,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.97"
-thiserror = "2.0.11"
+thiserror = "2.0.12"
 futures = "0.3.31"
 indexmap = "2.7.1"
 lazy_static = "1.4"
