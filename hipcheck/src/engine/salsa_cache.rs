@@ -4,7 +4,7 @@ use crate::{
 	engine::{HcEngine, RUNTIME},
 	hc_error,
 	plugin::{get_plugin_key, PluginResponse, QueryResult},
-	Result,
+	Error, Result,
 };
 
 trait CloneFromSalsaDb {
@@ -84,6 +84,7 @@ pub fn query_with_salsa(
 		}
 		PluginResponse::Completed(v) => return Ok(v),
 		PluginResponse::AwaitingResult(a) => a,
+		PluginResponse::Error(e) => return Err(Error::msg(e)),
 	};
 	// Otherwise, the plugin needs more data to continue. Recursively query
 	// (with salsa memo-ization) to get the needed data, and resume our
@@ -115,6 +116,7 @@ pub fn query_with_salsa(
 			}
 			PluginResponse::Completed(v) => return Ok(v),
 			PluginResponse::AwaitingResult(a) => a,
+			PluginResponse::Error(e) => return Err(Error::msg(e)),
 		};
 	}
 }

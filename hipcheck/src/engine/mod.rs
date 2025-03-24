@@ -10,7 +10,7 @@ use crate::{
 	},
 	policy::PolicyFile,
 	policy_exprs::Expr,
-	Result,
+	Error, Result,
 };
 use futures::future::{BoxFuture, FutureExt};
 use serde_json::Value;
@@ -110,6 +110,7 @@ pub fn async_query(
 				return Ok(v);
 			}
 			PluginResponse::AwaitingResult(a) => a,
+			PluginResponse::Error(e) => return Err(Error::msg(e)),
 		};
 		// Otherwise, the plugin needs more data to continue. Recursively query
 		// (with salsa memo-ization) to get the needed data, and resume our
@@ -143,6 +144,7 @@ pub fn async_query(
 					return Ok(v);
 				}
 				PluginResponse::AwaitingResult(a) => a,
+				PluginResponse::Error(e) => return Err(Error::msg(e)),
 			};
 		}
 	}
