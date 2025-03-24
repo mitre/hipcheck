@@ -115,7 +115,7 @@ tokio = { version = "1.44.0", features = [
 tokio-stream = "0.1.17"
 toml = "0.8.20"
 tonic = "0.12.3"
-thiserror = "2.0.11"
+thiserror = "2.0.12"
 ureq = { version = "2.12.1", default-features = false, features = [
     "json",
     "tls",
