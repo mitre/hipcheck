@@ -2196,7 +2196,6 @@ dependencies = [
  "minijinja-contrib",
  "nom",
  "num-traits",
- "once_cell",
  "ordered-float 5.0.0",
  "packageurl",
  "pathbuf",
