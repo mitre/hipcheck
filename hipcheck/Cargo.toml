@@ -63,7 +63,7 @@ hipcheck-macros = { path = "../library/hipcheck-macros", version = "0.3.4" }
 http = "1.2.0"
 indextree = "4.7.3"
 indicatif = { version = "0.17.11", features = ["rayon"] }
-itertools = "0.13.0"
+itertools = "0.14.0"
 jiff = "0.1.16"
 log = "0.4.25"
 logos = "0.15.0"
