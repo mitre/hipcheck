@@ -17,6 +17,7 @@ license-files = ["LICENSE"]
 dependencies = [
     "asyncio>=3.4.3",
     "coverage>=7.6.12",
+    "datamodel-code-generator>=0.28.5",
     "grpcio>=1.70.0",
     "grpcio-tools>=1.70.0",
     "logging>=0.4.9.6",

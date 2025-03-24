@@ -4,9 +4,10 @@
 # This script should be run after any changes are made to the Hipcheck
 # protobuf definition in `hipcheck-common/proto`.
 #
-# Usage: uv run scripts/update-proto.py
+# Usage: uv run scripts/update-gen.py
 
 import os
+import subprocess
 from pathlib import Path
 
 from grpc_tools import protoc
@@ -37,8 +38,27 @@ protoc_args = [
 ]
 protoc.main(protoc_args)
 
+sdk_parent = sdk_path.parent
+schema_src_path = sdk_parent / "schema" / "hipcheck_target_schema.json"
+schema_gen_path = sdk_gen_dir / "types.py"
+
+datamodel_args = [
+    "datamodel-codegen",
+    "--input",
+    f"{schema_src_path}",
+    "--input-file-type",
+    "jsonschema",
+    "--output-model-type",
+    "pydantic_v2.BaseModel",
+    "--output",
+    f"{schema_gen_path}",
+]
+schema_gen_res = subprocess.run(datamodel_args, capture_output=True)
+if schema_gen_res.returncode != 0:
+    print("types.py generation failed: ", schema_gen_res.stderr)
+
 # Prepend the SPDX License header to the relevant .py files
-py_files = ["hipcheck_pb2.py", "hipcheck_pb2_grpc.py"]
+py_files = ["hipcheck_pb2.py", "hipcheck_pb2_grpc.py", "types.py"]
 line = "# SPDX-License-Identifier: Apache-2.0"
 
 for py_file in py_files:
@@ -47,3 +67,4 @@ for py_file in py_files:
         content = f.read()
         f.seek(0, 0)
         f.write(line.rstrip("\r\n") + "\n" + content)
+
