@@ -26,4 +26,4 @@ def run_server_for(plugin: Plugin):
     plugin_name = type(plugin).__name__
     parser = get_parser_for(plugin_name)
     args = parser.parse_args()
-    PluginServer.register(plugin).listen(args.port)
+    PluginServer.register(plugin, args.log_level).listen(args.port)

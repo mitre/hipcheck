@@ -224,13 +224,35 @@ class PluginServer(gen.PluginServiceServicer):
         """
         self.plugin = plugin
 
-    def register(plugin: Plugin):
+    def register(plugin: Plugin, log_level="error"):
         """
         Set the server to use `plugin` as its implementation
 
         :param Plugin plugin: The plugin instance with which to run
         """
-        return PluginServer(plugin)
+        plugin_server = PluginServer(plugin)
+        plugin_server.init_logger(log_level)
+        return plugin_server
+
+
+    def init_logger(self, log_level_str = str):
+        """
+        Setup plugin logger in JSON at appropriate level.
+        
+        :param str log_level_str: maximum produced log level for plugin
+        """
+        # set output format
+        log_format = "{'target': '" + self.plugin.name + "', 'level': '%(levelname)s', 'fields': { 'message': '%(message)s' } }"
+        logging.basicConfig(format=log_format, level=logging.ERROR)
+
+        # set the logger's level
+        log_level = logging.getLevelName(log_level_str.upper())
+        # if log level arg is invalid - default to ERROR level
+        if not isinstance(log_level, int):
+            logging.error(f"Invalid log level string: {log_level_str}")
+            log_level = logging.ERROR
+        logging.getLogger().setLevel(log_level)
+
 
     def listen(self, port: int, host="127.0.0.1"):
         """
