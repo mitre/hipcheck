@@ -519,7 +519,7 @@ impl PolicyAnalyze {
 	pub fn pop(&mut self) -> Option<PolicyCategory> {
 		match self.root.children.pop() {
 			Some(PolicyCategoryChild::Category(c)) => Some(c),
-			_ => None
+			_ => None,
 		}
 	}
 

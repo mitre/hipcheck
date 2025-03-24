@@ -27,6 +27,12 @@ pub struct Target {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct VcsUrl {
+	pub remote: RemoteGitRepo,
+	pub git_ref: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct RemoteGitRepo {
 	pub url: Url,
 	pub known_remote: Option<KnownRemote>,
@@ -118,6 +124,7 @@ impl Display for SbomStandard {
 pub enum SingleTargetSeedKind {
 	LocalRepo(LocalGitRepo),
 	RemoteRepo(RemoteGitRepo),
+	VcsUrl(VcsUrl),
 	Package(Package),
 	MavenPackage(MavenPackage),
 	Sbom(Sbom),
@@ -165,6 +172,12 @@ impl Display for SingleTargetSeedKind {
 					write!(f, "GitHub repo {}/{} from {}", owner, repo, remote.url)
 				}
 				_ => write!(f, "remote repo at {}", remote.url.as_str()),
+			},
+			VcsUrl(vcs) => match &vcs.remote.known_remote {
+				Some(KnownRemote::GitHub { owner, repo }) => {
+					write!(f, "GitHub repo {}/{} from {}", owner, repo, vcs.remote.url)
+				}
+				_ => write!(f, "remote repo at {}", vcs.remote.url.as_str()),
 			},
 			Package(package) => {
 				let ver_str = if package.has_version() {
