@@ -3,6 +3,7 @@
 import asyncio
 import argparse
 import os
+import logging
 
 from typing import Optional
 
