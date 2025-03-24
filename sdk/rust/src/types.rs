@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 typify_macro::import_types!(
-	schema = "schema/hipcheck_target_schema.json",
+	schema = "../schema/hipcheck_target_schema.json",
 	derives = [schemars::JsonSchema],
 	convert = {
 		{
