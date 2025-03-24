@@ -4,7 +4,6 @@ use crate::{
 	error::{Context as _, Result},
 	hc_error,
 };
-use once_cell::sync::Lazy;
 use regex::Regex;
 use semver::Version;
 use std::{
@@ -15,13 +14,14 @@ use std::{
 	fmt,
 	fmt::{Display, Formatter},
 	iter::IntoIterator,
+	sync::LazyLock,
 };
 
 use DependentProgram::*;
 
 type VersionMap = HashMap<DependentProgram, Version>;
 
-static MIN_VERSIONS: Lazy<VersionMap> = Lazy::new(|| {
+static MIN_VERSIONS: LazyLock<VersionMap> = LazyLock::new(|| {
 	fn insert_version(hm: &mut VersionMap, program: DependentProgram) {
 		// SAFETY: The versions in `min_version_str` are known to be valid.
 		hm.insert(program, Version::parse(program.min_version_str()).unwrap());
