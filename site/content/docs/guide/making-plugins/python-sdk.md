@@ -13,7 +13,7 @@ This guide assumes familiarity with the Python language, async Python using
 [asyncio][asyncio], and Python project management. We leave it to the developer
 to select the right Python project dependency and packaging management tool
 that is right for them, from among the many that exist. For the purpose of
-[packaging and releasing your plugin][plugin_release], we suggest using one
+[packaging and releasing your plugin][plugin-release], we suggest using one
 that will make it easy to build a wheel from your plugin source code.
 
 To get started, first install the SDK (`hipcheck-sdk`) into your Python

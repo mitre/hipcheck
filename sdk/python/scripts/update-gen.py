@@ -52,6 +52,7 @@ datamodel_args = [
     "pydantic_v2.BaseModel",
     "--output",
     f"{schema_gen_path}",
+    "--disable-timestamp",
 ]
 schema_gen_res = subprocess.run(datamodel_args, capture_output=True)
 if schema_gen_res.returncode != 0:
