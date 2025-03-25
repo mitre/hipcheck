@@ -124,7 +124,7 @@ walkdir = "2.5.0"
 which = { version = "7.0.2", default-features = false }
 xml-rs = "0.8.25"
 xz2 = "0.1.7"
-zip = "2.2.2"
+zip = "2.3.0"
 zstd = "0.13.3"
 hipcheck-common = { version = "0.4.0", path = "../library/hipcheck-common", features = [
     "rfd9-compat",
