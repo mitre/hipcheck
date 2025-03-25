@@ -99,7 +99,6 @@ async fn commit_churns(
 		.collect::<StdResult<Vec<Value>, serde_json::Error>>()
 		.map_err(|_| Error::UnspecifiedQueryState)?;
 
-	tracing::trace!("querying mitre/linguist/is_likely_source_file");
 	let res = engine.batch_query("mitre/linguist", psf_val_vec).await?;
 	let psf_bools: Vec<bool> = serde_json::from_value(serde_json::Value::Array(res))
 		.map_err(|_| Error::UnspecifiedQueryState)?;
@@ -233,7 +232,6 @@ async fn commit_churns(
 async fn churn(engine: &mut PluginEngine, value: Target) -> Result<Vec<f64>> {
 	tracing::info!("running churn query");
 	let local = value.local;
-	tracing::trace!("querying mitre/git/commit_diffs");
 	let val_commits = engine.query("mitre/git/commit_diffs", local).await?;
 	let commits: Vec<CommitDiff> =
 		serde_json::from_value(val_commits).map_err(Error::InvalidJsonInQueryOutput)?;

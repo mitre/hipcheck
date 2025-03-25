@@ -46,7 +46,6 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	};
 
 	// Get a list of all pull requests to the repo, with their corresponding number of reviews
-	tracing::trace!("querying mitre/github/pr_reviews");
 	let value = engine
 		.query("mitre/github/pr_reviews", known_remote)
 		.await

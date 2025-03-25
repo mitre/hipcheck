@@ -156,6 +156,7 @@ impl PluginEngine {
 		V: Serialize,
 	{
 		let query_target: QueryTarget = target.try_into().map_err(|e| e.into())?;
+		tracing::trace!("querying {}", query_target.to_string());
 		let input: JsonValue = serde_json::to_value(input).map_err(Error::InvalidJsonInQueryKey)?;
 		// since there input had one value, there will only be one response
 		let mut response = self.query_inner(query_target, vec![input]).await?;
@@ -172,6 +173,7 @@ impl PluginEngine {
 		V: Serialize,
 	{
 		let target: QueryTarget = target.try_into().map_err(|e| e.into())?;
+		tracing::trace!("querying {}", target.to_string());
 		let mut input = Vec::with_capacity(keys.len());
 		for key in keys {
 			let jsonified_key = serde_json::to_value(key).map_err(Error::InvalidJsonInQueryKey)?;

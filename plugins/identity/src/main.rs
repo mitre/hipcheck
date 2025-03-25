@@ -64,7 +64,6 @@ impl Display for Commit {
 #[query]
 async fn commit_identity(engine: &mut PluginEngine, key: DetailedGitRepo) -> Result<bool> {
 	tracing::info!("running commit_identity query");
-	tracing::trace!("querying mitre/git/contributors_for_commit");
 	let value = engine
 		.query("mitre/git/contributors_for_commit", key)
 		.await
@@ -83,7 +82,6 @@ async fn identity(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
 	tracing::info!("running identity query");
 	// Get the commits for the source.
 	let repo = key.local;
-	tracing::trace!("querying mitre/git/commits");
 	let value = engine
 		.query("mitre/git/commits", repo.clone())
 		.await

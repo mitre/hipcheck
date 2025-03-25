@@ -124,6 +124,14 @@ impl FromStr for QueryTarget {
 		}
 	}
 }
+impl std::fmt::Display for QueryTarget {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match &self.query {
+			Some(query) => write!(f, "{}/{}/{}", self.publisher, self.plugin, query),
+			None => write!(f, "{}/{}", self.publisher, self.plugin),
+		}
+	}
+}
 
 impl TryInto<QueryTarget> for &str {
 	type Error = Error;
