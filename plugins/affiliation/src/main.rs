@@ -229,7 +229,6 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 	let repo = key.local;
 
 	// query the git plugin for a summary of all git contributors in the repo
-	tracing::trace!("querying mitre/git/contributor_summary");
 	let contributors_value = engine.query("mitre/git/contributor_summary", repo).await?;
 	let contributors: Vec<CommitContributorView> = serde_json::from_value(contributors_value)
 		.map_err(|e| {

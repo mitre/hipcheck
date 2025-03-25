@@ -74,7 +74,6 @@ async fn typo(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 		.ok_or_else(|| anyhow!("could not find typo file"))?;
 
 	// Get the repo's dependencies
-	tracing::trace!("querying mitre/npm/dependencies");
 	let value = engine
 		.query("mitre/npm/dependencies", value.local)
 		.await

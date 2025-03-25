@@ -28,7 +28,6 @@ async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 	let today = Timestamp::now();
 
 	// Get the date of the most recent commit.
-	tracing::trace!("querying mitre/git/last_commit_date");
 	let value = engine
 		.query("mitre/git/last_commit_date", repo)
 		.await
