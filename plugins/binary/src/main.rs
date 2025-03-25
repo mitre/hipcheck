@@ -7,9 +7,7 @@ mod util;
 use crate::binary_detector::{detect_binary_files, BinaryFileDetector};
 use clap::Parser;
 use hipcheck_sdk::{
-	prelude::*,
-	types::{LocalGitRepo, Target},
-	LogLevel,
+	macros::PluginConfig, prelude::*, types::{LocalGitRepo, Target}, LogLevel, PluginConfig
 };
 use pathbuf::pathbuf;
 use serde::de::{self, Deserializer, Visitor};
@@ -18,51 +16,60 @@ use std::{fmt, ops::Not, path::PathBuf, result::Result as StdResult, sync::OnceL
 
 pub static DETECTOR: OnceLock<BinaryFileDetector> = OnceLock::new();
 
-#[derive(Deserialize)]
+// // #[derive(Deserialize)]
+// #[derive(PluginConfig, Debug)]
+// struct RawConfig {
+//     // #[serde(rename = "binary-file")]
+//     binary_file: Option<PathBuf>,
+//     // #[serde(rename = "binary-file-threshold", deserialize_with = "deserialize_binary_file_threshold")]
+//     binary_file_threshold: Option<u64>,
+// }
+
+#[derive(PluginConfig, Deserialize, Debug)]
 struct RawConfig {
-    #[serde(rename = "binary-file")]
-    binary_file: Option<PathBuf>,
-    #[serde(rename = "binary-file-threshold", deserialize_with = "deserialize_binary_file_threshold")]
-    binary_file_threshold: Option<u64>,
+	#[serde(rename = "binary-file")]
+	binary_file: Option<PathBuf>,
+	#[serde(rename = "binary-file-threshold")]
+	binary_file_threshold: Option<u64>,
 }
 
-fn deserialize_binary_file_threshold<'de, D>(deserializer: D) -> StdResult<Option<u64>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct ThresholdVisitor;
+// fn deserialize_binary_file_threshold<'de, D>(deserializer: D) -> StdResult<Option<u64>, D::Error>
+// where
+//     D: Deserializer<'de>,
+// {
+//     struct ThresholdVisitor;
 
-    impl<'de> Visitor<'de> for ThresholdVisitor {
-        type Value = Option<u64>;
+//     impl<'de> Visitor<'de> for ThresholdVisitor {
+//         type Value = Option<u64>;
 
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("an integer or null")
-        }
+//         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+//             formatter.write_str("an integer or null")
+//         }
 
-		fn visit_some<D>(self, deserializer: D) -> StdResult<Self::Value, D::Error>
-				where
-					D: Deserializer<'de>,
-				{
-					let value: u64 = <u64 as Deserialize>::deserialize(deserializer).map_err(|_| {
-						de::Error::custom(format!("{:?}", ConfigError::InvalidConfigValue {
-							field_name: "binary-file-threshold".to_owned(),
-							value: "invalid value".to_owned(),
-							reason: "expected an integer or null".to_owned(),
-						}))
-					})?;
-					Ok(Some(value))
-				}
+// 		fn visit_some<D>(self, deserializer: D) -> StdResult<Self::Value, D::Error>
+// 				where
+// 					D: Deserializer<'de>,
+// 				{
+// 					let value: u64 = <u64 as Deserialize>::deserialize(deserializer).map_err(|_| {
+// 						de::Error::custom(format!("{:?}", ConfigError::InvalidConfigValue {
+// 							field_name: "binary-file-threshold".to_owned(),
+// 							value: "invalid value".to_owned(),
+// 							reason: "expected an integer or null".to_owned(),
+// 						}))
+// 					})?;
+// 					Ok(Some(value))
+// 				}
 
-		fn visit_none<E>(self) -> StdResult<Self::Value, E>
-				where
-					E: de::Error,
-				{
-					Ok(None)
-				}
-    }
+// 		fn visit_none<E>(self) -> StdResult<Self::Value, E>
+// 				where
+// 					E: de::Error,
+// 				{
+// 					Ok(None)
+// 				}
+//     }
 
-	D::deserialize_option(deserializer, ThresholdVisitor)
-}
+// 	D::deserialize_option(deserializer, ThresholdVisitor)
+// }
 
 
 struct Config {
@@ -119,7 +126,6 @@ impl Plugin for BinaryPlugin {
 	const NAME: &'static str = "binary";
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
-		println!("config: {:?}", config);
 		// Deserialize and validate the config struct
 		let conf: Config = serde_json::from_value::<RawConfig>(config)
 			.map_err(|e| ConfigError::Unspecified {
