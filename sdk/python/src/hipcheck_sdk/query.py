@@ -16,12 +16,15 @@ class Endpoint:
 
     :meta private:
     """
+
     # The name of the endpoint. If the default endpoint, name is ""
     name: str
     # The actual function that implements this endpoint
     func: Callable
     # The JSON Schema for the expected key
     key_schema: dict
+    # The object type to convert json to
+    key_type: type
     # The JSON Schema for the produced output object
     output_schema: dict
 
@@ -69,8 +72,12 @@ def register_query(func, default, key_schema, output_schema):
 
     if key_schema is None:
         # Try to derive from function
-        key_hint = hints[var_names[1]]
-        key_schema = get_json_schema_for_type(key_hint)
+        key_type = hints[var_names[1]]
+        key_schema = get_json_schema_for_type(key_type)
+    else:
+        # We do not generate a class definition for key_schema due to
+        # potential code execution security concerns
+        key_type = None
 
     if output_schema is None:
         if "return" not in hints:
@@ -87,12 +94,17 @@ def register_query(func, default, key_schema, output_schema):
     if default:
         if "" in query_registry:
             raise TypeError("default query already defined")
-        query_registry[""] = Endpoint("", func, key_schema, output_schema)
+        query_registry[""] = Endpoint("", func, key_schema, key_type, output_schema)
 
-    query_registry[key] = Endpoint(key, func, key_schema, output_schema)
+    query_registry[key] = Endpoint(key, func, key_schema, key_type, output_schema)
 
 
-def query(f_py=None, default: bool = False, key_schema: Optional[dict] = None, output_schema=None):
+def query(
+    f_py=None,
+    default: bool = False,
+    key_schema: Optional[dict] = None,
+    output_schema=None,
+):
     """
     Decorator function for query endpoints. Endpoint functions must have the
     following signature:
@@ -104,7 +116,9 @@ def query(f_py=None, default: bool = False, key_schema: Optional[dict] = None, o
     :param bool default: Whether this endpoint is the default for the plugin
     :param dict key_schema: A jsonable dict representing the schema for the key
         to this enpdpoint. If `None`, derive from type hint on key parameter of
-        function.
+        function. If a schema is supplied explicitly instead of having the SDK
+        use the type hint, the object passed to the query func will not be
+        automatically converted to a class instance.
     :param dict output_schema: A jsonable dict representing the schema for the
         return value of this endpoint. If `None`, derive from type hint on
         return value of function.

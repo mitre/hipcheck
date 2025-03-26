@@ -68,4 +68,3 @@ for py_file in py_files:
         content = f.read()
         f.seek(0, 0)
         f.write(line.rstrip("\r\n") + "\n" + content)
-
