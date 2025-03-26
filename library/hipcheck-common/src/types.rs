@@ -18,6 +18,7 @@ pub struct Query {
 	pub key: Vec<serde_json::Value>,
 	pub output: Vec<serde_json::Value>,
 	pub concerns: Vec<String>,
+	pub error: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -101,6 +102,7 @@ impl TryFrom<PluginQuery> for Query {
 			key: keys,
 			output: outputs,
 			concerns: value.concern,
+			error: value.error,
 		})
 	}
 }
@@ -135,7 +137,7 @@ impl TryFrom<Query> for PluginQuery {
 			output: outputs,
 			concern: value.concerns,
 			split: false,
-			error: None, // TODO actually pass error
+			error: value.error,
 		})
 	}
 }
