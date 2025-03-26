@@ -14,146 +14,238 @@
 {# Turn off breadcrumbs for the index page. #}
 {% block breadcrumbs %}{% endblock %}
 
+
+{% block lede %}
+
+<div class="py-32 bg-gradient-to-b from-white to-slate-50 from-85%">
+    <h2 class="pb-16 text-7xl font-semibold text-black text-center">
+        Identify
+        <span class="inline-block relative [z-index:10] font-black after:absolute after:content-[''] after:[z-index:-1] after:w-full after:-bottom-3 after:left-0 after:right-0 after:h-4 after:rounded-full after:bg-red-500 after:bg-gradient-to-r after:from-red-500 after:via-orange-500 after:to-yellow-500">risky dependencies</span>
+    </h2>
+
+    <p class="mb-8 text-4xl leading-tight w-1/2 text-center mx-auto">500 dependencies<a href="#" class="align-super text-base text-red-600">*</a> are too much to manually review.</p>
+    <p class="mb-24 text-4xl leading-tight w-1/2 text-center mx-auto"><span class="font-black">Hipcheck</span> automates what you&rsquo;d check by hand, filtering dependencies you should <span class="pt-[1px] pb-[3px] px-2 rounded-lg bg-yellow-100 text-yellow-700">investigate</span> further.</p>
+
+    <div class="w-2/3 mx-auto">
+        <div class="grid grid-cols-2 gap-32">
+            <div class="flex justify-center items-center border border-neutral-100 rounded-3xl shadow-sm bg-white">
+                <div class="flex flex-col gap-12 items-center content-center">
+                    <h3 class="font-semibold text-3xl">Try <span class="font-black">Hipcheck</span> Yourself</h3>
+
+                    {% include "partials/install.tera.html" %}
+
+                    <div class="flex gap-4">
+                        <a href="{{ get_url(path="@/docs/_index.md") }}" class="
+                                relative z-20
+                                inline-block
+                                !font-semibold
+                                px-5 py-3
+                                no-underline
+                                bg-blue-500 hover:bg-green-500 dark:hover:bg-neutral-800
+                                text-white hover:!text-white
+                                rounded-full
+                                ">
+                            {{ ic::icon(name="book", classes="!w-5 !h-5 mt-[-2px] mr-1") }} Read the Docs
+                        </a>
+
+                        <a href="#" class="
+                                relative z-20
+                                inline-block
+                                !font-semibold
+                                px-5 py-3
+                                no-underline
+                                bg-blue-50 hover:bg-green-100 dark:hover:bg-neutral-800
+                                text-blue-800 hover:!text-green-800
+                                rounded-full
+                                ">
+                            {{ ic::icon(name="box", classes="!w-5 !h-5 mt-[-2px] mr-1") }} Explore Plugins
+                        </a>
+                    </div>
+
+                    <div class="-mt-8">
+                        <p class="text-sm text-slate-600"><a class="hover:text-blue-500" href="https://github.com/mitre/hipcheck"><span class="underline">Proudly open source, hosted on GitHub</span> {{ ic::icon(name="github", classes="-mt-[1px]") }}</a></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-green-500 p-3 aspect-video rounded-3xl flex items-stretch">
+                <div class="bg-green-50 rounded-2xl w-full flex items-center justify-center">
+                    <div class="h-32 w-32 rounded-full bg-green-800 flex items-center justify-center">
+                        <div class="ml-3 w-0 h-0 border-l-[3rem] border-t-[1.875rem] border-b-[1.875rem] border-transparent border-l-green-100"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-slate-50 min-h-[400px] py-32">
+    <div class="w-2/3 mx-auto">
+        <h2 class="text-6xl font-extrabold mb-8">
+            Check <span class="inline-block relative [z-index:10] font-black after:absolute after:content-[''] after:[z-index:-1] after:w-full after:-bottom-3 after:left-0 after:right-0 after:h-4 after:rounded-full after:bg-red-500 after:bg-gradient-to-r after:from-red-500 after:via-orange-500 after:to-yellow-500">project practices</span>
+        </h2>
+        <p class="mb-16 text-3xl mt-8 font-normal">See how a dependency is developed to understand future risk.</p>
+
+        <div class="grid grid-cols-2 gap-16">
+            <div class="columns-2 space-y-8 gap-8">
+                {{ idx::check_block(title="Is the project actively maintained?", plugin="mitre/activity", policy="At least 1 commit in the last year.", data=["mitre/git"], outline=True) }}
+                {{ idx::check_block(title="Does the project do code review?", plugin="mitre/review", policy="More than 85% of Pull Requests approved prior to merging.", data=["mitre/github"]) }}
+                {{ idx::check_block(title="Does the project do fuzz testing?", plugin="mitre/fuzz", policy="Set up to fuzz with OSS-Fuzz.", data=["mitre/github"]) }}
+                {{ idx::check_block(title="Do contributors merge their own changes?", plugin="mitre/identity", policy="More than 85% of commits merged by another person.", data=["mitre/git"]) }}
+            </div>
+
+            <div class="flex justify-center items-start">
+                <img class="shadow-xl shadow-slate-300 rounded-2xl" src="/images/github-mitre-hipcheck.png" alt="Screenshot of the Hipcheck GitHub repository">
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="bg-slate-100 bg-gradient-to-b from-slate-50 via-slate-100 to-slate-50 min-h-[400px] py-32">
+    <div class="w-2/3 mx-auto">
+        <h2 class="text-6xl font-extrabold mb-8">
+            Check <span class="inline-block relative [z-index:10] font-black after:absolute after:content-[''] after:[z-index:-1] after:w-full after:-bottom-3 after:left-0 after:right-0 after:h-4 after:rounded-full after:bg-red-500 after:bg-gradient-to-r after:from-red-500 after:via-orange-500 after:to-yellow-500">possible attacks</span>
+        </h2>
+        <p class="mb-16 text-3xl mt-8 font-normal">Identify possible attacks that may be reasons not to use a dependency.</p>
+
+        <div class="grid grid-cols-2 gap-16">
+            <div class="columns-2 space-y-8 gap-8">
+                {{ idx::check_block(title="Are there binaries checked into the source repository?", plugin="mitre/binary", policy="No binaries in the source repository.", data=["mitre/git"]) }}
+                {{ idx::check_block(title="Are there unusually large commits in the history?", plugin="mitre/churn", policy="No unusually-large commits in the history.", data=["mitre/git"]) }}
+                {{ idx::check_block(title="Are there unusual-looking commits in the history?", plugin="mitre/entropy", policy="No unusual-looking commits in the history.", data=["mitre/git"]) }}
+                {{ idx::check_block(title="Are there dependencies that may be typosquatted?", plugin="mitre/typo", policy="No potentially-typosquatted dependencies.", data=["mitre/npm"]) }}
+            </div>
+
+            <div class="flex justify-center items-start">
+                <img class="shadow-xl shadow-slate-300 rounded-2xl" src="/images/github-mitre-hipcheck.png" alt="Screenshot of the Hipcheck GitHub repository">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-slate-50 bg-gradient-to-b from-slate-50 to-white min-h-[400px] py-32 text-slate-800">
+    <div class="w-2/3 mx-auto">
+        <h2 class="text-6xl font-extrabold mb-16 text-center">
+            Check <span class="inline-block relative [z-index:10] font-black after:absolute after:content-[''] after:[z-index:-1] after:w-full after:-bottom-3 after:left-0 after:right-0 after:h-4 after:rounded-full after:bg-white after:bg-gradient-to-r after:from-green-400 after:via-emerald-400 after:to-teal-400">what matters to you!</span>
+        </h2>
+        <p class="text-4xl leading-tight w-3/5 text-center mx-auto">All <span class="font-black">Hipcheck</span> analyses are powered by plugins.</p>
+        <p class="mb-24 text-4xl leading-tight w-3/5 text-center mx-auto">Configure and replace plugins to your heart&rsquo;s content!</p>
+
+        <div class="grid grid-cols-3 gap-16">
+            <div class="rounded-2xl bg-white shadow-md shadow-slate-300 p-8">
+                <div class="text-center">
+                    {{ ic::icon(name="sliders", classes="!w-8 !h-8 mb-4 !fill-blue-500") }}
+                </div>
+                <h3 class="text-2xl font-semibold text-center mb-4">Configure the plugins you have</h3>
+                <p class="text-lg leading-tight text-center font-light px-4">Change thresholds, modify scoring, and replace policy expressions for full control over what&rsquo;s &ldquo;good enough.&rdquo;</p>
+
+                <div class="text-center mt-6">
+                    <a href="{{ get_url(path="@/docs/_index.md") }}" class="
+                            relative z-20
+                            inline-block
+                            !font-semibold
+                            px-5 py-3
+                            no-underline
+                            bg-blue-500 hover:bg-green-500 dark:hover:bg-neutral-800
+                            text-white hover:!text-white
+                            rounded-full
+                            ">
+                        {{ ic::icon(name="file-text", classes="!w-5 !h-5 mt-[-2px] mr-1") }} Learn about Policy Files
+                    </a>
+                </div>
+            </div>
+
+            <div class="rounded-2xl bg-white shadow-md shadow-slate-300 p-8">
+                <div class="text-center">
+                    {{ ic::icon(name="box", classes="!w-8 !h-8 mb-4 !fill-blue-500") }}
+                </div>
+                <h3 class="text-2xl font-semibold text-center mb-4">Use the plugins you want</h3>
+                <p class="text-lg leading-tight text-center font-light px-4">Add or replace plugins with just minor edits to your policy file. Run only the analyses that matter to you!</p>
+
+                <div class="text-center mt-6">
+                    <a href="{{ get_url(path="@/docs/_index.md") }}" class="
+                            relative z-20
+                            inline-block
+                            !font-semibold
+                            px-5 py-3
+                            no-underline
+                            bg-blue-500 hover:bg-green-500 dark:hover:bg-neutral-800
+                            text-white hover:!text-white
+                            rounded-full
+                            ">
+                        {{ ic::icon(name="box", classes="!w-5 !h-5 mt-[-2px] mr-1") }} Explore Plugins
+                    </a>
+                </div>
+            </div>
+
+            <div class="rounded-2xl bg-white shadow-md shadow-slate-300 p-8">
+                <div class="text-center">
+                    {{ ic::icon(name="settings", classes="!w-8 !h-8 mb-4 !fill-blue-500") }}
+                </div>
+                <h3 class="text-2xl font-semibold text-center mb-4">Build your own plugins</h3>
+                <p class="text-lg leading-tight text-center font-light px-4">Write and distribute plugins in any language. We have plugin SDKs in Rust and Python, and the plugin protocol is fully-documented!</p>
+
+                <div class="text-center mt-6">
+                    <a href="{{ get_url(path="@/docs/_index.md") }}" class="
+                            relative z-20
+                            inline-block
+                            !font-semibold
+                            px-5 py-3
+                            no-underline
+                            bg-blue-500 hover:bg-green-500 dark:hover:bg-neutral-800
+                            text-white hover:!text-white
+                            rounded-full
+                            ">
+                        {{ ic::icon(name="tool", classes="!w-5 !h-5 mt-[-2px] mr-1") }} Learn how to Build Plugins
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="w-2/3 mx-auto mt-64 rounded-[12.5rem] bg-blue-500 bg-gradient-to-br from-blue-500 to-violet-500 p-48 shadow-2xl">
+        <h2 class="mb-16 text-center text-6xl font-bold text-white">For Hipcheck, <span class="inline-block relative [z-index:10] font-black after:absolute after:content-[''] after:[z-index:-1] after:w-full after:-bottom-3 after:left-0 after:right-0 after:h-4 after:rounded-full after:bg-green-100 after:bg-gradient-to-r after:from-green-100 after:via-cyan-100 after:to-violet-100">values matter</span></h2>
+
+        <div class="text-center text-white text-3xl [&_p]:mb-4 drop-shadow-md w-2/3 mx-auto *:!mb-8">
+            <p>We want to help open source maintainers and users understand
+                the dependencies they&rsquo;re using.</p>
+            <p>Hipcheck recommends &ldquo;pass&rdquo; or &ldquo;investigate&rdquo;
+                because people, not automated tools, should decide what to use.</p>
+            <p>We&rsquo;re open source ourselves, and care about being transparent,
+                welcoming, and safe for everyone.</p>
+        </div>
+
+        <div class="text-center mt-16">
+            <a href="{{ get_url(path="@/docs/_index.md") }}" class="
+                    text-2xl
+                    relative z-20
+                    top-0
+                    inline-block
+                    font-medium
+                    px-6 py-4
+                    no-underline
+                    bg-white/95 hover:bg-white
+                    text-blue-500
+                    rounded-full
+                    hover:shadow-md hover:shadow-blue-800
+                    hover:-top-1
+                    transition-all ease-in-out
+                    ">
+                {{ ic::icon(name="heart", classes="!w-6 !h-6 -mt-1 mr-2") }} Read Our Values
+            </a>
+        </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
 {% block content %}
-
-    <span class="mt-4 text-4xl lg:text-5xl relative z-20 font-medium !leading-tight">
-        Identify <span class="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 text-transparent bg-clip-text font-black">risky&nbsp;practices</span> and <span class="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 text-transparent bg-clip-text font-black">possible attacks</span> in your software dependencies.
-    </span>
-
-    <ul class="list-none ps-0 mt-12 text-lg">
-        <li class="before:inline-block before:top-0 before:left-0 before:w-6 before:h-6 before:-ml-2 before:-mb-1 before:mr-2 before:content-['✓'] before:font-extrabold before:text-green-500 before:text-xl">Filter <span class="font-bold italic">hundreds of dependencies</span> to a few for review</li>
-        <li class="before:inline-block before:top-0 before:left-0 before:w-6 before:h-6 before:-ml-2 before:-mb-1 before:mr-2 before:content-['✓'] before:font-extrabold before:text-green-500 before:text-xl">Use plugins to <span class="font-bold italic">run only the analyses you choose</span></li>
-        <li class="before:inline-block before:top-0 before:left-0 before:w-6 before:h-6 before:-ml-2 before:-mb-1 before:mr-2 before:content-['✓'] before:font-extrabold before:text-green-500 before:text-xl">Configure scoring to <span class="font-bold italic">decide when to investigate further</span></li>
-    </ul>
-
-    {% include "partials/install.tera.html" %}
-
-    <a href="{{ get_url(path="@/docs/_index.md") }}" class="
-            relative z-20
-            inline-block
-            !font-semibold
-            px-5 py-3
-            no-underline
-            bg-blue-500 hover:bg-green-500 dark:hover:bg-neutral-800
-            text-white hover:!text-white
-            rounded-full
-            mr-4 mt-8
-            top-[-1px]
-            ">
-        {{ ic::icon(name="book", classes="!w-5 !h-5 mt-[-2px] mr-1") }} Read the Docs
-    </a>
 {% endblock %}
 
 {% block sidebar %}
-    <div class="relative">
-        <div class="bg-sky-50/75 dark:bg-sky-50/25 rounded-full top-24 -left-12 h-20 w-20 absolute -z-10"></div>
-        <div class="bg-emerald-100/75 dark:bg-emerald-100/20 rounded-full top-28 right-24 h-32 w-32 absolute -z-10"></div>
-        <div class="bg-emerald-200/50 dark:bg-emerald-200/20 rounded-full top-[15rem] -left-8 h-48 w-48 absolute -z-10"></div>
-        <div class="bg-sky-50 dark:bg-sky-50/25 rounded-full top-80 right-28 h-24 w-24 absolute -z-20"></div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-8 gap-3 lg:-ml-16 my-24 lg:mb-0 lg:-mt-8 items-start">
-            <div class="col-span-1 lg:col-start-2 lg:col-span-5 mb-2 items-center justify-stretch text-nowrap">
-                <div class="flex flex-col items-center gap-1 font-medium">
-                    <span class="dark:text-neutral-200">Analyzing</span>
-                    <div class="bg-white dark:bg-sky-800 border shadow-sm shadow-sky-200 dark:shadow-sky-800 border-sky-300 dark:border-sky-600 inline-flex items-stretch gap-1 py-1 px-2 rounded-full text-nowrap">
-                        <div class="inline-flex justify-center items-center text-sky-600 dark:text-sky-200">
-                            {{ ic::icon(name="link") }}
-                        </div>
-                        <span class="text-sm font-normal text-sky-600 dark:text-sky-300">pkg:github/example/project</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white dark:bg-neutral-700 lg:col-start-2 col-span-1 lg:col-span-5 rounded-2xl border border-neutral-300 dark:border-neutral-500 shadow-sm">
-                <div class="p-4">
-                    <div class="mb-1">
-                        <span class="inline-flex gap-2 items-center text-sm font-medium text-neutral-600 dark:text-neutral-300">{{ ic::icon(name="box") }} mitre/activity</span>
-                    </div>
-                    <span class="text-black dark:text-white font-medium">Is the project maintained?</span>
-                    <span class="text-sm inline-block mt-1 text-green-700 dark:text-green-300">Active. Last commit 7 days ago.</span>
-                    <div class="mt-2 flex gap-2 text-xs items-center">
-                        <span class="text-xs text-green-800 dark:text-green-200 rounded-full py-[2px] px-2 inline-flex items-center gap-1 bg-green-50 dark:bg-green-600 font-medium border-green-600 dark:border-green-400 border">{{ ic::icon(name="check", classes="fill-green-800") }} Pass</span>
-                        <span class="text-neutral-600 dark:text-neutral-300">50% weight</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white dark:bg-neutral-700 lg:col-start-2 col-span-1 lg:col-span-5 rounded-2xl border border-neutral-300 dark:border-neutral-500 shadow-sm">
-                <div class="p-4">
-                    <div class="mb-1">
-                        <span class="inline-flex gap-2 items-center text-sm font-medium text-neutral-600 dark:text-neutral-300">{{ ic::icon(name="box") }} mitre/review</span>
-                    </div>
-                    <span class="text-black dark:text-white font-medium">Are there code reviews?</span>
-                    <span class="text-sm inline-block mt-1 text-green-700 dark:text-green-300">Code reviews common on PRs</span>
-                    <div class="mt-2 flex gap-2 text-xs items-center">
-                        <span class="text-xs text-green-800 dark:text-green-200 rounded-full py-[2px] px-2 inline-flex items-center gap-1 bg-green-50 dark:bg-green-600 font-medium border-green-600 dark:border-green-400 border">{{ ic::icon(name="check", classes="fill-green-800") }} Pass</span>
-                        <span class="text-neutral-600 dark:text-neutral-300">30% weight</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white dark:bg-neutral-700 lg:col-start-2 col-span-1 lg:col-span-5 rounded-2xl border border-neutral-300 dark:border-neutral-500 shadow-sm">
-                <div class="p-4">
-                    <div class="mb-1">
-                        <span class="inline-flex gap-2 items-center text-sm font-medium text-neutral-600 dark:text-neutral-300">{{ ic::icon(name="box") }} mitre/binary</span>
-                    </div>
-                    <span class="text-black dark:text-white font-medium">Are there binaries in the repo?</span>
-                    <span class="text-sm inline-block mt-1 text-yellow-700 dark:text-yellow-300">Warning: found prebuilt, prebuilt.exe</span>
-                    <div class="mt-2 flex gap-2 text-xs items-center">
-                        <span class="text-xs text-yellow-800 dark:text-yellow-200 rounded-full py-[2px] px-2 inline-flex items-center gap-1 bg-yellow-50 dark:bg-yellow-600 font-medium border-yellow-600 dark:border-yellow-400 border">{{ ic::icon(name="alert-circle", classes="fill-yellow-800") }} Investigate</span>
-                        <span class="text-neutral-600 dark:text-neutral-300">20% weight</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="pt-2 col-span-1 lg:col-span-5 lg:col-start-2">
-                <div class="mx-auto w-fit flex items-start gap-3 mt-1">
-                    <span class="inline-flex gap-1 flex-col align-bottom items-stretch">
-                        <span class="text-nowrap text-center -mt-[1px] p-1 px-2 rounded-md bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 text-neutral-800 dark:text-neutral-100 text-xl font-medium">0.2</span>
-                        <span class="text-nowrap text-center text-xs text-neutral-600 dark:text-neutral-300">Risk Score</span>
-                    </span>
-                    <span class="text-xl mt-1 dark:text-neutral-300">is</span>
-                    <span class="inline-flex gap-1 flex-col align-bottom items-stretch">
-                        <span class="text-nowrap text-center -mt-[1px] p-1 px-2 rounded-md bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 text-neutral-800 dark:text-neutral-100 text-xl font-medium">≤ 0.5</span>
-                        <span class="text-nowrap text-center text-xs text-neutral-600 dark:text-neutral-300">Risk Policy</span>
-                    </span>
-                    <span class="text-xl mt-1 dark:text-neutral-300">so</span>
-                    <span class="inline-flex gap-1 flex-col align-bottom items-stretch">
-                        <span class="text-nowrap text-center -mt-[1px] p-1 px-3 rounded-full bg-green-50 dark:bg-green-600 border border-green-600 dark:border-green-500 text-green-800 dark:text-white text-xl font-medium">{{ ic::icon(name="check", classes="") }} Pass</span>
-                        <span class="text-nowrap text-center text-xs text-neutral-600 dark:text-neutral-300">Result</span>
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
 {% endblock %}
 
 {% block extra %}
-    <div class="bg-gradient-to-b from-blue-900 via-blue-500 dark:via-blue-700 to-white dark:to-neutral-900 via-75% lg:via-50%">
-        <div class="max-w-7xl mx-auto py-16 lg:py-40">
-
-            <div class="px-8 lg:px-0 lg:grid lg:grid-cols-8 lg:gap-8">
-                <div class="lg:col-span-4 lg:col-start-3">
-                    <div class="text-white text-lg lg:text-2xl [&_p]:mb-4 drop-shadow-md">
-                        <p>Maintainers don't need drive-by comments with
-                            <span class="relative whitespace-nowrap">
-                                <span class="absolute top-[14px] left-0 right-0 h-[3px] bg-red-500 shadow-md"></span>
-                                best practice</span>
-                            scanner results, they need insights to make
-                            dependencies work for them.</p>
-                        <p>We&rsquo;re not building <span class="text-white/50">Yet Another Analysis Tool</span>,
-                            we&rsquo;re building an analysis swiss army knife
-                            you can extend, modify, and own.</p>
-                        <p>Hipcheck&rsquo;s plugin system means anyone can add
-                            new data sources and analyses, and users control
-                            what runs and what gets recommended.</p>
-                        <p>We wear <a class="white underline underline-offset-2 decoration-2 decoration-blue-200 hover:decoration-white" href="{{ get_url(path="@/docs/rfds/0002-hipchecks-values.md") }}">our values</a>
-                            on our sleeves, and we&rsquo;re proud to be working
-                            for regular maintainers.</p>
-
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 {% endblock %}

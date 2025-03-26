@@ -1,6 +1,7 @@
 {% import "macros/breadcrumbs.tera.html" as bc %}
 {% import "macros/icon.tera.html" as ic %}
 {% import "macros/toc.tera.html" as toc %}
+{% import "macros/index.tera.html" as idx %}
 
 <!doctype html>
 <html lang="en-US" class="">
@@ -18,6 +19,9 @@
                     {{ bc::breadcrumbs(current=current) }}
                 {% endblock %}
             </div>
+
+            {% block lede %}{% endblock %}
+
             <div class="lg:max-w-7xl lg:mx-auto mt-8 lg:mt-32 lg:mb-32 px-4 md:px-8 lg:px-8">
                 <div class="lg:grid lg:grid-cols-12 lg:gap-16">
                     <div class="lg:col-span-7">
