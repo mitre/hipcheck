@@ -469,6 +469,7 @@ pub enum FullCommands {
 	PrintConfig,
 	PrintCache,
 	Scoring,
+	ExplainTargetTriple,
 }
 
 impl From<&Commands> for FullCommands {
@@ -490,6 +491,9 @@ impl From<&Commands> for FullCommands {
 				}
 			},
 			Commands::Plugin(args) => FullCommands::Plugin(args.clone()),
+			Commands::Explain(args) => match &args.subcmd {
+				ExplainSubcmds::TargetTriple => FullCommands::ExplainTargetTriple,
+			},
 		}
 	}
 }
@@ -511,6 +515,8 @@ pub enum Commands {
 	/// Manage Hipcheck repo or plugin cache
 	Cache(CacheArgs),
 	Plugin(PluginArgs),
+	/// View setup information to help debug
+	Explain(ExplainArgs),
 }
 
 // If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
@@ -927,7 +933,7 @@ impl<T: Clone> Update for Option<T> {
 		}
 	}
 }
-/// subcommands for cache
+/// subcommands for cache // copy from here
 #[derive(Debug, Clone, clap::Parser)]
 #[command(arg_required_else_help = true)]
 pub struct CacheArgs {
@@ -1350,6 +1356,20 @@ impl Format {
 			Format::Human
 		}
 	}
+}
+
+// Help subcommand
+#[derive(Debug, Clone, clap::Parser)]
+#[command(arg_required_else_help = true)] // idk
+pub struct ExplainArgs {
+	#[clap(subcommand)]
+	pub subcmd: ExplainSubcmds,
+}
+#[derive(Debug, Clone, clap::Subcommand)]
+#[command(arg_required_else_help = true)]
+pub enum ExplainSubcmds {
+	/// Show the current and known architecture targets
+	TargetTriple,
 }
 
 /// Test CLI commands
