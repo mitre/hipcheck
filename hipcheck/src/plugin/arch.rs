@@ -4,21 +4,28 @@ use crate::error::Result;
 use crate::hc_error;
 use clap::ValueEnum;
 use std::{fmt::Display, result::Result as StdResult, str::FromStr, sync::OnceLock};
+use strum::IntoEnumIterator;
+use strum_macros::{EnumIter, VariantNames};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, ValueEnum)]
+#[derive(Clone, Copy, Debug, EnumIter, VariantNames, PartialEq, Eq, Hash, ValueEnum)]
 /// Officially supported target triples, as of RFD #0004
 ///
 /// NOTE: these architectures correspond to the offically supported Rust platforms
 pub enum KnownArch {
 	/// Used for macOS running on "Apple Silicon" running on a 64-bit ARM Instruction Set Architecture (ISA)
+	#[strum(serialize = "Apple Silicon 64-bit ARM, MacOS")]
 	Aarch64AppleDarwin,
 	/// Used for macOS running on the Intel 64-bit ISA
+	#[strum(serialize = "Intel 64-bit ISA, MacOS")]
 	X86_64AppleDarwin,
 	/// Used for Windows running on the Intel 64-bit ISA with the Microsoft Visual Studio Code toolchain for compilation
+	#[strum(serialize = "Intel 64-bit ISA, MSVC")]
 	X86_64PcWindowsMsvc,
 	/// Used for Linux operating systems running on the Intel 64-bit ISA with a GNU toolchain for compilation
+	#[strum(serialize = "Linux 64-bit Intel, GNU")]
 	X86_64UnknownLinuxGnu,
 	/// Used for Linux operating systems running on a 64-bit ARM ISA
+	#[strum(serialize = "Linux aRM 64-bit")]
 	Aarch64UnknownLinuxGnu,
 }
 
@@ -26,6 +33,12 @@ pub enum KnownArch {
 pub enum Arch {
 	Known(KnownArch),
 	Unknown(String),
+}
+
+impl Arch {
+	pub fn known_iter() -> impl Iterator<Item = Arch> {
+		KnownArch::iter().map(Arch::Known)
+	}
 }
 
 pub const DETECTED_ARCH_STR: &str = env!("TARGET");

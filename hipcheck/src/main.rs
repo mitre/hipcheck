@@ -29,7 +29,7 @@ use crate::{
 	engine::HcEngine,
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
-	plugin::{try_set_arch, Plugin, PluginVersion, PluginWithConfig},
+	plugin::{get_current_arch, try_set_arch, Arch, Plugin, PluginVersion, PluginWithConfig},
 	policy::{config_to_policy, PolicyFile},
 	report::report_builder::{build_report, Report},
 	score::score_results,
@@ -107,6 +107,7 @@ fn main() -> ExitCode {
 					ExitCode::FAILURE
 				});
 		}
+		Some(FullCommands::TargetTriple) => return cmd_target_triple(),
 
 		None => Shell::print_error(&hc_error!("missing subcommand"), Format::Human),
 	};
@@ -682,6 +683,35 @@ fn updater_command(command_name: &str, args: &UpdateArgs) -> Command {
 	}
 
 	command
+}
+
+fn cmd_target_triple() -> ExitCode {
+	let current_arch = get_current_arch();
+
+	match &current_arch {
+		Arch::Known(arch) => {
+			println!("  \tCurrent target triple architecture: {}", arch)
+		}
+		Arch::Unknown(arch_str) => {
+			println!("> {}", arch_str)
+		}
+	}
+
+	for arch in Arch::known_iter() {
+		match (&current_arch, &arch) {
+			(Arch::Known(current_known_arch), Arch::Known(arch_to_print))
+				if current_known_arch == arch_to_print =>
+			{
+				continue
+			}
+			(Arch::Known(_), _) | (Arch::Unknown(_), _) => match arch {
+				Arch::Known(known_arch) => println!("  \t{}", known_arch),
+				_ => unreachable!(),
+			},
+		}
+	}
+
+	ExitCode::SUCCESS
 }
 
 fn cmd_cache_target(args: CacheTargetArgs, config: &CliConfig) -> ExitCode {
