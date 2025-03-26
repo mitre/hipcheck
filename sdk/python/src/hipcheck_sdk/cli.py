@@ -4,6 +4,7 @@ import argparse
 
 from hipcheck_sdk.server import Plugin, PluginServer
 
+
 def get_parser_for(plugin_name: str) -> argparse.ArgumentParser:
     """
     Get the default argument parser for a Hipcheck plugin
@@ -15,6 +16,7 @@ def get_parser_for(plugin_name: str) -> argparse.ArgumentParser:
     parser.add_argument("-p", "--port", type=int)
     parser.add_argument("-l", "--log-level", type=str, default="error")
     return parser
+
 
 def run_server_for(plugin: Plugin):
     """

@@ -312,7 +312,7 @@ impl PluginExecutor {
 				.env("PATH", &cmd_path)
 				.args(spawn_args)
 				// pipe output to tokio task for plugin log forwarding
-				.stdout(std::process::Stdio::piped())
+				.stdout(std::process::Stdio::inherit())
 				.stderr(std::process::Stdio::piped())
 				.kill_on_drop(true)
 				.spawn()
@@ -358,10 +358,8 @@ impl PluginExecutor {
 				continue;
 			};
 
-			let plugin_stdout = proc.stdout.take().expect("Failed to capture plugin stdout");
 			let plugin_stderr = proc.stderr.take().expect("Failed to capture plugin stderr");
 
-			self.forward_plugin_logs(plugin_stdout, plugin_title.clone());
 			self.forward_plugin_logs(plugin_stderr, plugin_title.clone());
 
 			// We now have an open gRPC connection to our plugin process

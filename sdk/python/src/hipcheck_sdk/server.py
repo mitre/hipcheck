@@ -109,6 +109,7 @@ class HcSessionSocket:
     """
     :meta private:
     """
+
     def __init__(self, stream, context):
         self.stream = stream
         self.context = context
@@ -217,6 +218,7 @@ class PluginServer(gen.PluginServiceServicer):
     """
     The server object which runs a plugin class implementation
     """
+
     def __init__(self, plugin: Plugin):
         """
         :meta private:
@@ -233,15 +235,18 @@ class PluginServer(gen.PluginServiceServicer):
         plugin_server.init_logger(log_level)
         return plugin_server
 
-
-    def init_logger(self, log_level_str = str):
+    def init_logger(self, log_level_str=str):
         """
         Setup plugin logger in JSON at appropriate level.
 
         :param str log_level_str: maximum produced log level for plugin
         """
         # set output format
-        log_format = "{'target': '" + self.plugin.name + "', 'level': '%(levelname)s', 'fields': { 'message': '%(message)s' } }"
+        log_format = (
+            "{'target': '"
+            + self.plugin.name
+            + "', 'level': '%(levelname)s', 'fields': { 'message': '%(message)s' } }"
+        )
         logging.basicConfig(format=log_format, level=logging.ERROR)
 
         # set the logger's level
@@ -252,7 +257,6 @@ class PluginServer(gen.PluginServiceServicer):
             log_level = logging.ERROR
         logging.getLogger().setLevel(log_level)
 
-
     def listen(self, port: int, host="127.0.0.1"):
         """
         Start the plugin listening for an incoming gRPC connection from Hipcheck core
@@ -262,6 +266,7 @@ class PluginServer(gen.PluginServiceServicer):
             that will be run in a docker container you will need to change it to listen on
             all network interfaces, e.g. '0.0.0.0'.
         """
+
         async def inner(s: PluginServer, port: int):
             # Create server
             server = grpc.aio.server()

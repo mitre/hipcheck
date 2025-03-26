@@ -3,6 +3,7 @@
 import copy
 from dataclasses import dataclass
 
+
 @dataclass
 class SdkOptions:
     """
@@ -10,6 +11,7 @@ class SdkOptions:
     control behavior. Designed to offer roughly similar behavior to the
     feature flags available in the Rust Hipcheck SDK.
     """
+
     rfd9_compat: bool = True
     mock_engine: bool = False
 

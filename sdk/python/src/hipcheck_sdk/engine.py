@@ -4,6 +4,7 @@ from typing import List, Tuple, Dict, Optional
 
 import asyncio
 import logging
+import pydantic
 
 from hipcheck_sdk import *
 import hipcheck_sdk.gen as gen
@@ -52,6 +53,24 @@ def parse_target_str(target: str) -> Tuple[str, str, str]:
     if name is None:
         name = ""
     return (publisher, plugin, name)
+
+
+def deserialize_key(json_str: str, target_type: type) -> object:
+    """
+    Try to turn a JSON string into a given type
+
+    :param str json_str: The JSON string to be read
+    :param type target_type: The type to produce
+    :return: An instance of `target_type`
+
+    :meta private:
+    """
+    if issubclass(target_type, pydantic.BaseModel):
+        return target_type.model_validate_json(json_str)
+    elif target_type in [int, bool, float, list, dict]:
+        return json.loads(json_str)
+    else:
+        return json.loads(json_str, cls=target_type)
 
 
 class QueryBuilder:
@@ -336,6 +355,15 @@ class PluginEngine:
         query = next((x for x in plugin.queries() if x.name == name), None)
         if query is None:
             raise UnknownPluginQuery()
+
+        # None key type means they used an explicit key_schema so we leave as dict
+        if query.key_type is not None:
+            # Convert query as dict to target object schema
+            try:
+                key = deserialize_key(json.dumps(key), query.key_type)
+            except Exception as e:
+                logger.error(f"{e}")
+                raise InvalidJsonInQueryKey()
 
         value = await query.func(self, key)
 

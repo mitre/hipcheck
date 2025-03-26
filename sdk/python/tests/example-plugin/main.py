@@ -8,13 +8,13 @@ import logging
 from typing import Optional
 
 from hipcheck_sdk.error import *
-from hipcheck_sdk import PluginEngine, Plugin, query, run_server_for
+from hipcheck_sdk import PluginEngine, Plugin, query, run_server_for, Target
 
 DETECTOR = None
 
 
-@query(default=True)
-async def my_query(engine: PluginEngine, key: int) -> int:
+@query
+async def dummy_rand_data(engine: PluginEngine, key: int) -> int:
     reduced_num = key % 7
 
     engine.record_concern("This is a test")
@@ -24,6 +24,11 @@ async def my_query(engine: PluginEngine, key: int) -> int:
     engine.record_concern("This is a test2")
 
     return value[0]
+
+
+@query(default=True)
+async def take_target(engine: PluginEngine, key: Target) -> int:
+    return len(key.local.path)
 
 
 class ExamplePlugin(Plugin):
