@@ -105,7 +105,9 @@
                         ">
                     {% if item.icon %}
                         {% set name = item.icon %}
-                        {{ ic::icon(name=name, classes="ml-[-4px] mr-0") }}
+                        <div class="{% if name == 'bluesky' %}*:!fill-neutral-500{% endif %}">
+                            {{ ic::icon(name=name, classes="ml-[-4px] mr-0") }}
+                        </div>
                     {% endif %}
                     {% if not item.icononly %}
                         {{ item.name }}{% if item.external %}&nbsp;↗{% endif %}

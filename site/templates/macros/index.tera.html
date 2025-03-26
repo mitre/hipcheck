@@ -1,0 +1,34 @@
+
+{% macro check_block(title, plugin="", policy="", data="", empty=False, outline=False) %}
+    <div>
+        <div class="rounded-3xl p-8 {% if empty %}border-4 border-dashed border-slate-200 flex justify-center items-center{% else %}bg-white border border-slate-200 shadow-md shadow-slate-200{% endif %} {% if outline %}outline outline-4 outline-blue-500{% endif %}">
+            <div class="">
+                <h3 class="-mt-2 font-semibold text-xl {% if not empty %}text-slate-800{% endif %}">
+                    {{ title | safe }}
+                </h3>
+                {% if not empty %}
+                    {% if policy == "" %}
+                        {{ throw(message="missing 'policy'") }}
+                    {% endif %}
+                    {% if plugin == "" %}
+                        {{ throw(message="missing 'plugin'") }}
+                    {% endif %}
+
+                    <div class="border-t border-slate-200 -mx-8 -mb-4 px-8 py-4 mt-4 font-light">
+                        <ul class="">
+                            <li class="flex flex-wrap gap-1 mb-4"><span class="font-medium inline-block">Default Policy:&nbsp;</span><span>{{ policy }}</span></li>
+                            <li class="flex flex-nowrap gap-1 items-center"><span class="font-medium inline-block min-w-14">Plugin:&nbsp;</span><span class="tracking-wide text-sm bg-violet-50 text-violet-800 border-b border-violet-200 rounded-md py-[2px] px-[6px]">{{ ic::icon(name="box", classes="opacity-50") }}  {{ plugin }}</span></li>
+                            {% if data != "" %}
+                                <li class="flex flex-nowrap gap-1 items-center mt-2"><span class="font-medium inline-block min-w-14">Data:&nbsp;</span>
+                                    {% for datum in data %}
+                                        <span class="tracking-wide text-sm bg-amber-50 text-amber-800 border-b border-amber-200 rounded-md py-[2px] px-[6px]">{{ ic::icon(name="box", classes="opacity-50") }}  {{ datum }}</span>
+                                    {% endfor %}
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endmacro %}
