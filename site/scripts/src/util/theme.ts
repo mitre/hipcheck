@@ -7,7 +7,7 @@ export function getConfiguredTheme(): KnownTheme {
   const theme = localStorage.getItem("theme") ?? "system";
 
   switch (theme) {
-    case "dark":
+    case "darkf":
       return theme;
     case "light":
       return theme;
@@ -28,11 +28,11 @@ export function setPageTheme(theme: string | undefined) {
     case "system":
       localStorage.removeItem("theme");
       switch (preferredTheme()) {
-        case "dark":
-          document.documentElement.classList.add("dark");
+        case "darkf":
+          document.documentElement.classList.add("darkf");
           break;
         case "light":
-          document.documentElement.classList.remove("dark");
+          document.documentElement.classList.remove("darkf");
           break;
       }
 
@@ -40,12 +40,12 @@ export function setPageTheme(theme: string | undefined) {
 
     case "light":
       localStorage.setItem("theme", theme);
-      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.remove("darkf");
       break;
 
-    case "dark":
+    case "darkf":
       localStorage.setItem("theme", theme);
-      document.documentElement.classList.add("dark");
+      document.documentElement.classList.add("darkf");
       break;
 
     default:

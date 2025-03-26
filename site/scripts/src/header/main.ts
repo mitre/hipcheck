@@ -1,10 +1,13 @@
 import { setupTheme } from "./theme.ts";
+import { setupnav } from "./docs.ts";
+
 
 /**
  * Run all page setup operations, initializing all interactive widgets.
  */
 function setup() {
   setupTheme();
+  setupnav();
 }
 
 /**
