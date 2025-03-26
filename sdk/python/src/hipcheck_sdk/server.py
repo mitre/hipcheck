@@ -67,8 +67,7 @@ class Plugin(ABC):
         This should only be overriden if the plugin defines a default query
         endpoint.
 
-        :return: An unstructured description of what is returned by the plugin's
-        default query endpoint.
+        :return: An unstructured description of what is returned by the plugin's default query endpoint.
         """
         return None
 
@@ -238,7 +237,7 @@ class PluginServer(gen.PluginServiceServicer):
     def init_logger(self, log_level_str = str):
         """
         Setup plugin logger in JSON at appropriate level.
-        
+
         :param str log_level_str: maximum produced log level for plugin
         """
         # set output format

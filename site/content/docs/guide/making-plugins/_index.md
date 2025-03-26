@@ -22,7 +22,7 @@ How to start making a new Hipcheck plugin.
 How to use the Rust SDK to create a plugin.
 {% end %}
 
-{% waypoint(title="The Python Plugin SDK", path="@/docs/guide/making-plugins/rust-sdk.md", icon="tool") %}
+{% waypoint(title="The Python Plugin SDK", path="@/docs/guide/making-plugins/python-sdk.md", icon="tool") %}
 How to use the Python SDK to create a plugin.
 {% end %}
 
