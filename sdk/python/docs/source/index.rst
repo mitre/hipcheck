@@ -15,3 +15,4 @@ documentation for details.
    :maxdepth: 2
    :caption: Contents:
 
+   modules

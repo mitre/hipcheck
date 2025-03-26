@@ -55,10 +55,9 @@ async def <QUERY_NAME>(engine: PluginEngine, key: <KEY_TYPE>) -> <OUTPUT_TYPE>
 ```
 
 `<QUERY_NAME>`, the name of the function, is also used as the name of the query
-endpoint as called by other plugins (unless the query is marked as the default
-query, see [below](#query-decorator-parameters)). The `engine` parameter is
-provided to allow the query endpoint to query other plugins, while `key` is the
-input to your endpoint.
+endpoint as called by other plugins. The `engine` parameter is provided to allow
+the query endpoint to query other plugins, while `key` is the input to your
+endpoint.
 
 The `key` parameter and return type of the function should be type-hinted, as
 the hints are used to derive input and output JSON schemas for the endpoint.
@@ -90,9 +89,9 @@ The `@query` decorator has the following optional parameters:
 - `output_schema: dict` - Same behavior as `key_schema` but for the endpoint's return type.
 
 For an endpoint marked `@query(default=True)`, that endpoint becomes the
-default endpoint for the plugin, meaning that if Hipcheck core or another
-plugin queries your plugin without providing an endpoint name, this endpoint
-will be invoked. Only one endpoint may be marked as the default, marking
+default endpoint for the plugin, meaning that it will be invoked when
+Hipcheck core or another plugin queries your plugin without providing an
+endpoint name. Only one endpoint may be marked as the default, marking
 multiple will result in an error.
 
 #### Using the Engine Handle
@@ -110,9 +109,9 @@ endpoint to query.  If you are querying the plugin's default query, you may omit
 the final slash and `<QUERY>` (e.g. `mitre/example_plugin`).
 
 To supply a multiple keys in a single call, you may use the
-`engine.batch_query()` function which takes a list of keys instead of a single
-key. The returned list of results is in order corresponding with the order of
-the keys.
+`engine.batch_query()` async function which takes a list of keys instead of a
+single key. The returned list of results is in order corresponding with the
+order of the keys.
 
 #### Error Handling
 
@@ -150,7 +149,7 @@ below.
 ### Setting Configuration
 
 Plugins may require or allow users to supply a map of configuration keys and
-values at startup. These are simple `str` to primtive pairs; if your plugin
+values at startup. These are simple `str` to primitive pairs; if your plugin
 requires more complex configuration, we prescribe designing a config file
 format and having users specify the path to the file as a configuration
 key/value pair. To define the logic for setting your plugin's configuration,
@@ -169,10 +168,10 @@ dict`. A successful configuration should not return anything.
 
 Query endpoints return data that is used in the Hipcheck analysis; the default
 query endpoint exposed by a plugin is the one most likely to be a top-level
-analysis in a Hipcheck policy file. Thus, the SDK exposes a way for users to
-define a default policy expression for the default query endpoint, in the case
-that the policy file does not specify one. To do so, define the following
-function override:
+analysis in a Hipcheck [policy file][policy-file]. Thus, the SDK exposes a way
+for users to define a default [policy expression][policy-expr] for the default
+query endpoint, in the case that the policy file does not specify one. To do so,
+define the following function override:
 
 ```python
  	def default_policy_expr(self) -> Optional[str]:

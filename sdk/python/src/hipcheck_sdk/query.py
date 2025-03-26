@@ -81,10 +81,14 @@ def register_query(func, default, key_schema, output_schema):
         output_schema = get_json_schema_for_type(out_hint)
 
     key = func.__name__
+
+    # Create an additional entry that maps this func to the empty string so queries
+    #   received without an endpoint name will call it
     if default:
         if "" in query_registry:
             raise TypeError("default query already defined")
-        key = ""
+        query_registry[""] = Endpoint("", func, key_schema, output_schema)
+
     query_registry[key] = Endpoint(key, func, key_schema, output_schema)
 
 
@@ -92,7 +96,10 @@ def query(f_py=None, default: bool = False, key_schema: Optional[dict] = None, o
     """
     Decorator function for query endpoints. Endpoint functions must have the
     following signature:
-      async fn <QUERY_NAME>(engine: hipcheck_sdk.engine.PluginEngine, key: <TYPE>) -> <TYPE>
+
+    .. code-block:: python
+
+        async fn <QUERY_NAME>(engine: hipcheck_sdk.engine.PluginEngine, key: <TYPE>) -> <TYPE>
 
     :param bool default: Whether this endpoint is the default for the plugin
     :param dict key_schema: A jsonable dict representing the schema for the key
