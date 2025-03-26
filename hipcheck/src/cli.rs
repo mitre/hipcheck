@@ -466,6 +466,7 @@ pub enum FullCommands {
 	CacheTarget(CacheTargetArgs),
 	CachePlugin(CachePluginArgs),
 	Plugin(PluginArgs),
+	TargetTriple,
 	PrintConfig,
 	PrintCache,
 	Scoring,
@@ -490,6 +491,7 @@ impl From<&Commands> for FullCommands {
 				}
 			},
 			Commands::Plugin(args) => FullCommands::Plugin(args.clone()),
+			Commands::TargetTriple => FullCommands::TargetTriple,
 		}
 	}
 }
@@ -511,6 +513,8 @@ pub enum Commands {
 	/// Manage Hipcheck repo or plugin cache
 	Cache(CacheArgs),
 	Plugin(PluginArgs),
+	/// Show the current and known architecture targets
+	TargetTriple,
 }
 
 // If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
