@@ -3,14 +3,10 @@
 use convert_case::Casing;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use tracing::field;
 use std::ops::Not;
 use std::sync::{LazyLock, Mutex};
 use syn::spanned::Spanned;
-use syn::{parse, parse_macro_input, Data, DeriveInput, Error, Ident, ItemFn, Meta, PatType};
-use hipcheck_common::proto::{
-	ConfigurationStatus, SetConfigurationResponse,
-};
+use syn::{parse_macro_input, Data, DeriveInput, Error, Ident, ItemFn, Meta, PatType};
 
 static QUERIES: LazyLock<Mutex<Vec<NamedQuerySpec>>> = LazyLock::new(|| Mutex::new(vec![]));
 
@@ -285,142 +281,6 @@ pub fn queries(_item: TokenStream) -> TokenStream {
 	proc_macro::TokenStream::from(out)
 }
 
-
-/// Errors specific to the execution of `Plugin::set_configuration()` to configure a Hipcheck
-/// plugin.
-#[derive(Debug)]
-enum ConfigError {
-	/// The config key was valid, but the associated value was invalid
-	InvalidConfigValue {
-		field_name: String,
-		value: String,
-		reason: String,
-	},
-
-	/// The config was missing an expected field
-	MissingRequiredConfig {
-		field_name: String,
-		field_type: String,
-		possible_values: Vec<String>,
-	},
-
-	/// The config included an unrecognized field
-	UnrecognizedConfig {
-		field_name: String,
-		field_value: String,
-		possible_confusables: Vec<String>,
-	},
-
-	/// An unspecified error
-	Unspecified { message: String },
-
-	/// The plugin encountered an error, probably due to incorrect assumptions.
-	InternalError { message: String },
-
-	/// A necessary plugin input file was not found.
-	FileNotFound { file_path: String },
-
-	/// The plugin's input data could not be parsed correctly.
-	ParseError {
-		// A short name or description of the data source.
-		source: String,
-		message: String,
-	},
-
-	/// An environment variable needed by the plugin was not set.
-	EnvVarNotSet {
-		/// Name of the environment variable
-		env_var_name: String,
-		/// Message describing what the environment variable should contain
-		purpose: String,
-	},
-
-	/// The plugin could not run a needed program.
-	MissingProgram { program_name: String },
-}
-
-impl From<ConfigError> for SetConfigurationResponse {
-	fn from(value: ConfigError) -> Self {
-		match value {
-			ConfigError::InvalidConfigValue {
-				field_name,
-				value,
-				reason,
-			} => SetConfigurationResponse {
-				status: ConfigurationStatus::InvalidConfigurationValue as i32,
-				message: format!("'{value}' for '{field_name}', reason: '{reason}'"),
-			},
-			ConfigError::MissingRequiredConfig {
-				field_name,
-				field_type,
-				possible_values,
-			} => SetConfigurationResponse {
-				status: ConfigurationStatus::MissingRequiredConfiguration as i32,
-				message: {
-					let mut message = format!(
-						"'{field_name}' of type '{field_type}'"
-					);
-
-					if possible_values.is_empty().not() {
-						message.push_str("; possible values: ");
-						message.push_str(&possible_values.join(", "));
-					}
-
-					message
-				},
-			},
-			ConfigError::UnrecognizedConfig {
-				field_name,
-				field_value,
-				possible_confusables,
-			} => SetConfigurationResponse {
-				status: ConfigurationStatus::UnrecognizedConfiguration as i32,
-				message: {
-					let mut message =
-						format!("'{field_name}' with value '{field_value}'");
-
-					if possible_confusables.is_empty().not() {
-						message.push_str("; possible field names: ");
-						message.push_str(&possible_confusables.join(", "));
-					}
-
-					message
-				},
-			},
-			ConfigError::Unspecified { message } => SetConfigurationResponse {
-				status: ConfigurationStatus::Unspecified as i32,
-				message,
-			},
-			ConfigError::InternalError { message } => SetConfigurationResponse {
-				status: ConfigurationStatus::InternalError as i32,
-				message: format!("the plugin encountered an error, probably due to incorrect assumptions: {message}"),
-			},
-			ConfigError::FileNotFound { file_path } => SetConfigurationResponse {
-				status: ConfigurationStatus::FileNotFound as i32,
-				message: file_path,
-			},
-			ConfigError::ParseError {
-				source,
-				message,
-			} => SetConfigurationResponse {
-				status: ConfigurationStatus::ParseError as i32,
-				message: format!("{source} could not be parsed correctly: {message}"),
-			},
-			ConfigError::EnvVarNotSet {
-				env_var_name,
-				purpose,
-			} => SetConfigurationResponse {
-				status: ConfigurationStatus::EnvVarNotSet as i32,
-				message: format!("\"{env_var_name}\". Purpose: {purpose}"),
-			},
-			ConfigError::MissingProgram { program_name } => SetConfigurationResponse {
-				status: ConfigurationStatus::MissingProgram as i32,
-				message: program_name,
-			},
-		}
-	}
-}
-
 #[proc_macro_derive(PluginConfig)]
 pub fn derive_plugin_config(input: TokenStream) -> TokenStream {
     // Parse the input struct
@@ -434,7 +294,6 @@ pub fn derive_plugin_config(input: TokenStream) -> TokenStream {
             // Generate code to deserialize each field and handle errors
             let field_deserialization: Vec<_> = fields.iter().map(|field| {
                 let field_name = field.ident.as_ref().unwrap(); // Get the field name
-				// let field_name_str = field_name.to_string();
 				let field_name_str = field_name.to_string().replace("_", "-");
 
 				quote::quote! {
@@ -449,7 +308,7 @@ pub fn derive_plugin_config(input: TokenStream) -> TokenStream {
 								ConfigError::InvalidConfigValue {
 									field_name: #field_name_str.to_owned(),
 									value: format!("{:?}", value),
-									reason: e.to_string(),
+									reason: format!("{:?}", e),
 								}
 							})
 						})?;
