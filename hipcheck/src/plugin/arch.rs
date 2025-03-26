@@ -4,8 +4,9 @@ use crate::error::Result;
 use crate::hc_error;
 use clap::ValueEnum;
 use std::{fmt::Display, result::Result as StdResult, str::FromStr, sync::OnceLock};
+use strum_macros::{EnumIter, VariantNames};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, ValueEnum)]
+#[derive(Clone, Copy, Debug, EnumIter, VariantNames, PartialEq, Eq, Hash, ValueEnum)]
 /// Officially supported target triples, as of RFD #0004
 ///
 /// NOTE: these architectures correspond to the offically supported Rust platforms
@@ -107,6 +108,18 @@ impl Display for KnownArch {
 			KnownArch::X86_64UnknownLinuxGnu => "x86_64-unknown-linux-gnu",
 		};
 		write!(f, "{}", target_triple)
+	}
+}
+
+impl KnownArch {
+	pub fn pretty_print(&self) -> &'static str {
+		match self {
+			KnownArch::Aarch64AppleDarwin => "Apple Silicon (ARM64), macOS",
+			KnownArch::X86_64AppleDarwin => "Intel x86_64, macOS",
+			KnownArch::X86_64PcWindowsMsvc => "Intel x86_64, Windows (MSVC)",
+			KnownArch::X86_64UnknownLinuxGnu => "Intel x86_64, Linux (GNU)",
+			KnownArch::Aarch64UnknownLinuxGnu => "ARM64, Linux",
+		}
 	}
 }
 

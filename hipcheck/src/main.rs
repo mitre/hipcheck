@@ -29,7 +29,9 @@ use crate::{
 	engine::HcEngine,
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
-	plugin::{try_set_arch, Plugin, PluginVersion, PluginWithConfig},
+	plugin::{
+		get_current_arch, try_set_arch, Arch, KnownArch, Plugin, PluginVersion, PluginWithConfig,
+	},
 	policy::{config_to_policy, PolicyFile},
 	report::report_builder::Report,
 	session::ReadySession,
@@ -58,6 +60,7 @@ use std::{
 	result::Result as StdResult,
 	time::Duration,
 };
+use strum::IntoEnumIterator;
 use target::{TargetSeed, ToTargetSeed};
 use tokio::runtime::Runtime;
 use tokio_stream::StreamExt;
@@ -108,7 +111,7 @@ fn main() -> ExitCode {
 					ExitCode::FAILURE
 				});
 		}
-
+		Some(FullCommands::ExplainTargetTriple) => return cmd_explain_target_triple(),
 		None => Shell::print_error(&hc_error!("missing subcommand"), Format::Human),
 	};
 
@@ -701,6 +704,37 @@ fn updater_command(command_name: &str, args: &UpdateArgs) -> Command {
 	}
 
 	command
+}
+
+fn cmd_explain_target_triple() -> ExitCode {
+	let current_arch = get_current_arch();
+
+	match &current_arch {
+		Arch::Known(arch) => {
+			println!("Current target triple architecture (Known):");
+			println!("  > {}", arch.pretty_print());
+		}
+		Arch::Unknown(arch_str) => {
+			println!("Current target triple architecture (Unknown):");
+			println!("  > {}", arch_str);
+		}
+	}
+
+	println!("\nOther supported architectures:");
+	for arch in KnownArch::iter().map(Arch::Known) {
+		match (&current_arch, &arch) {
+			(Arch::Known(current_known_arch), Arch::Known(arch_to_print))
+				if current_known_arch == arch_to_print =>
+			{
+				continue
+			}
+			(Arch::Known(_), _) | (Arch::Unknown(_), _) => match arch {
+				Arch::Known(known_arch) => println!("  - {}", known_arch.pretty_print()),
+				_ => unreachable!(),
+			},
+		}
+	}
+	ExitCode::SUCCESS
 }
 
 fn cmd_cache_target(args: CacheTargetArgs, config: &CliConfig) -> ExitCode {
