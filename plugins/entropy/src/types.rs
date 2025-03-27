@@ -26,7 +26,7 @@ pub struct Diff {
 	pub file_diffs: Vec<FileDiff>,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, JsonSchema, Deserialize)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, JsonSchema, Deserialize)]
 pub struct CommitDiff {
 	pub commit: Commit,
 	pub diff: Diff,

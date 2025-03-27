@@ -32,7 +32,7 @@ enum DrainedString {
 /// walk backwards to the end of the previous char. Returns the substring
 /// drained from `buf`.
 fn drain_at_most_n_bytes(mut buf: String, max: usize) -> DrainedString {
-	let mut to_drain = std::cmp::min(buf.bytes().len(), max);
+	let mut to_drain = std::cmp::min(buf.len(), max);
 	if buf.len() <= to_drain {
 		return DrainedString::CompleteString(buf);
 	}
