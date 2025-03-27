@@ -141,24 +141,35 @@ async fn commit_entropies(
 #[query(default)]
 async fn entropy(engine: &mut PluginEngine, value: Target) -> Result<Vec<f64>> {
 	tracing::info!("running entropy query");
+	let policy_config = POLICY_CONFIG.get().cloned().flatten();
 	let local = value.local;
 	let val_commits = engine.query("mitre/git/commit_diffs", local).await?;
 	let commits: Vec<CommitDiff> =
 		serde_json::from_value(val_commits).map_err(Error::InvalidJsonInQueryOutput)?;
-	let commit_entropies = commit_entropies(engine, commits)
+	let commit_entropies: Vec<f64> = commit_entropies(engine, commits)
 		.await?
 		.iter()
-		.map(|o| o.entropy)
+		.map(|o| {
+			if policy_config
+				.as_ref()
+				.is_some_and(|policy_config| policy_config.entropy_threshold < o.entropy)
+			{
+				engine.record_concern(format!(
+					"Commit hash: {}, Entropy: {}",
+					o.commit.hash, o.entropy
+				));
+			}
+			o.entropy
+		})
 		.collect();
-
 	tracing::info!("completed entropy query");
 	Ok(commit_entropies)
 }
 
 #[derive(Clone, Debug, Default)]
-struct EntropyPlugin {
-	policy_conf: OnceLock<Option<PolicyExprConf>>,
-}
+struct EntropyPlugin {}
+// Define a global OnceLock variable to store the policy_config so it can be accessed by entropy
+static POLICY_CONFIG: OnceLock<Option<PolicyExprConf>> = OnceLock::new();
 
 impl Plugin for EntropyPlugin {
 	const PUBLISHER: &'static str = "mitre";
@@ -173,15 +184,14 @@ impl Plugin for EntropyPlugin {
 			.try_into()?;
 
 		// Store the PolicyExprConf to be accessed only in the `default_policy_expr()` impl
-		self.policy_conf
+		POLICY_CONFIG
 			.set(conf.opt_policy)
 			.map_err(|_| ConfigError::InternalError {
 				message: "plugin was already configured".to_string(),
 			})
 	}
-
 	fn default_policy_expr(&self) -> Result<String> {
-		match self.policy_conf.get() {
+		match POLICY_CONFIG.get() {
 			None => Err(Error::UnspecifiedQueryState),
 			Some(policy_conf) => {
 				let entropy_threshold = policy_conf
