@@ -6,7 +6,8 @@ extra:
   rfd: 13
   primary_author: Julian Lanson
   primary_author_link: https://github.com/j-lanson
-  status: Proposed
+  status: Accepted
+  pr: 1032
 ---
 
 # Plugin Configuration Hashing
