@@ -256,6 +256,7 @@ pub trait Plugin: Send + Sync + 'static {
 pub fn init_tracing_logger(log_level: LogLevel) {
 	tracing_subscriber::fmt()
 		.json()
+		.with_writer(std::io::stderr)
 		.with_env_filter(log_level.to_string())
 		.init();
 }
