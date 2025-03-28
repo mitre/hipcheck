@@ -198,7 +198,18 @@ impl<'sess> ReportBuilder<'sess> {
 				};
 				if self.investigate_if_failed.contains(&policy_plugin_name) {
 					rec.kind = RecommendationKind::Investigate;
-					break;
+					// If no investigate reason, add one
+					match &mut rec.reason {
+						Some(InvestigateReason::Policy) => (),
+						None => {
+							rec.reason = Some(InvestigateReason::FailedAnalyses(vec![
+								policy_plugin_name.into(),
+							]))
+						}
+						Some(InvestigateReason::FailedAnalyses(x)) => {
+							x.push(policy_plugin_name.into())
+						}
+					}
 				}
 			}
 

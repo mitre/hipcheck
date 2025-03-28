@@ -79,7 +79,8 @@ const TEMPLATE: &str = r#"
 {% if recommendation.kind == "Pass" -%}
 {{ title("Pass") }} risk rated as {{ recommendation.risk_score }}, policy was {{ recommendation.risk_policy }}
 {% elif recommendation.kind == "Investigate" -%}
-{{ title("Investigate") }} risk rated as {{ recommendation.risk_score }}, policy was {{ recommendation.risk_policy }}
+{{ title("Investigate") }} {% if recommendation.reason is string and recommendation.reason == "Policy" -%} recommendation.risk rated as {{ recommendation.risk_score }}, policy was {{ recommendation.risk_policy }} {%- elif recommendation.reason.FailedAnalyses is sequence -%} the following investigate-if-fail plugins failed: {% for f in recommendation.reason.FailedAnalyses %}{{f}} {% endfor %}
+{%- endif %}
 {%- endif %}"#;
 
 /// Type interface to the global shell used to produce output in the user's terminal.

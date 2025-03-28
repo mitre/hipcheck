@@ -592,9 +592,21 @@ impl PolicyPluginName {
 	}
 }
 
+impl From<PolicyPluginName> for String {
+	fn from(value: PolicyPluginName) -> Self {
+		format!("{}/{}", value.publisher.0, value.name.0)
+	}
+}
+
+impl From<&PolicyPluginName> for String {
+	fn from(value: &PolicyPluginName) -> Self {
+		value.clone().into()
+	}
+}
+
 impl Display for PolicyPluginName {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}/{}", self.publisher.0, self.name.0)
+		write!(f, "{}", String::from(self))
 	}
 }
 
