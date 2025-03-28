@@ -9,12 +9,17 @@ use crate::{
 	policy::policy_file::PolicyPluginName,
 	score::*,
 	session::Session,
+	target::Target,
 	version::hc_version,
 };
 use std::{collections::HashSet, default::Default};
 
 /// Print the final report of a Hipcheck run.
-pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Report> {
+pub fn build_report(
+	session: &Session,
+	target: &Target,
+	scoring: &ScoringResults,
+) -> Result<Report> {
 	#[cfg(feature = "print-timings")]
 	let _0 = crate::benchmarking::print_scope_time!("build_report");
 
@@ -25,7 +30,7 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	// 1. Build a report from the information available.
 	// 2. Print that report.
 
-	let mut builder = ReportBuilder::for_session(session);
+	let mut builder = ReportBuilder::for_session(session, target);
 
 	for (analysis, stored) in scoring.results.plugin_results() {
 		let name = format!(
@@ -78,6 +83,9 @@ pub struct ReportBuilder<'sess> {
 	/// The `Session`, containing general data from the run.
 	session: &'sess Session,
 
+	/// The target analyzed by Hipcheck
+	target: &'sess Target,
+
 	/// A lookup of which failed analyses warrant an immediate investigation
 	investigate_if_failed: HashSet<PolicyPluginName>,
 
@@ -99,7 +107,7 @@ pub struct ReportBuilder<'sess> {
 
 impl<'sess> ReportBuilder<'sess> {
 	/// Initiate building a new `Report`.
-	pub fn for_session(session: &'sess Session) -> ReportBuilder<'sess> {
+	pub fn for_session(session: &'sess Session, target: &'sess Target) -> ReportBuilder<'sess> {
 		// Get investigate_if_failed hashset from policy
 		let policy_file = session.policy_file();
 		let investigate_if_failed = policy_file
@@ -110,6 +118,7 @@ impl<'sess> ReportBuilder<'sess> {
 
 		ReportBuilder {
 			session,
+			target,
 			investigate_if_failed,
 			passing: Default::default(),
 			failing: Default::default(),
@@ -167,9 +176,9 @@ impl<'sess> ReportBuilder<'sess> {
 	/// The `recommendation_kind` and `risk_score` _must_ be set before calling `build`,
 	/// or building will fail.
 	pub fn build(self) -> Result<Report> {
-		let repo_name = self.session.name();
-		let repo_owner = self.session.owner();
-		let repo_head = self.session.head();
+		let repo_name = self.target.name();
+		let repo_owner = self.target.owner();
+		let repo_head = self.target.head();
 		let hipcheck_version = hc_version();
 		let analyzed_at = Timestamp(self.session.started_at());
 		let passing = self.passing;
