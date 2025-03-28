@@ -48,16 +48,8 @@ config files that are referenced by the policy file ought also to invalidate a
 cached repo. For example, a policy file using the `mitre/binary` plugin might
 configure that plugin to use `Binary.kdl`. If the user changes the content of
 `Binary.kdl`, the analysis configuration is technically different, but the
-policy file path and hash have not changed. We do not currently have a strategy
-to address this because the policy file by design does not have contextual
-understanding of the configuration key/value pairs sent to each plugin. We
-therefore cannot know which config keys represent files that need to be checked
-as part of the policy keying process.
-
-Thus, it will be important for us to document clearly to users this limitation,
-and provide them with CLI tools for invalidating cache entries based on
-particular elements of the key tuple `(policy file path, policy file hash, hc
-binary hash, repository, commit/tag)`.
+policy file path and hash have not changed. We have addressed overcoming this
+limitation in a subsequent [RFD][rfd-13].
 
 ## Inserting Report Caching into the Analysis Workflow
 
@@ -99,8 +91,29 @@ to store a table containing all the key elements plus the filename of the
 report. We would likely store all the reports directly in `report/` as
 compressed files, plus the one database file. We also propose a simple unique ID
 column for the table so that entries can be referenced without specifying every
-key element. This unique ID would be auto-generated and assigned by the SQLite
-database as each entry is created.
+key element. We discuss the generation strategy and format of the unique ID
+below.
+
+### Report Cache Entry Unique ID
+
+Since the multi-key that is used to cache elements is burdensome to specify when
+manipulating entries, we propose to add a unique ID scheme to simplify referring
+to reports.
+
+To generate this hash, we will do the following (all hash operations performed
+using SHA256):
+
+1. Generate the combined hash of the policy file and plugins, as described in
+   [RFD13][rfd-13].
+2. Generate the Hipcheck binary hash.
+3. Hash the concatenation of the repository name and specific commit ID being
+   analyzed.
+4. Concatenate the hashes of 1-3 in a consistent order and hash the result,
+   which will be the unique ID.
+
+As a hash shortcode, we can allow `<REPO_NAME>-<SHORT_HASH>`, where
+`<SHORT_HASH>` is the shortest hash prefix necessary to distinguish the report
+from other reports on the same repository.
 
 ### Report Cache Synchronization
 
@@ -219,32 +232,31 @@ We propose Hipcheck to act as a GitHub CI action that fails if any provided
 targets need investigation. This means that, provided subsequent workflow steps
 aren't explicitly configured to run in spite of a previous failed step, the
 entire job will also fail. The failure message will report to users what
-dependencies/targets need investigation, and each dependency's unique ID.
+dependencies/targets need investigation, and each dependency's unique ID. As a
+side note: if users are not interested in this more strict workflow, they can
+mark the check action as `continue-on-error` so that an "investigate"
+determination on any number of dependencies does not cause the whole job to
+fail.
 
-Once the user decides the dependency is acceptable, they will use a separate
-manual CI action to manipulate the cache. This Hipcheck review action will take
-as input a comma-separated list of dependencies as a string. The review action
-will then split the dependency list into separate calls to `hc cache report
-reviewed --id <ID>` to mark the specific dependencies as reviewed.
+Once the user decides the dependency is acceptable, they will update a file they
+keep in their repository called `reviewed.txt`, which will be a newline-
+separated list of unique IDs or report shortcodes. This list will be read in by
+Hipcheck at runtime during an `hc check` and will be referenced when reports are
+emitted to determine whether to return a failure status code when Hipcheck
+encounters a report in need of investigation.
 
-The key element to make this approach work is that the main check workflow and
-the manual review workflow need to pull from the same `HC_CACHE` so that the
-unique IDs match and "reviewed" markings in the report database from the manual
-review workflow are reflected in the next `hc check` run. According to the
-GitHub [actions documentation][workspace-docs], it appears that the path
-specified by the `GITHUB_WORKSPACE` environment variable is consistent between
-runs, in which case we can point all Hipcheck actions to the same location in
-this directory with the `HC_CACHE` variable.
-
-If this strategy does not work, we propose both actions to use the
-`actions/cache@v3` [action][cache-action] with a common key that saves and loads
-the contents of the designated cache directory, and ensures that `HC_CACHE` is
-set to that cache when `hc` is run in both actions.
-
-If users are not interested in this more strict workflow, they can mark the
-check action as `continue-on-error` so that an "investigate" determination on
-any number of dependencies does not cause the whole job to fail.
+This addresses how to let Hipcheck pass CI, but not necessarily how to actually
+cache report generation in a GitLab runner. For this, we propose to use the
+`actions/cache` GitHub action to cache the `HC_CACHE` directory between runs.
+Keys in the cache crated by this action are deleted after 7 days without use; so as a workaround to
+allow people who don't run Hipcheck consistently in that timeframe, we could
+offer a hack GitHub action that simply loads the key. Users can set up this hack
+action as a cron job to ensure it gets set consistently. This strategy has the
+limitation that when two Hipcheck actions run simultaenously, the second
+instance to complete will trample the writes to the report cache directory and
+SQL file that was made by the first.
 
 [sqlite-blobs]: https://www.sqlite.org/intern-v-extern-blob.html
 [workspace-docs]: https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables#default-environment-variables
 [cache-action]: https://github.com/marketplace/actions/cache
+[rfd-13]: @docs/rfds/0013-plugin-config-hash.md
