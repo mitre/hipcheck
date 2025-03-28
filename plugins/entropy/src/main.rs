@@ -145,19 +145,51 @@ async fn entropy(engine: &mut PluginEngine, value: Target) -> Result<Vec<f64>> {
 	let val_commits = engine.query("mitre/git/commit_diffs", local).await?;
 	let commits: Vec<CommitDiff> =
 		serde_json::from_value(val_commits).map_err(Error::InvalidJsonInQueryOutput)?;
-	let commit_entropies = commit_entropies(engine, commits)
+	// clone the commits list to access the commit information since the list will be moved into commit_entropies
+	// Currently we only need hashes but if other information is needed, it is more efficient to have a copy that can be used in the future
+	let commits_clone = commits.clone();
+	let commit_entropies: Vec<f64> = commit_entropies(engine, commits)
 		.await?
 		.iter()
 		.map(|o| o.entropy)
 		.collect();
-
+	// extract the hashes from the commits
+	let commit_hash_ids: Vec<String> = commits_clone.into_iter().map(|c| c.commit.hash).collect();
+	// creates a tuple with the commit hashes and entropies to be passed into the helper function
+	let commits_with_entropies: Vec<(&String, f64)> = commit_hash_ids
+		.iter()
+		.zip(commit_entropies.iter().copied()) // Automatically dereferences &f64 to f64
+		.collect();
+	report_concerns(engine, commits_with_entropies);
 	tracing::info!("completed entropy query");
 	Ok(commit_entropies)
 }
-
+// Helper function to report concerns
+fn report_concerns(engine: &mut PluginEngine, commit_hashes_with_entropies: Vec<(&String, f64)>) {
+	// Get the entropy threshold from the global policy config file
+	let policy_config = EntropyPlugin::global_policy_conf().get().cloned().flatten();
+	let entropy_threshold = match policy_config {
+		None => -100.00,
+		Some(a) => a.entropy_threshold,
+	};
+	// Add hashes to concerns
+	for element in commit_hashes_with_entropies {
+		if element.1 > entropy_threshold {
+			let concern: String = format!("Commit hash: {}", element.0);
+			engine.record_concern(concern);
+		}
+	}
+}
 #[derive(Clone, Debug, Default)]
 struct EntropyPlugin {
 	policy_conf: OnceLock<Option<PolicyExprConf>>,
+}
+impl EntropyPlugin {
+	// Static method to access policy_conf globally
+	fn global_policy_conf() -> &'static OnceLock<Option<PolicyExprConf>> {
+		static GLOBAL_POLICY_CONF: OnceLock<Option<PolicyExprConf>> = OnceLock::new();
+		&GLOBAL_POLICY_CONF
+	}
 }
 
 impl Plugin for EntropyPlugin {
@@ -179,7 +211,6 @@ impl Plugin for EntropyPlugin {
 				message: "plugin was already configured".to_string(),
 			})
 	}
-
 	fn default_policy_expr(&self) -> Result<String> {
 		match self.policy_conf.get() {
 			None => Err(Error::UnspecifiedQueryState),
