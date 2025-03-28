@@ -243,9 +243,9 @@ class PluginServer(gen.PluginServiceServicer):
         """
         # set output format
         log_format = (
-            "{'target': '"
+            "{\"target\": \""
             + self.plugin.name
-            + "', 'level': '%(levelname)s', 'fields': { 'message': '%(message)s' } }"
+            + "\", \"level\": \"%(levelname)s\", \"fields\": { \"message\": \"%(message)s\" } }"
         )
         logging.basicConfig(format=log_format, level=logging.ERROR)
 
