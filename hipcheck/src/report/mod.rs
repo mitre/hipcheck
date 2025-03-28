@@ -315,6 +315,7 @@ pub struct Percent {
 #[schemars(crate = "schemars")]
 pub struct Recommendation {
 	pub kind: RecommendationKind,
+	pub reason: Option<InvestigateReason>,
 	risk_score: RiskScore,
 	risk_policy: RiskPolicy,
 }
@@ -323,9 +324,14 @@ impl Recommendation {
 	/// Make a recommendation.
 	pub fn is(risk_score: RiskScore, risk_policy: RiskPolicy) -> Result<Recommendation> {
 		let kind = RecommendationKind::is(risk_score, risk_policy.clone())?;
+		let reason = match kind {
+			RecommendationKind::Pass => None,
+			RecommendationKind::Investigate => Some(InvestigateReason::Policy),
+		};
 
 		Ok(Recommendation {
 			kind,
+			reason,
 			risk_score,
 			risk_policy,
 		})
@@ -338,6 +344,14 @@ impl Recommendation {
 pub enum RecommendationKind {
 	Pass,
 	Investigate,
+}
+
+/// Describe why the the recommendation is to investigate
+#[derive(Debug, Serialize, JsonSchema, Clone)]
+#[schemars(crate = "schemars")]
+pub enum InvestigateReason {
+	Policy,
+	FailedAnalyses(Vec<String>),
 }
 
 impl RecommendationKind {
