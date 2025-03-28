@@ -59,14 +59,12 @@ jobs:
 
       # Install Python
       - name: Set up Python 3.10
-        if: steps.filter.outputs.site == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
       # Build the Python SDK docs from doc comments
       - name: Build And Copy Python SDK Docs
-        if: steps.filter.outputs.site == 'true'
         run: |
           pip install uv
           mkdir site/static/sdk
