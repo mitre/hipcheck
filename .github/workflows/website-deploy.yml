@@ -57,6 +57,23 @@ jobs:
         with:
           deno-version: v2.x
 
+      # Install Python
+      - name: Set up Python 3.10
+        if: steps.filter.outputs.site == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # Build the Python SDK docs from doc comments
+      - name: Build And Copy Python SDK Docs
+        if: steps.filter.outputs.site == 'true'
+        run: |
+          pip install uv
+          mkdir site/static/sdk
+          cd sdk/python/docs
+          uv run make html
+          cp -r ./build/html ../../../site/static/sdk/python
+
       # Setup GitHub Pages
       #
       # Specifically, this sets some variables we can use in later steps that
