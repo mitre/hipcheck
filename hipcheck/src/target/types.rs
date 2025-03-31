@@ -26,6 +26,35 @@ pub struct Target {
 	pub package: Option<Package>,
 }
 
+impl Target {
+	/// git ref of the HEAD commit being analyzed
+	pub fn head(&self) -> String {
+		self.local.git_ref.clone()
+	}
+
+	/// gets the owner if there is a known Github remote repository
+	pub fn owner(&self) -> Option<String> {
+		// Gets the owner if there is a known GitHub remote repository
+		let KnownRemote::GitHub { owner, repo: _ } =
+			&self.remote.as_ref()?.known_remote.as_ref()?;
+		Some(owner.clone())
+	}
+
+	/// name of the repository being analyzed
+	pub fn name(&self) -> String {
+		// In the future may want to augment Target/LocalGitRepo with a
+		// "name" field. For now, treat the dir name of the repo as the name
+		self.local
+			.path
+			.as_path()
+			.file_name()
+			.unwrap()
+			.to_str()
+			.unwrap()
+			.to_owned()
+	}
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct VcsUrl {
 	pub remote: RemoteGitRepo,
@@ -160,6 +189,16 @@ pub enum TargetSeedKind {
 pub enum TargetSeed {
 	Single(SingleTargetSeed),
 	Multi(MultiTargetSeed),
+}
+
+impl TargetSeed {
+	/// Return whether the target seed is for multiple targets or not
+	pub fn is_multi_target(&self) -> bool {
+		match self {
+			Self::Single(_) => false,
+			Self::Multi(_) => true,
+		}
+	}
 }
 
 impl Display for SingleTargetSeedKind {

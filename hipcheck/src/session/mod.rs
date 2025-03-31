@@ -9,10 +9,10 @@ use crate::{
 	exec::ExecConfig,
 	hc_error,
 	policy::{config_to_policy, PolicyFile},
+	report::{report_builder::build_report, Report},
+	score::score_results,
 	shell::{spinner_phase::SpinnerPhase, Shell},
-	target::{
-		resolve::TargetResolverConfig, KnownRemote, SingleTargetSeedKind, Target, TargetSeed,
-	},
+	target::{resolve::TargetResolverConfig, SingleTargetSeedKind, Target, TargetSeed},
 };
 use chrono::prelude::*;
 use std::{
@@ -28,7 +28,6 @@ struct SessionBuilder {
 	cache_dir: Option<PathBuf>,
 	policy_file_path: Option<PathBuf>,
 	policy_file: Option<PolicyFile>,
-	target: Option<Target>,
 	exec_config: Option<ExecConfig>,
 	core: Option<Arc<HcPluginCore>>,
 	format: Format,
@@ -42,7 +41,6 @@ impl SessionBuilder {
 			cache_dir: None,
 			policy_file_path: None,
 			policy_file: None,
-			target: None,
 			exec_config: None,
 			core: None,
 			format,
@@ -60,10 +58,6 @@ impl SessionBuilder {
 		self
 	}
 
-	fn get_cache_dir(&self) -> Option<&PathBuf> {
-		self.cache_dir.as_ref()
-	}
-
 	fn set_policy(&mut self, policy_file: PolicyFile) -> &mut Self {
 		self.policy_file = Some(policy_file);
 		self
@@ -75,11 +69,6 @@ impl SessionBuilder {
 
 	fn set_policy_path(&mut self, policy_path: Option<PathBuf>) -> &mut Self {
 		self.policy_file_path = policy_path;
-		self
-	}
-
-	fn set_target(&mut self, target: Target) -> &mut Self {
-		self.target = Some(target);
 		self
 	}
 
@@ -98,9 +87,9 @@ impl SessionBuilder {
 	}
 
 	fn build(self) -> Result<Session> {
-		let target = match self.target {
-			Some(target) => target,
-			None => return Err(hc_error!("Missing Target")),
+		let home = match self.cache_dir {
+			Some(h) => h,
+			None => return Err(hc_error!("Missing CacheDir")),
 		};
 
 		let exec_config = match self.exec_config {
@@ -108,7 +97,7 @@ impl SessionBuilder {
 			None => return Err(hc_error!("Missing ExecConfig")),
 		};
 
-		let policy_file = match self.policy_file {
+		let policy_file: PolicyFile = match self.policy_file {
 			Some(policy_file) => policy_file,
 			None => return Err(hc_error!("Missing PolicyFile")),
 		};
@@ -120,7 +109,7 @@ impl SessionBuilder {
 
 		let session = Session {
 			storage: Default::default(),
-			target,
+			home,
 			policy_file,
 			exec_config,
 			started_at: self.started_at,
@@ -131,10 +120,6 @@ impl SessionBuilder {
 	}
 
 	fn build_ready(self) -> Result<ReadySession> {
-		if self.target.is_some() {
-			return Err(hc_error!("Target should not be set for ReadySession"));
-		};
-
 		let exec_config = match self.exec_config {
 			Some(c) => c,
 			None => return Err(hc_error!("Missing ExecConfig")),
@@ -149,7 +134,6 @@ impl SessionBuilder {
 			policy_file,
 			exec_config,
 			started_at: self.started_at,
-			format: self.format,
 		};
 
 		Ok(session)
@@ -162,10 +146,10 @@ impl SessionBuilder {
 pub struct Session {
 	/// Query storage (used by salsa)
 	storage: salsa::Storage<Self>,
-	/// target of the analysis
-	target: Target,
 	/// format to display results in to end-user
 	format: Format,
+	/// Hipcheck home directory
+	home: PathBuf,
 	/// policy file used to configure session
 	policy_file: PolicyFile,
 	/// configuration for plugins
@@ -196,7 +180,6 @@ impl fmt::Debug for Session {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("Session")
 			.field("storage", &"salsa::Storage<Session>")
-			.field("target", &self.target)
 			.field("format", &self.format)
 			.field("policy_file", &self.policy_file)
 			.field("exec_config", &self.exec_config)
@@ -210,71 +193,22 @@ impl Session {
 	/// Construct a new `Session` which owns all the data needed in later phases.
 	#[allow(clippy::too_many_arguments)]
 	pub fn new(
-		target: &TargetSeed,
 		config_mode: ConfigMode,
 		home_dir: Option<PathBuf>,
 		exec_path: Option<PathBuf>,
 		format: Format,
 	) -> StdResult<Session, Error> {
-		/*===================================================================
-		 * Printing the prelude.
-		 *-----------------------------------------------------------------*/
-
-		Shell::print_prelude(target.to_string());
-
-		let mut session_builder = setup_base_session(config_mode, home_dir, exec_path, format)?;
-
-		/*===================================================================
-		 *  Resolving the source.
-		 *-----------------------------------------------------------------*/
-
-		let home = session_builder.get_cache_dir().ok_or_else(|| {
-			hc_error!("Internal error: SessionBuilder doesn't have cache_dir set")
-		})?;
-
-		let target = load_target(target, home)?;
-		session_builder.set_target(target);
+		let session_builder = setup_base_session(config_mode, home_dir, exec_path, format)?;
 
 		session_builder.build()
 	}
 
-	/// target of this analysis
-	pub fn target(&self) -> Target {
-		self.target.clone()
+	pub fn home(&self) -> &Path {
+		&self.home
 	}
 
 	pub fn policy_file(&self) -> &PolicyFile {
 		&self.policy_file
-	}
-
-	/// git ref of the HEAD commit being analyzed
-	pub fn head(&self) -> Arc<String> {
-		Arc::new(self.target.local.git_ref.clone())
-	}
-
-	/// gets the owner if there is a known Github remote repository
-	pub fn owner(&self) -> Option<Arc<String>> {
-		// Gets the owner if there is a known GitHub remote repository
-		let KnownRemote::GitHub { owner, repo: _ } =
-			&self.target.remote.as_ref()?.known_remote.as_ref()?;
-		Some(Arc::new(owner.clone()))
-	}
-
-	/// name of the repository being analyzed
-	pub fn name(&self) -> Arc<String> {
-		// In the future may want to augment Target/LocalGitRepo with a
-		// "name" field. For now, treat the dir name of the repo as the name
-		Arc::new(
-			self.target
-				.local
-				.path
-				.as_path()
-				.file_name()
-				.unwrap()
-				.to_str()
-				.unwrap()
-				.to_owned(),
-		)
 	}
 
 	/// When the Session started
@@ -286,14 +220,31 @@ impl Session {
 	pub fn format(&self) -> Format {
 		self.format
 	}
+
+	pub fn run(&mut self, phase: &SpinnerPhase, target: &Target, clear_db: bool) -> Result<Report> {
+		// Clear the Salsa db and reset the start time if told to do so
+		if clear_db {
+			self.storage = Default::default();
+			self.started_at = chrono::Local::now();
+		}
+
+		// Score the target
+		let scoring = score_results(phase, self, target)?;
+
+		phase.finish_successful();
+
+		// Build the final report.
+		let report =
+			build_report(self, target, &scoring).context("failed to build final report")?;
+
+		Ok(report)
+	}
 }
 
 /// A subset of Session that's used for the `hc ready` command.
 /// It doesn't include a target or support for queries.
 #[allow(unused)]
 pub struct ReadySession {
-	/// format to display results in to end-user
-	format: Format,
 	/// policy file used to configure session
 	policy_file: PolicyFile,
 	/// configuration for plugins
@@ -504,7 +455,7 @@ fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
 	Ok(exec_config)
 }
 
-fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
+pub fn load_target(seed: &TargetSeed, home: &Path) -> Result<Vec<Target>> {
 	// Resolve the source specifier into an actual source.
 	match seed {
 		TargetSeed::Single(single_target_seed) => {
@@ -525,17 +476,15 @@ fn load_target(seed: &TargetSeed, home: &Path) -> Result<Target> {
 				cache: PathBuf::from(home),
 			};
 
-			let mut targets = seed.get_targets(config)?.collect::<Vec<Target>>();
+			let targets = seed.get_targets(config)?.collect::<Vec<Target>>();
 			if targets.len() != 1 {
 				log::error!("load_target produced {} targets, expected 1", targets.len());
 				return Err(hc_error!(
 					"TargetSeed::Single did not produce exactly one target"
 				));
 			}
-			// SAFETY: if this is reached it is known that the length of target is exactly 1
-			let target = targets.pop().unwrap();
 			phase.finish_successful();
-			Ok(target)
+			Ok(targets)
 		}
 		TargetSeed::Multi(_multi_target_seed) => todo!(),
 	}

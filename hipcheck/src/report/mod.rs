@@ -37,7 +37,7 @@ pub struct Report {
 	pub repo_name: Arc<String>,
 
 	/// Optional owner/maintainer of the repo
-	pub repo_owner: Option<Arc<String>>,
+	pub repo_owner: Arc<Option<String>>,
 
 	/// The HEAD commit hash of the repository during analysis.
 	pub repo_head: Arc<String>,
