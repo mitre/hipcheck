@@ -244,4 +244,74 @@ Plugin` struct to `PluginServer::register()`, then call `listen(<PORT>).await`
 on the returned `PluginServer` instance. This function will not return until
 the gRPC channel with Hipcheck core is closed.
 
+### Testing Plugin Endpoints
+
+While working on your plugin implementation, it may be useful to unit-test
+your query endpoint logic instead of having to test it indirectly through
+an `hc check` analysis run. For this purpose, the Rust SDK offers a way to
+"mock" responses from calls to the `PluginEngine.query()` function that your
+query endpoint may make throughout its execution.
+
+When in a `#cfg[test]` context or the Rust SDK `mock_engine` feature is enabled,
+the `PluginEngine::mock(mock_responses: MockResponses) -> PluginEngine`
+constructor becomes available. This constructor takes a `MockResponses` object
+that acts as a dictionary of query targets to response values. `MockResponses`
+is type-defined as follows:
+
+```rust
+pub struct MockResponses(pub(crate) HashMap<(QueryTarget, JsonValue), Result<JsonValue>>);
+```
+
+Looking at it, `MockResponses` takes as keys `QueryTarget`, `JsonValue` pairs
+that represent the target plugin endpoint and the key that would be passed to
+it. The value of the internal map is the mock response object for
+`PluginEngine.query()` to return.  Here is an example of constructing one such
+object:
+
+```rust
+fn mock_responses() -> Result<MockResponses, Error> {
+    let mut mock_responses = MockResponses::new();
+    mock_responses.insert("mitre/linguist", PathBuf::from("foo.java"), Ok(true))?;
+    mock_responses.insert("mitre/linguist", PathBuf::from("bar.java"), Ok(true))?;
+    mock_responses.insert("mitre/linguist", PathBuf::from("baz.java"), Ok(true))?;
+    mock_responses.insert("mitre/linguist", PathBuf::from("oof.txt"), Ok(false))?;
+    Ok(mock_responses)
+}
+```
+
+This function sets up mock responses for calls to the default query endpoint of
+the `mitre/linguist` plugin for four different keys. For example, with a
+`PluginEngine` constructed using this `MockResponses` instance, a call to
+`engine.query("mitre/linguist", PathBuf::from("oof.txt"))` would return
+`Ok(false)` immediately without attempting to contact the Hipcheck core over
+gRPC. The SDK offers the `MockResponses.insert()` function for building up
+key/value pairs, which takes the query endpoint target, key, and output as
+separate parameters. Each of the key and output types must be serializable to a
+`serde_json::JsonValue` object.
+
+Within a given test case, a `PluginEngine` instance can be mocked using an
+instance of the above type as follows:
+
+```rust
+	let mut engine = PluginEngine::mock(mock_responses().unwrap());
+```
+
+From then on, the engine can be used, for example, as follows:
+
+```rust
+let freqs = commit_churns(&mut engine, key).await.unwrap();
+````
+
+Assertion statements can then be run on the output, namely `freqs` in this example:
+
+```rust
+	assert_eq!(freqs.len(), 2);
+    assert_eq!(freqs[0].churn, -1.0);
+    assert_eq!(freqs[1].churn, 1.0);
+```
+
+To inspect the concerns that would have been recorded during query execution
+via `engine.record_concern()`, you can call the special testing-only function
+`PluginEngine.get_concerns(&self) -> &[String]`.
+
 And that's all there is to it! Happy plugin development!
