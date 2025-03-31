@@ -31,8 +31,7 @@ use crate::{
 	exec::ExecConfig,
 	plugin::{try_set_arch, Plugin, PluginVersion, PluginWithConfig},
 	policy::{config_to_policy, PolicyFile},
-	report::report_builder::{build_report, Report},
-	score::score_results,
+	report::report_builder::Report,
 	session::ReadySession,
 	session::Session,
 	setup::write_config_binaries,
@@ -48,7 +47,7 @@ use indextree::{Arena, NodeId};
 use ordered_float::NotNan;
 use pathbuf::pathbuf;
 use schemars::schema_for;
-use shell::{color_choice::ColorChoice, spinner_phase::SpinnerPhase};
+use shell::{color_choice::ColorChoice, spinner_phase::SpinnerPhase, verbosity::Verbosity};
 use std::{
 	env,
 	fmt::{Display, Formatter},
@@ -60,6 +59,8 @@ use std::{
 	time::Duration,
 };
 use target::{TargetSeed, ToTargetSeed};
+use tokio::runtime::Runtime;
+use tokio_stream::StreamExt;
 use util::command::DependentProgram;
 use util::fs::create_dir_all;
 use which::which;
@@ -142,26 +143,44 @@ fn cmd_check(args: &mut CheckArgs, config: &CliConfig) -> ExitCode {
 
 	log::info!("Using configuration source: {}", config_mode);
 
-	let report = run(
+	// Panic: Safe to unwrap as Runtime::new() always returns as Ok
+	let runtime = Runtime::new().unwrap();
+
+	// TODO: In future work, we will not be looping through a collection of completed reports and emiting them all at once
+	match run(
 		target,
 		config_mode,
 		config.cache().map(ToOwned::to_owned),
 		config.exec().map(ToOwned::to_owned),
 		config.format(),
-	);
+	) {
+		Ok(mut reports) => {
+			while let Some(report) = runtime.block_on(reports.next()) {
+				match report {
+					Ok(report) => {
+						if let Err(err) = Shell::print_report(report, config.format()) {
+							Shell::print_error(&err, config.format());
+							return ExitCode::FAILURE;
+						}
+					}
+					// Something went wrong with analyzing a specific dependency
+					Err(e) => {
+						Shell::print_error(&e, config.format());
+						return ExitCode::FAILURE;
+					}
+				}
+			}
 
-	match report {
-		Ok(report) => Shell::print_report(report, config.format())
-			.map(|()| ExitCode::SUCCESS)
-			.unwrap_or_else(|err| {
-				Shell::print_error(&err, Format::Human);
-				ExitCode::FAILURE
-			}),
+			ExitCode::SUCCESS
+		}
+		// Something went wrong during setup or plugin initialization
 		Err(e) => {
 			Shell::print_error(&e, config.format());
-			ExitCode::FAILURE
+			return ExitCode::FAILURE;
 		}
-	}
+	};
+
+	ExitCode::SUCCESS
 }
 
 /// Run the `schema` command.
@@ -833,14 +852,26 @@ impl CheckKind {
 /// Now that we're fully-initialized, run Hipcheck's analyses.
 #[allow(clippy::too_many_arguments)]
 fn run(
-	target: TargetSeed,
+	seed: TargetSeed,
 	config_mode: ConfigMode,
 	home_dir: Option<PathBuf>,
 	exec_path: Option<PathBuf>,
 	format: Format,
-) -> Result<Report> {
-	// Initialize the session.
-	let session = Session::new(&target, config_mode, home_dir, exec_path, format)?;
+) -> Result<impl StreamExt<Item = Result<Report>>> {
+	// Initialize a base session that will be cloned for each Target.
+	let base_session = Session::new(config_mode, home_dir, exec_path, format)?;
+
+	// Print the prelude
+	Shell::print_prelude(seed.to_string());
+
+	// Silence progress bars (if not already silenced) going forward if there are multiple targets
+	if seed.is_multi_target() {
+		Shell::set_verbosity(Verbosity::Quiet);
+	}
+
+	// Resolve the target from the target seed
+	// TODO: Once we are analyzing targets in parallel, we will not be loading the entire list of Targets at once
+	let targets = session::load_target(&seed, base_session.home())?;
 
 	// Run analyses against a repo and score the results (score calls analyses that call metrics).
 	let phase = SpinnerPhase::start("analyzing and scoring results");
@@ -848,12 +879,19 @@ fn run(
 	// Enable steady ticking on the spinner, since we currently don't increment it manually.
 	phase.enable_steady_tick(Duration::from_millis(250));
 
-	let scoring = score_results(&phase, &session)?;
+	// Run and score plugins, then generate the final collection of reports
+	// TODO: Once we are analyzing targets in parallel, we will be emitting scored reports as soon as they are build, instead of collecting them
+	let mut reports = Vec::new();
+	for target in targets {
+		// Clone a new session for each target
+		// TODO: Clone a fixed number of sessions, optionally specified by the user, and reuse them as they become free
+		let mut session = base_session.clone();
+		// Run plugins against the target, generate scores, and build a report
+		// Clear the Salsa db and reset the start time, in case we are re-using an existing session
+		let report = session.run(&phase, &target, true);
+		// Add report to report collection
+		reports.push(report);
+	}
 
-	phase.finish_successful();
-
-	// Build the final report.
-	let report = build_report(&session, &scoring).context("failed to build final report")?;
-
-	Ok(report)
+	Ok(tokio_stream::iter(reports))
 }

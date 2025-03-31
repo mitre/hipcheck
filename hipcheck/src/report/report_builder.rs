@@ -6,15 +6,20 @@ use crate::{
 	error::{Error, Result},
 	hc_error,
 	plugin::{PluginName, PluginPublisher},
-	policy::policy_file::PolicyPluginName,
+	policy::{policy_file::PolicyPluginName, PolicyFile},
 	score::*,
 	session::Session,
+	target::Target,
 	version::hc_version,
 };
 use std::{collections::HashSet, default::Default};
 
 /// Print the final report of a Hipcheck run.
-pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Report> {
+pub fn build_report(
+	session: &Session,
+	target: &Target,
+	scoring: &ScoringResults,
+) -> Result<Report> {
 	#[cfg(feature = "print-timings")]
 	let _0 = crate::benchmarking::print_scope_time!("build_report");
 
@@ -25,7 +30,10 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 	// 1. Build a report from the information available.
 	// 2. Print that report.
 
-	let mut builder = ReportBuilder::for_session(session);
+	let policy_file = session.policy_file().clone();
+	let started_at = session.started_at();
+
+	let mut builder = ReportBuilder::for_session(target, policy_file, started_at);
 
 	for (analysis, stored) in scoring.results.plugin_results() {
 		let name = format!(
@@ -74,9 +82,12 @@ pub fn build_report(session: &Session, scoring: &ScoringResults) -> Result<Repor
 }
 
 /// Builds a final `Report` of Hipcheck's results.
-pub struct ReportBuilder<'sess> {
-	/// The `Session`, containing general data from the run.
-	session: &'sess Session,
+pub struct ReportBuilder<'target> {
+	/// The target analyzed by Hipcheck
+	target: &'target Target,
+
+	/// When the analysis was performed
+	analyzed_at: Timestamp,
 
 	/// A lookup of which failed analyses warrant an immediate investigation
 	investigate_if_failed: HashSet<PolicyPluginName>,
@@ -97,19 +108,25 @@ pub struct ReportBuilder<'sess> {
 	risk_score: Option<f64>,
 }
 
-impl<'sess> ReportBuilder<'sess> {
+impl<'target> ReportBuilder<'target> {
 	/// Initiate building a new `Report`.
-	pub fn for_session(session: &'sess Session) -> ReportBuilder<'sess> {
+	pub fn for_session(
+		target: &'target Target,
+		policy_file: PolicyFile,
+		started_at: DateTime<Local>,
+	) -> ReportBuilder<'target> {
 		// Get investigate_if_failed hashset from policy
-		let policy_file = session.policy_file();
 		let investigate_if_failed = policy_file
 			.analyze
 			.if_fail
 			.as_ref()
 			.map_or(HashSet::new(), |x| HashSet::from_iter(x.0.iter().cloned()));
 
+		let analyzed_at = Timestamp(started_at);
+
 		ReportBuilder {
-			session,
+			target,
+			analyzed_at,
 			investigate_if_failed,
 			passing: Default::default(),
 			failing: Default::default(),
@@ -167,11 +184,11 @@ impl<'sess> ReportBuilder<'sess> {
 	/// The `recommendation_kind` and `risk_score` _must_ be set before calling `build`,
 	/// or building will fail.
 	pub fn build(self) -> Result<Report> {
-		let repo_name = self.session.name();
-		let repo_owner = self.session.owner();
-		let repo_head = self.session.head();
+		let repo_name = Arc::new(self.target.name());
+		let repo_owner = Arc::new(self.target.owner());
+		let repo_head = Arc::new(self.target.head());
 		let hipcheck_version = hc_version();
-		let analyzed_at = Timestamp(self.session.started_at());
+		let analyzed_at = self.analyzed_at;
 		let passing = self.passing;
 		let failing = self.failing;
 		let errored = self.errored;

@@ -9,6 +9,7 @@ use crate::{
 	policy_exprs::{std_exec, Expr},
 	session::Session,
 	shell::spinner_phase::SpinnerPhase,
+	target::Target,
 };
 use indextree::{Arena, NodeId};
 #[cfg(test)]
@@ -186,7 +187,11 @@ pub struct ScoreTreeNode {
 	pub weight: f64,
 }
 
-pub fn score_results(_phase: &SpinnerPhase, session: &Session) -> Result<ScoringResults> {
+pub fn score_results(
+	_phase: &SpinnerPhase,
+	session: &Session,
+	target: &Target,
+) -> Result<ScoringResults> {
 	// Scoring should be performed by the construction of a "score tree" where scores are the
 	// nodes and weights are the edges. The leaves are the analyses themselves, which either
 	// pass (a score of 0) or fail (a score of 1). These are then combined with the other
@@ -201,7 +206,7 @@ pub fn score_results(_phase: &SpinnerPhase, session: &Session) -> Result<Scoring
 
 	// RFD4 analysis style - get all "leaf" analyses and call through plugin architecture
 	let plugin_score_tree = {
-		let target_json = serde_json::to_value(session.target())?;
+		let target_json = serde_json::to_value(target)?;
 
 		for analysis in analysis_tree.get_analyses() {
 			let policy = analysis.1.ok_or(hc_error!(
