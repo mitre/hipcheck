@@ -104,7 +104,7 @@ spdx-rs = "0.5.0"
 tabled = "0.18.0"
 tar = "0.4.44"
 tempfile = "3.17.1"
-tokio = { version = "1.44.0", features = [
+tokio = { version = "1.44.1", features = [
     "rt",
     "rt-multi-thread",
     "sync",
