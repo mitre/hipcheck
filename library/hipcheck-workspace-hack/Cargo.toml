@@ -49,7 +49,7 @@ regex = { version = "1.11.1" }
 regex-automata = { version = "0.4.8", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
 regex-syntax = { version = "0.8.5" }
 schemars = { version = "0.8.22", features = ["chrono", "preserve_order", "url"] }
-semver = { version = "1.0.25", features = ["serde"] }
+semver = { version = "1.0.26", features = ["serde"] }
 serde = { version = "1.0.219", features = ["alloc", "derive", "rc"] }
 sha2 = { version = "0.10.8" }
 smallvec = { version = "1.13.2", default-features = false, features = ["const_new", "union", "write"] }
@@ -97,7 +97,7 @@ regex = { version = "1.11.1" }
 regex-automata = { version = "0.4.8", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
 regex-syntax = { version = "0.8.5" }
 schemars = { version = "0.8.22", features = ["chrono", "preserve_order", "url"] }
-semver = { version = "1.0.25", features = ["serde"] }
+semver = { version = "1.0.26", features = ["serde"] }
 serde = { version = "1.0.219", features = ["alloc", "derive", "rc"] }
 sha2 = { version = "0.10.8" }
 smallvec = { version = "1.13.2", default-features = false, features = ["const_new", "union", "write"] }
