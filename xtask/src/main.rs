@@ -11,6 +11,7 @@ use clap::{
 };
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use std::{fmt::Display, process::ExitCode};
+use task::benchmark::BenchmarkArgs;
 
 fn main() -> ExitCode {
 	let args = Args::parse();
@@ -35,6 +36,7 @@ fn main() -> ExitCode {
 			SiteCommand::Serve(args) => task::site::serve::run(args),
 		},
 		Commands::Manifest => task::manifest::run(),
+		Commands::Benchmark(args) => task::benchmark::run(args),
 	};
 
 	match result {
@@ -98,6 +100,8 @@ enum Commands {
 	Rfd(RfdArgs),
 	/// Work with the Hipcheck website.
 	Site(SiteArgs),
+	/// Run benchmark suite (currently x86_linux only)
+	Benchmark(BenchmarkArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -139,7 +143,7 @@ impl Display for BuildProfile {
 }
 
 #[derive(Debug, Clone, Copy, Default, clap::ValueEnum)]
-enum BuildPkg {
+pub enum BuildPkg {
 	/// Rebuild the whole workspace.
 	#[default]
 	All,

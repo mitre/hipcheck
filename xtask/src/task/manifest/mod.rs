@@ -11,6 +11,9 @@ use download_manifest::DownloadManifestEntry;
 use anyhow::Result;
 use std::collections::HashSet;
 
+#[allow(unused)]
+pub use kdl::ParseKdlNode;
+
 pub fn run() -> Result<()> {
 	let api_token = std::env::var("HC_GITHUB_TOKEN")?;
 	let releases = remote::get_hipcheck_plugin_releases(&api_token)?;

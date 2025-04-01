@@ -1,0 +1,10 @@
+targets {
+    // NOTE: the parser of this file expects the following order repo url=<> ref=<> type=<>
+    // git repository with about 700 commits
+    repo url="https://github.com/mitre/hipcheck" ref="hipcheck-v3.11.0" type="repo"
+    // popular Python repo with approximately 3000 commits
+    repo url="jinja2" ref="3.1.6" type="pypi"
+    // popular NPM package with approximately 6000 commits as of v5.0.0
+    repo url="express" ref="v5.0.0" type="npm"
+}
+
