@@ -115,6 +115,28 @@ class QueryBuilder:
         return await self.engine.batch_query(self.target, self.keys)
 
 
+MockResponses = List[Tuple[Tuple[str, object], object]]
+
+
+def find_response(m: MockResponses, key: Tuple[str, object]) -> Optional[object]:
+    """
+    Find a tuple `y` in `m` such that y[0] == key, and return y[1]. This acts
+    like a pseudo-dictionary for storing mock responses to deal with the fact
+    that lists/dicts/objects are not hashable by default.
+
+    :param MockResponses m: The list of tuples to search
+    :param tuple key: The key to check elements of `m` against
+    :return: The second element of a tuple whose first element matches `key`. If none found, returns `None`.
+
+    :meta private:
+    """
+    i = map(lambda x: x[1], filter(lambda y: y[0] == key, m))
+    try:
+        return next(i)
+    except StopIteration:
+        return None
+
+
 class PluginEngine:
     """
     Manages a particular query session.
@@ -130,7 +152,7 @@ class PluginEngine:
         tx: asyncio.Queue = None,
         rx: asyncio.Queue = None,
         drop_tx: asyncio.Queue = None,
-        mock_responses: Optional[Dict[Tuple[str, object], object]] = None,
+        mock_responses: Optional[MockResponses] = None,
     ):
         """
         :meta private:
@@ -150,17 +172,24 @@ class PluginEngine:
         # When unit testing, this enables the user to mock plugin responses to various inputs
         self.mock_responses = mock_responses
 
-    def mock(mock_responses: Dict[Tuple[str, object], object]):
+    def mock(mock_responses: List[Tuple[Tuple[str, object], object]] = []):
         """
         For unit testing purposes, construct a PluginEngine with a set of
         mock responses
 
-        :param dict mock_responses: A dictionary that maps queries to mock
-            responses. The query is a tuple of a target string and a key
+        :param tuple mock_responses: A list of key, value pairs that maps
+            queries to mock responses. Does not use a dict since many
+            relevant types are not hashable and thus cannot be used as
+            keys. The query is a tuple of a target string and a key
             object, the response is the output object for that query.
 
         :return: An instance of `PluginEngine`
         """
+        # In `PluginEngine.query()` if mock_responses is None we try to query Hipcheck core
+        #   which will obviously fail in a unit-testing context. Try to defend here against
+        #   the user making a mistake; if `mock()` called we expect to always mock responses.
+        if mock_responses is None:
+            mock_responses = []
         return PluginEngine(mock_responses=mock_responses)
 
     # Convenience function to expose a `QueryBuilder` to make it easy to dynamically build
@@ -187,10 +216,10 @@ class PluginEngine:
         :meta: private
         """
         # If using a mock engine, look to the `mock_responses` field for the query answer
-        if enabled("mock_engine"):
+        if self.mock_responses is not None:
             results = []
             for i in keys:
-                opt_val = self.mock_responses.get((target, i), None)
+                opt_val = find_response(self.mock_responses, (target, i))
                 if opt_val is None:
                     raise UnknownPluginQuery()
                 else:

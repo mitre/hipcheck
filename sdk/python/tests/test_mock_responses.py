@@ -6,12 +6,10 @@ import asyncio
 from hipcheck_sdk import *
 from hipcheck_sdk.error import UnknownPluginQuery
 
-from context import *
 
-
-def test_mock_responses(options_enable_mock_responses):
+def test_mock_responses():
     expected = 2
-    engine = PluginEngine.mock({("mitre/example/nondefault", 1): expected})
+    engine = PluginEngine.mock([(("mitre/example/nondefault", 1), expected)])
     try:
         res = asyncio.run(engine.query("mitre/example", 1))
         assert false
@@ -27,7 +25,11 @@ def test_mock_responses(options_enable_mock_responses):
     assert res == expected
 
     engine = PluginEngine.mock(
-        {("mitre/example", 1): 1, ("mitre/example", 2): 2, ("mitre/example", 3): 3}
+        [
+            (("mitre/example", 1), 1),
+            (("mitre/example", 2), 2),
+            (("mitre/example", 3), 3),
+        ]
     )
 
     async def run(engine):

@@ -13,7 +13,6 @@ class SdkOptions:
     """
 
     rfd9_compat: bool = True
-    mock_engine: bool = False
 
 
 _options = SdkOptions()
