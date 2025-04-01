@@ -221,6 +221,94 @@ if __name__ == "__main__":
 
 The function takes an instance of your plugin subclass.
 
+## Testing Your Plugin
+
+While working on your plugin implementation, it may be useful to unit-test
+your query endpoint logic instead of having to test it indirectly through
+an `hc check` analysis run. For this purpose, the Python SDK offers a way to
+"mock" response calls to the `PluginEngine.query()` function that your
+query endpoint may make throughout its execution.
+
+In this section we will describe setting up query endpoint unit tests using
+`pytest`; if you choose a different Python testing framework, you will need to
+adapt these instructions. As you may know, `pytest` by default runs against
+Python files prefixed with `test_`, and treats functions contained within those
+files that are also prefixed with `test_` as unit tests. It runs these functions
+and reports any failed assertions or raised errors as a test failure.
+
+The first important point is that `PluginEngine.query()` is an `asyncio` async
+function; it is easiest to call this function if the test function we write is
+also async. However,since async functions do not execute if they are simply
+called, we need additional help to make sure `pytest` executes them correctly.
+In addition to installing `pytest` as a dependency, you should install
+`pytest-asyncio`. Then, we can declare `async def` test cases as follows:
+
+```python
+import pytest
+
+@pytest.mark.asyncio
+async def test_endpoint():
+	# Your implementation here
+	pass
+```
+
+The goal of our unit test is to call a query endpoint function and validate the
+result. Looking at the signature, an endpoint function takes a `PluginEngine`
+instance. Usually this is provided by the SDK, but for testing we need to
+instantiate our own special `PluginEngine` instance using the
+`PluginEngine.mock()` constructor. `mock()` takes a dictionary that that maps
+query endpoint + key pairs to output values, so that when `PluginEngine.query()`
+is called during the unit test, the engine can return a pre-defined response.
+
+So, first we must define the dictionary to pass to `mock()`. Although we just
+called it a dictionary, this mapping, henceforth referred to as `MockResponses`,
+is actually a list of tuples. This is because common types like lists, dicts,
+and Pydantic models that query endpoints are likely to take as input are not
+hashable by default. So, the Python SDK approximates a dictionary by having a
+list of two-element tuples where the first is the key and the second is the
+value. `MockResponses` is explicitly defined as follows:
+
+```python
+MockResponses = List[Tuple[Tuple[str, object], object]]
+```
+
+Therefore, the `MockResponses` "key" is of type `Tuple[str, object]`, and the
+"value" is of type `object`. The key represents the two parameters that
+`PluginEngine.query()` takes, namely the endpoint target string (see
+[above](#using-the-engine-handle)) and the query `key` object. The `value`
+object is what we are telling `PluginEngine` to return when `PluginQuery.key()`
+is called with that target/key pair. For instance:
+
+```python
+mock_responses = [(("dummy/sha256/sha256", [1]), b'deadbeef')]
+```
+
+The above `mock_responses` would cause
+`PluginEngine.query("dummy/sha256/sha256", [1])` to return `b'deadbeef'`.
+
+Now we can put it all together:
+
+```python
+import pytest
+import asyncio
+
+from hipcheck_sdk import PluginEngine
+
+@pytest.mark.asyncio
+async def test_endpoint():
+    mock_responses = [
+        (("dummy/sha256/sha256", [1]), [0xBE]),
+        (("dummy/sha256/sha256", True), None),
+    ]
+    engine = PluginEngine.mock(mock_responses)
+
+    res = await dummy_rand_data(engine, 8)
+    assert res == 0xBE
+```
+
+If your query endpoint does not rely on querying other plugins, you can simply
+instantiate `engine` with an empty call to `PluginEngine.mock()`.
+
 That's all for the basics, happy plugin development!
 
 [asyncio]: https://docs.python.org/3/library/asyncio.html
