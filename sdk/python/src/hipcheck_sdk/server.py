@@ -225,14 +225,17 @@ class PluginServer(gen.PluginServiceServicer):
         """
         self.plugin = plugin
 
-    def register(plugin: Plugin, log_level="error"):
+    def register(plugin: Plugin, log_level="error", init_logger=True):
         """
         Set the server to use `plugin` as its implementation
 
         :param Plugin plugin: The plugin instance with which to run
+        :param str log_level: A string indicating the minimum logging level to emit
+        :param bool init_logger: If True, init the standard plugin logger that emits a custom JSON format over stderr to Hipcheck core.
         """
         plugin_server = PluginServer(plugin)
-        plugin_server.init_logger(log_level)
+        if init_logger:
+            plugin_server.init_logger(log_level)
         return plugin_server
 
     def init_logger(self, log_level_str=str):
