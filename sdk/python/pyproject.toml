@@ -1,6 +1,6 @@
 [project]
 name = "hipcheck-sdk"
-version = "0.1.0"
+version = "0.2.1"
 description = "An SDK for developing Hipcheck plugins"
 readme = "README.md"
 authors = [
@@ -30,6 +30,8 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://hipcheck.mitre.org/"
+Documentation = "https://hipcheck.mitre.org/sdk/python/hipcheck_sdk.html"
+Repository = "https://github.com/mitre/hipcheck.git"
 Issues = "https://github.com/mitre/hipcheck/issues"
 
 [build-system]
