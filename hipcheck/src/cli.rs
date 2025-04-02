@@ -733,12 +733,8 @@ impl ToTargetSeedKind for CheckNpmArgs {
 			_ => pm::extract_package_version(raw_package)?,
 		};
 
-		// If the package is scoped, replace the leading '@' in the scope with %40 for proper pURL formatting
-		let purl = Url::parse(&match version.as_str() {
-			"no version" => format!("pkg:npm/{}", str::replace(&name, '@', "%40")),
-			_ => format!("pkg:npm/{}@{}", str::replace(&name, '@', "%40"), version),
-		})
-		.unwrap();
+		let purl = Url::parse(&format_npm_url(&name, &version))
+			.map_err(|e| hc_error!("Failed to parse package url: {}", e))?;
 
 		Ok(TargetSeedKind::Single(SingleTargetSeedKind::Package(
 			Package {
@@ -748,6 +744,14 @@ impl ToTargetSeedKind for CheckNpmArgs {
 				host: PackageHost::Npm,
 			},
 		)))
+	}
+}
+
+pub fn format_npm_url(name: &str, version: &str) -> String {
+	// If the package is scoped, replace the leading '@' in the scope with %40 for proper pURL formatting
+	match version {
+		"no version" => format!("pkg:npm/{}", str::replace(name, '@', "%40")),
+		_ => format!("pkg:npm/{}@{}", str::replace(name, '@', "%40"), version),
 	}
 }
 

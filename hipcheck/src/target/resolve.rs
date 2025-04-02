@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use super::{
 	cyclone_dx::{extract_cyclonedx_download_url, BomTarget},
+	multi::resolve_package_lock_json,
 	pm::{detect_and_extract, extract_repo_for_maven},
 	spdx::extract_spdx_download_url,
 };
@@ -250,7 +251,8 @@ impl ResolveRepo for RemoteGitRepo {
 		// Clone remote repo if not exists
 		if path.exists().not() {
 			t.update_status("cloning");
-			git::clone(&self.url, &path).context("failed to clone remote repository")?;
+			git::clone(&self.url, &path)
+				.map_err(|e| hc_error!("failed to clone remote repository {}", e))?;
 		} else {
 			t.update_status("pulling");
 		}
@@ -421,6 +423,7 @@ impl MultiTargetSeed {
 	pub async fn get_target_seeds(&self) -> Result<Vec<SingleTargetSeed>> {
 		match &self.kind {
 			MultiTargetSeedKind::GoMod(path) => resolve_go_mod(path).await,
+			MultiTargetSeedKind::PackageLockJson(path) => resolve_package_lock_json(path).await,
 		}
 	}
 }

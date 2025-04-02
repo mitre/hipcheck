@@ -171,7 +171,7 @@ pub struct SingleTargetSeed {
 pub enum MultiTargetSeedKind {
 	// CargoToml(PathBuf),
 	GoMod(PathBuf),
-	// PackageJson(PathBuf),
+	PackageLockJson(PathBuf),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
