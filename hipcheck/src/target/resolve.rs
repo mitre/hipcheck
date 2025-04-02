@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use super::{
 	cyclone_dx::{extract_cyclonedx_download_url, BomTarget},
+	multi::resolve_package_lock_json,
 	pm::{detect_and_extract, extract_repo_for_maven},
 	spdx::extract_spdx_download_url,
 };
@@ -250,7 +251,8 @@ impl ResolveRepo for RemoteGitRepo {
 		// Clone remote repo if not exists
 		if path.exists().not() {
 			t.update_status("cloning");
-			git::clone(&self.url, &path).context("failed to clone remote repository")?;
+			git::clone(&self.url, &path)
+				.map_err(|e| hc_error!("failed to clone remote repository {}", e))?;
 		} else {
 			t.update_status("pulling");
 		}
@@ -421,6 +423,7 @@ impl MultiTargetSeed {
 	pub async fn get_target_seeds(&self) -> Result<Vec<SingleTargetSeed>> {
 		match &self.kind {
 			MultiTargetSeedKind::GoMod(path) => resolve_go_mod(path).await,
+			MultiTargetSeedKind::PackageLockJson(path) => resolve_package_lock_json(path).await,
 		}
 	}
 }
@@ -439,5 +442,49 @@ impl TargetSeed {
 			// Since `then()` can only take one arg, we combine the config and seed into a tuple
 			.map(move |x| (config.clone(), x));
 		Ok(it.then(TargetResolver::resolve_map))
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use tokio_stream::StreamExt;
+
+use super::{MultiTargetSeed, TargetResolverConfig, TargetSeed};
+	use crate::shell::spinner_phase::SpinnerPhase;
+	use crate::target::{Target, MultiTargetSeedKind::PackageLockJson};
+	use std::{path::PathBuf, time::Duration};
+
+	#[tokio::test]
+	async fn test_multi_target_seed_kind_package_lock_json_get_targets() {
+		let manifest = env!("CARGO_MANIFEST_DIR");
+		let path: PathBuf = [manifest, "src", "target", "tests", "package-lock.json"]
+			.iter()
+			.collect();
+
+		let target_seed = TargetSeed::Multi(MultiTargetSeed {
+			kind: PackageLockJson(path.clone()),
+			specifier: "package-lock.json".to_string(),
+		});
+
+		let phase = SpinnerPhase::start("resolving package-lock.json");
+		phase.enable_steady_tick(Duration::from_millis(100));
+
+		let config: TargetResolverConfig = TargetResolverConfig {
+			phase: Some(phase.clone()),
+			cache: PathBuf::from(path),
+		};
+
+		let targets = target_seed
+			.get_targets(config)
+			.await
+			.map_err(|err| format!("Failed to get targets: {}", err))
+			.unwrap()
+			.collect::<Result<Vec<Target>, _>>()
+			.await
+			.map_err(|err| format!("Failed to collect targets: {}", err))
+			.unwrap();
+
+		assert_eq!(targets.len(), 3);
+		let first = &targets[0];
 	}
 }

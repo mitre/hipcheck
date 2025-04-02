@@ -1,0 +1,28 @@
+{
+  "name": "fake-app",
+  "version": "0.2.0",
+  "lockfileVersion": 2,
+  "requires": true,
+  "packages": {  
+  },
+  "dependencies": {
+    "@bugsounet/node-lpcm16": {
+      "version": "1.0.2",
+      "resolved": "https://registry.npmjs.org/@bugsounet/node-lpcm16/-/node-lpcm16-1.0.2.tgz",
+      "integrity": "sha512-PZ3EUZ7C2V1hYNSsHQLW+vy/xKbKeeBwbL4mVYNdaxRjf3ByYF/Udu8qQX9zpRTBD2D3VYq5dtEMS0aD2g6IEQ==",
+      "requires": {
+        "child_process": "^1.0.2"
+      }
+    },
+    "child_process": {
+      "version": "1.0.2",
+      "resolved": "https://registry.npmjs.org/child_process/-/child_process-1.0.2.tgz",
+      "integrity": "sha512-Wmza/JzL0SiWz7kl6MhIKT5ceIlnFPJX+lwUGj7Clhy5MMldsSoJR0+uvRzOS5Kv45Mq7t1PoE8TsOA9bzvb6g=="
+    },
+    "chownr": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/chownr/-/chownr-2.0.0.tgz",
+      "integrity": "sha512-bIomtDF5KGpdogkLd9VspvFzk9KfpyyGlS8YFVZl7TGPBHL5snIOnxeshwVgPteQ9b4Eydl+pVbIyE1DcvCWgQ=="
+    }
+  }
+}

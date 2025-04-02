@@ -3,8 +3,9 @@
 // NOTE: This file is shared as a build-dependency in `build.rs`! This will cause compilation errors when importing crates that are not build-dependencies.
 
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
+	collections::HashMap,
 	fmt,
 	fmt::{Display, Formatter},
 	path::PathBuf,
@@ -171,7 +172,8 @@ pub struct SingleTargetSeed {
 pub enum MultiTargetSeedKind {
 	// CargoToml(PathBuf),
 	GoMod(PathBuf),
-	// PackageJson(PathBuf),
+	PackageLockJson(PathBuf),
+	// TODO: maybe add a PackageJson option?
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -244,4 +246,16 @@ impl Display for TargetSeed {
 			TargetSeed::Multi(_x) => unimplemented!(),
 		}
 	}
+}
+
+#[derive(Deserialize)]
+pub struct PackageLockJson {
+	pub dependencies: Option<HashMap<String, PackageDependency>>,
+	// ignore packages
+}
+
+#[derive(Deserialize)]
+pub struct PackageDependency {
+	pub version: String,
+	pub resolved: Option<String>,
 }
