@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+	cli::format_npm_url,
 	error::{Error, Result},
 	hc_error, source,
-	target::{SingleTargetSeed, SingleTargetSeedKind},
+	target::{Package, PackageHost, SingleTargetSeed, SingleTargetSeedKind},
 	util::http::agent,
 };
 
 use gomod_rs::{Context as GmContext, Directive, Identifier};
 use regex::Regex;
+use serde::Deserialize;
+use serde_json::from_slice;
 use url::Url;
 
-use std::{ops::Deref, path::Path, sync::LazyLock};
+use std::{collections::BTreeMap, ops::Deref, path::Path, sync::LazyLock};
 
 /// A struct with owned data to simplify TryFrom conversion impl
 /// vs. gomod_rs::Context which is full of lifetimes
@@ -187,8 +190,73 @@ pub(crate) async fn resolve_go_mod(path: &Path) -> Result<Vec<SingleTargetSeed>>
 		.collect::<Result<Vec<SingleTargetSeed>>>()
 }
 
+#[derive(Deserialize)]
+pub struct PackageLockJson {
+	pub dependencies: Option<BTreeMap<String, PackageDependency>>,
+	// ignore packages
+}
+
+#[derive(Deserialize)]
+pub struct PackageDependency {
+	pub version: String,
+}
+
+pub(crate) async fn resolve_package_lock_json(path: &Path) -> Result<Vec<SingleTargetSeed>> {
+	// Parse package-lock.json
+	let contents = tokio::fs::read(path)
+		.await
+		.map_err(|e| hc_error!("Failed to read package-lock.json: {}", e))?;
+	let package_lock: PackageLockJson =
+		from_slice(&contents).map_err(|e| hc_error!("Failed to parse package-lock.json: {}", e))?;
+
+	// Extract dependencies from file
+	let dependencies: BTreeMap<String, SingleTargetSeed> = package_lock
+		.dependencies
+		.iter()
+		.flat_map(|dependencies| {
+			dependencies.iter().map(|(name, dependency)| {
+				// Map dependency to SingleTargetSeedKind::Package
+				let name = name.to_string();
+				let version = dependency.version.clone();
+				let specifier = format!("{name} {version}");
+
+				let purl = Url::parse(&format_npm_url(&name, &version))
+					.map_err(|e| hc_error!("Failed to parse dependency url: {}", e))?;
+
+				Ok((
+					name.clone(),
+					SingleTargetSeed {
+						kind: SingleTargetSeedKind::Package(Package {
+							purl,
+							name,
+							version: version.clone(),
+							host: PackageHost::Npm,
+						}),
+						refspec: None,
+						specifier,
+					},
+				))
+			})
+		})
+		.collect::<Result<BTreeMap<String, SingleTargetSeed>>>()?;
+
+	// collect vals from BTreeMap to Vec
+	let dependencies_vec: Vec<SingleTargetSeed> = dependencies.into_values().collect();
+
+	Ok(dependencies_vec)
+}
+
 #[cfg(test)]
 mod tests {
+	use std::path::PathBuf;
+
+	use url::Url;
+
+	use crate::target::{
+		multi::resolve_package_lock_json, Package, PackageHost, SingleTargetSeed,
+		SingleTargetSeedKind,
+	};
+
 	use super::*;
 	use crate::target::KnownRemote;
 
@@ -234,5 +302,56 @@ mod tests {
 		//      We don't test this one directly because requires HTTP requests
 		let opt_url_str = try_get_repo_url_from_go_get(yaml_v3_resp);
 		assert_eq!(opt_url_str, Some("https://gopkg.in/yaml.v3"))
+	}
+
+	#[tokio::test]
+	async fn test_resolve_package_lock_json() {
+		let manifest = env!("CARGO_MANIFEST_DIR");
+		let path_json: PathBuf = [manifest, "src", "target", "tests", "package-lock.json"]
+			.iter()
+			.collect();
+
+		let mut target_seeds = resolve_package_lock_json(&path_json).await.unwrap();
+
+		assert_eq!(target_seeds.len(), 3);
+
+		let name = "chownr".to_string();
+		let version = "2.0.0".to_string();
+		let specifier = format!("{name} {version}");
+
+		let chownr_seed = target_seeds.pop();
+		assert_eq!(
+			chownr_seed,
+			Some(SingleTargetSeed {
+				kind: SingleTargetSeedKind::Package(Package {
+					purl: Url::parse("pkg:npm/chownr@2.0.0").unwrap(),
+					name,
+					version,
+					host: PackageHost::Npm,
+				}),
+				refspec: None,
+				specifier,
+			})
+		);
+		_ = target_seeds.pop();
+
+		let name = "@bugsounet/node-lpcm16".to_string();
+		let version = "1.0.2".to_string();
+		let specifier = format!("{name} {version}");
+
+		let bugsounet_seed = target_seeds.pop();
+		assert_eq!(
+			bugsounet_seed,
+			Some(SingleTargetSeed {
+				kind: SingleTargetSeedKind::Package(Package {
+					purl: Url::parse("pkg:npm/%40bugsounet/node-lpcm16@1.0.2").unwrap(),
+					name,
+					version,
+					host: PackageHost::Npm,
+				}),
+				refspec: None,
+				specifier,
+			})
+		);
 	}
 }
