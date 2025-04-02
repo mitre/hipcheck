@@ -22,6 +22,8 @@ use std::{
 	sync::Arc,
 	time::Duration,
 };
+use tokio::runtime::Runtime;
+use tokio_stream::StreamExt;
 
 struct SessionBuilder {
 	config_dir: Option<PathBuf>,
@@ -476,7 +478,17 @@ pub fn load_target(seed: &TargetSeed, home: &Path) -> Result<Vec<Target>> {
 				cache: PathBuf::from(home),
 			};
 
-			let targets = seed.get_targets(config)?.collect::<Vec<Target>>();
+			// Panic: Safe to unwrap as Runtime::new() always returns as Ok
+			let runtime = Runtime::new().unwrap();
+
+			let res_targets: Result<Result<Vec<Target>>> = runtime.block_on(async {
+				Ok(seed
+					.get_targets(config)
+					.await?
+					.collect::<Result<Vec<Target>>>()
+					.await)
+			});
+			let targets = res_targets??;
 			if targets.len() != 1 {
 				log::error!("load_target produced {} targets, expected 1", targets.len());
 				return Err(hc_error!(

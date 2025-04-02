@@ -12,12 +12,13 @@ use crate::{
 		build_unknown_remote_clone_dir, clone_local_repo_to_cache, get_remote_repo_from_url, git,
 		try_resolve_remote_for_local,
 	},
-	target::types::*,
+	target::{multi::resolve_go_mod, types::*},
 };
 use git2::{AnnotatedCommit, Repository};
 use pathbuf::pathbuf;
 use regex::Regex;
 use semver::Version;
+use tokio_stream::StreamExt;
 use url::Url;
 
 use std::{
@@ -38,6 +39,7 @@ use std::{
 // use (if any) and fuzzy version matching.
 
 /// Control the behavior of a `TargetResolver` struct instance
+#[derive(Debug, Clone)]
 pub struct TargetResolverConfig {
 	/// Object for updating the Hipcheck phase. If None, calls to
 	/// `TargetResolver::update_status()` will be no-ops
@@ -121,8 +123,12 @@ impl TargetResolver {
 		Ok(res)
 	}
 
+	pub async fn resolve_map(input: (TargetResolverConfig, SingleTargetSeed)) -> Result<Target> {
+		Self::resolve(input.0, input.1).await
+	}
+
 	/// Main function entrypoint for the resolution algorithm
-	pub fn resolve(config: TargetResolverConfig, seed: SingleTargetSeed) -> Result<Target> {
+	pub async fn resolve(config: TargetResolverConfig, seed: SingleTargetSeed) -> Result<Target> {
 		#[cfg(feature = "print-timings")]
 		let _0 = crate::benchmarking::print_scope_time!("resolve_target");
 
@@ -410,17 +416,28 @@ fn try_find_commit_for_latest_version_tag(
 	}
 }
 
+impl MultiTargetSeed {
+	/// Parse and return all single target seeds from this multi target seed
+	pub async fn get_target_seeds(&self) -> Result<Vec<SingleTargetSeed>> {
+		match &self.kind {
+			MultiTargetSeedKind::GoMod(path) => resolve_go_mod(path).await,
+		}
+	}
+}
+
 impl TargetSeed {
-	pub fn get_targets(
+	/// Get all targets that are resolved from this seed
+	pub async fn get_targets(
 		&self,
 		config: TargetResolverConfig,
-	) -> Result<impl Iterator<Item = Target>> {
-		let targets = match self {
-			TargetSeed::Single(single_target_seed) => {
-				vec![TargetResolver::resolve(config, single_target_seed.clone())?]
-			}
-			TargetSeed::Multi(_mulit_target_speed) => todo!(),
+	) -> Result<impl StreamExt<Item = Result<Target>>> {
+		let seed_vec = match self {
+			TargetSeed::Single(single_target_seed) => vec![single_target_seed.clone()],
+			TargetSeed::Multi(multi_target_seed) => multi_target_seed.get_target_seeds().await?,
 		};
-		Ok(targets.into_iter())
+		let it = tokio_stream::iter(seed_vec)
+			// Since `then()` can only take one arg, we combine the config and seed into a tuple
+			.map(move |x| (config.clone(), x));
+		Ok(it.then(TargetResolver::resolve_map))
 	}
 }
