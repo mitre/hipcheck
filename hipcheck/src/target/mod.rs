@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod cyclone_dx;
+mod multi;
 pub mod pm;
 pub mod purl;
 pub mod resolve;
