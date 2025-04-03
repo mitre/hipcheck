@@ -136,6 +136,7 @@ impl PluginEngine {
 				key: input,
 				output: vec![],
 				concerns: vec![],
+				error: todo!(),
 			};
 			self.send(query).await?;
 			let response = self.recv().await?;
@@ -233,6 +234,7 @@ impl PluginEngine {
 		Ok(())
 	}
 
+	// Cal TODO add error parameter
 	async fn send_session_err<P>(&mut self) -> crate::error::Result<()>
 	where
 		P: Plugin,
@@ -247,6 +249,7 @@ impl PluginEngine {
 			output: vec![],
 			concern: self.take_concerns(),
 			split: false,
+			error: None, // Cal TODO send error string
 		};
 		self.tx
 			.send(Ok(InitiateQueryProtocolResponse { query: Some(query) }))
@@ -313,6 +316,7 @@ impl PluginEngine {
 			key: vec![],
 			output: vec![value],
 			concerns: self.take_concerns(),
+			error: todo!(),
 		};
 
 		self.send(query).await
@@ -331,6 +335,7 @@ impl PluginEngine {
 				}
 				other => {
 					tracing::error!("{}", other);
+					// Cal TODO pass error value
 					self.send_session_err::<P>().await
 				}
 			};

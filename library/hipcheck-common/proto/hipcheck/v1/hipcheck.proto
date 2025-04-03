@@ -200,6 +200,10 @@ message Query {
     // Used to indicate whether or not a string field present in a `repeated string` field
     // was split between two messages
     bool split = 9;
+
+    // A plugin-generated error string.
+    // Shall be present if and only if state == QUERY_STATE_ERROR
+    optional string error = 10;
 }
 
 enum QueryState {
@@ -220,6 +224,9 @@ enum QueryState {
 
     // We are sending a query to a plugin and we are expecting to need to send more chunks
     QUERY_STATE_SUBMIT_IN_PROGRESS = 4;
+
+    // An error was encountered while processing.
+    QUERY_STATE_ERROR = 5;
 }
 
 /*===========================================================================

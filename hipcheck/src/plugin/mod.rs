@@ -118,6 +118,7 @@ impl ActivePlugin {
 			key: vec![key],
 			output: vec![],
 			concerns: vec![],
+			error: todo!(),
 		};
 
 		Ok(self.channel.query(query).await?.into())
@@ -137,6 +138,7 @@ impl ActivePlugin {
 			key: vec![],
 			output,
 			concerns: vec![],
+			error: todo!(),
 		};
 
 		log::trace!("Resuming query");
