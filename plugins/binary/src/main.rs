@@ -7,21 +7,18 @@ mod util;
 use crate::binary_detector::{detect_binary_files, BinaryFileDetector};
 use clap::Parser;
 use hipcheck_sdk::{
+	macros::PluginConfig,
 	prelude::*,
 	types::{LocalGitRepo, Target},
-	LogLevel,
+	LogLevel, PluginConfig,
 };
 use pathbuf::pathbuf;
-use serde::Deserialize;
 use std::{ops::Not, path::PathBuf, result::Result as StdResult, sync::OnceLock};
-
 pub static DETECTOR: OnceLock<BinaryFileDetector> = OnceLock::new();
 
-#[derive(Deserialize)]
+#[derive(PluginConfig, Debug)]
 struct RawConfig {
-	#[serde(rename = "binary-file")]
 	binary_file: Option<PathBuf>,
-	#[serde(rename = "binary-file-threshold")]
 	binary_file_threshold: Option<u64>,
 }
 
@@ -84,9 +81,9 @@ impl Plugin for BinaryPlugin {
 
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		// Deserialize and validate the config struct
-		let conf: Config = serde_json::from_value::<RawConfig>(config)
+		let conf: Config = RawConfig::deserialize(&config)
 			.map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: format!("{:#?}", e),
 			})?
 			.try_into()?;
 
