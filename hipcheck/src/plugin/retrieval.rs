@@ -343,7 +343,7 @@ fn download_plugin(
 		));
 	}
 
-	let filename = url.path_segments().unwrap().last().unwrap();
+	let filename = url.path_segments().unwrap().next_back().unwrap();
 	std::fs::create_dir_all(download_dir).map_err(|e| {
 		hc_error!(
 			"Error [{}] creating download directory {}",
@@ -452,7 +452,7 @@ fn move_to_extract_dir(extract_dir: &Path, entry: &DirEntry) -> Result<(), Error
 	let remaining_path = entry
 		.path()
 		.components()
-		.last()
+		.next_back()
 		.ok_or_else(|| hc_error!("no last component: {}", entry.path().display()))
 		.map(|component| {
 			let path: &Path = component.as_ref();
