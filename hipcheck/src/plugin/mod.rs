@@ -16,7 +16,7 @@ pub use crate::plugin::{
 };
 use crate::policy_exprs::Expr;
 use crate::{error::Result, hc_error};
-pub use arch::{get_current_arch, try_set_arch, Arch};
+pub use arch::{get_current_arch, try_set_arch, Arch, KnownArch};
 pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
 use hipcheck_common::types::{Query, QueryDirection};
 pub use plugin_manifest::{
