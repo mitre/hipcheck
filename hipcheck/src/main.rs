@@ -37,6 +37,8 @@ use crate::{
 	setup::write_config_binaries,
 	shell::Shell,
 };
+use async_channel::bounded;
+use async_stream::stream;
 use cli::{
 	CacheOp, CachePluginArgs, CacheTargetArgs, CheckArgs, CliConfig, ConfigMode, FullCommands,
 	PluginArgs, PluginOp, ReadyArgs, SchemaArgs, SchemaCommand, UpdateArgs,
@@ -56,10 +58,11 @@ use std::{
 	path::{Path, PathBuf},
 	process::{Command, ExitCode},
 	result::Result as StdResult,
+	sync::Arc,
 	time::Duration,
 };
 use target::{TargetSeed, ToTargetSeed};
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, sync::Mutex};
 use tokio_stream::StreamExt;
 use util::command::DependentProgram;
 use util::fs::create_dir_all;
@@ -90,7 +93,11 @@ fn main() -> ExitCode {
 	}
 
 	match config.subcommand() {
-		Some(FullCommands::Check(mut args)) => return cmd_check(&mut args, &config),
+		Some(FullCommands::Check(mut args)) => {
+			// Panic: Safe to unwrap as Runtime::new() always returns as Ok
+			let runtime = Runtime::new().unwrap();
+			return runtime.block_on(cmd_check(&mut args, &config));
+		}
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
 		Some(FullCommands::Setup) => return cmd_setup(&config),
 		Some(FullCommands::Ready(args)) => return cmd_ready(&args, &config),
@@ -117,7 +124,7 @@ fn main() -> ExitCode {
 }
 
 /// Run the `check` command.
-fn cmd_check(args: &mut CheckArgs, config: &CliConfig) -> ExitCode {
+async fn cmd_check(args: &mut CheckArgs, config: &CliConfig) -> ExitCode {
 	// Before we do any analysis, set the user-provided arch
 	if let Some(arch) = &args.arch {
 		if let Err(e) = try_set_arch(arch) {
@@ -143,19 +150,17 @@ fn cmd_check(args: &mut CheckArgs, config: &CliConfig) -> ExitCode {
 
 	log::info!("Using configuration source: {}", config_mode);
 
-	// Panic: Safe to unwrap as Runtime::new() always returns as Ok
-	let runtime = Runtime::new().unwrap();
-
-	// TODO: In future work, we will not be looping through a collection of completed reports and emiting them all at once
 	match run(
 		target,
 		config_mode,
 		config.cache().map(ToOwned::to_owned),
 		config.exec().map(ToOwned::to_owned),
 		config.format(),
-	) {
+	)
+	.await
+	{
 		Ok(mut reports) => {
-			while let Some(report) = runtime.block_on(reports.next()) {
+			while let Some(report) = reports.next().await {
 				match report {
 					Ok(report) => {
 						if let Err(err) = Shell::print_report(report, config.format()) {
@@ -851,15 +856,22 @@ impl CheckKind {
 // This is for testing purposes.
 /// Now that we're fully-initialized, run Hipcheck's analyses.
 #[allow(clippy::too_many_arguments)]
-fn run(
+async fn run(
 	seed: TargetSeed,
 	config_mode: ConfigMode,
 	home_dir: Option<PathBuf>,
 	exec_path: Option<PathBuf>,
 	format: Format,
 ) -> Result<impl StreamExt<Item = Result<Report>>> {
-	// Initialize a base session that will be cloned for each Target.
-	let base_session = Session::new(config_mode, home_dir, exec_path, format)?;
+	// TODO: Have a CLI paramater so the user can specify this or else use a default value
+	let num_sessions = 10;
+
+	// Initialize a base session that will be cloned for use in parallel tasks.
+	let base_session = Session::new(config_mode, home_dir, exec_path, format).await?;
+
+	// Create a number of clones of the base session determined by the number of simultaneous tasks we want
+	let sessions = vec![base_session.clone(); num_sessions];
+	let (sender, receiver) = bounded(num_sessions);
 
 	// Print the prelude
 	Shell::print_prelude(seed.to_string());
@@ -870,28 +882,51 @@ fn run(
 	}
 
 	// Resolve the target from the target seed
-	// TODO: Once we are analyzing targets in parallel, we will not be loading the entire list of Targets at once
-	let targets = session::load_target(&seed, base_session.home())?;
+	let targets = Arc::new(Mutex::new(
+		session::load_target(&seed, base_session.home()).await?,
+	));
 
 	// Run analyses against a repo and score the results (score calls analyses that call metrics).
+	
 	let phase = SpinnerPhase::start("analyzing and scoring results");
 
 	// Enable steady ticking on the spinner, since we currently don't increment it manually.
 	phase.enable_steady_tick(Duration::from_millis(250));
 
-	// Run and score plugins, then generate the final collection of reports
-	// TODO: Once we are analyzing targets in parallel, we will be emitting scored reports as soon as they are build, instead of collecting them
-	let mut reports = Vec::new();
-	for target in targets {
-		// Clone a new session for each target
-		// TODO: Clone a fixed number of sessions, optionally specified by the user, and reuse them as they become free
-		let mut session = base_session.clone();
-		// Run plugins against the target, generate scores, and build a report
-		// Clear the Salsa db and reset the start time, in case we are re-using an existing session
-		let report = session.run(&phase, &target, true);
-		// Add report to report collection
-		reports.push(report);
+	// Run and score plugins, generate the final stream of reports
+	for session in sessions {
+		// Clone non-copy parameters for use in each Session task
+		let targets = Arc::clone(&targets);
+		let sender = sender.clone();
+		let phase = phase.clone();
+
+		tokio::spawn(async move {
+			// Get the next available target
+			let mut targets = targets.lock().await;
+			while let Some(target) = targets.next().await {
+				// Run plugins against the target, generate scores, and build a report
+				// Clear the Salsa db and reset the start time, in case we are re-using an existing session
+				
+				// Clone non-copy parameters again
+				let mut session = session.clone();
+				let phase = phase.clone();
+				// Use spawn_blocking because Salsa db's cannot be used in async code
+				let report = tokio::task::spawn_blocking(move || session.run(&phase, target, true))
+					.await;
+
+				// Send a report
+				sender.send(report).await.unwrap();
+			}
+		})
+		.await?
 	}
 
-	Ok(tokio_stream::iter(reports))
+	// Recieve reports into a Stream as they are generated
+	let reports = Box::pin(stream! {
+		while let Ok(report) = receiver.recv().await {
+			yield report?;
+		}
+	});
+
+	Ok(reports)
 }
