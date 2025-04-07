@@ -406,7 +406,7 @@ mod test {
 				remainder,
 			} => (drained_portion, remainder),
 		};
-		assert!((0..=max_size).contains(&drained.bytes().len()));
+		assert!((0..=max_size).contains(&drained.len()));
 
 		// ensure reassembling drained + remainder yields the original value
 		let mut reassembled = drained;

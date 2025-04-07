@@ -33,7 +33,7 @@ benchmarking = []
 [dependencies]
 
 base64 = "0.22.1"
-blake3 = "1.5.5"
+blake3 = "1.8.1"
 cyclonedx-bom = "0.8.0"
 dotenv = "0.15.0"
 chrono = { version = "0.4.40", features = ["alloc", "serde"] }
@@ -48,7 +48,7 @@ futures = "0.3.31"
 # Vendor libgit2 and openssl so that they will be statically included
 # and not cause problems on certain systems that might not have one or
 # the other.
-git2 = { version = "0.20.0", features = [
+git2 = { version = "0.20.1", features = [
     "vendored-libgit2",
     "vendored-openssl",
 ] }
@@ -109,7 +109,7 @@ tempfile = "3.17.1"
 tokio = { version = "1.44.1", features = ["rt", "rt-multi-thread", "sync", "time", "process", "fs"] }
 tokio-stream = "0.1.17"
 toml = "0.8.20"
-tonic = "0.12.3"
+tonic = "0.13.0"
 thiserror = "2.0.12"
 ureq = { version = "2.12.1", default-features = false, features = [
     "json",
