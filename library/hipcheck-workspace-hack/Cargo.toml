@@ -114,37 +114,37 @@ zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169" }
 linux-raw-sys = { version = "0.4.14", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std"] }
-rustix = { version = "0.38.40", features = ["fs", "termios"] }
+rustix = { version = "1.0.5", features = ["fs", "termios"] }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169" }
 linux-raw-sys = { version = "0.4.14", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std"] }
-rustix = { version = "0.38.40", features = ["fs", "termios"] }
+rustix = { version = "1.0.5", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.dependencies]
 bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
-rustix = { version = "0.38.40", features = ["fs", "termios"] }
+rustix = { version = "1.0.5", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.build-dependencies]
 bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
-rustix = { version = "0.38.40", features = ["fs", "termios"] }
+rustix = { version = "1.0.5", features = ["fs", "termios"] }
 
 [target.aarch64-apple-darwin.dependencies]
 bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
-rustix = { version = "0.38.40", features = ["fs", "termios"] }
+rustix = { version = "1.0.5", features = ["fs", "termios"] }
 
 [target.aarch64-apple-darwin.build-dependencies]
 bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
-rustix = { version = "0.38.40", features = ["fs", "termios"] }
+rustix = { version = "1.0.5", features = ["fs", "termios"] }
 
 [target.x86_64-pc-windows-msvc.dependencies]
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
