@@ -28,12 +28,10 @@ futures-channel = { version = "0.3.31", features = ["sink"] }
 futures-sink = { version = "0.3.31" }
 futures-task = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["async-await-macro", "channel", "io", "sink"] }
-getrandom-6f8ce4dd05d13bba = { package = "getrandom", version = "0.2.15", default-features = false, features = ["std"] }
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.2" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = ["raw"] }
 idna = { version = "1.0.3", default-features = false, features = ["compiled_data", "std"] }
-indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1.9.3", default-features = false, features = ["serde-1"] }
-indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2.7.1", features = ["serde"] }
+indexmap = { version = "2.7.1", features = ["serde"] }
 itertools = { version = "0.13.0" }
 jiff = { version = "0.1.16", features = ["serde"] }
 libz-sys = { version = "1.1.20", default-features = false, features = ["libc"] }
@@ -76,12 +74,10 @@ futures-channel = { version = "0.3.31", features = ["sink"] }
 futures-sink = { version = "0.3.31" }
 futures-task = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["async-await-macro", "channel", "io", "sink"] }
-getrandom-6f8ce4dd05d13bba = { package = "getrandom", version = "0.2.15", default-features = false, features = ["std"] }
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.2" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = ["raw"] }
 idna = { version = "1.0.3", default-features = false, features = ["compiled_data", "std"] }
-indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1.9.3", default-features = false, features = ["serde-1"] }
-indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2.7.1", features = ["serde"] }
+indexmap = { version = "2.7.1", features = ["serde"] }
 itertools = { version = "0.13.0" }
 jiff = { version = "0.1.16", features = ["serde"] }
 libz-sys = { version = "1.1.20", default-features = false, features = ["libc"] }
@@ -111,48 +107,48 @@ winnow = { version = "0.6.22", features = ["simd", "unstable-recover"] }
 zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
-getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
+getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169" }
 linux-raw-sys = { version = "0.4.14", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
-getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
+getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169" }
 linux-raw-sys = { version = "0.4.14", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.dependencies]
 bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
-getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
+getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.build-dependencies]
 bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
-getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
+getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.aarch64-apple-darwin.dependencies]
 bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
-getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
+getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.aarch64-apple-darwin.build-dependencies]
 bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
-getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
+getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.x86_64-pc-windows-msvc.dependencies]
-getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
+getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 windows-sys-73dcd821b1037cfd = { package = "windows-sys", version = "0.59.0", features = ["Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Console", "Win32_System_Time", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell"] }
 windows-sys-b21d60becc0929df = { package = "windows-sys", version = "0.52.0", features = ["Wdk_Foundation", "Wdk_Storage_FileSystem", "Wdk_System_IO", "Win32_Foundation", "Win32_Networking_WinSock", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_IO", "Win32_System_Memory", "Win32_System_Pipes", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming"] }
 
 [target.x86_64-pc-windows-msvc.build-dependencies]
-getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
+getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 windows-sys-73dcd821b1037cfd = { package = "windows-sys", version = "0.59.0", features = ["Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Console", "Win32_System_Time", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell"] }
 windows-sys-b21d60becc0929df = { package = "windows-sys", version = "0.52.0", features = ["Wdk_Foundation", "Wdk_Storage_FileSystem", "Wdk_System_IO", "Win32_Foundation", "Win32_Networking_WinSock", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_IO", "Win32_System_Memory", "Win32_System_Pipes", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming"] }
 
