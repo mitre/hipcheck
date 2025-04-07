@@ -2360,7 +2360,7 @@ dependencies = [
  "sha2",
  "smallvec",
  "strum 0.27.1",
- "syn 2.0.96",
+ "syn 2.0.100",
  "tokio",
  "tokio-stream",
  "tracing-core",
