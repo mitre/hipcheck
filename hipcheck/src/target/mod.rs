@@ -80,6 +80,11 @@ impl TargetType {
 				Ok(_) => Some((Repo, tgt.to_string())),
 				Err(_) => None,
 			}
+		// Otherwise, check if it a git protocol URL
+		} else if tgt.starts_with("git://") {
+			// Remove Git protocol prefix, and fetch Repo over http
+			let tgt_trimmed = tgt.replace("git://", "https://");
+			Some((Repo, tgt_trimmed.to_string()))
 		// Otherwise, check if it is a GitHub repo URL
 		} else if tgt.starts_with("https://github.com/") {
 			Some((Repo, tgt.to_string()))
