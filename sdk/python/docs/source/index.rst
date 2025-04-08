@@ -6,13 +6,10 @@
 hipcheck-sdk documentation
 ==========================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
-
+API documentation for the `Hipcheck <https://hipcheck.mitre.org>`_ plugin SDK.
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   modules
+   hipcheck_sdk
