@@ -2281,6 +2281,7 @@ name = "hipcheck-sdk"
 version = "0.5.0"
 dependencies = [
  "anyhow",
+ "console",
  "futures",
  "hipcheck-common",
  "hipcheck-sdk-macros",
