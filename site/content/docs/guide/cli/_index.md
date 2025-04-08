@@ -47,4 +47,8 @@ Complete post-installation setup of Hipcheck.
 Have Hipcheck update itself.
 {% end %}
 
+{% waypoint(title="hc explain", path="@/docs/guide/cli/hc-explain.md", icon="info", mono=true) %}
+Understand any Hipcheck-specific logic.
+{% end %}
+
 </div>

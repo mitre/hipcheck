@@ -1340,6 +1340,7 @@ impl TryFrom<Vec<String>> for PluginCacheDeleteScope {
 	}
 }
 #[derive(Debug, Clone, clap::Args)]
+#[command(hide = true)]
 pub struct PluginArgs {
 	#[arg(long = "async")]
 	pub asynch: bool,
@@ -1370,7 +1371,7 @@ impl Format {
 
 // Help subcommand
 #[derive(Debug, Clone, clap::Parser)]
-#[command(arg_required_else_help = true)] // idk
+#[command(arg_required_else_help = true)]
 pub struct ExplainArgs {
 	#[clap(subcommand)]
 	pub subcmd: ExplainSubcmds,
