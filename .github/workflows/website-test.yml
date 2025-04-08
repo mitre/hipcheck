@@ -33,6 +33,7 @@ jobs:
             site:
               - "site/**"
               - "sdk/python/src/**"
+              - "sdk/python/pyproject.toml"
 
       # Install the latest version of Zola.
       - name: Install Zola

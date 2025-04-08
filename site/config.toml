@@ -61,6 +61,7 @@ footer = [
         { name = "Packages", title = true },
         { name = "Hipcheck", url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.12.0", external = true },
         { name = "Rust Plugin SDK", url = "https://crates.io/crates/hipcheck-sdk", external = true },
+        { name = "Python Plugin SDK", url = "https://pypi.org/project/hipcheck-sdk/", external = true },
     ],
     [
         { name = "Contribute", title = true },
