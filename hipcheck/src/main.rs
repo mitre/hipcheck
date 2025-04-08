@@ -288,13 +288,29 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 		return ExitCode::FAILURE;
 	};
 
-	if !tgt_conf_path.exists() && create_dir_all(tgt_conf_path).is_err() {
-		Shell::print_error(
-			&hc_error!("failed to create missing target config dir"),
-			Format::Human,
+	if !tgt_conf_path.exists() {
+		log::debug!(
+			"{:?} does not exist. Attempting to create directory",
+			tgt_conf_path
 		);
+		if create_dir_all(tgt_conf_path).is_err() {
+			Shell::print_error(
+				&hc_error!(
+					"Failed to create target config dir {}. Hipcheck may be 
+					defaulting to a directory that requires escalated privileges. You can resolve 
+					this by specifying a custom target config directory with `hc setup --config [path]`. 
+					You may alternatively run `hc setup` with elevated privileges.",
+					tgt_conf_path.to_string_lossy()
+				),
+				Format::Human,
+			);
+		}
 	}
 
+	log::debug!(
+		"Attempting to canonicalize HC_CONFIG path {:?}",
+		tgt_conf_path
+	);
 	let Ok(abs_conf_path) = tgt_conf_path.canonicalize() else {
 		Shell::print_error(
 			&hc_error!("failed to canonicalize HC_CONFIG path"),
@@ -304,6 +320,7 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 	};
 
 	// Write config file binaries to target directory
+	log::debug!("Attempted to write config binaries to {:?}", tgt_conf_path);
 	if let Err(e) = write_config_binaries(tgt_conf_path) {
 		Shell::print_error(
 			&hc_error!("failed to write config binaries to config dir {}", e),
