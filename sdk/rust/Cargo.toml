@@ -27,6 +27,7 @@ tracing = { version= "0.1", optional = true }
 tracing-subscriber = { version="0.3", features=["env-filter", "json"], optional = true }
 hipcheck-common = { version = "0.4.0", path = "../../library/hipcheck-common" }
 hipcheck-workspace-hack = { version = "0.1", path = "../../library/hipcheck-workspace-hack" }
+console = { version = "0.15.11", features = ["windows-console-colors"] }
 
 [features]
 default = ["log_forwarding"]
