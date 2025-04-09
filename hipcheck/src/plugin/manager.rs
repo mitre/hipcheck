@@ -372,7 +372,10 @@ impl PluginExecutor {
 			});
 		}
 		Err(hc_error!(
-			"Reached max spawn attempts for plugin {}",
+			"Reached max spawn attempts for plugin {}. If you believe the plugin should have \
+ 			started, consider using a custom Exec.kdl file and increasing startup parameters \
+ 			such as `backoff-interval`, `max-spawn-attempts`, and `max-conn-attempts`. See \
+ 			<https://hipcheck.mitre.org/docs/guide/config/exec-file/>.",
 			plugin.name
 		))
 	}
