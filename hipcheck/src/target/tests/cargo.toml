@@ -34,7 +34,6 @@ benchmarking = []
 
 base64 = "0.22.1"
 blake3 = "1.8.1"
-cargo_toml = "0.22.1"
 cyclonedx-bom = "0.8.0"
 dotenv = "0.15.0"
 chrono = { version = "0.4.40", features = ["alloc", "serde"] }

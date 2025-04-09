@@ -8,6 +8,7 @@ use crate::{
 	util::http::agent,
 };
 
+use cargo_toml::Manifest;
 use gomod_rs::{Context as GmContext, Directive, Identifier};
 use regex::Regex;
 use serde::Deserialize;
@@ -246,6 +247,31 @@ pub(crate) async fn resolve_package_lock_json(path: &Path) -> Result<Vec<SingleT
 	Ok(dependencies_vec)
 }
 
+// if implementing entire struct and parsing with toml crate:
+// #[derive(Debug, Deserialize)]
+// struct CargoToml {
+//     dependencies: Option<Vec<CargoTomlDependency>>,
+//     dev_dependencies: Option<Vec<CargoTomlDependency>>,
+//     build_dependencies: Option<Vec<CargoTomlDependency>>,
+// }
+
+// #[derive(Debug, Deserialize)]
+// struct CargoTomlDependency {
+
+// }
+
+pub(crate) async fn resolve_cargo_toml(path: &Path) -> Result<Vec<SingleTargetSeed>> {
+	// let content = tokio::fs::read_to_string(path).await?;
+	// let cargo_toml: CargoToml = toml::from_str(&content)?;
+
+	let manifest = Manifest::from_path(path).unwrap();
+	// https://docs.rs/cargo_toml/latest/cargo_toml/struct.Manifest.html
+
+	// TODO: get dependencies from struct
+	// TODO: resolve to SingleTargetSeeds
+	Err(hc_error!("unfinished!"))
+}
+
 #[cfg(test)]
 mod tests {
 	use std::path::PathBuf;
@@ -353,5 +379,15 @@ mod tests {
 				specifier,
 			})
 		);
+	}
+
+	#[tokio::test]
+	async fn test_resolve_cargo_toml() {
+		let manifest = env!("CARGO_MANIFEST_DIR");
+		let path_json: PathBuf = [manifest, "src", "target", "tests", "cargo.toml"]
+			.iter()
+			.collect();
+		let mut target_seeds = resolve_cargo_toml(&path_json).await.unwrap();
+		assert_eq!(target_seeds.len(), 50);
 	}
 }

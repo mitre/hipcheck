@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use super::{
 	cyclone_dx::{extract_cyclonedx_download_url, BomTarget},
-	multi::resolve_package_lock_json,
+	multi::{resolve_cargo_toml, resolve_package_lock_json},
 	pm::{detect_and_extract, extract_repo_for_maven},
 	spdx::extract_spdx_download_url,
 };
@@ -424,6 +424,7 @@ impl MultiTargetSeed {
 		match &self.kind {
 			MultiTargetSeedKind::GoMod(path) => resolve_go_mod(path).await,
 			MultiTargetSeedKind::PackageLockJson(path) => resolve_package_lock_json(path).await,
+			MultiTargetSeedKind::CargoToml(path) => resolve_cargo_toml(path).await,
 		}
 	}
 }
