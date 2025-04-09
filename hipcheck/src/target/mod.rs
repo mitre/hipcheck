@@ -60,6 +60,8 @@ pub enum TargetType {
 	Repo,
 	Request,
 	Sbom,
+	#[serde(rename = "package-lock-json")]
+	PackageLockJson,
 }
 
 impl TargetType {
@@ -96,6 +98,9 @@ impl TargetType {
 			|| tgt.ends_with(".cdx.xml")
 		{
 			Some((Sbom, tgt.to_string()))
+		// Otherwise check if it is a package-lock.json for a local npm project
+		} else if tgt.ends_with("package-lock.json") {
+			Some((PackageLockJson, tgt.to_string()))
 		// If is path to a file/dir that exists, treat as a local Repo
 		} else if PathBuf::from(tgt).exists() {
 			Some((Repo, tgt.to_string()))
