@@ -506,11 +506,14 @@ pub struct QueryResult {
 	pub concerns: Vec<String>,
 }
 
+// Cal TODO remove unused
+#[allow(unused)]
 #[derive(Clone, Debug)]
 pub enum PluginResponse {
 	RemoteClosed,
 	AwaitingResult(AwaitingResult),
 	Completed(QueryResult),
+	Error(String),
 }
 
 impl From<Option<Query>> for PluginResponse {
@@ -529,6 +532,7 @@ impl From<Query> for PluginResponse {
 				value: value.output,
 				concerns: value.concerns,
 			};
+			// Cal TODO not all responses are complete, if some are errors
 			PluginResponse::Completed(result)
 		} else {
 			PluginResponse::AwaitingResult(value.into())
