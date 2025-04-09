@@ -159,7 +159,7 @@ struct DeprecatedArgs {
 	quiet: Option<bool>,
 
 	/// Use JSON output format.
-	#[arg(short = 'j', long = "json", hide = true, global = true)]
+	#[arg(long = "json", hide = true, global = true)]
 	json: Option<bool>,
 
 	/// Print the home directory for Hipcheck.
@@ -529,6 +529,10 @@ pub struct CheckArgs {
 	/// The ref (e.g. commit hash, branch, tag) of the target to analyze
 	#[clap(long = "ref", value_name = "REF")]
 	pub git_ref: Option<String>,
+
+	/// The number of parallel jobs to run at once against a multi-target run of Hipcheck (default 5)
+	#[clap(short = 'j', long = "jobs")]
+	pub num_jobs: Option<usize>,
 
 	#[clap(subcommand)]
 	command: Option<CheckCommand>,
@@ -1350,6 +1354,8 @@ pub enum Format {
 	/// Human-readable format.
 	#[default]
 	Human,
+	/// Summary format, suitable for multi-target runs with minimal information printed for each target
+	Summary,
 }
 
 impl Format {

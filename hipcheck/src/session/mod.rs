@@ -194,15 +194,29 @@ impl fmt::Debug for Session {
 impl Session {
 	/// Construct a new `Session` which owns all the data needed in later phases.
 	#[allow(clippy::too_many_arguments)]
-	pub fn new(
+	pub async fn new(
 		config_mode: ConfigMode,
 		home_dir: Option<PathBuf>,
 		exec_path: Option<PathBuf>,
 		format: Format,
 	) -> StdResult<Session, Error> {
-		let session_builder = setup_base_session(config_mode, home_dir, exec_path, format)?;
+		let session_builder = setup_base_session(config_mode, home_dir, exec_path, format).await?;
 
 		session_builder.build()
+	}
+
+	/// Creates a new `Session` with the same `format`, `home`, `policy_file`, and `exec_config` as another `Session`, for a run against a new `Target`
+	/// Clears `storage` and resets `started_at`. `core` is passed as an argument for reuse from a prior session.
+	pub fn new_with_core(&self, core: Arc<HcPluginCore>) -> Session {
+		Session {
+			storage: Default::default(),
+			format: self.format,
+			home: self.home.clone(),
+			policy_file: self.policy_file.clone(),
+			exec_config: self.exec_config.clone(),
+			started_at: chrono::Local::now(),
+			core,
+		}
 	}
 
 	pub fn home(&self) -> &Path {
@@ -223,13 +237,7 @@ impl Session {
 		self.format
 	}
 
-	pub fn run(&mut self, phase: &SpinnerPhase, target: &Target, clear_db: bool) -> Result<Report> {
-		// Clear the Salsa db and reset the start time if told to do so
-		if clear_db {
-			self.storage = Default::default();
-			self.started_at = chrono::Local::now();
-		}
-
+	pub fn run(&mut self, phase: &SpinnerPhase, target: &Target) -> Result<Report> {
 		// Score the target
 		let scoring = score_results(phase, self, target)?;
 
@@ -263,7 +271,12 @@ impl ReadySession {
 		exec_path: Option<PathBuf>,
 		format: Format,
 	) -> StdResult<ReadySession, Error> {
-		let session_builder = setup_base_session(config_mode, home_dir, exec_path, format)?;
+		// Since a `ReadySession` is not used for `hc check`, we can call `block_on` here to contain async code
+
+		// Panic: Safe to unwrap as Runtime::new() always returns as Ok
+		let runtime = Runtime::new().unwrap();
+		let session_builder =
+			runtime.block_on(setup_base_session(config_mode, home_dir, exec_path, format))?;
 		session_builder.build_ready()
 	}
 }
@@ -271,7 +284,7 @@ impl ReadySession {
 /// Set up a `SessionBuilder`, with everything but the target.
 /// This allows the setup logic to be shared between `hc check`
 /// and `hc ready`, since `hc ready` does not use a target.
-fn setup_base_session(
+async fn setup_base_session(
 	config_mode: ConfigMode,
 	home_dir: Option<PathBuf>,
 	exec_path: Option<PathBuf>,
@@ -352,7 +365,7 @@ fn setup_base_session(
 	let phase = SpinnerPhase::start("starting plugins");
 	phase.inc();
 	phase.enable_steady_tick(Duration::from_millis(100));
-	let core = start_plugins(&policy, &plugin_cache, executor)?;
+	let core = start_plugins(&policy, &plugin_cache, executor).await?;
 	phase.finish_successful();
 
 	session_builder.set_core(core);
@@ -457,7 +470,10 @@ fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
 	Ok(exec_config)
 }
 
-pub fn load_target(seed: &TargetSeed, home: &Path) -> Result<Vec<Target>> {
+pub async fn load_target(
+	seed: &TargetSeed,
+	home: &Path,
+) -> Result<impl StreamExt<Item = Result<Target>>> {
 	// Resolve the source specifier into an actual source.
 	match seed {
 		TargetSeed::Single(single_target_seed) => {
@@ -478,25 +494,11 @@ pub fn load_target(seed: &TargetSeed, home: &Path) -> Result<Vec<Target>> {
 				cache: PathBuf::from(home),
 			};
 
-			// Panic: Safe to unwrap as Runtime::new() always returns as Ok
-			let runtime = Runtime::new().unwrap();
+			let targets = seed.get_targets(config);
 
-			let res_targets: Result<Result<Vec<Target>>> = runtime.block_on(async {
-				Ok(seed
-					.get_targets(config)
-					.await?
-					.collect::<Result<Vec<Target>>>()
-					.await)
-			});
-			let targets = res_targets??;
-			if targets.len() != 1 {
-				log::error!("load_target produced {} targets, expected 1", targets.len());
-				return Err(hc_error!(
-					"TargetSeed::Single did not produce exactly one target"
-				));
-			}
 			phase.finish_successful();
-			Ok(targets)
+
+			targets.await
 		}
 		TargetSeed::Multi(_multi_target_seed) => todo!(),
 	}

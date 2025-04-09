@@ -194,7 +194,7 @@ impl HcEngineImpl {
 	// analysis plugin to kick off the execution
 }
 
-pub fn start_plugins(
+pub async fn start_plugins(
 	policy_file: &PolicyFile,
 	plugin_cache: &HcPluginCache,
 	executor: PluginExecutor,
@@ -244,7 +244,6 @@ pub fn start_plugins(
 		plugins.push(plugin_with_config);
 	}
 
-	let runtime = RUNTIME.handle();
-	let core = runtime.block_on(HcPluginCore::new(executor, plugins))?;
+	let core = HcPluginCore::new(executor, plugins).await?;
 	Ok(Arc::new(core))
 }

@@ -26,6 +26,7 @@ use std::{
 	fmt::Display,
 	ops::Not,
 	path::{Path, PathBuf},
+	pin::Pin,
 	sync::LazyLock,
 };
 
@@ -433,7 +434,7 @@ impl TargetSeed {
 	pub async fn get_targets(
 		&self,
 		config: TargetResolverConfig,
-	) -> Result<impl StreamExt<Item = Result<Target>>> {
+	) -> Result<Pin<Box<impl StreamExt<Item = Result<Target>>>>> {
 		let seed_vec = match self {
 			TargetSeed::Single(single_target_seed) => vec![single_target_seed.clone()],
 			TargetSeed::Multi(multi_target_seed) => multi_target_seed.get_target_seeds().await?,
@@ -441,6 +442,6 @@ impl TargetSeed {
 		let it = tokio_stream::iter(seed_vec)
 			// Since `then()` can only take one arg, we combine the config and seed into a tuple
 			.map(move |x| (config.clone(), x));
-		Ok(it.then(TargetResolver::resolve_map))
+		Ok(Box::pin(it.then(TargetResolver::resolve_map)))
 	}
 }

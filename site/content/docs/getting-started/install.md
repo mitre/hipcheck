@@ -149,7 +149,7 @@ Hipcheck image, you might run:
 
 ```sh
 $ export HC_GITHUB_TOKEN=<TOKEN_VALUE>
-$ docker run -e HC_GITHUG_TOKEN=$HC_GITHUB_TOKEN mitre/hipcheck:latest check https://github.com/mitre/hipcheck
+$ docker run -e HC_GITHUB_TOKEN=$HC_GITHUB_TOKEN mitre/hipcheck:latest check https://github.com/mitre/hipcheck
 ```
 
 ### Using the `Containerfile`

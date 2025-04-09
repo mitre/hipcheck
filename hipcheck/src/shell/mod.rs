@@ -83,6 +83,15 @@ const TEMPLATE: &str = r#"
 {%- endif %}
 {%- endif %}"#;
 
+///MiniJina template for summary output
+const SUMMARY_TEMPLATE: &str = r#"
+{% if recommendation.kind == "Pass" -%}
+{{ indent() }} '{{ repo_name }}': {{ title("SummaryPass") }} risk rated as {{ recommendation.risk_score }}, policy was {{ recommendation.risk_policy }}
+{% elif recommendation.kind == "Investigate" -%}
+{{ target(repo_name) }}: {{ title("SummaryInvestigate") }} {% if recommendation.reason is string and recommendation.reason == "Policy" -%} recommendation.risk rated as {{ recommendation.risk_score }}, policy was {{ recommendation.risk_policy }} {%- elif recommendation.reason.FailedAnalyses is sequence -%} the following investigate-if-fail plugins failed: {% for f in recommendation.reason.FailedAnalyses %}{{f}} {% endfor %}
+{%- endif %}
+{%- endif %}"#;
+
 /// Type interface to the global shell used to produce output in the user's terminal.
 #[derive(Debug)]
 pub struct Shell {
@@ -327,6 +336,7 @@ impl Shell {
 			Format::Json => print_json(report),
 			Format::Debug => print_json(report),
 			Format::Human => print_human(report),
+			Format::Summary => print_summary(report),
 		}
 	}
 }
@@ -386,6 +396,26 @@ fn print_human(report: Report) -> Result<()> {
 	Ok(())
 }
 
+fn print_summary(report: Report) -> Result<()> {
+	// Turn the JSON serializable report into a one-line summary report, suitable for multi-target runs
+
+	// '<repo_name>': PASS risk rated as 0.4, policy was (gt 0.5 $)
+
+	// Create the MiniJinja environment
+	let mut env = Environment::new();
+	// Add additional filters and functions
+	minijinja_contrib::add_to_environment(&mut env);
+	env.add_function("target", print_target);
+	env.add_function("title", print_title);
+	// Add template
+	env.add_template("summary", SUMMARY_TEMPLATE)?;
+	// Print the report as formatted in the template
+	let template = env.get_template("summary")?;
+	macros::println!("{}", template.render(report)?);
+
+	Ok(())
+}
+
 /// The "title" of a message; may be accompanied by a timestamp or outcome.
 #[derive(Debug)]
 #[allow(unused)]
@@ -404,6 +434,8 @@ enum Title {
 	ErroredSection,
 	/// "Recommendation"
 	RecommendationSection,
+	/// "Target"
+	Target,
 	/// An analysis passed.
 	Passed,
 	/// An analysis failed.
@@ -434,6 +466,7 @@ impl Title {
 			FailingSection => "Failing",
 			ErroredSection => "Errored",
 			RecommendationSection => "Recommendation",
+			Target => "Target",
 			Passed => "+",
 			Failed => "-",
 			Errored => "?",
@@ -450,9 +483,12 @@ impl Title {
 		use Title::*;
 
 		let color = match self {
-			Analyzed | PassingSection | FailingSection | ErroredSection | RecommendationSection => {
-				Some(Blue)
-			}
+			Analyzed
+			| PassingSection
+			| FailingSection
+			| ErroredSection
+			| RecommendationSection
+			| Target => Some(Blue),
 			Analyzing | Done | Config => Some(Cyan),
 			InProgress => Some(Magenta),
 			Passed | Pass => Some(Green),
@@ -499,14 +535,25 @@ fn print_title(title: &str) -> String {
 		"FailingSection" => format!("{:>LEFT_COL_WIDTH$}", Title::FailingSection),
 		"ErroredSection" => format!("{:>LEFT_COL_WIDTH$}", Title::ErroredSection),
 		"RecommendationSection" => format!("{:>LEFT_COL_WIDTH$}", Title::RecommendationSection),
+		"Target" => format!("{:>LEFT_COL_WIDTH$}", Title::Target),
 		"Passed" => format!("{:>LEFT_COL_WIDTH$}", Title::Passed),
 		"Failed" => format!("{:>LEFT_COL_WIDTH$}", Title::Failed),
 		"Errored" => format!("{:>LEFT_COL_WIDTH$}", Title::Errored),
 		"Pass" => format!("{:>LEFT_COL_WIDTH$}", Title::Pass),
 		"Investigate" => format!("{:>LEFT_COL_WIDTH$}", Title::Investigate),
+		"SummaryPass" => format!("{}", Title::Pass),
+		"SummaryInvestigate" => format!("{}", Title::Investigate),
 		// Returns an empty String on a failed match because a minijinja function cannot return a Result or Option
 		_ => "".to_string(),
 	}
+}
+
+fn print_target(target: &str) -> String {
+	let mut target_title = print_title("Target");
+	target_title.push(' ');
+	target_title.push_str(target);
+
+	target_title
 }
 
 fn indent() -> String {
