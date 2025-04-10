@@ -98,9 +98,14 @@ fn main() -> ExitCode {
 
 	match config.subcommand() {
 		Some(FullCommands::Check(mut args)) => {
-			// Panic: Safe to unwrap as Runtime::new() always returns as Ok
-			let runtime = Runtime::new().unwrap();
-			return runtime.block_on(cmd_check(&mut args, &config));
+			// Create a new runtime for the check command, which uses async code
+			match Runtime::new() {
+				Ok(runtime) => return runtime.block_on(cmd_check(&mut args, &config)),
+				Err(e) => Shell::print_error(
+					&hc_error!("could not create new tokio runtime: {}", e.to_string()),
+					Format::Human,
+				),
+			}
 		}
 		Some(FullCommands::Schema(args)) => cmd_schema(&args),
 		Some(FullCommands::Setup) => return cmd_setup(&config),
