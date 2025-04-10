@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-mod git2_log_shim;
-mod git2_rustls_transport;
 mod indicatif_log_bridge;
 
 use crate::shell::{verbosity::Verbosity, Shell};
@@ -15,7 +13,6 @@ use rustls::crypto::{ring, CryptoProvider};
 pub fn init() {
 	init_shell();
 	init_logging();
-	init_libgit2();
 	init_cryptography();
 	init_software_versions();
 }
@@ -30,17 +27,6 @@ fn init_logging() {
 	indicatif_log_bridge::LogWrapper(logger)
 		.try_init()
 		.expect("logging initialization must succeed");
-}
-
-fn init_libgit2() {
-	// Tell the `git2` crate to pass its tracing messages to the log crate.
-	git2_log_shim::git2_set_trace_log_shim();
-
-	// Make libgit2 use a rustls + ureq based transport for executing the git
-	// protocol over http(s). I would normally just let libgit2 use its own
-	// implementation but have seen that this rustls/ureq transport is 2-3 times
-	// faster on my machine — enough of a performance bump to warrant using this.
-	git2_rustls_transport::register();
 }
 
 fn init_cryptography() {

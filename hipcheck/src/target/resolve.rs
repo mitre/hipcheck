@@ -11,11 +11,11 @@ use crate::{
 	shell::spinner_phase::SpinnerPhase,
 	source::{
 		build_unknown_remote_clone_dir, clone_local_repo_to_cache, get_remote_repo_from_url, git,
-		try_resolve_remote_for_local,
+		try_resolve_remote_for_local, GitProgressRenderHandle,
 	},
 	target::{multi::resolve_go_mod, types::*},
 };
-use git2::{AnnotatedCommit, Repository};
+use gix::Object;
 use pathbuf::pathbuf;
 use regex::Regex;
 use semver::Version;
@@ -73,6 +73,17 @@ impl TargetResolver {
 		}
 	}
 
+	/// Hide the progress bar temporarily, execute `f`, then redraw the progress bar
+	///
+	/// Useful for external code that writes to the standard output.
+	pub fn suspend_status<F: FnOnce() -> R, R>(&self, f: F) -> R {
+		if let Some(phase) = &self.config.phase {
+			phase.suspend(f)
+		} else {
+			f()
+		}
+	}
+
 	/// Accessor method to ensure immutability of `config` field
 	pub fn get_config(&self) -> &TargetResolverConfig {
 		&self.config
@@ -90,8 +101,7 @@ impl TargetResolver {
 			// if ref provided on CLI, use that
 			Some(refspec.clone())
 		} else if let Some(pkg) = &self.package {
-			// Open the repo with git2.
-			let repo: Repository = Repository::open(repo_path)?;
+			let repo: gix::Repository = gix::open(repo_path)?;
 
 			let cmt = {
 				// If the package was specified with a version, try fuzzy matching it with the repo tags
@@ -212,7 +222,7 @@ impl ResolveRepo for LocalGitRepo {
 		};
 
 		// Checkout specified ref
-		self.git_ref = git::checkout(&self.path, init_ref)?;
+		self.git_ref = git::checkout(&self.path, init_ref)?.to_string();
 
 		log::debug!("Resolved git ref was '{}'", &self.git_ref);
 
@@ -249,19 +259,27 @@ impl ResolveRepo for RemoteGitRepo {
 			}
 		};
 
-		// Clone remote repo if not exists
-		if path.exists().not() {
-			t.update_status("cloning");
-			git::clone(&self.url, &path)
-				.map_err(|e| hc_error!("failed to clone remote repository {}", e))?;
-		} else {
-			t.update_status("pulling");
-		}
-		// Whether we cloned or not, we need to fetch so we get tags
-		git::fetch(&path).context("failed to fetch updates from remote repository")?;
+		// NOTE: suspend_status is needed, otherwise the Shell ProgressBars and progress bars
+		// tracking git operation progress fight over the terminal
+		t.suspend_status(|| -> std::result::Result<(), crate::Error> {
+			// when this goes out of scope, the render thread will die
+			let progress_root = prodash::tree::Root::new();
+			// do not drop this until the end of the scope, otherwise the render thread will die
+			let _handle = GitProgressRenderHandle::new(progress_root.clone());
+
+			// Clone remote repo if not exists
+			if path.exists().not() {
+				git::clone(&self.url, &path, progress_root.clone())
+					.context("failed to clone remote repository")?;
+			}
+			// Whether we cloned or not, we need to fetch so we get tags
+			git::fetch(&path, progress_root.clone())
+				.context("failed to fetch updates from remote repository")?;
+			Ok(())
+		})?;
 
 		let refspec = t.get_checkout_target(&path)?;
-		let git_ref = git::checkout(&path, refspec)?;
+		let git_ref = git::checkout(&path, refspec)?.to_string();
 		log::debug!("Resolved git ref was '{}'", &git_ref);
 
 		let local = LocalGitRepo { path, git_ref };
@@ -328,9 +346,9 @@ impl ResolveRepo for Sbom {
 }
 
 fn fuzzy_match_package_version<'a>(
-	repo: &'a Repository,
+	repo: &'a gix::Repository,
 	package: &Package,
-) -> Result<AnnotatedCommit<'a>> {
+) -> Result<Object<'a>> {
 	let version = &package.version;
 	let pkg_name = &package.name;
 
@@ -347,11 +365,11 @@ fn fuzzy_match_package_version<'a>(
 		format!("{pkg_name}@v{version}"),
 	];
 
-	let mut opt_tgt_ref: Option<AnnotatedCommit> = None;
+	let mut opt_tgt_ref: Option<gix::Object> = None;
 	for tag_str in potential_tags {
-		if let Ok(obj) = repo.revparse_single(&tag_str) {
+		if let Ok(obj) = repo.rev_parse_single(tag_str.as_str()) {
 			log::debug!("revparse_single succeeded on '{}'", tag_str);
-			opt_tgt_ref = Some(repo.find_annotated_commit(obj.peel_to_commit()?.id())?);
+			opt_tgt_ref = Some(repo.find_object(obj)?);
 			break;
 		} else {
 			log::trace!("Tried and failed to find a tag '{tag_str}' in repo");
@@ -373,29 +391,33 @@ static SEMVER_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 	Regex::new(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?").unwrap()
 });
 
-fn try_get_version_from_tag(opt_tag: Option<&str>) -> Option<(Version, String)> {
-	if let Some(tag_str) = opt_tag {
-		SEMVER_REGEX.captures(tag_str).and_then(|m| {
-			Version::parse(m.get(0).unwrap().as_str())
-				.ok()
-				.map(|v| (v, tag_str.to_owned()))
-		})
-	} else {
-		None
-	}
+fn try_get_version_from_tag(tag: &str) -> Option<(Version, String)> {
+	SEMVER_REGEX.captures(tag).and_then(|m| {
+		Version::parse(m.get(0).unwrap().as_str())
+			.ok()
+			.map(|v| (v, tag.to_owned()))
+	})
+}
+
+/// get all of the git tags present in a repository
+fn get_all_tags(repo: &gix::Repository) -> Result<Vec<String>> {
+	let tags = repo.refs.iter()?.prefixed("refs/tags".as_ref()).map(|t| {
+		t.into_iter()
+			.filter_map(|x| x.ok())
+			.map(|x| x.name.shorten().to_string())
+			.collect::<Vec<String>>()
+	})?;
+	Ok(tags)
 }
 
 // @SpeedUp - could reverse the `tag_names()` iterator and just find the first tag that matches the
 // regex in `try_get_version_from_tag()`.
-fn try_find_commit_for_latest_version_tag(
-	repo: &Repository,
-) -> Result<Option<AnnotatedCommit<'_>>> {
+fn try_find_commit_for_latest_version_tag(repo: &gix::Repository) -> Result<Option<gix::Object>> {
 	// Iterate through the tags in the repo and filter for those that have a semver version embedded
 	// in the name
-	let mut tags: Vec<(Version, String)> = repo
-		.tag_names(None)?
-		.iter()
-		.filter_map(try_get_version_from_tag)
+	let mut tags: Vec<(Version, String)> = get_all_tags(repo)?
+		.into_iter()
+		.filter_map(|tag| try_get_version_from_tag(tag.as_str()))
 		.collect();
 	// Reverse-sort so "highest" version is first
 	tags.sort_by(|a, b| b.0.cmp_precedence(&a.0));
@@ -403,11 +425,9 @@ fn try_find_commit_for_latest_version_tag(
 	// Get the tag of the highest version and convert to an AnnotatedCommit
 	if let Some((_, tag_str)) = tags.first() {
 		log::debug!("Determined '{tag_str}' to be the tag for the newest version");
-		if let Ok(obj) = repo.revparse_single(tag_str) {
+		if let Ok(obj) = repo.rev_parse_single(tag_str.as_str()) {
 			log::debug!("revparse_single succeeded on '{tag_str}'");
-			Ok(Some(
-				repo.find_annotated_commit(obj.peel_to_commit()?.id())?,
-			))
+			Ok(Some(repo.find_commit(obj)?.into()))
 		} else {
 			let err_msg = format!("Failed to get commit for known tag '{}' in repo", tag_str);
 			log::error!("{err_msg}");
