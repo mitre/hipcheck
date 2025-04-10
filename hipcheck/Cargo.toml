@@ -6,7 +6,7 @@ Automatically assess and score software packages for supply chain risk.
 keywords = ["security", "sbom"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "../README.md"
-version = "3.12.0"
+version = "3.13.0"
 edition = "2021"
 license = "Apache-2.0"
 homepage = "https://hipcheck.mitre.org"
@@ -124,7 +124,7 @@ xml-rs = "0.8.25"
 xz2 = "0.1.7"
 zip = "2.3.0"
 zstd = "0.13.3"
-hipcheck-common = { version = "0.4.0", path = "../library/hipcheck-common", features = [
+hipcheck-common = { version = "0.4.1", path = "../library/hipcheck-common", features = [
     "rfd9-compat",
 ] }
 serde_with = "3.12.0"
