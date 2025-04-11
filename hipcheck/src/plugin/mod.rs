@@ -19,6 +19,7 @@ use crate::{error::Result, hc_error};
 pub use arch::{get_current_arch, try_set_arch, Arch, KnownArch};
 pub use download_manifest::{ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest};
 use hipcheck_common::types::{Query, QueryDirection};
+pub(crate) use plugin_manifest::validate_version_req;
 pub use plugin_manifest::{
 	try_get_bin_for_entrypoint, PluginManifest, PluginName, PluginPublisher, PluginVersion,
 	PluginVersionReq,
