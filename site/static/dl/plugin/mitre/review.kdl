@@ -138,3 +138,31 @@ plugin version="0.4.0" arch="x86_64-unknown-linux-gnu" {
     compress format="tar.xz"
     size bytes=2025988
 }
+
+plugin version="0.4.1" arch="aarch64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/review-v0.4.1/review-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="503e1f29ccb684ebfd8375ca5ad4f774bd162d1e116305ff034465f600939e7b"
+    compress format="tar.xz"
+    size bytes=1697528
+}
+
+plugin version="0.4.1" arch="x86_64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/review-v0.4.1/review-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="1862a633ac611119532cea3ee2659f09255ab81c95aceaf15b19aefae070c864"
+    compress format="tar.xz"
+    size bytes=1871072
+}
+
+plugin version="0.4.1" arch="x86_64-pc-windows-msvc" {
+    url "https://github.com/mitre/hipcheck/releases/download/review-v0.4.1/review-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="42cb09f2109ac3b2ee1e0eb5be603b909088ef46b7bd8554a07c9dbd638ab65a"
+    compress format="zip"
+    size bytes=6758157
+}
+
+plugin version="0.4.1" arch="x86_64-unknown-linux-gnu" {
+    url "https://github.com/mitre/hipcheck/releases/download/review-v0.4.1/review-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="08c53c61da3121ce50db3f6ab45a6d96186b9625f0f167f32b6f277129187721"
+    compress format="tar.xz"
+    size bytes=2031380
+}

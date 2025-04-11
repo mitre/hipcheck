@@ -138,3 +138,31 @@ plugin version="0.4.0" arch="x86_64-unknown-linux-gnu" {
     compress format="tar.xz"
     size bytes=2267520
 }
+
+plugin version="0.4.1" arch="aarch64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/typo-v0.4.1/typo-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="3d97af39d57dafe39c0c9a23f402ebe1a0890a715d385781db04cd2f0187ac78"
+    compress format="tar.xz"
+    size bytes=1902908
+}
+
+plugin version="0.4.1" arch="x86_64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/typo-v0.4.1/typo-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="c7a0f88dfad12c2e280949ca05c4b3cb03ad4252b099f56a335ce3a5d55db015"
+    compress format="tar.xz"
+    size bytes=2105456
+}
+
+plugin version="0.4.1" arch="x86_64-pc-windows-msvc" {
+    url "https://github.com/mitre/hipcheck/releases/download/typo-v0.4.1/typo-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="bab0b4196820c46ecf8d9e4bf3004eda5ebe7f17886033c80fb352f4b3d57683"
+    compress format="zip"
+    size bytes=7592185
+}
+
+plugin version="0.4.1" arch="x86_64-unknown-linux-gnu" {
+    url "https://github.com/mitre/hipcheck/releases/download/typo-v0.4.1/typo-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="4dd42356f5445f81c8fdf467b4b3ddd23881737ba277229b5d86cc5bbeb963d6"
+    compress format="tar.xz"
+    size bytes=2274052
+}
