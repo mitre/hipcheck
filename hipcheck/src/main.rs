@@ -8,6 +8,7 @@ mod config;
 mod engine;
 mod error;
 mod exec;
+mod explain;
 mod init;
 mod plugin;
 mod policy;
@@ -125,6 +126,7 @@ fn main() -> ExitCode {
 				});
 		}
 		Some(FullCommands::ExplainTargetTriple) => return cmd_explain_target_triple(),
+		Some(FullCommands::ExplainSemVer(req)) => return cmd_explain_semver(&req),
 		None => Shell::print_error(&hc_error!("missing subcommand"), Format::Human),
 	};
 
@@ -313,9 +315,9 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 		if create_dir_all(tgt_conf_path).is_err() {
 			Shell::print_error(
 				&hc_error!(
-					"Failed to create target config dir {}. Hipcheck may be 
-					defaulting to a directory that requires escalated privileges. You can resolve 
-					this by specifying a custom target config directory with `hc setup --config [path]`. 
+					"Failed to create target config dir {}. Hipcheck may be
+					defaulting to a directory that requires escalated privileges. You can resolve
+					this by specifying a custom target config directory with `hc setup --config [path]`.
 					You may alternatively run `hc setup` with elevated privileges.",
 					tgt_conf_path.to_string_lossy()
 				),
@@ -768,6 +770,30 @@ fn cmd_explain_target_triple() -> ExitCode {
 			},
 		}
 	}
+	ExitCode::SUCCESS
+}
+
+fn cmd_explain_semver(req: &str) -> ExitCode {
+	// We do a custom check for a raw version to prepend '=' for backwards
+	// compatibility
+	let version = match plugin::validate_version_req(req) {
+		Ok(r) => r,
+		Err(e) => {
+			println!("error: failed to parse version with error '{}'", e);
+			return ExitCode::FAILURE;
+		}
+	};
+
+	for comparator in &version.comparators {
+		match crate::explain::semver::explain_comparator(comparator) {
+			Ok(explanation) => println!("{explanation}"),
+			Err(e) => {
+				println!("error: {e}");
+				return ExitCode::FAILURE;
+			}
+		}
+	}
+
 	ExitCode::SUCCESS
 }
 
