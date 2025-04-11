@@ -19,7 +19,7 @@ use gix::Object;
 use pathbuf::pathbuf;
 use regex::Regex;
 use semver::Version;
-use tokio_stream::StreamExt;
+use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 use url::Url;
 
 use std::{
@@ -135,12 +135,8 @@ impl TargetResolver {
 		Ok(res)
 	}
 
-	pub async fn resolve_map(input: (TargetResolverConfig, SingleTargetSeed)) -> Result<Target> {
-		Self::resolve(input.0, input.1).await
-	}
-
 	/// Main function entrypoint for the resolution algorithm
-	pub async fn resolve(config: TargetResolverConfig, seed: SingleTargetSeed) -> Result<Target> {
+	pub fn resolve(config: TargetResolverConfig, seed: SingleTargetSeed) -> Result<Target> {
 		#[cfg(feature = "print-timings")]
 		let _0 = crate::benchmarking::print_scope_time!("resolve_target");
 
@@ -455,13 +451,37 @@ impl TargetSeed {
 		&self,
 		config: TargetResolverConfig,
 	) -> Result<Pin<Box<impl StreamExt<Item = Result<Target>>>>> {
-		let seed_vec = match self {
+		let mut seed_vec = match self {
 			TargetSeed::Single(single_target_seed) => vec![single_target_seed.clone()],
 			TargetSeed::Multi(multi_target_seed) => multi_target_seed.get_target_seeds().await?,
 		};
-		let it = tokio_stream::iter(seed_vec)
-			// Since `then()` can only take one arg, we combine the config and seed into a tuple
-			.map(move |x| (config.clone(), x));
-		Ok(Box::pin(it.then(TargetResolver::resolve_map)))
+		let total_seeds = seed_vec.len();
+
+		let (tx, rx) = tokio::sync::mpsc::channel(50);
+
+		// if there is more than one seed spawn threads to resolve each seed, otherwise use current thread
+		if total_seeds > 1 {
+			// spawn the tasks to resolve the repos in their own thread
+			let mut it = tokio_stream::iter(seed_vec)
+				// Since `then()` can only take one arg, we combine the config and seed into a tuple
+				.map(move |x| (config.clone(), x));
+			let mut resolve_tasks = tokio::task::JoinSet::new();
+			while let Some((config, seed)) = it.next().await {
+				let tx_clone = tx.clone();
+				resolve_tasks.spawn_blocking(|| async move {
+					let target = TargetResolver::resolve(config, seed);
+					tx_clone.send(target).await.unwrap();
+				});
+			}
+			resolve_tasks.join_all().await;
+		} else {
+			// unwrap is safe since len == 1
+			tx.send(TargetResolver::resolve(config, seed_vec.pop().unwrap()))
+				.await
+				.unwrap();
+		};
+
+		let rx = ReceiverStream::new(rx);
+		Ok(Box::pin(rx))
 	}
 }
