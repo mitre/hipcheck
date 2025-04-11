@@ -59,7 +59,7 @@ footer = [
         { name = "Release Notes", url = "https://github.com/mitre/hipcheck/releases", external = true },
         { name = "Changelog", url = "https://github.com/mitre/hipcheck/blob/main/CHANGELOG.md", external = true },
         { name = "Packages", title = true },
-        { name = "Hipcheck", url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.12.0", external = true },
+        { name = "Hipcheck", url = "https://github.com/mitre/hipcheck/releases/tag/hipcheck-v3.13.0", external = true },
         { name = "Rust Plugin SDK", url = "https://crates.io/crates/hipcheck-sdk", external = true },
         { name = "Python Plugin SDK", url = "https://pypi.org/project/hipcheck-sdk/", external = true },
     ],
@@ -77,5 +77,5 @@ footer = [
 
 # Set an announcement for the site navigation bar.
 [extra.announce]
-url = "https://hipcheck.mitre.org/blog/hipcheck-3-12-0-release/"
-text = "v3.12.0"
+url = "https://hipcheck.mitre.org/blog/hipcheck-3-13-0-release/"
+text = "v3.13.0"
