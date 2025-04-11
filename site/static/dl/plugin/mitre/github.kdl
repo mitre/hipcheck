@@ -138,3 +138,31 @@ plugin version="0.4.0" arch="x86_64-unknown-linux-gnu" {
     compress format="tar.xz"
     size bytes=2814944
 }
+
+plugin version="0.4.1" arch="aarch64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/github-v0.4.1/github-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="5302bae88fcc4ab14ff7e1cec29e02ef04817b30123a4d39730e47cf2f16af20"
+    compress format="tar.xz"
+    size bytes=2359040
+}
+
+plugin version="0.4.1" arch="x86_64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/github-v0.4.1/github-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="65a035f263614ca85f3ea9e5fc2293cd14825955db1a62c22c3541ca7ed56f20"
+    compress format="tar.xz"
+    size bytes=2597172
+}
+
+plugin version="0.4.1" arch="x86_64-pc-windows-msvc" {
+    url "https://github.com/mitre/hipcheck/releases/download/github-v0.4.1/github-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="1b0ab6f872adf27a567bb1215e2358a623a0a32aa65c3386e1fd60b9b2d06ff9"
+    compress format="zip"
+    size bytes=8535695
+}
+
+plugin version="0.4.1" arch="x86_64-unknown-linux-gnu" {
+    url "https://github.com/mitre/hipcheck/releases/download/github-v0.4.1/github-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="8bd0870e5ee9abd368c658baf6c3f8bdf1eebf21137a3f2feb23653916afc1f0"
+    compress format="tar.xz"
+    size bytes=2834536
+}
