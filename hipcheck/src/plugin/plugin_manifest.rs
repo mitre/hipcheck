@@ -84,7 +84,7 @@ impl PluginVersionReq {
 	}
 }
 
-fn validate_version_req(version_string: &str) -> Result<VersionReq, Error> {
+pub(crate) fn validate_version_req(version_string: &str) -> Result<VersionReq, Error> {
 	// If an exact version is provided, e.g., "0.4.2", a "=" will be prepended to it to
 	// make the Semver VersionReq object treat the version as an exact version requirement
 	let parsed_req = if Version::parse(version_string).is_ok() {

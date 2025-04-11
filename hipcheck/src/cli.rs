@@ -470,6 +470,7 @@ pub enum FullCommands {
 	PrintCache,
 	Scoring,
 	ExplainTargetTriple,
+	ExplainSemVer(String),
 }
 
 impl From<&Commands> for FullCommands {
@@ -493,6 +494,7 @@ impl From<&Commands> for FullCommands {
 			Commands::Plugin(args) => FullCommands::Plugin(args.clone()),
 			Commands::Explain(args) => match &args.subcmd {
 				ExplainSubcmds::TargetTriple => FullCommands::ExplainTargetTriple,
+				ExplainSubcmds::Semver(s) => FullCommands::ExplainSemVer(s.version_req.clone()),
 			},
 		}
 	}
@@ -1381,6 +1383,14 @@ pub struct ExplainArgs {
 pub enum ExplainSubcmds {
 	/// Show the current and known architecture targets
 	TargetTriple,
+	/// Explain a given SemVer version requirement string
+	Semver(SemVerArgs),
+}
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct SemVerArgs {
+	/// The semantic versioning requirement to explain
+	pub version_req: String,
 }
 
 /// Test CLI commands
