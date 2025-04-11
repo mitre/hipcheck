@@ -2,6 +2,7 @@
 
 from abc import ABC
 from typing import List, Dict, Optional
+import binascii
 import signal
 import logging
 
@@ -41,12 +42,13 @@ class Plugin(ABC):
                 )
         return super().__init_subclass__(**kwargs)
 
-    def set_config(self, config: Dict[str, object]):
+    def set_config(self, config: Dict[str, object]) -> Optional[bytes | bytearray]:
         """
         Configure the plugin according to the fields received from the policy
         file used for this analysis.
 
         :param dict config: The configuration key-value map
+        :returns: A bytes-like object representing the hash of the configuration
         :raises ConfigError: The `config` value was invalid
         """
         pass
@@ -324,9 +326,11 @@ class PluginServer(gen.PluginServiceServicer):
         """
         config = json.loads(request.configuration)
         try:
-            result = self.plugin.set_config(config)
+            opt_buf = self.plugin.set_config(config)
+            buf = binascii.hexlify(opt_buf) if opt_buf is not None else ""
+
             return gen.SetConfigurationResponse(
-                status=gen.ConfigurationStatus.CONFIGURATION_STATUS_NONE, message=""
+                status=gen.ConfigurationStatus.CONFIGURATION_STATUS_NONE, message=buf
             )
         except ConfigError as e:
             return to_set_config_response(e)

@@ -4,6 +4,7 @@ import asyncio
 import argparse
 import os
 import logging
+import hashlib
 import pytest
 
 from typing import Optional
@@ -52,7 +53,7 @@ class ExamplePlugin(Plugin):
 
         opt_threshold = config.get("binary-file-threshold", None)
         if opt_threshold is not None:
-            if type(opt_threshold) != int:
+            if type(opt_threshold) is not int:
                 raise InvalidConfigValue(
                     "binary-file-threshold",
                     opt_threshold,
@@ -63,7 +64,7 @@ class ExamplePlugin(Plugin):
         binary_file = config.get("binary-file", None)
         if binary_file is None:
             raise MissingRequiredConfig("binary-file", "string", [])
-        if not type(binary_file) is str:
+        if type(binary_file) is not str:
             raise InvalidConfigValue(
                 "binary-file", binary_file, "must be a string path"
             )
@@ -76,6 +77,11 @@ class ExamplePlugin(Plugin):
             raise InvalidConfigValue("binary-file", binary_file, f"{e}")
 
         DETECTOR = data
+        enc_data = data.encode('utf-8')
+
+        conf_hash = hashlib.sha256(enc_data)
+        conf_hash.update(str(opt_threshold).encode('utf-8'))
+        return conf_hash.digest()
 
     def default_policy_expr(self) -> Optional[str]:
         if self.opt_threshold is None:
