@@ -3,6 +3,7 @@
 //! Plugin for querying what percentage of pull requests were merged without review
 
 use anyhow::Context as _;
+use chrono::prelude::*;
 use clap::Parser;
 use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
 use schemars::JsonSchema;
@@ -21,6 +22,7 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 pub struct PullRequest {
 	pub id: u64,
 	pub reviews: u64,
+	pub date_merged: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -44,6 +46,17 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 		tracing::error!("target repository is not a GitHub repository or else is missing GitHub repo information");
 		return Err(Error::UnexpectedPluginQueryInputFormat);
 	};
+	let latest_commit_date = engine
+		.query("mitre/git/last_commit_date", value.local)
+		.await
+		.context("failed to get the last commit date from repo")?;
+
+	let latest_commit_date_as_string: String =
+		serde_json::from_value(latest_commit_date).map_err(Error::InvalidJsonInQueryOutput)?;
+
+	let latest_commit_date_as_timestamp = latest_commit_date_as_string
+		.parse::<DateTime<Utc>>()
+		.unwrap();
 
 	// Get a list of all pull requests to the repo, with their corresponding number of reviews
 	let value = engine
@@ -59,7 +72,11 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	// Create a Vec big enough to hold every single pull request
 	let mut pull_reviews = Vec::with_capacity(pull_requests.len());
 
-	pull_reviews.extend(pull_requests.into_iter().map(|pr| pr.reviews > 0));
+	pull_reviews.extend(
+		pull_requests
+			.into_iter()
+			.map(|pr| pr.reviews > 0 && pr.date_merged <= latest_commit_date_as_timestamp),
+	);
 
 	tracing::info!("completed review query");
 	Ok(pull_reviews)
@@ -129,7 +146,6 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod test {
 	use super::*;
-
 	use hipcheck_sdk::types::{KnownRemote, LocalGitRepo, RemoteGitRepo};
 	use std::result::Result as StdResult;
 	use url::Url;
@@ -144,15 +160,37 @@ mod test {
 	fn mock_responses() -> StdResult<MockResponses, Error> {
 		let known_remote = known_remote();
 
-		let pr1 = PullRequest { id: 1, reviews: 1 };
-		let pr2 = PullRequest { id: 2, reviews: 3 };
-		let pr3 = PullRequest { id: 3, reviews: 0 };
-		let pr4 = PullRequest { id: 4, reviews: 1 };
+		let pr1 = PullRequest {
+			id: 1,
+			reviews: 1,
+			date_merged: Utc::now(),
+		};
+		let pr2 = PullRequest {
+			id: 2,
+			reviews: 3,
+			date_merged: Utc::now(),
+		};
+		let pr3 = PullRequest {
+			id: 3,
+			reviews: 0,
+			date_merged: Utc::now(),
+		};
+		let pr4 = PullRequest {
+			id: 4,
+			reviews: 1,
+			date_merged: Utc::now(),
+		};
 		let prs = vec![pr1, pr2, pr3, pr4];
 
 		// when calling into query, the input known_remote gets passed to `pr_reviews`, lets assume it returns the vec of PullRequests `prs`
 		let mut mock_responses = MockResponses::new();
-		mock_responses.insert("mitre/github/pr_reviews", known_remote, Ok(prs))?;
+		mock_responses.insert("mitre/github/pr_reviews", &known_remote, Ok(prs))?;
+		// TODO: figure out how to call multiple mock responses since review calls both github/pr_reviews and git/last_commit_date
+		mock_responses.insert(
+			"mitre/git/last_commit_date",
+			&known_remote,
+			Ok("2023-10-01T15:30:45Z"),
+		)?;
 		Ok(mock_responses)
 	}
 

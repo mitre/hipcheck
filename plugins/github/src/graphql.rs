@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use chrono::prelude::*;
 use std::convert::TryInto;
 
 use self::reviews::{ResponseData, ReviewsRepositoryPullRequestsNodes as RawPull, Variables};
@@ -152,6 +153,14 @@ fn process_pr(pr: RawPull) -> GitHubPullRequest {
 	}
 	.try_into()
 	.unwrap();
+	let date_merged: DateTime<Utc> = pr
+		.merged_at
+		.parse::<DateTime<Utc>>()
+		.expect("Error, could not get timestamp");
 
-	GitHubPullRequest { number, reviews }
+	GitHubPullRequest {
+		number,
+		reviews,
+		date_merged,
+	}
 }

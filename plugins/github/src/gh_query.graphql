@@ -12,7 +12,8 @@ query Reviews($owner:String!, $repo:String!, $cursor:String) {
                     nodes {
                         databaseId
                     }
-                }
+                },
+                mergedAt
             }
         }
     }

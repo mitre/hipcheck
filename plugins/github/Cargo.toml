@@ -13,6 +13,7 @@ graphql_client = "0.14.0"
 hipcheck-sdk = { version = "0.5.0", path = "../../sdk/rust", features = [
     "macros",
 ] }
+chrono = "0.4.40"
 tracing = "0.1"
 # Exactly matching the version of rustls used by ureq
 # Get rid of default features since we don't use the AWS backed crypto
