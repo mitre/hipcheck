@@ -237,11 +237,25 @@ impl Display for SingleTargetSeedKind {
 	}
 }
 
+impl Display for MultiTargetSeedKind {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		use MultiTargetSeedKind::*;
+		match self {
+			GoMod(path) => {
+				write!(f, "go.mod file at {}", path.display())
+			}
+			PackageLockJson(path) => {
+				write!(f, "package-lock.json file at {}", path.display())
+			}
+		}
+	}
+}
+
 impl Display for TargetSeed {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		match self {
 			TargetSeed::Single(x) => x.kind.fmt(f),
-			TargetSeed::Multi(_x) => unimplemented!(),
+			TargetSeed::Multi(x) => x.kind.fmt(f),
 		}
 	}
 }

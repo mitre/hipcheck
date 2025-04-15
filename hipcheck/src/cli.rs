@@ -13,9 +13,9 @@ use crate::{
 	shell::{color_choice::ColorChoice, verbosity::Verbosity},
 	source,
 	target::{
-		pm, LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, SingleTargetSeed,
-		SingleTargetSeedKind, TargetSeed, TargetSeedKind, TargetType, ToTargetSeed,
-		ToTargetSeedKind, VcsUrl,
+		pm, LocalGitRepo, MavenPackage, MultiTargetSeed, MultiTargetSeedKind, Package, PackageHost,
+		Sbom, SbomStandard, SingleTargetSeed, SingleTargetSeedKind, TargetSeed, TargetSeedKind,
+		TargetType, ToTargetSeed, ToTargetSeedKind, VcsUrl,
 	},
 };
 use clap::{Parser as _, ValueEnum};
@@ -657,7 +657,13 @@ impl ToTargetSeed for CheckArgs {
 
 				Ok(TargetSeed::Single(seed))
 			}
-			TargetSeedKind::Multi(_multi_target_seed_kind) => todo!(),
+			TargetSeedKind::Multi(multi_target_seed_kind) => {
+				let seed = MultiTargetSeed {
+					kind: multi_target_seed_kind,
+					specifier: command.get_specifier().to_string(),
+				};
+				Ok(TargetSeed::Multi(seed))
+			}
 		}
 	}
 }
@@ -679,6 +685,9 @@ pub enum CheckCommand {
 	/// Analyze packages specified in an SBOM document
 	#[command(hide = true)]
 	Sbom(CheckSbomArgs),
+	/// Analyze npm dependencies specified in an package-lock.json document
+	#[command(hide = true)]
+	PackageLockJson(CheckPackageLockJsonArgs),
 }
 
 impl CheckCommand {
@@ -690,6 +699,7 @@ impl CheckCommand {
 			Pypi(args) => &args.package,
 			Repo(args) => &args.source,
 			Sbom(args) => &args.path,
+			PackageLockJson(args) => &args.path,
 		}
 	}
 }
@@ -702,6 +712,7 @@ impl ToTargetSeedKind for CheckCommand {
 			CheckCommand::Pypi(args) => args.to_target_seed_kind(),
 			CheckCommand::Repo(args) => args.to_target_seed_kind(),
 			CheckCommand::Sbom(args) => args.to_target_seed_kind(),
+			CheckCommand::PackageLockJson(args) => args.to_target_seed_kind(),
 		}
 	}
 }
@@ -890,6 +901,24 @@ impl ToTargetSeedKind for CheckSbomArgs {
 		} else {
 			Err(hc_error!("The provided SBOM file does not exist"))
 		}
+	}
+}
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct CheckPackageLockJsonArgs {
+	/// package-lock.json to analyze
+	pub path: String,
+}
+
+impl ToTargetSeedKind for CheckPackageLockJsonArgs {
+	fn to_target_seed_kind(&self) -> Result<TargetSeedKind> {
+		let path = PathBuf::from(&self.path);
+		if path.exists() && self.path.ends_with("package-lock.json") {
+			return Ok(TargetSeedKind::Multi(MultiTargetSeedKind::PackageLockJson(
+				path,
+			)));
+		}
+		Err(hc_error!("The provided package-lock.json does not exist"))
 	}
 }
 
@@ -1633,6 +1662,7 @@ mod tests {
 			CheckCommand::Pypi(args) => args.package,
 			CheckCommand::Repo(args) => args.source,
 			CheckCommand::Sbom(args) => args.path,
+			CheckCommand::PackageLockJson(args) => args.path,
 		}
 	}
 
