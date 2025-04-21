@@ -121,25 +121,25 @@ linux-raw-sys = { version = "0.4.14", default-features = false, features = ["elf
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.dependencies]
-bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
+bitflags = { version = "2.9.0", default-features = false, features = ["std"] }
 getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.build-dependencies]
-bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
+bitflags = { version = "2.9.0", default-features = false, features = ["std"] }
 getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.aarch64-apple-darwin.dependencies]
-bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
+bitflags = { version = "2.9.0", default-features = false, features = ["std"] }
 getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.aarch64-apple-darwin.build-dependencies]
-bitflags = { version = "2.6.0", default-features = false, features = ["std"] }
+bitflags = { version = "2.9.0", default-features = false, features = ["std"] }
 getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169", features = ["extra_traits"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
