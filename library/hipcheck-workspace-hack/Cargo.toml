@@ -34,7 +34,7 @@ idna = { version = "1.0.3", default-features = false, features = ["compiled_data
 indexmap = { version = "2.7.1", features = ["serde"] }
 itertools = { version = "0.13.0" }
 jiff = { version = "0.1.16", features = ["serde"] }
-libz-sys = { version = "1.1.20", default-features = false, features = ["libc"] }
+libz-sys = { version = "1.1.22", default-features = false, features = ["libc"] }
 log = { version = "0.4.25", default-features = false, features = ["std"] }
 memchr = { version = "2.7.4", features = ["use_std"] }
 miette = { version = "7.4.0", features = ["fancy"] }
@@ -81,7 +81,7 @@ idna = { version = "1.0.3", default-features = false, features = ["compiled_data
 indexmap = { version = "2.7.1", features = ["serde"] }
 itertools = { version = "0.13.0" }
 jiff = { version = "0.1.16", features = ["serde"] }
-libz-sys = { version = "1.1.20", default-features = false, features = ["libc"] }
+libz-sys = { version = "1.1.22", default-features = false, features = ["libc"] }
 log = { version = "0.4.25", default-features = false, features = ["std"] }
 memchr = { version = "2.7.4", features = ["use_std"] }
 miette = { version = "7.4.0", features = ["fancy"] }
