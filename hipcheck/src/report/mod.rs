@@ -108,14 +108,16 @@ fn no_concerns(concerns: &[String]) -> bool {
 #[schemars(crate = "schemars")]
 pub struct ErroredAnalysis {
 	analysis: AnalysisIdent,
+	name: AnalysisIdent,
 	error: ErrorReport,
 }
 
 impl ErroredAnalysis {
 	/// Construct a new `ErroredAnalysis`.
-	pub fn new(analysis: AnalysisIdent, error: &Error) -> Self {
+	pub fn new(analysis: AnalysisIdent, name: AnalysisIdent, error: &Error) -> Self {
 		ErroredAnalysis {
 			analysis,
+			name,
 			error: ErrorReport::from(error),
 		}
 	}

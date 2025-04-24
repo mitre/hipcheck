@@ -65,7 +65,7 @@ pub fn build_report(
 				)?;
 			}
 			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent(name), error);
+				builder.add_errored_analysis(AnalysisIdent(name.clone()), AnalysisIdent(name), error);
 			}
 		}
 	}
@@ -146,8 +146,8 @@ impl<'target> ReportBuilder<'target> {
 	}
 
 	/// Add an errored analysis to the report.
-	pub fn add_errored_analysis(&mut self, analysis: AnalysisIdent, error: &Error) -> &mut Self {
-		self.errored.push(ErroredAnalysis::new(analysis, error));
+	pub fn add_errored_analysis(&mut self, analysis: AnalysisIdent, name: AnalysisIdent, error: &Error) -> &mut Self {
+		self.errored.push(ErroredAnalysis::new(analysis, name, error));
 		self
 	}
 
