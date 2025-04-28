@@ -3565,9 +3565,9 @@ checksum = "fb37767f6569cd834a413442455e0f066d0d522de8630436e2a1761d9726ba56"
 
 [[package]]
 name = "packageurl"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7eb30e191e775e11d76e54e8c7df6ccbf357001c16bb8d1252e8bf7a787ec5a"
+checksum = "b0f0b986147b7e6ab812eeb9dfd0bd5cd4afd263e50b2abf2d15a4a094890a88"
 dependencies = [
  "percent-encoding",
  "thiserror 1.0.69",
