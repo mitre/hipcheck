@@ -51,6 +51,6 @@ fn init_cryptography() {
 
 fn init_software_versions() {
 	if let Err(e) = crate::version::init_software_versions() {
-		panic!("Error saving off dependent binary versions: {}", e);
+		panic!("initial dependency version checking failed: {}", e);
 	}
 }
