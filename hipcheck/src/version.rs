@@ -2,7 +2,7 @@
 
 use crate::{
 	error::{Context, Result},
-	util::{command::DependentProgram, git::get_git_version, npm::get_npm_version},
+	util::{command::DependentProgram, git::get_git_version},
 };
 use semver::Version;
 use std::{sync::Arc, sync::OnceLock};
@@ -10,7 +10,6 @@ use std::{sync::Arc, sync::OnceLock};
 /// struct which holds the version information for binaries relevant to `hc` used in this run
 struct SoftwareVersions {
 	hc: Arc<String>,
-	npm: Arc<String>,
 	git: Arc<String>,
 }
 
@@ -22,15 +21,11 @@ pub fn init_software_versions() -> Result<()> {
 	let git_version = get_git_version()?;
 	DependentProgram::Git.check_version(&git_version)?;
 
-	let npm_version = get_npm_version()?;
-	DependentProgram::Npm.check_version(&npm_version)?;
-
 	let raw_hc_version = env!("CARGO_PKG_VERSION", "can't find Hipcheck package version");
 	let hc_version = parse_hc_version(raw_hc_version)?;
 
 	HC_VERSIONS.get_or_init(|| SoftwareVersions {
 		hc: Arc::new(hc_version),
-		npm: Arc::new(npm_version),
 		git: Arc::new(git_version),
 	});
 	Ok(())
@@ -43,16 +38,6 @@ pub fn git_version() -> Arc<String> {
 		.get()
 		.expect("'HC_VERSIONS' not initialized")
 		.git
-		.clone()
-}
-
-#[allow(unused)]
-/// retrieve the version of `npm` used in this run of `hc`
-pub fn npm_version() -> Arc<String> {
-	HC_VERSIONS
-		.get()
-		.expect("'HC_VERSIONS' not initialized")
-		.npm
 		.clone()
 }
 
