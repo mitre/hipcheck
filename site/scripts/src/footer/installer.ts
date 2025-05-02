@@ -99,7 +99,7 @@ function unix_installer(host: string): string {
  * The install script to use for Windows.
  */
 function windows_installer(host: string): string {
-  return `irm ${host}/dl/install.ps1 | iex`;
+  return `powershell -ExecutionPolicy Bypass -c "irm ${host}/dl/install.ps1 | iex"`;
 }
 
 /**
@@ -107,8 +107,6 @@ function windows_installer(host: string): string {
  */
 class UnknownPlatformError extends Error {
   constructor(platform: string | undefined) {
-    super(
-      `could not determine platform: '${platform || "undefined"}'`,
-    );
+    super(`could not determine platform: '${platform || "undefined"}'`);
   }
 }
