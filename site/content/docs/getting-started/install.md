@@ -11,14 +11,6 @@ This page covers different mechanisms for installing Hipcheck. It's organized
 between [direct installation](#installing-directly) and
 [container-based installation](#using-in-a-container).
 
-## Installing Directly
-
-Use the following instructions if you want to install Hipcheck onto your local
-system _outside_ of a container. If you want to install Hipcheck _inside_ of a
-container, see the [container installation instructions](#using-in-a-container).
-
-### Install from Script
-
 The easiest way to install Hipcheck is to use an install script included with
 each release.
 
@@ -54,6 +46,12 @@ The scripts themselves are only downloaded over TLS-protected connections, and
 the artifacts are checked against SHA-256 hashes also included with each
 release to ensure artifact integrity.
 {% end %}
+
+## Installing Directly
+
+Use the following instructions if you want to install Hipcheck onto your local
+system _outside_ of a container. If you want to install Hipcheck _inside_ of a
+container, see the [container installation instructions](#using-in-a-container).
 
 ### Install from Source
 
