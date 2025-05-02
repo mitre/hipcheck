@@ -1,6 +1,6 @@
 [package]
 name = "linguist"
-version = "0.4.1"
+version = "0.4.2"
 license = "Apache-2.0"
 edition = "2021"
 repository = "https://github.com/mitre/hipcheck"
@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 clap = { version = "4.5.32", features = ["derive"] }
 hipcheck-kdl = { version = "0.1.0", path = "../../library/hipcheck-kdl" }
-hipcheck-sdk = { version = "0.6.0", path = "../../sdk/rust", features = [
+hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
     "macros",
 ] }
 tracing = "0.1"
@@ -21,7 +21,7 @@ tokio = { version = "1.44.2", features = ["rt"] }
 hipcheck-workspace-hack = { version = "0.1", path = "../../library/hipcheck-workspace-hack" }
 
 [dev-dependencies]
-hipcheck-sdk = { version = "0.6.0", path = "../../sdk/rust", features = [
+hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
     "macros",
     "mock_engine",
 ] }
