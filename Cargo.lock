@@ -9,7 +9,7 @@ dependencies = [
  "clap",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "jiff 0.1.16",
+ "jiff 0.2.5",
  "serde",
  "serde_json",
  "tokio",
@@ -1061,7 +1061,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "976dd42dc7e85965fe702eb8164f21f450704bdde31faefd6471dba214cb594e"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1335,7 +1335,7 @@ dependencies = [
  "gix",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "jiff 0.1.16",
+ "jiff 0.2.5",
  "lru",
  "schemars",
  "serde",
@@ -1544,7 +1544,7 @@ checksum = "c57c477b645ee248b173bb1176b52dd528872f12c50375801a58aaf5ae91113f"
 dependencies = [
  "bstr",
  "itoa",
- "jiff 0.1.16",
+ "jiff 0.1.29",
  "thiserror 2.0.12",
 ]
 
@@ -2262,7 +2262,7 @@ dependencies = [
  "indextree",
  "indicatif",
  "itertools 0.13.0",
- "jiff 0.1.16",
+ "jiff 0.2.5",
  "log",
  "logos",
  "miette 7.4.0",
@@ -2353,7 +2353,7 @@ dependencies = [
  "hipcheck-sdk-macros",
  "hipcheck-workspace-hack",
  "indexmap 2.9.0",
- "jiff 0.1.16",
+ "jiff 0.2.5",
  "lazy_static",
  "schemars",
  "serde",
@@ -2405,7 +2405,7 @@ dependencies = [
  "idna",
  "indexmap 2.9.0",
  "itertools 0.13.0",
- "jiff 0.1.16",
+ "jiff 0.2.5",
  "libc",
  "libz-sys",
  "linux-raw-sys 0.4.14",
@@ -2862,13 +2862,16 @@ checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 
 [[package]]
 name = "jiff"
-version = "0.1.16"
+version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24a46169c7a10358cdccfb179910e8a5a392fc291bdb409da9aeece5b19786d8"
+checksum = "c04ef77ae73f3cf50510712722f0c4e8b46f5aaa1bf5ffad2ae213e6495e78e5"
 dependencies = [
  "jiff-tzdb-platform",
+ "log",
+ "portable-atomic",
+ "portable-atomic-util",
  "serde",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2878,10 +2881,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c102670231191d07d37a35af3eb77f1f0dbf7a71be51a962dcd57ea607be7260"
 dependencies = [
  "jiff-static",
+ "jiff-tzdb-platform",
  "log",
  "portable-atomic",
  "portable-atomic-util",
  "serde",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4110,7 +4115,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4761,7 +4766,7 @@ dependencies = [
  "getrandom 0.3.1",
  "once_cell",
  "rustix 1.0.5",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
