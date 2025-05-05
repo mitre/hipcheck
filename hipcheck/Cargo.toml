@@ -69,7 +69,7 @@ itertools = "0.13.0"
 jiff = "0.1.16"
 log = "0.4.27"
 logos = "0.15.0"
-miette = { version = "7.4.0", features = ["fancy"] }
+miette = { version = "7.6.0", features = ["fancy"] }
 minijinja = "2.9.0"
 minijinja-contrib = { version = "2.7.0", features = ["datetime"] }
 nom = "7.1.3"
