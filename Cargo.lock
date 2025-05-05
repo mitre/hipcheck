@@ -57,7 +57,7 @@ dependencies = [
  "hipcheck-kdl",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "miette 7.4.0",
+ "miette 7.6.0",
  "pathbuf",
  "schemars",
  "serde",
@@ -351,7 +351,7 @@ dependencies = [
  "hipcheck-kdl",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "miette 7.4.0",
+ "miette 7.6.0",
  "pathbuf",
  "serde",
  "serde_json",
@@ -2265,7 +2265,7 @@ dependencies = [
  "jiff 0.1.16",
  "log",
  "logos",
- "miette 7.4.0",
+ "miette 7.6.0",
  "minijinja",
  "minijinja-contrib",
  "nom",
@@ -2411,7 +2411,7 @@ dependencies = [
  "linux-raw-sys 0.4.14",
  "log",
  "memchr",
- "miette 7.4.0",
+ "miette 7.6.0",
  "minimal-lexical",
  "nom",
  "num-traits",
@@ -2968,7 +2968,7 @@ version = "6.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d63de1aa3d632a8dd61da7cddfc499e9f88e6265d85bd84002419c3cdd3dc8f"
 dependencies = [
- "miette 7.4.0",
+ "miette 7.6.0",
  "num",
  "thiserror 1.0.69",
  "winnow 0.6.22",
@@ -3053,7 +3053,7 @@ dependencies = [
  "hipcheck-kdl",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "miette 7.4.0",
+ "miette 7.6.0",
  "pathbuf",
  "serde",
  "serde_json",
@@ -3239,21 +3239,20 @@ dependencies = [
 
 [[package]]
 name = "miette"
-version = "7.4.0"
+version = "7.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "317f146e2eb7021892722af37cf1b971f0a70c8406f487e24952667616192c64"
+checksum = "5f98efec8807c63c752b5bd61f862c165c115b0a35685bdcfd9238c7aeb592b7"
 dependencies = [
  "backtrace",
  "backtrace-ext",
  "cfg-if",
- "miette-derive 7.4.0",
+ "miette-derive 7.6.0",
  "owo-colors",
  "supports-color",
  "supports-hyperlinks",
  "supports-unicode",
  "terminal_size",
  "textwrap",
- "thiserror 1.0.69",
  "unicode-width 0.1.11",
 ]
 
@@ -3270,9 +3269,9 @@ dependencies = [
 
 [[package]]
 name = "miette-derive"
-version = "7.4.0"
+version = "7.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23c9b935fbe1d6cbd1dac857b54a688145e2d93f48db36010514d0f612d0ad67"
+checksum = "db5b29714e950dbb20d5e6f74f9dcec4edbcc1067bb7f8ed198c097b8c1a818b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5220,7 +5219,7 @@ dependencies = [
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
  "maplit",
- "miette 7.4.0",
+ "miette 7.6.0",
  "pathbuf",
  "serde",
  "serde_json",
