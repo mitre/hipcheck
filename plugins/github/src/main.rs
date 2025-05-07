@@ -5,8 +5,8 @@ mod data;
 mod graphql;
 mod types;
 mod util;
-
 use crate::data::GitHub;
+use chrono::prelude::*;
 use clap::Parser;
 use hipcheck_sdk::{
 	prelude::*,
@@ -54,6 +54,7 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 pub struct PullRequest {
 	pub id: u64,
 	pub reviews: u64,
+	pub date_merged: DateTime<Utc>,
 }
 
 fn get_github_agent<'a>(owner: &'a str, repo: &'a str) -> Result<GitHub<'a>> {
@@ -91,6 +92,7 @@ async fn pr_reviews(_engine: &mut PluginEngine, key: KnownRemote) -> Result<Vec<
 		.map(|pr| PullRequest {
 			id: pr.number,
 			reviews: pr.reviews,
+			date_merged: pr.date_merged,
 		})
 		.collect();
 

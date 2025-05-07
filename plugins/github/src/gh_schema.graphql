@@ -94,6 +94,12 @@ type PullRequest {
   number: Int!
 
   url: URI!
+  
+  """
+  Identifies the date the pull request was merged
+  """
+  mergedAt: String!
+  
   """
   A list of reviews associated with the pull request.
   """
