@@ -140,7 +140,7 @@ gomod-rs = "0.1.1"
 
 [build-dependencies]
 
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 pathbuf = "1.0.0"
 schemars = { version = "0.8.22", features = ["chrono", "url"] }
 serde = { version = "1.0.219", features = ["derive"] }
