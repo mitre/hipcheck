@@ -111,13 +111,13 @@ zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
 [target.x86_64-unknown-linux-gnu.dependencies]
 getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169" }
-linux-raw-sys = { version = "0.4.14", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std"] }
+linux-raw-sys = { version = "0.9.4", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
 getrandom = { version = "0.3.1", default-features = false, features = ["std", "wasm_js"] }
 libc = { version = "0.2.169" }
-linux-raw-sys = { version = "0.4.14", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std"] }
+linux-raw-sys = { version = "0.9.4", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std"] }
 rustix = { version = "0.38.40", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.dependencies]
