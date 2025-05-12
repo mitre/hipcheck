@@ -7,7 +7,7 @@ repository = "https://github.com/mitre/hipcheck"
 publish = false
 
 [dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 clap = { version = "4.5.32", features = ["derive"] }
 hipcheck-kdl = { version = "0.1.0", path = "../../library/hipcheck-kdl" }
 hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [

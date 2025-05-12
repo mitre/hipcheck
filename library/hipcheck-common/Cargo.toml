@@ -7,7 +7,7 @@ license = "Apache-2.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 clap = { version = "4.5.32", features = ["cargo", "derive", "string"] }
 prost = "0.13.5"
 serde = { version = "1.0.219", features = ["derive", "rc"] }
@@ -17,7 +17,7 @@ tonic = "0.13.0"
 hipcheck-workspace-hack = { version = "0.1", path = "../hipcheck-workspace-hack" }
 
 [build-dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 pathbuf = "1.0.0"
 tonic-build = "0.13.0"
 
