@@ -105,7 +105,7 @@ smart-default = "0.7.1"
 spdx-rs = "0.5.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
-tabled = "0.18.0"
+tabled = "0.19.0"
 tar = "0.4.44"
 tempfile = "3.19.1"
 tokio = { version = "1.44.2", features = [
