@@ -12,7 +12,7 @@ proc-macro = true
 [dependencies]
 convert_case = "0.7.1"
 tracing = "0.1"
-proc-macro2 = "1.0.94"
+proc-macro2 = "1.0.95"
 quote = "1.0.40"
 syn = { version = "2.0.101", features = ["full", "printing"] }
 hipcheck-workspace-hack = { version = "0.1", path = "../hipcheck-workspace-hack" }
