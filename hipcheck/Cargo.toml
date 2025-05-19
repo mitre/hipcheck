@@ -89,7 +89,7 @@ rustls = { version = "0.23.10", default-features = false, features = [
     "tls12",
     "ring",
 ] }
-rustls-platform-verifier = "0.5.0"
+rustls-platform-verifier = "0.5.3"
 salsa = "0.19.0"
 schemars = { version = "0.8.22", default-features = false, features = [
     "derive",
