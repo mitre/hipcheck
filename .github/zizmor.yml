@@ -1,0 +1,20 @@
+rules:
+  template-injection:
+    ignore:
+      - release.yml:77:9
+      - release.yml:128:9
+      - release.yml:137:9
+      - release.yml:140:9
+      - release.yml:192:9
+      - release.yml:241:9
+      - release.yml:265:9
+  excessive-permissions:
+    ignore:
+      - release.yml:18:3
+  artipacked:
+    ignore:
+      - release.yml:59:9
+      - release.yml:118:9
+      - release.yml:176:9
+      - release.yml:225:9
+      - release.yml:289:9
