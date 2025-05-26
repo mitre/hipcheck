@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 clap = { version = "4.5.32", features = ["derive"] }
 hipcheck-sdk = { path = "../../../sdk/rust", features = ["macros"] }
-tokio = { version = "1.45.0", features = ["rt"] }
+tokio = { version = "1.45.1", features = ["rt"] }
 hipcheck-workspace-hack = { version = "0.1", path = "../../../library/hipcheck-workspace-hack" }
 
 [dev-dependencies]
