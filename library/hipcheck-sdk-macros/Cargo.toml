@@ -10,7 +10,7 @@ license = "Apache-2.0"
 proc-macro = true
 
 [dependencies]
-convert_case = "0.7.1"
+convert_case = "0.8.0"
 tracing = "0.1"
 proc-macro2 = "1.0.94"
 quote = "1.0.40"
