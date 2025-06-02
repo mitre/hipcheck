@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-clap = { version = "4.5.32", features = ["derive"] }
+clap = { version = "4.5.39", features = ["derive"] }
 hipcheck-sdk = { path = "../../../sdk/rust", features = ["macros"] }
 sha2 = "0.10.8"
 tokio = { version = "1.45.0", features = ["rt"] }
