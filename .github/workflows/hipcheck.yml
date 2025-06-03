@@ -59,7 +59,9 @@ jobs:
               - "xtask/**"
               - "sdk/rust/**"
               - "library/**"
-      - uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # stable
+      # This is a tag, not a commit, because that's how the Action determines
+      # what Rust toolchain you're using.
+      - uses: dtolnay/rust-toolchain@stable
         if: steps.filter.outputs.code == 'true'
       - uses: taiki-e/install-action@a761292ced99fc08cbae630a81f800d2d49b8bf4 # nextest
         if: steps.filter.outputs.code == 'true'
