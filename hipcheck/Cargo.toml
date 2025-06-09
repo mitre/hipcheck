@@ -38,7 +38,7 @@ base64 = "0.22.1"
 blake3 = "1.8.1"
 cyclonedx-bom = "0.8.0"
 dotenv = "0.15.0"
-chrono = { version = "0.4.40", features = ["alloc", "serde"] }
+chrono = { version = "0.4.41", features = ["alloc", "serde"] }
 clap = { version = "4.5.32", features = ["derive"] }
 console = { version = "0.15.11", features = ["windows-console-colors"] }
 dialoguer = "0.11.0"
