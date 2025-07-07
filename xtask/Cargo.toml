@@ -20,7 +20,7 @@ pathbuf = "1.0.0"
 pep440_rs = "0.7.3"
 pyproject-toml = "0.13.4"
 serde = { version = "1.0.219", features = ["derive"] }
-toml = "0.8.20"
+toml = "0.8.23"
 xshell = "0.2.7"
 which = "7.0.2"
 convert_case = "0.7.1"
