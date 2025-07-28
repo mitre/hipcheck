@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.98"
-clap = { version = "4.5.32", features = ["derive"] }
+clap = { version = "4.5.41", features = ["derive"] }
 graphql_client = "0.14.0"
 hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
     "macros",
