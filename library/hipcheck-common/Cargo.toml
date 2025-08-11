@@ -19,7 +19,7 @@ hipcheck-workspace-hack = { version = "0.1", path = "../hipcheck-workspace-hack"
 [build-dependencies]
 anyhow = "1.0.98"
 pathbuf = "1.0.0"
-tonic-build = "0.13.0"
+tonic-build = "0.14.1"
 
 [features]
 default = ["rfd9-compat"]
