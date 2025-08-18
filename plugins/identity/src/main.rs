@@ -72,7 +72,7 @@ async fn commit_identity(engine: &mut PluginEngine, key: DetailedGitRepo) -> Res
 			Error::UnspecifiedQueryState
 		})?;
 	let ccv = serde_json::from_value::<CommitContributorView>(value)
-		.map_err(Error::InvalidJsonInQueryOutput)?;
+		.map_err(|source| Error::InvalidJsonInQueryOutput(Box::new(source)))?;
 	tracing::info!("completed commit_identity query");
 	Ok(ccv.author == ccv.committer)
 }
@@ -116,12 +116,12 @@ impl Plugin for IdentityPlugin {
 		// Deserialize the config struct
 		let conf =
 			serde_json::from_value::<Config>(config).map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: e.to_string().into_boxed_str(),
 			})?;
 		self.policy_conf
 			.set(conf.percent_threshold)
 			.map_err(|_| ConfigError::InternalError {
-				message: "plugin was already configured".to_string(),
+				message: "plugin was already configured".to_string().into_boxed_str(),
 			})?;
 		Ok(())
 	}

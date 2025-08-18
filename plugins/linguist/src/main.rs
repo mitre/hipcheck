@@ -43,23 +43,23 @@ impl Plugin for LinguistPlugin {
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		let conf: Config =
 			serde_json::from_value(config).map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: e.to_string().into_boxed_str(),
 			})?;
 		let sfd = match conf.langs_file {
 			Some(p) => SourceFileDetector::load(&p).map_err(|e| ConfigError::ParseError {
-				source: format!("Language definitions file at {}", p.display()),
-				message: e.to_string_pretty_multiline(),
+				source: format!("Language definitions file at {}", p.display()).into_boxed_str(),
+				message: e.to_string_pretty_multiline().into_boxed_str(),
 			})?,
 			None => {
 				return Err(ConfigError::MissingRequiredConfig {
-					field_name: "langs-file".to_owned(),
-					field_type: "string".to_owned(),
+					field_name: "langs-file".to_owned().into_boxed_str(),
+					field_type: "string".to_owned().into_boxed_str(),
 					possible_values: vec![],
 				});
 			}
 		};
 		DETECTOR.set(sfd).map_err(|_e| ConfigError::InternalError {
-			message: "config was already set".to_owned(),
+			message: "config was already set".to_owned().into_boxed_str(),
 		})
 	}
 

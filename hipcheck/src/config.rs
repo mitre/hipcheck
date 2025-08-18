@@ -455,7 +455,7 @@ pub enum AnalysisTreeNode {
 		weight: F64,
 	},
 	Analysis {
-		analysis: PoliciedAnalysis,
+		analysis: Box<PoliciedAnalysis>,
 		weight: F64,
 	},
 }
@@ -492,7 +492,7 @@ impl AnalysisTreeNode {
 	}
 	pub fn analysis(analysis: Analysis, opt_policy: Option<Expr>, weight: F64) -> Self {
 		AnalysisTreeNode::Analysis {
-			analysis: PoliciedAnalysis(analysis, opt_policy),
+			analysis: Box::new(PoliciedAnalysis(analysis, opt_policy)),
 			weight,
 		}
 	}
@@ -545,7 +545,7 @@ impl AnalysisTree {
 	}
 
 	pub fn get_analyses(&self) -> Vec<PoliciedAnalysis> {
-		visit_leaves(
+		let res = visit_leaves(
 			self.root,
 			&self.tree,
 			|_n| false,
@@ -553,7 +553,9 @@ impl AnalysisTree {
 				AnalysisTreeNode::Analysis { analysis, .. } => analysis.clone(),
 				AnalysisTreeNode::Category { .. } => unreachable!(),
 			},
-		)
+		);
+
+		res.into_iter().map(|boxed| *boxed).collect()
 	}
 
 	pub fn node_is_category(&self, id: NodeId) -> Result<bool> {

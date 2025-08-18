@@ -102,7 +102,8 @@ impl ExprMutator for FunctionResolver {
 			_ => {
 				return Err(Error::InternalError(
 					"FunctionResolver's `visit_function` impl should always return a function"
-						.to_owned(),
+						.to_owned()
+						.into_boxed_str(),
 				));
 			}
 		};
@@ -130,7 +131,9 @@ impl ExprVisitor<Result<Type>> for TypeChecker {
 
 		let Type::Function(ft) = func.get_type()? else {
 			return Err(Error::InternalError(
-				"expression must have been run through TypeFixer pass first".to_owned(),
+				"expression must have been run through TypeFixer pass first"
+					.to_owned()
+					.into_boxed_str(),
 			));
 		};
 		// Check that the arguments to the function are correct

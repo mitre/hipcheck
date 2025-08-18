@@ -96,7 +96,7 @@ impl PluginEngine {
 	/// Convenience function to expose a `QueryBuilder` to make it convenient to dynamically build
 	/// up queries to plugins and send them off to the `target` plugin, in as few GRPC calls as
 	/// possible
-	pub fn batch<T>(&mut self, target: T) -> Result<QueryBuilder>
+	pub fn batch<T>(&mut self, target: T) -> Result<QueryBuilder<'_>>
 	where
 		T: TryInto<QueryTarget, Error: Into<Error>>,
 	{
@@ -157,7 +157,8 @@ impl PluginEngine {
 	{
 		let query_target: QueryTarget = target.try_into().map_err(|e| e.into())?;
 		tracing::trace!("querying {}", query_target.to_string());
-		let input: JsonValue = serde_json::to_value(input).map_err(Error::InvalidJsonInQueryKey)?;
+		let input: JsonValue = serde_json::to_value(input)
+			.map_err(|source| Error::InvalidJsonInQueryKey(Box::new(source)))?;
 		// since there input had one value, there will only be one response
 		let mut response = self.query_inner(query_target, vec![input]).await?;
 		Ok(response.pop().unwrap())
@@ -176,7 +177,8 @@ impl PluginEngine {
 		tracing::trace!("querying {}", target.to_string());
 		let mut input = Vec::with_capacity(keys.len());
 		for key in keys {
-			let jsonified_key = serde_json::to_value(key).map_err(Error::InvalidJsonInQueryKey)?;
+			let jsonified_key = serde_json::to_value(key)
+				.map_err(|source| Error::InvalidJsonInQueryKey(Box::new(source)))?;
 			input.push(jsonified_key);
 		}
 		self.query_inner(target, input).await
@@ -228,7 +230,7 @@ impl PluginEngine {
 			self.tx
 				.send(Ok(query))
 				.await
-				.map_err(Error::FailedToSendQueryFromSessionToServer)?;
+				.map_err(|source| Error::FailedToSendQueryFromSessionToServer(Box::new(source)))?;
 		}
 		Ok(())
 	}
@@ -251,7 +253,7 @@ impl PluginEngine {
 		self.tx
 			.send(Ok(InitiateQueryProtocolResponse { query: Some(query) }))
 			.await
-			.map_err(Error::FailedToSendQueryFromSessionToServer)
+			.map_err(|source| Error::FailedToSendQueryFromSessionToServer(Box::new(source)))
 	}
 
 	async fn recv(&mut self) -> Result<Option<Query>> {
@@ -587,10 +589,11 @@ impl MockResponses {
 		W: serde::Serialize,
 	{
 		let query_target: QueryTarget = query_target.try_into().map_err(|e| e.into())?;
-		let query_value: JsonValue =
-			serde_json::to_value(query_value).map_err(crate::Error::InvalidJsonInQueryKey)?;
+		let query_value: JsonValue = serde_json::to_value(query_value)
+			.map_err(|source| crate::Error::InvalidJsonInQueryKey(Box::new(source)))?;
 		let query_response = match query_response {
-			Ok(v) => serde_json::to_value(v).map_err(crate::Error::InvalidJsonInQueryKey),
+			Ok(v) => serde_json::to_value(v)
+				.map_err(|source| crate::Error::InvalidJsonInQueryKey(Box::new(source))),
 			Err(e) => Err(e),
 		};
 		self.0.insert((query_target, query_value), query_response);

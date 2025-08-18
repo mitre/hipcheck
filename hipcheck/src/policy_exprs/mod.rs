@@ -67,7 +67,7 @@ pub fn std_parse(raw_program: &str) -> Result<Expr> {
 pub fn std_exec(expr: Expr, context: Option<&Value>) -> Result<bool> {
 	match std_post_analysis_pipeline(expr, context, false)? {
 		Expr::Primitive(Primitive::Bool(b)) => Ok(b),
-		result => Err(Error::DidNotReturnBool(result)),
+		result => Err(Error::DidNotReturnBool(Box::new(result))),
 	}
 }
 
@@ -95,7 +95,7 @@ impl Executor {
 	pub fn run(&self, raw_program: &str, context: &Value) -> Result<bool> {
 		match self.parse_and_eval(raw_program, context)? {
 			Expr::Primitive(Primitive::Bool(b)) => Ok(b),
-			result => Err(Error::DidNotReturnBool(result)),
+			result => Err(Error::DidNotReturnBool(Box::new(result))),
 		}
 	}
 
@@ -123,13 +123,15 @@ impl ExprMutator for Env<'_> {
 			.collect::<Result<Vec<Expr>>>()?;
 		let binding = self
 			.get(&f.ident)
-			.ok_or_else(|| Error::UnknownFunction(f.ident.deref().to_owned()))?;
+			.ok_or_else(|| Error::UnknownFunction(f.ident.deref().to_owned().into_boxed_str()))?;
 		if let Binding::Fn(op_info) = binding {
 			// Doesn't use `execute` because currently allows Functions that haven't been changed
 			// to Lambdas
 			(op_info.op)(self, &f.args)
 		} else {
-			Err(Error::FoundVarExpectedFunc(f.ident.deref().to_owned()))
+			Err(Error::FoundVarExpectedFunc(
+				f.ident.deref().to_owned().into_boxed_str(),
+			))
 		}
 	}
 	fn visit_lambda(&self, mut l: Lambda) -> Result<Expr> {
@@ -149,12 +151,15 @@ impl ExprMutator for Env<'_> {
 	fn visit_json_pointer(&self, jp: JsonPointer) -> Result<Expr> {
 		let expr = &jp.value;
 		match expr {
-			None => Err(Error::InternalError(format!(
-				"JsonPointer's `value` field was not set. \
+			None => Err(Error::InternalError(
+				format!(
+					"JsonPointer's `value` field was not set. \
 				All `value` fields must be set by `LookupJsonPointers` before evaluation. \
 				JsonPointer: {:?}",
-				&jp
-			))),
+					&jp
+				)
+				.into_boxed_str(),
+			)),
 			Some(expr) => Ok(*expr.to_owned()),
 		}
 	}
@@ -203,7 +208,7 @@ pub fn parse_expr_to_english(
 		let inner_value = match value {
 			Some(context) => match Executor::std().parse_and_eval(&inner.to_string(), context)? {
 				Expr::Primitive(prim) => Some(english.visit_primitive(&prim)?),
-				_ => return Err(Error::BadReturnType(inner.clone())),
+				_ => return Err(Error::BadReturnType(Box::new(inner.clone()))),
 			},
 			None => None,
 		};
@@ -405,14 +410,14 @@ impl ExprVisitor<Result<String>> for English<'_> {
 		// Check for an invalid number of arguments
 		if args.len() < expected_args {
 			return Err(Error::NotEnoughArgs {
-				name: func.ident.to_string(),
+				name: func.ident.to_string().into_boxed_str(),
 				expected: expected_args,
 				given: args.len(),
 			});
 		}
 		if args.len() > expected_args {
 			return Err(Error::TooManyArgs {
-				name: func.ident.to_string(),
+				name: func.ident.to_string().into_boxed_str(),
 				expected: expected_args,
 				given: args.len(),
 			});
@@ -518,17 +523,19 @@ fn get_function_def(func: &Function, env: &Env) -> Result<FunctionDef> {
 		Some(binding) => match binding {
 			Binding::Fn(function_def) => function_def,
 			_ => {
-				return Err(Error::UnknownFunction(format!(
-					"Given function name {} is not a function",
-					fn_name
-				)))
+				return Err(Error::UnknownFunction(
+					format!("Given function name {} is not a function", fn_name).into_boxed_str(),
+				))
 			}
 		},
 		_ => {
-			return Err(Error::UnknownFunction(format!(
-				"Given function name {} not found in list of functions",
-				fn_name
-			)))
+			return Err(Error::UnknownFunction(
+				format!(
+					"Given function name {} not found in list of functions",
+					fn_name
+				)
+				.into_boxed_str(),
+			))
 		}
 	};
 
@@ -756,14 +763,17 @@ mod tests {
 		let expr = FunctionResolver::std().run(expr).unwrap();
 		let expr = TypeFixer::std().run(expr).unwrap();
 		let res_ty = TypeChecker::default().run(&expr);
-		assert!(matches!(
+		assert_eq!(
 			res_ty,
 			Err(Error::BadFuncArgType {
+				name: "gt".to_owned().into_boxed_str(),
 				idx: 0,
-				got: Type::Primitive(PrimitiveType::Int),
-				..
+				expected: "a float, int, bool, span, or datetime"
+					.to_owned()
+					.into_boxed_str(),
+				got: Box::new(Type::Primitive(PrimitiveType::Int))
 			})
-		));
+		)
 	}
 
 	#[test]

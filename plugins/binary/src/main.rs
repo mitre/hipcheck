@@ -64,17 +64,17 @@ impl Plugin for BinaryPlugin {
 		self.policy_conf
 			.set(conf.binary_file_threshold)
 			.map_err(|_| ConfigError::InternalError {
-				message: "plugin was already configured".to_string(),
+				message: "plugin was already configured".to_string().into_boxed_str(),
 			})?;
 
 		if std::fs::exists(&conf.binary_file)
 			.map_err(|e| ConfigError::InternalError {
-				message: format!("failed to check file existence: {e}"),
+				message: format!("failed to check file existence: {e}").into_boxed_str(),
 			})?
 			.not()
 		{
 			return Err(ConfigError::FileNotFound {
-				file_path: format!("{}", conf.binary_file.display()),
+				file_path: format!("{}", conf.binary_file.display()).into_boxed_str(),
 			});
 		}
 
@@ -84,13 +84,14 @@ impl Plugin for BinaryPlugin {
 				source: format!(
 					"binary file type definitions at {}",
 					conf.binary_file.display()
-				),
-				message: e.to_string_pretty_multiline(),
+				)
+				.into_boxed_str(),
+				message: e.to_string_pretty_multiline().into_boxed_str(),
 			})?;
 
 		// Make the salsa db globally accessible
 		DETECTOR.set(bfd).map_err(|_e| ConfigError::InternalError {
-			message: "config was already set".to_owned(),
+			message: "config was already set".to_owned().into_boxed_str(),
 		})
 	}
 

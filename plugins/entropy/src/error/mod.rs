@@ -74,7 +74,7 @@ impl Error {
 	}
 
 	/// Get an iterator over the errors in a chain.
-	pub fn chain(&self) -> Chain {
+	pub fn chain(&self) -> Chain<'_> {
 		Chain::new(self)
 	}
 

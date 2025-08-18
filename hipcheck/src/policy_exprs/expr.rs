@@ -61,7 +61,7 @@ pub type Op = fn(&Env, &[Expr]) -> Result<Expr>;
 
 pub type TypeChecker = fn(&[Type]) -> Result<ReturnableType>;
 
-#[derive(Clone, PartialEq, Debug, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub struct FunctionDef {
 	pub name: String,
 	pub english: String,
@@ -69,19 +69,30 @@ pub struct FunctionDef {
 	pub ty_checker: TypeChecker,
 	pub op: Op,
 }
+
+impl PartialEq for FunctionDef {
+	fn eq(&self, other: &Self) -> bool {
+		// Do not include `ty_checker` or `op` since they're function pointers
+		// and function pointer equality is unreliable and mostly meaningless.
+		self.name == other.name
+			&& self.english == other.english
+			&& self.expected_args == other.expected_args
+	}
+}
+
 impl FunctionDef {
 	pub fn type_check(&self, args: &[Type]) -> Result<ReturnableType> {
 		match args.len().cmp(&self.expected_args) {
 			Ordering::Less => {
 				return Err(Error::NotEnoughArgs {
-					name: self.name.clone(),
+					name: self.name.clone().into_boxed_str(),
 					expected: self.expected_args,
 					given: args.len(),
 				});
 			}
 			Ordering::Greater => {
 				return Err(Error::TooManyArgs {
-					name: self.name.clone(),
+					name: self.name.clone().into_boxed_str(),
 					expected: self.expected_args,
 					given: args.len(),
 				});
@@ -92,7 +103,7 @@ impl FunctionDef {
 		// There's probably a better way to augment err with name
 		if let Err(Error::BadFuncArgType { name, .. }) = &mut res {
 			if name.is_empty() {
-				*name = self.name.clone();
+				*name = self.name.clone().into_boxed_str();
 			}
 		};
 		res
@@ -125,7 +136,9 @@ impl Function {
 	}
 	pub fn resolve(&self, env: &Env) -> Result<Self> {
 		let Some(Binding::Fn(op_info)) = env.get(&self.ident.0) else {
-			return Err(Error::UnknownFunction(self.ident.0.clone()));
+			return Err(Error::UnknownFunction(
+				self.ident.0.clone().into_boxed_str(),
+			));
 		};
 		let ident = self.ident.clone();
 		let args = self.args.clone();
@@ -351,7 +364,9 @@ impl Typed for Function {
 	fn get_type(&self) -> Result<Type> {
 		// Can't get a type if we haven't resolved the function
 		let Some(def) = self.opt_def.clone() else {
-			return Err(Error::UnknownFunction(self.ident.0.clone()));
+			return Err(Error::UnknownFunction(
+				self.ident.0.clone().into_boxed_str(),
+			));
 		};
 
 		// Get types of each argument
@@ -381,7 +396,7 @@ impl Typed for Lambda {
 		let fty = match self.body.get_type()? {
 			Type::Function(f) => f,
 			other => {
-				return Err(Error::InternalError(format!("Body of a lambda expr should be a function with a placeholder var, got {other:?}")));
+				return Err(Error::InternalError(format!("Body of a lambda expr should be a function with a placeholder var, got {other:?}").into_boxed_str()));
 			}
 		};
 
@@ -608,7 +623,10 @@ pub fn parse(input: &str) -> Result<Expr> {
 		Err(err) => {
 			let remaining = err.input.lexer().slice().to_string();
 			let kind = err.code;
-			Err(Error::Parse { remaining, kind })
+			Err(Error::Parse {
+				remaining: remaining.into_boxed_str(),
+				kind,
+			})
 		}
 	}
 }

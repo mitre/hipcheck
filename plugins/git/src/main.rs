@@ -350,14 +350,14 @@ impl Plugin for GitPlugin {
 		// Deserialize and validate the config struct
 		let conf: Config =
 			serde_json::from_value::<Config>(config).map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: e.to_string().into_boxed_str(),
 			})?;
 		let cache_size = conf.commit_cache_size;
 
 		CACHE
 			.set(Mutex::new(LruCache::new(NonZero::new(cache_size).unwrap())))
 			.map_err(|_e| ConfigError::InternalError {
-				message: "config was already set".to_owned(),
+				message: "config was already set".to_owned().into_boxed_str(),
 			})
 	}
 

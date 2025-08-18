@@ -44,7 +44,7 @@ fn ty_check_higher_order_lambda(
 		// Copy the lambda function type, replace ident with arr_elt_ty
 		let mut try_l_ty = l_ty.clone();
 		let first_arg = try_l_ty.arg_tys.get_mut(0).ok_or(Error::NotEnoughArgs {
-			name: "".to_owned(),
+			name: "".to_owned().into_boxed_str(),
 			expected: 1,
 			given: 0,
 		})?;
@@ -61,14 +61,16 @@ fn ty_filter(args: &[Type]) -> Result<ReturnableType> {
 	let arr_ty = expect_array_at(args, 1)?;
 
 	let wrapped_l_ty = args.first().ok_or(Error::InternalError(
-		"we were supposed to have already checked that there are at least two arguments".to_owned(),
+		"we were supposed to have already checked that there are at least two arguments"
+			.to_owned()
+			.into_boxed_str(),
 	))?;
 	let Type::Lambda(l_ty) = wrapped_l_ty else {
 		return Err(Error::BadFuncArgType {
-			name: "".to_owned(),
+			name: "".to_owned().into_boxed_str(),
 			idx: 0,
-			expected: "a lambda".to_owned(),
-			got: wrapped_l_ty.clone(),
+			expected: "a lambda".to_owned().into_boxed_str(),
+			got: Box::new(wrapped_l_ty.clone()),
 		});
 	};
 
@@ -78,10 +80,10 @@ fn ty_filter(args: &[Type]) -> Result<ReturnableType> {
 			Ok(ReturnableType::Array(arr_ty))
 		}
 		_ => Err(Error::BadFuncArgType {
-			name: "".to_owned(),
+			name: "".to_owned().into_boxed_str(),
 			idx: 0,
-			expected: "a bool-returning lambda".to_owned(),
-			got: Type::Lambda(l_ty.clone()),
+			expected: "a bool-returning lambda".to_owned().into_boxed_str(),
+			got: Box::new(Type::Lambda(l_ty.clone())),
 		}),
 	}
 }
@@ -91,14 +93,16 @@ fn ty_higher_order_bool_fn(args: &[Type]) -> Result<ReturnableType> {
 	let arr_ty = expect_array_at(args, 1)?;
 
 	let wrapped_l_ty = args.first().ok_or(Error::InternalError(
-		"we were supposed to have already checked that there are at least two arguments".to_owned(),
+		"we were supposed to have already checked that there are at least two arguments"
+			.to_owned()
+			.into_boxed_str(),
 	))?;
 	let Type::Lambda(l_ty) = wrapped_l_ty else {
 		return Err(Error::BadFuncArgType {
-			name: "".to_owned(),
+			name: "".to_owned().into_boxed_str(),
 			idx: 0,
-			expected: "a lambda".to_owned(),
-			got: wrapped_l_ty.clone(),
+			expected: "a lambda".to_owned().into_boxed_str(),
+			got: Box::new(wrapped_l_ty.clone()),
 		});
 	};
 
@@ -108,10 +112,10 @@ fn ty_higher_order_bool_fn(args: &[Type]) -> Result<ReturnableType> {
 			Ok(ReturnableType::Primitive(PrimitiveType::Bool))
 		}
 		_ => Err(Error::BadFuncArgType {
-			name: "".to_owned(),
+			name: "".to_owned().into_boxed_str(),
 			idx: 0,
-			expected: "a bool-returning lambda".to_owned(),
-			got: Type::Lambda(l_ty.clone()),
+			expected: "a bool-returning lambda".to_owned().into_boxed_str(),
+			got: Box::new(Type::Lambda(l_ty.clone())),
 		}),
 	}
 }
@@ -119,7 +123,7 @@ fn ty_higher_order_bool_fn(args: &[Type]) -> Result<ReturnableType> {
 // Type of dynamic function is dependent on first arg
 fn ty_inherit_first(args: &[Type]) -> Result<ReturnableType> {
 	args.first().ok_or(
-        Error::InternalError("type checking function expects one argument, was incorrectly applied to a function that takes none".to_owned())
+        Error::InternalError("type checking function expects one argument, was incorrectly applied to a function that takes none".to_owned().into_boxed_str())
     )?.try_into()
 }
 
@@ -136,17 +140,18 @@ fn expect_primitive_at(args: &[Type], idx: usize) -> Result<Option<PrimitiveType
 		.get(idx)
 		.ok_or(Error::InternalError(
 			"we were supposed to have already checked that function had enough arguments"
-				.to_owned(),
+				.to_owned()
+				.into_boxed_str(),
 		))?
 		.try_into()?;
 
 	match arg {
 		ReturnableType::Primitive(p) => Ok(Some(p)),
 		ReturnableType::Array(a) => Err(Error::BadFuncArgType {
-			name: "".to_owned(),
+			name: "".to_owned().into_boxed_str(),
 			idx,
-			expected: "a primitive type".to_owned(),
-			got: Type::Array(a),
+			expected: "a primitive type".to_owned().into_boxed_str(),
+			got: Box::new(Type::Array(a)),
 		}),
 		ReturnableType::Unknown => Ok(None),
 	}
@@ -157,7 +162,8 @@ fn expect_array_at(args: &[Type], idx: usize) -> Result<ExprArrayType> {
 		.get(idx)
 		.ok_or(Error::InternalError(
 			"we were supposed to have already checked that function had enough arguments"
-				.to_owned(),
+				.to_owned()
+				.into_boxed_str(),
 		))?
 		.try_into()?;
 
@@ -165,10 +171,10 @@ fn expect_array_at(args: &[Type], idx: usize) -> Result<ExprArrayType> {
 		ReturnableType::Array(a) => Ok(a),
 		ReturnableType::Unknown => Ok(None),
 		ReturnableType::Primitive(p) => Err(Error::BadFuncArgType {
-			name: "".to_owned(),
+			name: "".to_owned().into_boxed_str(),
 			idx,
-			expected: "an array".to_owned(),
-			got: Type::Primitive(p),
+			expected: "an array".to_owned().into_boxed_str(),
+			got: Box::new(Type::Primitive(p)),
 		}),
 	}
 }
@@ -185,10 +191,10 @@ fn ty_divz(args: &[Type]) -> Result<ReturnableType> {
 	};
 
 	Err(Error::BadFuncArgType {
-		name: "".to_owned(),
+		name: "".to_owned().into_boxed_str(),
 		idx,
-		expected: "an int or float".to_owned(),
-		got: Type::Primitive(bad),
+		expected: "an int or float".to_owned().into_boxed_str(),
+		got: Box::new(Type::Primitive(bad)),
 	})
 }
 
@@ -211,26 +217,30 @@ fn ty_arithmetic_binary_ops(args: &[Type]) -> Result<ReturnableType> {
 	};
 
 	Err(Error::BadFuncArgType {
-		name: "".to_owned(),
+		name: "".to_owned().into_boxed_str(),
 		idx,
-		expected: "a float, int, span, or datetime".to_owned(),
-		got: Type::Primitive(bad),
+		expected: "a float, int, span, or datetime"
+			.to_owned()
+			.into_boxed_str(),
+		got: Box::new(Type::Primitive(bad)),
 	})
 }
 
 fn ty_foreach(args: &[Type]) -> Result<ReturnableType> {
 	expect_array_at(args, 1)?;
 	let first_arg = args.first().ok_or(Error::InternalError(
-		"we were supposed to have already checked that there are at least two arguments".to_owned(),
+		"we were supposed to have already checked that there are at least two arguments"
+			.to_owned()
+			.into_boxed_str(),
 	))?;
 	let fty = match first_arg {
 		Type::Lambda(f) => f,
 		other => {
 			return Err(Error::BadFuncArgType {
-				name: "foreach".to_owned(),
+				name: "foreach".to_owned().into_boxed_str(),
 				idx: 0,
-				expected: "lambda".to_owned(),
-				got: other.clone(),
+				expected: "lambda".to_owned().into_boxed_str(),
+				got: Box::new(other.clone()),
 			});
 		}
 	};
@@ -254,10 +264,12 @@ fn ty_comp(args: &[Type]) -> Result<ReturnableType> {
 		(_, Some(x)) => (x, 1),
 	};
 	Err(Error::BadFuncArgType {
-		name: "".to_owned(),
+		name: "".to_owned().into_boxed_str(),
 		idx,
-		expected: "a float, int, bool, span, or datetime".to_owned(),
-		got: Type::Primitive(bad),
+		expected: "a float, int, bool, span, or datetime"
+			.to_owned()
+			.into_boxed_str(),
+		got: Box::new(Type::Primitive(bad)),
 	})
 }
 
@@ -271,10 +283,10 @@ fn ty_avg(args: &[Type]) -> Result<ReturnableType> {
 	match arr_ty {
 		None | Some(Int) | Some(Float) => Ok(Float.into()),
 		Some(x) => Err(Error::BadFuncArgType {
-			name: "".to_owned(),
+			name: "".to_owned().into_boxed_str(),
 			idx: 0,
-			expected: "array of ints or floats".to_owned(),
-			got: Type::Array(Some(x)),
+			expected: "array of ints or floats".to_owned().into_boxed_str(),
+			got: Box::new(Type::Array(Some(x))),
 		}),
 	}
 }
@@ -287,10 +299,10 @@ fn ty_duration(args: &[Type]) -> Result<ReturnableType> {
 		None | Some(DateTime) => (),
 		Some(got) => {
 			return Err(Error::BadFuncArgType {
-				name: "".to_owned(),
+				name: "".to_owned().into_boxed_str(),
 				idx: 0,
-				expected: "a datetime".to_owned(),
-				got: Type::Primitive(got),
+				expected: "a datetime".to_owned().into_boxed_str(),
+				got: Box::new(Type::Primitive(got)),
 			});
 		}
 	}
@@ -298,10 +310,10 @@ fn ty_duration(args: &[Type]) -> Result<ReturnableType> {
 		None | Some(DateTime) => (),
 		Some(got) => {
 			return Err(Error::BadFuncArgType {
-				name: "".to_owned(),
+				name: "".to_owned().into_boxed_str(),
 				idx: 1,
-				expected: "a datetime".to_owned(),
-				got: Type::Primitive(got),
+				expected: "a datetime".to_owned().into_boxed_str(),
+				got: Box::new(Type::Primitive(got)),
 			});
 		}
 	}
@@ -313,10 +325,10 @@ fn ty_bool_unary(args: &[Type]) -> Result<ReturnableType> {
 	match expect_primitive_at(args, 0)? {
 		None | Some(Bool) => Ok(PrimitiveType::Bool.into()),
 		Some(got) => Err(Error::BadFuncArgType {
-			name: "".to_owned(),
+			name: "".to_owned().into_boxed_str(),
 			idx: 0,
-			expected: "a bool".to_owned(),
-			got: Type::Primitive(got),
+			expected: "a bool".to_owned().into_boxed_str(),
+			got: Box::new(Type::Primitive(got)),
 		}),
 	}
 }
@@ -329,10 +341,10 @@ fn ty_bool_binary(args: &[Type]) -> Result<ReturnableType> {
 		None | Some(Bool) => (),
 		Some(got) => {
 			return Err(Error::BadFuncArgType {
-				name: "".to_owned(),
+				name: "".to_owned().into_boxed_str(),
 				idx: 0,
-				expected: "a bool".to_owned(),
-				got: Type::Primitive(got),
+				expected: "a bool".to_owned().into_boxed_str(),
+				got: Box::new(Type::Primitive(got)),
 			});
 		}
 	}
@@ -340,10 +352,10 @@ fn ty_bool_binary(args: &[Type]) -> Result<ReturnableType> {
 		None | Some(Bool) => (),
 		Some(got) => {
 			return Err(Error::BadFuncArgType {
-				name: "".to_owned(),
+				name: "".to_owned().into_boxed_str(),
 				idx: 1,
-				expected: "a bool".to_owned(),
-				got: Type::Primitive(got),
+				expected: "a bool".to_owned().into_boxed_str(),
+				got: Box::new(Type::Primitive(got)),
 			});
 		}
 	}
@@ -457,12 +469,12 @@ fn check_num_args(name: &str, args: &[Expr], expected: usize) -> Result<()> {
 	match expected.cmp(&given) {
 		Ordering::Equal => Ok(()),
 		Ordering::Less => Err(Error::TooManyArgs {
-			name: name.to_string(),
+			name: name.to_string().into_boxed_str(),
 			expected,
 			given,
 		}),
 		Ordering::Greater => Err(Error::NotEnoughArgs {
-			name: name.to_string(),
+			name: name.to_string().into_boxed_str(),
 			expected,
 			given,
 		}),
@@ -680,7 +692,7 @@ fn gt(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Span(arg_1), Span(arg_2)) => Ok(Bool(
 			arg_1
 				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string()))?
+				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
 				.is_gt(),
 		)),
 		_ => unreachable!(),
@@ -701,7 +713,7 @@ fn lt(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Span(arg_1), Span(arg_2)) => Ok(Bool(
 			arg_1
 				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string()))?
+				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
 				.is_lt(),
 		)),
 		_ => unreachable!(),
@@ -722,7 +734,7 @@ fn gte(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Span(arg_1), Span(arg_2)) => Ok(Bool(
 			arg_1
 				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string()))?
+				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
 				.is_ge(),
 		)),
 		_ => unreachable!(),
@@ -743,7 +755,7 @@ fn lte(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Span(arg_1), Span(arg_2)) => Ok(Bool(
 			arg_1
 				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string()))?
+				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
 				.is_le(),
 		)),
 		_ => unreachable!(),
@@ -764,7 +776,7 @@ fn eq(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Span(arg_1), Span(arg_2)) => Ok(Bool(
 			arg_1
 				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string()))?
+				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
 				.is_eq(),
 		)),
 		_ => unreachable!(),
@@ -785,7 +797,7 @@ fn neq(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Span(arg_1), Span(arg_2)) => Ok(Bool(
 			arg_1
 				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string()))?
+				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
 				.is_ne(),
 		)),
 		_ => unreachable!(),
@@ -803,15 +815,16 @@ fn add(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Int(arg_1), Int(arg_2)) => Ok(Int(arg_1 + arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Float(arg_1 + arg_2)),
 		// Span or DateTime can come first
-		(DateTime(dt), Span(s)) | (Span(s), DateTime(dt)) => Ok(DateTime(
-			dt.checked_add(s)
-				.map_err(|err| Error::Datetime(err.to_string()))?,
-		)),
-		(Span(arg_1), Span(arg_2)) => Ok(Span(
-			arg_1
-				.checked_add(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string()))?,
-		)),
+		(DateTime(dt), Span(s)) | (Span(s), DateTime(dt)) => {
+			Ok(DateTime(dt.checked_add(s).map_err(|err| {
+				Error::Datetime(err.to_string().into_boxed_str())
+			})?))
+		}
+		(Span(arg_1), Span(arg_2)) => {
+			Ok(Span(arg_1.checked_add(arg_2).map_err(|err| {
+				Error::Datetime(err.to_string().into_boxed_str())
+			})?))
+		}
 		(_, _) => Err(Error::BadType(name)),
 	};
 
@@ -827,16 +840,16 @@ fn sub(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
 		(Int(arg_1), Int(arg_2)) => Ok(Int(arg_1 - arg_2)),
 		(Float(arg_1), Float(arg_2)) => Ok(Float(arg_1 - arg_2)),
-		(DateTime(arg_1), Span(arg_2)) => Ok(DateTime(
-			arg_1
-				.checked_sub(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string()))?,
-		)),
-		(Span(arg_1), Span(arg_2)) => Ok(Span(
-			arg_1
-				.checked_sub(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string()))?,
-		)),
+		(DateTime(arg_1), Span(arg_2)) => {
+			Ok(DateTime(arg_1.checked_sub(arg_2).map_err(|err| {
+				Error::Datetime(err.to_string().into_boxed_str())
+			})?))
+		}
+		(Span(arg_1), Span(arg_2)) => {
+			Ok(Span(arg_1.checked_sub(arg_2).map_err(|err| {
+				Error::Datetime(err.to_string().into_boxed_str())
+			})?))
+		}
 		(_, _) => Err(Error::BadType(name)),
 	};
 
@@ -872,11 +885,11 @@ fn duration(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "duration";
 
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
-		(DateTime(arg_1), DateTime(arg_2)) => Ok(Span(
-			arg_1
-				.since(&arg_2)
-				.map_err(|err| Error::Datetime(err.to_string()))?,
-		)),
+		(DateTime(arg_1), DateTime(arg_2)) => {
+			Ok(Span(arg_1.since(&arg_2).map_err(|err| {
+				Error::Datetime(err.to_string().into_boxed_str())
+			})?))
+		}
 		(_, _) => Err(Error::BadType(name)),
 	};
 

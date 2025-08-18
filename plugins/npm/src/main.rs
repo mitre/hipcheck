@@ -107,7 +107,7 @@ impl Plugin for DependenciesPlugin {
 	fn set_config(&self, _config: Value) -> std::result::Result<(), ConfigError> {
 		match get_npm_version() {
 			Err(_) => Err(ConfigError::MissingProgram {
-				program_name: "npm".to_owned(),
+				program_name: "npm".to_owned().into_boxed_str(),
 			}),
 			Ok(_) => Ok(()),
 		}

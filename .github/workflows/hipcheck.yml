@@ -35,7 +35,7 @@ jobs:
         # to achieve ARM and x86 support (macos-14 is ARM, macos-13 is x86),
         # since alternative runners with matching versions aren't all on the
         # free plan for GitHub Actions.
-        os: [ubuntu-22.04, windows-2019, macos-14, macos-13]
+        os: [ubuntu-22.04, windows-2022, macos-14, macos-13]
     name: "Test (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
