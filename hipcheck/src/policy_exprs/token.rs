@@ -153,13 +153,12 @@ fn lex_json_pointer(input: &mut Lexer<'_, Token>) -> Result<String> {
 		"JSON Pointer token missing mandatory initial '$': got '{}'",
 		token
 	)))?;
-	if let Some(chr) = pointer.chars().next() {
-		if chr != '/' {
+	if let Some(chr) = pointer.chars().next()
+		&& chr != '/' {
 			return Err(LexingError::JSONPointerMissingInitialSlash(
 				pointer.to_owned(),
 			));
 		}
-	}
 	Ok(pointer.to_owned())
 }
 

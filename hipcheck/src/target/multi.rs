@@ -95,11 +95,10 @@ impl TryFrom<GoModRequire> for SingleTargetSeed {
 
 		// Check if version string is really a pseudo-version, if so, pull out ref hash
 		// Reference: https://go.dev/ref/mod#pseudo-versions
-		if let Some((_, hash)) = version.rsplit_once("-") {
-			if hash.len() == 12 {
+		if let Some((_, hash)) = version.rsplit_once("-")
+			&& hash.len() == 12 {
 				version = hash.to_owned();
 			}
-		}
 
 		let is_github = repo.contains("github.com");
 

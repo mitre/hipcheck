@@ -158,11 +158,10 @@ impl PluginExecutor {
 			// if std::net::TcpListener::bind(format!("127.0.0.1:{i}")).is_ok() {
 			// 	return Ok(i);
 			// }
-			if let Ok(addr) = std::net::TcpListener::bind("127.0.0.1:0") {
-				if let Ok(local_addr) = addr.local_addr() {
+			if let Ok(addr) = std::net::TcpListener::bind("127.0.0.1:0")
+				&& let Ok(local_addr) = addr.local_addr() {
 					return Ok(local_addr.port());
 				}
-			}
 		}
 
 		Err(hc_error!("Failed to find available port"))

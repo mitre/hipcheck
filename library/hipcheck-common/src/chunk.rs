@@ -5,7 +5,7 @@ use crate::{
 	proto::{Query as PluginQuery, QueryState},
 	types::Query,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::result::Result as StdResult;
 
 /// Max size of a single GRPC message (4 MB)
@@ -138,18 +138,14 @@ pub fn chunk_with_size(msg: PluginQuery, max_est_size: usize) -> Result<Vec<Plug
 	// @Compatibility - pre-RFD9 expects concatenation of all `key` fields to be a valid JSON
 	// string, same with `output`. This ensures if either were all blank, at least the first says
 	// "null"
-	if cfg!(feature = "rfd9-compat") && (null_key || null_output) {
-		if let Some(first) = out.first_mut() {
-			if null_key {
-				if let Some(k) = first.key.first_mut() {
-					*k = "null".to_owned()
-				}
-			}
-			if null_output {
-				if let Some(o) = first.output.first_mut() {
-					*o = "null".to_owned()
-				}
-			}
+	if (cfg!(feature = "rfd9-compat") && (null_key || null_output))
+		&& let Some(first) = out.first_mut()
+	{
+		if null_key && let Some(k) = first.key.first_mut() {
+			*k = "null".to_owned()
+		}
+		if null_output && let Some(o) = first.output.first_mut() {
+			*o = "null".to_owned()
 		}
 	}
 
@@ -315,12 +311,12 @@ impl QuerySynthesizer {
 					// error out if expecting a Submit messages and a Reply is received
 					(QueryState::SubmitInProgress, QueryState::ReplyInProgress)
 					| (QueryState::SubmitInProgress, QueryState::ReplyComplete) => {
-						return Err(Error::ReceivedReplyWhenExpectingSubmitChunk)
+						return Err(Error::ReceivedReplyWhenExpectingSubmitChunk);
 					}
 					// error out if expecting a Reply message and Submit is received
 					(QueryState::ReplyInProgress, QueryState::SubmitInProgress)
 					| (QueryState::ReplyInProgress, QueryState::SubmitComplete) => {
-						return Err(Error::ReceivedSubmitWhenExpectingReplyChunk)
+						return Err(Error::ReceivedSubmitWhenExpectingReplyChunk);
 					}
 					// otherwise we got an expected message type
 					(_, _) => {

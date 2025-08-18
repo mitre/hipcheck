@@ -573,14 +573,13 @@ impl CheckArgs {
 				// Update that string here
 				target_str = new_target;
 				// Check if the user also provided a type, and error if it does not agree with the inferred type.
-				if let Some(user_submcd) = self.target_type.clone() {
-					if user_submcd.as_str() != subcmd_str {
+				if let Some(user_submcd) = self.target_type.clone()
+					&& user_submcd.as_str() != subcmd_str {
 						return Err(hc_error!(
 							"Provided target type '{}' does not match the type, '{}', inferred from the target '{}'. Check that you have specified the correct type and provided the intended target.",
 							user_submcd.as_str(), subcmd_str, target
 						));
 					}
-				}
 			}
 			None => match self.target_type.clone() {
 				// If a type could not be inferred, check if a type was provided
@@ -632,16 +631,14 @@ impl ToTargetSeed for CheckArgs {
 						}
 					}
 					// Validate for VCS URL
-					else if let SingleTargetSeedKind::VcsUrl(vcs) = &single_target_seed_kind {
-						if let Some(git_ref) = &vcs.git_ref {
-							if git_ref != init_ref {
+					else if let SingleTargetSeedKind::VcsUrl(vcs) = &single_target_seed_kind
+						&& let Some(git_ref) = &vcs.git_ref
+							&& git_ref != init_ref {
 								return Err(hc_error!(
 								"Provided ref_spec '{}' does not match the ref spec, '{}', inferred from the target '{}'. Check that you have specified the correct ref and provided the intended target.",
 								init_ref, git_ref, &command.get_specifier()
 							));
 							}
-						}
-					}
 				} else {
 					// If no --ref is set and the target seed is a VCS URL, get the ref from that
 					if let SingleTargetSeedKind::VcsUrl(vcs) = &single_target_seed_kind {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 use super::{
-	cyclone_dx::{extract_cyclonedx_download_url, BomTarget},
+	cyclone_dx::{BomTarget, extract_cyclonedx_download_url},
 	multi::resolve_package_lock_json,
 	pm::{detect_and_extract, extract_repo_for_maven},
 	spdx::extract_spdx_download_url,
@@ -101,7 +101,9 @@ impl TargetResolver {
 				}
 				// No version was specified. Try to figure out the tag representing the latest version in the repo
 				else if let Some(cmt) = {
-					log::debug!("Package specified without version, trying to determine latest version tag in repo");
+					log::debug!(
+						"Package specified without version, trying to determine latest version tag in repo"
+					);
 					try_find_commit_for_latest_version_tag(&repo)?
 				} {
 					cmt
@@ -434,7 +436,7 @@ impl TargetSeed {
 	pub async fn get_targets(
 		&self,
 		config: TargetResolverConfig,
-	) -> Result<Pin<Box<impl StreamExt<Item = Result<Target>>>>> {
+	) -> Result<Pin<Box<impl StreamExt<Item = Result<Target>> + use<>>>> {
 		let seed_vec = match self {
 			TargetSeed::Single(single_target_seed) => vec![single_target_seed.clone()],
 			TargetSeed::Multi(multi_target_seed) => multi_target_seed.get_target_seeds().await?,

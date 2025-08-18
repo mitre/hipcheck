@@ -6,7 +6,7 @@ use proc_macro2::Span;
 use std::ops::Not;
 use std::sync::{LazyLock, Mutex};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Data, DeriveInput, Error, Ident, ItemFn, Meta, PatType};
+use syn::{Data, DeriveInput, Error, Ident, ItemFn, Meta, PatType, parse_macro_input};
 
 static QUERIES: LazyLock<Mutex<Vec<NamedQuerySpec>>> = LazyLock::new(|| Mutex::new(vec![]));
 
@@ -57,14 +57,13 @@ fn parse_result_generic(p: &syn::Path) -> Result<syn::Type, Error> {
 
 /// Parse PatType to confirm that it contains a &mut PluginEngine
 fn parse_plugin_engine(engine_arg: &PatType) -> Result<(), Error> {
-	if let syn::Type::Reference(type_reference) = engine_arg.ty.as_ref() {
-		if type_reference.mutability.is_some() {
-			if let syn::Type::Path(type_path) = type_reference.elem.as_ref() {
-				let last = type_path.path.segments.last().unwrap();
-				if last.ident == "PluginEngine" {
-					return Ok(());
-				}
-			}
+	if let syn::Type::Reference(type_reference) = engine_arg.ty.as_ref()
+		&& type_reference.mutability.is_some()
+		&& let syn::Type::Path(type_path) = type_reference.elem.as_ref()
+	{
+		let last = type_path.path.segments.last().unwrap();
+		if last.ident == "PluginEngine" {
+			return Ok(());
 		}
 	}
 
@@ -84,7 +83,10 @@ fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<Que
 	let input_type: syn::Type = {
 		let inputs = &sig.inputs;
 		if inputs.len() != 2 {
-			return Err(Error::new(item_fn.span(), "Query function must take two arguments: &mut PluginEngine, and an input type that implements Serialize"));
+			return Err(Error::new(
+				item_fn.span(),
+				"Query function must take two arguments: &mut PluginEngine, and an input type that implements Serialize",
+			));
 		}
 		// Validate that the first arg is type &mut PluginEngine
 		if let Some(syn::FnArg::Typed(engine_arg)) = inputs.get(0) {
@@ -93,11 +95,17 @@ fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<Que
 
 		if let Some(input_arg) = inputs.get(1) {
 			let syn::FnArg::Typed(input_arg_info) = input_arg else {
-				return Err(Error::new(item_fn.span(), "Query function must take two arguments: &mut PluginEngine, and an input type that implements Serialize"));
+				return Err(Error::new(
+					item_fn.span(),
+					"Query function must take two arguments: &mut PluginEngine, and an input type that implements Serialize",
+				));
 			};
 			input_arg_info.ty.as_ref().clone()
 		} else {
-			return Err(Error::new(item_fn.span(), "Query function must take two arguments: &mut PluginEngine, and an input type that implements Serialize"));
+			return Err(Error::new(
+				item_fn.span(),
+				"Query function must take two arguments: &mut PluginEngine, and an input type that implements Serialize",
+			));
 		}
 	};
 
@@ -116,7 +124,7 @@ fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<Que
 					return Err(Error::new(
 						item_fn.span(),
 						"Query function must return Result<T: Serialize>",
-					))
+					));
 				}
 			}
 		}
@@ -155,7 +163,12 @@ fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<Que
 			if seg.ident == "default" {
 				match seg.arguments {
 					syn::PathArguments::None => true,
-					_ => return Err(Error::new(item_fn.span(), "Default field in query options path cannot have any parenthized or bracketed arguments")),
+					_ => {
+						return Err(Error::new(
+							item_fn.span(),
+							"Default field in query options path cannot have any parenthized or bracketed arguments",
+						));
+					}
 				}
 			} else {
 				return Err(Error::new(

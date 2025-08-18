@@ -3,12 +3,12 @@
 //! Validate the configuration of all Hipcheck crates.
 
 use crate::workspace;
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{Context as _, Result, anyhow};
 use glob::glob;
 use pathbuf::pathbuf;
 use pep440_rs::{Version, VersionSpecifiers};
 use pyproject_toml::{Contact, License, Project, PyProjectToml};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{Deserialize, de::DeserializeOwned};
 use std::{
 	collections::BTreeSet,
 	fmt::{self, Debug, Display, Formatter},
@@ -185,8 +185,8 @@ enum PackageIssues {
 	NoDuplicateLicense,
 	/// The license config in the manifest is invalid.
 	LicenseInvalid,
-	/// Crate is using an edition other than 2021.
-	Not2021Edition,
+	/// Crate is using an edition other than 2024.
+	Not2024Edition,
 	/// Python project does not support Python version 3.10
 	NotPython3_10,
 }
@@ -203,7 +203,7 @@ impl Display for PackageIssues {
 				"must have a single license file that matches the Hipcheck license file"
 			}
 			LicenseInvalid => "license must be set to `'Apache-2.0'`",
-			Not2021Edition => "edition must be set to '2021' in 'Cargo.toml'",
+			Not2024Edition => "edition must be set to '2024' in 'Cargo.toml'",
 			NotPython3_10 => "python projects must support Python version 3.10",
 		};
 
@@ -278,7 +278,7 @@ fn validate_crate(krate: &Package) -> PackageFindingsSet {
 
 	log::info!("validating crate '{}' uses the correct edition", krate.name);
 	if crate_uses_wrong_edition(manifest) {
-		findings.insert(Not2021Edition);
+		findings.insert(Not2024Edition);
 	}
 
 	findings
@@ -309,7 +309,7 @@ fn crate_uses_wrong_edition(manifest: &CrateManifest) -> bool {
 		.package
 		.edition
 		.as_ref()
-		.map(|e| e != "2021")
+		.map(|e| e != "2024")
 		.unwrap_or(true)
 }
 

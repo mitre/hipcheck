@@ -5,7 +5,7 @@ homepage = "https://hipcheck.mitre.org"
 repository = "https://github.com/mitre/hipcheck"
 license = "Apache-2.0"
 version = "0.6.1"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
@@ -29,8 +29,8 @@ tracing-subscriber = { version = "0.3", features = [
     "json",
 ], optional = true }
 hipcheck-common = { version = "0.4.2", path = "../../library/hipcheck-common" }
-hipcheck-workspace-hack = { version = "0.1", path = "../../library/hipcheck-workspace-hack" }
 console = { version = "0.15.11", features = ["windows-console-colors"] }
+hipcheck-workspace-hack = { version = "0.1", path = "../../library/hipcheck-workspace-hack" }
 
 [features]
 default = ["log_forwarding"]

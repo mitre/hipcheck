@@ -4,15 +4,15 @@ use crate::{
 	cache::plugin::HcPluginCache,
 	cli::{ConfigMode, Format},
 	config::Config,
-	engine::{start_plugins, HcPluginCore, PluginCore},
+	engine::{HcPluginCore, PluginCore, start_plugins},
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
 	hc_error,
-	policy::{config_to_policy, PolicyFile},
-	report::{report_builder::build_report, Report},
+	policy::{PolicyFile, config_to_policy},
+	report::{Report, report_builder::build_report},
 	score::score_results,
-	shell::{spinner_phase::SpinnerPhase, Shell},
-	target::{resolve::TargetResolverConfig, SingleTargetSeedKind, Target, TargetSeed},
+	shell::{Shell, spinner_phase::SpinnerPhase},
+	target::{SingleTargetSeedKind, Target, TargetSeed, resolve::TargetResolverConfig},
 };
 use chrono::prelude::*;
 use std::{
@@ -304,7 +304,10 @@ async fn setup_base_session(
 	let config_msg = match config_mode {
 		PreferPolicy { policy, config } => match use_policy(policy, &mut session_builder) {
 			Err(err) => {
-				log::info!("Failed to load default policy KDL file; trying legacy config TOML directory instead. Error: {:#?}", err);
+				log::info!(
+					"Failed to load default policy KDL file; trying legacy config TOML directory instead. Error: {:#?}",
+					err
+				);
 
 				use_config(config, &mut session_builder)?
 			}
@@ -405,7 +408,9 @@ fn use_policy(policy_path: PathBuf, session_builder: &mut SessionBuilder) -> Res
 
 pub fn load_config_and_data(config_path: &Path) -> Result<PolicyFile> {
 	// Start the phase.
-	let phase = SpinnerPhase::start("loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.");
+	let phase = SpinnerPhase::start(
+		"loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.",
+	);
 	// Increment the phase into the "running" stage.
 	phase.inc();
 	// Set the spinner phase to tick constantly, 10 times a second.
@@ -453,7 +458,9 @@ fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
 		Some(p) => {
 			// Use the path provided
 			if !p.exists() {
-				return Err(hc_error!("Failed to load exec config. Please make sure the path set by the --exec flag exists."));
+				return Err(hc_error!(
+					"Failed to load exec config. Please make sure the path set by the --exec flag exists."
+				));
 			}
 			ExecConfig::from_file(p)
 				.context("Failed to load the exec config. Please make sure the exec config file is in the provided location and is formatted correctly.")?
@@ -473,33 +480,33 @@ fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
 pub async fn load_target(
 	seed: &TargetSeed,
 	home: &Path,
-) -> Result<impl StreamExt<Item = Result<Target>>> {
+) -> Result<impl StreamExt<Item = Result<Target>> + use<>> {
 	// Resolve the source specifier into an actual source.
-	match seed {
+	let targets = match seed {
 		TargetSeed::Single(single_target_seed) => {
-			let phase_desc = match single_target_seed.kind {
+			let phase = SpinnerPhase::start(match single_target_seed.kind {
 				SingleTargetSeedKind::LocalRepo(_)
 				| SingleTargetSeedKind::RemoteRepo(_)
 				| SingleTargetSeedKind::VcsUrl(_) => "resolving git repository target",
 				SingleTargetSeedKind::Package(_) => "resolving package target",
 				SingleTargetSeedKind::Sbom(_) => "parsing SBOM document",
 				SingleTargetSeedKind::MavenPackage(_) => "resolving maven package target",
-			};
-			let phase = SpinnerPhase::start(phase_desc);
+			});
 
 			// Set the phase to tick steadily 10 times a second.
 			phase.enable_steady_tick(Duration::from_millis(100));
-			let config = TargetResolverConfig {
+
+			let targets = seed.get_targets(TargetResolverConfig {
 				phase: Some(phase.clone()),
 				cache: PathBuf::from(home),
-			};
-
-			let targets = seed.get_targets(config);
+			});
 
 			phase.finish_successful();
 
-			targets.await
+			targets
 		}
 		TargetSeed::Multi(_multi_target_seed) => todo!(),
-	}
+	};
+
+	targets.await
 }

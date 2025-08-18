@@ -38,13 +38,12 @@ fn lookup_json_pointer<'val>(pointer: &str, context: &'val Value) -> Result<&'va
 	// syntax errors and lookup errors, so we check the syntax ourselves.
 	// The only syntax error that serde_json currently recognizes is that a
 	// non-empty pointer must start with the '/' character.
-	if let Some(chr) = pointer.chars().next() {
-		if chr != '/' {
+	if let Some(chr) = pointer.chars().next()
+		&& chr != '/' {
 			return Err(Error::JSONPointerInvalidSyntax {
 				pointer: pointer.to_owned().into_boxed_str(),
 			});
 		}
-	}
 	match context.pointer(pointer) {
 		Some(val) => Ok(val),
 		None => Err(Error::JSONPointerLookupFailed {

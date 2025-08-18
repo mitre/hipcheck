@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+	Plugin, QuerySchema,
 	engine::HcSessionSocket,
 	error::{Error, Result},
-	Plugin, QuerySchema,
 };
 use hipcheck_common::{
 	proto::{
-		plugin_service_server::{PluginService, PluginServiceServer},
 		ConfigurationStatus, ExplainDefaultQueryRequest as ExplainDefaultQueryReq,
 		ExplainDefaultQueryResponse as ExplainDefaultQueryResp,
 		GetDefaultPolicyExpressionRequest as GetDefaultPolicyExpressionReq,
@@ -18,6 +17,7 @@ use hipcheck_common::{
 		InitiateQueryProtocolResponse as InitiateQueryProtocolResp,
 		SetConfigurationRequest as SetConfigurationReq,
 		SetConfigurationResponse as SetConfigurationResp,
+		plugin_service_server::{PluginService, PluginServiceServer},
 	},
 	types::LogLevel,
 };
@@ -28,7 +28,7 @@ use std::{
 };
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream as RecvStream;
-use tonic::{transport::Server, Code, Request as Req, Response as Resp, Status, Streaming};
+use tonic::{Code, Request as Req, Response as Resp, Status, Streaming, transport::Server};
 use tracing::error;
 
 #[derive(Debug, Clone)]
@@ -222,13 +222,12 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 			let mut channel = HcSessionSocket::new(tx, rx);
 			if let Err(e) = channel.run(cloned_plugin).await {
 				error!("Channel error: {e}");
-				if !tx_clone.is_closed() {
-					if let Err(send_err) = tx_clone
+				if !tx_clone.is_closed()
+					&& let Err(send_err) = tx_clone
 						.send(Err(tonic::Status::internal(format!("Session error: {e}"))))
 						.await
-					{
-						error!("Failed to send error through channel: {send_err}");
-					}
+				{
+					error!("Failed to send error through channel: {send_err}");
 				}
 			}
 		});

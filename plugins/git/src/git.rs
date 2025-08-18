@@ -2,23 +2,23 @@
 
 use crate::data::*;
 
-use crate::Error;
 use crate::CACHE;
+use crate::Error;
 use anyhow::Context;
 use anyhow::Result;
+use gix::ObjectId;
+use gix::Repository;
 use gix::bstr::ByteSlice;
+use gix::diff::blob::Algorithm;
+use gix::diff::blob::UnifiedDiffBuilder;
 use gix::diff::blob::intern::InternedInput;
 use gix::diff::blob::sink::Counter;
 use gix::diff::blob::sources::lines_with_terminator;
-use gix::diff::blob::Algorithm;
-use gix::diff::blob::UnifiedDiffBuilder;
 use gix::object;
 use gix::objs::tree::EntryKind;
-use gix::revision::walk::Sorting;
 use gix::revision::Walk;
+use gix::revision::walk::Sorting;
 use gix::traverse::commit::simple::CommitTimeOrder;
-use gix::ObjectId;
-use gix::Repository;
 use jiff::Timestamp;
 use lru::LruCache;
 use std::path::Path;
@@ -65,10 +65,10 @@ fn walk_commits<'repo, T>(
 	let mut results = Vec::with_capacity(5_000);
 	for object in repo_walker {
 		let commit = object?.object()?;
-		if let Some(ref break_now_fn) = break_now_fn {
-			if let Ok(true) = break_now_fn(&commit) {
-				break;
-			}
+		if let Some(ref break_now_fn) = break_now_fn
+			&& let Ok(true) = break_now_fn(&commit)
+		{
+			break;
 		}
 		let res = transform_fn(repo, commit)?;
 		results.push(res);

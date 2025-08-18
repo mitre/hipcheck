@@ -9,7 +9,7 @@ use crate::{
 	types::{CommitChurn, CommitChurnFreq, CommitDiff},
 };
 use clap::Parser;
-use hipcheck_sdk::{macros::PluginConfig, prelude::*, types::Target, LogLevel, PluginConfig};
+use hipcheck_sdk::{LogLevel, PluginConfig, macros::PluginConfig, prelude::*, types::Target};
 use std::{
 	collections::{HashMap, HashSet},
 	path::PathBuf,
@@ -60,16 +60,16 @@ impl TryFrom<RawConfig> for Config {
 			}),
 		};
 		// Sanity check on policy expr config
-		if let Some(policy_ref) = &opt_policy {
-			if policy_ref.commit_percentage < 0.0 || policy_ref.commit_percentage > 1.0 {
-				return Err(ConfigError::InvalidConfigValue {
-					field_name: "commit_percentage".to_owned().into_boxed_str(),
-					value: policy_ref.commit_percentage.to_string().into_boxed_str(),
-					reason: "percentage must be between 0.0 and 1.0, inclusive"
-						.to_owned()
-						.into_boxed_str(),
-				});
-			}
+		if let Some(policy_ref) = &opt_policy
+			&& (policy_ref.commit_percentage < 0.0 || policy_ref.commit_percentage > 1.0)
+		{
+			return Err(ConfigError::InvalidConfigValue {
+				field_name: "commit_percentage".to_owned().into_boxed_str(),
+				value: policy_ref.commit_percentage.to_string().into_boxed_str(),
+				reason: "percentage must be between 0.0 and 1.0, inclusive"
+					.to_owned()
+					.into_boxed_str(),
+			});
 		}
 		Ok(Config { opt_policy })
 	}

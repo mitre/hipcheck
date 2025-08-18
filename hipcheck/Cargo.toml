@@ -7,7 +7,7 @@ keywords = ["security", "sbom"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "../README.md"
 version = "3.14.0"
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0"
 homepage = "https://hipcheck.mitre.org"
 repository = "https://github.com/mitre/hipcheck"
@@ -135,8 +135,8 @@ hipcheck-common = { version = "0.4.2", path = "../library/hipcheck-common", feat
     "rfd9-compat",
 ] }
 serde_with = "3.12.0"
-hipcheck-workspace-hack = { version = "0.1", path = "../library/hipcheck-workspace-hack" }
 gomod-rs = "0.1.1"
+hipcheck-workspace-hack = { version = "0.1", path = "../library/hipcheck-workspace-hack" }
 
 [build-dependencies]
 

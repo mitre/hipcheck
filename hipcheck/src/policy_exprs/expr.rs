@@ -101,11 +101,10 @@ impl FunctionDef {
 		}
 		let mut res = (self.ty_checker)(args);
 		// There's probably a better way to augment err with name
-		if let Err(Error::BadFuncArgType { name, .. }) = &mut res {
-			if name.is_empty() {
+		if let Err(Error::BadFuncArgType { name, .. }) = &mut res
+			&& name.is_empty() {
 				*name = self.name.clone().into_boxed_str();
-			}
-		};
+			};
 		res
 	}
 	pub fn execute(&self, env: &Env, args: &[Expr]) -> Result<Expr> {
