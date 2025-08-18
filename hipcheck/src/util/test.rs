@@ -27,8 +27,8 @@ where
 		let old_v = env::var(k);
 		old_kvs.push((k, old_v));
 		match v {
-			None => env::remove_var(k),
-			Some(v) => env::set_var(k, v),
+			None => unsafe { env::remove_var(k) },
+			Some(v) => unsafe { env::set_var(k, v) },
 		}
 	}
 
@@ -55,8 +55,8 @@ where
 fn reset_env(k: &str, old: Result<String, VarError>) {
 	use std::env::VarError::*;
 	match old {
-		Ok(v) => env::set_var(k, v),
-		Err(NotUnicode(os_str)) => env::set_var(k, os_str),
-		Err(NotPresent) => env::remove_var(k),
+		Ok(v) => unsafe { env::set_var(k, v) },
+		Err(NotUnicode(os_str)) => unsafe { env::set_var(k, os_str) },
+		Err(NotPresent) => unsafe { env::remove_var(k) },
 	}
 }

@@ -220,8 +220,8 @@ impl ParseKdlNode for PolicyConfig {
 		let mut config = PolicyConfig::new();
 		for node in node.children()?.nodes() {
 			let description = node.name().to_string();
-			if let Some(info) = node.entries().first() {
-				if config
+			if let Some(info) = node.entries().first()
+				&& config
 					.insert(
 						description.clone(),
 						try_to_serde_json(info.value()).unwrap_or_else(|e| {
@@ -237,7 +237,6 @@ impl ParseKdlNode for PolicyConfig {
 					);
 					return None;
 				}
-			}
 		}
 		Some(config)
 	}
@@ -376,11 +375,10 @@ impl ParseKdlNode for PolicyCategory {
 				if let Some(analysis) = PolicyAnalysis::parse_node(node) {
 					children.push(PolicyCategoryChild::Analysis(analysis));
 				}
-			} else if node.name().to_string().as_str() == "category" {
-				if let Some(category) = PolicyCategory::parse_node(node) {
+			} else if node.name().to_string().as_str() == "category"
+				&& let Some(category) = PolicyCategory::parse_node(node) {
 					children.push(PolicyCategoryChild::Category(category));
 				}
-			}
 		}
 
 		Some(Self {
@@ -549,17 +547,15 @@ impl ParseKdlNode for PolicyAnalyze {
 		let mut root = PolicyCategory::new("risk".to_string(), None);
 
 		for node in nodes {
-			if node.name().to_string().as_str() == "category" {
-				if let Some(category) = PolicyCategory::parse_node(node) {
+			if node.name().to_string().as_str() == "category"
+				&& let Some(category) = PolicyCategory::parse_node(node) {
 					root.children.push(PolicyCategoryChild::Category(category));
 				}
-			}
-			if node.name().to_string().as_str() == "analysis" {
-				if let Some(analysis) = PolicyAnalysis::parse_node(node) {
+			if node.name().to_string().as_str() == "analysis"
+				&& let Some(analysis) = PolicyAnalysis::parse_node(node) {
 					root.children
 						.push(PolicyCategoryChild::Analysis(analysis.clone()));
 				}
-			}
 		}
 
 		Some(Self {

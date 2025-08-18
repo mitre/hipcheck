@@ -4,7 +4,7 @@ description = "Common functionality for the Hipcheck gRPC protocol"
 repository = "https://github.com/mitre/hipcheck"
 version = "0.4.2"
 license = "Apache-2.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"

@@ -2,7 +2,7 @@
 name = "activity"
 version = "0.5.2"
 license = "Apache-2.0"
-edition = "2021"
+edition = "2024"
 repository = "https://github.com/mitre/hipcheck"
 publish = false
 

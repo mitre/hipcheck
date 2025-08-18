@@ -2,9 +2,9 @@
 
 //! Subtypes of an organization specification, with KDL parsing functions
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{Context as _, Result, anyhow};
 use hipcheck_kdl::kdl::KdlNode;
-use hipcheck_kdl::{string_newtype_parse_kdl_node, ParseKdlNode};
+use hipcheck_kdl::{ParseKdlNode, string_newtype_parse_kdl_node};
 use serde::Deserialize;
 use std::str::FromStr;
 use strum::EnumString;
@@ -91,11 +91,10 @@ impl ParseKdlNode for Strategy {
 						if let Some(country) = StrategyCountry::parse_node(node) {
 							strategy_children.push(StrategyChild::StrategyCountry(country));
 						}
-					} else if node.name().to_string().as_str() == "org" {
-						if let Some(org) = StrategyOrg::parse_node(node) {
+					} else if node.name().to_string().as_str() == "org"
+						&& let Some(org) = StrategyOrg::parse_node(node) {
 							strategy_children.push(StrategyChild::StrategyOrg(org));
 						}
-					}
 				}
 				Some(strategy_children)
 			}

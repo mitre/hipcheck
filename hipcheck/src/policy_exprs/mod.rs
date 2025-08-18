@@ -289,13 +289,11 @@ impl English<'_> {
 		let lambda_arg = &lambda_func.args[1];
 
 		// Special case of `(count (filter (eq #t) $))`
-		if lambda_func.ident.to_string() == "eq" {
-			if let Expr::Primitive(Primitive::Bool(bool)) = lambda_arg {
-				if *bool {
+		if lambda_func.ident.to_string() == "eq"
+			&& let Expr::Primitive(Primitive::Bool(bool)) = lambda_arg
+				&& *bool {
 					return Some(format!("the number of {}", self.message.clone()));
 				}
-			}
-		}
 
 		// More general lambda expressions
 		let english_operator = get_function_def(lambda_func, &self.env).ok()?.english;
@@ -353,13 +351,11 @@ impl English<'_> {
 		let lambda_arg = &lambda_func.args[1];
 
 		// Special case of `(divz (count (filter (eq #t) $)) (count $))`
-		if lambda_func.ident.to_string() == "eq" {
-			if let Expr::Primitive(Primitive::Bool(bool)) = lambda_arg {
-				if *bool {
+		if lambda_func.ident.to_string() == "eq"
+			&& let Expr::Primitive(Primitive::Bool(bool)) = lambda_arg
+				&& *bool {
 					return Some(format!("the percent of {}", self.message.clone()));
 				}
-			}
-		}
 
 		// More general lambda expressions
 		let english_operator = get_function_def(lambda_func, &self.env).ok()?.english;

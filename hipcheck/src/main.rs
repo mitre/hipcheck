@@ -26,14 +26,14 @@ mod version;
 use crate::{
 	cache::{plugin::HcPluginCache, repo::HcRepoCache},
 	cli::Format,
-	config::{normalized_unresolved_analysis_tree_from_policy, Config},
+	config::{Config, normalized_unresolved_analysis_tree_from_policy},
 	engine::HcEngine,
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
 	plugin::{
-		get_current_arch, try_set_arch, Arch, KnownArch, Plugin, PluginVersion, PluginWithConfig,
+		Arch, KnownArch, Plugin, PluginVersion, PluginWithConfig, get_current_arch, try_set_arch,
 	},
-	policy::{config_to_policy, PolicyFile},
+	policy::{PolicyFile, config_to_policy},
 	report::report_builder::Report,
 	session::ReadySession,
 	session::Session,
@@ -137,12 +137,11 @@ fn main() -> ExitCode {
 /// Run the `check` command.
 async fn cmd_check(args: &mut CheckArgs, config: &CliConfig) -> ExitCode {
 	// Before we do any analysis, set the user-provided arch
-	if let Some(arch) = &args.arch {
-		if let Err(e) = try_set_arch(arch) {
+	if let Some(arch) = &args.arch
+		&& let Err(e) = try_set_arch(arch) {
 			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;
 		}
-	}
 	let target = match args.to_target_seed() {
 		Ok(target) => target,
 		Err(e) => {
@@ -224,7 +223,9 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
 		config_to_policy(config, c)?
 	} else {
-		return Err(hc_error!("No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."));
+		return Err(hc_error!(
+			"No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."
+		));
 	};
 
 	// Get the weight tree and print it.
@@ -427,7 +428,10 @@ impl Display for PathCheckError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		match self {
 			PathCheckError::PathNotFound => write!(f, "Path not found"),
-			PathCheckError::PolicyNotFound => write!(f, "Policy file not found. Specify the location of a policy file using the --policy flag.")
+			PathCheckError::PolicyNotFound => write!(
+				f,
+				"Policy file not found. Specify the location of a policy file using the --policy flag."
+			),
 		}
 	}
 }
@@ -516,7 +520,7 @@ fn check_plugins(config: &CliConfig) -> StdResult<(), Error> {
 }
 
 fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
-	use crate::engine::{async_query, HcEngineImpl, PluginCore};
+	use crate::engine::{HcEngineImpl, PluginCore, async_query};
 	use std::sync::Arc;
 	use tokio::task::JoinSet;
 
@@ -641,12 +645,11 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
 
 fn cmd_ready(args: &ReadyArgs, config: &CliConfig) -> ExitCode {
 	// Before we start plugins, set the user-provided arch
-	if let Some(arch) = &args.arch {
-		if let Err(e) = try_set_arch(arch) {
+	if let Some(arch) = &args.arch
+		&& let Err(e) = try_set_arch(arch) {
 			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;
 		}
-	}
 	let ready = ReadyChecks {
 		hipcheck_version_check: check_hipcheck_version(),
 		git_version_check: check_git_version(),
@@ -709,7 +712,12 @@ fn cmd_update(args: &UpdateArgs) {
 		command_name = "hipcheck-update";
 	} else {
 		// If neither possible updater command us found, print this error
-		Shell::print_error(&hc_error!("Updater tool not found. Did you install Hipcheck with the official release script (which will install the updater tool)? If you installed Hipcheck from source, you must update Hipcheck by installing a new version from source manually."), Format::Human);
+		Shell::print_error(
+			&hc_error!(
+				"Updater tool not found. Did you install Hipcheck with the official release script (which will install the updater tool)? If you installed Hipcheck from source, you must update Hipcheck by installing a new version from source manually."
+			),
+			Format::Human,
+		);
 		return;
 	}
 
@@ -718,7 +726,12 @@ fn cmd_update(args: &UpdateArgs) {
 	match hc_command.output() {
 		// Panic: Safe to unwrap because if the updater command runs, it will always produce some output to stderr
 		Ok(output) => std::io::stdout().write_all(&output.stderr).unwrap(),
-		Err(..) => Shell::print_error(&hc_error!("Updater command failed to run. You may need to re-install Hipcheck with the official release script."), Format::Human),
+		Err(..) => Shell::print_error(
+			&hc_error!(
+				"Updater command failed to run. You may need to re-install Hipcheck with the official release script."
+			),
+			Format::Human,
+		),
 	}
 }
 
@@ -762,7 +775,7 @@ fn cmd_explain_target_triple() -> ExitCode {
 			(Arch::Known(current_known_arch), Arch::Known(arch_to_print))
 				if current_known_arch == arch_to_print =>
 			{
-				continue
+				continue;
 			}
 			(Arch::Known(_), _) | (Arch::Unknown(_), _) => match arch {
 				Arch::Known(known_arch) => println!("  - {}", known_arch.pretty_print()),
@@ -944,7 +957,6 @@ impl CheckKind {
 
 // This is for testing purposes.
 /// Now that we're fully-initialized, run Hipcheck's analyses.
-#[allow(clippy::too_many_arguments)]
 async fn run(
 	seed: TargetSeed,
 	config_mode: ConfigMode,
