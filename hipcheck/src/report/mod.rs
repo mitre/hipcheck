@@ -287,6 +287,7 @@ impl Analysis {
 	}
 }
 
+#[allow(unused)]
 /// Value and threshold for counting-based analyses.
 #[derive(Debug, Serialize, JsonSchema, Clone)]
 #[schemars(crate = "schemars")]
@@ -295,6 +296,7 @@ pub struct Count {
 	policy: String,
 }
 
+#[allow(unused)]
 /// Value for binary-based analyses.
 #[derive(Debug, Serialize, JsonSchema, Clone)]
 #[schemars(crate = "schemars")]
@@ -303,6 +305,7 @@ pub struct Exists {
 	policy: String,
 }
 
+#[allow(unused)]
 /// Value and threshold for percentage-based analyses.
 #[derive(Debug, Serialize, JsonSchema, Clone)]
 #[schemars(crate = "schemars")]

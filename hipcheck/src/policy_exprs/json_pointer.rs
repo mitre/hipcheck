@@ -41,14 +41,14 @@ fn lookup_json_pointer<'val>(pointer: &str, context: &'val Value) -> Result<&'va
 	if let Some(chr) = pointer.chars().next() {
 		if chr != '/' {
 			return Err(Error::JSONPointerInvalidSyntax {
-				pointer: pointer.to_owned(),
+				pointer: pointer.to_owned().into_boxed_str(),
 			});
 		}
 	}
 	match context.pointer(pointer) {
 		Some(val) => Ok(val),
 		None => Err(Error::JSONPointerLookupFailed {
-			pointer: pointer.to_owned(),
+			pointer: pointer.to_owned().into_boxed_str(),
 			context: context.clone(),
 		}),
 	}
@@ -76,7 +76,7 @@ fn json_to_policy_expr(val: &Value, pointer: &str, context: &Value) -> Result<Ex
 		}
 		Value::Object(_) => Err(Error::JSONPointerUnrepresentableType {
 			json_type: error::UnrepresentableJSONType::JSONObject,
-			pointer: pointer.to_owned(),
+			pointer: pointer.to_owned().into_boxed_str(),
 			value: val.clone(),
 			context: context.clone(),
 		}),
@@ -93,14 +93,14 @@ fn json_to_policy_expr(val: &Value, pointer: &str, context: &Value) -> Result<Ex
 
 			Err(Error::JSONPointerUnrepresentableType {
 				json_type: error::UnrepresentableJSONType::JSONString,
-				pointer: pointer.to_owned(),
+				pointer: pointer.to_owned().into_boxed_str(),
 				value: val.clone(),
 				context: context.clone(),
 			})
 		}
 		Value::Null => Err(Error::JSONPointerUnrepresentableType {
 			json_type: error::UnrepresentableJSONType::JSONNull,
-			pointer: pointer.to_owned(),
+			pointer: pointer.to_owned().into_boxed_str(),
 			value: val.clone(),
 			context: context.clone(),
 		}),
@@ -136,7 +136,7 @@ fn json_array_item_to_policy_expr_primitive(
 		Expr::Primitive(p) => Ok(p),
 		_ => Err(Error::JSONPointerUnrepresentableType {
 			json_type: error::UnrepresentableJSONType::NonPrimitiveInArray,
-			pointer: pointer.to_owned(),
+			pointer: pointer.to_owned().into_boxed_str(),
 			value: v.clone(),
 			context: context.clone(),
 		}),

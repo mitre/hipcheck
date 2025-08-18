@@ -34,14 +34,18 @@ impl TryFrom<RawConfig> for Config {
 	fn try_from(value: RawConfig) -> StdResult<Config, ConfigError> {
 		if let Some(atv) = value.api_token_var {
 			let api_token = std::env::var(&atv).map_err(|_e| ConfigError::EnvVarNotSet {
-				env_var_name: atv.clone(),
-				purpose: "This environment variable must contain a GitHub API token.".to_owned(),
+				env_var_name: atv.clone().into_boxed_str(),
+				purpose: "This environment variable must contain a GitHub API token."
+					.to_owned()
+					.into_boxed_str(),
 			})?;
 			Ok(Config { api_token })
 		} else {
 			Err(ConfigError::MissingRequiredConfig {
-				field_name: "api-token-var".to_owned(),
-				field_type: "name of environment variable containing GitHub API token".to_owned(),
+				field_name: "api-token-var".to_owned().into_boxed_str(),
+				field_type: "name of environment variable containing GitHub API token"
+					.to_owned()
+					.into_boxed_str(),
 				possible_values: vec![],
 			})
 		}
@@ -137,11 +141,11 @@ impl Plugin for GithubAPIPlugin {
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		let conf: Config = serde_json::from_value::<RawConfig>(config)
 			.map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: e.to_string().into_boxed_str(),
 			})?
 			.try_into()?;
 		CONFIG.set(conf).map_err(|_e| ConfigError::InternalError {
-			message: "config was already set".to_owned(),
+			message: "config was already set".to_owned().into_boxed_str(),
 		})
 	}
 

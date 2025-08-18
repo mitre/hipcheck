@@ -252,22 +252,23 @@ impl Plugin for AffiliationPlugin {
 		// Parse the Orgs file and construct an OrgSpec.
 		let orgs_spec =
 			OrgSpec::load_from(&conf.orgs_file).map_err(|e| ConfigError::ParseError {
-				source: format!("OrgSpec file at {}", conf.orgs_file.to_string_lossy()),
+				source: format!("OrgSpec file at {}", conf.orgs_file.to_string_lossy())
+					.into_boxed_str(),
 				// Print error with Debug for full context
-				message: format!("{:?}", e),
+				message: format!("{:?}", e).into_boxed_str(),
 			})?;
 
 		// Store the policy conf to be accessed only in the `default_policy_expr()` impl
 		self.policy_conf
 			.set(conf.count_threshold)
 			.map_err(|_| ConfigError::InternalError {
-				message: "plugin was already configured".to_string(),
+				message: "plugin was already configured".to_string().into_boxed_str(),
 			})?;
 
 		ORGSSPEC
 			.set(orgs_spec)
 			.map_err(|_e| ConfigError::InternalError {
-				message: "orgs spec was already set".to_owned(),
+				message: "orgs spec was already set".to_owned().into_boxed_str(),
 			})
 	}
 

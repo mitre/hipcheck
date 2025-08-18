@@ -42,15 +42,15 @@ impl TryFrom<RawConfig> for Config {
 			(None, None) => None,
 			(Some(_), None) => {
 				return Err(ConfigError::MissingRequiredConfig {
-					field_name: "commit_percentage".to_owned(),
-					field_type: "float".to_owned(),
+					field_name: "commit_percentage".to_owned().into_boxed_str(),
+					field_type: "float".to_owned().into_boxed_str(),
 					possible_values: vec![],
 				});
 			}
 			(None, Some(_)) => {
 				return Err(ConfigError::MissingRequiredConfig {
-					field_name: "churn_freq".to_owned(),
-					field_type: "float".to_owned(),
+					field_name: "churn_freq".to_owned().into_boxed_str(),
+					field_type: "float".to_owned().into_boxed_str(),
 					possible_values: vec![],
 				});
 			}
@@ -63,9 +63,11 @@ impl TryFrom<RawConfig> for Config {
 		if let Some(policy_ref) = &opt_policy {
 			if policy_ref.commit_percentage < 0.0 || policy_ref.commit_percentage > 1.0 {
 				return Err(ConfigError::InvalidConfigValue {
-					field_name: "commit_percentage".to_owned(),
-					value: policy_ref.commit_percentage.to_string(),
-					reason: "percentage must be between 0.0 and 1.0, inclusive".to_owned(),
+					field_name: "commit_percentage".to_owned().into_boxed_str(),
+					value: policy_ref.commit_percentage.to_string().into_boxed_str(),
+					reason: "percentage must be between 0.0 and 1.0, inclusive"
+						.to_owned()
+						.into_boxed_str(),
 				});
 			}
 		}
@@ -230,8 +232,8 @@ async fn churn(engine: &mut PluginEngine, value: Target) -> Result<Vec<f64>> {
 	tracing::info!("running churn query");
 	let local = value.local;
 	let val_commits = engine.query("mitre/git/commit_diffs", local).await?;
-	let commits: Vec<CommitDiff> =
-		serde_json::from_value(val_commits).map_err(Error::InvalidJsonInQueryOutput)?;
+	let commits: Vec<CommitDiff> = serde_json::from_value(val_commits)
+		.map_err(|source| Error::InvalidJsonInQueryOutput(Box::new(source)))?;
 	let churns_freq = commit_churns(engine, commits)
 		.await?
 		.iter()
@@ -259,7 +261,7 @@ impl Plugin for ChurnPlugin {
 		self.policy_conf
 			.set(conf.opt_policy)
 			.map_err(|_| ConfigError::InternalError {
-				message: "plugin was already configured".to_string(),
+				message: "plugin was already configured".to_string().into_boxed_str(),
 			})
 	}
 

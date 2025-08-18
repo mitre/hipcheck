@@ -20,7 +20,7 @@ pub enum Error {
 
 	#[error("internal error: '{0}'")]
 	#[allow(clippy::enum_variant_names)]
-	InternalError(String),
+	InternalError(Box<str>),
 
 	#[error("missing close paren")]
 	MissingOpenParen,
@@ -41,36 +41,39 @@ pub enum Error {
 	Lex(#[from] LexingError),
 
 	#[error("expression returned '{0:?}', not a boolean")]
-	DidNotReturnBool(Expr),
+	DidNotReturnBool(Box<Expr>),
 
 	#[error("evaluation of inner expression returned '{0:?}', not a primitive")]
-	BadReturnType(Expr),
+	BadReturnType(Box<Expr>),
 
 	#[error("tried to call unknown function '{0}'")]
-	UnknownFunction(String),
+	UnknownFunction(Box<str>),
 
 	#[error("ident '{0}' resolved to a variable, not a function")]
-	FoundVarExpectedFunc(String),
+	FoundVarExpectedFunc(Box<str>),
 
 	#[error("parsing did not consume the entire input {}", needed_str(.0))]
 	IncompleteParse(Needed),
 
 	#[error("parse failed with kind '{kind:?}', with '{remaining}' remaining")]
-	Parse { remaining: String, kind: ErrorKind },
+	Parse {
+		remaining: Box<str>,
+		kind: ErrorKind,
+	},
 
 	#[error(transparent)]
 	FloatIsNan(#[from] FloatIsNan),
 
 	#[error("too many args to '{name}'; expected {expected}, got {given}")]
 	TooManyArgs {
-		name: String,
+		name: Box<str>,
 		expected: usize,
 		given: usize,
 	},
 
 	#[error("not enough args to '{name}'; expected {expected}, got {given}")]
 	NotEnoughArgs {
-		name: String,
+		name: Box<str>,
 		expected: usize,
 		given: usize,
 	},
@@ -80,10 +83,10 @@ pub enum Error {
 
 	#[error("call to '{name}' with '{got:?}' as argument {idx}, expected {expected}")]
 	BadFuncArgType {
-		name: String,
+		name: Box<str>,
 		idx: usize,
-		expected: String,
-		got: Type,
+		expected: Box<str>,
+		got: Box<Type>,
 	},
 
 	#[error("array of {expected:?}s contains a {got:?} at idx {idx}")]
@@ -124,11 +127,11 @@ pub enum Error {
 		"JSON Pointer invalid syntax: non-empty pointer must start with '/'. \
 		pointer: '{pointer}'"
 	)]
-	JSONPointerInvalidSyntax { pointer: String },
+	JSONPointerInvalidSyntax { pointer: Box<str> },
 
 	#[error("JSON Pointer lookup failed. pointer: '{pointer}'; context: {context}")]
 	JSONPointerLookupFailed {
-		pointer: String,
+		pointer: Box<str>,
 		context: serde_json::Value,
 	},
 
@@ -139,13 +142,13 @@ pub enum Error {
 	)]
 	JSONPointerUnrepresentableType {
 		json_type: UnrepresentableJSONType,
-		pointer: String,
+		pointer: Box<str>,
 		value: serde_json::Value,
 		context: serde_json::Value,
 	},
 
 	#[error("Datetime error: {0}")]
-	Datetime(String),
+	Datetime(Box<str>),
 }
 
 #[derive(Debug, PartialEq)]

@@ -19,17 +19,17 @@ pub enum Error {
 	UnexpectedReplyInProgress,
 
 	#[error("invalid JSON in query key")]
-	InvalidJsonInQueryKey(#[source] serde_json::Error),
+	InvalidJsonInQueryKey(#[source] Box<serde_json::Error>),
 
 	#[error("invalid JSON in query output")]
-	InvalidJsonInQueryOutput(#[source] serde_json::Error),
+	InvalidJsonInQueryOutput(#[source] Box<serde_json::Error>),
 
 	#[error("session channel closed unexpectedly")]
 	SessionChannelClosed,
 
 	#[error("failed to send query from session to server")]
 	FailedToSendQueryFromSessionToServer(
-		#[source] TokioMpscSendError<StdResult<InitiateQueryProtocolResponse, TonicStatus>>,
+		#[source] Box<TokioMpscSendError<StdResult<InitiateQueryProtocolResponse, TonicStatus>>>,
 	),
 
 	/// The `PluginEngine` received a message with a reply-type status when it expected a request
@@ -45,7 +45,7 @@ pub enum Error {
 	MoreAfterQueryComplete { id: usize },
 
 	#[error("failed to start server")]
-	FailedToStartServer(#[source] tonic::transport::Error),
+	FailedToStartServer(#[source] Box<tonic::transport::Error>),
 
 	/// The `Query::run` function implementation received an incorrectly-typed JSON Value key
 	#[error("unexpected JSON value from plugin")]
@@ -76,8 +76,8 @@ impl From<hipcheck_common::error::Error> for Error {
 			ReceivedSubmitWhenExpectingReplyChunk => Error::ReceivedSubmitWhenExpectingReplyChunk,
 			ReceivedReplyWhenExpectingSubmitChunk => Error::ReceivedReplyWhenExpectingRequest,
 			MoreAfterQueryComplete { id } => Error::MoreAfterQueryComplete { id },
-			InvalidJsonInQueryKey(s) => Error::InvalidJsonInQueryKey(s),
-			InvalidJsonInQueryOutput(s) => Error::InvalidJsonInQueryOutput(s),
+			InvalidJsonInQueryKey(s) => Error::InvalidJsonInQueryKey(Box::new(s)),
+			InvalidJsonInQueryOutput(s) => Error::InvalidJsonInQueryOutput(Box::new(s)),
 		}
 	}
 }
@@ -117,51 +117,51 @@ pub type Result<T> = StdResult<T, Error>;
 pub enum ConfigError {
 	/// The config key was valid, but the associated value was invalid
 	InvalidConfigValue {
-		field_name: String,
-		value: String,
-		reason: String,
+		field_name: Box<str>,
+		value: Box<str>,
+		reason: Box<str>,
 	},
 
 	/// The config was missing an expected field
 	MissingRequiredConfig {
-		field_name: String,
-		field_type: String,
-		possible_values: Vec<String>,
+		field_name: Box<str>,
+		field_type: Box<str>,
+		possible_values: Vec<Box<str>>,
 	},
 
 	/// The config included an unrecognized field
 	UnrecognizedConfig {
-		field_name: String,
-		field_value: String,
-		possible_confusables: Vec<String>,
+		field_name: Box<str>,
+		field_value: Box<str>,
+		possible_confusables: Vec<Box<str>>,
 	},
 
 	/// An unspecified error
-	Unspecified { message: String },
+	Unspecified { message: Box<str> },
 
 	/// The plugin encountered an error, probably due to incorrect assumptions.
-	InternalError { message: String },
+	InternalError { message: Box<str> },
 
 	/// A necessary plugin input file was not found.
-	FileNotFound { file_path: String },
+	FileNotFound { file_path: Box<str> },
 
 	/// The plugin's input data could not be parsed correctly.
 	ParseError {
 		// A short name or description of the data source.
-		source: String,
-		message: String,
+		source: Box<str>,
+		message: Box<str>,
 	},
 
 	/// An environment variable needed by the plugin was not set.
 	EnvVarNotSet {
 		/// Name of the environment variable
-		env_var_name: String,
+		env_var_name: Box<str>,
 		/// Message describing what the environment variable should contain
-		purpose: String,
+		purpose: Box<str>,
 	},
 
 	/// The plugin could not run a needed program.
-	MissingProgram { program_name: String },
+	MissingProgram { program_name: Box<str> },
 }
 
 impl From<ConfigError> for SetConfigurationResponse {
@@ -214,7 +214,7 @@ impl From<ConfigError> for SetConfigurationResponse {
 			},
 			ConfigError::Unspecified { message } => SetConfigurationResponse {
 				status: ConfigurationStatus::Unspecified as i32,
-				message,
+                message: message.to_string(),
 			},
 			ConfigError::InternalError { message } => SetConfigurationResponse {
 				status: ConfigurationStatus::InternalError as i32,
@@ -222,7 +222,7 @@ impl From<ConfigError> for SetConfigurationResponse {
 			},
 			ConfigError::FileNotFound { file_path } => SetConfigurationResponse {
 				status: ConfigurationStatus::FileNotFound as i32,
-				message: file_path,
+				message: file_path.to_string(),
 			},
 			ConfigError::ParseError {
 				source,
@@ -240,7 +240,7 @@ impl From<ConfigError> for SetConfigurationResponse {
 			},
 			ConfigError::MissingProgram { program_name } => SetConfigurationResponse {
 				status: ConfigurationStatus::MissingProgram as i32,
-				message: program_name,
+				message: program_name.to_string(),
 			},
 		}
 	}

@@ -65,10 +65,10 @@ impl Plugin for ActivityPlugin {
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		let conf =
 			serde_json::from_value::<Config>(config).map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: e.to_string().into_boxed_str(),
 			})?;
 		CONFIG.set(conf).map_err(|_e| ConfigError::InternalError {
-			message: "config was already set".to_owned(),
+			message: "config was already set".to_owned().into_boxed_str(),
 		})
 	}
 

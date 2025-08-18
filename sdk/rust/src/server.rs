@@ -89,7 +89,7 @@ impl<P: Plugin> PluginServer<P> {
 			.add_service(service)
 			.serve(host_addr)
 			.await
-			.map_err(Error::FailedToStartServer)?;
+			.map_err(|source| Error::FailedToStartServer(Box::new(source)))?;
 
 		Ok(())
 	}

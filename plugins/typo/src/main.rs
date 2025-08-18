@@ -39,8 +39,8 @@ async fn typo(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 		.await
 		.context("failed to get dependencies")?;
 
-	let dependencies: NpmDependencies =
-		serde_json::from_value(value).map_err(Error::InvalidJsonInQueryOutput)?;
+	let dependencies: NpmDependencies = serde_json::from_value(value)
+		.map_err(|source| Error::InvalidJsonInQueryOutput(Box::new(source)))?;
 
 	// Get the dependencies with identified typos
 	let typo_deps = match dependencies.language {
@@ -83,9 +83,9 @@ impl Plugin for TypoPlugin {
 			// Print error with Debug for full context
 			tracing::error!("{:?}", e);
 			ConfigError::ParseError {
-				source: format!("Typo file at path {}", conf.typo_file.display()),
+				source: format!("Typo file at path {}", conf.typo_file.display()).into_boxed_str(),
 				// Print error with Debug for full context
-				message: format!("{:?}", e),
+				message: format!("{:?}", e).into_boxed_str(),
 			}
 		})?;
 
@@ -93,13 +93,13 @@ impl Plugin for TypoPlugin {
 		self.policy_conf
 			.set(conf.count_threshold)
 			.map_err(|_| ConfigError::InternalError {
-				message: "plugin was already configured".to_string(),
+				message: "plugin was already configured".to_string().into_boxed_str(),
 			})?;
 
 		TYPOFILE
 			.set(typo_file)
 			.map_err(|_e| ConfigError::InternalError {
-				message: "config was already set".to_owned(),
+				message: "config was already set".to_owned().into_boxed_str(),
 			})
 	}
 

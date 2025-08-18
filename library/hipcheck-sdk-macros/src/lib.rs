@@ -319,13 +319,13 @@ pub fn derive_plugin_config(input: TokenStream) -> TokenStream {
 					// Map contained value, return an error if an invalid value is provided for the field
 					serde_json::from_value::<#field_type>(value.clone()).map_err(|_| {
 						ConfigError::InvalidConfigValue {
-							field_name: #field_name_str.to_owned(),
-							value: format!("{:?}", value),
+							field_name: #field_name_str.to_owned().into_boxed_str(),
+							value: format!("{:?}", value).into_boxed_str(),
 							reason: format!(
 								"Expected type: {}, but got: {:?}",
 								stringify!(#field_type),
 								value
-							),
+							).into_boxed_str(),
 						}
 					})?
 				} else {
@@ -333,8 +333,8 @@ pub fn derive_plugin_config(input: TokenStream) -> TokenStream {
 					// optional. If this fails, missing required config.
 					serde_json::from_value::<#field_type>(serde_json::Value::Null).map_err(|_| {
 						ConfigError::MissingRequiredConfig {
-							field_name: #field_name_str.to_owned(),
-							field_type: stringify!(#field_type).to_owned(),
+							field_name: #field_name_str.to_owned().into_boxed_str(),
+							field_type: stringify!(#field_type).to_owned().into_boxed_str(),
 							possible_values: vec![],
 						}
 					})?
@@ -348,8 +348,8 @@ pub fn derive_plugin_config(input: TokenStream) -> TokenStream {
 		if let Some((unexpected_key, value)) = config.iter().next() {
 			// Return an error if any remaining key/value pair in map
 			return Err(ConfigError::UnrecognizedConfig {
-				field_name: unexpected_key.to_string(),
-				field_value: format!("{:?}", value),
+				field_name: unexpected_key.to_string().into_boxed_str(),
+				field_value: format!("{:?}", value).into_boxed_str(),
 				possible_confusables: vec![],
 			});
 		}
