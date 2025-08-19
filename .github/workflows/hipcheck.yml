@@ -22,11 +22,13 @@ permissions:
   contents: read
 
 env:
+  # Speed up CI compilation by turning off debug info.
   RUSTFLAGS: -Dwarnings -C debuginfo=0 -C strip=symbols
   CARGO_TERM_COLOR: always
 
 jobs:
   test:
+    name: "Test (${{ matrix.os }})"
     strategy:
       matrix:
         # NOTE: MUST be synced manually with runners in 'dist-workspace.toml'
@@ -35,20 +37,22 @@ jobs:
         # to achieve ARM and x86 support (macos-14 is ARM, macos-13 is x86),
         # since alternative runners with matching versions aren't all on the
         # free plan for GitHub Actions.
+        #
+        # More info: https://github.com/actions/runner-images
         os: [ubuntu-22.04, windows-2022, macos-14, macos-13]
-    name: "Test (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: read
     steps:
-      # Get the repo, get Rust, get `cargo-nextest`, setup caching.
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check out the repo
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
 
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+      - name: Stop if not modifying code-relevant paths
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: filter
         with:
           filters: |
@@ -59,76 +63,79 @@ jobs:
               - "xtask/**"
               - "sdk/rust/**"
               - "library/**"
-      # This is a tag, not a commit, because that's how the Action determines
-      # what Rust toolchain you're using.
-      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # v1
         if: steps.filter.outputs.code == 'true'
-      - uses: taiki-e/install-action@a761292ced99fc08cbae630a81f800d2d49b8bf4 # nextest
-        if: steps.filter.outputs.code == 'true'
-      - name: Install cargo-hakari
-        uses: taiki-e/install-action@52039f232923165906a3c824622a332e84ca4560 # v2
         with:
-          tool: cargo-hakari
-      - uses: swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+          toolchain: stable
+
+      - name: Install Rust tools (nextest, hakari)
+        uses: taiki-e/install-action@ad95d4e02e061d4390c4b66ef5ed56c7fee3d2ce # v2.58.17
+        if: steps.filter.outputs.code == 'true'
+        with:
+          tool: nextest,cargo-hakari
+
+      - name: Setup Rust caching
+        uses: swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
         if: steps.filter.outputs.code == 'true'
         with:
           key: ${{ matrix.os }}
 
-      # Install the protobuf compiler
-      - if: runner.os == 'Linux' && steps.filter.outputs.code == 'true'
+      - name: Install protobuf compiler (Linux)
+        if: runner.os == 'Linux' && steps.filter.outputs.code == 'true'
         run: sudo apt-get install -y protobuf-compiler mold
-      - if: runner.os == 'macOS' && steps.filter.outputs.code == 'true'
+
+      - name: Install protobuf compiler (macOS)
+        if: runner.os == 'macOS' && steps.filter.outputs.code == 'true'
         run: brew install protobuf
-      - if: runner.os == 'Windows' && steps.filter.outputs.code == 'true'
+
+      - name: Install protobuf compiler (Windows)
+        if: runner.os == 'Windows' && steps.filter.outputs.code == 'true'
         run: choco install protoc
 
-      # Print dependency info (useful for debugging)
-      - name: Dependency Tree
+      - name: Print dependency tree
         if: steps.filter.outputs.code == 'true'
         run: cargo tree
 
-      # Validate 'cargo hakari' is up to date and set up correctly
       - name: Check workspace-hack is up to date
         if: steps.filter.outputs.code == 'true'
         run: cargo hakari generate --diff
+
       - name: Check all crates depend on workspace-hack
         if: steps.filter.outputs.code == 'true'
         run: cargo hakari manage-deps --dry-run
 
-      # Try building every crate in the workspace, without debug symbols to
-      # hopefully reduce build times
-      - name: Build
+      - name: Check workspace builds
         if: steps.filter.outputs.code == 'true'
-        run: cargo build --verbose --workspace
+        run: cargo check --verbose --workspace
 
-      # Test the code.
-      - name: Test
-        if: steps.filter.outputs.code == 'true'
-        run: cargo nextest r --verbose --workspace
-
-      # Run the linter.
-      - name: Lint
+      - name: Run clippy on workspace
         if: steps.filter.outputs.code == 'true'
         run: cargo clippy --verbose --workspace
 
-      # Run our own checks for licensing and other info.
-      - name: Check
+      - name: Run workspace tests with nextest
         if: steps.filter.outputs.code == 'true'
-        run: cargo xtask check
+        run: cargo nextest r --verbose --workspace
 
-      # Run a few variants of Hipcheck
-      - name: Run with Policy
+      - name: Validate custom requirements for workspace
+        if: steps.filter.outputs.code == 'true'
+        run: cargo xtask validate
+
+      - name: Run with '--policy ./config/Hipcheck.kdl'
         if: steps.filter.outputs.code == 'true'
         env:
           HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./target/debug/hc --policy ./config/Hipcheck.kdl check https://github.com/mitre/hipcheck
-      - name: Run with Local Policy
+        run: cargo run --bin "hc" -- --policy ./config/Hipcheck.kdl check https://github.com/mitre/hipcheck
+
+      - name: Run with '--policy ./config/local.Hipcheck.kdl'
         if: steps.filter.outputs.code == 'true'
         env:
           HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./target/debug/hc --policy ./config/local.Hipcheck.kdl check https://github.com/mitre/hipcheck
-      - name: Run with Config
+        run: cargo run --bin "hc" -- --policy ./config/local.Hipcheck.kdl check https://github.com/mitre/hipcheck
+
+      - name: Run with '--config ./config'
         if: steps.filter.outputs.code == 'true'
         env:
           HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./target/debug/hc --config ./config check https://github.com/mitre/hipcheck
+        run: cargo run --bin "hc" -- --config ./config check https://github.com/mitre/hipcheck
