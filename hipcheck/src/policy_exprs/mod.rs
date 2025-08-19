@@ -18,10 +18,10 @@ pub use crate::policy_exprs::{
 };
 use env::Binding;
 use expr::FunctionDef;
-pub use expr::{parse, Primitive};
+pub use expr::{Primitive, parse};
 use jiff::{
-	fmt::friendly::{Designator, Spacing, SpanPrinter},
 	SpanRound, Unit,
+	fmt::friendly::{Designator, Spacing, SpanPrinter},
 };
 use json_pointer::LookupJsonPointers;
 use serde_json::Value;
@@ -291,9 +291,10 @@ impl English<'_> {
 		// Special case of `(count (filter (eq #t) $))`
 		if lambda_func.ident.to_string() == "eq"
 			&& let Expr::Primitive(Primitive::Bool(bool)) = lambda_arg
-				&& *bool {
-					return Some(format!("the number of {}", self.message.clone()));
-				}
+			&& *bool
+		{
+			return Some(format!("the number of {}", self.message.clone()));
+		}
 
 		// More general lambda expressions
 		let english_operator = get_function_def(lambda_func, &self.env).ok()?.english;
@@ -353,9 +354,10 @@ impl English<'_> {
 		// Special case of `(divz (count (filter (eq #t) $)) (count $))`
 		if lambda_func.ident.to_string() == "eq"
 			&& let Expr::Primitive(Primitive::Bool(bool)) = lambda_arg
-				&& *bool {
-					return Some(format!("the percent of {}", self.message.clone()));
-				}
+			&& *bool
+		{
+			return Some(format!("the percent of {}", self.message.clone()));
+		}
 
 		// More general lambda expressions
 		let english_operator = get_function_def(lambda_func, &self.env).ok()?.english;
@@ -521,7 +523,7 @@ fn get_function_def(func: &Function, env: &Env) -> Result<FunctionDef> {
 			_ => {
 				return Err(Error::UnknownFunction(
 					format!("Given function name {} is not a function", fn_name).into_boxed_str(),
-				))
+				));
 			}
 		},
 		_ => {
@@ -531,7 +533,7 @@ fn get_function_def(func: &Function, env: &Env) -> Result<FunctionDef> {
 					fn_name
 				)
 				.into_boxed_str(),
-			))
+			));
 		}
 	};
 

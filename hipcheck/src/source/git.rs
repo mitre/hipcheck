@@ -5,12 +5,12 @@
 use crate::{
 	error::{Context, Error as HcError, Result as HcResult},
 	hc_error,
-	shell::{progress_phase::ProgressPhase, verbosity::Verbosity, Shell},
+	shell::{Shell, progress_phase::ProgressPhase, verbosity::Verbosity},
 };
 use console::Term;
 use git2::{
-	build::{CheckoutBuilder, RepoBuilder},
 	AnnotatedCommit, Branch, FetchOptions, Progress, Reference, RemoteCallbacks, Repository,
+	build::{CheckoutBuilder, RepoBuilder},
 };
 use std::{cell::OnceCell, io::Write, path::Path};
 use url::Url;

@@ -2,7 +2,7 @@
 
 use crate::{error::Result, hc_error, plugin::PluginExecutor, util::fs::read_string};
 use hipcheck_kdl::kdl::{KdlDocument, KdlNode, KdlValue};
-use hipcheck_kdl::{extract_data, ParseKdlNode};
+use hipcheck_kdl::{ParseKdlNode, extract_data};
 use std::{env, path::Path, str::FromStr};
 
 #[derive(Clone, Debug, Eq, PartialEq)]

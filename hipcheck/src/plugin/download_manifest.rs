@@ -4,10 +4,10 @@
 use crate::plugin::arch::KnownArch;
 use crate::{
 	hc_error,
-	plugin::{arch::Arch, PluginVersion},
+	plugin::{PluginVersion, arch::Arch},
 };
 use hipcheck_kdl::kdl::{KdlDocument, KdlNode, KdlValue};
-use hipcheck_kdl::{extract_data, ParseKdlNode};
+use hipcheck_kdl::{ParseKdlNode, extract_data};
 use std::{fmt::Display, ops::Deref, str::FromStr};
 
 /// newtype wrapper around `url::Url`, which enables implementing `ParseKdlNode`

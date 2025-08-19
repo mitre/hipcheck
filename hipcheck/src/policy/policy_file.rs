@@ -8,7 +8,7 @@ use crate::{
 	plugin::{PluginIdVersionRange, PluginName, PluginPublisher, PluginVersionReq},
 };
 use hipcheck_kdl::kdl::KdlNode;
-use hipcheck_kdl::{extract_data, string_newtype_parse_kdl_node, ParseKdlNode};
+use hipcheck_kdl::{ParseKdlNode, extract_data, string_newtype_parse_kdl_node};
 use serde_json::Value;
 use std::{collections::HashMap, fmt, fmt::Display, path::PathBuf};
 use url::Url;
@@ -230,13 +230,13 @@ impl ParseKdlNode for PolicyConfig {
 						}),
 					)
 					.is_err()
-				{
-					log::error!(
-						"Duplicate configuration information detected for {}",
-						description
-					);
-					return None;
-				}
+			{
+				log::error!(
+					"Duplicate configuration information detected for {}",
+					description
+				);
+				return None;
+			}
 		}
 		Some(config)
 	}
@@ -376,9 +376,10 @@ impl ParseKdlNode for PolicyCategory {
 					children.push(PolicyCategoryChild::Analysis(analysis));
 				}
 			} else if node.name().to_string().as_str() == "category"
-				&& let Some(category) = PolicyCategory::parse_node(node) {
-					children.push(PolicyCategoryChild::Category(category));
-				}
+				&& let Some(category) = PolicyCategory::parse_node(node)
+			{
+				children.push(PolicyCategoryChild::Category(category));
+			}
 		}
 
 		Some(Self {
@@ -548,14 +549,16 @@ impl ParseKdlNode for PolicyAnalyze {
 
 		for node in nodes {
 			if node.name().to_string().as_str() == "category"
-				&& let Some(category) = PolicyCategory::parse_node(node) {
-					root.children.push(PolicyCategoryChild::Category(category));
-				}
+				&& let Some(category) = PolicyCategory::parse_node(node)
+			{
+				root.children.push(PolicyCategoryChild::Category(category));
+			}
 			if node.name().to_string().as_str() == "analysis"
-				&& let Some(analysis) = PolicyAnalysis::parse_node(node) {
-					root.children
-						.push(PolicyCategoryChild::Analysis(analysis.clone()));
-				}
+				&& let Some(analysis) = PolicyAnalysis::parse_node(node)
+			{
+				root.children
+					.push(PolicyCategoryChild::Analysis(analysis.clone()));
+			}
 		}
 
 		Some(Self {

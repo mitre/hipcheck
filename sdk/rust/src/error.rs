@@ -182,9 +182,7 @@ impl From<ConfigError> for SetConfigurationResponse {
 			} => SetConfigurationResponse {
 				status: ConfigurationStatus::MissingRequiredConfiguration as i32,
 				message: {
-					let mut message = format!(
-						"'{field_name}' of type '{field_type}'"
-					);
+					let mut message = format!("'{field_name}' of type '{field_type}'");
 
 					if possible_values.is_empty().not() {
 						message.push_str("; possible values: ");
@@ -201,8 +199,7 @@ impl From<ConfigError> for SetConfigurationResponse {
 			} => SetConfigurationResponse {
 				status: ConfigurationStatus::UnrecognizedConfiguration as i32,
 				message: {
-					let mut message =
-						format!("'{field_name}' with value '{field_value}'");
+					let mut message = format!("'{field_name}' with value '{field_value}'");
 
 					if possible_confusables.is_empty().not() {
 						message.push_str("; possible field names: ");
@@ -214,20 +211,19 @@ impl From<ConfigError> for SetConfigurationResponse {
 			},
 			ConfigError::Unspecified { message } => SetConfigurationResponse {
 				status: ConfigurationStatus::Unspecified as i32,
-                message: message.to_string(),
+				message: message.to_string(),
 			},
 			ConfigError::InternalError { message } => SetConfigurationResponse {
 				status: ConfigurationStatus::InternalError as i32,
-				message: format!("the plugin encountered an error, probably due to incorrect assumptions: {message}"),
+				message: format!(
+					"the plugin encountered an error, probably due to incorrect assumptions: {message}"
+				),
 			},
 			ConfigError::FileNotFound { file_path } => SetConfigurationResponse {
 				status: ConfigurationStatus::FileNotFound as i32,
 				message: file_path.to_string(),
 			},
-			ConfigError::ParseError {
-				source,
-				message,
-			} => SetConfigurationResponse {
+			ConfigError::ParseError { source, message } => SetConfigurationResponse {
 				status: ConfigurationStatus::ParseError as i32,
 				message: format!("{source} could not be parsed correctly: {message}"),
 			},

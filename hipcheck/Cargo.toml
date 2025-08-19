@@ -126,7 +126,7 @@ ureq = { version = "2.12.1", default-features = false, features = [
 ] }
 url = { version = "2.5.4", features = ["serde"] }
 walkdir = "2.5.0"
-which = { version = "7.0.2", default-features = false }
+which = { version = "8.0.0" }
 xml-rs = "0.8.26"
 xz2 = "0.1.7"
 zip = "2.3.0"

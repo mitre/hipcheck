@@ -4,7 +4,7 @@ use std::convert::TryInto;
 
 use self::reviews::{ResponseData, ReviewsRepositoryPullRequestsNodes as RawPull, Variables};
 use crate::{types::*, util::authenticated_agent::AuthenticatedAgent};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
 use serde_json::{from_value as from_json_value, to_value as to_json_value};
 

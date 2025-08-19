@@ -6,7 +6,7 @@ use crate::{
 	org_types::{Mode, OrgList, Strategy},
 	util::fs as file,
 };
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{Context as _, Result, anyhow};
 use hipcheck_kdl::extract_data;
 use hipcheck_kdl::kdl::KdlDocument;
 use miette::Report;

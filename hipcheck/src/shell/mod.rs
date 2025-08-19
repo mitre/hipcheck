@@ -479,8 +479,8 @@ impl Title {
 	}
 
 	fn style(&self) -> Style {
-		use console::Color::*;
 		use Title::*;
+		use console::Color::*;
 
 		let color = match self {
 			Analyzed

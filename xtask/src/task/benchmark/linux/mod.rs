@@ -8,7 +8,7 @@ use std::{
 	str::FromStr,
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use config::{BenchmarkTarget, BenchmarkTargets};
 use results::{
 	AvgCpuCycles, AvgMaxRssKb, AvgTotalInstructions, AvgWallTimeResult, BenchmarkResult,
@@ -40,7 +40,9 @@ fn check_preconditions() -> Result<()> {
 	File::open("/proc/sys/kernel/perf_event_paranoid")?.read_to_string(&mut contents)?;
 	let perf_event_level = i32::from_str(contents.trim())?;
 	if perf_event_level > 2 {
-		return Err(anyhow!("/proc/sys/kernel/perf_event_paranoid greater than 2; 'sudo sysctl -w kernel.perf_event_paranoid=2' to fix"));
+		return Err(anyhow!(
+			"/proc/sys/kernel/perf_event_paranoid greater than 2; 'sudo sysctl -w kernel.perf_event_paranoid=2' to fix"
+		));
 	}
 	Ok(())
 }

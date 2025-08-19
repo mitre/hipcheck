@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
+	Array as StructArray, Error, Expr, F64, Function as StructFunction, Ident,
+	Lambda as StructLambda, Primitive, Result,
 	expr::{
 		ArrayType as ExprArrayType, Function, FunctionDef, FunctionType, Op, PrimitiveType,
 		ReturnableType, Type, TypeChecker, Typed,
 	},
 	pass::ExprMutator,
-	Array as StructArray, Error, Expr, Function as StructFunction, Ident, Lambda as StructLambda,
-	Primitive, Result, F64,
 };
+use Expr::*;
+use Primitive::*;
 use itertools::Itertools as _;
 use jiff::{Span, Zoned};
 use std::{cmp::Ordering, collections::HashMap, ops::Not as _};
-use Expr::*;
-use Primitive::*;
 
 /// Environment, containing bindings of names to functions and variables.
 #[derive(Clone)]

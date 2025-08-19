@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
+use hipcheck_sdk::{LogLevel, prelude::*, types::Target};
 use serde_json::Value;
 use std::result::Result as StdResult;
 

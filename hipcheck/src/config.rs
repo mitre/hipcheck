@@ -3,18 +3,18 @@
 //! Defines the configuration file format.
 
 use crate::{
+	F64,
 	engine::HcEngine,
 	error::{Context, Result},
 	hc_error,
 	policy::{
-		policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild},
 		PolicyFile,
+		policy_file::{PolicyAnalysis, PolicyCategory, PolicyCategoryChild},
 	},
 	policy_exprs::Expr,
 	score::*,
 	session::Session,
 	util::fs as file,
-	F64,
 };
 use indextree::{Arena, NodeEdge, NodeId};
 use num_traits::identities::Zero;
@@ -733,7 +733,15 @@ pub fn analysis_tree(session: &Session) -> Result<Rc<AnalysisTree>> {
 		if let AnalysisTreeNode::Analysis { analysis, .. } = node {
 			let a: &Analysis = &analysis.0;
 			if analysis.1.is_none() {
-				analysis.1 = Some(session.default_policy_expr(a.publisher.clone(), a.plugin.clone())?.ok_or(hc_error!("plugin {}::{} does not have a default policy, please define a policy in your policy file", a.publisher.clone(), a.plugin.clone()))?);
+				analysis.1 = Some(
+					session
+						.default_policy_expr(a.publisher.clone(), a.plugin.clone())?
+						.ok_or(hc_error!(
+							"plugin {}::{} does not have a default policy, please define a policy in your policy file",
+							a.publisher.clone(),
+							a.plugin.clone()
+						))?,
+				);
 			}
 		}
 		Ok(())

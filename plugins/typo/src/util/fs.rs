@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{Context as _, Result, anyhow};
 use hipcheck_kdl::kdl::KdlDocument;
-use hipcheck_kdl::{extract_data, ParseKdlNode};
+use hipcheck_kdl::{ParseKdlNode, extract_data};
 use miette::Report;
 use std::{fs, path::Path, str::FromStr};
 

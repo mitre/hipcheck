@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
+	ExprMutator, JsonPointer, LexingError,
 	error::{self, Error, JiffError, Result},
 	expr::{Array, Expr, Primitive},
-	ExprMutator, JsonPointer, LexingError,
 };
-use jiff::{tz::TimeZone, Timestamp, Zoned};
+use jiff::{Timestamp, Zoned, tz::TimeZone};
 use ordered_float::NotNan;
 use serde_json::Value;
 
@@ -39,11 +39,12 @@ fn lookup_json_pointer<'val>(pointer: &str, context: &'val Value) -> Result<&'va
 	// The only syntax error that serde_json currently recognizes is that a
 	// non-empty pointer must start with the '/' character.
 	if let Some(chr) = pointer.chars().next()
-		&& chr != '/' {
-			return Err(Error::JSONPointerInvalidSyntax {
-				pointer: pointer.to_owned().into_boxed_str(),
-			});
-		}
+		&& chr != '/'
+	{
+		return Err(Error::JSONPointerInvalidSyntax {
+			pointer: pointer.to_owned().into_boxed_str(),
+		});
+	}
 	match context.pointer(pointer) {
 		Some(val) => Ok(val),
 		None => Err(Error::JSONPointerLookupFailed {
@@ -145,8 +146,8 @@ fn json_array_item_to_policy_expr_primitive(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::policy_exprs::expr::json_ptr;
 	use crate::policy_exprs::F64;
+	use crate::policy_exprs::expr::json_ptr;
 	use test_log::test;
 
 	#[test]

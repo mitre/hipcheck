@@ -11,12 +11,12 @@ use crate::{
 		DetailedGitRepo, Diff,
 	},
 	git::{
-		get_all_raw_commits, get_commit_diffs, get_commits_from_date, get_contributors, get_diffs,
-		get_latest_commit, GitRawCommitCache,
+		GitRawCommitCache, get_all_raw_commits, get_commit_diffs, get_commits_from_date,
+		get_contributors, get_diffs, get_latest_commit,
 	},
 };
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::LocalGitRepo, LogLevel};
+use hipcheck_sdk::{LogLevel, prelude::*, types::LocalGitRepo};
 use jiff::Timestamp;
 use lru::LruCache;
 use serde::Deserialize;

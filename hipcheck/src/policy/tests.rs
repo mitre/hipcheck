@@ -6,10 +6,10 @@ mod test {
 	use crate::{
 		config::Config,
 		plugin::PluginVersionReq,
-		policy::{config_to_policy::config_to_policy, policy_file::*, PolicyFile, PolicyPatchList},
+		policy::{PolicyFile, PolicyPatchList, config_to_policy::config_to_policy, policy_file::*},
 	};
-	use hipcheck_kdl::kdl::KdlNode;
 	use hipcheck_kdl::ParseKdlNode;
+	use hipcheck_kdl::kdl::KdlNode;
 	use pathbuf::pathbuf;
 	use serde_json::Value;
 	use std::{env, str::FromStr};

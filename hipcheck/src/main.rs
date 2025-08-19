@@ -138,10 +138,11 @@ fn main() -> ExitCode {
 async fn cmd_check(args: &mut CheckArgs, config: &CliConfig) -> ExitCode {
 	// Before we do any analysis, set the user-provided arch
 	if let Some(arch) = &args.arch
-		&& let Err(e) = try_set_arch(arch) {
-			Shell::print_error(&e, Format::Human);
-			return ExitCode::FAILURE;
-		}
+		&& let Err(e) = try_set_arch(arch)
+	{
+		Shell::print_error(&e, Format::Human);
+		return ExitCode::FAILURE;
+	}
 	let target = match args.to_target_seed() {
 		Ok(target) => target,
 		Err(e) => {
@@ -646,10 +647,11 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
 fn cmd_ready(args: &ReadyArgs, config: &CliConfig) -> ExitCode {
 	// Before we start plugins, set the user-provided arch
 	if let Some(arch) = &args.arch
-		&& let Err(e) = try_set_arch(arch) {
-			Shell::print_error(&e, Format::Human);
-			return ExitCode::FAILURE;
-		}
+		&& let Err(e) = try_set_arch(arch)
+	{
+		Shell::print_error(&e, Format::Human);
+		return ExitCode::FAILURE;
+	}
 	let ready = ReadyChecks {
 		hipcheck_version_check: check_hipcheck_version(),
 		git_version_check: check_git_version(),

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{hc_error, Result};
+use crate::{Result, hc_error};
 use hipcheck_kdl::kdl::{KdlEntry, KdlValue};
 use std::{path::Path, sync::LazyLock};
 

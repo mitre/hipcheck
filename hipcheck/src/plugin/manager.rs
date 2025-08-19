@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	hc_error,
-	plugin::{try_get_bin_for_entrypoint, HcPluginClient, Plugin, PluginContext},
+	Result, hc_error,
+	plugin::{HcPluginClient, Plugin, PluginContext, try_get_bin_for_entrypoint},
 	policy::policy_file::PolicyPluginName,
-	Result,
 };
 use futures::future::join_all;
 use hipcheck_common::{proto::plugin_service_client::PluginServiceClient, types::LogLevel};
@@ -15,7 +14,7 @@ use std::{collections::HashMap, env, ffi::OsString, ops::Range, path::Path, sync
 use tokio::process::Command;
 use tokio::{
 	io::{AsyncBufReadExt, BufReader},
-	time::{sleep_until, Duration, Instant},
+	time::{Duration, Instant, sleep_until},
 };
 
 static PLUGIN_LOG_SETTINGS: LazyLock<PluginLogLevels> =
@@ -159,9 +158,10 @@ impl PluginExecutor {
 			// 	return Ok(i);
 			// }
 			if let Ok(addr) = std::net::TcpListener::bind("127.0.0.1:0")
-				&& let Ok(local_addr) = addr.local_addr() {
-					return Ok(local_addr.port());
-				}
+				&& let Ok(local_addr) = addr.local_addr()
+			{
+				return Ok(local_addr.port());
+			}
 		}
 
 		Err(hc_error!("Failed to find available port"))
@@ -330,7 +330,9 @@ impl PluginExecutor {
 				let jitter_percent = 1.0 + ((jitter - (self.jitter_percent as i32)) as f64 / 100.0);
 				// Once we are confident this math works, we can remove this
 				if !(0.0..=2.0).contains(&jitter_percent) {
-					panic!("Math error! We should have better guardrails around PluginExecutor field values.");
+					panic!(
+						"Math error! We should have better guardrails around PluginExecutor field values."
+					);
 				}
 				// sleep_duration = (backoff * conn_attempts) * (1.0 +/- jitter_percent)
 				let sleep_duration: Duration = self

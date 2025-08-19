@@ -14,7 +14,7 @@ pub mod report_builder;
 use crate::{
 	cli::Format,
 	error::{Context, Error, Result},
-	policy_exprs::{self, std_exec, Expr},
+	policy_exprs::{self, Expr, std_exec},
 };
 use chrono::prelude::*;
 use schemars::JsonSchema;

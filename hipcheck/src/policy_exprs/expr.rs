@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
+	Error, Result, Tokens,
 	env::{Binding, Env},
 	token::Token,
-	Error, Result, Tokens,
 };
 use itertools::Itertools;
 use jiff::{Span, Zoned};
 use nom::{
+	Finish as _, IResult,
 	branch::alt,
 	combinator::{all_consuming, map},
 	multi::many0,
 	sequence::tuple,
-	Finish as _, IResult,
 };
 use ordered_float::NotNan;
 use serde_with::{DeserializeFromStr, SerializeDisplay};
@@ -102,9 +102,10 @@ impl FunctionDef {
 		let mut res = (self.ty_checker)(args);
 		// There's probably a better way to augment err with name
 		if let Err(Error::BadFuncArgType { name, .. }) = &mut res
-			&& name.is_empty() {
-				*name = self.name.clone().into_boxed_str();
-			};
+			&& name.is_empty()
+		{
+			*name = self.name.clone().into_boxed_str();
+		};
 		res
 	}
 	pub fn execute(&self, env: &Env, args: &[Expr]) -> Result<Expr> {
@@ -395,7 +396,12 @@ impl Typed for Lambda {
 		let fty = match self.body.get_type()? {
 			Type::Function(f) => f,
 			other => {
-				return Err(Error::InternalError(format!("Body of a lambda expr should be a function with a placeholder var, got {other:?}").into_boxed_str()));
+				return Err(Error::InternalError(
+					format!(
+						"Body of a lambda expr should be a function with a placeholder var, got {other:?}"
+					)
+					.into_boxed_str(),
+				));
 			}
 		};
 
@@ -643,7 +649,7 @@ mod tests {
 	use super::*;
 	use test_log::test;
 
-	use jiff::{tz::TimeZone, Span, Timestamp, Zoned};
+	use jiff::{Span, Timestamp, Zoned, tz::TimeZone};
 
 	trait IntoExpr {
 		fn into_expr(self) -> Expr;

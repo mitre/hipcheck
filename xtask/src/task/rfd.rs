@@ -3,9 +3,9 @@
 //! Tasks to list or create RFDs
 
 use crate::{NewRfdArgs, RfdArgs};
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{Context as _, Result, anyhow};
 use convert_case::{Case, Casing as _};
-use glob::{glob, Paths};
+use glob::{Paths, glob};
 use pathbuf::pathbuf;
 use std::{
 	fs::File,

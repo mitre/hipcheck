@@ -3,7 +3,7 @@
 use crate::ChangelogArgs;
 use anyhow::{Context, Result};
 use log::LevelFilter;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 /// Execute the changelog task.
 pub fn run(args: ChangelogArgs) -> Result<()> {

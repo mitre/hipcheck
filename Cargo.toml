@@ -32,6 +32,7 @@ members = [
     "plugins/linguist",
     "plugins/review",
     "plugins/typo",
+    "tests/test-plugins/activity-container",
     "tests/test-plugins/dummy_rand_data",
     "tests/test-plugins/dummy_sha256",
     "xtask",
@@ -41,7 +42,31 @@ members = [
 #
 # This means to use `xtask` with `cargo run` you need to specify the package.
 # See `.cargo/config.toml` for how this is done.
-default-members = ["hipcheck"]
+#
+# This list is equivalent to `members` except it removes `xtask` and the test
+# plugin crates.
+default-members = [
+    "hipcheck",
+    "library/hipcheck-common",
+    "library/hipcheck-kdl",
+    "library/hipcheck-macros",
+    "library/hipcheck-sdk-macros",
+    "library/hipcheck-workspace-hack",
+    "sdk/rust",
+    "plugins/git",
+    "plugins/github",
+    "plugins/npm",
+    "plugins/activity",
+    "plugins/affiliation",
+    "plugins/binary",
+    "plugins/churn",
+    "plugins/entropy",
+    "plugins/fuzz",
+    "plugins/identity",
+    "plugins/linguist",
+    "plugins/review",
+    "plugins/typo",
+]
 
 # The profile that 'cargo dist' will build with
 #

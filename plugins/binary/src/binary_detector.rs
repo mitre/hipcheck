@@ -2,16 +2,16 @@
 use crate::error::Result;
 use crate::hc_error;
 use crate::util::fs::read_kdl;
-use content_inspector::{inspect, ContentType};
-use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
+use content_inspector::{ContentType, inspect};
 use hipcheck_kdl::ParseKdlNode;
+use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
 use miette::Report;
-use serde::{de::Visitor, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, de::Visitor};
 use std::{
 	fmt,
 	fmt::Formatter,
 	fs::File,
-	io::{prelude::Read, BufReader},
+	io::{BufReader, prelude::Read},
 	path::{Path, PathBuf},
 	result::Result as StdResult,
 	str::FromStr,

@@ -92,9 +92,10 @@ impl ParseKdlNode for Strategy {
 							strategy_children.push(StrategyChild::StrategyCountry(country));
 						}
 					} else if node.name().to_string().as_str() == "org"
-						&& let Some(org) = StrategyOrg::parse_node(node) {
-							strategy_children.push(StrategyChild::StrategyOrg(org));
-						}
+						&& let Some(org) = StrategyOrg::parse_node(node)
+					{
+						strategy_children.push(StrategyChild::StrategyOrg(org));
+					}
 				}
 				Some(strategy_children)
 			}

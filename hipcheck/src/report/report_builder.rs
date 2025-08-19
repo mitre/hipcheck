@@ -6,7 +6,7 @@ use crate::{
 	error::{Error, Result},
 	hc_error,
 	plugin::{PluginName, PluginPublisher},
-	policy::{policy_file::PolicyPluginName, PolicyFile},
+	policy::{PolicyFile, policy_file::PolicyPluginName},
 	score::*,
 	session::Session,
 	target::Target,
@@ -65,7 +65,11 @@ pub fn build_report(
 				)?;
 			}
 			Err(error) => {
-				builder.add_errored_analysis(AnalysisIdent(name.clone()), AnalysisIdent(name), error);
+				builder.add_errored_analysis(
+					AnalysisIdent(name.clone()),
+					AnalysisIdent(name),
+					error,
+				);
 			}
 		}
 	}
@@ -146,8 +150,14 @@ impl<'target> ReportBuilder<'target> {
 	}
 
 	/// Add an errored analysis to the report.
-	pub fn add_errored_analysis(&mut self, analysis: AnalysisIdent, name: AnalysisIdent, error: &Error) -> &mut Self {
-		self.errored.push(ErroredAnalysis::new(analysis, name, error));
+	pub fn add_errored_analysis(
+		&mut self,
+		analysis: AnalysisIdent,
+		name: AnalysisIdent,
+		error: &Error,
+	) -> &mut Self {
+		self.errored
+			.push(ErroredAnalysis::new(analysis, name, error));
 		self
 	}
 

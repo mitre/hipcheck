@@ -8,7 +8,7 @@ use crate::{
 	util::fs::read_string,
 };
 use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
-use hipcheck_kdl::{extract_data, string_newtype_parse_kdl_node, ParseKdlNode, ToKdlNode};
+use hipcheck_kdl::{ParseKdlNode, ToKdlNode, extract_data, string_newtype_parse_kdl_node};
 use semver::{Version, VersionReq};
 use std::{
 	collections::HashMap,

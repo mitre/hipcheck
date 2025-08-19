@@ -96,7 +96,7 @@ pub mod prelude {
 pub mod deps {
 	pub use jiff::{Span, Zoned};
 	pub use schemars::{schema::SchemaObject as JsonSchema, schema_for};
-	pub use serde_json::{from_str, from_value, to_value, Value};
+	pub use serde_json::{Value, from_str, from_value, to_value};
 	pub use tonic::async_trait;
 }
 

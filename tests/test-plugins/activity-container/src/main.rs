@@ -3,7 +3,7 @@
 //! Plugin for querying how long it has been since a commit was last made to a repo
 
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target};
+use hipcheck_sdk::{LogLevel, prelude::*, types::Target};
 use jiff::Timestamp;
 use serde::Deserialize;
 use std::{result::Result as StdResult, sync::OnceLock};
@@ -64,10 +64,10 @@ impl Plugin for ActivityPlugin {
 	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
 		let conf =
 			serde_json::from_value::<Config>(config).map_err(|e| ConfigError::Unspecified {
-				message: e.to_string(),
+				message: e.to_string().into_boxed_str(),
 			})?;
 		CONFIG.set(conf).map_err(|_e| ConfigError::Unspecified {
-			message: "config was already set".to_owned(),
+			message: "config was already set".to_owned().into_boxed_str(),
 		})
 	}
 
@@ -94,15 +94,18 @@ struct Args {
 	#[arg(long)]
 	port: u16,
 
+	#[arg(long, default_value_t=LogLevel::Error)]
+	log_level: LogLevel,
+
 	#[arg(trailing_var_arg(true), allow_hyphen_values(true), hide = true)]
-	unknown_args: Vec<String>
+	unknown_args: Vec<String>,
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
 	log::info!("Activity container plugin is registering {:?}", args);
-	PluginServer::register(ActivityPlugin {})
+	PluginServer::register(ActivityPlugin {}, args.log_level)
 		.listen(Host::Any, args.port)
 		.await
 }

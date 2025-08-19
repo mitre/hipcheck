@@ -104,7 +104,7 @@ impl TargetType {
 		}
 	}
 	pub fn as_str(&self) -> String {
-		use serde_json::{to_value, Value};
+		use serde_json::{Value, to_value};
 		let Ok(Value::String(out)) = to_value(self) else {
 			unreachable!();
 		};

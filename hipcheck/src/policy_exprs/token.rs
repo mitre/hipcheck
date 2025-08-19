@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::policy_exprs::error::JiffError;
 use crate::policy_exprs::F64;
+use crate::policy_exprs::error::JiffError;
 use jiff::{
+	Span, Timestamp, Zoned,
 	civil::{Date, DateTime},
 	tz::TimeZone,
-	Span, Timestamp, Zoned,
 };
 use logos::{Lexer, Logos};
 use ordered_float::FloatIsNan;
@@ -154,11 +154,12 @@ fn lex_json_pointer(input: &mut Lexer<'_, Token>) -> Result<String> {
 		token
 	)))?;
 	if let Some(chr) = pointer.chars().next()
-		&& chr != '/' {
-			return Err(LexingError::JSONPointerMissingInitialSlash(
-				pointer.to_owned(),
-			));
-		}
+		&& chr != '/'
+	{
+		return Err(LexingError::JSONPointerMissingInitialSlash(
+			pointer.to_owned(),
+		));
+	}
 	Ok(pointer.to_owned())
 }
 
@@ -218,8 +219,8 @@ pub enum LexingError {
 
 #[cfg(test)]
 mod tests {
-	use crate::policy_exprs::{token::Token, Error::Lex, LexingError, Result, F64};
-	use jiff::{tz::TimeZone, Span, Timestamp, Zoned};
+	use crate::policy_exprs::{Error::Lex, F64, LexingError, Result, token::Token};
+	use jiff::{Span, Timestamp, Zoned, tz::TimeZone};
 	use logos::Logos as _;
 	use test_log::test;
 

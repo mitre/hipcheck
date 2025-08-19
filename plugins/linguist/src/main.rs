@@ -7,7 +7,7 @@ mod linguist;
 mod util;
 
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, LogLevel};
+use hipcheck_sdk::{LogLevel, prelude::*};
 use linguist::SourceFileDetector;
 use serde::Deserialize;
 use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};

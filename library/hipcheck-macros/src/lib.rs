@@ -6,7 +6,7 @@
 mod update;
 
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, Error};
+use syn::{DeriveInput, Error, parse_macro_input};
 
 /// Derive an implementation of the `Update` trait for the type.
 #[proc_macro_derive(Update)]

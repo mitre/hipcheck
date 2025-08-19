@@ -3,9 +3,9 @@
 //! A task to simulate a CI run locally.
 
 use super::buf::run_buf_lint;
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result, anyhow};
 use std::{mem::drop, ops::Not as _};
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 /// Helper type for tasks.
 type Task = (&'static str, fn(&Shell) -> Result<()>);

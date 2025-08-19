@@ -4,9 +4,9 @@ mod git2_log_shim;
 mod git2_rustls_transport;
 mod indicatif_log_bridge;
 
-use crate::shell::{verbosity::Verbosity, Shell};
+use crate::shell::{Shell, verbosity::Verbosity};
 use env_logger::Env;
-use rustls::crypto::{ring, CryptoProvider};
+use rustls::crypto::{CryptoProvider, ring};
 
 /// Initialize global state for the program.
 ///
@@ -51,6 +51,6 @@ fn init_cryptography() {
 
 fn init_software_versions() {
 	if let Err(e) = crate::version::init_software_versions() {
-		panic!("initial dependency version checking failed: {}", e);
+		panic!("initial dependency version checking failed: {:?}", e);
 	}
 }

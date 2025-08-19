@@ -7,11 +7,11 @@
 //! <https://www.git-scm.com/docs/http-protocol>.
 
 use crate::{shell::Shell, util::http::agent};
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use dialoguer::{Input, Password};
 use git2::{
-	transport::{self, Service, SmartSubtransport, SmartSubtransportStream, Transport},
 	Error as Git2Error, Remote,
+	transport::{self, Service, SmartSubtransport, SmartSubtransportStream, Transport},
 };
 use http::Method;
 use std::{

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, LogLevel};
+use hipcheck_sdk::{LogLevel, prelude::*};
 #[cfg(test)]
 use std::result::Result as StdResult;
 

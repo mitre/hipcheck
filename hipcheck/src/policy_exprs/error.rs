@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
-	expr::{PrimitiveType, Type},
 	Expr, Ident, LexingError,
+	expr::{PrimitiveType, Type},
 };
 use jiff::Error as JError;
-use nom::{error::ErrorKind, Needed};
+use nom::{Needed, error::ErrorKind};
 use ordered_float::FloatIsNan;
 use std::fmt;
 

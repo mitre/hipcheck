@@ -2,15 +2,15 @@
 
 pub use crate::plugin::{HcPluginCore, PluginExecutor, PluginWithConfig};
 use crate::{
+	Result,
 	cache::plugin::HcPluginCache,
 	hc_error,
 	plugin::{
-		get_current_arch, get_plugin_key, retrieve_plugins, Plugin, PluginManifest, PluginResponse,
-		QueryResult,
+		Plugin, PluginManifest, PluginResponse, QueryResult, get_current_arch, get_plugin_key,
+		retrieve_plugins,
 	},
 	policy::PolicyFile,
 	policy_exprs::Expr,
-	Result,
 };
 use futures::future::{BoxFuture, FutureExt};
 use serde_json::Value;

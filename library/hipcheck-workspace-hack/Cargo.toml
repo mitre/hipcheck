@@ -32,15 +32,12 @@ getrandom = { version = "0.3.3", default-features = false, features = ["std", "w
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.5" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = ["raw"] }
 idna = { version = "1.0.3", default-features = false, features = ["compiled_data", "std"] }
-indexmap = { version = "2.10.0", features = ["serde"] }
-jiff-6f8ce4dd05d13bba = { package = "jiff", version = "0.2.15", features = ["serde"] }
+jiff-6f8ce4dd05d13bba = { package = "jiff", version = "0.2.15" }
 jiff-c65f7effa3be6d31 = { package = "jiff", version = "0.1.29", features = ["serde"] }
 libz-sys = { version = "1.1.22", default-features = false, features = ["libc"] }
 log = { version = "0.4.27", default-features = false, features = ["std"] }
 memchr = { version = "2.7.5", features = ["use_std"] }
 miette = { version = "7.6.0", features = ["fancy"] }
-minimal-lexical = { version = "0.2.1", default-features = false, features = ["std"] }
-nom = { version = "7.1.3" }
 num-traits = { version = "0.2.19", features = ["i128"] }
 percent-encoding = { version = "2.3.1" }
 prost = { version = "0.13.5", features = ["prost-derive"] }
@@ -51,7 +48,7 @@ schemars = { version = "0.8.22", features = ["chrono", "preserve_order", "url"] 
 semver = { version = "1.0.26", features = ["serde"] }
 serde = { version = "1.0.219", features = ["alloc", "derive", "rc"] }
 sha2 = { version = "0.10.9" }
-smallvec = { version = "1.15.1", default-features = false, features = ["const_new", "union", "write"] }
+smallvec = { version = "1.15.1", default-features = false, features = ["const_new", "write"] }
 strum = { version = "0.27.2", features = ["derive"] }
 tokio = { version = "1.47.1", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-stream = { version = "0.1.17", features = ["net"] }
@@ -79,15 +76,12 @@ getrandom = { version = "0.3.3", default-features = false, features = ["std", "w
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.5" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = ["raw"] }
 idna = { version = "1.0.3", default-features = false, features = ["compiled_data", "std"] }
-indexmap = { version = "2.10.0", features = ["serde"] }
-jiff-6f8ce4dd05d13bba = { package = "jiff", version = "0.2.15", features = ["serde"] }
+jiff-6f8ce4dd05d13bba = { package = "jiff", version = "0.2.15" }
 jiff-c65f7effa3be6d31 = { package = "jiff", version = "0.1.29", features = ["serde"] }
 libz-sys = { version = "1.1.22", default-features = false, features = ["libc"] }
 log = { version = "0.4.27", default-features = false, features = ["std"] }
 memchr = { version = "2.7.5", features = ["use_std"] }
 miette = { version = "7.6.0", features = ["fancy"] }
-minimal-lexical = { version = "0.2.1", default-features = false, features = ["std"] }
-nom = { version = "7.1.3" }
 num-traits = { version = "0.2.19", features = ["i128"] }
 percent-encoding = { version = "2.3.1" }
 prost = { version = "0.13.5", features = ["prost-derive"] }
@@ -98,7 +92,7 @@ schemars = { version = "0.8.22", features = ["chrono", "preserve_order", "url"] 
 semver = { version = "1.0.26", features = ["serde"] }
 serde = { version = "1.0.219", features = ["alloc", "derive", "rc"] }
 sha2 = { version = "0.10.9" }
-smallvec = { version = "1.15.1", default-features = false, features = ["const_new", "union", "write"] }
+smallvec = { version = "1.15.1", default-features = false, features = ["const_new", "write"] }
 strum = { version = "0.27.2", features = ["derive"] }
 syn = { version = "2.0.106", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 tokio = { version = "1.47.1", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
