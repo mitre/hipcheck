@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	error::{Error, Result},
 	JsonValue, Plugin, QueryTarget,
+	error::{Error, Result},
 };
 use futures::Stream;
 use hipcheck_common::proto::{
@@ -208,7 +208,9 @@ impl PluginEngine {
 					out.push_back(msg);
 				}
 				Ok(None) => {
-					tracing::warn!("None received, gRPC channel closed. we may not close properly if None is not returned again");
+					tracing::warn!(
+						"None received, gRPC channel closed. we may not close properly if None is not returned again"
+					);
 					break;
 				}
 				// Whether empty or disconnected, we return what we have

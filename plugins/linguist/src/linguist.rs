@@ -3,10 +3,10 @@
 use crate::error::Result;
 use crate::hc_error;
 use crate::util::fs::read_kdl;
-use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
 use hipcheck_kdl::ParseKdlNode;
+use hipcheck_kdl::kdl::{KdlDocument, KdlNode};
 use miette::Report;
-use serde::{de::Visitor, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, de::Visitor};
 use std::{
 	convert::AsRef, fmt, fmt::Formatter, path::Path, result::Result as StdResult, str::FromStr,
 };

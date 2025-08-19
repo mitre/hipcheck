@@ -6,8 +6,8 @@ mod task;
 mod workspace;
 
 use clap::{
-	builder::{IntoResettable, PossibleValue, Resettable, Str},
 	Parser as _,
+	builder::{IntoResettable, PossibleValue, Resettable, Str},
 };
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use std::{fmt::Display, process::ExitCode};

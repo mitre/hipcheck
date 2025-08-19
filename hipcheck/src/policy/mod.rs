@@ -13,7 +13,7 @@ use crate::{
 	error::Result,
 	hc_error,
 	policy::policy_file::{PolicyAnalyze, PolicyPatchList, PolicyPluginList, PolicyPluginName},
-	policy_exprs::{std_parse, Expr},
+	policy_exprs::{Expr, std_parse},
 	util::fs as file,
 };
 use hipcheck_kdl::extract_data;

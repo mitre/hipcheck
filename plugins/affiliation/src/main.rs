@@ -14,10 +14,10 @@ use crate::{
 
 use clap::Parser;
 use hipcheck_sdk::{
+	LogLevel, PluginConfig,
 	macros::PluginConfig,
 	prelude::*,
 	types::{LocalGitRepo, Target},
-	LogLevel, PluginConfig,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

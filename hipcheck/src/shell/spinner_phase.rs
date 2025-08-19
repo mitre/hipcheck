@@ -4,7 +4,7 @@
 //!
 //! This can be useful for things like while-loops and iterators without a known size.
 
-use super::{verbosity::Verbosity, Shell, HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP};
+use super::{HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP, Shell, verbosity::Verbosity};
 use crate::shell::Title;
 use console::style;
 use indicatif::{HumanDuration, ProgressBar, ProgressDrawTarget, ProgressStyle};

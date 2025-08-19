@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	hc_error,
+	Result, hc_error,
 	plugin::PluginVersion,
-	policy_exprs::{std_parse, Expr},
-	Result,
+	policy_exprs::{Expr, std_parse},
 };
 use futures::{Stream, StreamExt};
 use hipcheck_common::proto::{
-	plugin_service_client::PluginServiceClient, ConfigurationStatus, Empty,
-	ExplainDefaultQueryRequest, GetDefaultPolicyExpressionRequest, GetQuerySchemasRequest,
-	GetQuerySchemasResponse as PluginSchema, InitiateQueryProtocolRequest, Query as PluginQuery,
-	SetConfigurationRequest, SetConfigurationResponse as PluginConfigResult,
+	ConfigurationStatus, Empty, ExplainDefaultQueryRequest, GetDefaultPolicyExpressionRequest,
+	GetQuerySchemasRequest, GetQuerySchemasResponse as PluginSchema, InitiateQueryProtocolRequest,
+	Query as PluginQuery, SetConfigurationRequest, SetConfigurationResponse as PluginConfigResult,
+	plugin_service_client::PluginServiceClient,
 };
 use hipcheck_common::{chunk::QuerySynthesizer, types::*};
 use serde_json::Value;
@@ -25,9 +24,9 @@ use std::{
 	result::Result as StdResult,
 };
 use tokio::process::Child;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::{transport::Channel, Code, Status};
+use tonic::{Code, Status, transport::Channel};
 pub type HcPluginClient = PluginServiceClient<Channel>;
 
 #[derive(Clone, Debug)]

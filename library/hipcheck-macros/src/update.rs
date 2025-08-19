@@ -4,8 +4,8 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::ops::Not as _;
 use syn::{
-	spanned::Spanned, Data, DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed, Ident,
-	Result,
+	Data, DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed, Ident, Result,
+	spanned::Spanned,
 };
 
 /// Convenience macro for producing new `syn::Error`s.

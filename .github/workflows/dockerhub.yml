@@ -11,12 +11,16 @@ on:
 
 jobs:
   push:
+    name: Push
     runs-on: ubuntu-latest
     steps:
-      - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
-      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+      - name: Setup Qemu
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
 
-      - name: Run string replace
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Extract Hipcheck version
         uses: frabert/replace-string-action@9c9aeb483eab07adb9d0be75b5212cc0bcef0d4b # v2.5.1
         id: format-tag
         with:
@@ -31,7 +35,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Checkout the Hipcheck Repository
+      - name: Check out the repo
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
@@ -46,7 +50,7 @@ jobs:
           platforms: "linux/amd64,linux/arm64"
           tags: mitre/hipcheck:latest,mitre/hipcheck:${{ steps.format-tag.outputs.replaced }}
 
-      - name: Verify Dockerhub Description Size
+      - name: Verify Dockerhub description size
         id: verify_dockerhub_readme_size
         run: |
           FILE_PATH="./dist/dockerhub/README.md"

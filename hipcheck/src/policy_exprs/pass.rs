@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::policy_exprs::{
-	env::{partially_evaluate, Env},
+	env::{Env, partially_evaluate},
 	error::{Error, Result},
 	expr::*,
 };

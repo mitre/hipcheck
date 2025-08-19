@@ -4,7 +4,7 @@ use crate::workspace;
 use anyhow::{Context, Result};
 use pathbuf::pathbuf;
 use which::which;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 /// Run the `buf lint` command
 pub fn run() -> Result<()> {

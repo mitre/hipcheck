@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)] // for ease of testing
 use crate::{
+	StdResult,
 	cache::repo,
 	error::Result,
 	hc_error,
 	plugin::{PluginId, PluginName, PluginPublisher, PluginVersion},
-	StdResult,
 };
 use dialoguer::Confirm;
 use pathbuf::pathbuf;
@@ -116,7 +116,7 @@ impl HcPluginCacheIterator {
 					plugin_version_string,
 					plugin_publisher,
 					plugin_name
-				))
+				));
 			}
 		};
 		let last_modified: SystemTime = repo::get_last_modified_or_now(path);

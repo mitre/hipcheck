@@ -4,7 +4,7 @@
 //! This code will eventually be removed once Hipcheck no longer accepts TOML files in lieu of KDL policy files
 //! In the meantime, this code exists so Hipcheck can still run using the older configuration format
 
-use super::{policy_file::*, PolicyFile};
+use super::{PolicyFile, policy_file::*};
 use crate::{
 	config::{
 		ActivityConfig, AffiliationConfig, AttacksConfig, BinaryConfig, ChurnConfig, CommitConfig,

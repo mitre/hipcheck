@@ -2,9 +2,9 @@
 
 use clap::Parser;
 use hipcheck_sdk::{
+	LogLevel,
 	prelude::*,
 	types::{LocalGitRepo, Target},
-	LogLevel,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

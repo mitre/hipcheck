@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+	CheckKind, EXIT_FAILURE,
 	error::{Context as _, Error, Result},
 	hc_error,
 	target::{Package, PackageHost},
 	util::http::agent,
-	CheckKind, EXIT_FAILURE,
 };
 use serde_json::Value;
 use std::{
-	cmp::{max, Ordering},
+	cmp::{Ordering, max},
 	process::exit,
 };
 use url::{Host, Url};
@@ -394,10 +394,9 @@ pub fn extract_repo_for_npm(package: &str, version: &str) -> Result<Url> {
 	};
 
 	// Make an HTTP request to that URL.
-	let response = agent::agent()
-		.get(&registry)
-		.call()
-		.context("request to npm API failed, make sure the package name is correct as well as the project version")?;
+	let response = agent::agent().get(&registry).call().context(
+		"request to npm API failed, make sure the package name is correct as well as the project version",
+	)?;
 
 	// Parse the response as JSON.
 	let json: Value = {
@@ -466,7 +465,7 @@ pub fn extract_repo_for_pypi(package: &str, version: &str) -> Result<Url> {
 		_ => {
 			return Err(Error::msg(
 				"Unable to get git repository URL from python package",
-			))
+			));
 		}
 	};
 	let repo = repository.clone().unwrap();

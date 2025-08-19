@@ -96,9 +96,10 @@ impl TryFrom<GoModRequire> for SingleTargetSeed {
 		// Check if version string is really a pseudo-version, if so, pull out ref hash
 		// Reference: https://go.dev/ref/mod#pseudo-versions
 		if let Some((_, hash)) = version.rsplit_once("-")
-			&& hash.len() == 12 {
-				version = hash.to_owned();
-			}
+			&& hash.len() == 12
+		{
+			version = hash.to_owned();
+		}
 
 		let is_github = repo.contains("github.com");
 
@@ -117,8 +118,8 @@ impl TryFrom<GoModRequire> for SingleTargetSeed {
 				Some(vcs_base) => {
 					if !vcs_base.ends_with(".git") {
 						return Err(hc_error!(
-						"Only git repos are supported currently, got Go dependency path {vcs_base}"
-					));
+							"Only git repos are supported currently, got Go dependency path {vcs_base}"
+						));
 					}
 					vcs_base.to_owned()
 				}
@@ -252,8 +253,8 @@ mod tests {
 	use url::Url;
 
 	use crate::target::{
-		multi::resolve_package_lock_json, Package, PackageHost, SingleTargetSeed,
-		SingleTargetSeedKind,
+		Package, PackageHost, SingleTargetSeed, SingleTargetSeedKind,
+		multi::resolve_package_lock_json,
 	};
 
 	use super::*;

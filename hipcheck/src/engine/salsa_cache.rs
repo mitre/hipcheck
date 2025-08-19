@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+	Result,
 	engine::{HcEngine, RUNTIME},
 	hc_error,
-	plugin::{get_plugin_key, PluginResponse, QueryResult},
-	Result,
+	plugin::{PluginResponse, QueryResult, get_plugin_key},
 };
 
 trait CloneFromSalsaDb {

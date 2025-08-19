@@ -4,13 +4,13 @@ mod binary_detector;
 mod error;
 mod util;
 
-use crate::binary_detector::{detect_binary_files, BinaryFileDetector};
+use crate::binary_detector::{BinaryFileDetector, detect_binary_files};
 use clap::Parser;
 use hipcheck_sdk::{
+	LogLevel, PluginConfig,
 	macros::PluginConfig,
 	prelude::*,
 	types::{LocalGitRepo, Target},
-	LogLevel, PluginConfig,
 };
 use pathbuf::pathbuf;
 use std::{ops::Not, path::PathBuf, result::Result as StdResult, sync::OnceLock};

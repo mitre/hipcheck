@@ -6,7 +6,7 @@
 
 use crate::shell::Title;
 
-use super::{Shell, HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP};
+use super::{HOUR_GLASS, LEFT_COL_WIDTH, ROCKET_SHIP, Shell};
 use console::style;
 use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
 use std::{

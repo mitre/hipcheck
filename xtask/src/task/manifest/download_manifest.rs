@@ -3,11 +3,11 @@
 use crate::{
 	string_newtype_parse_kdl_node,
 	task::manifest::{
-		kdl::{extract_data, ParseKdlNode, ToKdlNode},
+		kdl::{ParseKdlNode, ToKdlNode, extract_data},
 		util::agent,
 	},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use kdl::{KdlDocument, KdlNode, KdlValue};
 use regex::Regex;
 use std::{

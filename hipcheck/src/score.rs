@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	config::{analysis_tree, visit_leaves, Analysis, AnalysisTree},
+	config::{Analysis, AnalysisTree, analysis_tree, visit_leaves},
 	engine::HcEngine,
 	error::Result,
 	hc_error,
 	plugin::QueryResult,
-	policy_exprs::{std_exec, Expr},
+	policy_exprs::{Expr, std_exec},
 	session::Session,
 	shell::spinner_phase::SpinnerPhase,
 	target::Target,

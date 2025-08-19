@@ -4,7 +4,7 @@
 
 use anyhow::Context as _;
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, types::Target, LogLevel};
+use hipcheck_sdk::{LogLevel, prelude::*, types::Target};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{result::Result as StdResult, sync::OnceLock};
@@ -41,7 +41,9 @@ async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	};
 
 	let Some(known_remote) = remote.known_remote else {
-		tracing::error!("target repository is not a GitHub repository or else is missing GitHub repo information");
+		tracing::error!(
+			"target repository is not a GitHub repository or else is missing GitHub repo information"
+		);
 		return Err(Error::UnexpectedPluginQueryInputFormat);
 	};
 

@@ -25,3 +25,7 @@ platforms = [
 
 # Write out exact versions rather than a semver range. (Defaults to false.)
 exact-versions = true
+
+# Don't include 'xtask' in cargo-hakari's workspace hack calculations.
+[traversal-excludes]
+workspace-members = ["xtask"]

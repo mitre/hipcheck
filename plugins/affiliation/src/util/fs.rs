@@ -2,7 +2,7 @@
 
 //! General shared functions for interacting with the file system
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{Context as _, Result, anyhow};
 use std::{fs, ops::Not, path::Path};
 
 /// Read a file to a string.

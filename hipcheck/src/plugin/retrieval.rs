@@ -5,9 +5,9 @@ use crate::{
 	error::{Context, Error},
 	hc_error,
 	plugin::{
-		download_manifest::DownloadManifestEntry, get_current_arch, try_get_bin_for_entrypoint,
 		ArchiveFormat, DownloadManifest, HashAlgorithm, HashWithDigest, PluginId,
 		PluginIdVersionRange, PluginManifest, PluginVersion,
+		download_manifest::DownloadManifestEntry, get_current_arch, try_get_bin_for_entrypoint,
 	},
 	policy::policy_file::{ManifestLocation, PolicyPlugin},
 	util::{fs::file_sha256, http::agent::agent},
@@ -17,7 +17,7 @@ use fs_extra::{dir::remove, file::write_all};
 use pathbuf::pathbuf;
 use std::{
 	collections::HashSet,
-	fs::{read_dir, rename, DirEntry, File},
+	fs::{DirEntry, File, read_dir, rename},
 	io::{Read, Write},
 	path::{Path, PathBuf},
 	str::FromStr,

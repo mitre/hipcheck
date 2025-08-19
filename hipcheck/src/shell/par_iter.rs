@@ -8,8 +8,8 @@ use super::{
 	spinner_phase::{SpinnerPhase, SpinnerPhaseTracker},
 };
 use rayon::iter::{
-	plumbing::{Consumer, Folder, Producer, ProducerCallback, UnindexedConsumer},
 	IndexedParallelIterator, ParallelIterator,
+	plumbing::{Consumer, Folder, Producer, ProducerCallback, UnindexedConsumer},
 };
 use std::sync::Arc;
 
@@ -304,9 +304,9 @@ impl<Phase, T, Prod> Producer for PhaseProducer<Phase, Prod>
 where
 	Prod: Producer<Item = T>,
 	Phase: HasTrackerType<
-		Prod::IntoIter,
-		Tracker: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = T>,
-	>,
+			Prod::IntoIter,
+			Tracker: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = T>,
+		>,
 	Phase: Send + Clone,
 {
 	type Item = T;
@@ -342,7 +342,7 @@ where
 #[cfg(test)]
 mod test {
 	use super::{ParallelTrackAsPhase, SpinnerPhaseTracker};
-	use crate::shell::{verbosity::Verbosity, Shell};
+	use crate::shell::{Shell, verbosity::Verbosity};
 	use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 	#[test]

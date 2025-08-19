@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{hc_error, Result};
+use crate::{Result, hc_error};
 use semver::{Comparator, Op};
 
 pub(crate) fn explain_comparator(c: &Comparator) -> Result<String> {

@@ -11,9 +11,9 @@ use crate::{
 	languages::TypoFile,
 	types::{Lang, NpmDependencies},
 };
-use anyhow::{anyhow, Context as _};
+use anyhow::{Context as _, anyhow};
 use clap::Parser;
-use hipcheck_sdk::{macros::PluginConfig, prelude::*, types::Target, LogLevel, PluginConfig};
+use hipcheck_sdk::{LogLevel, PluginConfig, macros::PluginConfig, prelude::*, types::Target};
 use std::{path::PathBuf, result::Result as StdResult, sync::OnceLock};
 
 pub static TYPOFILE: OnceLock<TypoFile> = OnceLock::new();

@@ -1,0 +1,193 @@
+name: Rust
+
+# Run on both PRs and pushes to the main branch.
+# It may seem redundant to run tests on main, since we disallow pushing directly
+# to main and all PRs get tested before merging.
+#
+# But due to how GitHub Actions isolates caches, we need to run the tests on
+# main so that caches are available to new PRs. The caches created when testing
+# PR code cannot be re-used outside of testing that PR.
+#
+# See the GitHub Actions documentation here:
+# https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/caching-dependencies-to-speed-up-workflows#restrictions-for-accessing-a-cache
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+env:
+  # Speed up CI compilation by turning off debug info.
+  RUSTFLAGS: -Dwarnings -C debuginfo=0 -C strip=symbols
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
+
+jobs:
+  universal-test:
+    name: "Universal Test"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Stop if not modifying code-relevant paths
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            rust:
+              - "config/**"
+              - "hipcheck/**"
+              - "plugins/**"
+              - "xtask/**"
+              - "sdk/rust/**"
+              - "library/**"
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # v1
+        if: steps.filter.outputs.rust == 'true'
+        with:
+          toolchain: stable
+
+      - name: Install Rust tools (cargo-hakari)
+        uses: taiki-e/install-action@ad95d4e02e061d4390c4b66ef5ed56c7fee3d2ce # v2.58.17
+        if: steps.filter.outputs.rust == 'true'
+        with:
+          tool: cargo-hakari
+
+      - name: Setup Rust caching
+        uses: swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        if: steps.filter.outputs.rust == 'true'
+
+      - name: Print dependency tree
+        if: steps.filter.outputs.rust == 'true'
+        run: cargo tree
+
+      - name: Check workspace-hack is up to date
+        if: steps.filter.outputs.rust == 'true'
+        run: cargo hakari generate --diff
+
+      - name: Check all crates depend on workspace-hack
+        if: steps.filter.outputs.rust == 'true'
+        run: cargo hakari manage-deps --dry-run
+
+      - name: Validate custom requirements for workspace
+        if: steps.filter.outputs.rust == 'true'
+        run: cargo run --locked --package xtask --bin xtask -- validate
+
+      - name: Check Rust formatting
+        if: steps.filter.outputs.rust == 'true'
+        run: cargo fmt --all --check
+
+  platform-test:
+    name: "Platform Test (${{ matrix.os }})"
+    needs: universal-test
+    strategy:
+      fail-fast: false
+      matrix:
+        # NOTE: MUST be synced manually with runners in 'dist-workspace.toml'
+        #
+        # We've purposefully chosen to use two different versions of macOS here
+        # to achieve ARM and x86 support (macos-14 is ARM, macos-13 is x86),
+        # since alternative runners with matching versions aren't all on the
+        # free plan for GitHub Actions.
+        #
+        # More info: https://github.com/actions/runner-images
+        # See also: https://github.com/actions/partner-runner-images
+        os: [ubuntu-22.04, windows-2022, macos-14, macos-13]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Stop if not modifying code-relevant paths
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            rust:
+              - "config/**"
+              - "hipcheck/**"
+              - "plugins/**"
+              - "xtask/**"
+              - "sdk/rust/**"
+              - "library/**"
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # v1
+        if: steps.filter.outputs.rust == 'true'
+        with:
+          toolchain: stable
+
+      - name: Install Rust tools (nextest)
+        uses: taiki-e/install-action@ad95d4e02e061d4390c4b66ef5ed56c7fee3d2ce # v2.58.17
+        if: steps.filter.outputs.rust == 'true'
+        with:
+          tool: nextest
+
+      - name: Setup Rust caching
+        uses: swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        if: steps.filter.outputs.rust == 'true'
+        with:
+          key: ${{ matrix.os }}
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux' && steps.filter.outputs.rust == 'true'
+        run: sudo apt-get install -y protobuf-compiler mold
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS' && steps.filter.outputs.rust == 'true'
+        run: brew install protobuf
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows' && steps.filter.outputs.rust == 'true'
+        run: choco install protoc
+
+      - name: Check and lint workspace
+        if: steps.filter.outputs.rust == 'true'
+        run: cargo clippy --locked --verbose --workspace --exclude xtask
+
+      - name: Run workspace tests with nextest
+        if: steps.filter.outputs.rust == 'true'
+        run: cargo nextest r --no-fail-fast --hide-progress-bar --locked --verbose --workspace --exclude xtask
+
+      # Build is required because we need plugin binaries for run-tests.
+      - name: Build workspace
+        if: steps.filter.outputs.rust == 'true'
+        run: cargo build --locked --verbose --workspace --exclude xtask
+
+      - name: Run with '--policy ./config/Hipcheck.kdl'
+        if: steps.filter.outputs.rust == 'true'
+        env:
+          HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./target/debug/hc --policy ./config/Hipcheck.kdl check https://github.com/mitre/hipcheck
+
+      - name: Run with '--policy ./config/local.Hipcheck.kdl'
+        if: steps.filter.outputs.rust == 'true'
+        env:
+          HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./target/debug/hc --policy ./config/local.Hipcheck.kdl check https://github.com/mitre/hipcheck
+
+      - name: Run with '--config ./config'
+        if: steps.filter.outputs.rust == 'true'
+        env:
+          HC_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./target/debug/hc --config ./config check https://github.com/mitre/hipcheck

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::util::authenticated_agent::AuthenticatedAgent;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 const GH_API_V4_SEARCH: &str = "https://api.github.com/search/code";

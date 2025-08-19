@@ -13,9 +13,9 @@ use crate::{
 	shell::{color_choice::ColorChoice, verbosity::Verbosity},
 	source,
 	target::{
-		pm, LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, SingleTargetSeed,
+		LocalGitRepo, MavenPackage, Package, PackageHost, Sbom, SbomStandard, SingleTargetSeed,
 		SingleTargetSeedKind, TargetSeed, TargetSeedKind, TargetType, ToTargetSeed,
-		ToTargetSeedKind, VcsUrl,
+		ToTargetSeedKind, VcsUrl, pm,
 	},
 };
 use clap::{Parser as _, ValueEnum};
@@ -201,7 +201,11 @@ impl Display for ConfigMode {
 		use ConfigMode::*;
 		match &self {
 			PreferPolicy { policy, config } => {
-				write!(f, "Default to Policy KDL file at path:\n{:?}\nFallback Legacy Config TOML directory at path:\n{:?}", policy, config)
+				write!(
+					f,
+					"Default to Policy KDL file at path:\n{:?}\nFallback Legacy Config TOML directory at path:\n{:?}",
+					policy, config
+				)
 			}
 			ForcePolicy { policy } => {
 				write!(f, "Policy KDL file at path:\n{:?}", policy)
@@ -241,13 +245,16 @@ impl CliConfig {
 			(_, Some(Provenance::FromUser(config_path))) => Ok(ConfigMode::ForceConfig {
 				config: config_path.to_path_buf(),
 			}),
-			(Some(Provenance::FromDefaults(policy_path)), Some(Provenance::FromDefaults(config_path))) => Ok(
-				ConfigMode::PreferPolicy {
-					policy: policy_path.to_path_buf(),
-					config: config_path.to_path_buf(),
-				}
-			),
-			_ => Err(hc_error!("Could not find any source of configuration. Use --policy or --config to configure Hipcheck."))
+			(
+				Some(Provenance::FromDefaults(policy_path)),
+				Some(Provenance::FromDefaults(config_path)),
+			) => Ok(ConfigMode::PreferPolicy {
+				policy: policy_path.to_path_buf(),
+				config: config_path.to_path_buf(),
+			}),
+			_ => Err(hc_error!(
+				"Could not find any source of configuration. Use --policy or --config to configure Hipcheck."
+			)),
 		}
 	}
 
@@ -271,7 +278,9 @@ impl CliConfig {
 			(None, Some(quiet)) => Verbosity::use_quiet(quiet),
 			(Some(verbosity), None) => verbosity,
 			(Some(verbosity), Some(_quiet)) => {
-				log::warn!("verbosity specified with both -v/--verbosity and -q/--quiet; prefer -v/--verbosity");
+				log::warn!(
+					"verbosity specified with both -v/--verbosity and -q/--quiet; prefer -v/--verbosity"
+				);
 				verbosity
 			}
 		}
@@ -304,7 +313,9 @@ impl CliConfig {
 			(None, Some(home)) => Some(home),
 			(Some(cache), None) => Some(cache),
 			(Some(cache), Some(_home)) => {
-				log::warn!("cache directory specified with both -C/--cache and -H/--home; prefer -C/--cache");
+				log::warn!(
+					"cache directory specified with both -C/--cache and -H/--home; prefer -C/--cache"
+				);
 				Some(cache)
 			}
 		}
@@ -574,12 +585,15 @@ impl CheckArgs {
 				target_str = new_target;
 				// Check if the user also provided a type, and error if it does not agree with the inferred type.
 				if let Some(user_submcd) = self.target_type.clone()
-					&& user_submcd.as_str() != subcmd_str {
-						return Err(hc_error!(
-							"Provided target type '{}' does not match the type, '{}', inferred from the target '{}'. Check that you have specified the correct type and provided the intended target.",
-							user_submcd.as_str(), subcmd_str, target
-						));
-					}
+					&& user_submcd.as_str() != subcmd_str
+				{
+					return Err(hc_error!(
+						"Provided target type '{}' does not match the type, '{}', inferred from the target '{}'. Check that you have specified the correct type and provided the intended target.",
+						user_submcd.as_str(),
+						subcmd_str,
+						target
+					));
+				}
 			}
 			None => match self.target_type.clone() {
 				// If a type could not be inferred, check if a type was provided
@@ -591,9 +605,9 @@ impl CheckArgs {
 				// If no type was inferred or provided, return an error
 				None => {
 					return Err(hc_error!(
-					"could not resolve target '{}' to a target type. please specify with the `-t` flag",
-					target
-				))
+						"could not resolve target '{}' to a target type. please specify with the `-t` flag",
+						target
+					));
 				}
 			},
 		}
@@ -627,18 +641,25 @@ impl ToTargetSeed for CheckArgs {
 					// Validate for package
 					if let SingleTargetSeedKind::Package(p) = &single_target_seed_kind {
 						if p.has_version() && &p.version != init_ref {
-							return Err(hc_error!("ambiguous version for package target: package target specified {}, but refspec flag specified {}. please specify only one.", p.version, init_ref));
+							return Err(hc_error!(
+								"ambiguous version for package target: package target specified {}, but refspec flag specified {}. please specify only one.",
+								p.version,
+								init_ref
+							));
 						}
 					}
 					// Validate for VCS URL
 					else if let SingleTargetSeedKind::VcsUrl(vcs) = &single_target_seed_kind
 						&& let Some(git_ref) = &vcs.git_ref
-							&& git_ref != init_ref {
-								return Err(hc_error!(
-								"Provided ref_spec '{}' does not match the ref spec, '{}', inferred from the target '{}'. Check that you have specified the correct ref and provided the intended target.",
-								init_ref, git_ref, &command.get_specifier()
-							));
-							}
+						&& git_ref != init_ref
+					{
+						return Err(hc_error!(
+							"Provided ref_spec '{}' does not match the ref spec, '{}', inferred from the target '{}'. Check that you have specified the correct ref and provided the intended target.",
+							init_ref,
+							git_ref,
+							&command.get_specifier()
+						));
+					}
 				} else {
 					// If no --ref is set and the target seed is a VCS URL, get the ref from that
 					if let SingleTargetSeedKind::VcsUrl(vcs) = &single_target_seed_kind {
@@ -851,7 +872,9 @@ fn to_local_repo(source: &String) -> Result<TargetSeedKind> {
 			},
 		)))
 	} else {
-		Err(hc_error!("Provided target repository could not be identified as either a remote url or path to a local file"))
+		Err(hc_error!(
+			"Provided target repository could not be identified as either a remote url or path to a local file"
+		))
 	}
 }
 
@@ -1360,11 +1383,7 @@ pub enum Format {
 
 impl Format {
 	pub fn use_json(json: bool) -> Format {
-		if json {
-			Format::Json
-		} else {
-			Format::Human
-		}
+		if json { Format::Json } else { Format::Human }
 	}
 }
 

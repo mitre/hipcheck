@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+	BuildArgs,
 	build::{resolve_builder_args, resolve_packages},
 	string::list_with_commas,
-	BuildArgs,
 };
 use anyhow::Result;
 use itertools::Itertools;
 use log::debug;
 use std::collections::BTreeSet;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 /// Run the build command.
 pub fn run(args: BuildArgs) -> Result<()> {

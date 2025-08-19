@@ -3,7 +3,7 @@
 use crate::{
 	error::{Context as _, Result},
 	hc_error,
-	util::command::{log_args, DependentProgram},
+	util::command::{DependentProgram, log_args},
 };
 use std::{
 	ffi::OsStr,

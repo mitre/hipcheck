@@ -5,8 +5,8 @@ use crate::{
 	util::fs as file,
 };
 use anyhow::{Context as _, Result};
-use hipcheck_kdl::kdl::KdlNode;
 use hipcheck_kdl::ParseKdlNode;
+use hipcheck_kdl::kdl::KdlNode;
 use std::{collections::HashMap, path::Path};
 
 #[derive(Debug)]

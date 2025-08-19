@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{Context as _, Result, anyhow};
 use regex::Regex;
 use semver::Version;
 use std::{convert::AsRef, env, ffi::OsStr, iter::IntoIterator};

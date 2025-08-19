@@ -9,9 +9,9 @@ mod util;
 use crate::data::GitHub;
 use clap::Parser;
 use hipcheck_sdk::{
+	LogLevel,
 	prelude::*,
 	types::{KnownRemote, RemoteGitRepo},
-	LogLevel,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

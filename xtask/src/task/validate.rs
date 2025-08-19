@@ -8,6 +8,7 @@ use glob::glob;
 use pathbuf::pathbuf;
 use pep440_rs::{Version, VersionSpecifiers};
 use pyproject_toml::{Contact, License, Project, PyProjectToml};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, de::DeserializeOwned};
 use std::{
 	collections::BTreeSet,
@@ -75,35 +76,32 @@ impl<'work> Findings<'work> {
 	fn for_workspace(workspace: &'work Workspace) -> Findings<'work> {
 		let package_findings: PackageFindings<'work> = workspace
 			.packages
-			.iter()
-			.fold(Vec::new(), |mut package_findings, package| {
-				package_findings.push((package, validate_package(package)));
-				package_findings
+			.par_iter()
+			.filter_map(|package| {
+				let results = validate_package(package);
+				results.is_empty().not().then_some((package, results))
 			})
-			.into_iter()
-			.filter(|(_, findings)| findings.is_empty().not())
 			.collect();
 
 		let config_findings: ConfigFindings<'work> = workspace
 			.configs
-			.iter()
-			.fold(Vec::new(), |mut config_findings, config| {
-				config_findings.push((config.as_ref(), validate_config(config)));
-				config_findings
+			.par_iter()
+			.filter_map(|config| {
+				let results = validate_config(config);
+				results
+					.is_empty()
+					.not()
+					.then_some((config.as_ref(), results))
 			})
-			.into_iter()
-			.filter(|(_, findings)| findings.is_empty().not())
 			.collect();
 
 		let source_findings: SourceFindings<'work> = workspace
 			.packages
-			.iter()
-			.fold(Vec::new(), |mut source_findings, package| {
-				source_findings.push((package, validate_sources(package)));
-				source_findings
+			.par_iter()
+			.filter_map(|package| {
+				let results = validate_sources(package);
+				results.is_empty().not().then_some((package, results))
 			})
-			.into_iter()
-			.filter(|(_, findings)| findings.is_empty().not())
 			.collect();
 
 		Findings {

@@ -8,7 +8,7 @@ use crate::{
 	util::command::check_version,
 };
 use clap::Parser;
-use hipcheck_sdk::{prelude::*, LogLevel};
+use hipcheck_sdk::{LogLevel, prelude::*};
 use pathbuf::pathbuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

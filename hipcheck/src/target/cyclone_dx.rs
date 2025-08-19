@@ -2,7 +2,7 @@
 
 //! Utilities for extracting repository info from CycloneDX documents.
 
-use super::{pm::extract_repo_for_maven, purl::parse_purl, TargetType};
+use super::{TargetType, pm::extract_repo_for_maven, purl::parse_purl};
 use crate::{
 	error::{Context as _, Result},
 	hc_error,
@@ -122,9 +122,15 @@ fn extract_download_url(bom: Bom) -> Result<BomTarget> {
 			match purl.ty() {
 				// It is possible to fail to resolve a URL from a GitHub repo or Maven package while parsing a pURL.
 				// Give a special error message for those cases. Otherwise, assume we have parsed an incompatible pURL type.
-				"github" => Err(hc_error!("Could not determine GitHub reposity download location from CycloneDX file.")),
-				"maven" =>  Err(hc_error!("Could not determine git repo Url from CycloneDX file's corresponding Maven package.")),
-				_ => Err(hc_error!("Download location for CycloneDX file is a pURL for a type not currently supported by Hipcheck.")),
+				"github" => Err(hc_error!(
+					"Could not determine GitHub reposity download location from CycloneDX file."
+				)),
+				"maven" => Err(hc_error!(
+					"Could not determine git repo Url from CycloneDX file's corresponding Maven package."
+				)),
+				_ => Err(hc_error!(
+					"Download location for CycloneDX file is a pURL for a type not currently supported by Hipcheck."
+				)),
 			}
 		}
 	}

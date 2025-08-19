@@ -4,7 +4,7 @@ use crate::{
 	util::command::{check_version, log_args},
 	util::fs as file,
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use pathbuf::pathbuf;
 use serde::Deserialize;
 use std::{
