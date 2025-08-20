@@ -142,7 +142,6 @@ jobs:
               - "config/**"
               - "hipcheck/**"
               - "plugins/**"
-              - "xtask/**"
               - "sdk/rust/**"
               - "library/**"
 
@@ -228,7 +227,6 @@ jobs:
               - "config/**"
               - "hipcheck/**"
               - "plugins/**"
-              - "xtask/**"
               - "sdk/rust/**"
               - "library/**"
 

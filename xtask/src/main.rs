@@ -82,26 +82,26 @@ struct Args {
 
 #[derive(Debug, clap::Subcommand)]
 enum Commands {
-	/// Rebuild crates in the workspace.
-	Build(BuildArgs),
-	/// Check compilation for crates in the workspace.
-	Check(BuildArgs),
-	/// Lint the Hipcheck plugin gRPC definition.
-	Buf,
-	/// Run a variety of quality checks.
-	Validate,
-	/// Simulate a CI run locally.
-	Ci,
-	/// Generate a draft CHANGELOG.
-	Changelog(ChangelogArgs),
-	/// Update the plugin download manifests after a new release.
-	Manifest,
-	/// Interact with Hipcheck RFDs.
-	Rfd(RfdArgs),
-	/// Work with the Hipcheck website.
-	Site(SiteArgs),
-	/// Run benchmark suite (currently x86_linux only)
+	/// (DEV) Run benchmark suite (currently x86_linux only)
 	Benchmark(BenchmarkArgs),
+	/// (DEV) Lint the Hipcheck plugin gRPC definition.
+	Buf,
+	/// (DEV) Rebuild crates in the workspace.
+	Build(BuildArgs),
+	/// (DEV) Check compilation for crates in the workspace.
+	Check(BuildArgs),
+	/// (DEV) Simulate a CI run locally.
+	Ci,
+	/// (DEV) Run a variety of quality checks.
+	Validate,
+	/// (PROJECT) Interact with Hipcheck RFDs.
+	Rfd(RfdArgs),
+	/// (PROJECT) Work with the Hipcheck website.
+	Site(SiteArgs),
+	/// (RELEASE) Generate a draft CHANGELOG.
+	Changelog(ChangelogArgs),
+	/// (RELEASE) Update the plugin download manifests after a new release.
+	Manifest,
 }
 
 #[derive(Debug, clap::Args)]
