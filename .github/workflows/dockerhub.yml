@@ -67,7 +67,7 @@ jobs:
         uses: peter-evans/dockerhub-description@432a30c9e07499fd01da9f8a49f0faf9e0ca5b77 # v4.0.2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
+          password: ${{ secrets.DOCKER_DESC_TOKEN }}
           repository: mitre/hipcheck
           short-description: ${{ github.event.repository.description }}
           readme-filepath: ./dist/dockerhub/README.md
