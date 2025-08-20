@@ -24,6 +24,14 @@ jobs:
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: filter
         with:
+          # Make paths-filter support merge groups:
+          # If merge_group, set base to compare against the target branch (main),
+          # set the incoming ref to the merge group head ref.
+          #
+          # Adapted from here: https://github.com/dorny/paths-filter/pull/255#issuecomment-2730937516
+          # See also: https://github.com/dorny/paths-filter/pull/255
+          base: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_ref || '' }}
+          ref: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.ref }}
           filters: |
             site:
               - "site/**"
