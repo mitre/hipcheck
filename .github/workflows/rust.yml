@@ -184,6 +184,78 @@ jobs:
         if: steps.filter.outputs.rust == 'true'
         run: cargo nextest r --no-fail-fast --hide-progress-bar --locked --verbose --workspace --exclude xtask
 
+  platform-run:
+    name: "Platform Run (${{ matrix.os }})"
+    needs: universal-test
+    strategy:
+      fail-fast: false
+      matrix:
+        # NOTE: MUST be synced manually with runners in 'dist-workspace.toml'
+        #
+        # We've purposefully chosen to use two different versions of macOS here
+        # to achieve ARM and x86 support (macos-14 is ARM, macos-13 is x86),
+        # since alternative runners with matching versions aren't all on the
+        # free plan for GitHub Actions.
+        #
+        # More info: https://github.com/actions/runner-images
+        # See also: https://github.com/actions/partner-runner-images
+        os: [ubuntu-22.04, windows-2022, macos-14, macos-13]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Stop if not modifying code-relevant paths
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          # Make paths-filter support merge groups:
+          # If merge_group, set base to compare against the target branch (main),
+          # set the incoming ref to the merge group head ref.
+          #
+          # Adapted from here: https://github.com/dorny/paths-filter/pull/255#issuecomment-2730937516
+          # See also: https://github.com/dorny/paths-filter/pull/255
+          base: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_ref || '' }}
+          ref: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.ref }}
+          filters: |
+            rust:
+              - "config/**"
+              - "hipcheck/**"
+              - "plugins/**"
+              - "xtask/**"
+              - "sdk/rust/**"
+              - "library/**"
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # v1
+        if: steps.filter.outputs.rust == 'true'
+        with:
+          toolchain: stable
+
+      - name: Setup Rust caching
+        uses: swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        if: steps.filter.outputs.rust == 'true'
+        with:
+          key: ${{ matrix.os }}
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux' && steps.filter.outputs.rust == 'true'
+        run: sudo apt-get install -y protobuf-compiler mold
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS' && steps.filter.outputs.rust == 'true'
+        run: brew install protobuf
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows' && steps.filter.outputs.rust == 'true'
+        run: choco install protoc
+
       # Build is required because we need plugin binaries for run-tests.
       - name: Build workspace
         if: steps.filter.outputs.rust == 'true'
