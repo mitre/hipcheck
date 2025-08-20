@@ -1,25 +1,18 @@
 # What is Hipcheck?
 
-Hipcheck is a command line interface (CLI) tool for analyzing open source
-software packages and source repositories to understand their software supply
-chain risk. It analyzes a project's _software development practices_ and
-detects _active supply chain attacks_ to give you both a long-term and
-immediate picture of the risk from using a package.
+Hipcheck is a plugin-based command line interface (CLI) tool for analyzing open
+source software packages and source repositories to understand their software
+supply chain risk.
 
-## How to Use the Image
-
-To run a short-lived container with the latest version of `hipcheck`, you might run:
-
-NOTE: `latest` __always__ refers to the most-recently published image.
+## How to Use
 
 ```
 docker run mitre/hipcheck:latest
 ```
 
-Hipcheck currently provides images for the following architectures:
+NOTE: `latest` __always__ refers to the most-recently published image.
 
-* `linux/amd64`
-* `linux/arm64`
+Hipcheck currently provides images for `linux/amd64` (64-bit Linux).
 
 ## Helpful Links
 
@@ -31,5 +24,5 @@ Hipcheck currently provides images for the following architectures:
 
 ## License
 
-Hipcheck's software is licensed under the Apache 2.0 license, which can be
-found [here](https://github.com/mitre/hipcheck/blob/main/LICENSE)
+Hipcheck's software is licensed under the
+[Apache 2.0 license](https://github.com/mitre/hipcheck/blob/main/LICENSE)
