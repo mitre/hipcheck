@@ -151,10 +151,10 @@ impl ParseKdlNode for HashWithDigest {
 			return None;
 		}
 		// Per RFD #0004, the hash algorithm is of type String
-		let specified_algorithm = node.get("alg")?.value().as_string()?;
+		let specified_algorithm = node.get("alg")?.as_string()?;
 		let hash_algorithm = HashAlgorithm::try_from(specified_algorithm).ok()?;
 		// Per RFD #0004, the digest is of type String
-		let digest = node.get("digest")?.value().as_string()?.to_string();
+		let digest = node.get("digest")?.as_string()?.to_string();
 		Some(HashWithDigest::new(
 			hash_algorithm,
 			BufferedDigest::Resolved(digest),
@@ -228,7 +228,7 @@ impl ParseKdlNode for Compress {
 			return None;
 		}
 		// Per RFD #0004, the format is of type String
-		let specified_format = node.get("format")?.value().as_string()?;
+		let specified_format = node.get("format")?.as_string()?;
 		let format = ArchiveFormat::try_from(specified_format).ok()?;
 		Some(Compress { format })
 	}
@@ -256,9 +256,9 @@ impl ParseKdlNode for Size {
 			return None;
 		}
 		let specified_size = node.get("bytes")?;
-		let bytes = match specified_size.value() {
+		let bytes = match specified_size {
 			// Negative size and a size of 0 do not make sense
-			KdlValue::Base10(bytes) => {
+			KdlValue::Integer(bytes) => {
 				let bytes = *bytes;
 				if bytes.is_positive() {
 					bytes as u64
@@ -341,8 +341,8 @@ impl ParseKdlNode for DownloadManifestEntry {
 			return None;
 		}
 		// Per RFD #0004, arch is of type String
-		let arch = Arch(node.get("arch")?.value().as_string()?.to_string());
-		let version = parse_plugin_version(node.get("version")?.value().as_string()?)?;
+		let arch = Arch(node.get("arch")?.as_string()?.to_string());
+		let version = parse_plugin_version(node.get("version")?.as_string()?)?;
 
 		// there should be one child for each plugin and it should contain the url, hash, compress
 
@@ -390,7 +390,7 @@ impl ToKdlNode for DownloadManifestEntry {
 		children_nodes.push(compress);
 
 		let mut size = KdlNode::new("size");
-		size.insert("bytes", self.size.bytes as i64);
+		size.insert("bytes", KdlValue::Integer(self.size.bytes as i128));
 		children_nodes.push(size);
 
 		parent.set_children(children);

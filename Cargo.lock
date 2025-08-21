@@ -66,7 +66,7 @@ dependencies = [
  "hipcheck-kdl",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "miette 7.6.0",
+ "miette",
  "pathbuf",
  "schemars 0.8.22",
  "serde",
@@ -349,7 +349,7 @@ dependencies = [
  "hipcheck-kdl",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "miette 7.6.0",
+ "miette",
  "pathbuf",
  "serde",
  "serde_json",
@@ -2245,7 +2245,7 @@ dependencies = [
  "jiff",
  "log",
  "logos",
- "miette 7.6.0",
+ "miette",
  "minijinja",
  "minijinja-contrib",
  "nom",
@@ -2309,7 +2309,7 @@ name = "hipcheck-kdl"
 version = "0.1.0"
 dependencies = [
  "hipcheck-workspace-hack",
- "kdl 6.3.3",
+ "kdl",
 ]
 
 [[package]]
@@ -2382,11 +2382,12 @@ dependencies = [
  "hashbrown 0.14.5",
  "hashbrown 0.15.5",
  "idna",
+ "jiff",
  "libc",
  "libz-sys",
  "log",
  "memchr",
- "miette 7.6.0",
+ "miette",
  "miniz_oxide",
  "num-traits",
  "percent-encoding",
@@ -2896,22 +2897,11 @@ dependencies = [
 
 [[package]]
 name = "kdl"
-version = "4.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e03e2e96c5926fe761088d66c8c2aee3a4352a2573f4eaca50043ad130af9117"
-dependencies = [
- "miette 5.10.0",
- "nom",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "kdl"
 version = "6.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "412e2cf22cb560469db5b211c594ff9dcd490c6964e284ea64eddffe41c2249c"
 dependencies = [
- "miette 7.6.0",
+ "miette",
  "num",
  "thiserror 1.0.69",
  "winnow 0.6.26",
@@ -2997,7 +2987,7 @@ dependencies = [
  "hipcheck-kdl",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "miette 7.6.0",
+ "miette",
  "pathbuf",
  "serde",
  "serde_json",
@@ -3152,18 +3142,6 @@ dependencies = [
 
 [[package]]
 name = "miette"
-version = "5.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59bb584eaeeab6bd0226ccf3509a69d7936d148cf3d036ad350abe35e8c6856e"
-dependencies = [
- "miette-derive 5.10.0",
- "once_cell",
- "thiserror 1.0.69",
- "unicode-width 0.1.14",
-]
-
-[[package]]
-name = "miette"
 version = "7.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f98efec8807c63c752b5bd61f862c165c115b0a35685bdcfd9238c7aeb592b7"
@@ -3171,7 +3149,7 @@ dependencies = [
  "backtrace",
  "backtrace-ext",
  "cfg-if",
- "miette-derive 7.6.0",
+ "miette-derive",
  "owo-colors",
  "supports-color",
  "supports-hyperlinks",
@@ -3179,17 +3157,6 @@ dependencies = [
  "terminal_size",
  "textwrap",
  "unicode-width 0.1.14",
-]
-
-[[package]]
-name = "miette-derive"
-version = "5.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49e7bc1560b95a3c4a25d03de42fe76ca718ab92d1a22a55b9b4cf67b3ae635c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.106",
 ]
 
 [[package]]
@@ -5175,7 +5142,7 @@ dependencies = [
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
  "maplit",
- "miette 7.6.0",
+ "miette",
  "pathbuf",
  "serde",
  "serde_json",
@@ -5870,7 +5837,7 @@ dependencies = [
  "glob",
  "itertools 0.14.0",
  "jiff",
- "kdl 4.7.1",
+ "kdl",
  "log",
  "pathbuf",
  "pep440_rs",

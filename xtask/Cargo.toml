@@ -19,7 +19,7 @@ env_logger = { workspace = true }
 glob = { workspace = true }
 itertools = { workspace = true }
 jiff = { workspace = true, features = ["alloc", "serde", "std"] }
-kdl = "4.7.0"
+kdl = { workspace = true }
 log = { workspace = true }
 pathbuf = { workspace = true }
 pep440_rs = { workspace = true }
