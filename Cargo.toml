@@ -284,6 +284,7 @@ gix = { version = "0.70.0", default-features = false }
 glob = "0.3.3"
 gomod-rs = "0.1.1"
 graphql_client = "0.14.0"
+hex = "0.4.3"
 hipcheck-common = { version = "0.4.2", path = "library/hipcheck-common" }
 hipcheck-kdl = { version = "0.1.0", path = "library/hipcheck-kdl" }
 hipcheck-macros = { version = "0.3.5", path = "library/hipcheck-macros" }
@@ -332,7 +333,6 @@ serde = "1.0.219"
 serde_json = "1.0.143"
 serde_with = "3.14.0"
 sha2 = "0.10.9"
-sha256 = { version = "1.6.0", default-features = false }
 smart-default = "0.7.1"
 spdx-rs = "0.5.5"
 strum = "0.27.2"

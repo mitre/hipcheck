@@ -15,6 +15,7 @@ use crate::{
 use flate2::read::GzDecoder;
 use fs_extra::{dir::remove, file::write_all};
 use pathbuf::pathbuf;
+use sha2::Digest;
 use std::{
 	collections::HashSet,
 	fs::{DirEntry, File, read_dir, rename},
@@ -332,7 +333,10 @@ fn download_plugin(
 
 	// verify hash
 	let actual_hash = match expected_hash_with_digest.hash_algorithm {
-		HashAlgorithm::Sha256 => sha256::digest(&contents),
+		HashAlgorithm::Sha256 => {
+			let bytes = sha2::Sha256::digest(&contents);
+			hex::encode(&bytes[..])
+		}
 		HashAlgorithm::Blake3 => blake3::hash(&contents).to_string(),
 	};
 	if actual_hash != expected_hash_with_digest.digest {
