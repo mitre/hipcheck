@@ -4,6 +4,7 @@ use crate::policy_exprs::{
 	ExprMutator, JsonPointer, LexingError,
 	error::{self, Error, JiffError, Result},
 	expr::{Array, Expr, Primitive},
+	span::HcSpan,
 };
 use jiff::{Timestamp, Zoned, tz::TimeZone};
 use ordered_float::NotNan;
@@ -117,7 +118,7 @@ fn parse_datetime(s: &str) -> Result<jiff::Zoned> {
 	Ok(Zoned::new(ts, TimeZone::UTC))
 }
 
-fn parse_span(s: &str) -> Result<jiff::Span> {
+fn parse_span(s: &str) -> Result<HcSpan> {
 	s.parse().map_err(|jiff_error| {
 		Error::Lex(LexingError::InvalidSpan(
 			s.to_owned(),
@@ -169,14 +170,14 @@ mod tests {
 	fn json_span() {
 		let pointer = "/event_duration";
 		let context = serde_json::json!({
-			"event_duration": "P1y2dT3h4m",
+			"event_duration": "P2dT3h4m",
 		});
-		let span: jiff::Span = "P1y2dT3h4m".parse().unwrap();
+		let span: HcSpan = "P2dT3h4m".parse().unwrap();
 		let expected = Primitive::Span(span).into();
 
 		let val = lookup_json_pointer(pointer, &context).unwrap();
-		let result = json_to_policy_expr(val, pointer, &context);
-		assert_eq!(result, Ok(expected));
+		let result = json_to_policy_expr(val, pointer, &context).unwrap();
+		assert_eq!(result, expected);
 	}
 
 	#[test]
