@@ -251,8 +251,11 @@ features_always_bump_minor = false
 owner = "mitre"
 repo = "hipcheck"
 
+[workspace.metadata.cargo-autoinherit]
+# Skip cargo-autoinherit for these packages
+exclude-members = ["hipcheck-workspace-hack"]
+
 [workspace.dependencies]
-ahash = "0.8.12"
 anyhow = "1.0.99"
 async-channel = "2.5.0"
 async-stream = "0.3.6"
@@ -291,9 +294,12 @@ gix = { version = "0.70.0", default-features = false }
 glob = "0.3.3"
 gomod-rs = "0.1.1"
 graphql_client = "0.14.0"
+hashbrown-3575ec1268b04181 = "0.15.5"
+hashbrown-582f2526e08bb6a0 = "0.14.5"
 hipcheck-common = { version = "0.4.2", path = "library/hipcheck-common" }
 hipcheck-kdl = { version = "0.1.0", path = "library/hipcheck-kdl" }
 hipcheck-macros = { version = "0.3.5", path = "library/hipcheck-macros" }
+hipcheck-sdk = { version = "0.6.1", path = "sdk/rust" }
 hipcheck-sdk-macros = { version = "0.2.1", path = "library/hipcheck-sdk-macros" }
 hipcheck-workspace-hack = { version = "0.1", path = "library/hipcheck-workspace-hack" }
 http = "1.3.1"
@@ -301,6 +307,8 @@ idna = { version = "1.1.0", default-features = false }
 indexmap = "2.10.0"
 indextree = "4.7.4"
 indicatif = "0.18.0"
+jiff = { version = "0.2.15", default-features = false }
+kdl = "6.3.4"
 lazy_static = "1.5.0"
 libz-sys = { version = "1.1.22", default-features = false }
 log = { version = "0.4.27", default-features = false }
@@ -377,10 +385,5 @@ zeroize = "1.8.1"
 # 10. 4.4.0
 zip = "2.3.0"
 zstd = "0.13.3"
-hipcheck-sdk = { version = "0.6.1", path = "sdk/rust" }
 itertools = "0.14.0"
 which = { version = "8.0.0" }
-jiff = { version = "0.2.15", default-features = false }
-hashbrown-3575ec1268b04181 = "0.15.5"
-hashbrown-582f2526e08bb6a0 = "0.14.5"
-kdl = "6.3.4"
