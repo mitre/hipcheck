@@ -16,92 +16,92 @@ publish = false
 
 ### BEGIN HAKARI SECTION
 [dependencies]
-ahash = { version = "0.8.12" }
-bytes = { version = "1.10.1" }
-chrono = { version = "0.4.41", features = ["serde"] }
-dashmap = { version = "6.1.0", default-features = false, features = ["inline", "raw-api", "rayon"] }
-digest = { version = "0.10.7", features = ["mac", "std"] }
-either = { version = "1.15.0", features = ["use_std"] }
-flate2 = { version = "1.1.2", features = ["zlib"] }
-form_urlencoded = { version = "1.2.1", default-features = false, features = ["std"] }
-futures-channel = { version = "0.3.31", features = ["sink"] }
-futures-sink = { version = "0.3.31" }
-futures-task = { version = "0.3.31", default-features = false, features = ["std"] }
-futures-util = { version = "0.3.31", default-features = false, features = ["async-await-macro", "channel", "io", "sink"] }
-getrandom = { version = "0.3.3", default-features = false, features = ["std", "wasm_js"] }
+ahash = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+dashmap = { workspace = true, features = ["inline", "raw-api", "rayon"] }
+digest = { workspace = true, features = ["mac", "std"] }
+either = { workspace = true, features = ["use_std"] }
+flate2 = { workspace = true, features = ["zlib"] }
+form_urlencoded = { workspace = true, features = ["std"] }
+futures-channel = { workspace = true, features = ["sink"] }
+futures-sink = { workspace = true }
+futures-task = { workspace = true, features = ["std"] }
+futures-util = { workspace = true, features = ["async-await-macro", "channel", "io", "sink"] }
+getrandom = { workspace = true, features = ["std", "wasm_js"] }
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.5" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = ["raw"] }
-idna = { version = "1.0.3", default-features = false, features = ["compiled_data", "std"] }
+idna = { workspace = true, features = ["compiled_data", "std"] }
 jiff-6f8ce4dd05d13bba = { package = "jiff", version = "0.2.15" }
 jiff-c65f7effa3be6d31 = { package = "jiff", version = "0.1.29", features = ["serde"] }
-libz-sys = { version = "1.1.22", default-features = false, features = ["libc"] }
-log = { version = "0.4.27", default-features = false, features = ["std"] }
-memchr = { version = "2.7.5", features = ["use_std"] }
-miette = { version = "7.6.0", features = ["fancy"] }
-num-traits = { version = "0.2.19", features = ["i128"] }
-percent-encoding = { version = "2.3.1" }
-prost = { version = "0.13.5", features = ["prost-derive"] }
-regex = { version = "1.11.1" }
-regex-automata = { version = "0.4.9", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
-regex-syntax = { version = "0.8.5" }
-schemars = { version = "0.8.22", features = ["chrono", "preserve_order", "url"] }
-semver = { version = "1.0.26", features = ["serde"] }
-serde = { version = "1.0.219", features = ["alloc", "derive", "rc"] }
-sha2 = { version = "0.10.9" }
-smallvec = { version = "1.15.1", default-features = false, features = ["const_new", "write"] }
-strum = { version = "0.27.2", features = ["derive"] }
-tokio = { version = "1.47.1", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
-tokio-stream = { version = "0.1.17", features = ["net"] }
-tracing-core = { version = "0.1.34" }
-unicode-normalization = { version = "0.1.24" }
-url = { version = "2.5.4", features = ["serde"] }
-winnow = { version = "0.6.26", features = ["simd", "unstable-recover"] }
-zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
+libz-sys = { workspace = true, features = ["libc"] }
+log = { workspace = true, features = ["std"] }
+memchr = { workspace = true, features = ["use_std"] }
+miette = { workspace = true, features = ["fancy"] }
+num-traits = { workspace = true, features = ["i128"] }
+percent-encoding = { workspace = true }
+prost = { workspace = true, features = ["prost-derive"] }
+regex = { workspace = true }
+regex-automata = { workspace = true, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
+regex-syntax = { workspace = true }
+schemars = { workspace = true, features = ["chrono", "preserve_order", "url"] }
+semver = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["alloc", "derive", "rc"] }
+sha2 = { workspace = true }
+smallvec = { workspace = true, features = ["const_new", "write"] }
+strum = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-stream = { workspace = true, features = ["net"] }
+tracing-core = { workspace = true }
+unicode-normalization = { workspace = true }
+url = { workspace = true, features = ["serde"] }
+winnow = { workspace = true, features = ["simd", "unstable-recover"] }
+zeroize = { workspace = true, features = ["zeroize_derive"] }
 
 [build-dependencies]
-ahash = { version = "0.8.12" }
-bytes = { version = "1.10.1" }
-cc = { version = "1.2.33", default-features = false, features = ["parallel"] }
-chrono = { version = "0.4.41", features = ["serde"] }
-dashmap = { version = "6.1.0", default-features = false, features = ["inline", "raw-api", "rayon"] }
-digest = { version = "0.10.7", features = ["mac", "std"] }
-either = { version = "1.15.0", features = ["use_std"] }
-flate2 = { version = "1.1.2", features = ["zlib"] }
-form_urlencoded = { version = "1.2.1", default-features = false, features = ["std"] }
-futures-channel = { version = "0.3.31", features = ["sink"] }
-futures-sink = { version = "0.3.31" }
-futures-task = { version = "0.3.31", default-features = false, features = ["std"] }
-futures-util = { version = "0.3.31", default-features = false, features = ["async-await-macro", "channel", "io", "sink"] }
-getrandom = { version = "0.3.3", default-features = false, features = ["std", "wasm_js"] }
+ahash = { workspace = true }
+bytes = { workspace = true }
+cc = { workspace = true, features = ["parallel"] }
+chrono = { workspace = true, features = ["serde"] }
+dashmap = { workspace = true, features = ["inline", "raw-api", "rayon"] }
+digest = { workspace = true, features = ["mac", "std"] }
+either = { workspace = true, features = ["use_std"] }
+flate2 = { workspace = true, features = ["zlib"] }
+form_urlencoded = { workspace = true, features = ["std"] }
+futures-channel = { workspace = true, features = ["sink"] }
+futures-sink = { workspace = true }
+futures-task = { workspace = true, features = ["std"] }
+futures-util = { workspace = true, features = ["async-await-macro", "channel", "io", "sink"] }
+getrandom = { workspace = true, features = ["std", "wasm_js"] }
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.5" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = ["raw"] }
-idna = { version = "1.0.3", default-features = false, features = ["compiled_data", "std"] }
+idna = { workspace = true, features = ["compiled_data", "std"] }
 jiff-6f8ce4dd05d13bba = { package = "jiff", version = "0.2.15" }
 jiff-c65f7effa3be6d31 = { package = "jiff", version = "0.1.29", features = ["serde"] }
-libz-sys = { version = "1.1.22", default-features = false, features = ["libc"] }
-log = { version = "0.4.27", default-features = false, features = ["std"] }
-memchr = { version = "2.7.5", features = ["use_std"] }
-miette = { version = "7.6.0", features = ["fancy"] }
-num-traits = { version = "0.2.19", features = ["i128"] }
-percent-encoding = { version = "2.3.1" }
-prost = { version = "0.13.5", features = ["prost-derive"] }
-regex = { version = "1.11.1" }
-regex-automata = { version = "0.4.9", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
-regex-syntax = { version = "0.8.5" }
-schemars = { version = "0.8.22", features = ["chrono", "preserve_order", "url"] }
-semver = { version = "1.0.26", features = ["serde"] }
-serde = { version = "1.0.219", features = ["alloc", "derive", "rc"] }
-sha2 = { version = "0.10.9" }
-smallvec = { version = "1.15.1", default-features = false, features = ["const_new", "write"] }
-strum = { version = "0.27.2", features = ["derive"] }
-syn = { version = "2.0.106", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
-tokio = { version = "1.47.1", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
-tokio-stream = { version = "0.1.17", features = ["net"] }
-tracing-core = { version = "0.1.34" }
-unicode-normalization = { version = "0.1.24" }
-url = { version = "2.5.4", features = ["serde"] }
-winnow = { version = "0.6.26", features = ["simd", "unstable-recover"] }
-zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
+libz-sys = { workspace = true, features = ["libc"] }
+log = { workspace = true, features = ["std"] }
+memchr = { workspace = true, features = ["use_std"] }
+miette = { workspace = true, features = ["fancy"] }
+num-traits = { workspace = true, features = ["i128"] }
+percent-encoding = { workspace = true }
+prost = { workspace = true, features = ["prost-derive"] }
+regex = { workspace = true }
+regex-automata = { workspace = true, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
+regex-syntax = { workspace = true }
+schemars = { workspace = true, features = ["chrono", "preserve_order", "url"] }
+semver = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["alloc", "derive", "rc"] }
+sha2 = { workspace = true }
+smallvec = { workspace = true, features = ["const_new", "write"] }
+strum = { workspace = true, features = ["derive"] }
+syn = { workspace = true, features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
+tokio = { workspace = true, features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-stream = { workspace = true, features = ["net"] }
+tracing-core = { workspace = true }
+unicode-normalization = { workspace = true }
+url = { workspace = true, features = ["serde"] }
+winnow = { workspace = true, features = ["simd", "unstable-recover"] }
+zeroize = { workspace = true, features = ["zeroize_derive"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 libc = { version = "0.2.175" }

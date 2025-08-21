@@ -7,21 +7,17 @@ repository = "https://github.com/mitre/hipcheck"
 publish = false
 
 [dependencies]
-anyhow = "1.0.98"
-clap = { version = "4.5.32", features = ["derive"] }
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
     "macros",
 ] }
-lru = "0.14.0"
-gix = { version = "0.70.0", default-features = false, features = [
-    "basic",
-    "max-control",
-    "zlib-stock",
-] }
+lru = { workspace = true }
+gix = { workspace = true, features = ["basic", "max-control", "zlib-stock"] }
 jiff = { version = "0.1.16", features = ["serde"] }
-tracing = "0.1"
-schemars = { version = "0.8.22", features = ["url"] }
-serde_json = "1.0.140"
-serde = { version = "1.0.219", features = ["derive", "rc"] }
-tokio = { version = "1.45.0", features = ["rt"] }
-hipcheck-workspace-hack = { version = "0.1", path = "../../library/hipcheck-workspace-hack" }
+tracing = { workspace = true }
+schemars = { workspace = true, features = ["url"] }
+serde_json = { workspace = true }
+serde = { workspace = true, features = ["derive", "rc"] }
+tokio = { workspace = true, features = ["rt"] }
+hipcheck-workspace-hack = { workspace = true }
