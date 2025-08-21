@@ -8,11 +8,12 @@ use crate::policy_exprs::{
 		ReturnableType, Type, TypeChecker, Typed,
 	},
 	pass::ExprMutator,
+	span::HcSpan,
 };
 use Expr::*;
 use Primitive::*;
 use itertools::Itertools as _;
-use jiff::{Span, Zoned};
+use jiff::Zoned;
 use std::{cmp::Ordering, collections::HashMap, ops::Not as _};
 
 /// Environment, containing bindings of names to functions and variables.
@@ -596,7 +597,7 @@ enum ArrayType {
 	DateTime(Vec<Zoned>),
 
 	/// An array of time spans.
-	Span(Vec<Span>),
+	Span(Vec<HcSpan>),
 
 	/// An empty array (no type hints).
 	Empty,
@@ -654,7 +655,7 @@ fn array_type(arr: &[Primitive]) -> Result<ArrayType> {
 			Ok(ArrayType::DateTime(result))
 		}
 		Span(_) => {
-			let mut result: Vec<Span> = Vec::with_capacity(arr.len());
+			let mut result: Vec<HcSpan> = Vec::with_capacity(arr.len());
 			for elem in arr {
 				if let Span(val) = elem {
 					result.push(*val);
@@ -689,12 +690,7 @@ fn gt(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 > arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 > arg_2)),
 		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 > arg_2)),
-		(Span(arg_1), Span(arg_2)) => Ok(Bool(
-			arg_1
-				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
-				.is_gt(),
-		)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(arg_1 > arg_2)),
 		_ => unreachable!(),
 	};
 
@@ -710,12 +706,7 @@ fn lt(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 < arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 < arg_2)),
 		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 < arg_2)),
-		(Span(arg_1), Span(arg_2)) => Ok(Bool(
-			arg_1
-				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
-				.is_lt(),
-		)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(arg_1 < arg_2)),
 		_ => unreachable!(),
 	};
 
@@ -731,12 +722,7 @@ fn gte(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 >= arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 >= arg_2)),
 		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 >= arg_2)),
-		(Span(arg_1), Span(arg_2)) => Ok(Bool(
-			arg_1
-				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
-				.is_ge(),
-		)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(arg_1 >= arg_2)),
 		_ => unreachable!(),
 	};
 
@@ -752,12 +738,7 @@ fn lte(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 <= arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 <= arg_2)),
 		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 <= arg_2)),
-		(Span(arg_1), Span(arg_2)) => Ok(Bool(
-			arg_1
-				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
-				.is_le(),
-		)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(arg_1 <= arg_2)),
 		_ => unreachable!(),
 	};
 
@@ -773,12 +754,7 @@ fn eq(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 == arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 == arg_2)),
 		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 == arg_2)),
-		(Span(arg_1), Span(arg_2)) => Ok(Bool(
-			arg_1
-				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
-				.is_eq(),
-		)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(arg_1 == arg_2)),
 		_ => unreachable!(),
 	};
 
@@ -794,12 +770,7 @@ fn neq(env: &Env, args: &[Expr]) -> Result<Expr> {
 		(Float(arg_1), Float(arg_2)) => Ok(Bool(arg_1 != arg_2)),
 		(Bool(arg_1), Bool(arg_2)) => Ok(Bool(arg_1 != arg_2)),
 		(DateTime(arg_1), DateTime(arg_2)) => Ok(Bool(arg_1 != arg_2)),
-		(Span(arg_1), Span(arg_2)) => Ok(Bool(
-			arg_1
-				.compare(arg_2)
-				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
-				.is_ne(),
-		)),
+		(Span(arg_1), Span(arg_2)) => Ok(Bool(arg_1 != arg_2)),
 		_ => unreachable!(),
 	};
 
@@ -885,11 +856,12 @@ fn duration(env: &Env, args: &[Expr]) -> Result<Expr> {
 	let name = "duration";
 
 	let op = |arg_1, arg_2| match (arg_1, arg_2) {
-		(DateTime(arg_1), DateTime(arg_2)) => {
-			Ok(Span(arg_1.since(&arg_2).map_err(|err| {
-				Error::Datetime(err.to_string().into_boxed_str())
-			})?))
-		}
+		(DateTime(arg_1), DateTime(arg_2)) => Ok(Span(
+			arg_1
+				.since(&arg_2)
+				.map_err(|err| Error::Datetime(err.to_string().into_boxed_str()))?
+				.into(),
+		)),
 		(_, _) => Err(Error::BadType(name)),
 	};
 

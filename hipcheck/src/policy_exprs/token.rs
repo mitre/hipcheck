@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::policy_exprs::F64;
 use crate::policy_exprs::error::JiffError;
+use crate::policy_exprs::{F64, span::HcSpan};
 use jiff::{
-	Span, SpanCompare, Timestamp, Zoned,
+	Timestamp, Zoned,
 	civil::{Date, DateTime},
 	tz::TimeZone,
 };
 use logos::{Lexer, Logos};
 use ordered_float::FloatIsNan;
 use std::{
-	cmp::Ordering,
 	fmt::Display,
 	num::{ParseFloatError, ParseIntError},
 };
@@ -47,7 +46,7 @@ pub enum Token {
 	// In the future this regex *could* be made more specific to reduce collision
 	// with Ident, or we could introduce a special prefix character like '@' or '#'
 	#[regex(r"PT?[0-9.]+[a-zA-Z][^\s\)]*", lex_span)]
-	Span(Box<Span>),
+	Span(Box<HcSpan>),
 
 	// Prioritize over span regex, which starts with a 'P'
 	#[regex(r"([a-zA-Z]+)", lex_ident, priority = 10)]
@@ -64,10 +63,7 @@ impl PartialEq for Token {
 			(Self::Float(l0), Self::Float(r0)) => l0 == r0,
 			(Self::Integer(l0), Self::Integer(r0)) => l0 == r0,
 			(Self::DateTime(l0), Self::DateTime(r0)) => l0 == r0,
-			(Self::Span(l0), Self::Span(r0)) => {
-				let r0 = SpanCompare::from(**r0).days_are_24_hours();
-				l0.compare(r0).expect("span's must be comparable") == Ordering::Equal
-			}
+			(Self::Span(l0), Self::Span(r0)) => l0 == r0,
 			(Self::Ident(l0), Self::Ident(r0)) => l0 == r0,
 			(Self::JSONPointer(l0), Self::JSONPointer(r0)) => l0 == r0,
 			_ => core::mem::discriminant(self) == core::mem::discriminant(other),
@@ -131,9 +127,9 @@ fn lex_datetime(input: &mut Lexer<'_, Token>) -> Result<Box<Zoned>> {
 }
 
 /// Lex a time span
-fn lex_span(input: &mut Lexer<'_, Token>) -> Result<Box<Span>> {
+fn lex_span(input: &mut Lexer<'_, Token>) -> Result<Box<HcSpan>> {
 	let s = input.slice();
-	s.parse::<Span>()
+	s.parse::<HcSpan>()
 		.map_err(|err| LexingError::InvalidSpan(s.to_string(), JiffError::new(err)))
 		.map(|x| span_to_days(&x))?
 		.map(Box::new)
@@ -141,7 +137,7 @@ fn lex_span(input: &mut Lexer<'_, Token>) -> Result<Box<Span>> {
 
 // Error if the span contains years or months.
 // If the span contains weeks, convert the weeks to days by treating every week as 7 24-hour days.
-fn span_to_days(full_span: &Span) -> Result<Span> {
+fn span_to_days(full_span: &HcSpan) -> Result<HcSpan> {
 	if full_span.get_years() != 0 || full_span.get_months() != 0 {
 		Err(LexingError::SpanWithBadUnits)
 	} else {
@@ -238,8 +234,8 @@ pub enum LexingError {
 
 #[cfg(test)]
 mod tests {
-	use crate::policy_exprs::{Error::Lex, F64, LexingError, Result, token::Token};
-	use jiff::{Span, Timestamp, Zoned, tz::TimeZone};
+	use crate::policy_exprs::{Error::Lex, F64, LexingError, Result, span::HcSpan, token::Token};
+	use jiff::{Timestamp, Zoned, tz::TimeZone};
 	use logos::Logos as _;
 	use test_log::test;
 
@@ -346,7 +342,7 @@ mod tests {
 		let dt1 = Zoned::new(ts1, TimeZone::UTC);
 		let ts2: Timestamp = "2024-09-17T10:30-05".parse().unwrap();
 		let dt2 = Zoned::new(ts2, TimeZone::UTC);
-		let span: Span = "PT1H30M".parse().unwrap();
+		let span: HcSpan = "PT1H30M".parse().unwrap();
 
 		let expected = vec![
 			Token::OpenParen,
@@ -382,7 +378,7 @@ mod tests {
 		assert_eq!(tokens, expected);
 
 		let raw_program = "PT1H30M";
-		let span: Span = raw_program.parse().unwrap();
+		let span: HcSpan = raw_program.parse().unwrap();
 
 		let expected = vec![Token::Span(Box::new(span))];
 

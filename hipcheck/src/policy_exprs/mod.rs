@@ -6,6 +6,7 @@ mod error;
 pub mod expr;
 mod json_pointer;
 mod pass;
+pub mod span;
 mod token;
 
 use crate::policy_exprs::env::Env;

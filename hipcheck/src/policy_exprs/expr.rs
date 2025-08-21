@@ -3,10 +3,11 @@
 use crate::policy_exprs::{
 	Error, Result, Tokens,
 	env::{Binding, Env},
+	span::HcSpan,
 	token::Token,
 };
 use itertools::Itertools;
-use jiff::{Span, SpanCompare, Zoned};
+use jiff::Zoned;
 use nom::{
 	Finish as _, IResult,
 	branch::alt,
@@ -207,27 +208,41 @@ pub enum Primitive {
 	/// Boolean.
 	Bool(bool),
 
-	/// Date-time value with timezone information using the [jiff] crate, which uses a modified version of ISO8601.
-	/// This must include a date in the format <YYYY>-<MM>-<DD>.
-	/// An optional time in the format T<HH>:[MM]:[SS] will be accepted after the date.
-	/// Decimal fractions of hours and minutes are not allowed; use smaller time units instead (e.g. T10:30 instead of T10.5). Decimal fractions of seconds are allowed.
-	/// The timezone is always set to UTC, but you can set an offeset from UTC by including +{HH}:[MM] or -{HH}:[MM]. The time will be adjusted to the correct UTC time during parsing.
+	/// Date-time value with timezone information using the [jiff] crate, which
+	/// uses a modified version of ISO8601. This must include a date in the
+	/// format <YYYY>-<MM>-<DD>. An optional time in the format T<HH>:[MM]:[SS]
+	/// will be accepted after the date. Decimal fractions of hours and minutes
+	/// are not allowed; use smaller time units instead (e.g. T10:30 instead of
+	/// T10.5). Decimal fractions of seconds are allowed. The timezone is
+	/// always set to UTC, but you can set an offeset from UTC by including
+	/// +{HH}:[MM] or -{HH}:[MM]. The time will be adjusted to the correct UTC
+	/// time during parsing.
 	DateTime(Zoned),
 
-	/// Span of time using the [jiff] crate, which uses a modified version of ISO8601.
+	/// Span of time using the [jiff] crate, which uses a variant of ISO8601.
 	///
-	/// Can include weeks, days, hours, minutes, and seconds. The smallest provided unit of time (but not weeks or days) can have a decimal fraction.
-	/// While spans with months, years, or both are valid under IS08601 and supported by [jiff] in general, we do not allow them in Hipcheck policy expressions.
-	/// This is because spans greater than a day require additional zoned datetime information in [jiff] (to determine e.g. how many days are in a year or month)
-	/// before we can do time arithmetic with them.
-	/// We *do* allows spans with weeks, even though [jiff] has similar issues with those units.
-	/// We take care of this by converting a week to a period of seven 24-hour days that [jiff] can handle in arithematic without zoned datetime information.
+	/// Can include weeks, days, hours, minutes, and seconds. The smallest
+	/// provided unit of time (but not weeks or days) can have a decimal
+	/// fraction. While spans with months, years, or both are valid under
+	/// IS08601 and supported by [jiff] in general, we do not allow them in
+	/// Hipcheck policy expressions.
 	///
-	/// Spans are preceded by the letter "P" with any optional time units separated from optional date units by the letter "T".
-	/// All units of dates and times are represented by single case-agnostic letter abbreviations after the number.
-	/// For example, a span of one week, one day, one hour, one minute, and one-and-a-tenth seconds would be represented as
-	/// "P1w1dT1h1m1.1s"
-	Span(Span),
+	/// This is because spans greater than a day require additional zoned
+	/// datetime information in [jiff] (to determine e.g. how many days are in
+	/// a year or month) before we can do time arithmetic with them.
+	///
+	/// We *do* allows spans with weeks, even though [jiff] has similar issues
+	/// with those units. We take care of this by converting a week to a period
+	/// of seven 24-hour days that [jiff] can handle in arithematic without
+	/// zoned datetime information.
+	///
+	/// Spans are preceded by the letter "P" with any optional time units
+	/// separated from optional date units by the letter "T". All units of
+	/// dates and times are represented by single case-agnostic letter
+	/// abbreviations after the number. For example, a span of one week, one
+	/// day, one hour, one minute, and one-and-a-tenth seconds would be
+	/// represented as `"P1w1dT1h1m1.1s"`.
+	Span(HcSpan),
 }
 
 impl PartialEq for Primitive {
@@ -238,10 +253,7 @@ impl PartialEq for Primitive {
 			(Self::Float(l0), Self::Float(r0)) => l0 == r0,
 			(Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
 			(Self::DateTime(l0), Self::DateTime(r0)) => l0 == r0,
-			(Self::Span(l0), Self::Span(r0)) => {
-				let r0 = SpanCompare::from(r0).days_are_24_hours();
-				l0.compare(r0).expect("spans must be comparable") == Ordering::Equal
-			}
+			(Self::Span(l0), Self::Span(r0)) => l0 == r0,
 			_ => false,
 		}
 	}
@@ -669,7 +681,7 @@ mod tests {
 	use super::*;
 	use test_log::test;
 
-	use jiff::{Span, Timestamp, Zoned, tz::TimeZone};
+	use jiff::{Timestamp, Zoned, tz::TimeZone};
 
 	trait IntoExpr {
 		fn into_expr(self) -> Expr;
@@ -708,7 +720,7 @@ mod tests {
 		Primitive::DateTime(val)
 	}
 
-	fn span(val: Span) -> Primitive {
+	fn span(val: HcSpan) -> Primitive {
 		Primitive::Span(val)
 	}
 
@@ -753,7 +765,7 @@ mod tests {
 		let input = "P2W4DT1H30.5M";
 		let result = parse(input).unwrap();
 
-		let raw_span: Span = "P18DT1H30.5M".parse().unwrap();
+		let raw_span: HcSpan = "P18DT1H30.5M".parse().unwrap();
 		let expected = span(raw_span).into_expr();
 
 		assert_eq!(result, expected);
@@ -764,7 +776,7 @@ mod tests {
 		let input = "P2w";
 		let result = parse(input).unwrap();
 
-		let raw_span: Span = "P14d".parse().unwrap();
+		let raw_span: HcSpan = "P14d".parse().unwrap();
 		let expected = span(raw_span).into_expr();
 
 		assert_eq!(result, expected);

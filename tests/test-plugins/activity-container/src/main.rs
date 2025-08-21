@@ -115,7 +115,7 @@ mod test {
 	use super::*;
 
 	use hipcheck_sdk::types::LocalGitRepo;
-	use jiff::{Span, SpanRound, Unit};
+	use jiff::{Span, SpanCompare, SpanRound, Unit};
 	use std::{cmp::Ordering, result::Result as StdResult};
 
 	fn repo() -> LocalGitRepo {
@@ -149,16 +149,19 @@ mod test {
 		let mut engine = PluginEngine::mock(mock_responses().unwrap());
 		let output = activity(&mut engine, target).await.unwrap();
 		let span: Span = output.parse().unwrap();
-		let result = span.round(SpanRound::new().smallest(Unit::Day)).unwrap();
+		let result = span
+			.round(SpanRound::new().days_are_24_hours().smallest(Unit::Day))
+			.unwrap();
 
 		let today = Timestamp::now();
 		let last_commit: Timestamp = "2024-06-19T19:22:45Z".parse().unwrap();
 		let expected = today
 			.since(last_commit)
 			.unwrap()
-			.round(SpanRound::new().smallest(Unit::Day))
+			.round(SpanRound::new().days_are_24_hours().smallest(Unit::Day))
 			.unwrap();
 
+		let expected = SpanCompare::from(expected).days_are_24_hours();
 		let comparison = result.compare(expected).unwrap();
 		assert_eq!(comparison, Ordering::Equal);
 	}
