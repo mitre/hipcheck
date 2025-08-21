@@ -6,7 +6,7 @@ use crate::policy_exprs::{
 	token::Token,
 };
 use itertools::Itertools;
-use jiff::{Span, Zoned};
+use jiff::{Span, SpanCompare, Zoned};
 use nom::{
 	Finish as _, IResult,
 	branch::alt,
@@ -193,7 +193,7 @@ impl From<Lambda> for Expr {
 }
 
 /// Primitive data.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Primitive {
 	/// Identifier in a lambda, to be substituted.
 	Identifier(Ident),
@@ -229,6 +229,26 @@ pub enum Primitive {
 	/// "P1w1dT1h1m1.1s"
 	Span(Span),
 }
+
+impl PartialEq for Primitive {
+	fn eq(&self, other: &Self) -> bool {
+		match (self, other) {
+			(Self::Identifier(l0), Self::Identifier(r0)) => l0 == r0,
+			(Self::Int(l0), Self::Int(r0)) => l0 == r0,
+			(Self::Float(l0), Self::Float(r0)) => l0 == r0,
+			(Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
+			(Self::DateTime(l0), Self::DateTime(r0)) => l0 == r0,
+			(Self::Span(l0), Self::Span(r0)) => {
+				let r0 = SpanCompare::from(r0).days_are_24_hours();
+				l0.compare(r0).expect("spans must be comparable") == Ordering::Equal
+			}
+			_ => false,
+		}
+	}
+}
+
+impl Eq for Primitive {}
+
 impl From<Primitive> for Expr {
 	fn from(value: Primitive) -> Self {
 		Expr::Primitive(value)

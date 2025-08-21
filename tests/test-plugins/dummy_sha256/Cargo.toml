@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
-hipcheck-sdk = { path = "../../../sdk/rust", features = ["macros"] }
+hipcheck-sdk = { workspace = true, features = ["macros"] }
 sha2 = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
 hipcheck-workspace-hack = { workspace = true }

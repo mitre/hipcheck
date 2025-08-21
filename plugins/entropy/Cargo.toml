@@ -10,9 +10,7 @@ publish = false
 clap = { workspace = true, features = ["derive"] }
 dashmap = { workspace = true, features = ["inline", "rayon"] }
 finl_unicode = { workspace = true, features = ["grapheme_clusters"] }
-hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
-    "macros",
-] }
+hipcheck-sdk = { workspace = true, features = ["macros"] }
 rayon = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
@@ -23,7 +21,4 @@ unicode-normalization = { workspace = true }
 hipcheck-workspace-hack = { workspace = true }
 
 [dev-dependencies]
-hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
-    "macros",
-    "mock_engine",
-] }
+hipcheck-sdk = { workspace = true, features = ["macros", "mock_engine"] }
