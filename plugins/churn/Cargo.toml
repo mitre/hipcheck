@@ -8,9 +8,7 @@ publish = false
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
-hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
-    "macros",
-] }
+hipcheck-sdk = { workspace = true, features = ["macros"] }
 tracing = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
@@ -19,6 +17,4 @@ tokio = { workspace = true, features = ["rt"] }
 hipcheck-workspace-hack = { workspace = true }
 
 [dev-dependencies]
-hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
-    "mock_engine",
-] }
+hipcheck-sdk = { workspace = true, features = ["mock_engine"] }

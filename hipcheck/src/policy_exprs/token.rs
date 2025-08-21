@@ -3,20 +3,21 @@
 use crate::policy_exprs::F64;
 use crate::policy_exprs::error::JiffError;
 use jiff::{
-	Span, Timestamp, Zoned,
+	Span, SpanCompare, Timestamp, Zoned,
 	civil::{Date, DateTime},
 	tz::TimeZone,
 };
 use logos::{Lexer, Logos};
 use ordered_float::FloatIsNan;
 use std::{
+	cmp::Ordering,
 	fmt::Display,
 	num::{ParseFloatError, ParseIntError},
 };
 
 type Result<T> = std::result::Result<T, LexingError>;
 
-#[derive(Logos, Clone, Debug, PartialEq)]
+#[derive(Logos, Clone, Debug)]
 #[logos(skip r"[ \t\n\f]+", error = LexingError)]
 pub enum Token {
 	#[token("(")]
@@ -54,6 +55,24 @@ pub enum Token {
 
 	#[regex(r"\$[/~_[:alnum:]]*", lex_json_pointer)]
 	JSONPointer(String),
+}
+
+impl PartialEq for Token {
+	fn eq(&self, other: &Self) -> bool {
+		match (self, other) {
+			(Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
+			(Self::Float(l0), Self::Float(r0)) => l0 == r0,
+			(Self::Integer(l0), Self::Integer(r0)) => l0 == r0,
+			(Self::DateTime(l0), Self::DateTime(r0)) => l0 == r0,
+			(Self::Span(l0), Self::Span(r0)) => {
+				let r0 = SpanCompare::from(**r0).days_are_24_hours();
+				l0.compare(r0).expect("span's must be comparable") == Ordering::Equal
+			}
+			(Self::Ident(l0), Self::Ident(r0)) => l0 == r0,
+			(Self::JSONPointer(l0), Self::JSONPointer(r0)) => l0 == r0,
+			_ => core::mem::discriminant(self) == core::mem::discriminant(other),
+		}
+	}
 }
 
 /// Lex a single boolean.

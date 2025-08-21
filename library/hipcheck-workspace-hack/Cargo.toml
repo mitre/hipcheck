@@ -27,13 +27,18 @@ form_urlencoded = { workspace = true, features = ["std"] }
 futures-channel = { workspace = true, features = ["sink"] }
 futures-sink = { workspace = true }
 futures-task = { workspace = true, features = ["std"] }
-futures-util = { workspace = true, features = ["async-await-macro", "channel", "io", "sink"] }
+futures-util = { workspace = true, features = [
+    "async-await-macro",
+    "channel",
+    "io",
+    "sink",
+] }
 getrandom = { workspace = true, features = ["std", "wasm_js"] }
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.5" }
-hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = ["raw"] }
+hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = [
+    "raw",
+] }
 idna = { workspace = true, features = ["compiled_data", "std"] }
-jiff-6f8ce4dd05d13bba = { package = "jiff", version = "0.2.15" }
-jiff-c65f7effa3be6d31 = { package = "jiff", version = "0.1.29", features = ["serde"] }
 libz-sys = { workspace = true, features = ["libc"] }
 log = { workspace = true, features = ["std"] }
 memchr = { workspace = true, features = ["use_std"] }
@@ -42,7 +47,16 @@ num-traits = { workspace = true, features = ["i128"] }
 percent-encoding = { workspace = true }
 prost = { workspace = true, features = ["prost-derive"] }
 regex = { workspace = true }
-regex-automata = { workspace = true, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
+regex-automata = { workspace = true, features = [
+    "dfa-onepass",
+    "dfa-search",
+    "hybrid",
+    "meta",
+    "nfa-backtrack",
+    "perf-inline",
+    "perf-literal",
+    "unicode",
+] }
 regex-syntax = { workspace = true }
 schemars = { workspace = true, features = ["chrono", "preserve_order", "url"] }
 semver = { workspace = true, features = ["serde"] }
@@ -50,7 +64,17 @@ serde = { workspace = true, features = ["alloc", "derive", "rc"] }
 sha2 = { workspace = true }
 smallvec = { workspace = true, features = ["const_new", "write"] }
 strum = { workspace = true, features = ["derive"] }
-tokio = { workspace = true, features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+tokio = { workspace = true, features = [
+    "fs",
+    "io-std",
+    "io-util",
+    "macros",
+    "net",
+    "process",
+    "rt-multi-thread",
+    "sync",
+    "time",
+] }
 tokio-stream = { workspace = true, features = ["net"] }
 tracing-core = { workspace = true }
 unicode-normalization = { workspace = true }
@@ -71,13 +95,18 @@ form_urlencoded = { workspace = true, features = ["std"] }
 futures-channel = { workspace = true, features = ["sink"] }
 futures-sink = { workspace = true }
 futures-task = { workspace = true, features = ["std"] }
-futures-util = { workspace = true, features = ["async-await-macro", "channel", "io", "sink"] }
+futures-util = { workspace = true, features = [
+    "async-await-macro",
+    "channel",
+    "io",
+    "sink",
+] }
 getrandom = { workspace = true, features = ["std", "wasm_js"] }
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.5" }
-hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = ["raw"] }
+hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = [
+    "raw",
+] }
 idna = { workspace = true, features = ["compiled_data", "std"] }
-jiff-6f8ce4dd05d13bba = { package = "jiff", version = "0.2.15" }
-jiff-c65f7effa3be6d31 = { package = "jiff", version = "0.1.29", features = ["serde"] }
 libz-sys = { workspace = true, features = ["libc"] }
 log = { workspace = true, features = ["std"] }
 memchr = { workspace = true, features = ["use_std"] }
@@ -86,7 +115,16 @@ num-traits = { workspace = true, features = ["i128"] }
 percent-encoding = { workspace = true }
 prost = { workspace = true, features = ["prost-derive"] }
 regex = { workspace = true }
-regex-automata = { workspace = true, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
+regex-automata = { workspace = true, features = [
+    "dfa-onepass",
+    "dfa-search",
+    "hybrid",
+    "meta",
+    "nfa-backtrack",
+    "perf-inline",
+    "perf-literal",
+    "unicode",
+] }
 regex-syntax = { workspace = true }
 schemars = { workspace = true, features = ["chrono", "preserve_order", "url"] }
 semver = { workspace = true, features = ["serde"] }
@@ -94,8 +132,24 @@ serde = { workspace = true, features = ["alloc", "derive", "rc"] }
 sha2 = { workspace = true }
 smallvec = { workspace = true, features = ["const_new", "write"] }
 strum = { workspace = true, features = ["derive"] }
-syn = { workspace = true, features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
-tokio = { workspace = true, features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+syn = { workspace = true, features = [
+    "extra-traits",
+    "fold",
+    "full",
+    "visit",
+    "visit-mut",
+] }
+tokio = { workspace = true, features = [
+    "fs",
+    "io-std",
+    "io-util",
+    "macros",
+    "net",
+    "process",
+    "rt-multi-thread",
+    "sync",
+    "time",
+] }
 tokio-stream = { workspace = true, features = ["net"] }
 tracing-core = { workspace = true }
 unicode-normalization = { workspace = true }
@@ -105,46 +159,122 @@ zeroize = { workspace = true, features = ["zeroize_derive"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 libc = { version = "0.2.175" }
-miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
+miniz_oxide = { version = "0.8.9", default-features = false, features = [
+    "with-alloc",
+] }
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
 libc = { version = "0.2.175" }
-miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
+miniz_oxide = { version = "0.8.9", default-features = false, features = [
+    "with-alloc",
+] }
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.dependencies]
 bitflags = { version = "2.9.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.175", features = ["extra_traits"] }
-miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
+miniz_oxide = { version = "0.8.9", default-features = false, features = [
+    "with-alloc",
+] }
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.build-dependencies]
 bitflags = { version = "2.9.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.175", features = ["extra_traits"] }
-miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
+miniz_oxide = { version = "0.8.9", default-features = false, features = [
+    "with-alloc",
+] }
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
 
 [target.aarch64-apple-darwin.dependencies]
 bitflags = { version = "2.9.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.175", features = ["extra_traits"] }
-miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
+miniz_oxide = { version = "0.8.9", default-features = false, features = [
+    "with-alloc",
+] }
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
 
 [target.aarch64-apple-darwin.build-dependencies]
 bitflags = { version = "2.9.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.175", features = ["extra_traits"] }
-miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
+miniz_oxide = { version = "0.8.9", default-features = false, features = [
+    "with-alloc",
+] }
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
 
 [target.x86_64-pc-windows-msvc.dependencies]
-windows-sys-4db8c43aad08e7ae = { package = "windows-sys", version = "0.60.2", features = ["Win32_Globalization", "Win32_System_Com", "Win32_System_Console", "Win32_UI_Shell"] }
-windows-sys-73dcd821b1037cfd = { package = "windows-sys", version = "0.59.0", features = ["Wdk_Foundation", "Wdk_Storage_FileSystem", "Wdk_System_IO", "Win32_Networking_WinSock", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Console", "Win32_System_IO", "Win32_System_Pipes", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_Time", "Win32_System_WindowsProgramming", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell"] }
-windows-sys-b21d60becc0929df = { package = "windows-sys", version = "0.52.0", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Memory", "Win32_System_Threading", "Win32_System_WindowsProgramming"] }
+windows-sys-4db8c43aad08e7ae = { package = "windows-sys", version = "0.60.2", features = [
+    "Win32_Globalization",
+    "Win32_System_Com",
+    "Win32_System_Console",
+    "Win32_UI_Shell",
+] }
+windows-sys-73dcd821b1037cfd = { package = "windows-sys", version = "0.59.0", features = [
+    "Wdk_Foundation",
+    "Wdk_Storage_FileSystem",
+    "Wdk_System_IO",
+    "Win32_Networking_WinSock",
+    "Win32_Security_Cryptography",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_Console",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_SystemInformation",
+    "Win32_System_SystemServices",
+    "Win32_System_Threading",
+    "Win32_System_Time",
+    "Win32_System_WindowsProgramming",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+] }
+windows-sys-b21d60becc0929df = { package = "windows-sys", version = "0.52.0", features = [
+    "Win32_Foundation",
+    "Win32_Networking_WinSock",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+    "Win32_System_WindowsProgramming",
+] }
 
 [target.x86_64-pc-windows-msvc.build-dependencies]
-windows-sys-4db8c43aad08e7ae = { package = "windows-sys", version = "0.60.2", features = ["Win32_Globalization", "Win32_System_Com", "Win32_System_Console", "Win32_UI_Shell"] }
-windows-sys-73dcd821b1037cfd = { package = "windows-sys", version = "0.59.0", features = ["Wdk_Foundation", "Wdk_Storage_FileSystem", "Wdk_System_IO", "Win32_Networking_WinSock", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Console", "Win32_System_IO", "Win32_System_Pipes", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_Time", "Win32_System_WindowsProgramming", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell"] }
-windows-sys-b21d60becc0929df = { package = "windows-sys", version = "0.52.0", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Memory", "Win32_System_Threading", "Win32_System_WindowsProgramming"] }
+windows-sys-4db8c43aad08e7ae = { package = "windows-sys", version = "0.60.2", features = [
+    "Win32_Globalization",
+    "Win32_System_Com",
+    "Win32_System_Console",
+    "Win32_UI_Shell",
+] }
+windows-sys-73dcd821b1037cfd = { package = "windows-sys", version = "0.59.0", features = [
+    "Wdk_Foundation",
+    "Wdk_Storage_FileSystem",
+    "Wdk_System_IO",
+    "Win32_Networking_WinSock",
+    "Win32_Security_Cryptography",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_Console",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_SystemInformation",
+    "Win32_System_SystemServices",
+    "Win32_System_Threading",
+    "Win32_System_Time",
+    "Win32_System_WindowsProgramming",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+] }
+windows-sys-b21d60becc0929df = { package = "windows-sys", version = "0.52.0", features = [
+    "Win32_Foundation",
+    "Win32_Networking_WinSock",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+    "Win32_System_WindowsProgramming",
+] }
 
 ### END HAKARI SECTION
