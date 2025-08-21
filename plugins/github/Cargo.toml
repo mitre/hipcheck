@@ -10,9 +10,7 @@ publish = false
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 graphql_client = { workspace = true }
-hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
-    "macros",
-] }
+hipcheck-sdk = { workspace = true, features = ["macros"] }
 tracing = { workspace = true }
 # Exactly matching the version of rustls used by ureq
 # Get rid of default features since we don't use the AWS backed crypto

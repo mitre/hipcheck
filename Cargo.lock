@@ -9,7 +9,7 @@ dependencies = [
  "clap",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "jiff 0.1.29",
+ "jiff",
  "serde",
  "serde_json",
  "tokio",
@@ -23,7 +23,7 @@ dependencies = [
  "clap",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "jiff 0.1.29",
+ "jiff",
  "log",
  "schemars 0.8.22",
  "serde",
@@ -1032,7 +1032,7 @@ dependencies = [
  "anstream",
  "anstyle",
  "env_filter",
- "jiff 0.2.15",
+ "jiff",
  "log",
 ]
 
@@ -1310,7 +1310,7 @@ dependencies = [
  "gix",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "jiff 0.1.29",
+ "jiff",
  "lru",
  "schemars 0.8.22",
  "serde",
@@ -1519,7 +1519,7 @@ checksum = "daa30058ec7d3511fbc229e4f9e696a35abd07ec5b82e635eff864a2726217e4"
 dependencies = [
  "bstr",
  "itoa",
- "jiff 0.2.15",
+ "jiff",
  "thiserror 2.0.15",
 ]
 
@@ -2241,8 +2241,8 @@ dependencies = [
  "http",
  "indextree",
  "indicatif",
- "itertools 0.13.0",
- "jiff 0.1.29",
+ "itertools 0.14.0",
+ "jiff",
  "log",
  "logos",
  "miette 7.6.0",
@@ -2281,8 +2281,7 @@ dependencies = [
  "ureq",
  "url",
  "walkdir",
- "which 7.0.3",
- "which 8.0.0",
+ "which",
  "xml-rs",
  "xz2",
  "zip",
@@ -2334,7 +2333,7 @@ dependencies = [
  "hipcheck-sdk-macros",
  "hipcheck-workspace-hack",
  "indexmap 2.10.0",
- "jiff 0.1.29",
+ "jiff",
  "lazy_static",
  "schemars 0.8.22",
  "serde",
@@ -2383,8 +2382,6 @@ dependencies = [
  "hashbrown 0.14.5",
  "hashbrown 0.15.5",
  "idna",
- "jiff 0.1.29",
- "jiff 0.2.15",
  "libc",
  "libz-sys",
  "log",
@@ -2813,20 +2810,6 @@ name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
-
-[[package]]
-name = "jiff"
-version = "0.1.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c04ef77ae73f3cf50510712722f0c4e8b46f5aaa1bf5ffad2ae213e6495e78e5"
-dependencies = [
- "jiff-tzdb-platform",
- "log",
- "portable-atomic",
- "portable-atomic-util",
- "serde",
- "windows-sys 0.59.0",
-]
 
 [[package]]
 name = "jiff"
@@ -3315,7 +3298,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "which 7.0.3",
+ "which",
 ]
 
 [[package]]
@@ -5515,18 +5498,6 @@ dependencies = [
 
 [[package]]
 name = "which"
-version = "7.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24d643ce3fd3e5b54854602a080f34fb10ab75e0b813ee32d00ca2b44fa74762"
-dependencies = [
- "either",
- "env_home",
- "rustix 1.0.8",
- "winsafe",
-]
-
-[[package]]
-name = "which"
 version = "8.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fabb953106c3c8eea8306e4393700d7657561cb43122571b172bbfb7c7ba1d"
@@ -5930,7 +5901,7 @@ dependencies = [
  "env_logger",
  "glob",
  "itertools 0.14.0",
- "jiff 0.2.15",
+ "jiff",
  "kdl 4.7.1",
  "log",
  "pathbuf",
@@ -5945,7 +5916,7 @@ dependencies = [
  "toml",
  "ureq",
  "url",
- "which 7.0.3",
+ "which",
  "xshell",
 ]
 

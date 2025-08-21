@@ -9,12 +9,10 @@ publish = false
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
-    "macros",
-] }
+hipcheck-sdk = { workspace = true, features = ["macros"] }
 lru = { workspace = true }
 gix = { workspace = true, features = ["basic", "max-control", "zlib-stock"] }
-jiff = { version = "0.1.16", features = ["serde"] }
+jiff = { workspace = true, features = ["serde"] }
 tracing = { workspace = true }
 schemars = { workspace = true, features = ["url"] }
 serde_json = { workspace = true }

@@ -10,9 +10,7 @@ publish = false
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 hipcheck-kdl = { workspace = true }
-hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
-    "macros",
-] }
+hipcheck-sdk = { workspace = true, features = ["macros"] }
 tracing = { workspace = true }
 maplit = { workspace = true }
 miette = { workspace = true, features = ["fancy"] }
@@ -24,6 +22,4 @@ url = { workspace = true }
 hipcheck-workspace-hack = { workspace = true }
 
 [dev-dependencies]
-hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
-    "mock_engine",
-] }
+hipcheck-sdk = { workspace = true, features = ["mock_engine"] }
