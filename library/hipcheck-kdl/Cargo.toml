@@ -8,5 +8,5 @@ edition = "2024"
 publish = false
 
 [dependencies]
-kdl = "6.2.2"
-hipcheck-workspace-hack = { version = "0.1", path = "../hipcheck-workspace-hack" }
+kdl = { workspace = true }
+hipcheck-workspace-hack = { workspace = true }

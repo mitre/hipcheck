@@ -115,8 +115,8 @@ mod test {
 	use super::*;
 
 	use hipcheck_sdk::types::LocalGitRepo;
-	use jiff::{Span, SpanRound, Unit};
-	use std::result::Result as StdResult;
+	use jiff::{Span, SpanCompare, SpanRound, Unit};
+	use std::{cmp::Ordering, result::Result as StdResult};
 
 	fn repo() -> LocalGitRepo {
 		LocalGitRepo {
@@ -159,6 +159,8 @@ mod test {
 			.round(SpanRound::new().smallest(Unit::Day))
 			.unwrap();
 
-		assert_eq!(result, expected);
+		let expected = SpanCompare::from(expected).days_are_24_hours();
+		let comparison = result.compare(expected).unwrap();
+		assert_eq!(comparison, Ordering::Equal);
 	}
 }
