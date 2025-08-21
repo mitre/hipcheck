@@ -2246,6 +2246,7 @@ dependencies = [
  "futures",
  "git2",
  "gomod-rs",
+ "hex",
  "hipcheck-common",
  "hipcheck-kdl",
  "hipcheck-macros",
@@ -2276,7 +2277,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "sha256",
+ "sha2",
  "smart-default",
  "spdx-rs",
  "strum 0.27.2",
@@ -4375,18 +4376,6 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
-]
-
-[[package]]
-name = "sha256"
-version = "1.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f880fc8562bdeb709793f00eb42a2ad0e672c4f883bbe59122b926eca935c8f6"
-dependencies = [
- "async-trait",
- "bytes",
- "hex",
- "sha2",
 ]
 
 [[package]]

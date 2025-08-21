@@ -5,6 +5,7 @@ use crate::{
 	hc_error,
 };
 use serde::de::DeserializeOwned;
+use sha2::Digest;
 use std::{
 	fs::{self},
 	ops::Not,
@@ -64,5 +65,7 @@ pub fn exists<P: AsRef<Path>>(path: P) -> Result<()> {
 /// return the sha256 of a file
 pub fn file_sha256<P: AsRef<Path>>(path: P) -> Result<String> {
 	let bytes = read_bytes(path)?;
-	Ok(sha256::digest(&bytes))
+	let hashed = sha2::Sha256::digest(&bytes);
+	let s = hex::encode(&hashed[..]);
+	Ok(s)
 }

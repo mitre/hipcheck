@@ -51,6 +51,7 @@ futures = { workspace = true }
 # and not cause problems on certain systems that might not have one or
 # the other.
 git2 = { workspace = true, features = ["vendored-libgit2", "vendored-openssl"] }
+hex = { workspace = true }
 # Include with both a `path` and `version` reference.
 # Local builds will use the `path` dependency, which may be a newer
 # version than the one published to Crates.io.
@@ -92,7 +93,7 @@ schemars = { workspace = true, features = [
 semver = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
-sha256 = { workspace = true }
+sha2 = { workspace = true }
 smart-default = { workspace = true }
 spdx-rs = { workspace = true }
 strum = { workspace = true }
