@@ -107,6 +107,7 @@ hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", featur
     "raw",
 ] }
 idna = { workspace = true, features = ["compiled_data", "std"] }
+jiff = { workspace = true, features = ["serde"] }
 libz-sys = { workspace = true, features = ["libc"] }
 log = { workspace = true, features = ["std"] }
 memchr = { workspace = true, features = ["use_std"] }

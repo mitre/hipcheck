@@ -290,8 +290,6 @@ gix = { version = "0.70.0", default-features = false }
 glob = "0.3.2"
 gomod-rs = "0.1.1"
 graphql_client = "0.14.0"
-hashbrown-3575ec1268b04181 = "0.15.5"
-hashbrown-582f2526e08bb6a0 = "0.14.5"
 hipcheck-common = { version = "0.4.2", path = "library/hipcheck-common" }
 hipcheck-kdl = { version = "0.1.0", path = "library/hipcheck-kdl" }
 hipcheck-macros = { version = "0.3.5", path = "library/hipcheck-macros" }
@@ -302,8 +300,6 @@ idna = { version = "1.0.3", default-features = false }
 indexmap = "2.9.0"
 indextree = "4.7.3"
 indicatif = "0.17.11"
-jiff-6f8ce4dd05d13bba = "0.2.15"
-jiff-c65f7effa3be6d31 = "0.1.29"
 lazy_static = "1.4"
 libz-sys = { version = "1.1.22", default-features = false }
 log = { version = "0.4.27", default-features = false }
@@ -375,7 +371,6 @@ hipcheck-sdk = { version = "0.6.1", path = "sdk/rust" }
 itertools = "0.14.0"
 which = { version = "8.0.0" }
 jiff = { version = "0.2.5", default-features = false }
-
-# This integration ALSO requires a GitHub token, which we expect to be
-# set with the `GITHUB_TOKEN` environment variable. This token needs
-# read permission for the repository, but nothing more.
+hashbrown-3575ec1268b04181 = "0.15.5"
+hashbrown-582f2526e08bb6a0 = "0.14.5"
+kdl = "6.2.2"
