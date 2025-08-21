@@ -6,10 +6,10 @@ edition = "2024"
 publish = false
 
 [dependencies]
-clap = { version = "4.5.32", features = ["derive"] }
+clap = { workspace = true, features = ["derive"] }
 hipcheck-sdk = { path = "../../../sdk/rust", features = ["macros"] }
-tokio = { version = "1.45.0", features = ["rt"] }
-hipcheck-workspace-hack = { version = "0.1", path = "../../../library/hipcheck-workspace-hack" }
+tokio = { workspace = true, features = ["rt"] }
+hipcheck-workspace-hack = { workspace = true }
 
 [dev-dependencies]
 hipcheck-sdk = { path = "../../../sdk/rust", features = [

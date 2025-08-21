@@ -251,6 +251,127 @@ features_always_bump_minor = false
 owner = "mitre"
 repo = "hipcheck"
 
+[workspace.dependencies]
+ahash = "0.8.12"
+anyhow = "1.0.98"
+async-channel = "2.3.1"
+async-stream = "0.3.6"
+base64 = "0.22.1"
+blake3 = "1.8.1"
+bytes = "1.10.1"
+cc = { version = "1.2.33", default-features = false }
+chrono = "0.4.41"
+clap = "4.5.32"
+clap-verbosity-flag = "3.0.2"
+console = "0.15.11"
+content_inspector = "0.2.4"
+convert_case = "0.7.1"
+csv = "1.3.1"
+cyclonedx-bom = "0.8.0"
+dashmap = { version = "6.1.0", default-features = false }
+dialoguer = "0.11.0"
+digest = "0.10.7"
+dirs = "6.0.0"
+dotenv = "0.15.0"
+either = "1.15.0"
+env_logger = "0.11.6"
+finl_unicode = "1.3.0"
+flate2 = "1.1.2"
+form_urlencoded = { version = "1.2.1", default-features = false }
+fs_extra = "1.3.0"
+futures = "0.3.31"
+futures-channel = "0.3.31"
+futures-sink = "0.3.31"
+futures-task = { version = "0.3.31", default-features = false }
+futures-util = { version = "0.3.31", default-features = false }
+getrandom = { version = "0.3.3", default-features = false }
+git2 = "0.20.1"
+gix = { version = "0.70.0", default-features = false }
+glob = "0.3.2"
+gomod-rs = "0.1.1"
+graphql_client = "0.14.0"
+hashbrown-3575ec1268b04181 = "0.15.5"
+hashbrown-582f2526e08bb6a0 = "0.14.5"
+hipcheck-common = { version = "0.4.2", path = "library/hipcheck-common" }
+hipcheck-kdl = { version = "0.1.0", path = "library/hipcheck-kdl" }
+hipcheck-macros = { version = "0.3.5", path = "library/hipcheck-macros" }
+hipcheck-sdk-macros = { version = "0.2.1", path = "library/hipcheck-sdk-macros" }
+hipcheck-workspace-hack = { version = "0.1", path = "library/hipcheck-workspace-hack" }
+http = "1.3.1"
+idna = { version = "1.0.3", default-features = false }
+indexmap = "2.9.0"
+indextree = "4.7.3"
+indicatif = "0.17.11"
+jiff-6f8ce4dd05d13bba = "0.2.15"
+jiff-c65f7effa3be6d31 = "0.1.29"
+lazy_static = "1.4"
+libz-sys = { version = "1.1.22", default-features = false }
+log = { version = "0.4.27", default-features = false }
+logos = "0.15.0"
+lru = "0.14.0"
+maplit = "1.0.2"
+memchr = "2.7.5"
+miette = "7.6.0"
+minijinja = "2.10.2"
+minijinja-contrib = "2.7.0"
+nom = "7.1.3"
+num-traits = "0.2.19"
+ordered-float = "5.0.0"
+packageurl = "0.4.2"
+pathbuf = "1.0.0"
+pep440_rs = "0.7.3"
+percent-encoding = "2.3.1"
+proc-macro2 = "1.0.94"
+prost = "0.13.5"
+pyproject-toml = "0.13.4"
+quote = "1.0.40"
+rand = "0.9.0"
+rayon = "1.11.0"
+regex = "1.11.1"
+regex-automata = { version = "0.4.9", default-features = false }
+regex-syntax = "0.8.5"
+rustls = { version = "0.23.10", default-features = false }
+rustls-platform-verifier = "0.5.0"
+salsa = "0.19.0"
+schemars = { version = "0.8.22", default-features = false }
+semver = "1.0.26"
+serde = "1.0.219"
+serde_json = "1.0.140"
+serde_with = "3.12.0"
+sha2 = "0.10.9"
+sha256 = { version = "1.6.0", default-features = false }
+smallvec = { version = "1.15.1", default-features = false }
+smart-default = "0.7.1"
+spdx-rs = "0.5.0"
+strum = "0.27.2"
+strum_macros = "0.27.1"
+syn = "2.0.106"
+tabled = "0.19.0"
+tar = "0.4.44"
+tempfile = "3.19.1"
+test-log = "0.2.17"
+thiserror = "2.0.12"
+tokio = "1.47.1"
+tokio-stream = "0.1.17"
+toml = "0.8.20"
+tonic = "0.13.0"
+tonic-build = "0.13.0"
+tracing = "0.1"
+tracing-core = "0.1.34"
+tracing-subscriber = "0.3"
+typify-macro = "0.3.0"
+unicode-normalization = "0.1.24"
+ureq = { version = "2.12.1", default-features = false }
+url = "2.5.4"
+walkdir = "2.5.0"
+winnow = "0.6.26"
+xml-rs = "0.8.26"
+xshell = "0.2.7"
+xz2 = "0.1.7"
+zeroize = "1.8.1"
+zip = "2.3.0"
+zstd = "0.13.3"
+
 # This integration ALSO requires a GitHub token, which we expect to be
 # set with the `GITHUB_TOKEN` environment variable. This token needs
 # read permission for the repository, but nothing more.

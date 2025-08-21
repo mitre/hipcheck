@@ -7,30 +7,22 @@ repository = "https://github.com/mitre/hipcheck"
 publish = false
 
 [dependencies]
-anyhow = "1.0.98"
-clap = { version = "4.5.32", features = ["derive"] }
-graphql_client = "0.14.0"
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+graphql_client = { workspace = true }
 hipcheck-sdk = { version = "0.6.1", path = "../../sdk/rust", features = [
     "macros",
 ] }
-tracing = "0.1"
+tracing = { workspace = true }
 # Exactly matching the version of rustls used by ureq
 # Get rid of default features since we don't use the AWS backed crypto
 # provider (we use ring) and it breaks stuff on windows.
-rustls = { version = "0.23.10", default-features = false, features = [
-    "logging",
-    "std",
-    "tls12",
-    "ring",
-] }
-rustls-platform-verifier = "0.5.0"
-schemars = { version = "0.8.22", features = ["url"] }
-serde = "1.0.219"
-serde_json = "1.0.140"
-tokio = { version = "1.45.0", features = ["rt"] }
-ureq = { version = "2.12.1", default-features = false, features = [
-    "json",
-    "tls",
-] }
-url = { version = "2.5.4", features = ["serde"] }
-hipcheck-workspace-hack = { version = "0.1", path = "../../library/hipcheck-workspace-hack" }
+rustls = { workspace = true, features = ["logging", "std", "tls12", "ring"] }
+rustls-platform-verifier = { workspace = true }
+schemars = { workspace = true, features = ["url"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
+ureq = { workspace = true, features = ["json", "tls"] }
+url = { workspace = true, features = ["serde"] }
+hipcheck-workspace-hack = { workspace = true }

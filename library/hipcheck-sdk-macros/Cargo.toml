@@ -10,9 +10,9 @@ license = "Apache-2.0"
 proc-macro = true
 
 [dependencies]
-convert_case = "0.7.1"
-tracing = "0.1"
-proc-macro2 = "1.0.94"
-quote = "1.0.40"
-syn = { version = "2.0.101", features = ["full", "printing"] }
-hipcheck-workspace-hack = { version = "0.1", path = "../hipcheck-workspace-hack" }
+convert_case = { workspace = true }
+tracing = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["full", "printing"] }
+hipcheck-workspace-hack = { workspace = true }
