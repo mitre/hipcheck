@@ -114,25 +114,25 @@ miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-a
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.dependencies]
-bitflags = { version = "2.9.2", default-features = false, features = ["std"] }
+bitflags = { version = "2.9.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.175", features = ["extra_traits"] }
 miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
 
 [target.x86_64-apple-darwin.build-dependencies]
-bitflags = { version = "2.9.2", default-features = false, features = ["std"] }
+bitflags = { version = "2.9.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.175", features = ["extra_traits"] }
 miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
 
 [target.aarch64-apple-darwin.dependencies]
-bitflags = { version = "2.9.2", default-features = false, features = ["std"] }
+bitflags = { version = "2.9.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.175", features = ["extra_traits"] }
 miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
 
 [target.aarch64-apple-darwin.build-dependencies]
-bitflags = { version = "2.9.2", default-features = false, features = ["std"] }
+bitflags = { version = "2.9.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.175", features = ["extra_traits"] }
 miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
 rustix = { version = "1.0.8", features = ["fs", "termios"] }
