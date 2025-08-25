@@ -11,7 +11,7 @@ edition = "2024"
 anyhow = "1.0.98"
 thiserror = "2.0.12"
 futures = "0.3.31"
-indexmap = "2.9.0"
+indexmap = "2.11.0"
 lazy_static = "1.4"
 jiff = { version = "0.1.16", features = ["serde"] }
 serde = { version = "1.0.219", features = ["derive"] }
