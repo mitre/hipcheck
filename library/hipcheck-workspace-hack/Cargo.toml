@@ -31,7 +31,7 @@ futures-util = { version = "0.3.31", default-features = false, features = ["asyn
 getrandom = { version = "0.3.3", default-features = false, features = ["std", "wasm_js"] }
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.5" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = ["raw"] }
-idna = { version = "1.0.3", default-features = false, features = ["compiled_data", "std"] }
+idna = { version = "1.1.0", default-features = false, features = ["compiled_data", "std"] }
 jiff-6f8ce4dd05d13bba = { package = "jiff", version = "0.2.15" }
 jiff-c65f7effa3be6d31 = { package = "jiff", version = "0.1.29", features = ["serde"] }
 libz-sys = { version = "1.1.22", default-features = false, features = ["libc"] }
@@ -75,7 +75,7 @@ futures-util = { version = "0.3.31", default-features = false, features = ["asyn
 getrandom = { version = "0.3.3", default-features = false, features = ["std", "wasm_js"] }
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.5" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", features = ["raw"] }
-idna = { version = "1.0.3", default-features = false, features = ["compiled_data", "std"] }
+idna = { version = "1.1.0", default-features = false, features = ["compiled_data", "std"] }
 jiff-6f8ce4dd05d13bba = { package = "jiff", version = "0.2.15" }
 jiff-c65f7effa3be6d31 = { package = "jiff", version = "0.1.29", features = ["serde"] }
 libz-sys = { version = "1.1.22", default-features = false, features = ["libc"] }
