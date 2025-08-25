@@ -55,7 +55,7 @@ tokio-stream = { version = "0.1.17", features = ["net"] }
 tracing-core = { version = "0.1.34" }
 unicode-normalization = { version = "0.1.24" }
 url = { version = "2.5.4", features = ["serde"] }
-winnow = { version = "0.6.26", features = ["simd", "unstable-recover"] }
+winnow = { version = "0.7.12", features = ["simd", "unstable-recover"] }
 zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
 
 [build-dependencies]
@@ -100,7 +100,7 @@ tokio-stream = { version = "0.1.17", features = ["net"] }
 tracing-core = { version = "0.1.34" }
 unicode-normalization = { version = "0.1.24" }
 url = { version = "2.5.4", features = ["serde"] }
-winnow = { version = "0.6.26", features = ["simd", "unstable-recover"] }
+winnow = { version = "0.7.12", features = ["simd", "unstable-recover"] }
 zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
