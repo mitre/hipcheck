@@ -297,7 +297,7 @@ indextree = "4.7.4"
 indicatif = "0.18.0"
 itertools = "0.14.0"
 jiff = { version = "0.2.15", default-features = false }
-kdl = "6.3.4"
+kdl = "6.5.0"
 lazy_static = "1.5.0"
 log = { version = "0.4.27", default-features = false }
 logos = "0.15.1"
