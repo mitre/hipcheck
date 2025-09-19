@@ -2424,7 +2424,7 @@ dependencies = [
  "windows-sys 0.59.0",
  "windows-sys 0.60.2",
  "windows-sys 0.61.0",
- "winnow 0.6.24",
+ "winnow 0.7.13",
  "zeroize",
 ]
 
@@ -5780,6 +5780,9 @@ name = "winnow"
 version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21a0236b59786fed61e2a80582dd500fe61f18b5dca67a4a067d0bc9039339cf"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "winsafe"
