@@ -43,7 +43,7 @@ regex-automata = { version = "0.4.10", default-features = false, features = ["df
 regex-syntax = { version = "0.8.6" }
 schemars = { version = "0.8.22", features = ["chrono", "preserve_order", "url"] }
 semver = { version = "1.0.27", features = ["serde"] }
-serde = { version = "1.0.223", features = ["alloc", "derive", "rc"] }
+serde = { version = "1.0.226", features = ["alloc", "derive", "rc"] }
 sha2 = { version = "0.10.9" }
 smallvec = { version = "1.15.1", default-features = false, features = ["const_new", "write"] }
 strum = { version = "0.27.2", features = ["derive"] }
@@ -84,7 +84,7 @@ regex-automata = { version = "0.4.10", default-features = false, features = ["df
 regex-syntax = { version = "0.8.6" }
 schemars = { version = "0.8.22", features = ["chrono", "preserve_order", "url"] }
 semver = { version = "1.0.27", features = ["serde"] }
-serde = { version = "1.0.223", features = ["alloc", "derive", "rc"] }
+serde = { version = "1.0.226", features = ["alloc", "derive", "rc"] }
 sha2 = { version = "0.10.9" }
 smallvec = { version = "1.15.1", default-features = false, features = ["const_new", "write"] }
 strum = { version = "0.27.2", features = ["derive"] }
