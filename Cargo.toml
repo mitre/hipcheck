@@ -256,7 +256,7 @@ repo = "hipcheck"
 exclude-members = ["hipcheck-workspace-hack"]
 
 [workspace.dependencies]
-anyhow = "1.0.99"
+anyhow = "1.0.100"
 async-channel = "2.5.0"
 async-stream = "0.3.6"
 base64 = "0.22.1"
