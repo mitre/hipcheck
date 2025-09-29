@@ -38,7 +38,7 @@ miette = { version = "7.6.0", features = ["fancy"] }
 num-traits = { version = "0.2.19", features = ["i128"] }
 percent-encoding = { version = "2.3.2" }
 prost = { version = "0.13.5", features = ["prost-derive"] }
-regex = { version = "1.11.2" }
+regex = { version = "1.11.3" }
 regex-automata = { version = "0.4.10", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
 regex-syntax = { version = "0.8.6" }
 schemars = { version = "0.8.22", features = ["chrono", "preserve_order", "url"] }
@@ -79,7 +79,7 @@ miette = { version = "7.6.0", features = ["fancy"] }
 num-traits = { version = "0.2.19", features = ["i128"] }
 percent-encoding = { version = "2.3.2" }
 prost = { version = "0.13.5", features = ["prost-derive"] }
-regex = { version = "1.11.2" }
+regex = { version = "1.11.3" }
 regex-automata = { version = "0.4.10", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
 regex-syntax = { version = "0.8.6" }
 schemars = { version = "0.8.22", features = ["chrono", "preserve_order", "url"] }
