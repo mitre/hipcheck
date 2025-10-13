@@ -345,7 +345,7 @@ test-log = "0.2.18"
 thiserror = "2.0.16"
 tokio = "1.47.1"
 tokio-stream = "0.1.17"
-toml = "0.9.5"
+toml = "0.9.8"
 # 7. 0.14.1
 tonic = "0.13.0"
 # 8. 0.14.1
