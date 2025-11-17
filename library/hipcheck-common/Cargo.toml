@@ -14,12 +14,13 @@ serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tonic = { workspace = true }
+tonic-prost = { workspace = true }
 hipcheck-workspace-hack = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
 pathbuf = { workspace = true }
-tonic-build = { workspace = true }
+tonic-prost-build = { workspace = true }
 
 [features]
 default = ["rfd9-compat"]
