@@ -213,7 +213,7 @@ ureq = { version = "2.12.1", default-features = false } # 3.1.4
 url = "2.5.7"
 walkdir = "2.5.0"
 which = { version = "8.0.0" }
-xml-rs = "0.8.27" # 1.0.0
+xml-rs = "1.0.0"
 xshell = "0.2.7"
 xz2 = "0.1.7"
 zip = "2.3.0" # 6.0.0
