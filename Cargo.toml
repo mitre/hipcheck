@@ -110,6 +110,14 @@ consolidate-commits = false
 # Skip cargo-autoinherit for these packages
 exclude-members = ["hipcheck-workspace-hack"]
 
+
+#============================================================================
+# Dependencies
+#
+# The Hipcheck project centralizes all dependencies at the workspace root,
+# so here is where they're listed.
+#----------------------------------------------------------------------------
+
 [workspace.dependencies]
 anyhow = "1.0.100"
 async-channel = "2.5.0"
