@@ -40,15 +40,16 @@ impl TryFrom<gix::Commit<'_>> for RawCommit {
 			name: commit_author.name.to_string(),
 			email: commit_author.email.to_string(),
 		};
+
 		let written_on =
-			jiff::Timestamp::from_second(commit_author.time.seconds).map_err(|x| x.to_string());
+			jiff::Timestamp::from_second(commit_author.time()?.seconds).map_err(|x| x.to_string());
 		let commit_committer = value.committer()?;
 		let committer = Contributor {
 			name: commit_committer.name.to_string(),
 			email: commit_committer.email.to_string(),
 		};
-		let committed_on =
-			jiff::Timestamp::from_second(commit_committer.time.seconds).map_err(|x| x.to_string());
+		let committed_on = jiff::Timestamp::from_second(commit_committer.time()?.seconds)
+			.map_err(|x| x.to_string());
 
 		Ok(Self {
 			hash: value.id().to_string(),
