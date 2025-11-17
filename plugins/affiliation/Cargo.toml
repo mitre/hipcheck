@@ -14,7 +14,7 @@ hipcheck-sdk = { workspace = true, features = ["macros"] }
 tracing = { workspace = true }
 miette = { workspace = true, features = ["fancy"] }
 pathbuf = { workspace = true }
-schemars = { workspace = true, features = ["url"] }
+schemars = { workspace = true, features = ["url2"] }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
 strum = { workspace = true, features = ["derive"] }

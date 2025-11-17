@@ -25,7 +25,7 @@ dependencies = [
  "hipcheck-workspace-hack",
  "jiff",
  "log",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "serde",
  "serde_json",
  "tokio",
@@ -68,7 +68,7 @@ dependencies = [
  "hipcheck-workspace-hack",
  "miette",
  "pathbuf",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "serde",
  "serde_json",
  "strum 0.27.2",
@@ -474,7 +474,7 @@ dependencies = [
  "clap",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "serde",
  "serde_json",
  "tokio",
@@ -969,7 +969,7 @@ dependencies = [
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
  "rayon",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "serde",
  "serde_json",
  "tokio",
@@ -1293,7 +1293,7 @@ dependencies = [
  "hipcheck-workspace-hack",
  "jiff",
  "lru",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "serde",
  "serde_json",
  "tokio",
@@ -1326,7 +1326,7 @@ dependencies = [
  "hipcheck-workspace-hack",
  "rustls",
  "rustls-platform-verifier",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "serde",
  "serde_json",
  "tokio",
@@ -2258,7 +2258,7 @@ dependencies = [
  "rustls",
  "rustls-platform-verifier",
  "salsa",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "semver",
  "serde",
  "serde_json",
@@ -2335,7 +2335,7 @@ dependencies = [
  "indexmap 2.12.0",
  "jiff",
  "lazy_static",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
@@ -2608,7 +2608,7 @@ dependencies = [
  "clap",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "serde",
  "serde_json",
  "tokio",
@@ -3207,7 +3207,7 @@ dependencies = [
  "hipcheck-workspace-hack",
  "pathbuf",
  "regex",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "semver",
  "serde",
  "serde_json",
@@ -3904,7 +3904,7 @@ dependencies = [
  "clap",
  "hipcheck-sdk",
  "hipcheck-workspace-hack",
- "schemars 0.8.22",
+ "schemars 1.1.0",
  "serde",
  "serde_json",
  "tokio",
@@ -4111,13 +4111,10 @@ version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
 dependencies = [
- "chrono",
  "dyn-clone",
- "indexmap 1.9.3",
- "schemars_derive",
+ "schemars_derive 0.8.22",
  "serde",
  "serde_json",
- "url",
 ]
 
 [[package]]
@@ -4134,14 +4131,17 @@ dependencies = [
 
 [[package]]
 name = "schemars"
-version = "1.0.4"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82d20c4491bc164fa2f6c5d44565947a52ad80b9505d8e36f8d54c27c739fcd0"
+checksum = "9558e172d4e8533736ba97870c4b2cd63f84b382a3d6eb063da41b91cce17289"
 dependencies = [
+ "chrono",
  "dyn-clone",
  "ref-cast",
+ "schemars_derive 1.1.0",
  "serde",
  "serde_json",
+ "url",
 ]
 
 [[package]]
@@ -4149,6 +4149,18 @@ name = "schemars_derive"
 version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.110",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "301858a4023d78debd2353c7426dc486001bddc91ae31a76fb1f55132f7e2633"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4242,6 +4254,7 @@ version = "1.0.145"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "402a6f66d8c709116cf22f558eab210f5a50187f702eb4d7e5ef38d9a7f1c79c"
 dependencies = [
+ "indexmap 2.12.0",
  "itoa",
  "memchr",
  "ryu",
@@ -4282,7 +4295,7 @@ dependencies = [
  "indexmap 1.9.3",
  "indexmap 2.12.0",
  "schemars 0.9.0",
- "schemars 1.0.4",
+ "schemars 1.1.0",
  "serde_core",
  "serde_json",
  "serde_with_macros",

@@ -21,7 +21,6 @@ use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 use serde_json::Value;
 use std::{
-	default::Default,
 	fmt,
 	fmt::{Display, Formatter},
 	iter::Iterator,

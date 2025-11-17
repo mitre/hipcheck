@@ -13,7 +13,7 @@ hipcheck-sdk = { workspace = true, features = ["macros"] }
 tracing = { workspace = true }
 pathbuf = { workspace = true }
 regex = { workspace = true }
-schemars = { workspace = true, features = ["url"] }
+schemars = { workspace = true, features = ["url2"] }
 semver = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
