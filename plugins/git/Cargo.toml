@@ -14,7 +14,7 @@ lru = { workspace = true }
 gix = { workspace = true, features = ["basic", "max-control", "zlib-stock"] }
 jiff = { workspace = true, features = ["serde"] }
 tracing = { workspace = true }
-schemars = { workspace = true, features = ["url"] }
+schemars = { workspace = true, features = ["url2"] }
 serde_json = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 tokio = { workspace = true, features = ["rt"] }

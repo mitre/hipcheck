@@ -87,8 +87,8 @@ salsa = { workspace = true }
 schemars = { workspace = true, features = [
     "derive",
     "preserve_order",
-    "chrono",
-    "url",
+    "chrono04",
+    "url2",
 ] }
 semver = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
@@ -130,7 +130,7 @@ hipcheck-workspace-hack = { workspace = true }
 
 anyhow = { workspace = true }
 pathbuf = { workspace = true }
-schemars = { workspace = true, features = ["chrono", "url"] }
+schemars = { workspace = true, features = ["chrono04", "url2"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 url = { workspace = true, features = ["serde"] }

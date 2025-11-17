@@ -10,7 +10,7 @@ clap = { workspace = true, features = ["derive"] }
 hipcheck-sdk = { workspace = true, features = ["macros"] }
 jiff = { workspace = true, features = ["serde"] }
 log = { workspace = true }
-schemars = { workspace = true, features = ["url"] }
+schemars = { workspace = true, features = ["url2"] }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }

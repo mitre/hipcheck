@@ -231,11 +231,11 @@ pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
 		#[hipcheck_sdk::prelude::async_trait]
 		impl hipcheck_sdk::prelude::Query for #struct_name {
 			fn input_schema(&self) -> hipcheck_sdk::prelude::JsonSchema {
-				hipcheck_sdk::prelude::schema_for!(#input_type).schema
+				hipcheck_sdk::prelude::schema_for!(#input_type)
 			}
 
 			fn output_schema(&self) -> hipcheck_sdk::prelude::JsonSchema {
-				hipcheck_sdk::prelude::schema_for!(#output_type).schema
+				hipcheck_sdk::prelude::schema_for!(#output_type)
 			}
 
 			async fn run(&self, engine: &mut hipcheck_sdk::prelude::PluginEngine, input: hipcheck_sdk::prelude::Value) -> hipcheck_sdk::prelude::Result<hipcheck_sdk::prelude::Value> {

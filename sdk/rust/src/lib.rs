@@ -33,7 +33,7 @@ use crate::error::{ConfigError, Error, Result};
 pub use engine::PluginEngine;
 pub use engine::QueryBuilder;
 pub use hipcheck_common::types::LogLevel;
-use schemars::schema::SchemaObject as JsonSchema;
+use schemars::Schema as JsonSchema;
 use serde_json::Value as JsonValue;
 pub use server::PluginServer;
 use std::result::Result as StdResult;
@@ -95,7 +95,7 @@ pub mod prelude {
 /// Re-export of user-facing third-party dependencies
 pub mod deps {
 	pub use jiff::{Span, Zoned};
-	pub use schemars::{schema::SchemaObject as JsonSchema, schema_for};
+	pub use schemars::{Schema as JsonSchema, schema_for};
 	pub use serde_json::{Value, from_str, from_value, to_value};
 	pub use tonic::async_trait;
 }
