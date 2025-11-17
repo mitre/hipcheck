@@ -4,11 +4,11 @@
 
 [workspace]
 
-# Use the newer, better feature resolver.
+# Use the newest, even better feature resolver.
 #
 # In the future we'll be able to remove this, but for now without it Cargo
 # will default to the old resolver.
-resolver = "2"
+resolver = "3"
 
 # Members of the workspace.
 members = [
