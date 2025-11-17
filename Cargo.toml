@@ -159,7 +159,7 @@ indextree = "4.7.4"
 indicatif = "0.18.3"
 itertools = "0.14.0"
 jiff = { version = "0.2.16", default-features = false }
-kdl = "6.3.4" # 6.5.0
+kdl = "6.5.0"
 lazy_static = "1.5.0"
 log = { version = "0.4.28", default-features = false }
 logos = "0.15.1"
