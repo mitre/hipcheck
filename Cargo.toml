@@ -207,7 +207,7 @@ tonic = "0.13.0" # 0.14.2
 tonic-build = "0.13.0" # 0.14.2
 tracing = "0.1.41"
 tracing-subscriber = "0.3.20"
-typify-macro = "0.4.3" # 0.5.0
+typify-macro = "0.5.0"
 unicode-normalization = "0.1.25"
 ureq = { version = "2.12.1", default-features = false } # 3.1.4
 url = "2.5.7"
