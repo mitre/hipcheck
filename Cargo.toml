@@ -99,157 +99,12 @@ consolidate-commits = false
 
 
 #============================================================================
-# `git-cliff` Configuration
+# `cargo-autoinherit` Configuration
 #
-# We use `git-cliff` to help with generating a `CHANGELOG.md` when we
-# publish new versions of Hipcheck.
+# We use `cargo-autoinherit` to set all dependencies at the workspace root
+# level, so we limit the possibility of ending up with multiple versions of
+# a single dependency.
 #----------------------------------------------------------------------------
-
-[workspace.metadata.git-cliff.changelog]
-
-header = """
-# Hipcheck Changelog
-
-All notable changes to this project will be documented in this file. This
-project adheres to [Semantic Versioning].
-
-"""
-
-body = """
-{% if version -%}
-    ## [{{ version | split(pat="-") | last | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
-{% else -%}
-    ## [Unreleased]
-{%- endif %}
-{%- for group, commits in commits | group_by(attribute="group") %}
-
-    ### {{ group | upper_first }}
-    {% for commit in commits %}
-        * \
-            {{ commit.message | split(pat="\n") | first | trim | trim_end_matches(pat=".") }} \
-            {% if commit.remote.username %}\
-                by [@{{ commit.remote.username }}]({{ self::remote_user(name=commit.remote.username) }}) \
-            {%- endif -%} \
-            {% if commit.remote.pr_number %} \
-                in [#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }})
-            {%- endif %}
-    {%- endfor %}
-{%- endfor %}
-{% if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
-    ### New Contributors
-{%- endif %}
-{% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
-    * \
-        [@{{ contributor.username }}]({{ self::remote_user(name=contributor.username) }}) \
-        made their first contribution \
-        {%- if contributor.pr_number %} \
-            in [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}) \
-        {%- endif %}
-{%- endfor %}
-
-{% if version %}
-    {% if previous.version %}
-    __Full Changelog__: <{{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}>
-    {% endif %}
-{% endif %}
-
-{% if version -%}
-    {% if previous.version -%}
-        [{{ version | split(pat="-") | last | trim_start_matches(pat="v") }}]: \
-            https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
-                /compare/{{ previous.version }}..{{ version }}
-    {% else -%}
-        {% set first_commit = "4372390" %}
-        [{{ version | split(pat="-") | last | trim_start_matches(pat="v") }}]: \
-            https://github.com/{{ remote.github.owner }}/{{remote.github.repo}}\
-                /compare/{{ first_commit }}..HEAD
-    {% endif -%}
-{% else -%}
-    {% if previous.version -%}
-        [Unreleased]: https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
-            /compare/{{ previous.version }}..HEAD
-    {% else -%}
-        {% set first_commit = "4372390" %}
-        [Unreleased]: https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
-            /compare/{{ first_commit }}..HEAD
-    {% endif -%}
-{% endif -%}
-
-{%- macro remote_url() -%}
-    https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
-{%- endmacro -%}
-
-{%- macro remote_user(name) -%}
-    {%- if name -%}
-        https://github.com/{{ name | trim_end_matches(pat="[bot]") }}
-    {%- else -%}
-        ERROR
-    {%- endif -%}
-{%- endmacro -%}
-"""
-
-footer = """
-[Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-"""
-
-# Remove leading and trailing whitespace from the template.
-#
-# This lets the template use indentation without having that reflected in
-# the output.
-trim = true
-
-[workspace.metadata.git-cliff.git]
-
-# How to preprocess commit messages before injecting them into the template
-# context when making the `CHANGELOG.md`.
-commit_preprocessors = [
-    # remove issue numbers from commits
-    { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "" },
-]
-
-# How to parse and group commit messages.
-commit_parsers = [
-    { message = "^.*: add", group = "Added" },
-    { message = "^.*: support", group = "Added" },
-    { message = "^.*: remove", group = "Removed" },
-    { message = "^.*: delete", group = "Removed" },
-    { message = "^test", group = "Fixed" },
-    { message = "^fix", group = "Fixed" },
-    { message = "^.*: fix", group = "Fixed" },
-    { message = "^.*", group = "Changed" },
-]
-
-# Parse the commits based on https://www.conventionalcommits.org
-conventional_commits = true
-
-# Filter out the commits that are not conventional
-filter_unconventional = true
-
-# Process each line of a commit as an individual commit
-split_commits = false
-
-# Protect breaking changes from being skipped due to matching a skipping
-# commit_parser
-protect_breaking_commits = false
-
-# Filter out the commits that are not matched by commit parsers
-filter_commits = true
-
-# Regex for matching git tags
-tag_pattern = "v[0-9].*"
-
-[workspace.metadata.git-cliff.bump]
-features_always_bump_minor = false
-
-# Configures GitHub integration, which lets `git-cliff` augments the
-# generated `CHANGELOG.md` with additional GitHub info.
-#
-# See: https://git-cliff.org/docs/integration/github
-[workspace.metadata.git-cliff.remote.github]
-
-# The GitHub owner and repo name.
-owner = "mitre"
-repo = "hipcheck"
 
 [workspace.metadata.cargo-autoinherit]
 # Skip cargo-autoinherit for these packages
@@ -279,7 +134,6 @@ flate2 = "1.1.4"
 fs_extra = "1.3.0"
 futures = "0.3.31"
 git2 = "0.20.2"
-# 1. 0.73.0
 gix = { version = "0.70.0", default-features = false }
 glob = "0.3.3"
 gomod-rs = "0.1.1"
@@ -306,7 +160,6 @@ maplit = "1.0.2"
 miette = "7.6.0"
 minijinja = "2.11.0"
 minijinja-contrib = "2.11.0"
-# 2. 8.0.0
 nom = "7.1.3"
 num-traits = "0.2.19"
 ordered-float = "5.1.0"
@@ -314,7 +167,6 @@ packageurl = "0.5.0"
 pathbuf = "1.0.0"
 pep440_rs = "0.7.3"
 proc-macro2 = "1.0.101"
-# 3. 0.14.1
 prost = "0.13.5"
 pyproject-toml = "0.13.6"
 quote = "1.0.41"
@@ -322,11 +174,8 @@ rand = "0.9.2"
 rayon = "1.11.0"
 regex = "1.11.1"
 rustls = { version = "0.23.31", default-features = false }
-# 4. 0.6.1
 rustls-platform-verifier = "0.5.0"
-# 5. 0.23.0
 salsa = "0.19.0"
-# 6. 1.0.4
 schemars = { version = "0.8.22" }
 semver = "1.0.27"
 serde = "1.0.226"
@@ -346,15 +195,12 @@ thiserror = "2.0.16"
 tokio = "1.47.1"
 tokio-stream = "0.1.17"
 toml = "0.9.5"
-# 7. 0.14.1
 tonic = "0.13.0"
-# 8. 0.14.1
 tonic-build = "0.13.0"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 typify-macro = "0.4.3"
 unicode-normalization = "0.1.24"
-# 9. 3.1.0
 ureq = { version = "2.12.1", default-features = false }
 url = "2.5.6"
 walkdir = "2.5.0"
