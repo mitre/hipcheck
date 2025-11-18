@@ -2,6 +2,8 @@
 
 //! Globally defined agent containing system TLS Certs.
 
+use crate::Result;
+use hipcheck_sdk::error::Error;
 use rustls::ClientConfig;
 use rustls_platform_verifier::ConfigVerifierExt;
 use std::sync::{Arc, OnceLock};
@@ -14,11 +16,14 @@ static AGENT: OnceLock<Agent> = OnceLock::new();
 ///
 /// # Panics
 /// - If native certs cannot be loaded the first time this function is called.
-pub fn agent() -> &'static Agent {
-	AGENT.get_or_init(|| {
-		// Create connection configuration with system certs retrieved by rustls platform verifier
-		let tls_config = ClientConfig::with_platform_verifier();
+pub fn agent() -> Result<&'static Agent> {
+	// Create connection configuration with system certs retrieved by rustls platform verifier
+	let tls_config = ClientConfig::with_platform_verifier().map_err(|e| Error::Unspecified {
+		source: Box::new(e),
+	})?;
+
+	Ok(AGENT.get_or_init(|| {
 		// Construct agent
 		AgentBuilder::new().tls_config(Arc::new(tls_config)).build()
-	})
+	}))
 }

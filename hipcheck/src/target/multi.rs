@@ -127,7 +127,7 @@ impl TryFrom<GoModRequire> for SingleTargetSeed {
 				// repo url info
 				None => {
 					let get_url = format!("{repo}?go-get=1");
-					let html_str = agent::agent()
+					let html_str = agent::agent()?
 						.get(&get_url)
 						.call()
 						.map_err(|e| hc_error!("go dependency GET request failed: {}", e))?

@@ -3,6 +3,7 @@
 //! Defines an authenticated [`Agent`] type that adds token auth to all requests.
 
 use crate::util::{agent, redacted::Redacted};
+use hipcheck_sdk::error::Result;
 use ureq::{Agent, Request};
 
 /// An [`Agent`] which authenticates requests with token auth.
@@ -19,11 +20,11 @@ pub struct AuthenticatedAgent<'token> {
 
 impl<'token> AuthenticatedAgent<'token> {
 	/// Construct a new authenticated agent.
-	pub fn new(token: &'token str) -> AuthenticatedAgent<'token> {
-		AuthenticatedAgent {
-			agent: agent::agent(),
+	pub fn new(token: &'token str) -> Result<AuthenticatedAgent<'token>> {
+		Ok(AuthenticatedAgent {
+			agent: agent::agent()?,
 			token: Redacted::new(token),
-		}
+		})
 	}
 
 	/// Make an authenticated GET request.

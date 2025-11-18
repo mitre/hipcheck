@@ -108,7 +108,7 @@ impl BufferedDigest {
 		match self {
 			Resolved(s) => Ok(s),
 			Remote(u) => {
-				let agent = agent::agent();
+				let agent = agent::agent()?;
 				let raw_hash_str = agent.get(u.as_ref()).call()?.into_string()?;
 				let Some(hash_str) = raw_hash_str.split_whitespace().next() else {
 					return Err(anyhow!("malformed sha256 file at {}", u));
