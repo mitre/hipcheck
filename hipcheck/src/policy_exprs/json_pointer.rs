@@ -50,7 +50,7 @@ fn lookup_json_pointer<'val>(pointer: &str, context: &'val Value) -> Result<&'va
 		Some(val) => Ok(val),
 		None => Err(Error::JSONPointerLookupFailed {
 			pointer: pointer.to_owned().into_boxed_str(),
-			context: context.clone(),
+			context: Box::new(context.clone()),
 		}),
 	}
 }
@@ -78,8 +78,8 @@ fn json_to_policy_expr(val: &Value, pointer: &str, context: &Value) -> Result<Ex
 		Value::Object(_) => Err(Error::JSONPointerUnrepresentableType {
 			json_type: error::UnrepresentableJSONType::JSONObject,
 			pointer: pointer.to_owned().into_boxed_str(),
-			value: val.clone(),
-			context: context.clone(),
+			value: Box::new(val.clone()),
+			context: Box::new(context.clone()),
 		}),
 		// Attempt to parse a datetime or span, and only error out if both fail.
 		// TODO: Use JSON schema data to guide which of datetime or span to parse into.
@@ -95,15 +95,15 @@ fn json_to_policy_expr(val: &Value, pointer: &str, context: &Value) -> Result<Ex
 			Err(Error::JSONPointerUnrepresentableType {
 				json_type: error::UnrepresentableJSONType::JSONString,
 				pointer: pointer.to_owned().into_boxed_str(),
-				value: val.clone(),
-				context: context.clone(),
+				value: Box::new(val.clone()),
+				context: Box::new(context.clone()),
 			})
 		}
 		Value::Null => Err(Error::JSONPointerUnrepresentableType {
 			json_type: error::UnrepresentableJSONType::JSONNull,
 			pointer: pointer.to_owned().into_boxed_str(),
-			value: val.clone(),
-			context: context.clone(),
+			value: Box::new(val.clone()),
+			context: Box::new(context.clone()),
 		}),
 	}
 }
@@ -138,8 +138,8 @@ fn json_array_item_to_policy_expr_primitive(
 		_ => Err(Error::JSONPointerUnrepresentableType {
 			json_type: error::UnrepresentableJSONType::NonPrimitiveInArray,
 			pointer: pointer.to_owned().into_boxed_str(),
-			value: v.clone(),
-			context: context.clone(),
+			value: Box::new(v.clone()),
+			context: Box::new(context.clone()),
 		}),
 	}
 }
@@ -226,7 +226,7 @@ mod tests {
 			result,
 			Err(Error::JSONPointerLookupFailed {
 				pointer: "/alpa".into(),
-				context
+				context: Box::new(context),
 			})
 		);
 	}
@@ -243,8 +243,8 @@ mod tests {
 			Err(Error::JSONPointerUnrepresentableType {
 				json_type: error::UnrepresentableJSONType::JSONString,
 				pointer: "/str".into(),
-				value: context.get("str").unwrap().clone(),
-				context,
+				value: Box::new(context.get("str").unwrap().clone()),
+				context: Box::new(context),
 			})
 		);
 	}
@@ -264,8 +264,8 @@ mod tests {
 			Err(Error::JSONPointerUnrepresentableType {
 				json_type: error::UnrepresentableJSONType::JSONObject,
 				pointer: "/obj".into(),
-				value: context.get("obj").unwrap().clone(),
-				context,
+				value: Box::new(context.get("obj").unwrap().clone()),
+				context: Box::new(context),
 			})
 		);
 	}
@@ -282,8 +282,8 @@ mod tests {
 			Err(Error::JSONPointerUnrepresentableType {
 				json_type: error::UnrepresentableJSONType::NonPrimitiveInArray,
 				pointer: "/array".into(),
-				value: serde_json::json!([5, 10]),
-				context,
+				value: Box::new(serde_json::json!([5, 10])),
+				context: Box::new(context),
 			})
 		);
 	}

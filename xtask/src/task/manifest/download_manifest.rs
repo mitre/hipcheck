@@ -420,7 +420,7 @@ impl FromStr for DownloadManifest {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let document = KdlDocument::from_str(s)
-			.map_err(|e| anyhow!("Error parsing download manifest file: {}", e.to_string()))?;
+			.map_err(|e| anyhow!("Error parsing download manifest file: {}", e))?;
 		let mut entries = vec![];
 		for node in document.nodes() {
 			if let Some(entry) = DownloadManifestEntry::parse_node(node) {
