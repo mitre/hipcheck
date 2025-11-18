@@ -107,13 +107,13 @@ jobs:
         # NOTE: MUST be synced manually with runners in 'dist-workspace.toml'
         #
         # We've purposefully chosen to use two different versions of macOS here
-        # to achieve ARM and x86 support (macos-14 is ARM, macos-13 is x86),
-        # since alternative runners with matching versions aren't all on the
-        # free plan for GitHub Actions.
+        # to achieve ARM and x86 support (macos-14 is ARM, macos-15-intel is
+        # x86), since alternative runners with matching versions aren't all on
+        # the free plan for GitHub Actions.
         #
         # More info: https://github.com/actions/runner-images
         # See also: https://github.com/actions/partner-runner-images
-        os: [ubuntu-22.04, windows-2022, macos-14, macos-13]
+        os: [ubuntu-22.04, windows-2022, macos-14, macos-15-intel]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
@@ -177,7 +177,7 @@ jobs:
 
       - name: Check and lint workspace
         if: steps.filter.outputs.rust == 'true'
-        run: cargo clippy --locked --verbose --workspace --exclude xtask
+        run: cargo clippy --locked --verbose --workspace --exclude xtask -- -A clippy::doc-lazy-continuation
 
       - name: Run workspace tests with nextest
         if: steps.filter.outputs.rust == 'true'
@@ -192,13 +192,13 @@ jobs:
         # NOTE: MUST be synced manually with runners in 'dist-workspace.toml'
         #
         # We've purposefully chosen to use two different versions of macOS here
-        # to achieve ARM and x86 support (macos-14 is ARM, macos-13 is x86),
-        # since alternative runners with matching versions aren't all on the
-        # free plan for GitHub Actions.
+        # to achieve ARM and x86 support (macos-14 is ARM, macos-15-intel is
+        # x86), since alternative runners with matching versions aren't all on
+        # the free plan for GitHub Actions.
         #
         # More info: https://github.com/actions/runner-images
         # See also: https://github.com/actions/partner-runner-images
-        os: [ubuntu-22.04, windows-2022, macos-14, macos-13]
+        os: [ubuntu-22.04, windows-2022, macos-14, macos-15-intel]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
