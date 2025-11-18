@@ -159,12 +159,7 @@ pub struct HcEngineImpl {
 }
 
 #[salsa::db]
-impl salsa::Database for HcEngineImpl {
-	fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
-		let event = event();
-		log::debug!("{:?}", event);
-	}
-}
+impl salsa::Database for HcEngineImpl {}
 
 impl PluginCore for HcEngineImpl {
 	fn core(&self) -> Arc<HcPluginCore> {

@@ -164,12 +164,7 @@ pub struct Session {
 
 // Required by our query groups
 #[salsa::db]
-impl salsa::Database for Session {
-	fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
-		let event = event();
-		log::debug!("{:?}", event);
-	}
-}
+impl salsa::Database for Session {}
 
 impl PluginCore for Session {
 	fn core(&self) -> Arc<HcPluginCore> {
