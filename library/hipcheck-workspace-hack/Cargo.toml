@@ -15,5 +15,150 @@ publish = false
 # are managed by hakari.
 
 ### BEGIN HAKARI SECTION
+[dependencies]
+bytes = { version = "1.10.1" }
+chrono = { version = "0.4.42", features = ["serde"] }
+crypto-common = { version = "0.1.6", default-features = false, features = ["std"] }
+dashmap = { version = "6.1.0", default-features = false, features = ["inline", "rayon"] }
+digest = { version = "0.10.7", features = ["mac", "std"] }
+either = { version = "1.15.0", features = ["use_std"] }
+form_urlencoded = { version = "1.2.2", default-features = false, features = ["std"] }
+futures-channel = { version = "0.3.31", features = ["sink"] }
+futures-sink = { version = "0.3.31" }
+futures-task = { version = "0.3.31", default-features = false, features = ["std"] }
+futures-util = { version = "0.3.31", default-features = false, features = ["async-await-macro", "channel", "io", "sink"] }
+hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.5" }
+hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", default-features = false, features = ["inline-more", "raw"] }
+hashbrown-986da7b5efc2b80e = { package = "hashbrown", version = "0.16.0" }
+idna = { version = "1.1.0", default-features = false, features = ["compiled_data", "std"] }
+jiff = { version = "0.2.16", features = ["serde"] }
+libz-rs-sys = { version = "0.5.2" }
+log = { version = "0.4.28", default-features = false, features = ["std"] }
+memchr = { version = "2.7.5", features = ["use_std"] }
+miette = { version = "7.6.0", features = ["fancy"] }
+num-traits = { version = "0.2.19", features = ["i128"] }
+percent-encoding = { version = "2.3.2" }
+prost = { version = "0.14.1" }
+regex = { version = "1.12.2" }
+regex-automata = { version = "0.4.13", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
+regex-syntax = { version = "0.8.6" }
+schemars = { version = "1.1.0", features = ["chrono04", "preserve_order", "url2"] }
+semver = { version = "1.0.27", features = ["serde"] }
+serde = { version = "1.0.228", features = ["alloc", "derive", "rc"] }
+serde_core = { version = "1.0.228", default-features = false, features = ["alloc", "rc", "result", "std"] }
+serde_json = { version = "1.0.145", features = ["alloc", "preserve_order"] }
+sha1 = { version = "0.10.6", features = ["compress"] }
+smallvec = { version = "1.15.1", default-features = false, features = ["const_new", "write"] }
+strum = { version = "0.27.2", features = ["derive"] }
+tokio = { version = "1.48.0", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-stream = { version = "0.1.17", features = ["net"] }
+tracing-core = { version = "0.1.34" }
+unicode-normalization = { version = "0.1.25" }
+url = { version = "2.5.7" }
+winnow = { version = "0.7.13", features = ["simd"] }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
+
+[build-dependencies]
+bytes = { version = "1.10.1" }
+cc = { version = "1.2.36", default-features = false, features = ["parallel"] }
+chrono = { version = "0.4.42", features = ["serde"] }
+crypto-common = { version = "0.1.6", default-features = false, features = ["std"] }
+dashmap = { version = "6.1.0", default-features = false, features = ["inline", "rayon"] }
+digest = { version = "0.10.7", features = ["mac", "std"] }
+either = { version = "1.15.0", features = ["use_std"] }
+form_urlencoded = { version = "1.2.2", default-features = false, features = ["std"] }
+futures-channel = { version = "0.3.31", features = ["sink"] }
+futures-sink = { version = "0.3.31" }
+futures-task = { version = "0.3.31", default-features = false, features = ["std"] }
+futures-util = { version = "0.3.31", default-features = false, features = ["async-await-macro", "channel", "io", "sink"] }
+hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15.5" }
+hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14.5", default-features = false, features = ["inline-more", "raw"] }
+hashbrown-986da7b5efc2b80e = { package = "hashbrown", version = "0.16.0" }
+idna = { version = "1.1.0", default-features = false, features = ["compiled_data", "std"] }
+jiff = { version = "0.2.16", features = ["serde"] }
+libz-rs-sys = { version = "0.5.2" }
+log = { version = "0.4.28", default-features = false, features = ["std"] }
+memchr = { version = "2.7.5", features = ["use_std"] }
+miette = { version = "7.6.0", features = ["fancy"] }
+num-traits = { version = "0.2.19", features = ["i128"] }
+percent-encoding = { version = "2.3.2" }
+prost = { version = "0.14.1" }
+regex = { version = "1.12.2" }
+regex-automata = { version = "0.4.13", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
+regex-syntax = { version = "0.8.6" }
+schemars = { version = "1.1.0", features = ["chrono04", "preserve_order", "url2"] }
+semver = { version = "1.0.27", features = ["serde"] }
+serde = { version = "1.0.228", features = ["alloc", "derive", "rc"] }
+serde_core = { version = "1.0.228", default-features = false, features = ["alloc", "rc", "result", "std"] }
+serde_json = { version = "1.0.145", features = ["alloc", "preserve_order"] }
+sha1 = { version = "0.10.6", features = ["compress"] }
+smallvec = { version = "1.15.1", default-features = false, features = ["const_new", "write"] }
+strum = { version = "0.27.2", features = ["derive"] }
+syn = { version = "2.0.110", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
+tokio = { version = "1.48.0", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-stream = { version = "0.1.17", features = ["net"] }
+tracing-core = { version = "0.1.34" }
+unicode-normalization = { version = "0.1.25" }
+url = { version = "2.5.7" }
+winnow = { version = "0.7.13", features = ["simd"] }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
+
+[target.x86_64-unknown-linux-gnu.dependencies]
+getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
+libc = { version = "0.2.177" }
+miniz_oxide = { version = "0.8.9", default-features = false, features = ["simd", "with-alloc"] }
+rustix = { version = "1.1.2", features = ["fs", "termios"] }
+simd-adler32 = { version = "0.3.7", default-features = false, features = ["std"] }
+
+[target.x86_64-unknown-linux-gnu.build-dependencies]
+getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
+libc = { version = "0.2.177" }
+miniz_oxide = { version = "0.8.9", default-features = false, features = ["simd", "with-alloc"] }
+rustix = { version = "1.1.2", features = ["fs", "termios"] }
+simd-adler32 = { version = "0.3.7", default-features = false, features = ["std"] }
+
+[target.x86_64-apple-darwin.dependencies]
+bitflags = { version = "2.9.4", default-features = false, features = ["std"] }
+getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
+libc = { version = "0.2.177" }
+miniz_oxide = { version = "0.8.9", default-features = false, features = ["simd", "with-alloc"] }
+rustix = { version = "1.1.2", features = ["fs", "termios"] }
+simd-adler32 = { version = "0.3.7", default-features = false, features = ["std"] }
+
+[target.x86_64-apple-darwin.build-dependencies]
+bitflags = { version = "2.9.4", default-features = false, features = ["std"] }
+getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
+libc = { version = "0.2.177" }
+miniz_oxide = { version = "0.8.9", default-features = false, features = ["simd", "with-alloc"] }
+rustix = { version = "1.1.2", features = ["fs", "termios"] }
+simd-adler32 = { version = "0.3.7", default-features = false, features = ["std"] }
+
+[target.aarch64-apple-darwin.dependencies]
+bitflags = { version = "2.9.4", default-features = false, features = ["std"] }
+getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
+libc = { version = "0.2.177" }
+miniz_oxide = { version = "0.8.9", default-features = false, features = ["simd", "with-alloc"] }
+rustix = { version = "1.1.2", features = ["fs", "termios"] }
+simd-adler32 = { version = "0.3.7", default-features = false, features = ["std"] }
+
+[target.aarch64-apple-darwin.build-dependencies]
+bitflags = { version = "2.9.4", default-features = false, features = ["std"] }
+getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
+libc = { version = "0.2.177" }
+miniz_oxide = { version = "0.8.9", default-features = false, features = ["simd", "with-alloc"] }
+rustix = { version = "1.1.2", features = ["fs", "termios"] }
+simd-adler32 = { version = "0.3.7", default-features = false, features = ["std"] }
+
+[target.x86_64-pc-windows-msvc.dependencies]
+getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
+windows-sys-4db8c43aad08e7ae = { package = "windows-sys", version = "0.60.2", features = ["Win32_Storage_FileSystem", "Win32_System_Console"] }
+windows-sys-73dcd821b1037cfd = { package = "windows-sys", version = "0.59.0", features = ["Wdk_Foundation", "Wdk_Storage_FileSystem", "Wdk_System_IO", "Win32_Networking_WinSock", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_IO", "Win32_System_Pipes", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Shell"] }
+windows-sys-d4189bed749088b6 = { package = "windows-sys", version = "0.61.1", features = ["Win32_Globalization", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Console", "Win32_System_Memory", "Win32_System_Pipes", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_Time", "Win32_System_WindowsProgramming", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell"] }
+
+[target.x86_64-pc-windows-msvc.build-dependencies]
+getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
+windows-sys-4db8c43aad08e7ae = { package = "windows-sys", version = "0.60.2", features = ["Win32_Storage_FileSystem", "Win32_System_Console"] }
+windows-sys-73dcd821b1037cfd = { package = "windows-sys", version = "0.59.0", features = ["Wdk_Foundation", "Wdk_Storage_FileSystem", "Wdk_System_IO", "Win32_Networking_WinSock", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_IO", "Win32_System_Pipes", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Shell"] }
+windows-sys-d4189bed749088b6 = { package = "windows-sys", version = "0.61.1", features = ["Win32_Globalization", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Console", "Win32_System_Memory", "Win32_System_Pipes", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_Time", "Win32_System_WindowsProgramming", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell"] }
 
 ### END HAKARI SECTION

@@ -3,20 +3,13 @@
   "title": "Target",
   "type": "object",
   "properties": {
+    "specifier": {
+      "description": "The original specifier provided by the user.",
+      "type": "string"
+    },
     "local": {
       "description": "The path to the local repository.",
       "$ref": "#/$defs/LocalGitRepo"
-    },
-    "package": {
-      "description": "The package associated with the target, if any.",
-      "anyOf": [
-        {
-          "$ref": "#/$defs/Package"
-        },
-        {
-          "type": "null"
-        }
-      ]
     },
     "remote": {
       "description": "The url of the remote repository, if any.",
@@ -29,9 +22,16 @@
         }
       ]
     },
-    "specifier": {
-      "description": "The original specifier provided by the user.",
-      "type": "string"
+    "package": {
+      "description": "The package associated with the target, if any.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Package"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [
@@ -39,6 +39,45 @@
     "local"
   ],
   "$defs": {
+    "LocalGitRepo": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "The path to the repo.",
+          "type": "string"
+        },
+        "git_ref": {
+          "description": "The Git ref we're referring to.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "git_ref"
+      ]
+    },
+    "RemoteGitRepo": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "known_remote": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KnownRemote"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
     "KnownRemote": {
       "oneOf": [
         {
@@ -60,49 +99,32 @@
               ]
             }
           },
-          "additionalProperties": false,
           "required": [
             "GitHub"
-          ]
+          ],
+          "additionalProperties": false
         }
-      ]
-    },
-    "LocalGitRepo": {
-      "type": "object",
-      "properties": {
-        "git_ref": {
-          "description": "The Git ref we're referring to.",
-          "type": "string"
-        },
-        "path": {
-          "description": "The path to the repo.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "path",
-        "git_ref"
       ]
     },
     "Package": {
       "type": "object",
       "properties": {
-        "host": {
-          "description": "What host the package is from.",
-          "$ref": "#/$defs/PackageHost"
-        },
-        "name": {
-          "description": "The package name",
-          "type": "string"
-        },
         "purl": {
           "description": "A package url for the package.",
           "type": "string",
           "format": "uri"
         },
+        "name": {
+          "description": "The package name",
+          "type": "string"
+        },
         "version": {
           "description": "The package version",
           "type": "string"
+        },
+        "host": {
+          "description": "What host the package is from.",
+          "$ref": "#/$defs/PackageHost"
         }
       },
       "required": [
@@ -117,28 +139,6 @@
       "enum": [
         "Npm",
         "PyPI"
-      ]
-    },
-    "RemoteGitRepo": {
-      "type": "object",
-      "properties": {
-        "known_remote": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/KnownRemote"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "url": {
-          "type": "string",
-          "format": "uri"
-        }
-      },
-      "required": [
-        "url"
       ]
     }
   }
