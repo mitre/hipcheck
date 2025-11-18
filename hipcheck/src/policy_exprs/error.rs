@@ -132,7 +132,7 @@ pub enum Error {
 	#[error("JSON Pointer lookup failed. pointer: '{pointer}'; context: {context}")]
 	JSONPointerLookupFailed {
 		pointer: Box<str>,
-		context: serde_json::Value,
+		context: Box<serde_json::Value>,
 	},
 
 	#[error(
@@ -143,8 +143,8 @@ pub enum Error {
 	JSONPointerUnrepresentableType {
 		json_type: UnrepresentableJSONType,
 		pointer: Box<str>,
-		value: serde_json::Value,
-		context: serde_json::Value,
+		value: Box<serde_json::Value>,
+		context: Box<serde_json::Value>,
 	},
 
 	#[error("Datetime error: {0}")]
