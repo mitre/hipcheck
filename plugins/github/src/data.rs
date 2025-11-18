@@ -18,7 +18,7 @@ impl<'a> GitHub<'a> {
 		Ok(GitHub {
 			owner,
 			repo,
-			agent: AuthenticatedAgent::new(token),
+			agent: AuthenticatedAgent::new(token)?,
 		})
 	}
 

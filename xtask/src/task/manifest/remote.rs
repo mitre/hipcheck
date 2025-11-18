@@ -125,7 +125,7 @@ impl TryFrom<Vec<RawReleaseDigest>> for ReleaseDigest {
 }
 
 pub fn get_hipcheck_plugin_releases(github_api_token: &str) -> Result<ReleaseDigest> {
-	let auth_agent = util::authenticated_agent::AuthenticatedAgent::new(github_api_token);
+	let auth_agent = util::authenticated_agent::AuthenticatedAgent::new(github_api_token)?;
 	let raw_rel_json = auth_agent
 		.get("https://api.github.com/repos/mitre/hipcheck/releases")
 		.call()?

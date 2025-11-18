@@ -394,7 +394,7 @@ pub fn extract_repo_for_npm(package: &str, version: &str) -> Result<Url> {
 	};
 
 	// Make an HTTP request to that URL.
-	let response = agent::agent().get(&registry).call().context(
+	let response = agent::agent()?.get(&registry).call().context(
 		"request to npm API failed, make sure the package name is correct as well as the project version",
 	)?;
 
@@ -446,7 +446,7 @@ pub fn extract_repo_for_pypi(package: &str, version: &str) -> Result<Url> {
 	};
 
 	// Make an HTTP request to that URL.
-	let response = agent::agent()
+	let response = agent::agent()?
 		.get(&registry)
 		.call()
 		.context("request to PYPI API failed, make sure the project name is correct (case matters) as well as the project version")?;
@@ -479,7 +479,7 @@ pub fn extract_repo_for_pypi(package: &str, version: &str) -> Result<Url> {
 pub fn extract_repo_for_maven(url: &str) -> Result<Url> {
 	// Make an HTTP request to that URL to get the POM file.
 
-	let response = agent::agent()
+	let response = agent::agent()?
 		.get(url)
 		.call()
 		.context("request to Maven API failed")?;

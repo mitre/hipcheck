@@ -193,6 +193,13 @@ impl SmartSubtransport for CustomTransport {
 
 		// Get the agent with rustls native certs to create an http request.
 		let mut req = agent::agent()
+			.map_err(|e| {
+				Git2Error::new(
+					git2::ErrorCode::GenericError,
+					git2::ErrorClass::None,
+					e.to_string(),
+				)
+			})?
 			.request(service_method(action).as_str(), url.as_str())
 			.set("Accept", service_response_type(action));
 

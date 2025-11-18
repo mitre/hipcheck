@@ -299,7 +299,7 @@ fn download_plugin(
 	expected_hash_with_digest: &HashWithDigest,
 ) -> Result<PathBuf, Error> {
 	// retrieve archive
-	let agent = agent();
+	let agent = agent()?;
 	let response = agent
 		.get(url.as_str())
 		.call()
@@ -470,7 +470,7 @@ fn move_to_extract_dir(extract_dir: &Path, entry: &DirEntry) -> Result<(), Error
 
 /// fetch and deserialize a DownloadManifest from a URL
 fn retrieve_download_manifest(url: &Url) -> Result<DownloadManifest, Error> {
-	let agent = agent();
+	let agent = agent()?;
 	let response = agent
 		.get(url.as_str())
 		.call()
