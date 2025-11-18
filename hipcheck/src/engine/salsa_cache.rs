@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	Result,
 	engine::{HcEngine, RUNTIME},
 	hc_error,
 	plugin::{PluginResponse, QueryResult, get_plugin_key},
@@ -57,7 +56,7 @@ pub fn query_with_salsa(
 	plugin: SalsaPlugin,
 	query: SalsaQuery,
 	key: SalsaKey,
-) -> Result<QueryResult> {
+) -> crate::Result<QueryResult> {
 	let hash_key = get_plugin_key(
 		publisher.clone_from_salsa_db(engine).as_str(),
 		plugin.clone_from_salsa_db(engine).as_str(),
@@ -73,6 +72,7 @@ pub fn query_with_salsa(
 	let Some(p_handle) = core.plugins.get(&hash_key) else {
 		return Err(hc_error!("No such plugin {}", hash_key));
 	};
+
 	// Initiate the query. If remote closed or we got our response immediately,
 	// return
 	let mut ar = match runtime.block_on(p_handle.query(
@@ -85,6 +85,7 @@ pub fn query_with_salsa(
 		PluginResponse::Completed(v) => return Ok(v),
 		PluginResponse::AwaitingResult(a) => a,
 	};
+
 	// Otherwise, the plugin needs more data to continue. Recursively query
 	// (with salsa memo-ization) to get the needed data, and resume our
 	// current query by providing the plugin the answer.
@@ -108,7 +109,9 @@ pub fn query_with_salsa(
 				.unwrap();
 			answers.push(value);
 		}
+
 		log::trace!("Got answer, resuming");
+
 		ar = match runtime.block_on(p_handle.resume_query(ar, answers))? {
 			PluginResponse::RemoteClosed => {
 				return Err(hc_error!("Plugin channel closed unexpected"));
