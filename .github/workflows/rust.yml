@@ -115,7 +115,7 @@ jobs:
         # See also: https://github.com/actions/partner-runner-images
         os: [ubuntu-22.04, windows-2022, macos-14, macos-15-intel]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: read
@@ -200,7 +200,7 @@ jobs:
         # See also: https://github.com/actions/partner-runner-images
         os: [ubuntu-22.04, windows-2022, macos-14, macos-15-intel]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: read
