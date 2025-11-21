@@ -1,0 +1,115 @@
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::api::GitHub;
+use crate::config::{CONFIG, Config, RawConfig};
+use hipcheck_sdk::{
+	prelude::*,
+	types::{KnownRemote, RemoteGitRepo},
+};
+use schemars::JsonSchema;
+use serde::Serialize;
+use std::result::Result as StdResult;
+use std::{fmt::Display, rc::Rc};
+
+/// Logs the error and returns a generic query error, to adapt errors for use
+/// across the plugin boundary.
+fn query_err<E: Display>(e: E) -> Error {
+	tracing::error!("{}", e);
+	Error::UnspecifiedQueryState
+}
+
+#[query]
+async fn pr_reviews(_engine: &mut PluginEngine, key: KnownRemote) -> Result<Vec<PullRequest>> {
+	tracing::info!("running pr_reviews query");
+
+	let (owner, repo) = match &key {
+		KnownRemote::GitHub { owner, repo } => (owner, repo),
+	};
+
+	let api_token = CONFIG
+		.get()
+		.ok_or_else(|| {
+			tracing::error!("tried to access config before set by Hipcheck core!");
+			Error::UnspecifiedQueryState
+		})?
+		.api_token
+		.as_str();
+
+	let results = GitHub::new(owner, repo, api_token)
+		.map_err(query_err)?
+		.get_reviews_for_pr()
+		.map_err(query_err)?
+		.into_iter()
+		.map(|pr| PullRequest {
+			id: pr.number,
+			reviews: pr.reviews,
+		})
+		.collect();
+
+	tracing::info!("completed pr_reviews query");
+
+	Ok(results)
+}
+
+#[query(default)]
+async fn has_fuzz(_engine: &mut PluginEngine, key: RemoteGitRepo) -> Result<bool> {
+	tracing::info!("running has_fuzz query");
+
+	let Some(KnownRemote::GitHub { owner, repo }) = &key.known_remote else {
+		tracing::error!("Unknown GitHub remote");
+		return Err(Error::UnspecifiedQueryState);
+	};
+
+	let api_token = CONFIG
+		.get()
+		.ok_or_else(|| {
+			tracing::error!("tried to access config before set by Hipcheck core!");
+			Error::UnspecifiedQueryState
+		})?
+		.api_token
+		.as_str();
+
+	let with_fuzz = GitHub::new(owner, repo, api_token)
+		.map_err(query_err)?
+		.fuzz_check(Rc::new(key.url.to_string()))
+		.map_err(query_err)?;
+
+	tracing::info!("completed has_fuzz query");
+
+	Ok(with_fuzz)
+}
+
+#[derive(Clone, Debug)]
+pub struct GithubAPIPlugin {}
+
+impl Plugin for GithubAPIPlugin {
+	const PUBLISHER: &'static str = "mitre";
+	const NAME: &'static str = "github";
+
+	fn set_config(&self, config: Value) -> StdResult<(), ConfigError> {
+		let conf: Config = serde_json::from_value::<RawConfig>(config)
+			.map_err(|e| ConfigError::Unspecified {
+				message: e.to_string().into_boxed_str(),
+			})?
+			.try_into()?;
+		CONFIG.set(conf).map_err(|_e| ConfigError::InternalError {
+			message: "config was already set".to_owned().into_boxed_str(),
+		})
+	}
+
+	fn default_policy_expr(&self) -> Result<String> {
+		Ok("".to_owned())
+	}
+
+	fn explain_default_query(&self) -> Result<Option<String>> {
+		Ok(None)
+	}
+
+	queries! {}
+}
+
+#[derive(Debug, Serialize, JsonSchema, PartialEq, Eq)]
+pub struct PullRequest {
+	pub id: u64,
+	pub reviews: u64,
+}

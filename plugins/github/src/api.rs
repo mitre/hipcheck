@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	graphql::reviews::get_all_reviews, rest::code_search::search_code_request,
+	graphql::reviews::get_all_reviews, rest::code_search::detect_oss_fuzz_participation,
 	tls::authenticated_agent::AuthenticatedAgent, types::GitHubPullRequest,
 };
 use anyhow::{Context, Result};
@@ -23,7 +23,7 @@ impl<'a> GitHub<'a> {
 	}
 
 	pub fn fuzz_check(&self, repo_uri: Rc<String>) -> Result<bool> {
-		search_code_request(&self.agent, repo_uri).context("unable to search fuzzing information; please ensure the provided system environment variable exists and contains a valid GitHub API token")
+		detect_oss_fuzz_participation(&self.agent, repo_uri).context("unable to search fuzzing information; please ensure the provided system environment variable exists and contains a valid GitHub API token")
 	}
 
 	pub fn get_reviews_for_pr(&self) -> Result<Vec<GitHubPullRequest>> {
