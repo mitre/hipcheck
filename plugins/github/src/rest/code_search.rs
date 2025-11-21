@@ -4,10 +4,11 @@ use crate::tls::authenticated_agent::AuthenticatedAgent;
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 
-const GH_API_V4_SEARCH: &str = "https://api.github.com/search/code";
+/// Endpoint for GitHub Code Search.
+const CODE_SEARCH: &str = "https://api.github.com/search/code";
 
-/// Make a request to the GitHub Code Search API.
-pub fn search_code_request(
+/// Check if the given repo participates in OSS-Fuzz.
+pub fn detect_oss_fuzz_participation(
 	agent: &AuthenticatedAgent<'_>,
 	repo: impl AsRef<String>,
 ) -> Result<bool> {
@@ -20,30 +21,27 @@ pub fn search_code_request(
 	// Breaking repo out in to more easily searchable string since full
 	// GitHub repo urls were not working for a few fuzzed urls.
 
-	let repo_query = repo
+	let repo = repo
 		.as_ref()
 		.replace("https://", "")
 		.replace("http://", "")
 		.replace('/', "%20");
 
-	let sub_query = format!(
-		"{}+in:file+filename:project.yaml+repo:google/oss-fuzz",
-		repo_query
+	let query = format!(
+		"{}?q={}+in:file+filename:project.yaml+repo:google/oss-fuzz",
+		CODE_SEARCH, repo
 	);
 
-	let query = format!("{}?q={}", GH_API_V4_SEARCH.to_owned(), sub_query);
+	let json = agent
+		.get(&query)
+		.call()?
+		.into_json::<Value>()
+		.map_err(|_| anyhow!("unable to query fuzzing info"))?;
 
-	// Make the get request.
-	let json = get_request(agent, query).map_err(|_| anyhow!("unable to query fuzzing info"))?;
+	let count = json["total_count"]
+		.to_string()
+		.parse::<u64>()
+		.map_err(|_| anyhow!("unable to parse count"))?;
 
-	match &json["total_count"].to_string().parse::<u64>() {
-		Ok(count) => Ok(count > &0),
-		_ => Err(anyhow!("unable to get fuzzing status")),
-	}
-}
-
-/// Get call using agent
-fn get_request(agent: &AuthenticatedAgent<'_>, query: String) -> Result<Value> {
-	let response = agent.get(&query).call()?.into_json()?;
-	Ok(response)
+	Ok(count > 0)
 }
