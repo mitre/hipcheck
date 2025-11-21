@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::util::authenticated_agent::AuthenticatedAgent;
+use crate::tls::authenticated_agent::AuthenticatedAgent;
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use std::convert::TryInto;
-
 use self::reviews::{ResponseData, ReviewsRepositoryPullRequestsNodes as RawPull, Variables};
-use crate::{types::*, util::authenticated_agent::AuthenticatedAgent};
+use crate::{tls::authenticated_agent::AuthenticatedAgent, types::*};
 use anyhow::{Result, anyhow};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
 use serde_json::{from_value as from_json_value, to_value as to_json_value};
+use std::convert::TryInto;
 
 /// The URL of the GitHub GraphQL API.
 const GH_API_V4: &str = "https://api.github.com/graphql";
@@ -14,8 +13,8 @@ const GH_API_V4: &str = "https://api.github.com/graphql";
 /// Defines the query being made against the GitHub API.
 #[derive(GraphQLQuery)]
 #[graphql(
-	schema_path = "src/gh_schema.graphql",
-	query_path = "src/gh_query.graphql",
+	schema_path = "src/graphql/schemas/types.graphql",
+	query_path = "src/graphql/schemas/reviews.graphql",
 	response_derives = "Debug"
 )]
 pub struct Reviews;

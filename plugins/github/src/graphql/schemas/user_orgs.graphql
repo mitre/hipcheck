@@ -1,0 +1,32 @@
+query UserOrgs(
+    $login: String!
+    $organizationCursor: String!
+    $domainCursor: String!
+) {
+    user(login: $login) {
+        # Company set in user's profile, if any.
+        company
+        # GitHub Organizations the user is a member of, if any.
+        organizations(first: 100, after: $organizationCursor, orderBy: LOGIN) {
+            nodes {
+                name
+                login
+                domains(first: 100, after: $domainCursor) {
+                    nodes {
+                        domain
+                        isApproved
+                        isVerified
+                    }
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                }
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+        }
+    }
+}

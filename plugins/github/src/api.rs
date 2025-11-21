@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	code_search::search_code_request, graphql::get_all_reviews, types::GitHubPullRequest,
-	util::authenticated_agent::AuthenticatedAgent,
+	graphql::reviews::get_all_reviews, rest::code_search::search_code_request,
+	tls::authenticated_agent::AuthenticatedAgent, types::GitHubPullRequest,
 };
 use anyhow::{Context, Result};
 use std::rc::Rc;

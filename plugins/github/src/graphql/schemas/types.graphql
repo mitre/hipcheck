@@ -1,0 +1,444 @@
+schema {
+    query: Query
+}
+
+"""
+The query root of GitHub's GraphQL interface.
+"""
+type Query {
+    """
+    Lookup a given repository by the owner and repository name.
+    """
+    repository(
+        """
+        The name of the repository
+        """
+        name: String!
+
+        """
+        The login field of a user or organization
+        """
+        owner: String!
+    ): Repository
+
+    """
+    Lookup a user by login.
+    """
+    user(
+        """
+        The user's login.
+        """
+        login: String!
+    ): User
+}
+
+"""
+A repository contains the content for a project.
+"""
+type Repository {
+    """
+    A list of pull requests that have been opened in the repository.
+    """
+    pullRequests(
+        """
+        Returns the elements in the list that come after the specified cursor.
+        """
+        after: String
+
+        """
+        Returns the first _n_ elements from the list.
+        """
+        first: Int
+
+        """
+        A list of states to filter the pull requests by.
+        """
+        states: [PullRequestState!]
+    ): PullRequestConnection!
+
+    # urlRequests(
+    #   url: URI
+    # ): PullRequestConnection!
+    pullRequest(number: Int): PullRequest
+}
+
+"""
+The connection type for PullRequest.
+"""
+type PullRequestConnection {
+    """
+    A list of nodes.
+    """
+    nodes: [PullRequest]
+
+    """
+    Information to aid in pagination.
+    """
+    pageInfo: PageInfo!
+}
+
+"""
+A repository pull request.
+"""
+type PullRequest {
+    """
+    A list of commits present in this pull request's head branch not present in the base branch.
+    """
+    commits(
+        """
+        Returns the elements in the list that come after the specified cursor.
+        """
+        after: String
+
+        """
+        Returns the first _n_ elements from the list.
+        """
+        first: Int
+    ): PullRequestCommitConnection
+
+    """
+    Identifies the pull request number.
+    """
+    number: Int!
+
+    url: URI!
+    """
+    A list of reviews associated with the pull request.
+    """
+    reviews(
+        """
+        Returns the elements in the list that come after the specified cursor.
+        """
+        after: String
+
+        """
+        Returns the first _n_ elements from the list.
+        """
+        first: Int
+
+        """
+        A list of states to filter the reviews.
+        """
+        states: [PullRequestReviewState!]
+    ): PullRequestReviewConnection
+}
+
+"""
+The possible states of a pull request.
+"""
+enum PullRequestState {
+    """
+    A pull request that has been closed without being merged.
+    """
+    CLOSED
+
+    """
+    A pull request that has been closed by being merged.
+    """
+    MERGED
+
+    """
+    A pull request that is still open.
+    """
+    OPEN
+}
+
+"""
+The connection type for PullRequestReview.
+"""
+type PullRequestReviewConnection {
+    """
+    A list of nodes.
+    """
+    nodes: [PullRequestReview]
+
+    """
+    Information to aid in pagination.
+    """
+    pageInfo: PageInfo!
+}
+
+"""
+A review object for a given pull request.
+"""
+type PullRequestReview {
+    """
+    Identifies the primary key from the database.
+    """
+    databaseId: Int
+}
+
+"""
+The possible states of a pull request review.
+"""
+enum PullRequestReviewState {
+    """
+    A review allowing the pull request to merge.
+    """
+    APPROVED
+
+    """
+    A review blocking the pull request from merging.
+    """
+    CHANGES_REQUESTED
+
+    """
+    An informational review.
+    """
+    COMMENTED
+
+    """
+    A review that has been dismissed.
+    """
+    DISMISSED
+
+    """
+    A review that has not yet been submitted.
+    """
+    PENDING
+}
+
+"""
+The connection type for PullRequestCommit.
+"""
+type PullRequestCommitConnection {
+    """
+    A list of nodes.
+    """
+    nodes: [PullRequestCommit]
+
+    """
+    Information to aid in pagination.
+    """
+    pageInfo: PageInfo!
+}
+
+"""
+Represents a Git commit part of a pull request.
+"""
+type PullRequestCommit {
+    """
+    The Git commit object.
+    """
+    commit: Commit!
+}
+
+"""
+Represents a Git commit.
+"""
+type Commit {
+    """
+    Authorship details of the commit.
+    """
+    author: GitActor
+
+    """
+    The datetime when this commit was authored.
+    """
+    authoredDate: String!
+
+    """
+    The datetime when this commit was committed.
+    """
+    committedDate: String!
+
+    """
+    Committer details of the commit.
+    """
+    committer: GitActor
+
+    """
+    The Git object ID.
+    """
+    oid: String!
+
+    """
+    Commit signing information, if present.
+    """
+    signature: GitSignature
+}
+
+"""
+Represents an actor in a Git commit (ie. an author or committer).
+"""
+type GitActor {
+    """
+    The email in the Git commit.
+    """
+    email: String
+
+    """
+    The name in the Git commit.
+    """
+    name: String
+}
+
+"""
+Information about a signature (GPG or S/MIME) on a Commit or Tag.
+"""
+type GitSignature {
+    """
+    True if the signature is valid and verified by GitHub.
+    """
+    isValid: Boolean!
+
+    """
+    ASCII-armored signature header from object.
+    """
+    signature: String!
+
+    """
+    GitHub user corresponding to the email signing this commit.
+    """
+    signer: User
+}
+
+"""
+A user is an individual's account on GitHub that owns repositories and can make new content.
+"""
+type User {
+    """
+    The user's public profile name.
+    """
+    name: String
+
+    """
+    The user's public profile company.
+    """
+    company: String
+
+    """
+    A list of organizations the user belongs to.
+    """
+    organizations(
+        """
+        Returns the elements in the list that come after the specified cursor.
+        """
+        after: String
+
+        """
+        Returns the first _n_ elements from the list.
+        """
+        first: Int
+
+        """
+        Ordering options for the User's organizations.
+        """
+        orderBy: OrganizationOrder = null
+    ): OrganizationConnection!
+}
+
+"""
+A list of organizations managed by an enterprise.
+"""
+type OrganizationConnection {
+    """
+    A list of nodes.
+    """
+    nodes: [Organization]
+
+    """
+    Information to aid in pagination.
+    """
+    pageInfo: PageInfo!
+}
+
+"""
+Properties by which organization connections can be ordered.
+"""
+enum OrganizationOrderField {
+    """
+    Order organizations by creation time
+    """
+    CREATED_AT
+
+    """
+    Order organizations by login
+    """
+    LOGIN
+}
+
+"""
+An account on GitHub, with one or more owners, that has repositories, members and teams.
+"""
+type Organization {
+    """
+    A list of domains owned by the organization.
+    """
+    domains(
+        """
+        Returns the elements in the list that come after the specified cursor.
+        """
+        after: String
+
+        """
+        Returns the first _n_ elements from the list.
+        """
+        first: Int
+    ): VerifiableDomainConnection
+
+    """
+    The organization's login name.
+    """
+    login: String!
+
+    """
+    The organization's public profile name.
+    """
+    name: String
+}
+
+"""
+The connection type for VerifiableDomain.
+"""
+type VerifiableDomainConnection {
+    """
+    A list of nodes.
+    """
+    nodes: [VerifiableDomain]
+
+    """
+    Information to aid in pagination.
+    """
+    pageInfo: PageInfo!
+}
+
+"""
+A domain that can be verified or approved for an organization or an enterprise.
+"""
+type VerifiableDomain {
+    """
+    The unicode encoded domain.
+    """
+    domain: URI!
+
+    """
+    Whether or not the domain is approved.
+    """
+    isApproved: Boolean!
+
+    """
+    Whether or not the domain is verified.
+    """
+    isVerified: Boolean!
+}
+
+"""
+Information about pagination in a connection.
+"""
+type PageInfo {
+    """
+    When paginating forwards, the cursor to continue.
+    """
+    endCursor: String
+
+    """
+    When paginating forwards, are there more items?
+    """
+    hasNextPage: Boolean!
+}
+
+"""
+Scalar type for URLs
+"""
+scalar URI

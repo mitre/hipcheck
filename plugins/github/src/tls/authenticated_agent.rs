@@ -2,7 +2,7 @@
 
 //! Defines an authenticated [`Agent`] type that adds token auth to all requests.
 
-use crate::util::{agent, redacted::Redacted};
+use crate::{redacted::Redacted, tls::agent};
 use hipcheck_sdk::error::Result;
 use ureq::{Agent, Request};
 
