@@ -118,7 +118,7 @@ rustix = { version = "1.1.2", features = ["fs", "termios"] }
 simd-adler32 = { version = "0.3.7", default-features = false, features = ["std"] }
 
 [target.x86_64-apple-darwin.dependencies]
-bitflags = { version = "2.9.4", default-features = false, features = ["std"] }
+bitflags = { version = "2.10.0", default-features = false, features = ["std"] }
 getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.177" }
 miniz_oxide = { version = "0.8.9", default-features = false, features = ["simd", "with-alloc"] }
@@ -126,7 +126,7 @@ rustix = { version = "1.1.2", features = ["fs", "termios"] }
 simd-adler32 = { version = "0.3.7", default-features = false, features = ["std"] }
 
 [target.x86_64-apple-darwin.build-dependencies]
-bitflags = { version = "2.9.4", default-features = false, features = ["std"] }
+bitflags = { version = "2.10.0", default-features = false, features = ["std"] }
 getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.177" }
 miniz_oxide = { version = "0.8.9", default-features = false, features = ["simd", "with-alloc"] }
@@ -134,7 +134,7 @@ rustix = { version = "1.1.2", features = ["fs", "termios"] }
 simd-adler32 = { version = "0.3.7", default-features = false, features = ["std"] }
 
 [target.aarch64-apple-darwin.dependencies]
-bitflags = { version = "2.9.4", default-features = false, features = ["std"] }
+bitflags = { version = "2.10.0", default-features = false, features = ["std"] }
 getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.177" }
 miniz_oxide = { version = "0.8.9", default-features = false, features = ["simd", "with-alloc"] }
@@ -142,7 +142,7 @@ rustix = { version = "1.1.2", features = ["fs", "termios"] }
 simd-adler32 = { version = "0.3.7", default-features = false, features = ["std"] }
 
 [target.aarch64-apple-darwin.build-dependencies]
-bitflags = { version = "2.9.4", default-features = false, features = ["std"] }
+bitflags = { version = "2.10.0", default-features = false, features = ["std"] }
 getrandom = { version = "0.3.3", default-features = false, features = ["std"] }
 libc = { version = "0.2.177" }
 miniz_oxide = { version = "0.8.9", default-features = false, features = ["simd", "with-alloc"] }
