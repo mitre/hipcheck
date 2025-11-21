@@ -1,13 +1,12 @@
-
-query Reviews($owner:String!, $repo:String!, $cursor:String) {
+query Reviews($owner: String!, $repo: String!, $cursor: String) {
     repository(owner: $owner, name: $repo) {
         pullRequests(first: 100, after: $cursor, states: MERGED) {
             pageInfo {
-                hasNextPage,
+                hasNextPage
                 endCursor
-            },
+            }
             nodes {
-                number,
+                number
                 reviews(first: 100, states: APPROVED) {
                     nodes {
                         databaseId
@@ -18,30 +17,30 @@ query Reviews($owner:String!, $repo:String!, $cursor:String) {
     }
 }
 
-query Review($owner:String!, $repo:String!, $number:Int!, $cursor:String) {
+query Review($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
     repository(owner: $owner, name: $repo) {
         pullRequest(number: $number) {
             commits(first: 100, after: $cursor) {
                 pageInfo {
-                    hasNextPage,
+                    hasNextPage
                     endCursor
                 }
                 nodes {
                     commit {
-                        oid,
+                        oid
                         author {
-                            name,
+                            name
                             email
                         }
-                        authoredDate,
+                        authoredDate
                         committer {
-                            name,
+                            name
                             email
-                        },
-                        committedDate,
+                        }
+                        committedDate
                         signature {
-                            isValid,
-                            signature,
+                            isValid
+                            signature
                             signer {
                                 name
                             }
@@ -49,7 +48,7 @@ query Review($owner:String!, $repo:String!, $number:Int!, $cursor:String) {
                     }
                 }
             }
-            number,
+            number
             reviews {
                 nodes {
                     databaseId

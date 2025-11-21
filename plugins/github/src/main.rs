@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
-mod code_search;
-mod data;
+mod api;
 mod graphql;
+mod redacted;
+mod rest;
+mod tls;
 mod types;
-mod util;
 
-use crate::data::GitHub;
+use crate::api::GitHub;
 use clap::Parser;
 use hipcheck_sdk::{
 	LogLevel,
@@ -15,9 +16,7 @@ use hipcheck_sdk::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
-use std::result::Result as StdResult;
-use std::sync::OnceLock;
+use std::{rc::Rc, result::Result as StdResult, sync::OnceLock};
 
 struct Config {
 	pub api_token: String,
