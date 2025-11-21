@@ -16,7 +16,7 @@ publish = false
 
 ### BEGIN HAKARI SECTION
 [dependencies]
-bytes = { version = "1.10.1" }
+bytes = { version = "1.11.0" }
 chrono = { version = "0.4.42", features = ["serde"] }
 crypto-common = { version = "0.1.6", default-features = false, features = ["std"] }
 dashmap = { version = "6.1.0", default-features = false, features = ["inline", "rayon"] }
@@ -59,7 +59,7 @@ winnow = { version = "0.7.13", features = ["simd"] }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 
 [build-dependencies]
-bytes = { version = "1.10.1" }
+bytes = { version = "1.11.0" }
 cc = { version = "1.2.36", default-features = false, features = ["parallel"] }
 chrono = { version = "0.4.42", features = ["serde"] }
 crypto-common = { version = "0.1.6", default-features = false, features = ["std"] }
