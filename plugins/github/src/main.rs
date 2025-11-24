@@ -29,7 +29,7 @@ struct Args {
 async fn main() -> Result<()> {
 	let args = Args::try_parse().unwrap();
 
-	PluginServer::register(GithubAPIPlugin {}, args.log_level)
+	PluginServer::register(GithubAPIPlugin::new(), args.log_level)
 		.listen_local(args.port)
 		.await
 }

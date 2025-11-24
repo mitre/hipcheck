@@ -51,7 +51,7 @@ async fn pr_reviews(_engine: &mut PluginEngine, key: KnownRemote) -> Result<Vec<
 	Ok(results)
 }
 
-#[query(default)]
+#[query]
 async fn has_fuzz(_engine: &mut PluginEngine, key: RemoteGitRepo) -> Result<bool> {
 	tracing::info!("running has_fuzz query");
 
@@ -79,8 +79,19 @@ async fn has_fuzz(_engine: &mut PluginEngine, key: RemoteGitRepo) -> Result<bool
 	Ok(with_fuzz)
 }
 
+#[query]
+async fn user_orgs(_engine: &mut PluginEngine, _key: KnownRemote) -> Result<Vec<String>> {
+	todo!()
+}
+
 #[derive(Clone, Debug)]
 pub struct GithubAPIPlugin {}
+
+impl GithubAPIPlugin {
+	pub fn new() -> Self {
+		GithubAPIPlugin {}
+	}
+}
 
 impl Plugin for GithubAPIPlugin {
 	const PUBLISHER: &'static str = "mitre";
