@@ -2,6 +2,7 @@
 
 use crate::api::GitHub;
 use crate::config::{CONFIG, Config, RawConfig};
+use crate::graphql::user_orgs::UserOrgData;
 use hipcheck_sdk::{
 	prelude::*,
 	types::{KnownRemote, RemoteGitRepo},
@@ -73,16 +74,13 @@ async fn has_fuzz(_engine: &mut PluginEngine, key: RemoteGitRepo) -> Result<bool
 }
 
 #[query]
-async fn user_orgs(_engine: &mut PluginEngine, user_login: String) -> Result<()> {
+async fn user_orgs(_engine: &mut PluginEngine, user_login: String) -> Result<UserOrgData> {
 	tracing::info!("running user_org query");
 	let api_token = get_api_token()?;
 	let agent = GitHub::new(api_token)?;
 	let user_orgs = agent.get_user_orgs(&user_login)?;
-
-	todo!();
-
 	tracing::info!("completed user_orgs query");
-	Ok(())
+	Ok(user_orgs)
 }
 
 #[derive(Clone, Debug)]

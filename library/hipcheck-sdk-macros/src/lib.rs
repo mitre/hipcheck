@@ -3,21 +3,31 @@
 use convert_case::Casing;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use std::ops::Not;
-use std::sync::{LazyLock, Mutex};
-use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Ident, ItemFn, Meta, PatType, parse_macro_input};
+use std::{
+	ops::Not as _,
+	sync::{LazyLock, Mutex},
+};
+use syn::{
+	Data, DeriveInput, Error, GenericArgument, Ident, ItemFn, Meta, PatType, PathArguments,
+	ReturnType, parse_macro_input, spanned::Spanned,
+};
 
+/// Records registered queries.
 static QUERIES: LazyLock<Mutex<Vec<NamedQuerySpec>>> = LazyLock::new(|| Mutex::new(vec![]));
 
-#[allow(unused)]
-#[derive(Debug, Clone)]
+/// Specification for a single query, used for outputting queries in the plugin impl.
+#[derive(Debug)]
 struct NamedQuerySpec {
+	/// The structure associated with the query.
 	pub struct_name: String,
+	/// The function implementing the query.
 	pub function: String,
+	/// Whether the query is the default query for the plugin.
 	pub default: bool,
 }
 
+/// Specification of a single query, used for generating the query trait impl.
+#[derive(Debug)]
 struct QuerySpec {
 	pub function: Ident,
 	pub input_type: syn::Type,
@@ -27,32 +37,32 @@ struct QuerySpec {
 
 /// Parse Path to confirm that it represents a Result<T: Serialize> and return the type T
 fn parse_result_generic(p: &syn::Path) -> Result<syn::Type, Error> {
-	use syn::GenericArgument;
-	use syn::PathArguments;
 	// Assert it is a Result
 	// Panic: Safe to unwrap because there should be at least one element in the sequence
 	let last = p.segments.last().unwrap();
+
 	if last.ident != "Result" {
 		return Err(Error::new(
 			p.span(),
 			"Expected return type to be a Result<T: Serialize>",
 		));
 	}
-	match &last.arguments {
-		PathArguments::AngleBracketed(x) => {
-			let Some(GenericArgument::Type(ty)) = x.args.first() else {
-				return Err(Error::new(
-					p.span(),
-					"Expected return type to be a Result<T: Serialize>",
-				));
-			};
-			Ok(ty.clone())
-		}
-		_ => Err(Error::new(
+
+	let PathArguments::AngleBracketed(x) = &last.arguments else {
+		return Err(Error::new(
 			p.span(),
 			"Expected return type to be a Result<T: Serialize>",
-		)),
-	}
+		));
+	};
+
+	let Some(GenericArgument::Type(ty)) = x.args.first() else {
+		return Err(Error::new(
+			p.span(),
+			"Expected return type to be a Result<T: Serialize>",
+		));
+	};
+
+	Ok(ty.clone())
 }
 
 /// Parse PatType to confirm that it contains a &mut PluginEngine
@@ -62,6 +72,7 @@ fn parse_plugin_engine(engine_arg: &PatType) -> Result<(), Error> {
 		&& let syn::Type::Path(type_path) = type_reference.elem.as_ref()
 	{
 		let last = type_path.path.segments.last().unwrap();
+
 		if last.ident == "PluginEngine" {
 			return Ok(());
 		}
@@ -75,38 +86,33 @@ fn parse_plugin_engine(engine_arg: &PatType) -> Result<(), Error> {
 
 fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<QuerySpec, Error> {
 	use syn::Meta::*;
-	use syn::ReturnType;
-	let sig = &item_fn.sig;
 
+	let sig = &item_fn.sig;
 	let function = sig.ident.clone();
 
-	let input_type: syn::Type = {
-		let inputs = &sig.inputs;
-		if inputs.len() != 2 {
+	let input_type = {
+		// Validate that there are two function arguments.
+		if sig.inputs.len() != 2 {
 			return Err(Error::new(
 				item_fn.span(),
 				"Query function must take two arguments: &mut PluginEngine, and an input type that implements Serialize",
 			));
 		}
+
 		// Validate that the first arg is type &mut PluginEngine
-		if let Some(syn::FnArg::Typed(engine_arg)) = inputs.get(0) {
+		if let Some(syn::FnArg::Typed(engine_arg)) = &sig.inputs.get(0) {
 			parse_plugin_engine(engine_arg)?;
 		}
 
-		if let Some(input_arg) = inputs.get(1) {
-			let syn::FnArg::Typed(input_arg_info) = input_arg else {
-				return Err(Error::new(
-					item_fn.span(),
-					"Query function must take two arguments: &mut PluginEngine, and an input type that implements Serialize",
-				));
-			};
-			input_arg_info.ty.as_ref().clone()
-		} else {
+		// Validate that the second argument is a typed function arg.
+		let Some(syn::FnArg::Typed(input_arg_info)) = &sig.inputs.get(1) else {
 			return Err(Error::new(
 				item_fn.span(),
 				"Query function must take two arguments: &mut PluginEngine, and an input type that implements Serialize",
 			));
-		}
+		};
+
+		input_arg_info.ty.as_ref().clone()
 	};
 
 	let output_type = match &sig.output {
@@ -116,65 +122,61 @@ fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<Que
 				"Query function must return Result<T: Serialize>",
 			));
 		}
-		ReturnType::Type(_, b_type) => {
-			use syn::Type;
-			match b_type.as_ref() {
-				Type::Path(p) => parse_result_generic(&p.path)?,
-				_ => {
-					return Err(Error::new(
-						item_fn.span(),
-						"Query function must return Result<T: Serialize>",
-					));
-				}
+		ReturnType::Type(_, b_type) => match b_type.as_ref() {
+			syn::Type::Path(p) => parse_result_generic(&p.path)?,
+			_ => {
+				return Err(Error::new(
+					item_fn.span(),
+					"Query function must return Result<T: Serialize>",
+				));
 			}
-		}
+		},
 	};
 
 	let default = match opt_meta {
 		Some(NameValue(nv)) => {
 			// Panic: Safe to unwrap because there should be at least one element in the sequence
-			if nv.path.segments.first().unwrap().ident == "default" {
-				match nv.value {
-					syn::Expr::Lit(e) => match e.lit {
-						syn::Lit::Bool(s) => s.value,
-						_ => {
-							return Err(Error::new(
-								item_fn.span(),
-								"Default field on query function options must have a Boolean value",
-							));
-						}
-					},
-					_ => {
-						return Err(Error::new(
-							item_fn.span(),
-							"Default field on query function options must have a Boolean value",
-						));
-					}
-				}
-			} else {
+			if nv.path.segments.first().unwrap().ident != "default" {
 				return Err(Error::new(
 					item_fn.span(),
 					"Default field must be set if options are included for the query function",
 				));
 			}
+
+			let syn::Expr::Lit(e) = nv.value else {
+				return Err(Error::new(
+					item_fn.span(),
+					"Default field on query function options must have a Boolean value",
+				));
+			};
+
+			let syn::Lit::Bool(s) = e.lit else {
+				return Err(Error::new(
+					item_fn.span(),
+					"Default field on query function options must have a Boolean value",
+				));
+			};
+
+			s.value
 		}
 		Some(Path(p)) => {
-			let seg: &syn::PathSegment = p.segments.first().unwrap();
-			if seg.ident == "default" {
-				match seg.arguments {
-					syn::PathArguments::None => true,
-					_ => {
-						return Err(Error::new(
-							item_fn.span(),
-							"Default field in query options path cannot have any parenthized or bracketed arguments",
-						));
-					}
-				}
-			} else {
+			let seg = p.segments.first().unwrap();
+
+			if seg.ident != "default" {
 				return Err(Error::new(
 					item_fn.span(),
 					"Default field must be set if options are included for the query function",
 				));
+			}
+
+			match seg.arguments {
+				syn::PathArguments::None => true,
+				_ => {
+					return Err(Error::new(
+						item_fn.span(),
+						"Default field in query options path cannot have any parenthized or bracketed arguments",
+					));
+				}
 			}
 		}
 		None => false,
@@ -203,12 +205,15 @@ fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<Que
 #[proc_macro_attribute]
 pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
 	let mut to_return = proc_macro2::TokenStream::from(item.clone());
+
 	let item_fn = parse_macro_input!(item as ItemFn);
+
 	let opt_meta: Option<Meta> = if attr.is_empty().not() {
 		Some(parse_macro_input!(attr as Meta))
 	} else {
 		None
 	};
+
 	let spec = match parse_named_query_spec(opt_meta, item_fn) {
 		Ok(span) => span,
 		Err(err) => return err.to_compile_error().into(),
@@ -221,6 +226,7 @@ pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
 			.as_str(),
 		Span::call_site(),
 	);
+
 	let ident = &spec.function;
 	let input_type = spec.input_type;
 	let output_type = spec.output_type;
@@ -238,9 +244,15 @@ pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
 				hipcheck_sdk::prelude::schema_for!(#output_type)
 			}
 
-			async fn run(&self, engine: &mut hipcheck_sdk::prelude::PluginEngine, input: hipcheck_sdk::prelude::Value) -> hipcheck_sdk::prelude::Result<hipcheck_sdk::prelude::Value> {
+			async fn run(
+				&self,
+				engine: &mut hipcheck_sdk::prelude::PluginEngine,
+				input: hipcheck_sdk::prelude::Value
+			) -> hipcheck_sdk::prelude::Result<hipcheck_sdk::prelude::Value>
+			{
 				let input = hipcheck_sdk::prelude::from_value(input).map_err(|_|
 					hipcheck_sdk::prelude::Error::UnexpectedPluginQueryInputFormat)?;
+
 				let output = #ident(engine, input).await?;
 				hipcheck_sdk::prelude::to_value(output).map_err(|_|
 					hipcheck_sdk::prelude::Error::UnexpectedPluginQueryOutputFormat)
@@ -264,33 +276,36 @@ pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// to ensure they are seen and added.
 #[proc_macro]
 pub fn queries(_item: TokenStream) -> TokenStream {
-	let mut agg = proc_macro2::TokenStream::new();
 	let q_lock = QUERIES.lock().unwrap();
+
 	// Create a NamedQuery for each #query func we've seen
-	for q in q_lock.iter() {
-		let name = match q.default {
-			true => "",
-			false => q.function.as_str(),
-		};
-		let inner = Ident::new(q.struct_name.as_str(), Span::call_site());
-		let out = quote::quote! {
-			NamedQuery {
-				name: #name,
-				inner: Box::new(#inner {})
-			},
-		};
-		agg.extend(out);
-	}
+	let agg = q_lock
+		.iter()
+		.map(|q| {
+			let name = q.default.then(|| "").unwrap_or_else(|| q.function.as_str());
+			let inner = Ident::new(q.struct_name.as_str(), Span::call_site());
+
+			quote::quote! {
+				NamedQuery {
+					name: #name,
+					inner: Box::new(#inner {})
+				},
+			}
+		})
+		.collect::<proc_macro2::TokenStream>();
+
 	tracing::debug!(
 		"Auto-generating Plugin::queries() with {} detected queries",
 		q_lock.len()
 	);
+
 	// Impl `Plugin::queries` as a vec of generated NamedQuery instances
 	let out = quote::quote! {
 		fn queries(&self) -> impl Iterator<Item = NamedQuery> {
 			vec![#agg].into_iter()
 		}
 	};
+
 	proc_macro::TokenStream::from(out)
 }
 
