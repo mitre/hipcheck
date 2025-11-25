@@ -87,7 +87,7 @@ fn make_request(
 			let parsed = from_json_value(response_json)?;
 			Ok(parsed)
 		}
-		status @ _ => Err(anyhow!(
+		status => Err(anyhow!(
 			"request to GitHub API returned the following HTTP status: {} {}",
 			status,
 			response.status_text()
