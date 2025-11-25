@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(unused)]
-
 use self::user_orgs::{ResponseData, Variables};
 use crate::{graphql::GH_API_V4, tls::authenticated_agent::AuthenticatedAgent};
 use anyhow::{Result, anyhow};
@@ -33,46 +31,42 @@ pub fn get_user_orgs(agent: &AuthenticatedAgent<'_>, login: &str) -> Result<User
 		.user
 		.ok_or_else(|| anyhow!("user not found on GitHub"))?;
 
-	let data = UserOrgData {
-		profile_employer: user.company,
-		github_orgs: user
-			.organizations
-			.nodes
-			.map(|nodes| {
-				nodes
+	let profile_employer = user.company;
+
+	let github_orgs = user
+		.organizations
+		.nodes
+		.unwrap_or_default()
+		.into_iter()
+		.filter_map(|org| {
+			let org = org?;
+
+			Some(GitHubOrg {
+				name: org.name,
+				login: org.login,
+				domains: org
+					.domains?
+					.nodes
+					.unwrap_or_default()
 					.into_iter()
-					.filter_map(|opt_node| {
-						opt_node.map(|node| GitHubOrg {
-							name: node.name,
-							login: node.login,
-							domains: node
-								.domains
-								.map(|domains| {
-									domains
-										.nodes
-										.map(|domains| {
-											domains
-												.into_iter()
-												.filter_map(|domain| {
-													domain.map(|domain| GitHubOrgDomain {
-														domain: domain.domain,
-														is_approved: domain.is_approved,
-														is_verified: domain.is_verified,
-													})
-												})
-												.collect::<Vec<_>>()
-										})
-										.unwrap_or_else(|| vec![])
-								})
-								.unwrap_or_else(|| vec![]),
+					.filter_map(|domain| {
+						let domain = domain?;
+
+						Some(GitHubOrgDomain {
+							domain: domain.domain,
+							is_approved: domain.is_approved,
+							is_verified: domain.is_verified,
 						})
 					})
-					.collect::<Vec<_>>()
+					.collect(),
 			})
-			.unwrap_or_else(|| vec![]),
-	};
+		})
+		.collect();
 
-	Ok(data)
+	Ok(UserOrgData {
+		profile_employer,
+		github_orgs,
+	})
 }
 
 /// Make a request to the GitHub API.
@@ -99,22 +93,33 @@ fn make_request(
 	}
 }
 
+/// User's organization membership data pulled from the GitHub API.
 #[derive(Debug, Default)]
 pub struct UserOrgData {
+	/// The user's employer, as pulled from their GitHub profile.
 	pub profile_employer: Option<String>,
+	/// The GitHub organizations the user belongs to.
 	pub github_orgs: Vec<GitHubOrg>,
 }
 
+/// A single organization on GitHub.
 #[derive(Debug)]
 pub struct GitHubOrg {
+	/// The display name of the organization, if present.
 	pub name: Option<String>,
+	/// The username of the organization.
 	pub login: String,
+	/// Domain names associated with the organization.
 	pub domains: Vec<GitHubOrgDomain>,
 }
 
+/// A single domain associated with a GitHub organization.
 #[derive(Debug)]
 pub struct GitHubOrgDomain {
+	/// The domain name associated with the organization.
 	pub domain: Url,
+	/// Whether the domain has been approved by the organization.
 	pub is_approved: bool,
+	/// Whether the domain has been verified by the organization.
 	pub is_verified: bool,
 }
