@@ -4,6 +4,8 @@ use self::user_orgs::{ResponseData, Variables};
 use crate::{graphql::GH_API_V4, tls::authenticated_agent::AuthenticatedAgent};
 use anyhow::{Result, anyhow};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
+use schemars::JsonSchema;
+use serde::Serialize;
 use serde_json::{from_value as from_json_value, to_value as to_json_value};
 use url::Url;
 
@@ -94,7 +96,7 @@ fn make_request(
 }
 
 /// User's organization membership data pulled from the GitHub API.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, JsonSchema)]
 pub struct UserOrgData {
 	/// The user's employer, as pulled from their GitHub profile.
 	pub profile_employer: Option<String>,
@@ -103,7 +105,7 @@ pub struct UserOrgData {
 }
 
 /// A single organization on GitHub.
-#[derive(Debug)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct GitHubOrg {
 	/// The display name of the organization, if present.
 	pub name: Option<String>,
@@ -114,7 +116,7 @@ pub struct GitHubOrg {
 }
 
 /// A single domain associated with a GitHub organization.
-#[derive(Debug)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct GitHubOrgDomain {
 	/// The domain name associated with the organization.
 	pub domain: Url,
