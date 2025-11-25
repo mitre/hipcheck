@@ -282,7 +282,7 @@ pub fn queries(_item: TokenStream) -> TokenStream {
 	let agg = q_lock
 		.iter()
 		.map(|q| {
-			let name = q.default.then(|| "").unwrap_or_else(|| q.function.as_str());
+			let name = if q.default { "" } else { q.function.as_str() };
 			let inner = Ident::new(q.struct_name.as_str(), Span::call_site());
 
 			quote::quote! {
