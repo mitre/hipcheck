@@ -18,6 +18,18 @@ fn query_err<E: Display>(e: E) -> Error {
 	Error::UnspecifiedQueryState
 }
 
+/// Reads the API token from the configuration.
+fn get_api_token() -> Result<&'static str> {
+	Ok(CONFIG
+		.get()
+		.ok_or_else(|| {
+			tracing::error!("tried to access config before set by Hipcheck core!");
+			Error::UnspecifiedQueryState
+		})?
+		.api_token
+		.as_str())
+}
+
 #[query]
 async fn pr_reviews(_engine: &mut PluginEngine, key: KnownRemote) -> Result<Vec<PullRequest>> {
 	tracing::info!("running pr_reviews query");
@@ -26,18 +38,11 @@ async fn pr_reviews(_engine: &mut PluginEngine, key: KnownRemote) -> Result<Vec<
 		KnownRemote::GitHub { owner, repo } => (owner, repo),
 	};
 
-	let api_token = CONFIG
-		.get()
-		.ok_or_else(|| {
-			tracing::error!("tried to access config before set by Hipcheck core!");
-			Error::UnspecifiedQueryState
-		})?
-		.api_token
-		.as_str();
+	let api_token = get_api_token()?;
 
-	let results = GitHub::new(owner, repo, api_token)
+	let results = GitHub::new(api_token)
 		.map_err(query_err)?
-		.get_reviews_for_pr()
+		.get_reviews_for_pr(owner, repo)
 		.map_err(query_err)?
 		.into_iter()
 		.map(|pr| PullRequest {
@@ -55,33 +60,29 @@ async fn pr_reviews(_engine: &mut PluginEngine, key: KnownRemote) -> Result<Vec<
 async fn has_fuzz(_engine: &mut PluginEngine, key: RemoteGitRepo) -> Result<bool> {
 	tracing::info!("running has_fuzz query");
 
-	let Some(KnownRemote::GitHub { owner, repo }) = &key.known_remote else {
-		tracing::error!("Unknown GitHub remote");
-		return Err(Error::UnspecifiedQueryState);
-	};
+	let api_token = get_api_token()?;
 
-	let api_token = CONFIG
-		.get()
-		.ok_or_else(|| {
-			tracing::error!("tried to access config before set by Hipcheck core!");
-			Error::UnspecifiedQueryState
-		})?
-		.api_token
-		.as_str();
-
-	let with_fuzz = GitHub::new(owner, repo, api_token)
+	let uses_oss_fuzz = GitHub::new(api_token)
 		.map_err(query_err)?
 		.fuzz_check(Rc::new(key.url.to_string()))
 		.map_err(query_err)?;
 
 	tracing::info!("completed has_fuzz query");
 
-	Ok(with_fuzz)
+	Ok(uses_oss_fuzz)
 }
 
 #[query]
-async fn user_orgs(_engine: &mut PluginEngine, _key: KnownRemote) -> Result<Vec<String>> {
-	todo!()
+async fn user_orgs(_engine: &mut PluginEngine, user_login: String) -> Result<()> {
+	tracing::info!("running user_org query");
+	let api_token = get_api_token()?;
+	let agent = GitHub::new(api_token)?;
+	let user_orgs = agent.get_user_orgs(&user_login)?;
+
+	todo!();
+
+	tracing::info!("completed user_orgs query");
+	Ok(())
 }
 
 #[derive(Clone, Debug)]
@@ -103,6 +104,7 @@ impl Plugin for GithubAPIPlugin {
 				message: e.to_string().into_boxed_str(),
 			})?
 			.try_into()?;
+
 		CONFIG.set(conf).map_err(|_e| ConfigError::InternalError {
 			message: "config was already set".to_owned().into_boxed_str(),
 		})
