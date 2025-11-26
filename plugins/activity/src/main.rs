@@ -18,7 +18,7 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 
 /// Returns the span of time since the most recent commit to a Git repo as `jiff:Span` displayed as a String
 /// (Which means that anything expecting a `Span` must parse the output of this query appropriately)
-#[query(default)]
+#[query]
 async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 	tracing::info!("running activity query");
 
@@ -87,7 +87,9 @@ impl Plugin for ActivityPlugin {
 		))
 	}
 
-	queries! {}
+	queries! {
+		#[default] activity
+	}
 }
 
 #[derive(Parser, Debug)]

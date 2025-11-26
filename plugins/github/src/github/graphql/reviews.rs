@@ -1,23 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use self::reviews::{ResponseData, ReviewsRepositoryPullRequestsNodes as RawPull, Variables};
-use crate::{graphql::GH_API_V4, tls::authenticated_agent::AuthenticatedAgent, types::*};
+use crate::{github::graphql::GH_API_V4, tls::authenticated_agent::AuthenticatedAgent};
 use anyhow::{Result, anyhow};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use serde_json::{from_value as from_json_value, to_value as to_json_value};
 use std::convert::TryInto;
 
 /// Defines the query being made against the GitHub API.
 #[derive(GraphQLQuery)]
 #[graphql(
-	schema_path = "src/graphql/schemas/types.graphql",
-	query_path = "src/graphql/schemas/reviews.graphql",
-	response_derives = "Debug"
+	schema_path = "src/github/graphql/schemas/types.graphql",
+	query_path = "src/github/graphql/schemas/reviews.graphql",
+	response_derives = "Debug",
+	custom_scalars_module = "crate::github::graphql::custom_scalars"
 )]
 pub struct Reviews;
 
 /// Query the GitHub GraphQL API for reviews performed on PRs for a repo.
-pub fn get_all_reviews(
+pub fn get_reviews(
 	agent: &AuthenticatedAgent<'_>,
 	owner: &str,
 	repo: &str,
@@ -29,7 +32,8 @@ pub fn get_all_reviews(
 
 	// Keep making requests so long as there's cursor data indicating more
 	// requests need to be made.
-	while let new_cursor @ Some(_) = get_reviews(agent, vars.with_cursor(cursor), &mut data)? {
+	while let new_cursor @ Some(_) = get_reviews_inner(agent, vars.with_cursor(cursor), &mut data)?
+	{
 		cursor = new_cursor;
 	}
 
@@ -62,7 +66,7 @@ impl<'a> Vars<'a> {
 type Cursor = Option<String>;
 
 /// Query the GitHub GraphQL API for reviews performed on PRs for a repo.
-fn get_reviews(
+fn get_reviews_inner(
 	agent: &AuthenticatedAgent<'_>,
 	variables: Variables,
 	data: &mut Vec<GitHubPullRequest>,
@@ -138,7 +142,7 @@ fn get_prs(body: Response<ResponseData>) -> Result<Vec<RawPull>> {
 
 /// Convert a single RawPull to a GitHubPullRequest
 fn process_pr(pr: RawPull) -> GitHubPullRequest {
-	let number: u64 = pr.number.try_into().unwrap();
+	let id: u64 = pr.number.try_into().unwrap();
 	let reviews: u64 = match pr.reviews {
 		None => 0,
 		Some(reviews) => match reviews.nodes {
@@ -149,5 +153,11 @@ fn process_pr(pr: RawPull) -> GitHubPullRequest {
 	.try_into()
 	.unwrap();
 
-	GitHubPullRequest { number, reviews }
+	GitHubPullRequest { id, reviews }
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+pub struct GitHubPullRequest {
+	pub id: u64,
+	pub reviews: u64,
 }

@@ -79,8 +79,9 @@ pub mod types;
 pub mod prelude {
 	pub use crate::deps::*;
 	pub use crate::engine::{PluginEngine, QueryBuilder};
-	pub use crate::error::{ConfigError, Error, Result};
+	pub use crate::error::{ConfigError, ConfigResult, Error, Result};
 	pub use crate::server::{Host, PluginServer, QueryResult};
+	pub use crate::types::{KnownRemote, RemoteGitRepo};
 	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
 	// Re-export macros
 	#[cfg(feature = "macros")]
@@ -223,10 +224,14 @@ pub trait Plugin: Send + Sync + 'static {
 	/// Get the plugin's default policy expression. This will only ever be called after
 	/// `Plugin::set_config()`. For more information on policy expression syntax, see the Hipcheck
 	/// website.
-	fn default_policy_expr(&self) -> Result<String>;
+	fn default_policy_expr(&self) -> Result<String> {
+		Ok(String::new())
+	}
 
 	/// Get an unstructured description of what is returned by the plugin's default query.
-	fn explain_default_query(&self) -> Result<Option<String>>;
+	fn explain_default_query(&self) -> Result<Option<String>> {
+		Ok(None)
+	}
 
 	/// Get all the queries supported by the plugin. Each query endpoint in a plugin will have its
 	/// own `trait Query` implementation. This function should return an iterator containing one

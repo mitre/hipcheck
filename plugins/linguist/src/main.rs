@@ -20,7 +20,7 @@ struct Config {
 
 static DETECTOR: OnceLock<SourceFileDetector> = OnceLock::new();
 
-#[query(default)]
+#[query]
 async fn is_likely_source_file(_engine: &mut PluginEngine, value: PathBuf) -> Result<bool> {
 	tracing::debug!("running is_likely_source_file query");
 	let Some(sfd) = DETECTOR.get() else {
@@ -71,7 +71,9 @@ impl Plugin for LinguistPlugin {
 		Ok(None)
 	}
 
-	queries! {}
+	queries! {
+		#[default] is_likely_source_file,
+	}
 }
 
 #[derive(Parser, Debug)]

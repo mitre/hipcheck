@@ -3,28 +3,10 @@
 use convert_case::Casing;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use std::{
-	ops::Not as _,
-	sync::{LazyLock, Mutex},
-};
 use syn::{
-	Data, DeriveInput, Error, GenericArgument, Ident, ItemFn, Meta, PatType, PathArguments,
-	ReturnType, parse_macro_input, spanned::Spanned,
+	Attribute, Data, DeriveInput, Error, GenericArgument, Ident, ItemFn, PatType, PathArguments,
+	ReturnType, parse::Parse, parse_macro_input, punctuated::Punctuated, spanned::Spanned,
 };
-
-/// Records registered queries.
-static QUERIES: LazyLock<Mutex<Vec<NamedQuerySpec>>> = LazyLock::new(|| Mutex::new(vec![]));
-
-/// Specification for a single query, used for outputting queries in the plugin impl.
-#[derive(Debug)]
-struct NamedQuerySpec {
-	/// The structure associated with the query.
-	pub struct_name: String,
-	/// The function implementing the query.
-	pub function: String,
-	/// Whether the query is the default query for the plugin.
-	pub default: bool,
-}
 
 /// Specification of a single query, used for generating the query trait impl.
 #[derive(Debug)]
@@ -32,7 +14,6 @@ struct QuerySpec {
 	pub function: Ident,
 	pub input_type: syn::Type,
 	pub output_type: syn::Type,
-	pub default: bool,
 }
 
 /// Parse Path to confirm that it represents a Result<T: Serialize> and return the type T
@@ -84,9 +65,7 @@ fn parse_plugin_engine(engine_arg: &PatType) -> Result<(), Error> {
 	))
 }
 
-fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<QuerySpec, Error> {
-	use syn::Meta::*;
-
+fn parse_named_query_spec(item_fn: ItemFn) -> Result<QuerySpec, Error> {
 	let sig = &item_fn.sig;
 	let function = sig.ident.clone();
 
@@ -133,64 +112,8 @@ fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<Que
 		},
 	};
 
-	let default = match opt_meta {
-		Some(NameValue(nv)) => {
-			// Panic: Safe to unwrap because there should be at least one element in the sequence
-			if nv.path.segments.first().unwrap().ident != "default" {
-				return Err(Error::new(
-					item_fn.span(),
-					"Default field must be set if options are included for the query function",
-				));
-			}
-
-			let syn::Expr::Lit(e) = nv.value else {
-				return Err(Error::new(
-					item_fn.span(),
-					"Default field on query function options must have a Boolean value",
-				));
-			};
-
-			let syn::Lit::Bool(s) = e.lit else {
-				return Err(Error::new(
-					item_fn.span(),
-					"Default field on query function options must have a Boolean value",
-				));
-			};
-
-			s.value
-		}
-		Some(Path(p)) => {
-			let seg = p.segments.first().unwrap();
-
-			if seg.ident != "default" {
-				return Err(Error::new(
-					item_fn.span(),
-					"Default field must be set if options are included for the query function",
-				));
-			}
-
-			match seg.arguments {
-				syn::PathArguments::None => true,
-				_ => {
-					return Err(Error::new(
-						item_fn.span(),
-						"Default field in query options path cannot have any parenthized or bracketed arguments",
-					));
-				}
-			}
-		}
-		None => false,
-		_ => {
-			return Err(Error::new(
-				item_fn.span(),
-				"Cannot parse query function options",
-			));
-		}
-	};
-
 	Ok(QuerySpec {
 		function,
-		default,
 		input_type,
 		output_type,
 	})
@@ -203,18 +126,12 @@ fn parse_named_query_spec(opt_meta: Option<Meta>, item_fn: ItemFn) -> Result<Que
 /// the pascal-case version of the function name (e.g. `do_something()` ->
 /// `DoSomething`).
 #[proc_macro_attribute]
-pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn query(_attr: TokenStream, item: TokenStream) -> TokenStream {
 	let mut to_return = proc_macro2::TokenStream::from(item.clone());
 
 	let item_fn = parse_macro_input!(item as ItemFn);
 
-	let opt_meta: Option<Meta> = if attr.is_empty().not() {
-		Some(parse_macro_input!(attr as Meta))
-	} else {
-		None
-	};
-
-	let spec = match parse_named_query_spec(opt_meta, item_fn) {
+	let spec = match parse_named_query_spec(item_fn) {
 		Ok(span) => span,
 		Err(err) => return err.to_compile_error().into(),
 	};
@@ -260,12 +177,6 @@ pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
 		}
 	};
 
-	QUERIES.lock().unwrap().push(NamedQuerySpec {
-		struct_name: struct_name.to_string(),
-		function: spec.function.to_string(),
-		default: spec.default,
-	});
-
 	to_return.extend(to_follow);
 	proc_macro::TokenStream::from(to_return)
 }
@@ -275,20 +186,33 @@ pub fn query(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// expansion ordering, all `#[query]` functions must come before this macro
 /// to ensure they are seen and added.
 #[proc_macro]
-pub fn queries(_item: TokenStream) -> TokenStream {
-	let q_lock = QUERIES.lock().unwrap();
+pub fn queries(item: TokenStream) -> TokenStream {
+	let query_list = parse_macro_input!(item as QueryList);
 
 	// Create a NamedQuery for each #query func we've seen
-	let agg = q_lock
+	let agg = query_list
+		.inner
 		.iter()
-		.map(|q| {
-			let name = if q.default { "" } else { q.function.as_str() };
-			let inner = Ident::new(q.struct_name.as_str(), Span::call_site());
+		.map(|query_entry| {
+			let name = if query_entry.is_default() {
+				"".to_string()
+			} else {
+				query_entry.ident.to_string()
+			};
+
+			let struct_name = Ident::new(
+				query_entry
+					.ident
+					.to_string()
+					.to_case(convert_case::Case::Pascal)
+					.as_str(),
+				Span::call_site(),
+			);
 
 			quote::quote! {
 				NamedQuery {
 					name: #name,
-					inner: Box::new(#inner {})
+					inner: Box::new(#struct_name {})
 				},
 			}
 		})
@@ -296,7 +220,7 @@ pub fn queries(_item: TokenStream) -> TokenStream {
 
 	tracing::debug!(
 		"Auto-generating Plugin::queries() with {} detected queries",
-		q_lock.len()
+		query_list.inner.len()
 	);
 
 	// Impl `Plugin::queries` as a vec of generated NamedQuery instances
@@ -307,6 +231,50 @@ pub fn queries(_item: TokenStream) -> TokenStream {
 	};
 
 	proc_macro::TokenStream::from(out)
+}
+
+/// A list of query names, separated by commas, with an optional default annotation.
+///
+/// Could look like: `#[default] default_query, some_other_query, another_query`.
+#[derive(Debug)]
+struct QueryList {
+	/// List of queries
+	inner: Punctuated<QueryListEntry, syn::Token![,]>,
+}
+
+impl Parse for QueryList {
+	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+		Ok(Self {
+			inner: input.parse_terminated(QueryListEntry::parse, syn::Token![,])?,
+		})
+	}
+}
+
+/// A single entry in the query list, with an optional default annotation.
+///
+/// Could look like: `#[default] query_name` or just `query_name`.
+#[derive(Debug)]
+struct QueryListEntry {
+	attrs: Vec<Attribute>,
+	/// Identifier for the query function.
+	ident: Ident,
+}
+
+impl QueryListEntry {
+	pub fn is_default(&self) -> bool {
+		self.attrs
+			.iter()
+			.any(|attr| attr.path().is_ident("default"))
+	}
+}
+
+impl Parse for QueryListEntry {
+	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+		Ok(Self {
+			attrs: input.call(Attribute::parse_outer).unwrap_or_default(),
+			ident: input.parse()?,
+		})
+	}
 }
 
 /// Generates a derived macro implementation of the `PluginConfig` trait to

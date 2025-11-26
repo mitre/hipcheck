@@ -77,7 +77,7 @@ async fn commit_identity(engine: &mut PluginEngine, key: DetailedGitRepo) -> Res
 	Ok(ccv.author == ccv.committer)
 }
 
-#[query(default)]
+#[query]
 async fn identity(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
 	tracing::info!("running identity query");
 	// Get the commits for the source.
@@ -145,7 +145,10 @@ impl Plugin for IdentityPlugin {
 		))
 	}
 
-	queries! {}
+	queries! {
+		commit_identity,
+		#[default] identity,
+	}
 }
 
 #[derive(Parser, Debug)]

@@ -2,8 +2,9 @@
 
 //! Defines an authenticated [`Agent`] type that adds token auth to all requests.
 
-use crate::{redacted::Redacted, tls::agent};
+use crate::tls::agent;
 use hipcheck_sdk::error::Result;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 use ureq::{Agent, Request};
 
 /// An [`Agent`] which authenticates requests with token auth.
@@ -50,5 +51,33 @@ trait TokenAuth {
 impl TokenAuth for Request {
 	fn token_auth(self, token: &str) -> Self {
 		self.set(AUTH_KEY, &format!("token {}", token))
+	}
+}
+
+/// Helper container to ensure a value isn't printed.
+struct Redacted<T>(T);
+
+impl<T> Redacted<T> {
+	/// Construct a new redacted value.
+	pub fn new(val: T) -> Redacted<T> {
+		Redacted(val)
+	}
+}
+
+impl<T> AsRef<T> for Redacted<T> {
+	fn as_ref(&self) -> &T {
+		&self.0
+	}
+}
+
+impl<T> AsMut<T> for Redacted<T> {
+	fn as_mut(&mut self) -> &mut T {
+		&mut self.0
+	}
+}
+
+impl<T> Debug for Redacted<T> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+		write!(f, "<redacted>")
 	}
 }

@@ -137,7 +137,7 @@ async fn commit_entropies(
 	z_scores(commit_entropies).map_err(|_| Error::UnspecifiedQueryState)
 }
 
-#[query(default)]
+#[query]
 async fn entropy(engine: &mut PluginEngine, value: Target) -> Result<Vec<f64>> {
 	tracing::info!("running entropy query");
 	let policy_config = POLICY_CONFIG.get().cloned().flatten();
@@ -213,7 +213,10 @@ impl Plugin for EntropyPlugin {
 		))
 	}
 
-	queries! {}
+	queries! {
+		commit_entropies,
+		#[default] entropy
+	}
 }
 
 #[derive(Parser, Debug)]

@@ -6,7 +6,7 @@ use serde_json::Value;
 use std::result::Result as StdResult;
 
 /// Returns whether the target's remote repo uses Google's OSS fuzzing
-#[query(default)]
+#[query]
 async fn fuzz(engine: &mut PluginEngine, key: Target) -> Result<Value> {
 	tracing::info!("running fuzz query");
 	if let Some(remote) = &key.remote {
@@ -49,7 +49,9 @@ impl Plugin for FuzzAnalysisPlugin {
 		Ok(Some("'Does the target repo do fuzzing?'".to_owned()))
 	}
 
-	queries! {}
+	queries! {
+		#[default] fuzz
+	}
 }
 
 #[tokio::main(flavor = "current_thread")]

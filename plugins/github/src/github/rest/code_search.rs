@@ -8,10 +8,7 @@ use serde_json::Value;
 const CODE_SEARCH: &str = "https://api.github.com/search/code";
 
 /// Check if the given repo participates in OSS-Fuzz.
-pub fn detect_oss_fuzz_participation(
-	agent: &AuthenticatedAgent<'_>,
-	repo: impl AsRef<String>,
-) -> Result<bool> {
+pub fn check_fuzzing(agent: &AuthenticatedAgent<'_>, repo: &str) -> Result<bool> {
 	// Example query will look like this:
 	//     https://api.github.com/search/code?q=github.com%20assimp%20assimp+in:file+filename:project.yaml+repo:google/oss-fuzz
 	//
@@ -22,7 +19,6 @@ pub fn detect_oss_fuzz_participation(
 	// GitHub repo urls were not working for a few fuzzed urls.
 
 	let repo = repo
-		.as_ref()
 		.replace("https://", "")
 		.replace("http://", "")
 		.replace('/', "%20");
