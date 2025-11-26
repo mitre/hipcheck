@@ -21,7 +21,7 @@ fn reduce(input: u64) -> u64 {
 #[derive(Clone, Debug)]
 struct RandDataPlugin;
 
-#[query(default = false)]
+#[query]
 async fn rand_data(engine: &mut PluginEngine, size: u64) -> Result<u64> {
 	let reduced_num = reduce(size);
 
@@ -63,7 +63,9 @@ impl Plugin for RandDataPlugin {
 		Ok(Some("generate random data".to_owned()))
 	}
 
-	queries! {}
+	queries! {
+		#[default] rand_data,
+	}
 }
 
 #[derive(Parser, Debug)]

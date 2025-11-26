@@ -24,7 +24,7 @@ struct Config {
 	count_threshold: Option<u64>,
 }
 
-#[query(default)]
+#[query]
 async fn typo(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	tracing::info!("running typo query");
 
@@ -115,7 +115,9 @@ impl Plugin for TypoPlugin {
 		))
 	}
 
-	queries! {}
+	queries! {
+		#[default] typo
+	}
 }
 
 #[derive(Parser, Debug)]

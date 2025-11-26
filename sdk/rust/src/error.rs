@@ -111,6 +111,9 @@ impl From<Infallible> for Error {
 /// A Result type using `hipcheck_sdk::Error`
 pub type Result<T> = StdResult<T, Error>;
 
+/// A Result type using `hipcheck_sdk::ConfigError`
+pub type ConfigResult<T> = StdResult<T, ConfigError>;
+
 /// Errors specific to the execution of `Plugin::set_configuration()` to configure a Hipcheck
 /// plugin.
 #[derive(Debug)]

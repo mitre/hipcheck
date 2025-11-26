@@ -30,7 +30,7 @@ pub struct PullReview {
 }
 
 /// Returns whether each commit in a repo was merged with a review
-#[query(default)]
+#[query]
 async fn review(engine: &mut PluginEngine, value: Target) -> Result<Vec<bool>> {
 	tracing::info!("running review query");
 
@@ -105,7 +105,9 @@ impl Plugin for ReviewPlugin {
 		))
 	}
 
-	queries! {}
+	queries! {
+		#[default] review,
+	}
 }
 
 #[derive(Parser, Debug)]

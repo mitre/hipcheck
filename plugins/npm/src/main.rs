@@ -121,7 +121,9 @@ impl Plugin for DependenciesPlugin {
 		Ok(None)
 	}
 
-	queries! {}
+	queries! {
+		dependencies
+	}
 }
 
 #[derive(Parser, Debug)]

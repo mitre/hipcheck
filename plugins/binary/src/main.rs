@@ -36,7 +36,7 @@ async fn files(_engine: &mut PluginEngine, value: LocalGitRepo) -> Result<Vec<Pa
 	Ok(out)
 }
 
-#[query(default)]
+#[query]
 async fn binary(engine: &mut PluginEngine, value: Target) -> Result<usize> {
 	tracing::info!("running binary query");
 	let paths = files(engine, value.local).await?;
@@ -108,7 +108,10 @@ impl Plugin for BinaryPlugin {
 		))
 	}
 
-	queries! {}
+	queries! {
+		files,
+		#[default] binary
+	}
 }
 
 #[derive(Parser, Debug)]

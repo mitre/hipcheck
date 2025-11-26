@@ -177,7 +177,7 @@ impl<'a> ContributorFrequencyMap<'a> {
 
 /// Returns a boolean list with one entry per contributor to the repo
 /// A `true` entry corresponds to an affiliated contributor
-#[query(default)]
+#[query]
 async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
 	tracing::info!("running affiliation query");
 
@@ -290,7 +290,9 @@ impl Plugin for AffiliationPlugin {
 		))
 	}
 
-	queries! {}
+	queries! {
+		#[default] affiliation
+	}
 }
 
 #[derive(Parser, Debug)]

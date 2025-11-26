@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use self::user_orgs::{ResponseData, Variables};
-use crate::{graphql::GH_API_V4, tls::authenticated_agent::AuthenticatedAgent};
+use crate::{github::graphql::GH_API_V4, tls::authenticated_agent::AuthenticatedAgent};
 use anyhow::{Result, anyhow};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
 use schemars::JsonSchema;
@@ -12,10 +12,10 @@ use url::Url;
 /// Defines the query being made against the GitHub API.
 #[derive(GraphQLQuery)]
 #[graphql(
-	schema_path = "src/graphql/schemas/types.graphql",
-	query_path = "src/graphql/schemas/user_orgs.graphql",
+	schema_path = "src/github/graphql/schemas/types.graphql",
+	query_path = "src/github/graphql/schemas/user_orgs.graphql",
 	response_derives = "Debug",
-	custom_scalars_module = "crate::graphql::custom_scalars"
+	custom_scalars_module = "crate::github::graphql::custom_scalars"
 )]
 pub struct UserOrgs;
 

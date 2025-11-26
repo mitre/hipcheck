@@ -328,6 +328,7 @@ async fn contributor_summary(
 	tracing::info!("completed contributor_summary query");
 	Ok(commit_contributor_views)
 }
+
 #[derive(Deserialize)]
 struct Config {
 	#[serde(default = "default_commit_cache_size")]
@@ -369,7 +370,17 @@ impl Plugin for GitPlugin {
 		Ok(None)
 	}
 
-	queries! {}
+	queries! {
+		last_commit_date,
+		diffs,
+		commits,
+		commits_from_date,
+		contributors,
+		commit_diffs,
+		commits_for_contributor,
+		contributors_for_commit,
+		contributor_summary,
+	}
 }
 
 #[derive(Parser, Debug)]

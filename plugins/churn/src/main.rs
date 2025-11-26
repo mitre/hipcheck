@@ -227,7 +227,7 @@ async fn commit_churns(
 	Ok(commit_churn_freqs)
 }
 
-#[query(default)]
+#[query]
 async fn churn(engine: &mut PluginEngine, value: Target) -> Result<Vec<f64>> {
 	tracing::info!("running churn query");
 	let local = value.local;
@@ -293,7 +293,10 @@ impl Plugin for ChurnPlugin {
 		))
 	}
 
-	queries! {}
+	queries! {
+		commit_churns,
+		#[default] churn
+	}
 }
 
 #[derive(Parser, Debug)]
