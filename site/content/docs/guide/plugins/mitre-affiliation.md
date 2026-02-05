@@ -6,7 +6,7 @@ extra:
 
 # `mitre/affiliation`
 
-Identifies project contributors affiliated with an organization of concern.
+__Identifies project contributors affiliated with an organization of concern.__
 
 ## Configuration
 
