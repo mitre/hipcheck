@@ -67,19 +67,27 @@ To build Hipcheck from source, you'll need:
 If building for `x86_64_unknown_linux_gnu`, then you will also need:
 - The `mold` linker: see the [installation instructions](https://github.com/rui314/mold?tab=readme-ov-file#installation)
 
-If you wish to disable use of `mold`, then open `.cargo/config.toml` inside the repository and remove the following lines:
+If you wish to disable use of `mold`, then open `.cargo/config.toml` inside the
+repository and remove the following lines:
+
 ```toml
 [target.x86_64-unknown-linux-gnu]
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 ```
 
 If you _only_ want to build from source without configuring the build in any
-way, you can use `cargo install` to install Hipcheck into a Cargo-specific
-binary directory with the source found from Crates.io.
+way, you can use `cargo install --locked` to install Hipcheck into a
+Cargo-specific binary directory with the source found from Crates.io.
 
 ```sh
-$ cargo install hipcheck
+$ cargo install --locked hipcheck
 ```
+
+Note that for `cargo install` running against Crates.io, we do not support
+building _without_ the `--locked` flag. This is because this is the
+configuration of dependencies we've tested in CI, while installing without
+the `--locked` flag means dependency versions may be arbitrarily newer than
+the versions we've tested.
 
 If you do want to build from source _and_ configure the build or modify
 Hipcheck itself before building, you'll also need:
