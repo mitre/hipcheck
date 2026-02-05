@@ -4,8 +4,8 @@
     "dev": "deno run -A --watch tasks/bundle.ts"
   },
   "imports": {
-    "@luca/esbuild-deno-loader": "jsr:@luca/esbuild-deno-loader@^0.11.0",
-    "esbuild": "npm:esbuild@^0.24.0"
+    "@luca/esbuild-deno-loader": "jsr:@luca/esbuild-deno-loader@^0.11.1",
+    "esbuild": "npm:esbuild@^0.27.2"
   },
   "compilerOptions": {
     "lib": ["deno.window", "dom"]

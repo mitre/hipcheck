@@ -40,9 +40,9 @@ jobs:
 
       - name: Install Zola
         if: steps.filter.outputs.site == 'true'
-        uses: taiki-e/install-action@ca770cf74e8d33db1454f49b3c96ef207b36cc46 # zola
+        uses: taiki-e/install-action@7c40b3573dcb8b05d44e41e0311df2007b230d2e # zola
         with:
-          tool: zola@0.20.0
+          tool: zola@0.22.1
 
       - name: Install Tailwind CLI
         if: steps.filter.outputs.site == 'true'

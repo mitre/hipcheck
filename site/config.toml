@@ -15,11 +15,10 @@ build_search_index = true
 # Use the elasticlunr format for the search index.
 index_format = "elasticlunr_json"
 
-[markdown]
+[markdown.highlighting]
 
-# Use syntax highlighting.
-highlight_code = true
-highlight_theme = "ayu-light"
+theme = "ayu"
+extra_themes = ["highlight/ayu.json"]
 
 [extra]
 
