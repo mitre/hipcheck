@@ -1,6 +1,7 @@
-use std::{cmp::Ordering, fmt::Display, str::FromStr};
+// SPDX-License-Identifier: Apache-2.0
 
 use jiff::{Span, SpanArithmetic, SpanCompare, SpanRound, ZonedArithmetic};
+use std::{cmp::Ordering, fmt::Display, str::FromStr};
 
 /// Wrapper around `jiff::Span` that implements our required semantics for days and weeks.
 ///
