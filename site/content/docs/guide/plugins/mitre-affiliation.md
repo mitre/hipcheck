@@ -45,6 +45,16 @@ analysis "mitre/affiliation" {
 }
 ```
 
+### Default Orgs File
+
+The default orgs file defines a list of well-known corporate entities such as
+Amazon, Google, Huawei, and Red Hat) and flags any repo contributors that do
+not have an email associated with one of these companies' domains. The ethos
+is to try and capture unknown third-party contributors.
+
+You can [view the default orgs file][default_orgs_file] within the Hipcheck
+source repository.
+
 ### Default Policy Expression
 
 ```kdl
@@ -202,3 +212,4 @@ malicious contributions would be made in commits authored or committed by those
 using their corporate emails.
 
 [kdl]: https://kdl.dev/
+[default_orgs_file]: https://github.com/mitre/hipcheck/blob/main/config/Orgs.kdl
