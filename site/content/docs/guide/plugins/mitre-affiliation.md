@@ -47,7 +47,7 @@ analysis "mitre/affiliation" {
 
 ### Default Orgs File
 
-The default orgs file defines a list of well-known corporate entities such as
+The default orgs file defines a list of well-known corporate entities (such as
 Amazon, Google, Huawei, and Red Hat) and flags any repo contributors that do
 not have an email associated with one of these companies' domains. The ethos
 is to try and capture unknown third-party contributors.
