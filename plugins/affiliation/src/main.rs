@@ -2,178 +2,26 @@
 
 //! Plugin for querying a repo for any contributors with concerning affiliations
 
+mod affiliator;
+mod config;
+mod git;
 mod org_spec;
 mod org_types;
 mod util;
 
 use crate::{
-	org_spec::{Matcher, OrgSpec},
-	org_types::Mode,
+	affiliator::Affiliator,
+	config::Config,
+	git::{CommitContributorView, ContributorFrequencyMap},
+	org_spec::OrgSpec,
 	util::fs as file,
 };
-
 use clap::Parser;
-use hipcheck_sdk::{
-	LogLevel, PluginConfig,
-	macros::PluginConfig,
-	prelude::*,
-	types::{LocalGitRepo, Target},
-};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use std::{
-	collections::HashMap,
-	fmt::{self, Display, Formatter},
-	path::PathBuf,
-	result::Result as StdResult,
-	sync::OnceLock,
-};
+use hipcheck_sdk::{LogLevel, PluginConfig, prelude::*, types::Target};
+use std::{result::Result as StdResult, sync::OnceLock};
 
+// We only keep a single org-spec in memory and just make it a global.
 pub static ORGSSPEC: OnceLock<OrgSpec> = OnceLock::new();
-
-#[derive(PluginConfig, Debug)]
-struct Config {
-	orgs_file: PathBuf,
-	count_threshold: Option<u64>,
-}
-
-/// A locally stored git repo, with optional additional details
-/// The details will vary based on the query (e.g. a date, a committer e-mail address, a commit hash)
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct DetailedGitRepo {
-	/// The local repo
-	local: LocalGitRepo,
-
-	/// Optional additional information for the query
-	pub details: Option<String>,
-}
-
-/// Commits as understood in Hipcheck's data model.
-/// The `written_on` and `committed_on` datetime fields contain Strings that are created from `jiff:Timestamps`.
-/// Because `Timestamp` does not `impl JsonSchema`, we display the datetimes as Strings for passing out of this plugin.
-/// Other plugins that expect a `Timestamp`` should parse the provided Strings into `Timestamps` as needed.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize, JsonSchema)]
-pub struct Commit {
-	pub hash: String,
-
-	pub written_on: StdResult<String, String>,
-
-	pub committed_on: StdResult<String, String>,
-}
-
-impl Display for Commit {
-	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		write!(f, "{}", self.hash)
-	}
-}
-
-/// Authors or committers of a commit.
-#[derive(
-	Debug, PartialEq, Eq, Deserialize, Serialize, Clone, Hash, PartialOrd, Ord, JsonSchema,
-)]
-pub struct Contributor {
-	pub name: String,
-	pub email: String,
-}
-
-impl Display for Contributor {
-	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		write!(f, "{} <{}>", self.name, self.email)
-	}
-}
-
-/// Temporary data structure for looking up the contributors of a commit
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, JsonSchema)]
-pub struct CommitContributorView {
-	pub commit: Commit,
-	pub author: Contributor,
-	pub committer: Contributor,
-}
-
-impl CommitContributorView {
-	/// get the author of the commit
-	pub fn author(&self) -> &Contributor {
-		&self.author
-	}
-
-	/// get the committer of the commit
-	pub fn committer(&self) -> &Contributor {
-		&self.committer
-	}
-}
-
-/// Temporary data structure for looking up the commits associated with a contributor
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, JsonSchema)]
-pub struct ContributorView {
-	pub contributor: Contributor,
-	pub commits: Vec<Commit>,
-}
-
-/// A type which encapsulates checking whether a given string matches an org in the orgs file,
-/// based on the mode in question. If the mode is Independent, then you're looking for
-/// the strings that _don't match_ any of the hosts in the set. If the mode is Affiliated,
-/// you're looking for the strings that _match_ one of the hosts in the set.
-struct Affiliator<'haystack> {
-	patterns: Matcher<'haystack>,
-	mode: Mode,
-}
-
-impl<'haystack> Affiliator<'haystack> {
-	/// Check whether the given string is a match for the set of hosts, based on the mode.
-	///
-	/// If independent mode is on, you're looking for strings which do not match any of
-	/// the hosts.
-	///
-	/// If affiliated mode is on, you're looking for strings which do match one of the
-	/// hosts.
-	fn is_match(&self, s: &str) -> bool {
-		match self.mode {
-			Mode::Independent => !self.patterns.is_match(s),
-			Mode::Affiliated => self.patterns.is_match(s),
-			Mode::All => true,
-			Mode::None => false,
-		}
-	}
-
-	/// Construct a new Affiliator from a given OrgSpec (built from an Orgs.kdl file).
-	fn from_spec(spec: &'haystack OrgSpec) -> Result<Affiliator<'haystack>> {
-		let patterns = spec.patterns().map_err(|e| {
-			tracing::error!("failed to get patterns for org spec to check against {}", e);
-			Error::UnspecifiedQueryState
-		})?;
-		let mode = spec.mode();
-		Ok(Affiliator { patterns, mode })
-	}
-}
-
-/// struct for counting number of contributions made by each contributor in the repo
-struct ContributorFrequencyMap<'a>(HashMap<&'a Contributor, u64>);
-
-impl<'a> ContributorFrequencyMap<'a> {
-	fn new(capacity: Option<usize>) -> Self {
-		match capacity {
-			Some(capacity) => Self(HashMap::with_capacity(capacity)),
-			None => Self(HashMap::new()),
-		}
-	}
-
-	/// Add an affiliated_contributor to the map, update frequency for affiliated_contributor
-	/// appropriately
-	///
-	/// If the contributor is not in the HashMap, then insert and set frequency to 1
-	/// Otherwise, increment frequency by 1
-	fn insert(&mut self, affiliated_contributor: &'a Contributor) {
-		self.0
-			.entry(affiliated_contributor)
-			.and_modify(|count| *count += 1)
-			.or_insert(1);
-	}
-
-	/// Retrieve a non-mutable handle to the internal HashMap
-	fn inner(&self) -> &HashMap<&'a Contributor, u64> {
-		&self.0
-	}
-}
 
 /// Returns a boolean list with one entry per contributor to the repo
 /// A `true` entry corresponds to an affiliated contributor
@@ -317,10 +165,12 @@ async fn main() -> Result<()> {
 
 #[cfg(test)]
 mod test {
+	use super::git::{Commit, Contributor};
 	use super::*;
-
+	use hipcheck_sdk::types::LocalGitRepo;
 	use pathbuf::pathbuf;
 	use std::{env, result::Result as StdResult};
+
 	fn repo() -> LocalGitRepo {
 		LocalGitRepo {
 			path: "/home/users/me/.cache/hipcheck/clones/github/foo/bar/".to_string(),
