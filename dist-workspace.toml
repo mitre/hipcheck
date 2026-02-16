@@ -8,7 +8,7 @@ members = ["cargo:."]
 # Config for 'dist'
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.30.2"
+cargo-dist-version = "0.30.3"
 # CI backends to support
 ci = "github"
 # Which actions to run on pull requests
@@ -16,7 +16,7 @@ pr-run-mode = "plan"
 # Path that installers should place binaries in
 install-path = ["~/.local/bin", "~/.hipcheck/bin"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
 # Whether to install an updater program
 install-updater = true
 # Build only the required packages, and individually
@@ -38,3 +38,7 @@ aarch64-apple-darwin = "macos-14"
 # compatible with 24.04, but if we built on 24.04 the glibc *would not* be
 # backwards-compatible.
 x86_64-unknown-linux-gnu = "ubuntu-22.04"
+# For arm64, we're using one of GitHub's ARM-provided "partner images," which
+# matches the Ubuntu version used for x86 (for the same reasons we chose that
+# version), though the tools installed on it are not guaranteed to match.
+aarch64-unknown-linux-gnu = "ubuntu-22.04-arm"

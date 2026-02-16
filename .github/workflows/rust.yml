@@ -113,7 +113,14 @@ jobs:
         #
         # More info: https://github.com/actions/runner-images
         # See also: https://github.com/actions/partner-runner-images
-        os: [ubuntu-22.04, windows-2022, macos-14, macos-15-intel]
+        os:
+          [
+            ubuntu-22.04,
+            ubuntu-22.04-arm,
+            windows-2022,
+            macos-14,
+            macos-15-intel,
+          ]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
@@ -198,7 +205,14 @@ jobs:
         #
         # More info: https://github.com/actions/runner-images
         # See also: https://github.com/actions/partner-runner-images
-        os: [ubuntu-22.04, windows-2022, macos-14, macos-15-intel]
+        os:
+          [
+            ubuntu-22.04,
+            ubuntu-22.04-arm,
+            windows-2022,
+            macos-14,
+            macos-15-intel,
+          ]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:

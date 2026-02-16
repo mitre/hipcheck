@@ -46,7 +46,7 @@ jobs:
           context: .
           file: dist/Containerfile
           push: true
-          platforms: "linux/amd64"
+          platforms: "linux/amd64,linux/arm64"
           tags: mitre/hipcheck:latest,mitre/hipcheck:${{ steps.format-tag.outputs.replaced }}
 
   description:
