@@ -3,6 +3,7 @@
 //! Logic for interacting with the GitHub GraphQL API.
 
 mod custom_scalars;
+pub mod repo_collaborators;
 pub mod reviews;
 pub mod user_orgs;
 

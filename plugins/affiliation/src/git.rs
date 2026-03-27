@@ -3,7 +3,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
-	collections::HashMap,
 	fmt::{self, Display, Formatter},
 	result::Result as StdResult,
 };
@@ -31,12 +30,12 @@ impl Display for Commit {
 #[derive(
 	Debug, PartialEq, Eq, Deserialize, Serialize, Clone, Hash, PartialOrd, Ord, JsonSchema,
 )]
-pub struct Contributor {
+pub struct GitIdentity {
 	pub name: String,
 	pub email: String,
 }
 
-impl Display for Contributor {
+impl Display for GitIdentity {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		write!(f, "{} <{}>", self.name, self.email)
 	}
@@ -44,49 +43,20 @@ impl Display for Contributor {
 
 /// Temporary data structure for looking up the contributors of a commit
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, JsonSchema)]
-pub struct CommitContributorView {
+pub struct GitCommitContributors {
 	pub commit: Commit,
-	pub author: Contributor,
-	pub committer: Contributor,
+	pub author: GitIdentity,
+	pub committer: GitIdentity,
 }
 
-impl CommitContributorView {
+impl GitCommitContributors {
 	/// get the author of the commit
-	pub fn author(&self) -> &Contributor {
+	pub fn author(&self) -> &GitIdentity {
 		&self.author
 	}
 
 	/// get the committer of the commit
-	pub fn committer(&self) -> &Contributor {
+	pub fn committer(&self) -> &GitIdentity {
 		&self.committer
-	}
-}
-
-/// struct for counting number of contributions made by each contributor in the repo
-pub struct ContributorFrequencyMap<'a>(HashMap<&'a Contributor, u64>);
-
-impl<'a> ContributorFrequencyMap<'a> {
-	pub fn new(capacity: Option<usize>) -> Self {
-		match capacity {
-			Some(capacity) => Self(HashMap::with_capacity(capacity)),
-			None => Self(HashMap::new()),
-		}
-	}
-
-	/// Add an affiliated_contributor to the map, update frequency for affiliated_contributor
-	/// appropriately
-	///
-	/// If the contributor is not in the HashMap, then insert and set frequency to 1
-	/// Otherwise, increment frequency by 1
-	pub fn insert(&mut self, affiliated_contributor: &'a Contributor) {
-		self.0
-			.entry(affiliated_contributor)
-			.and_modify(|count| *count += 1)
-			.or_insert(1);
-	}
-
-	/// Retrieve a non-mutable handle to the internal HashMap
-	pub fn inner(&self) -> &HashMap<&'a Contributor, u64> {
-		&self.0
 	}
 }

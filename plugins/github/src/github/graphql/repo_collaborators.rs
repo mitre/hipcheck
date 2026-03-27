@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use self::user_orgs::{ResponseData, Variables};
+use self::repo_collaborators::{ResponseData, Variables};
 use crate::{github::graphql::GH_API_V4, tls::authenticated_agent::AuthenticatedAgent};
 use anyhow::{Result, anyhow};
 use graphql_client::{GraphQLQuery, QueryBody, Response};
@@ -12,48 +12,81 @@ use serde_json::{from_value as from_json_value, to_value as to_json_value};
 #[derive(GraphQLQuery)]
 #[graphql(
 	schema_path = "src/github/graphql/schemas/types.graphql",
-	query_path = "src/github/graphql/schemas/user_orgs.graphql",
+	query_path = "src/github/graphql/schemas/repo_collaborators.graphql",
 	response_derives = "Debug",
 	custom_scalars_module = "crate::github::graphql::custom_scalars"
 )]
-pub struct UserOrgs;
+pub struct RepoCollaborators;
 
 /// Get organization data for the target user.
-pub fn get_user_orgs(agent: &AuthenticatedAgent<'_>, login: &str) -> Result<UserOrgData> {
-	let query = UserOrgs::build_query(Variables {
-		login: login.to_owned(),
+pub fn get_repo_collaborators(
+	agent: &AuthenticatedAgent<'_>,
+	owner: &str,
+	name: &str,
+) -> Result<Vec<Collaborator>> {
+	let query = RepoCollaborators::build_query(Variables {
+		owner: owner.to_owned(),
+		name: name.to_owned(),
 	});
 
 	let body = make_request(agent, query)?;
 
-	let user = body
+	if let Some(errors) = body.errors {
+		for error in errors {
+			tracing::error!("mitre/github/repo_collaborators, error from GitHub API: {error}")
+		}
+	}
+
+	let repository = body
 		.data
 		.ok_or_else(|| anyhow!("missing response data from GitHub"))?
-		.user
-		.ok_or_else(|| anyhow!("user not found on GitHub"))?;
+		.repository
+		.ok_or_else(|| anyhow!("repository not found on GitHub"))?;
 
-	let profile_employer = user.company;
+	let Some(collaborators) = repository.collaborators else {
+		return Err(anyhow!("no collaborators for repository"));
+	};
 
-	let github_orgs = user
-		.organizations
-		.nodes
-		.unwrap_or_default()
+	let Some(collaborators) = collaborators.nodes else {
+		return Err(anyhow!("no collaborators for repository"));
+	};
+
+	let collaborators = collaborators
 		.into_iter()
-		.filter_map(|org| {
-			let org = org?;
+		.filter_map(|user| {
+			// Filter out invalid users.
+			let user = user?;
 
-			Some(GitHubOrg {
-				name: org.name,
-				login: org.login,
-				email: org.email,
+			let login = user.login;
+			let email = user.email;
+			let profile_employer = user.company;
+
+			let github_orgs = user
+				.organizations
+				.nodes
+				.unwrap_or_default()
+				.into_iter()
+				.filter_map(|org| {
+					let org = org?;
+
+					Some(GitHubOrg {
+						name: org.name,
+						login: org.login,
+						email: org.email,
+					})
+				})
+				.collect();
+
+			Some(Collaborator {
+				login,
+				email,
+				profile_employer,
+				github_orgs,
 			})
 		})
 		.collect();
 
-	Ok(UserOrgData {
-		profile_employer,
-		github_orgs,
-	})
+	Ok(collaborators)
 }
 
 /// Make a request to the GitHub API.
@@ -80,9 +113,13 @@ fn make_request(
 	}
 }
 
-/// User's organization membership data pulled from the GitHub API.
+/// Repository collaborator data pulled from the GitHub API.
 #[derive(Debug, Default, Serialize, JsonSchema)]
-pub struct UserOrgData {
+pub struct Collaborator {
+	/// The user's username.
+	pub login: String,
+	/// The user's public email address.
+	pub email: String,
 	/// The user's employer, as pulled from their GitHub profile.
 	pub profile_employer: Option<String>,
 	/// The GitHub organizations the user belongs to.
@@ -96,6 +133,6 @@ pub struct GitHubOrg {
 	pub name: Option<String>,
 	/// The username of the organization.
 	pub login: String,
-	/// The organization's email, if present.
+	/// The organization's public email, if present.
 	pub email: Option<String>,
 }

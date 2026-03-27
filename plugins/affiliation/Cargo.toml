@@ -20,6 +20,7 @@ serde_json = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["rt"] }
 hipcheck-workspace-hack = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 hipcheck-sdk = { workspace = true, features = ["macros", "mock_engine"] }

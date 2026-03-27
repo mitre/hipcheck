@@ -89,8 +89,10 @@ async fn identity(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>> {
 			tracing::error!("failed to get last commits for identity metric: {}", e);
 			Error::UnspecifiedQueryState
 		})?;
-	let commits: Vec<Commit> =
-		serde_json::from_value(value).map_err(|_| Error::UnexpectedPluginQueryInputFormat)?;
+	let commits: Vec<Commit> = serde_json::from_value(value).map_err(|e| {
+		tracing::error!("Error parsing mitre/git/commits response: {e}");
+		Error::UnexpectedPluginQueryInputFormat
+	})?;
 	let mut res = vec![];
 	for c in commits {
 		let key = DetailedGitRepo {

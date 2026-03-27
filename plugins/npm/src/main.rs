@@ -48,8 +48,8 @@ impl NpmDependencies {
 				Ok(NpmDependencies { language, deps })
 			}
 			Lang::Unknown => {
-				tracing::error!("can't identify a known language in the repository");
-				Err(Error::UnspecifiedQueryState)
+				tracing::warn!("can't identify a known language in the repository");
+				Err(Error::QueryUnsupportedForTarget)
 			}
 		}
 	}

@@ -122,6 +122,7 @@ fn get_cursor(body: &Response<ResponseData>) -> Cursor {
 /// Extract any PRs from the GitHub API response data.
 fn get_prs(body: Response<ResponseData>) -> Result<Vec<RawPull>> {
 	// Get the repo info from the response.
+
 	let prs = body
 		.data
 		.ok_or_else(|| anyhow!("missing response data from GitHub"))?

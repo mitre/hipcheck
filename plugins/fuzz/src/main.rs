@@ -10,10 +10,11 @@ use std::result::Result as StdResult;
 async fn fuzz(engine: &mut PluginEngine, key: Target) -> Result<Value> {
 	tracing::info!("running fuzz query");
 	if let Some(remote) = &key.remote {
-		let fuzz = engine.query("mitre/github", remote.clone()).await;
+		let fuzz = engine.query("mitre/github/has_fuzz", remote.clone()).await;
 		tracing::info!("completed fuzz query");
 		fuzz
 	} else {
+		tracing::error!("key target was not for a remote: '{:?}'", key);
 		Err(Error::UnexpectedPluginQueryInputFormat)
 	}
 }
@@ -93,7 +94,7 @@ mod test {
 		let known_remote = target.remote.as_ref().unwrap().clone();
 		let output = true;
 		let mut mock_reponses = MockResponses::new();
-		mock_reponses.insert("mitre/github", known_remote, Ok(output))?;
+		mock_reponses.insert("mitre/github/has_fuzz", known_remote, Ok(output))?;
 		Ok(mock_reponses)
 	}
 

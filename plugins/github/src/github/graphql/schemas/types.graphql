@@ -37,6 +37,46 @@ A repository contains the content for a project.
 """
 type Repository {
     """
+    A list of collaborators associated with the repository.
+    """
+    collaborators(
+        """
+        Collaborators affiliation level with a repository.
+        """
+        affiliation: CollaboratorAffiliation
+
+        """
+        Returns the elements in the list that come after the specified cursor.
+        """
+        after: String
+
+        """
+        Returns the elements in the list that come before the specified cursor.
+        """
+        before: String
+
+        """
+        Returns the first _n_ elements from the list.
+        """
+        first: Int
+
+        """
+        Returns the last _n_ elements from the list.
+        """
+        last: Int
+
+        """
+        The login of one specific collaborator.
+        """
+        login: String
+
+        """
+        Filters users with query on user name and login
+        """
+        query: String
+    ): RepositoryCollaboratorConnection
+
+    """
     A list of pull requests that have been opened in the repository.
     """
     pullRequests(
@@ -56,9 +96,6 @@ type Repository {
         states: [PullRequestState!]
     ): PullRequestConnection!
 
-    # urlRequests(
-    #   url: URI
-    # ): PullRequestConnection!
     pullRequest(number: Int): PullRequest
 }
 
@@ -308,6 +345,16 @@ type User {
     company: String
 
     """
+    The user's publicly visible profile email.
+    """
+    email: String!
+
+    """
+    The username used to login.
+    """
+    login: String!
+
+    """
     A list of organizations the user belongs to.
     """
     organizations(
@@ -363,21 +410,6 @@ An account on GitHub, with one or more owners, that has repositories, members an
 """
 type Organization {
     """
-    A list of domains owned by the organization.
-    """
-    domains(
-        """
-        Returns the elements in the list that come after the specified cursor.
-        """
-        after: String
-
-        """
-        Returns the first _n_ elements from the list.
-        """
-        first: Int
-    ): VerifiableDomainConnection
-
-    """
     The organization's login name.
     """
     login: String!
@@ -386,41 +418,11 @@ type Organization {
     The organization's public profile name.
     """
     name: String
-}
-
-"""
-The connection type for VerifiableDomain.
-"""
-type VerifiableDomainConnection {
-    """
-    A list of nodes.
-    """
-    nodes: [VerifiableDomain]
 
     """
-    Information to aid in pagination.
+    The organization's public email.
     """
-    pageInfo: PageInfo!
-}
-
-"""
-A domain that can be verified or approved for an organization or an enterprise.
-"""
-type VerifiableDomain {
-    """
-    The unicode encoded domain.
-    """
-    domain: URI!
-
-    """
-    Whether or not the domain is approved.
-    """
-    isApproved: Boolean!
-
-    """
-    Whether or not the domain is verified.
-    """
-    isVerified: Boolean!
+    email: String
 }
 
 """
@@ -442,3 +444,39 @@ type PageInfo {
 An RFC 3986, RFC 3987, and RFC 6570 (level 4) compliant URI string.
 """
 scalar URI
+
+"""
+The connection type for User.
+"""
+type RepositoryCollaboratorConnection {
+    """
+    A list of edges.
+    """
+    edges: [RepositoryCollaboratorEdge]
+
+    """
+    A list of nodes.
+    """
+    nodes: [User]
+
+    """
+    Information to aid in pagination.
+    """
+    pageInfo: PageInfo!
+
+    """
+    Identifies the total count of items in the connection.
+    """
+    totalCount: Int!
+}
+
+"""
+Represents a user who is a collaborator of a repository.
+"""
+type RepositoryCollaboratorEdge {
+    """
+    A cursor for use in pagination.
+    """
+    cursor: String!
+    node: User!
+}
