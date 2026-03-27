@@ -1,0 +1,26 @@
+query RepoCollaborators($owner: String!, $name: String!) {
+    repository(owner: $owner, name: $name) {
+        # Want to include both direct (part of the owning org) and indirect collaborators.
+        collaborators(affiliation: ALL) {
+            nodes {
+                # The user's "login" (their username).
+                login
+                # The user's email address, which is guaranteed to be present.
+                email
+                # Company set in user's profile, if any.
+                company
+                # GitHub Organizations the user is a member of, if any, capped at 100.
+                organizations(
+                    first: 100
+                    orderBy: { direction: DESC, field: LOGIN }
+                ) {
+                    nodes {
+                        name
+                        login
+                        email
+                    }
+                }
+            }
+        }
+    }
+}

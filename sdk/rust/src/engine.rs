@@ -113,14 +113,18 @@ impl PluginEngine {
 			let mut results = Vec::with_capacity(input.len());
 			for i in input {
 				match self.mock_responses.0.get(&(target.clone(), i)) {
-					Some(res) => {
-						match res {
-							Ok(val) => results.push(val.clone()),
-							// TODO: since Error is not Clone, is there a better way to deal with this
-							Err(_) => return Err(Error::UnexpectedPluginQueryInputFormat),
+					Some(res) => match res {
+						Ok(val) => results.push(val.clone()),
+						Err(e) => {
+							tracing::error!("Error parsing mock_engine response: {e}");
+							return Err(Error::UnexpectedPluginQueryInputFormat);
 						}
+					},
+					None => {
+						return Err(Error::UnknownPluginQuery(
+							target.to_string().into_boxed_str(),
+						));
 					}
-					None => return Err(Error::UnknownPluginQuery),
 				}
 			}
 			Ok(results)
@@ -298,7 +302,13 @@ impl PluginEngine {
 			.filter_map(|x| if x.name == name { Some(x.inner) } else { None })
 			.next()
 			.or_else(|| plugin.default_query())
-			.ok_or_else(|| Error::UnknownPluginQuery)?;
+			.ok_or_else(|| {
+				if name.is_empty() {
+					Error::NoDefaultQuery
+				} else {
+					Error::UnknownPluginQuery(name.clone().into_boxed_str())
+				}
+			})?;
 
 		#[cfg(feature = "print-timings")]
 		let _0 = crate::benchmarking::print_scope_time!(format!("{}/{}", P::NAME, name));
@@ -326,10 +336,9 @@ impl PluginEngine {
 	where
 		P: Plugin,
 	{
-		use crate::error::Error::*;
 		if let Err(e) = self.handle_session_fallible(plugin).await {
 			let res_err_send = match e {
-				FailedToSendQueryFromSessionToServer(_) => {
+				Error::FailedToSendQueryFromSessionToServer(_) => {
 					tracing::error!("Failed to send message to Hipcheck core, analysis will hang.");
 					return;
 				}

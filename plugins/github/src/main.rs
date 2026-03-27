@@ -10,7 +10,10 @@ use crate::{
 	config::CONFIG,
 	github::{
 		GitHub,
-		graphql::{reviews::GitHubPullRequest, user_orgs::UserOrgData},
+		graphql::{
+			repo_collaborators::Collaborator, reviews::GitHubPullRequest, user_orgs::UserOrgData,
+		},
+		rest::repo_contributors::Contributor,
 	},
 };
 use hipcheck_sdk::prelude::*;
@@ -39,7 +42,9 @@ impl Plugin for GitHubPlugin {
 	queries! {
 		pr_reviews,
 		has_fuzz,
-		user_orgs
+		repo_contributors,
+		user_orgs,
+		repo_collaborators
 	}
 }
 
@@ -63,6 +68,34 @@ async fn has_fuzz(_e: &mut PluginEngine, repo: RemoteGitRepo) -> Result<bool> {
 	let github = GitHub::new(token)?;
 	let fuzzing = github.check_fuzzing(repo.url.as_str())?;
 	Ok(fuzzing)
+}
+
+/// Get the contributors to a repository.
+#[query]
+async fn repo_contributors(_e: &mut PluginEngine, repo: RemoteGitRepo) -> Result<Vec<Contributor>> {
+	let Some(KnownRemote::GitHub { owner, repo }) = &repo.known_remote else {
+		return Err(Error::InvalidQueryTargetFormat);
+	};
+
+	let token = CONFIG.api_token()?;
+	let github = GitHub::new(token)?;
+	let contributors = github.get_repo_contributors(owner, repo)?;
+	Ok(contributors)
+}
+
+#[query]
+async fn repo_collaborators(
+	_e: &mut PluginEngine,
+	repo: RemoteGitRepo,
+) -> Result<Vec<Collaborator>> {
+	let Some(KnownRemote::GitHub { owner, repo }) = &repo.known_remote else {
+		return Err(Error::InvalidQueryTargetFormat);
+	};
+
+	let token = CONFIG.api_token()?;
+	let github = GitHub::new(token)?;
+	let contributors = github.get_repo_collaborators(owner, repo)?;
+	Ok(contributors)
 }
 
 /// Get the organizations to which a user belongs.

@@ -11,7 +11,7 @@ use tonic::Status as TonicStatus;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
 	/// An unknown error occurred, the query is in an unspecified state
-	#[error("unknown error; query is in an unspecified state")]
+	#[error("unknown error")]
 	UnspecifiedQueryState,
 
 	/// The `PluginEngine` received a message with the unexpected status `ReplyInProgress`
@@ -56,11 +56,17 @@ pub enum Error {
 	UnexpectedPluginQueryOutputFormat,
 
 	/// The `PluginEngine` received a request for an unknown query endpoint
-	#[error("could not determine which plugin query to run")]
-	UnknownPluginQuery,
+	#[error("could not determine which plugin query to run for '{0}'")]
+	UnknownPluginQuery(Box<str>),
 
 	#[error("invalid format for QueryTarget")]
 	InvalidQueryTargetFormat,
+
+	#[error("the plugin was called with a default query, but none is defined")]
+	NoDefaultQuery,
+
+	#[error("the query is unsupported for the target")]
+	QueryUnsupportedForTarget,
 
 	#[error(transparent)]
 	Unspecified { source: DynError },
@@ -78,6 +84,7 @@ impl From<hipcheck_common::error::Error> for Error {
 			MoreAfterQueryComplete { id } => Error::MoreAfterQueryComplete { id },
 			InvalidJsonInQueryKey(s) => Error::InvalidJsonInQueryKey(Box::new(s)),
 			InvalidJsonInQueryOutput(s) => Error::InvalidJsonInQueryOutput(Box::new(s)),
+			QueryUnsupportedForTarget => Error::QueryUnsupportedForTarget,
 		}
 	}
 }

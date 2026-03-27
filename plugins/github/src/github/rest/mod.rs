@@ -3,3 +3,4 @@
 //! Logic for interacting with the GitHub REST API.
 
 pub mod code_search;
+pub mod repo_contributors;

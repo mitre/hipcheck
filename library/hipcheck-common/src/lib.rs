@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
+#![allow(clippy::doc_lazy_continuation)]
 
+use anyhow::anyhow;
 use std::{result::Result as StdResult, str::FromStr};
 
 pub mod chunk;

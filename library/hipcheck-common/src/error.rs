@@ -4,8 +4,11 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
 	/// An unknown error occurred, the query is in an unspecified state
-	#[error("unknown error; query is in an unspecified state")]
+	#[error("unknown error")]
 	UnspecifiedQueryState,
+
+	#[error("the query is not supported for the target")]
+	QueryUnsupportedForTarget,
 
 	/// The `PluginEngine` received a message with the unexpected status `ReplyInProgress`
 	#[error("unexpected ReplyInProgress state for query")]

@@ -37,6 +37,10 @@ async fn activity(engine: &mut PluginEngine, target: Target) -> Result<String> {
 		})?;
 
 	let Value::String(date_string) = value else {
+		tracing::error!(
+			"Response from mitre/git/last_commit_date was not a string: {:?}",
+			value
+		);
 		return Err(Error::UnexpectedPluginQueryInputFormat);
 	};
 	let last_commit_date: Timestamp = date_string.parse().map_err(|e| {

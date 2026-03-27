@@ -7,14 +7,7 @@ query UserOrgs($login: String!) {
             nodes {
                 name
                 login
-                # Domains associated with an org, if any, capped at 100.
-                domains(first: 100) {
-                    nodes {
-                        domain
-                        isApproved
-                        isVerified
-                    }
-                }
+                email
             }
         }
     }

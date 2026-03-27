@@ -6,10 +6,14 @@ pub mod rest;
 use crate::{
 	github::{
 		graphql::{
+			repo_collaborators::{Collaborator, get_repo_collaborators},
 			reviews::{GitHubPullRequest, get_reviews},
 			user_orgs::{UserOrgData, get_user_orgs},
 		},
-		rest::code_search::check_fuzzing,
+		rest::{
+			code_search::check_fuzzing,
+			repo_contributors::{Contributor, get_repo_contributors},
+		},
 	},
 	tls::authenticated_agent::AuthenticatedAgent,
 };
@@ -36,5 +40,13 @@ impl<'a> GitHub<'a> {
 
 	pub fn get_user_orgs(&self, user_login: &str) -> Result<UserOrgData> {
 		get_user_orgs(&self.agent, user_login)
+	}
+
+	pub fn get_repo_collaborators(&self, owner: &str, name: &str) -> Result<Vec<Collaborator>> {
+		get_repo_collaborators(&self.agent, owner, name)
+	}
+
+	pub fn get_repo_contributors(&self, owner: &str, name: &str) -> Result<Vec<Contributor>> {
+		get_repo_contributors(&self.agent, owner, name)
 	}
 }
