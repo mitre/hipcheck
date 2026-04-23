@@ -888,7 +888,7 @@ impl ToTargetSeedKind for CheckSbomArgs {
 	fn to_target_seed_kind(&self) -> Result<TargetSeedKind> {
 		let path = PathBuf::from(&self.path);
 		if path.exists() {
-			if self.path.ends_with(".spdx") {
+			if self.path.ends_with(".spdx") || self.path.ends_with(".spdx.json") {
 				Ok(TargetSeedKind::Single(SingleTargetSeedKind::Sbom(Sbom {
 					path,
 					standard: SbomStandard::Spdx,

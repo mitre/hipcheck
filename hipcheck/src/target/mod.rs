@@ -90,6 +90,7 @@ impl TargetType {
 			Some((Repo, tgt.to_string()))
 		// Otherwise check if it has an SPDX or CycloneDX SBOM file extension
 		} else if tgt.ends_with(".spdx")
+			|| tgt.ends_with(".spdx.json")
 			|| tgt.ends_with("bom.json")
 			|| tgt.ends_with(".cdx.json")
 			|| tgt.ends_with("bom.xml")
