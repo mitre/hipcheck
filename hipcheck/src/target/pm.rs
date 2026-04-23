@@ -83,17 +83,18 @@ fn retrieve_maven_urls(pom: &str) -> Vec<String> {
 	loop {
 		let e = parser.next();
 		match e {
-			Ok(XmlEvent::StartElement { name, .. }) => {
-				if name.local_name == "connection" || name.local_name == "developerConnection" {
-					match parser.next() {
-						Ok(XmlEvent::Characters(s)) => {
-							urls.push(s);
-						}
-						Err(err) => {
-							println!("Error: {}", err);
-						}
-						_ => {}
+			Ok(XmlEvent::StartElement { name, .. })
+				if (name.local_name == "connection"
+					|| name.local_name == "developerConnection") =>
+			{
+				match parser.next() {
+					Ok(XmlEvent::Characters(s)) => {
+						urls.push(s);
 					}
+					Err(err) => {
+						println!("Error: {}", err);
+					}
+					_ => {}
 				}
 			}
 			Ok(XmlEvent::EndDocument) => {

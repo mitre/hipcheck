@@ -108,7 +108,7 @@ async fn commit_churns(
 
 	let source_files: HashSet<String> = psf_vec
 		.into_iter()
-		.zip(psf_bools.into_iter())
+		.zip(psf_bools)
 		.filter_map(|(p, b)| if b { Some(p) } else { None })
 		.map(|p| p.as_path().to_string_lossy().into_owned())
 		.collect();
