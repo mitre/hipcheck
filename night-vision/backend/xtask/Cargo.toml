@@ -1,13 +1,10 @@
 [package]
-name = "nv-server"
+name = "xtask"
 version = "0.1.0"
 edition = "2024"
-publish = false
 
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-dropshot = { workspace = true }
 which = { workspace = true }
 xshell = { workspace = true }
-

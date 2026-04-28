@@ -1,10 +1,14 @@
 [workspace]
 
 resolver = "3"
-members = ["nv-server"]
+members = ["nv-server", "xtask"]
 default-members = ["nv-server"]
 
 [workspace.dependencies]
 
 dropshot = "0.17.0"
+clap = "4.6.1"
+anyhow = "1.0.102"
+xshell = "0.2.7"
+which = "8.0.2"
 
