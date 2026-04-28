@@ -1,0 +1,7 @@
+[toolchain]
+# We try to track close to the latest stable, but we explicitly
+# set that here for consistency across developers. Bumping this
+# number is a coordinated, purposeful change.
+channel = "1.95.0"
+profile = "default"
+

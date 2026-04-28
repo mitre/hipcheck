@@ -1,0 +1,12 @@
+[workspace]
+
+resolver = "3"
+
+members = ["crates/nv-server"]
+
+default-members = [
+	"crates/nv-server"
+]
+
+[workspace.dependencies]
+dropshot = "0.17.0"
