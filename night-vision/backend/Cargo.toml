@@ -11,4 +11,19 @@ clap = "4.6.1"
 anyhow = "1.0.102"
 xshell = "0.2.7"
 which = "8.0.2"
-
+tokio = {
+    version = "1.52.1",
+    features = [
+        "fs",
+        "io-util",
+        "io-std",
+        "net",
+        "parking_lot",
+        "process",
+        "rt",
+        "rt-multi-thread",
+        "signal",
+        "sync",
+        "time",
+    ]
+}

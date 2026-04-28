@@ -960,6 +960,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dropshot",
+ "tokio",
  "which",
  "xshell",
 ]
