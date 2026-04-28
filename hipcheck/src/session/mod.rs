@@ -3,7 +3,7 @@
 use crate::{
 	cache::plugin::HcPluginCache,
 	cli::{ConfigMode, Format},
-	config::Config,
+	config::{Config, unresolved_analysis_tree_from_policy},
 	engine::{HcPluginCore, PluginCore, start_plugins},
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
@@ -17,6 +17,7 @@ use crate::{
 use chrono::prelude::*;
 use std::{
 	fmt,
+	ops::Not,
 	path::{Path, PathBuf},
 	result::Result as StdResult,
 	sync::Arc,
@@ -435,9 +436,48 @@ pub fn load_policy_and_data(policy_path: &Path) -> Result<PolicyFile> {
 	let policy = PolicyFile::load_from(policy_path)
 		.with_context(|| format!("Failed to load policy file at path {:?}. Please make sure the policy file is in the provided location and is formatted correctly.", policy_path))?;
 
+	// Check the policy file for missing plugins
+	check_plugins(&policy)?;
+
 	phase.finish_successful();
 
 	Ok(policy)
+}
+
+/// Checks that all plugins listed in the `analyze` section of the policy file are included in the `plugins` section
+fn check_plugins(policy: &PolicyFile) -> Result<()> {
+	// Generate a list of plugins listed in the policy file to compare against plugins used by analyses
+	let mut plugin_names = Vec::new();
+	for policy_plugin in policy.plugins.0.iter() {
+		let full_name = &policy_plugin.name;
+		plugin_names.push((&full_name.publisher.0, &full_name.name.0))
+	}
+
+	// Get just the analyses from the policy file
+	let analyses = unresolved_analysis_tree_from_policy(policy)?.get_analyses();
+
+	// Check that all analyses use plugins listed in the plugin block
+	let mut missing = String::new();
+	for analysis in analyses {
+		if plugin_names
+			.contains(&(&analysis.0.publisher, &analysis.0.plugin))
+			.not()
+		{
+			missing.push_str(&format!(
+				"'{}/{}' ",
+				analysis.0.publisher, analysis.0.plugin
+			));
+		}
+	}
+
+	if missing.is_empty().not() {
+		return Err(hc_error!(
+			"Unknown analyses:\n{}\nPlease add to the plugins block of your policy file.",
+			missing
+		));
+	}
+
+	Ok(())
 }
 
 fn load_exec_config(exec_path: Option<&Path>) -> Result<ExecConfig> {
