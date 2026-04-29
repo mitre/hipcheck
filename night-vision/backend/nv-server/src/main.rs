@@ -1,6 +1,7 @@
 mod config;
 mod version;
 
+use crate::config::Config;
 use anyhow::Context;
 use anyhow::Result;
 use camino::Utf8Path;
@@ -13,8 +14,6 @@ use dropshot::ServerBuilder;
 use std::process::ExitCode;
 use std::time::Duration;
 
-use crate::config::Config;
-
 fn main() -> ExitCode {
     if let Err(err) = run() {
         eprintln!("Error: {}", err);
@@ -26,6 +25,9 @@ fn main() -> ExitCode {
 
 /// Create the async runtime and launch the server.
 fn run() -> Result<()> {
+    // NOTE: In general, prefer to add items to the configuration file rather
+    // than adding flags to the CLI. The configuration file can be tracked
+    // and managed more easily, and is the standard way to configure the server.
     let matches = clap::Command::new(env!("CARGO_CRATE_NAME"))
         .about("Night Vision backend server")
         .version(version::get_version())
@@ -78,6 +80,9 @@ async fn launch_server(config: &Config) -> Result<()> {
     Ok(())
 }
 
+// Since Tokio handles configuration through the builder pattern, rather than
+// by taking a configuration object (as Dropshot does), we need to do this
+// little dance to configure the runtime.
 fn configure_tokio_runtime(builder: &mut tokio::runtime::Builder, config: &Config) {
     // Make sure to turn on IO and timers, otherwise it won't run at all.
     builder.enable_all();
