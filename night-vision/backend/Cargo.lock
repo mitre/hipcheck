@@ -961,9 +961,19 @@ dependencies = [
  "camino",
  "clap",
  "dropshot",
+ "nv-server-api",
  "tokio",
  "which",
  "xshell",
+]
+
+[[package]]
+name = "nv-server-api"
+version = "0.1.0"
+dependencies = [
+ "dropshot",
+ "schemars",
+ "serde",
 ]
 
 [[package]]

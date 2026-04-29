@@ -1,15 +1,18 @@
 [workspace]
 
 resolver = "3"
-members = ["nv-server", "nvdb", "xtask"]
+members = ["nv-server", "nv-server-api", "nvdb", "xtask"]
 default-members = ["nv-server"]
 
 [workspace.dependencies]
-
-dropshot = "0.17.0"
-clap = { version = "4.6.1", features = ["string"] }
 anyhow = "1.0.102"
+camino = "1.2.2"
+clap = { version = "4.6.1", features = ["string"] }
+dropshot = "0.17.0"
+# This an outdated version, required to match the one expected by dropshot.
+# See: https://github.com/oxidecomputer/dropshot/issues/1375
+schemars = "0.8.22"
+serde = { version = "1.0.228", features = ["derive"] }
+tokio = { version = "1.52.1", features = ["fs", "io-util", "io-std", "net", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
 xshell = "0.2.7"
 which = "8.0.2"
-tokio = { version = "1.52.1", features = ["fs", "io-util", "io-std", "net", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
-camino = "1.2.2"

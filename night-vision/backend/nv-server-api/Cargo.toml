@@ -1,0 +1,9 @@
+[package]
+name = "nv-server-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dropshot.workspace = true
+schemars.workspace = true
+serde.workspace = true

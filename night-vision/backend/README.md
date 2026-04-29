@@ -17,6 +17,7 @@ This will install dependencies used by the project for development.
 ## Backend Crates
 
 - `nv-server`: The actual Night Vision backend server.
+- `nv-server-api`: Library crate that defines the `NvServerApi` trait.
 - `nvdb`: Night Vision Debugger, a tool for debugging the backend server.
 - `xtask`: Task runner, used for project-internal tasks.
 

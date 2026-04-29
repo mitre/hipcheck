@@ -222,6 +222,17 @@ impl Config {
                 continue;
             }
 
+            // If the value is quoted-wrapped, then remove the quotes before storing the value.
+            if value.starts_with("\"") && value.ends_with("\"") {
+                let value = value
+                    .trim_start_matches('"')
+                    .trim_end_matches('"')
+                    .to_string();
+
+                kvs.insert(key, value);
+                continue;
+            }
+
             kvs.insert(key, value);
         }
 

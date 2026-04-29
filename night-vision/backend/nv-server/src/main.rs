@@ -1,13 +1,13 @@
+mod api;
 mod config;
 mod version;
 
+use crate::api::Api;
 use crate::config::Config;
 use anyhow::Context;
 use anyhow::Result;
-use camino::Utf8Path;
 use camino::Utf8PathBuf;
 use clap::value_parser;
-use dropshot::ApiDescription;
 use dropshot::ConfigLogging;
 use dropshot::ConfigLoggingLevel;
 use dropshot::ServerBuilder;
@@ -38,14 +38,15 @@ fn run() -> Result<()> {
                 .long("config")
                 .value_name("FILE")
                 .value_parser(value_parser!(Utf8PathBuf))
+                .default_value("config.nv")
                 .help("Path to the configuration file"),
         )
         .get_matches();
 
+    // SAFETY: `get_one` always returns `Some` when a default value is set, so this won't panic.
     let config_path = matches
         .get_one::<Utf8PathBuf>("config")
-        .map(Utf8PathBuf::as_path)
-        .unwrap_or_else(|| Utf8Path::new("config.nv"));
+        .expect("config path is required");
 
     let config = Config::parse(config_path)?;
 
@@ -65,10 +66,7 @@ async fn launch_server(config: &Config) -> Result<()> {
     }
     .to_logger("nv-server")?;
 
-    let api = ApiDescription::new();
-    // TODO: Register API functions
-
-    let server = ServerBuilder::new(api, (), log)
+    let server = ServerBuilder::new(Api::new(), (), log)
         .config(config.dropshot_config()?)
         .start()
         .context("failed to start server")?;
