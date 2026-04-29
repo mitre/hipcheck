@@ -100,8 +100,8 @@ impl Config {
                 unexpected_keys.len(),
                 path,
                 unexpected_keys
-                    .into_iter()
-                    .map(|s| s.as_str())
+                    .iter()
+                    .map(|s| format!("\t{}", s))
                     .collect::<Vec<_>>()
                     .join("\n")
             );
@@ -138,10 +138,14 @@ impl Config {
 
         if value_errors.is_empty().not() {
             let msg = format!(
-                "{} failed to parse values in config file '{}':\n{}",
+                "{} values failed to parse in config file '{}':\n{}",
                 value_errors.len(),
                 path,
-                value_errors.join("\n")
+                value_errors
+                    .iter()
+                    .map(|s| format!("\t{}", s))
+                    .collect::<Vec<_>>()
+                    .join("\n")
             );
             return Err(anyhow!(msg));
         }
@@ -174,7 +178,7 @@ impl Config {
                 Ok(line) => line,
                 Err(err) => {
                     parse_errors.push(anyhow!(
-                        "line {}: failed to read line: {}",
+                        "\tline {}: failed to read line: {}",
                         line_number + 1,
                         err
                     ));
@@ -195,7 +199,7 @@ impl Config {
 
             let Some((key, value)) = line.split_once('=') else {
                 parse_errors.push(anyhow!(
-                    "line {}: invalid line, expected 'key = value' format",
+                    "\tline {}: invalid line, expected 'key = value' format",
                     line_number + 1
                 ));
 
@@ -203,7 +207,21 @@ impl Config {
             };
 
             let key = key.trim().to_string();
+
+            if key.is_empty() {
+                parse_errors.push(anyhow!("\tline {}: key is empty", line_number + 1));
+
+                continue;
+            }
+
             let value = value.trim().to_string();
+
+            if value.is_empty() {
+                parse_errors.push(anyhow!("\tline {}: value is empty", line_number + 1));
+
+                continue;
+            }
+
             kvs.insert(key, value);
         }
 
