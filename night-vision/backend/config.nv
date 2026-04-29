@@ -1,0 +1,5 @@
+# Configuration file for `nv-server`
+# This uses a very simple syntax inspired by the configuration for Ghostty.
+# Each configuration line is a key-value pair separated by an equals sign.
+
+# Currently we just use the defaults.
