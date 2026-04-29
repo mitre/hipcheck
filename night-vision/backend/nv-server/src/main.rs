@@ -13,9 +13,11 @@ use clap::value_parser;
 use dropshot::ConfigLogging;
 use dropshot::ConfigLoggingLevel;
 use dropshot::ServerBuilder;
+use sea_orm::ConnectOptions;
 use sea_orm::Database;
 use std::process::ExitCode;
 use std::time::Duration;
+use tokio::runtime::Builder;
 
 fn main() -> ExitCode {
     if let Err(err) = run() {
@@ -53,18 +55,17 @@ fn run() -> Result<()> {
 
     let config = Config::parse(config_path)?;
 
-    let mut builder = tokio::runtime::Builder::new_multi_thread();
-    configure_tokio_runtime(&mut builder, &config);
-    let rt = builder.build()?;
-
-    rt.block_on(launch_server(&config))?;
+    tokio_runtime(&config)
+        .build()
+        .context("failed to build Tokio runtime")?
+        .block_on(launch_server(&config))?;
 
     Ok(())
 }
 
 /// Launch the server.
 async fn launch_server(config: &Config) -> Result<()> {
-    let db = Database::connect(&config.database_conn)
+    let db = Database::connect(db_conn_options(&config))
         .await
         .context("failed to connect to database")?;
 
@@ -88,7 +89,9 @@ async fn launch_server(config: &Config) -> Result<()> {
 // Since Tokio handles configuration through the builder pattern, rather than
 // by taking a configuration object (as Dropshot does), we need to do this
 // little dance to configure the runtime.
-fn configure_tokio_runtime(builder: &mut tokio::runtime::Builder, config: &Config) {
+fn tokio_runtime(config: &Config) -> Builder {
+    let mut builder = tokio::runtime::Builder::new_multi_thread();
+
     // Make sure to turn on IO and timers, otherwise it won't run at all.
     builder.enable_all();
 
@@ -115,4 +118,37 @@ fn configure_tokio_runtime(builder: &mut tokio::runtime::Builder, config: &Confi
     if let Some(event_interval) = config.async_event_interval {
         builder.event_interval(event_interval);
     }
+
+    builder
+}
+
+/// Get connection options for the database.
+fn db_conn_options(config: &Config) -> ConnectOptions {
+    let mut opt = ConnectOptions::new(&config.database_conn);
+
+    if let Some(database_max_connections) = config.database_max_connections {
+        opt.max_connections(database_max_connections);
+    }
+
+    if let Some(database_min_connections) = config.database_min_connections {
+        opt.min_connections(database_min_connections);
+    }
+
+    if let Some(database_connect_timeout) = config.database_connect_timeout {
+        opt.connect_timeout(Duration::from_millis(database_connect_timeout));
+    }
+
+    if let Some(database_idle_timeout) = config.database_idle_timeout {
+        opt.idle_timeout(Duration::from_millis(database_idle_timeout));
+    }
+
+    if let Some(database_acquire_timeout) = config.database_acquire_timeout {
+        opt.acquire_timeout(Duration::from_millis(database_acquire_timeout));
+    }
+
+    if let Some(database_max_lifetime) = config.database_max_lifetime {
+        opt.max_lifetime(Duration::from_millis(database_max_lifetime));
+    }
+
+    opt
 }

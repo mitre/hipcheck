@@ -27,6 +27,24 @@ pub struct Config {
     /// String used to connect to the database.
     pub database_conn: String,
 
+    /// The maximum number of connections to the database.
+    pub database_max_connections: Option<u32>,
+
+    /// The minimum number of connections to the database.
+    pub database_min_connections: Option<u32>,
+
+    /// The timeout in milliseconds for establishing a connection to the database.
+    pub database_connect_timeout: Option<u64>,
+
+    /// The timeout in milliseconds for idle connections to the database.
+    pub database_idle_timeout: Option<u64>,
+
+    /// The timeout in milliseconds for acquiring a connection from the database.
+    pub database_acquire_timeout: Option<u64>,
+
+    /// The maximum lifetime in milliseconds for a connection to the database.
+    pub database_max_lifetime: Option<u64>,
+
     /// The number of async worker threads for Tokio to use.
     ///
     /// The default is equal to the number of CPU cores available on the system.
@@ -85,6 +103,12 @@ impl Config {
             "default-request-body-max-bytes",
             "default-early-disconnect-behavior",
             "database-conn",
+            "database-max-connections",
+            "database-min-connections",
+            "database-connect-timeout",
+            "database-idle-timeout",
+            "database-acquire-timeout",
+            "database-max-lifetime",
             "async-worker-threads",
             "async-worker-thread-stack-size",
             "async-max-blocking-threads",
@@ -123,6 +147,24 @@ impl Config {
             Self::parse_value(&kvs, "default-early-disconnect-behavior", &mut value_errors);
 
         let database_conn = Self::parse_value(&kvs, "database-conn", &mut value_errors);
+
+        let database_max_connections =
+            Self::parse_value(&kvs, "database-max-connections", &mut value_errors);
+
+        let database_min_connections =
+            Self::parse_value(&kvs, "database-min-connections", &mut value_errors);
+
+        let database_connect_timeout =
+            Self::parse_value(&kvs, "database-connect-timeout", &mut value_errors);
+
+        let database_idle_timeout =
+            Self::parse_value(&kvs, "database-idle-timeout", &mut value_errors);
+
+        let database_acquire_timeout =
+            Self::parse_value(&kvs, "database-acquire-timeout", &mut value_errors);
+
+        let database_max_lifetime =
+            Self::parse_value(&kvs, "database-max-lifetime", &mut value_errors);
 
         let async_worker_threads =
             Self::parse_value(&kvs, "async-worker-threads", &mut value_errors);
@@ -187,6 +229,12 @@ impl Config {
             default_early_disconnect_behavior,
             // PANIC SAFETY: We've already checked that it's Some above.
             database_conn: database_conn.expect("database-conn is required"),
+            database_max_connections,
+            database_min_connections,
+            database_connect_timeout,
+            database_idle_timeout,
+            database_acquire_timeout,
+            database_max_lifetime,
             async_worker_threads,
             async_worker_thread_stack_size,
             async_max_blocking_threads,
