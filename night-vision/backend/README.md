@@ -4,6 +4,12 @@
 This is the backend server for Night Vision. It is written in Rust, and includes
 a REST API to be used by the frontend.
 
+## Backend Crates
+
+- `nv-server`: The actual Night Vision backend server.
+- `nvdb`: Night Vision Debugger, a tool for debugging the backend server.
+- `xtask`: Task runner, used for project-internal tasks.
+
 ## Rust Guidelines
 
 The following are guidelines to follow when contributing Rust code to this
