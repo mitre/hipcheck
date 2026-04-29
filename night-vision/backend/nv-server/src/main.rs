@@ -15,6 +15,7 @@ use dropshot::ConfigLoggingLevel;
 use dropshot::ServerBuilder;
 use sea_orm::ConnectOptions;
 use sea_orm::Database;
+use sea_orm::DatabaseConnection;
 use std::process::ExitCode;
 use std::time::Duration;
 use tokio::runtime::Builder;
@@ -65,9 +66,7 @@ fn run() -> Result<()> {
 
 /// Launch the server.
 async fn launch_server(config: &Config) -> Result<()> {
-    let db = Database::connect(db_conn_options(&config))
-        .await
-        .context("failed to connect to database")?;
+    let db = db_conn(config).await?;
 
     let log = ConfigLogging::StderrTerminal {
         level: ConfigLoggingLevel::Info,
@@ -123,8 +122,8 @@ fn tokio_runtime(config: &Config) -> Builder {
 }
 
 /// Get connection options for the database.
-fn db_conn_options(config: &Config) -> ConnectOptions {
-    let mut opt = ConnectOptions::new(&config.database_conn);
+async fn db_conn(config: &Config) -> Result<DatabaseConnection> {
+    let mut opt = ConnectOptions::new(&config.database_connection);
 
     if let Some(database_max_connections) = config.database_max_connections {
         opt.max_connections(database_max_connections);
@@ -150,5 +149,9 @@ fn db_conn_options(config: &Config) -> ConnectOptions {
         opt.max_lifetime(Duration::from_millis(database_max_lifetime));
     }
 
-    opt
+    let db = Database::connect(opt)
+        .await
+        .context("failed to connect to database")?;
+
+    Ok(db)
 }

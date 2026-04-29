@@ -14,18 +14,18 @@ pub struct Config {
     /// The address to bind the server to.
     ///
     /// The default is `127.0.0.1` at an arbitrary available port..
-    pub server_addr: String,
+    pub server_address: String,
 
     /// The maximum size in bytes for the request body.
     ///
     /// The default is 1024 bytes.
-    pub default_request_body_max_bytes: Option<usize>,
+    pub http_request_body_max_bytes: Option<usize>,
 
     /// The default behavior for HTTP handler functions when clients disconnect early.
-    pub default_early_disconnect_behavior: Option<EarlyDisconnectBehavior>,
+    pub http_early_disconnect_behavior: Option<EarlyDisconnectBehavior>,
 
     /// String used to connect to the database.
-    pub database_conn: String,
+    pub database_connection: String,
 
     /// The maximum number of connections to the database.
     pub database_max_connections: Option<u32>,
@@ -99,10 +99,10 @@ impl Config {
         let kvs = Self::parse_kvs(path)?;
 
         let known_keys = [
-            "server-addr",
-            "default-request-body-max-bytes",
-            "default-early-disconnect-behavior",
-            "database-conn",
+            "server-address",
+            "http-request-body-max-bytes",
+            "http-early-disconnect-behavior",
+            "database-connection",
             "database-max-connections",
             "database-min-connections",
             "database-connect-timeout",
@@ -138,15 +138,15 @@ impl Config {
 
         let mut value_errors = Vec::new();
 
-        let server_addr = Self::parse_value(&kvs, "server-addr", &mut value_errors);
+        let server_addr = Self::parse_value(&kvs, "server-address", &mut value_errors);
 
         let default_request_body_max_bytes =
-            Self::parse_value(&kvs, "default-request-body-max-bytes", &mut value_errors);
+            Self::parse_value(&kvs, "http-request-body-max-bytes", &mut value_errors);
 
         let default_early_disconnect_behavior =
-            Self::parse_value(&kvs, "default-early-disconnect-behavior", &mut value_errors);
+            Self::parse_value(&kvs, "http-early-disconnect-behavior", &mut value_errors);
 
-        let database_conn = Self::parse_value(&kvs, "database-conn", &mut value_errors);
+        let database_conn = Self::parse_value(&kvs, "database-connection", &mut value_errors);
 
         let database_max_connections =
             Self::parse_value(&kvs, "database-max-connections", &mut value_errors);
@@ -201,11 +201,11 @@ impl Config {
         let mut missing_required = Vec::new();
 
         if server_addr.is_none() {
-            missing_required.push("server-addr");
+            missing_required.push("server-address");
         }
 
         if database_conn.is_none() {
-            missing_required.push("database-conn");
+            missing_required.push("database-connection");
         }
 
         if missing_required.is_empty().not() {
@@ -224,11 +224,11 @@ impl Config {
 
         let config = Config {
             // PANIC SAFETY: We've already checked that it's Some above.
-            server_addr: server_addr.expect("server-addr is required"),
-            default_request_body_max_bytes,
-            default_early_disconnect_behavior,
+            server_address: server_addr.expect("server-address is required"),
+            http_request_body_max_bytes: default_request_body_max_bytes,
+            http_early_disconnect_behavior: default_early_disconnect_behavior,
             // PANIC SAFETY: We've already checked that it's Some above.
-            database_conn: database_conn.expect("database-conn is required"),
+            database_connection: database_conn.expect("database-connection is required"),
             database_max_connections,
             database_min_connections,
             database_connect_timeout,
@@ -361,13 +361,13 @@ impl Config {
     pub fn dropshot_config(&self) -> Result<ConfigDropshot> {
         let mut config = ConfigDropshot::default();
 
-        config.bind_address = self.server_addr.parse()?;
+        config.bind_address = self.server_address.parse()?;
 
-        if let Some(max_bytes) = self.default_request_body_max_bytes {
+        if let Some(max_bytes) = self.http_request_body_max_bytes {
             config.default_request_body_max_bytes = max_bytes;
         }
 
-        if let Some(behavior) = self.default_early_disconnect_behavior {
+        if let Some(behavior) = self.http_early_disconnect_behavior {
             config.default_handler_task_mode = behavior.into();
         }
 
