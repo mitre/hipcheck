@@ -47,7 +47,7 @@ fn run() -> Result<()> {
         .map(Utf8PathBuf::as_path)
         .unwrap_or_else(|| Utf8Path::new("config.nv"));
 
-    let config = Config::parse(&config_path)?;
+    let config = Config::parse(config_path)?;
 
     let mut builder = tokio::runtime::Builder::new_multi_thread();
     configure_tokio_runtime(&mut builder, &config);

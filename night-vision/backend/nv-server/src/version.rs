@@ -7,7 +7,7 @@ pub fn get_version() -> String {
     if let Some(short_hash) = &commit_info.short_hash {
         s.push_str(" (commit hash ");
         s.push_str(short_hash);
-        s.push_str(")");
+        s.push(')');
     }
 
     s
@@ -26,7 +26,7 @@ pub fn get_long_version() -> String {
         s.push_str(hash);
         s.push_str(" on ");
         s.push_str(date);
-        s.push_str(")");
+        s.push(')');
     }
 
     s

@@ -243,6 +243,8 @@ impl Config {
         Ok(kvs)
     }
 
+    /// Parse a value from the config map, returning `None` if the key is not present,
+    /// and if parsing fails adding it to the error vector for later reporting.
     fn parse_value<T: std::str::FromStr>(
         kvs: &HashMap<String, String>,
         key: &str,
