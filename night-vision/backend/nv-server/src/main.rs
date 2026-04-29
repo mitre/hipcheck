@@ -86,9 +86,7 @@ async fn launch_server(config: &Config) -> Result<()> {
     Ok(())
 }
 
-// Since Tokio handles configuration through the builder pattern, rather than
-// by taking a configuration object (as Dropshot does), we need to do this
-// little dance to configure the runtime.
+/// Construct a Tokio runtime using the given configuration.
 fn tokio_runtime(config: &Config) -> Result<Runtime> {
     let mut builder = Builder::new_multi_thread();
 
@@ -124,7 +122,7 @@ fn tokio_runtime(config: &Config) -> Result<Runtime> {
     Ok(runtime)
 }
 
-/// Get connection options for the database.
+/// Connect to the database using the given configuration.
 async fn db_conn(config: &Config) -> Result<DatabaseConnection> {
     let mut opt = ConnectOptions::new(&config.database_connection);
 
@@ -159,6 +157,7 @@ async fn db_conn(config: &Config) -> Result<DatabaseConnection> {
     Ok(db)
 }
 
+/// Get the crate name, replacing underscores with hyphens.
 fn crate_name() -> String {
     env!("CARGO_CRATE_NAME").replace("_", "-").to_string()
 }
