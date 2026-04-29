@@ -9,6 +9,7 @@ anyhow = "1.0.102"
 camino = "1.2.2"
 clap = { version = "4.6.1", features = ["string"] }
 dropshot = "0.17.0"
+sea-orm = { version = "2.0.0-rc", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
 # This an outdated version, required to match the one expected by dropshot.
 # See: https://github.com/oxidecomputer/dropshot/issues/1375
 schemars = "0.8.22"

@@ -76,6 +76,10 @@ fn get_deps() -> &'static [Dep] {
             binary_name: "cargo-autoinherit",
             install_method: DepInstallMethod::Binstall,
         },
+        Dep {
+            binary_name: "sea-orm-cli",
+            install_method: DepInstallMethod::Binstall,
+        },
     ]
 }
 

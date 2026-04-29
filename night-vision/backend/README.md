@@ -40,3 +40,9 @@ time, including by keeping compile times reasonable.
   code generation can be slow. Don't lean on compile time guarantees for parts
   of the codebase that don't need it, and pay attention to how new generic code
   impacts compilation performance.
+
+## Database
+
+Night Vision's database of choice is PostgreSQL version 18. Make sure to
+install PostgreSQL locally for development. We also recommend installing
+pgAdmin if you want a GUI for inspecting the database.
