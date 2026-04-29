@@ -36,7 +36,7 @@ fn run() -> Result<()> {
     // NOTE: In general, prefer to add items to the configuration file rather
     // than adding flags to the CLI. The configuration file can be tracked
     // and managed more easily, and is the standard way to configure the server.
-    let matches = clap::Command::new(env!("CARGO_CRATE_NAME"))
+    let matches = clap::Command::new(crate_name())
         .about("Night Vision backend server")
         .version(version::get_version())
         .long_version(version::get_long_version())
@@ -157,4 +157,8 @@ async fn db_conn(config: &Config) -> Result<DatabaseConnection> {
         .context("failed to connect to database")?;
 
     Ok(db)
+}
+
+fn crate_name() -> String {
+    env!("CARGO_CRATE_NAME").replace("_", "-").to_string()
 }
