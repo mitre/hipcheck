@@ -1,3 +1,5 @@
+mod version;
+
 use anyhow::Context;
 use anyhow::Result;
 use dropshot::ApiDescription;
@@ -19,8 +21,8 @@ fn main() -> ExitCode {
 fn run() -> Result<()> {
     let _matches = clap::Command::new(env!("CARGO_CRATE_NAME"))
         .about("Night Vision backend server")
-        .version(get_version())
-        .long_version(get_long_version())
+        .version(version::get_version())
+        .long_version(version::get_long_version())
         .get_matches();
 
     let rt = tokio::runtime::Runtime::new()?;
@@ -47,26 +49,4 @@ async fn launch_server() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("server error: {}", e))?;
 
     Ok(())
-}
-
-/// Get the short version string, including just the pkg version and short commit hash.
-fn get_version() -> &'static str {
-    concat!(
-        env!("CARGO_PKG_VERSION"),
-        " (commit ",
-        env!("NV_BUILD_COMMIT_SHORT_HASH"),
-        ")"
-    )
-}
-
-/// Get the long version string, including the pkg version, full commit hash, and commit date.
-fn get_long_version() -> &'static str {
-    concat!(
-        env!("CARGO_PKG_VERSION"),
-        " (commit ",
-        env!("NV_BUILD_COMMIT_HASH"),
-        " on ",
-        env!("NV_BUILD_COMMIT_DATE"),
-        ")"
-    )
 }

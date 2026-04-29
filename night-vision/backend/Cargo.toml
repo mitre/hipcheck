@@ -7,7 +7,7 @@ default-members = ["nv-server"]
 [workspace.dependencies]
 
 dropshot = "0.17.0"
-clap = "4.6.1"
+clap = { version = "4.6.1", features = ["string"] }
 anyhow = "1.0.102"
 xshell = "0.2.7"
 which = "8.0.2"
