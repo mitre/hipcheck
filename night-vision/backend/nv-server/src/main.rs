@@ -8,6 +8,7 @@ use crate::config::Config;
 use crate::context::ApiCtx;
 use anyhow::Context;
 use anyhow::Result;
+use anyhow::anyhow;
 use camino::Utf8PathBuf;
 use clap::value_parser;
 use dropshot::ConfigLogging;
@@ -19,6 +20,7 @@ use sea_orm::DatabaseConnection;
 use std::process::ExitCode;
 use std::time::Duration;
 use tokio::runtime::Builder;
+use tokio::runtime::Runtime;
 
 fn main() -> ExitCode {
     if let Err(err) = run() {
@@ -56,31 +58,30 @@ fn run() -> Result<()> {
 
     let config = Config::parse(config_path)?;
 
-    tokio_runtime(&config)
-        .build()
-        .context("failed to build Tokio runtime")?
-        .block_on(launch_server(&config))?;
+    tokio_runtime(&config)?.block_on(launch_server(&config))?;
 
     Ok(())
 }
 
 /// Launch the server.
 async fn launch_server(config: &Config) -> Result<()> {
-    let db = db_conn(config).await?;
+    let api = Api::new();
+
+    let ctx = ApiCtx {
+        db: db_conn(config).await?,
+    };
 
     let log = ConfigLogging::StderrTerminal {
         level: ConfigLoggingLevel::Info,
     }
     .to_logger("nv-server")?;
 
-    let server = ServerBuilder::new(Api::new(), ApiCtx { db }, log)
+    let server = ServerBuilder::new(api, ctx, log)
         .config(config.dropshot_config()?)
         .start()
         .context("failed to start server")?;
 
-    server
-        .await
-        .map_err(|e| anyhow::anyhow!("server error: {}", e))?;
+    server.await.map_err(|e| anyhow!("server error: {}", e))?;
 
     Ok(())
 }
@@ -88,8 +89,8 @@ async fn launch_server(config: &Config) -> Result<()> {
 // Since Tokio handles configuration through the builder pattern, rather than
 // by taking a configuration object (as Dropshot does), we need to do this
 // little dance to configure the runtime.
-fn tokio_runtime(config: &Config) -> Builder {
-    let mut builder = tokio::runtime::Builder::new_multi_thread();
+fn tokio_runtime(config: &Config) -> Result<Runtime> {
+    let mut builder = Builder::new_multi_thread();
 
     // Make sure to turn on IO and timers, otherwise it won't run at all.
     builder.enable_all();
@@ -118,7 +119,9 @@ fn tokio_runtime(config: &Config) -> Builder {
         builder.event_interval(event_interval);
     }
 
-    builder
+    let runtime = builder.build().context("failed to build Tokio runtime")?;
+
+    Ok(runtime)
 }
 
 /// Get connection options for the database.
