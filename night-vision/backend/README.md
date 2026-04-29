@@ -4,6 +4,16 @@
 This is the backend server for Night Vision. It is written in Rust, and includes
 a REST API to be used by the frontend.
 
+## Getting Started
+
+After [installing Rust via `rustup`](https://rustup.rs/), run:
+
+```sh
+$ cargo xtask deps install
+```
+
+This will install dependencies used by the project for development.
+
 ## Backend Crates
 
 - `nv-server`: The actual Night Vision backend server.
