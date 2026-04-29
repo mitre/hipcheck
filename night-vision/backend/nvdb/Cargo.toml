@@ -1,5 +1,5 @@
 [package]
-name = "xtask"
+name = "nvdb"
 version = "0.1.0"
 edition = "2024"
 publish = false
@@ -7,5 +7,3 @@ publish = false
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-which = { workspace = true }
-xshell = { workspace = true }
