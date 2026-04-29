@@ -958,6 +958,7 @@ name = "nv-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "camino",
  "clap",
  "dropshot",
  "tokio",

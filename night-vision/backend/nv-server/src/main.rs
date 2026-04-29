@@ -3,12 +3,13 @@ mod version;
 
 use anyhow::Context;
 use anyhow::Result;
+use camino::Utf8Path;
+use camino::Utf8PathBuf;
 use clap::value_parser;
 use dropshot::ApiDescription;
 use dropshot::ConfigLogging;
 use dropshot::ConfigLoggingLevel;
 use dropshot::ServerBuilder;
-use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
 
@@ -34,16 +35,50 @@ fn run() -> Result<()> {
                 .short('c')
                 .long("config")
                 .value_name("FILE")
-                .value_parser(value_parser!(PathBuf))
+                .value_parser(value_parser!(Utf8PathBuf))
                 .help("Path to the configuration file"),
         )
         .get_matches();
 
-    let config_path = matches.get_one::<PathBuf>("config");
-    let config = Config::parse(config_path.map(|p| p.as_path()))?;
+    let config_path = matches
+        .get_one::<Utf8PathBuf>("config")
+        .map(Utf8PathBuf::as_path)
+        .unwrap_or_else(|| Utf8Path::new("config.nv"));
+
+    let config = Config::parse(&config_path)?;
 
     let mut builder = tokio::runtime::Builder::new_multi_thread();
+    configure_tokio_runtime(&mut builder, &config);
+    let rt = builder.build()?;
 
+    rt.block_on(launch_server(&config))?;
+
+    Ok(())
+}
+
+/// Launch the server.
+async fn launch_server(config: &Config) -> Result<()> {
+    let log = ConfigLogging::StderrTerminal {
+        level: ConfigLoggingLevel::Info,
+    }
+    .to_logger("nv-server")?;
+
+    let api = ApiDescription::new();
+    // TODO: Register API functions
+
+    let server = ServerBuilder::new(api, (), log)
+        .config(config.dropshot_config()?)
+        .start()
+        .context("failed to start server")?;
+
+    server
+        .await
+        .map_err(|e| anyhow::anyhow!("server error: {}", e))?;
+
+    Ok(())
+}
+
+fn configure_tokio_runtime(builder: &mut tokio::runtime::Builder, config: &Config) {
     // Make sure to turn on IO and timers, otherwise it won't run at all.
     builder.enable_all();
 
@@ -70,31 +105,4 @@ fn run() -> Result<()> {
     if let Some(event_interval) = config.async_event_interval {
         builder.event_interval(event_interval);
     }
-
-    let rt = builder.build()?;
-    rt.block_on(launch_server(&config))?;
-
-    Ok(())
-}
-
-/// Launch the server.
-async fn launch_server(config: &Config) -> Result<()> {
-    let log = ConfigLogging::StderrTerminal {
-        level: ConfigLoggingLevel::Info,
-    }
-    .to_logger("nv-server")?;
-
-    let api = ApiDescription::new();
-    // TODO: Register API functions
-
-    let server = ServerBuilder::new(api, (), log)
-        .config(config.dropshot_config()?)
-        .start()
-        .context("failed to start server")?;
-
-    server
-        .await
-        .map_err(|e| anyhow::anyhow!("server error: {}", e))?;
-
-    Ok(())
 }

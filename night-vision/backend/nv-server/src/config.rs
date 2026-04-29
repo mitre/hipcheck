@@ -1,15 +1,14 @@
+use anyhow::{Context, Result, anyhow};
+use camino::Utf8Path;
+use dropshot::{ConfigDropshot, HandlerTaskMode};
 use std::{
     collections::HashMap,
     fmt::Display,
     fs::File,
     io::{BufRead as _, BufReader},
     ops::Not,
-    path::Path,
     str::FromStr,
 };
-
-use anyhow::{Context, Result, anyhow};
-use dropshot::{ConfigDropshot, HandlerTaskMode};
 
 pub struct Config {
     /// The address to bind the server to.
@@ -75,8 +74,7 @@ impl Config {
     /// Parsing will fail on unknown keys, or on keys that fail to parse. This is purposefully
     /// pretty strict; these are server configuration items, and a malformed key or value should
     /// be considered a configuration failure.
-    pub fn parse(path: Option<&Path>) -> Result<Config> {
-        let path = path.unwrap_or(Path::new("config.nv"));
+    pub fn parse(path: &Utf8Path) -> Result<Config> {
         let kvs = Self::parse_kvs(path)?;
 
         let known_keys = [
@@ -100,7 +98,7 @@ impl Config {
             let msg = format!(
                 "{} unknown keys in config file '{}':\n{}",
                 unexpected_keys.len(),
-                path.display(),
+                path,
                 unexpected_keys
                     .into_iter()
                     .map(|s| s.as_str())
@@ -142,7 +140,7 @@ impl Config {
             let msg = format!(
                 "{} failed to parse values in config file '{}':\n{}",
                 value_errors.len(),
-                path.display(),
+                path,
                 value_errors.join("\n")
             );
             return Err(anyhow!(msg));
@@ -164,9 +162,9 @@ impl Config {
     }
 
     /// Parse a key-value config file into a [`HashMap`] of string keys and string values.
-    fn parse_kvs(path: &Path) -> Result<HashMap<String, String>> {
+    fn parse_kvs(path: &Utf8Path) -> Result<HashMap<String, String>> {
         let file = BufReader::new(
-            File::open(path).context(format!("failed to open config file '{}'", path.display()))?,
+            File::open(path).context(format!("failed to open config file '{}'", path))?,
         );
         let mut kvs: HashMap<String, String> = HashMap::new();
         let mut parse_errors = Vec::new();
@@ -213,7 +211,7 @@ impl Config {
             let msg = format!(
                 "{} errors while parsing config file '{}':\n{}",
                 parse_errors.len(),
-                path.display(),
+                path,
                 parse_errors
                     .iter()
                     .map(|e| e.to_string())
