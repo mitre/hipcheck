@@ -1,9 +1,11 @@
 mod api;
 mod config;
+mod context;
 mod version;
 
 use crate::api::Api;
 use crate::config::Config;
+use crate::context::ApiCtx;
 use anyhow::Context;
 use anyhow::Result;
 use camino::Utf8PathBuf;
@@ -11,6 +13,7 @@ use clap::value_parser;
 use dropshot::ConfigLogging;
 use dropshot::ConfigLoggingLevel;
 use dropshot::ServerBuilder;
+use sea_orm::Database;
 use std::process::ExitCode;
 use std::time::Duration;
 
@@ -61,12 +64,16 @@ fn run() -> Result<()> {
 
 /// Launch the server.
 async fn launch_server(config: &Config) -> Result<()> {
+    let db = Database::connect(&config.database_conn)
+        .await
+        .context("failed to connect to database")?;
+
     let log = ConfigLogging::StderrTerminal {
         level: ConfigLoggingLevel::Info,
     }
     .to_logger("nv-server")?;
 
-    let server = ServerBuilder::new(Api::new(), (), log)
+    let server = ServerBuilder::new(Api::new(), ApiCtx { db }, log)
         .config(config.dropshot_config()?)
         .start()
         .context("failed to start server")?;

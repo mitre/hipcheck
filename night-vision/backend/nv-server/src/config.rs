@@ -14,7 +14,7 @@ pub struct Config {
     /// The address to bind the server to.
     ///
     /// The default is `127.0.0.1` at an arbitrary available port..
-    pub server_addr: Option<String>,
+    pub server_addr: String,
 
     /// The maximum size in bytes for the request body.
     ///
@@ -23,6 +23,9 @@ pub struct Config {
 
     /// The default behavior for HTTP handler functions when clients disconnect early.
     pub default_early_disconnect_behavior: Option<EarlyDisconnectBehavior>,
+
+    /// String used to connect to the database.
+    pub database_conn: String,
 
     /// The number of async worker threads for Tokio to use.
     ///
@@ -81,6 +84,7 @@ impl Config {
             "server-addr",
             "default-request-body-max-bytes",
             "default-early-disconnect-behavior",
+            "database-conn",
             "async-worker-threads",
             "async-worker-thread-stack-size",
             "async-max-blocking-threads",
@@ -118,6 +122,8 @@ impl Config {
         let default_early_disconnect_behavior =
             Self::parse_value(&kvs, "default-early-disconnect-behavior", &mut value_errors);
 
+        let database_conn = Self::parse_value(&kvs, "database-conn", &mut value_errors);
+
         let async_worker_threads =
             Self::parse_value(&kvs, "async-worker-threads", &mut value_errors);
 
@@ -150,10 +156,37 @@ impl Config {
             return Err(anyhow!(msg));
         }
 
+        let mut missing_required = Vec::new();
+
+        if server_addr.is_none() {
+            missing_required.push("server-addr");
+        }
+
+        if database_conn.is_none() {
+            missing_required.push("database-conn");
+        }
+
+        if missing_required.is_empty().not() {
+            let msg = format!(
+                "{} missing required config value{}:\n{}",
+                missing_required.len(),
+                if missing_required.len() > 1 { "s" } else { "" },
+                missing_required
+                    .iter()
+                    .map(|s| format!("\t{}", s))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            return Err(anyhow!(msg));
+        }
+
         let config = Config {
-            server_addr,
+            // PANIC SAFETY: We've already checked that it's Some above.
+            server_addr: server_addr.expect("server-addr is required"),
             default_request_body_max_bytes,
             default_early_disconnect_behavior,
+            // PANIC SAFETY: We've already checked that it's Some above.
+            database_conn: database_conn.expect("database-conn is required"),
             async_worker_threads,
             async_worker_thread_stack_size,
             async_max_blocking_threads,
@@ -280,9 +313,7 @@ impl Config {
     pub fn dropshot_config(&self) -> Result<ConfigDropshot> {
         let mut config = ConfigDropshot::default();
 
-        if let Some(addr) = &self.server_addr {
-            config.bind_address = addr.parse()?;
-        }
+        config.bind_address = self.server_addr.parse()?;
 
         if let Some(max_bytes) = self.default_request_body_max_bytes {
             config.default_request_body_max_bytes = max_bytes;
