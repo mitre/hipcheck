@@ -140,10 +140,10 @@ impl Config {
 
         let server_addr = Self::parse_value(&kvs, "server-address", &mut value_errors);
 
-        let default_request_body_max_bytes =
+        let http_request_body_max_bytes =
             Self::parse_value(&kvs, "http-request-body-max-bytes", &mut value_errors);
 
-        let default_early_disconnect_behavior =
+        let http_early_disconnect_behavior =
             Self::parse_value(&kvs, "http-early-disconnect-behavior", &mut value_errors);
 
         let database_conn = Self::parse_value(&kvs, "database-connection", &mut value_errors);
@@ -225,8 +225,8 @@ impl Config {
         let config = Config {
             // PANIC SAFETY: We've already checked that it's Some above.
             server_address: server_addr.expect("server-address is required"),
-            http_request_body_max_bytes: default_request_body_max_bytes,
-            http_early_disconnect_behavior: default_early_disconnect_behavior,
+            http_request_body_max_bytes,
+            http_early_disconnect_behavior,
             // PANIC SAFETY: We've already checked that it's Some above.
             database_connection: database_conn.expect("database-connection is required"),
             database_max_connections,
