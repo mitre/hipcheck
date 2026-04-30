@@ -87,13 +87,13 @@ expand that support to more platforms in the future.
 
 Packages from these hosts may be specified as package names, with optional
 versions. When specifying one of these targets, it is not sufficient to
-specify just the package name, you'll need to use the `-t`/`--type` flag to
+specify just the package name, you'll need to use the `-t`/`--target` flag to
 specify the package host. For example:
 
 ```sh
-$ hc check --type npm chalk@5.3.0
-$ hc check --type pypi numpy@2.0.0
-$ hc check --type maven commons-csv@1.11.0
+$ hc check --target npm chalk@5.3.0
+$ hc check --target pypi numpy@2.0.0
+$ hc check --target maven commons-csv@1.11.0
 ```
 
 Without specifying the platform, Hipcheck will be unable to determine
