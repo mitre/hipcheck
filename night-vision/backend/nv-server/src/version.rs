@@ -1,3 +1,5 @@
+//! Helpers for getting version information for the Night Vision server.
+
 /// Get the short version string, including just the pkg version and short commit hash.
 pub fn get_version() -> String {
     let commit_info = CommitInfo::load();
@@ -32,13 +34,18 @@ pub fn get_long_version() -> String {
     s
 }
 
+/// Represents the commit information for the Night Vision server.
 struct CommitInfo {
+    /// The full-length hash of the commit.
     hash: Option<String>,
+    /// The short hash of the commit.
     short_hash: Option<String>,
+    /// The date of the commit.
     date: Option<String>,
 }
 
 impl CommitInfo {
+    /// Loads the commit information from environment variables.
     fn load() -> Self {
         Self {
             hash: option_env!("NV_BUILD_COMMIT_HASH").map(ToString::to_string),

@@ -1,8 +1,10 @@
-use dropshot::{HttpError, HttpResponseOk, RequestContext};
-use nv_server_api::nv_server_api_mod::api_description as generate_api_description;
-use nv_server_api::{NvServerApi, Stub};
+//! Defines the API endpoints for the Night Vision server.
 
-use crate::context::ApiCtx;
+use dropshot::{HttpError, HttpResponseOk, RequestContext};
+use nv_server_api::{
+    NvServerApi, Stub, nv_server_api_mod::api_description as generate_api_description,
+};
+use sea_orm::DatabaseConnection;
 
 pub struct Api;
 
@@ -24,4 +26,9 @@ impl NvServerApi for Api {
             name: "example".to_string(),
         }))
     }
+}
+
+pub struct ApiCtx {
+    #[allow(unused)]
+    pub db: DatabaseConnection,
 }

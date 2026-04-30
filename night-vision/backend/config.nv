@@ -2,15 +2,90 @@
 #
 # This uses a very simple syntax inspired by the configuration for Ghostty.
 # Each configuration line is a key-value pair separated by an equals sign.
-# Values can be quoted-wrapped if you want.
+# Values can be quoted-wrapped if you want. Values are optional, and if not
+# provided the key will use the default value.
 #
-# `server-address` and `database-connection` are required. Other fields are
-# optional.
-#
-# See `src/config.rs` for a list of supported keys and their default values.
+# `server-address` and `database-connection` are required.
 
 # The address to bind the Night Vision server to.
 server-address = "127.0.0.1:8080"
 
 # The connection string for the database.
 database-connection = "postgres://localhost:5432/nv"
+
+# Maximum size in bytes for the request body.
+#
+# Default: 1024
+http-request-body-max-bytes =
+
+# The default behavior for handling early client disconnects.
+# Can be "cancel" or "continue".
+# "cancel" means endpoint handlers are dropped when the client disconnects.
+# "continue" means endpoint handlers run to completion anyway.
+#
+# Default: "continue"
+http-early-disconnect-behavior =
+
+# The maximum number of connections to the database.
+#
+# Default: 100
+database-max-connections =
+
+# The minimum number of connections to the database.
+#
+# Default: 0
+database-min-connections =
+
+# Timeout in milliseconds for establishing a connection to the database.
+#
+# Default: (no timeout)
+database-connect-timeout =
+
+# Timeout in milliseconds for idle connections to the database.
+#
+# Default: (no timeout)
+database-idle-timeout =
+
+# Timeout in milliseconds for acquiring a connection from the database.
+#
+# Default: (no timeout)
+database-acquire-timeout =
+
+# Maximum total lifetime in milliseconds for a connection to the database.
+#
+# Default: (no timeout)
+database-max-lifetime =
+
+# The number of async worker threads to use for handling requests.
+#
+# Default: (the number of CPU cores available on the system)
+async-worker-threads =
+
+# The size in bytes for stacks available to worker tasks.
+#
+# Default: 2000000
+async-worker-thread-stack-size =
+
+# The maximum number of blocking threads in the async runtime.
+#
+# Default: 512
+async-max-blocking-threads =
+
+# The number of milliseconds to keep blocking threads alive after they finish.
+#
+# Default: 10000
+async-blocking-thread-keep-alive =
+
+# The number of scheduler ticks between polls to the global task queue.
+#
+# While each thread allocated for a worker maintains a local task queue, they
+# periodically also pull from the global task queue. This setting determines how
+# often that pull happens.
+#
+# Default: 31
+async-global-queue-interval =
+
+# The number of scheduler ticks between event polling.
+#
+# Default: 61
+async-event-interval =

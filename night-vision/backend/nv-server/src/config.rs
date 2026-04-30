@@ -1,3 +1,5 @@
+//! Defines configuration for the Night Vision server.
+
 use anyhow::{Context, Result, anyhow};
 use camino::Utf8Path;
 use dropshot::{ConfigDropshot, HandlerTaskMode};
@@ -10,6 +12,8 @@ use std::{
     str::FromStr,
 };
 
+/// Configuration for the Night Vision server.
+#[derive(Debug)]
 pub struct Config {
     /// The address to bind the server to.
     ///
@@ -50,7 +54,7 @@ pub struct Config {
     /// The default is equal to the number of CPU cores available on the system.
     pub async_worker_threads: Option<usize>,
 
-    /// The size in bytes for stacks available to worker threads.
+    /// The size in bytes for stacks available to worker tasks.
     ///
     /// The default is 2MB.
     pub async_worker_thread_stack_size: Option<usize>,
@@ -297,9 +301,12 @@ impl Config {
 
             let value = value.trim().to_string();
 
+            // We permit empty values and treat them as the key/value pair not being present at all
+            // (so the default value is used). This matches the behavior in Ghostty, and lets the
+            // configuration file have empty values for all the keys so we can clearly document
+            // what the keys are within the config file itself, without setting them or commenting
+            // them out.
             if value.is_empty() {
-                parse_errors.push(anyhow!("\tline {}: value is empty", line_number + 1));
-
                 continue;
             }
 
@@ -373,25 +380,136 @@ impl Config {
 
         Ok(config)
     }
+
+    /// Get a friendly report on the configuration being used.
+    pub fn report(&self) -> String {
+        let mut report = format!("{:-^80}\n", "");
+
+        report.push_str(&self.report_line("server-address", &self.server_address));
+        report.push_str(&self.report_line("database-connection", &self.database_connection));
+
+        if let Some(max_bytes) = self.http_request_body_max_bytes {
+            report
+                .push_str(&self.report_line("http-request-body-max-bytes", &max_bytes.to_string()));
+        }
+
+        if let Some(behavior) = self.http_early_disconnect_behavior {
+            report.push_str(
+                &self.report_line("http-early-disconnect-behavior", &behavior.to_string()),
+            );
+        }
+
+        if let Some(max_connections) = self.database_max_connections {
+            report.push_str(
+                &self.report_line("database-max-connections", &max_connections.to_string()),
+            );
+        }
+
+        if let Some(min_connections) = self.database_min_connections {
+            report.push_str(
+                &self.report_line("database-min-connections", &min_connections.to_string()),
+            );
+        }
+
+        if let Some(connect_timeout) = self.database_connect_timeout {
+            report.push_str(
+                &self.report_line("database-connect-timeout", &connect_timeout.to_string()),
+            );
+        }
+
+        if let Some(idle_timeout) = self.database_idle_timeout {
+            report.push_str(&self.report_line("database-idle-timeout", &idle_timeout.to_string()));
+        }
+
+        if let Some(acquire_timeout) = self.database_acquire_timeout {
+            report.push_str(
+                &self.report_line("database-acquire-timeout", &acquire_timeout.to_string()),
+            );
+        }
+
+        if let Some(max_lifetime) = self.database_max_lifetime {
+            report.push_str(&self.report_line("database-max-lifetime", &max_lifetime.to_string()));
+        }
+
+        if let Some(async_worker_threads) = self.async_worker_threads {
+            report.push_str(
+                &self.report_line("async-worker-threads", &async_worker_threads.to_string()),
+            );
+        }
+
+        if let Some(async_worker_thread_stack_size) = self.async_worker_thread_stack_size {
+            report.push_str(&self.report_line(
+                "async-worker-thread-stack-size",
+                &async_worker_thread_stack_size.to_string(),
+            ));
+        }
+
+        if let Some(async_max_blocking_threads) = self.async_max_blocking_threads {
+            report.push_str(&self.report_line(
+                "async-max-blocking-threads",
+                &async_max_blocking_threads.to_string(),
+            ));
+        }
+
+        if let Some(async_blocking_thread_keep_alive) = self.async_blocking_thread_keep_alive {
+            report.push_str(&self.report_line(
+                "async-blocking-thread-keep-alive",
+                &async_blocking_thread_keep_alive.to_string(),
+            ));
+        }
+
+        if let Some(async_global_queue_interval) = self.async_global_queue_interval {
+            report.push_str(&self.report_line(
+                "async-global-queue-interval",
+                &async_global_queue_interval.to_string(),
+            ));
+        }
+
+        if let Some(async_event_interval) = self.async_event_interval {
+            report.push_str(
+                &self.report_line("async-event-interval", &async_event_interval.to_string()),
+            );
+        }
+
+        report.push_str(&format!("{:-^80}\n", ""));
+
+        report
+    }
+
+    fn report_line(&self, key: &str, value: &str) -> String {
+        format!("{:>32}: {}\n", key, value)
+    }
 }
 
-#[derive(Clone, Copy)]
+/// How to handle early disconnects from clients.
+#[derive(Clone, Copy, Debug)]
 pub enum EarlyDisconnectBehavior {
-    CancelOnDisconnect,
-    Detached,
+    /// Cancel the handler task on a disconnect.
+    Cancel,
+    /// Run the handler to completion even after the client disconnects.
+    Continue,
 }
 
 impl FromStr for EarlyDisconnectBehavior {
     type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.trim() {
-            "cancel-on-disconnect" => Ok(Self::CancelOnDisconnect),
-            "detached" => Ok(Self::Detached),
+            "cancel" => Ok(Self::Cancel),
+            "continue" => Ok(Self::Continue),
             _ => Err(anyhow::anyhow!(
-                "invalid early disconnect behavior (must be 'cancel-on-disconnect' or 'detached'): {}",
+                "invalid early disconnect behavior (must be 'cancel' or 'continue'): {}",
                 s
             )),
+        }
+    }
+}
+
+impl std::fmt::Display for EarlyDisconnectBehavior {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EarlyDisconnectBehavior::Cancel => write!(f, "cancel"),
+            EarlyDisconnectBehavior::Continue => write!(f, "continue"),
         }
     }
 }
@@ -399,8 +517,8 @@ impl FromStr for EarlyDisconnectBehavior {
 impl From<EarlyDisconnectBehavior> for HandlerTaskMode {
     fn from(value: EarlyDisconnectBehavior) -> Self {
         match value {
-            EarlyDisconnectBehavior::CancelOnDisconnect => HandlerTaskMode::CancelOnDisconnect,
-            EarlyDisconnectBehavior::Detached => HandlerTaskMode::Detached,
+            EarlyDisconnectBehavior::Cancel => HandlerTaskMode::CancelOnDisconnect,
+            EarlyDisconnectBehavior::Continue => HandlerTaskMode::Detached,
         }
     }
 }
