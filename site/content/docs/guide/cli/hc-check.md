@@ -45,7 +45,7 @@ It is possible for a target specifier to be ambiguous. For example, Hipcheck
 accepts targets of the form `<package_name>[@<package_version>]`. In this case,
 it's not clear from the target specifier what package host this package is
 supposed to be hosted on. In these ambiguous cases, the user needs to specify
-the __target type__ with the `-t`/`--type` flag. The full list of current types
+the __target type__ with the `-t`/`--target` flag. The full list of current types
 is:
 
 - `maven`: A package on Maven Central
