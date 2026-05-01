@@ -37,7 +37,7 @@ fn run() -> Result<()> {
                 .long("config")
                 .value_name("FILE")
                 .value_parser(clap::value_parser!(Utf8PathBuf))
-                .default_value("config.nv")
+                .default_value("nv-server.spookey")
                 .help("Path to the configuration file"),
         )
         .get_matches();
