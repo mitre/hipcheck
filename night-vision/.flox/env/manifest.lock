@@ -6,14 +6,23 @@
       "cargo-autoinherit": {
         "pkg-path": "cargo-autoinherit"
       },
-      "cargo-binstall": {
-        "pkg-path": "cargo-binstall"
-      },
       "cargo-nextest": {
         "pkg-path": "cargo-nextest"
       },
+      "git": {
+        "pkg-path": "git"
+      },
+      "jujutsu": {
+        "pkg-path": "jujutsu"
+      },
+      "pgadmin4": {
+        "pkg-path": "pgadmin4"
+      },
       "pnpm": {
         "pkg-path": "pnpm"
+      },
+      "postgresql_18": {
+        "pkg-path": "postgresql_18"
       },
       "rustup": {
         "pkg-path": "rustup"
@@ -144,122 +153,6 @@
       "priority": 5
     },
     {
-      "attr_path": "cargo-binstall",
-      "broken": false,
-      "derivation": "/nix/store/i56pilmm5njq6si47x0mzpy1bwnqhz0k-cargo-binstall-1.18.1.drv",
-      "description": "Tool for installing rust binaries as an alternative to building from source",
-      "install_id": "cargo-binstall",
-      "license": "GPL-3.0-only",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
-      "name": "cargo-binstall-1.18.1",
-      "pname": "cargo-binstall",
-      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
-      "rev_count": 987561,
-      "rev_date": "2026-04-27T05:36:01Z",
-      "scrape_date": "2026-04-29T19:52:27.033895Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "1.18.1",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/a55s0mr4iy16g2nbimwffi6567j791fz-cargo-binstall-1.18.1"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "cargo-binstall",
-      "broken": false,
-      "derivation": "/nix/store/a8dd72nra06hynvr2a1s2y6k3rybaamx-cargo-binstall-1.18.1.drv",
-      "description": "Tool for installing rust binaries as an alternative to building from source",
-      "install_id": "cargo-binstall",
-      "license": "GPL-3.0-only",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
-      "name": "cargo-binstall-1.18.1",
-      "pname": "cargo-binstall",
-      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
-      "rev_count": 987561,
-      "rev_date": "2026-04-27T05:36:01Z",
-      "scrape_date": "2026-04-29T20:42:17.250958Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "1.18.1",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/d9rbwj1sm3ppkvmni74wh37p266mp0qb-cargo-binstall-1.18.1"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "cargo-binstall",
-      "broken": false,
-      "derivation": "/nix/store/i12dwrxrprxn21s6k3bwava98l2n2zj0-cargo-binstall-1.18.1.drv",
-      "description": "Tool for installing rust binaries as an alternative to building from source",
-      "install_id": "cargo-binstall",
-      "license": "GPL-3.0-only",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
-      "name": "cargo-binstall-1.18.1",
-      "pname": "cargo-binstall",
-      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
-      "rev_count": 987561,
-      "rev_date": "2026-04-27T05:36:01Z",
-      "scrape_date": "2026-04-29T21:54:32.190156Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "1.18.1",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/rxkpcia9ak8w74qldqmq1pil2acyhszm-cargo-binstall-1.18.1"
-      },
-      "system": "x86_64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "cargo-binstall",
-      "broken": false,
-      "derivation": "/nix/store/2qnllks50an43j3k441fipjm0vky2625-cargo-binstall-1.18.1.drv",
-      "description": "Tool for installing rust binaries as an alternative to building from source",
-      "install_id": "cargo-binstall",
-      "license": "GPL-3.0-only",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
-      "name": "cargo-binstall-1.18.1",
-      "pname": "cargo-binstall",
-      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
-      "rev_count": 987561,
-      "rev_date": "2026-04-27T05:36:01Z",
-      "scrape_date": "2026-04-29T23:09:57.050737Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "1.18.1",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/pfxyriql2aa33rrjbnd8wxmmsyh73r4v-cargo-binstall-1.18.1"
-      },
-      "system": "x86_64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
       "attr_path": "cargo-nextest",
       "broken": false,
       "derivation": "/nix/store/im42504dvng0d5wd5y9wdx33ij91g9di-cargo-nextest-0.9.133.drv",
@@ -376,6 +269,364 @@
       "priority": 5
     },
     {
+      "attr_path": "git",
+      "broken": false,
+      "derivation": "/nix/store/9n758xnd7s67zz9naiivygz24pv7zpr4-git-2.53.0.drv",
+      "description": "Distributed version control system",
+      "install_id": "git",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "git-2.53.0",
+      "pname": "git",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T19:52:28.124796Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.53.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/0kjpgj1grgba239ykdnv1cjc61xqk3aa-git-2.53.0-doc",
+        "out": "/nix/store/5y6cp247hspkqa7pp6cbc4540ygx0249-git-2.53.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "git",
+      "broken": false,
+      "derivation": "/nix/store/y0zdc38hb5flnbzx9a8sia7azv917jvc-git-2.53.0.drv",
+      "description": "Distributed version control system",
+      "install_id": "git",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "git-2.53.0",
+      "pname": "git",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T20:42:18.848991Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.53.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/rc56a3l2wby94gk9gvirpwi9hv9v15gi-git-2.53.0-debug",
+        "doc": "/nix/store/q8j5mwix1g75xyq025d3hmringklm52z-git-2.53.0-doc",
+        "out": "/nix/store/gx9r7g2kyrjhh0zhgxz91f5nbczxh1ac-git-2.53.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "git",
+      "broken": false,
+      "derivation": "/nix/store/mpa3y57ch7a3rz55183a886hq2g4h9wm-git-2.53.0.drv",
+      "description": "Distributed version control system",
+      "install_id": "git",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "git-2.53.0",
+      "pname": "git",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T21:54:33.236519Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.53.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/9jcm7zadfi5wsic3kizs4x71a8dqlj83-git-2.53.0-doc",
+        "out": "/nix/store/zar16r8w28c6qjdh3xqnkjcmvjjqwi77-git-2.53.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "git",
+      "broken": false,
+      "derivation": "/nix/store/gz2q1wq6ckyphg0q08nq9q93g1a6x561-git-2.53.0.drv",
+      "description": "Distributed version control system",
+      "install_id": "git",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "git-2.53.0",
+      "pname": "git",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T23:09:58.735141Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.53.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/qyqya20z59d164d6692hlyb9pkq10ykk-git-2.53.0-debug",
+        "doc": "/nix/store/vv1ap6qaxdzpa4jqg71myxh5wcvnlqv8-git-2.53.0-doc",
+        "out": "/nix/store/c0277k5giric1mn9dklllavbzvxl6hzb-git-2.53.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jujutsu",
+      "broken": false,
+      "derivation": "/nix/store/x6rmpcllq4da0l81kgjgv0yirb1b5c1h-jujutsu-0.40.0.drv",
+      "description": "Git-compatible DVCS that is both simple and powerful",
+      "install_id": "jujutsu",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "jujutsu-0.40.0",
+      "pname": "jujutsu",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T19:52:44.596252Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.40.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/w97zx2dl9sr30hfwnms7zrxwgcb9g4n1-jujutsu-0.40.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jujutsu",
+      "broken": false,
+      "derivation": "/nix/store/5kppri3mbfnm5nfwxfa6bry3avgf62nz-jujutsu-0.40.0.drv",
+      "description": "Git-compatible DVCS that is both simple and powerful",
+      "install_id": "jujutsu",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "jujutsu-0.40.0",
+      "pname": "jujutsu",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T20:42:38.960194Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.40.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/flx7vw3616lws8gyk7xidjjn5n9yjgvh-jujutsu-0.40.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jujutsu",
+      "broken": false,
+      "derivation": "/nix/store/s3mwijjqswn3b3gag5wzz0h0cizqmbdf-jujutsu-0.40.0.drv",
+      "description": "Git-compatible DVCS that is both simple and powerful",
+      "install_id": "jujutsu",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "jujutsu-0.40.0",
+      "pname": "jujutsu",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T21:54:49.590435Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.40.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/kk66bk1fh06jkm5rhh9rignfdp3pxlj2-jujutsu-0.40.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jujutsu",
+      "broken": false,
+      "derivation": "/nix/store/p9zz8kp3qcvcrj5yrrricp7n821blnaj-jujutsu-0.40.0.drv",
+      "description": "Git-compatible DVCS that is both simple and powerful",
+      "install_id": "jujutsu",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "jujutsu-0.40.0",
+      "pname": "jujutsu",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T23:10:20.260035Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.40.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/ncnc1vi3aqrazmpn8lhaqi8hs9x0m07s-jujutsu-0.40.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pgadmin4",
+      "broken": false,
+      "derivation": "/nix/store/315h76fg48g5mif6rp5pqpiz0iji9v7y-pgadmin-9.14.drv",
+      "description": "Administration and development platform for PostgreSQL",
+      "install_id": "pgadmin4",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "pgadmin-9.14",
+      "pname": "pgadmin4",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T19:53:04.864681Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "9.14",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/in8hfh5lxz32l5npynckfglqn6v89qbx-pgadmin-9.14-dist",
+        "out": "/nix/store/hpx0653ryvz4by0a46lxk7qnmmifzd1s-pgadmin-9.14"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pgadmin4",
+      "broken": false,
+      "derivation": "/nix/store/pi1ylfhh4pbq0ycf4r52agpsrd546q84-pgadmin-9.14.drv",
+      "description": "Administration and development platform for PostgreSQL",
+      "install_id": "pgadmin4",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "pgadmin-9.14",
+      "pname": "pgadmin4",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T20:43:10.422039Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "9.14",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/y43wfn0zh8vxrlmc0v4gvmwxvqhnv7c0-pgadmin-9.14-dist",
+        "out": "/nix/store/f7mn8zdyazy3ad5ga7kahwvgx81zvmlv-pgadmin-9.14"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pgadmin4",
+      "broken": false,
+      "derivation": "/nix/store/0vivha8l3468vjih72z8c87llgvfgbfg-pgadmin-9.14.drv",
+      "description": "Administration and development platform for PostgreSQL",
+      "install_id": "pgadmin4",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "pgadmin-9.14",
+      "pname": "pgadmin4",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T21:55:10.445342Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "9.14",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/7b7dn0q4hp8kn8hqhxqqxqcc0kwb4j23-pgadmin-9.14-dist",
+        "out": "/nix/store/v0qqw7z1g8q7vfm08kin69krqjcm8l1k-pgadmin-9.14"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pgadmin4",
+      "broken": false,
+      "derivation": "/nix/store/q8laaip6c6avd8afpqylph2ywnhknjh9-pgadmin-9.14.drv",
+      "description": "Administration and development platform for PostgreSQL",
+      "install_id": "pgadmin4",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "pgadmin-9.14",
+      "pname": "pgadmin4",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T23:10:54.721976Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "9.14",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/hvj1cmsi1d3hw84r65fkhlwz2s7k8ir7-pgadmin-9.14-dist",
+        "out": "/nix/store/l3cclldcxzidvrd60jmj5c57crsikqvh-pgadmin-9.14"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "pnpm",
       "broken": false,
       "derivation": "/nix/store/xybhwrpk7cxgzv8lpy9d3zl9457n8ix6-pnpm-10.33.2.drv",
@@ -486,6 +737,160 @@
       ],
       "outputs": {
         "out": "/nix/store/4yfpaak9jcmls1hzybqxb1yh8wipr4id-pnpm-10.33.2"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_18",
+      "broken": false,
+      "derivation": "/nix/store/5rmh170nncx7pv635maj71zs2jx3by0d-postgresql-18.3.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql_18",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "postgresql-18.3",
+      "pname": "postgresql_18",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T19:53:07.645990Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "18.3",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/i3f5qvnl8im4zv4771r8q8nhz9cy8pbl-postgresql-18.3-dev",
+        "doc": "/nix/store/1hhlmvccsqj6gcvvyh5by7sf83p8rgxv-postgresql-18.3-doc",
+        "jit": "/nix/store/79jdilapwp3jf0xwr0abw3dgkjpr5z1g-postgresql-18.3-jit",
+        "lib": "/nix/store/fw9qqiznz02scd85sr19gf93iwx31xbw-postgresql-18.3-lib",
+        "man": "/nix/store/c3fgz3l7pfdszrbs5vmd4i36pzc8n2mm-postgresql-18.3-man",
+        "out": "/nix/store/qf4icgvggdm1mf9js619akwqp8ppbmb1-postgresql-18.3",
+        "plperl": "/nix/store/q66gmsd76a5z79dx57rr89macp26zkg8-postgresql-18.3-plperl",
+        "plpython3": "/nix/store/iq0hl26d8jpapgfni9gk4757n5sp7hvw-postgresql-18.3-plpython3",
+        "pltcl": "/nix/store/zcckn5hwx282h1xc7dncf4vmgmf114mz-postgresql-18.3-pltcl"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_18",
+      "broken": false,
+      "derivation": "/nix/store/5j34js810r925q6sy35qwiggm3g189z6-postgresql-18.3.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql_18",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "postgresql-18.3",
+      "pname": "postgresql_18",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T20:43:14.181594Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "18.3",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/sygawj6a209cr7krr8fz8i4czdkx5mgl-postgresql-18.3-debug",
+        "dev": "/nix/store/13hsffqjdv8dhzq06n6afdp2yyc2di16-postgresql-18.3-dev",
+        "doc": "/nix/store/p6f79nfpc8sihkkli6msm3w108clkfa3-postgresql-18.3-doc",
+        "jit": "/nix/store/5yyl1lfmis3gs6ydfw8kr6hh1if38axz-postgresql-18.3-jit",
+        "lib": "/nix/store/0nyqb2q98h9mxv1pkxsk1k45bcpdsckj-postgresql-18.3-lib",
+        "man": "/nix/store/56njaqq6gjpkajqdn7ay1wx74vsapvfs-postgresql-18.3-man",
+        "out": "/nix/store/vqdnhn23l8cpvrc30fbbpfdk30jzbd11-postgresql-18.3",
+        "plperl": "/nix/store/dhjvqb9jia2jm3i74hw43nq9ar4fng5v-postgresql-18.3-plperl",
+        "plpython3": "/nix/store/4j5prm9i0va06yr17afzdqffxqj7kgk3-postgresql-18.3-plpython3",
+        "pltcl": "/nix/store/l22g4yg6j39i905cmlw529gh8jkqn7s8-postgresql-18.3-pltcl"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_18",
+      "broken": false,
+      "derivation": "/nix/store/xskmjfk00l89k1c6wprssz6di8kh86wy-postgresql-18.3.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql_18",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "postgresql-18.3",
+      "pname": "postgresql_18",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T21:55:13.155090Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "18.3",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/jnxfg240wbbapl8dvd2931nnyb4zrr1x-postgresql-18.3-dev",
+        "doc": "/nix/store/d16a2b2qf76ynbscci6rqqkhwvdb63kk-postgresql-18.3-doc",
+        "jit": "/nix/store/2621d49kk1p8klbvbjnfz2jg63azz6zh-postgresql-18.3-jit",
+        "lib": "/nix/store/b9h7m1j51xx0lk09jra88q2r91ld2zly-postgresql-18.3-lib",
+        "man": "/nix/store/wjkf1gsfympcvsxhihxr6f91xm0k6kk9-postgresql-18.3-man",
+        "out": "/nix/store/gpx4nr3y2ms832qp9kdclad19p2w48bl-postgresql-18.3",
+        "plperl": "/nix/store/1d244vsvx5wpkc5xgwv0wwwbzsb8gzqx-postgresql-18.3-plperl",
+        "plpython3": "/nix/store/jypxhvhy1y7x4p2bj3izvxvpwya30xa9-postgresql-18.3-plpython3",
+        "pltcl": "/nix/store/719kxwr4wb3nnpsvd214b59fzb2bv96v-postgresql-18.3-pltcl"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_18",
+      "broken": false,
+      "derivation": "/nix/store/qhn2gx43zlqmary3ykfq09g98ldxd95n-postgresql-18.3.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql_18",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "name": "postgresql-18.3",
+      "pname": "postgresql_18",
+      "rev": "1c3fe55ad329cbcb28471bb30f05c9827f724c76",
+      "rev_count": 987561,
+      "rev_date": "2026-04-27T05:36:01Z",
+      "scrape_date": "2026-04-29T23:10:58.848258Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "18.3",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/mbmqzzl4rmslzch9d01flsni8j9mabvs-postgresql-18.3-debug",
+        "dev": "/nix/store/8ajyf17ywhx7f5xmg5xkswxm1ihyxinr-postgresql-18.3-dev",
+        "doc": "/nix/store/ffca0lall91zhaj2p6cgrpdy69y8ijhl-postgresql-18.3-doc",
+        "jit": "/nix/store/wkb8sv0z0zbncxbmyyn92gi5m0d96ky0-postgresql-18.3-jit",
+        "lib": "/nix/store/6j64p3xdmg4jbcwa2cpgd805ghi28k3i-postgresql-18.3-lib",
+        "man": "/nix/store/j803in65cl13i14mpp74g7ibnr9wjv8h-postgresql-18.3-man",
+        "out": "/nix/store/833dwx7lgfdfyzkmavd5rpd2sl4dngbh-postgresql-18.3",
+        "plperl": "/nix/store/w1hfqkdkx0xhlmnyjq0b8hqicny1qxj3-postgresql-18.3-plperl",
+        "plpython3": "/nix/store/ycbr8frbf909ldr6aq9jgi011sxx7qqw-postgresql-18.3-plpython3",
+        "pltcl": "/nix/store/sqx19dsnw3cg24q4zi1m0afb36x3pvnr-postgresql-18.3-pltcl"
       },
       "system": "x86_64-linux",
       "group": "toplevel",

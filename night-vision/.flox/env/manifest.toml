@@ -7,12 +7,19 @@ schema-version = "1.11.0"
 ##  $ flox show gum     <- show all versions of a package
 ## -------------------------------------------------------------------
 [install]
-rustup.pkg-path = "rustup"
-cargo-binstall.pkg-path = "cargo-binstall"
-cargo-nextest.pkg-path = "cargo-nextest"
 cargo-autoinherit.pkg-path = "cargo-autoinherit"
-sea-orm-cli.pkg-path = "sea-orm-cli"
+cargo-nextest.pkg-path = "cargo-nextest"
+# Even though Git is required to clone this repo in the first place, we
+# choose to include it in the Flox environment because we can't be sure
+# that everyone contributing will be on a good recent version of Git out
+# of the box.
+git.pkg-path = "git"
+jujutsu.pkg-path = "jujutsu"
 pnpm.pkg-path = "pnpm"
+postgresql_18.pkg-path = "postgresql_18"
+rustup.pkg-path = "rustup"
+sea-orm-cli.pkg-path = "sea-orm-cli"
+pgadmin4.pkg-path = "pgadmin4"
 
 
 ## Environment Variables ---------------------------------------------
