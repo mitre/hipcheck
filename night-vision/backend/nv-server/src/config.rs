@@ -1,9 +1,9 @@
 //! Defines configuration for the Night Vision server.
 
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, anyhow};
 use camino::Utf8Path;
 use dropshot::{ConfigDropshot, HandlerTaskMode};
-use std::{fmt::Display, fs::File, io::BufReader, ops::Not, str::FromStr};
+use std::{fmt::Display, fs::File, io::BufReader, str::FromStr};
 
 /// Configuration for the Night Vision server.
 #[derive(Debug)]
@@ -86,105 +86,88 @@ pub struct Config {
 impl Config {
     /// Parse configuration from a configuration file.
     ///
-    /// If not provided, then `nv-server` will look for a file called `config.nv` in the current
-    /// directory.
+    /// If not provided, then `nv-server` will look for a file called `nv-server.spookey` in the
+    /// current directory.
     ///
     /// Parsing will fail on unknown keys, or on keys that fail to parse. This is purposefully
     /// pretty strict; these are server configuration items, and a malformed key or value should
     /// be considered a configuration failure.
     pub fn parse(path: &Utf8Path) -> Result<Config> {
-        let config = spookey::ParseConfig {
-            required_keys: vec!["server-address", "database-connection"],
-            optional_keys: vec![
-                "http-request-body-max-bytes",
-                "http-early-disconnect-behavior",
-                "database-max-connections",
-                "database-min-connections",
-                "database-connect-timeout",
-                "database-idle-timeout",
-                "database-acquire-timeout",
-                "database-max-lifetime",
-                "async-worker-threads",
-                "async-worker-thread-stack-size",
-                "async-max-blocking-threads",
-                "async-blocking-thread-keep-alive",
-                "async-global-queue-interval",
-                "async-event-interval",
-            ],
-        };
+        let parsed = spookey::parse(
+            spookey::ParseConfig {
+                required_keys: vec!["server-address", "database-connection"],
+                optional_keys: vec![
+                    "http-request-body-max-bytes",
+                    "http-early-disconnect-behavior",
+                    "database-max-connections",
+                    "database-min-connections",
+                    "database-connect-timeout",
+                    "database-idle-timeout",
+                    "database-acquire-timeout",
+                    "database-max-lifetime",
+                    "async-worker-threads",
+                    "async-worker-thread-stack-size",
+                    "async-max-blocking-threads",
+                    "async-blocking-thread-keep-alive",
+                    "async-global-queue-interval",
+                    "async-event-interval",
+                ],
+            },
+            BufReader::new(
+                File::open(path).context(format!("failed to open config file '{}'", path))?,
+            ),
+        )?;
 
-        let reader = BufReader::new(
-            File::open(path).context(format!("failed to open config file '{}'", path))?,
-        );
-
-        let parsed = spookey::parse(config, reader)?;
-
-        let mut warnings = Vec::new();
-
+        // Construct the config object, parsing fields into the proper types and collecting errors.
+        let mut errors = Vec::new();
         let config = Config {
             // PANIC SAFETY: We've already checked that it's Some above.
-            server_address: parse_value(&parsed, "server-address", &mut warnings)
+            server_address: parse_value(&parsed, "server-address", &mut errors)
                 .expect("server-address is required"),
             http_request_body_max_bytes: parse_value(
                 &parsed,
                 "http-request-body-max-bytes",
-                &mut warnings,
+                &mut errors,
             ),
             http_early_disconnect_behavior: parse_value(
                 &parsed,
                 "http-early-disconnect-behavior",
-                &mut warnings,
+                &mut errors,
             ),
             // PANIC SAFETY: We've already checked that it's Some above.
-            database_connection: parse_value(&parsed, "database-connection", &mut warnings)
+            database_connection: parse_value(&parsed, "database-connection", &mut errors)
                 .expect("database-connection is required"),
-            database_max_connections: parse_value(
-                &parsed,
-                "database-max-connections",
-                &mut warnings,
-            ),
-            database_min_connections: parse_value(
-                &parsed,
-                "database-min-connections",
-                &mut warnings,
-            ),
-            database_connect_timeout: parse_value(
-                &parsed,
-                "database-connect-timeout",
-                &mut warnings,
-            ),
-            database_idle_timeout: parse_value(&parsed, "database-idle-timeout", &mut warnings),
-            database_acquire_timeout: parse_value(
-                &parsed,
-                "database-acquire-timeout",
-                &mut warnings,
-            ),
-            database_max_lifetime: parse_value(&parsed, "database-max-lifetime", &mut warnings),
-            async_worker_threads: parse_value(&parsed, "async-worker-threads", &mut warnings),
+            database_max_connections: parse_value(&parsed, "database-max-connections", &mut errors),
+            database_min_connections: parse_value(&parsed, "database-min-connections", &mut errors),
+            database_connect_timeout: parse_value(&parsed, "database-connect-timeout", &mut errors),
+            database_idle_timeout: parse_value(&parsed, "database-idle-timeout", &mut errors),
+            database_acquire_timeout: parse_value(&parsed, "database-acquire-timeout", &mut errors),
+            database_max_lifetime: parse_value(&parsed, "database-max-lifetime", &mut errors),
+            async_worker_threads: parse_value(&parsed, "async-worker-threads", &mut errors),
             async_worker_thread_stack_size: parse_value(
                 &parsed,
                 "async-worker-thread-stack-size",
-                &mut warnings,
+                &mut errors,
             ),
             async_max_blocking_threads: parse_value(
                 &parsed,
                 "async-max-blocking-threads",
-                &mut warnings,
+                &mut errors,
             ),
             async_blocking_thread_keep_alive: parse_value(
                 &parsed,
                 "async-blocking-thread-keep-alive",
-                &mut warnings,
+                &mut errors,
             ),
             async_global_queue_interval: parse_value(
                 &parsed,
                 "async-global-queue-interval",
-                &mut warnings,
+                &mut errors,
             ),
-            async_event_interval: parse_value(&parsed, "async-event-interval", &mut warnings),
+            async_event_interval: parse_value(&parsed, "async-event-interval", &mut errors),
         };
 
-        report_warnings(path, &parsed.warnings, &warnings);
+        check_errors(path, &parsed.warnings, &errors)?;
 
         Ok(config)
     }
@@ -312,7 +295,7 @@ impl Config {
 fn parse_value<T: std::str::FromStr>(
     results: &spookey::ParseResult,
     key: &str,
-    warnings: &mut Vec<String>,
+    errors: &mut Vec<String>,
 ) -> Option<T>
 where
     <T as FromStr>::Err: Display,
@@ -329,7 +312,10 @@ where
         (None, Some(Some(value))) | (Some(value), None) => value
             .parse()
             .map_err(|err| {
-                warnings.push(format!("{}: {}", key, err));
+                errors.push(format!(
+                    "failed to parse key {} with value {}: {}",
+                    key, value, err
+                ));
             })
             .ok(),
         // Known key, somehow found in both "required" and "optional" maps.
@@ -339,40 +325,28 @@ where
     }
 }
 
-fn report_warnings(
+fn check_errors(
     path: &Utf8Path,
     parsed_warnings: &[spookey::Warning],
-    value_parsing_warnings: &[String],
-) {
-    let mut msg = String::new();
+    value_parsing_errors: &[String],
+) -> Result<()> {
+    let num_errors = parsed_warnings.len() + value_parsing_errors.len();
 
-    if parsed_warnings.is_empty().not() {
-        msg.push_str(&format!(
-            "{} warnings found in config file '{}':\n{}",
-            parsed_warnings.len(),
-            path,
-            parsed_warnings
-                .iter()
-                .map(|s| format!("\t{}", s))
-                .collect::<Vec<_>>()
-                .join("\n")
-        ));
+    if num_errors == 0 {
+        return Ok(());
     }
 
-    if value_parsing_warnings.is_empty().not() {
-        msg.push_str(&format!(
-            "{} values failed to parse in config file '{}':\n{}",
-            value_parsing_warnings.len(),
-            path,
-            value_parsing_warnings
-                .iter()
-                .map(|s| format!("\t{}", s))
-                .collect::<Vec<_>>()
-                .join("\n")
-        ));
+    let mut msg = format!("{} errors found in config file '{}':\n", num_errors, path);
+
+    for warning in parsed_warnings {
+        msg.push_str(&format!("\t{}\n", warning));
     }
 
-    eprintln!("{}", msg);
+    for error in value_parsing_errors {
+        msg.push_str(&format!("\t{}\n", error));
+    }
+
+    return Err(anyhow!(msg));
 }
 
 /// How to handle early disconnects from clients.
