@@ -14,4 +14,5 @@ tokio = { workspace = true }
 which = { workspace = true }
 xshell = { workspace = true }
 
-nv-server-api = { path = "../nv-server-api" }
+nv-server-api = { workspace = true }
+spookey = { workspace = true }

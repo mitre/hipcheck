@@ -1,16 +1,9 @@
 //! Defines configuration for the Night Vision server.
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context as _, Result};
 use camino::Utf8Path;
 use dropshot::{ConfigDropshot, HandlerTaskMode};
-use std::{
-    collections::HashMap,
-    fmt::Display,
-    fs::File,
-    io::{BufRead as _, BufReader},
-    ops::Not,
-    str::FromStr,
-};
+use std::{fmt::Display, fs::File, io::BufReader, ops::Not, str::FromStr};
 
 /// Configuration for the Night Vision server.
 #[derive(Debug)]
@@ -100,268 +93,100 @@ impl Config {
     /// pretty strict; these are server configuration items, and a malformed key or value should
     /// be considered a configuration failure.
     pub fn parse(path: &Utf8Path) -> Result<Config> {
-        let kvs = Self::parse_kvs(path)?;
+        let config = spookey::ParseConfig {
+            required_keys: vec!["server-address", "database-connection"],
+            optional_keys: vec![
+                "http-request-body-max-bytes",
+                "http-early-disconnect-behavior",
+                "database-max-connections",
+                "database-min-connections",
+                "database-connect-timeout",
+                "database-idle-timeout",
+                "database-acquire-timeout",
+                "database-max-lifetime",
+                "async-worker-threads",
+                "async-worker-thread-stack-size",
+                "async-max-blocking-threads",
+                "async-blocking-thread-keep-alive",
+                "async-global-queue-interval",
+                "async-event-interval",
+            ],
+        };
 
-        let known_keys = [
-            "server-address",
-            "http-request-body-max-bytes",
-            "http-early-disconnect-behavior",
-            "database-connection",
-            "database-max-connections",
-            "database-min-connections",
-            "database-connect-timeout",
-            "database-idle-timeout",
-            "database-acquire-timeout",
-            "database-max-lifetime",
-            "async-worker-threads",
-            "async-worker-thread-stack-size",
-            "async-max-blocking-threads",
-            "async-blocking-thread-keep-alive",
-            "async-global-queue-interval",
-            "async-event-interval",
-        ];
+        let reader = BufReader::new(
+            File::open(path).context(format!("failed to open config file '{}'", path))?,
+        );
 
-        let unexpected_keys = kvs
-            .keys()
-            .filter(|key| known_keys.contains(&key.as_str()).not())
-            .collect::<Vec<_>>();
+        let parsed = spookey::parse(config, reader)?;
 
-        if unexpected_keys.is_empty().not() {
-            let msg = format!(
-                "{} unknown keys in config file '{}':\n{}",
-                unexpected_keys.len(),
-                path,
-                unexpected_keys
-                    .iter()
-                    .map(|s| format!("\t{}", s))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            );
-            return Err(anyhow!(msg));
-        }
-
-        let mut value_errors = Vec::new();
-
-        let server_addr = Self::parse_value(&kvs, "server-address", &mut value_errors);
-
-        let http_request_body_max_bytes =
-            Self::parse_value(&kvs, "http-request-body-max-bytes", &mut value_errors);
-
-        let http_early_disconnect_behavior =
-            Self::parse_value(&kvs, "http-early-disconnect-behavior", &mut value_errors);
-
-        let database_conn = Self::parse_value(&kvs, "database-connection", &mut value_errors);
-
-        let database_max_connections =
-            Self::parse_value(&kvs, "database-max-connections", &mut value_errors);
-
-        let database_min_connections =
-            Self::parse_value(&kvs, "database-min-connections", &mut value_errors);
-
-        let database_connect_timeout =
-            Self::parse_value(&kvs, "database-connect-timeout", &mut value_errors);
-
-        let database_idle_timeout =
-            Self::parse_value(&kvs, "database-idle-timeout", &mut value_errors);
-
-        let database_acquire_timeout =
-            Self::parse_value(&kvs, "database-acquire-timeout", &mut value_errors);
-
-        let database_max_lifetime =
-            Self::parse_value(&kvs, "database-max-lifetime", &mut value_errors);
-
-        let async_worker_threads =
-            Self::parse_value(&kvs, "async-worker-threads", &mut value_errors);
-
-        let async_worker_thread_stack_size =
-            Self::parse_value(&kvs, "async-worker-thread-stack-size", &mut value_errors);
-
-        let async_max_blocking_threads =
-            Self::parse_value(&kvs, "async-max-blocking-threads", &mut value_errors);
-
-        let async_blocking_thread_keep_alive =
-            Self::parse_value(&kvs, "async-blocking-thread-keep-alive", &mut value_errors);
-
-        let async_global_queue_interval =
-            Self::parse_value(&kvs, "async-global-queue-interval", &mut value_errors);
-
-        let async_event_interval =
-            Self::parse_value(&kvs, "async-event-interval", &mut value_errors);
-
-        if value_errors.is_empty().not() {
-            let msg = format!(
-                "{} values failed to parse in config file '{}':\n{}",
-                value_errors.len(),
-                path,
-                value_errors
-                    .iter()
-                    .map(|s| format!("\t{}", s))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            );
-            return Err(anyhow!(msg));
-        }
-
-        let mut missing_required = Vec::new();
-
-        if server_addr.is_none() {
-            missing_required.push("server-address");
-        }
-
-        if database_conn.is_none() {
-            missing_required.push("database-connection");
-        }
-
-        if missing_required.is_empty().not() {
-            let msg = format!(
-                "{} missing required config value{}:\n{}",
-                missing_required.len(),
-                if missing_required.len() > 1 { "s" } else { "" },
-                missing_required
-                    .iter()
-                    .map(|s| format!("\t{}", s))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-            return Err(anyhow!(msg));
-        }
+        let mut warnings = Vec::new();
 
         let config = Config {
             // PANIC SAFETY: We've already checked that it's Some above.
-            server_address: server_addr.expect("server-address is required"),
-            http_request_body_max_bytes,
-            http_early_disconnect_behavior,
+            server_address: parse_value(&parsed, "server-address", &mut warnings)
+                .expect("server-address is required"),
+            http_request_body_max_bytes: parse_value(
+                &parsed,
+                "http-request-body-max-bytes",
+                &mut warnings,
+            ),
+            http_early_disconnect_behavior: parse_value(
+                &parsed,
+                "http-early-disconnect-behavior",
+                &mut warnings,
+            ),
             // PANIC SAFETY: We've already checked that it's Some above.
-            database_connection: database_conn.expect("database-connection is required"),
-            database_max_connections,
-            database_min_connections,
-            database_connect_timeout,
-            database_idle_timeout,
-            database_acquire_timeout,
-            database_max_lifetime,
-            async_worker_threads,
-            async_worker_thread_stack_size,
-            async_max_blocking_threads,
-            async_blocking_thread_keep_alive,
-            async_global_queue_interval,
-            async_event_interval,
+            database_connection: parse_value(&parsed, "database-connection", &mut warnings)
+                .expect("database-connection is required"),
+            database_max_connections: parse_value(
+                &parsed,
+                "database-max-connections",
+                &mut warnings,
+            ),
+            database_min_connections: parse_value(
+                &parsed,
+                "database-min-connections",
+                &mut warnings,
+            ),
+            database_connect_timeout: parse_value(
+                &parsed,
+                "database-connect-timeout",
+                &mut warnings,
+            ),
+            database_idle_timeout: parse_value(&parsed, "database-idle-timeout", &mut warnings),
+            database_acquire_timeout: parse_value(
+                &parsed,
+                "database-acquire-timeout",
+                &mut warnings,
+            ),
+            database_max_lifetime: parse_value(&parsed, "database-max-lifetime", &mut warnings),
+            async_worker_threads: parse_value(&parsed, "async-worker-threads", &mut warnings),
+            async_worker_thread_stack_size: parse_value(
+                &parsed,
+                "async-worker-thread-stack-size",
+                &mut warnings,
+            ),
+            async_max_blocking_threads: parse_value(
+                &parsed,
+                "async-max-blocking-threads",
+                &mut warnings,
+            ),
+            async_blocking_thread_keep_alive: parse_value(
+                &parsed,
+                "async-blocking-thread-keep-alive",
+                &mut warnings,
+            ),
+            async_global_queue_interval: parse_value(
+                &parsed,
+                "async-global-queue-interval",
+                &mut warnings,
+            ),
+            async_event_interval: parse_value(&parsed, "async-event-interval", &mut warnings),
         };
 
+        report_warnings(path, &parsed.warnings, &warnings);
+
         Ok(config)
-    }
-
-    /// Parse a key-value config file into a [`HashMap`] of string keys and string values.
-    fn parse_kvs(path: &Utf8Path) -> Result<HashMap<String, String>> {
-        let file = BufReader::new(
-            File::open(path).context(format!("failed to open config file '{}'", path))?,
-        );
-        let mut kvs: HashMap<String, String> = HashMap::new();
-        let mut parse_errors = Vec::new();
-
-        for (line_number, line) in file.lines().enumerate() {
-            let line = match line {
-                Ok(line) => line,
-                Err(err) => {
-                    parse_errors.push(anyhow!(
-                        "\tline {}: failed to read line: {}",
-                        line_number + 1,
-                        err
-                    ));
-
-                    continue;
-                }
-            };
-
-            let line = line.trim();
-
-            if line.is_empty() {
-                continue;
-            }
-
-            if line.starts_with("#") {
-                continue;
-            }
-
-            let Some((key, value)) = line.split_once('=') else {
-                parse_errors.push(anyhow!(
-                    "\tline {}: invalid line, expected 'key = value' format",
-                    line_number + 1
-                ));
-
-                continue;
-            };
-
-            let key = key.trim().to_string();
-
-            if key.is_empty() {
-                parse_errors.push(anyhow!("\tline {}: key is empty", line_number + 1));
-
-                continue;
-            }
-
-            let value = value.trim().to_string();
-
-            // We permit empty values and treat them as the key/value pair not being present at all
-            // (so the default value is used). This matches the behavior in Ghostty, and lets the
-            // configuration file have empty values for all the keys so we can clearly document
-            // what the keys are within the config file itself, without setting them or commenting
-            // them out.
-            if value.is_empty() {
-                continue;
-            }
-
-            // If the value is quoted-wrapped, then remove the quotes before storing the value.
-            if value.starts_with("\"") && value.ends_with("\"") {
-                let value = value
-                    .trim_start_matches('"')
-                    .trim_end_matches('"')
-                    .to_string();
-
-                kvs.insert(key, value);
-                continue;
-            }
-
-            kvs.insert(key, value);
-        }
-
-        if parse_errors.is_empty().not() {
-            let msg = format!(
-                "{} errors while parsing config file '{}':\n{}",
-                parse_errors.len(),
-                path,
-                parse_errors
-                    .iter()
-                    .map(|e| e.to_string())
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            );
-
-            return Err(anyhow!(msg));
-        }
-
-        Ok(kvs)
-    }
-
-    /// Parse a value from the config map, returning `None` if the key is not present,
-    /// and if parsing fails adding it to the error vector for later reporting.
-    fn parse_value<T: std::str::FromStr>(
-        kvs: &HashMap<String, String>,
-        key: &str,
-        errors: &mut Vec<String>,
-    ) -> Option<T>
-    where
-        <T as FromStr>::Err: Display,
-    {
-        match kvs.get(key) {
-            Some(v) => match v.parse() {
-                Ok(v) => Some(v),
-                Err(e) => {
-                    errors.push(format!("{}: {}", key, e));
-                    None
-                }
-            },
-            None => None,
-        }
     }
 
     /// Get the Dropshot server configuration items out of the overall config.
@@ -479,6 +304,75 @@ impl Config {
     fn report_line(&self, key: &str, value: &str) -> String {
         format!("{:>32}: {}\n", key, value)
     }
+}
+
+/// Parse a value from the config map, returning `None` if the value is unset.
+///
+/// This also records any parsing failures as warnings.
+fn parse_value<T: std::str::FromStr>(
+    results: &spookey::ParseResult,
+    key: &str,
+    warnings: &mut Vec<String>,
+) -> Option<T>
+where
+    <T as FromStr>::Err: Display,
+{
+    match (
+        results.required_keys.get(key),
+        results.optional_keys.get(key),
+    ) {
+        // Unknown key.
+        (None, None) => None,
+        // Known key, but not set in the parsed document.
+        (None, Some(None)) => None,
+        // Known key, set in the parsed document.
+        (None, Some(Some(value))) | (Some(value), None) => value
+            .parse()
+            .map_err(|err| {
+                warnings.push(format!("{}: {}", key, err));
+            })
+            .ok(),
+        // Known key, somehow found in both "required" and "optional" maps.
+        (Some(_), Some(_)) => unreachable!(
+            "spookey doesn't permit a single key to be in `required_keys` and `optional_keys`"
+        ),
+    }
+}
+
+fn report_warnings(
+    path: &Utf8Path,
+    parsed_warnings: &[spookey::Warning],
+    value_parsing_warnings: &[String],
+) {
+    let mut msg = String::new();
+
+    if parsed_warnings.is_empty().not() {
+        msg.push_str(&format!(
+            "{} warnings found in config file '{}':\n{}",
+            parsed_warnings.len(),
+            path,
+            parsed_warnings
+                .iter()
+                .map(|s| format!("\t{}", s))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ));
+    }
+
+    if value_parsing_warnings.is_empty().not() {
+        msg.push_str(&format!(
+            "{} values failed to parse in config file '{}':\n{}",
+            value_parsing_warnings.len(),
+            path,
+            value_parsing_warnings
+                .iter()
+                .map(|s| format!("\t{}", s))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ));
+    }
+
+    eprintln!("{}", msg);
 }
 
 /// How to handle early disconnects from clients.

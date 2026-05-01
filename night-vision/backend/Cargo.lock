@@ -1904,6 +1904,7 @@ dependencies = [
  "dropshot",
  "nv-server-api",
  "sea-orm",
+ "spookey",
  "tokio",
  "which",
  "xshell",
@@ -2924,6 +2925,10 @@ dependencies = [
  "base64ct",
  "der",
 ]
+
+[[package]]
+name = "spookey"
+version = "0.1.0"
 
 [[package]]
 name = "sqlx"

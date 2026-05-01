@@ -1,7 +1,7 @@
 [workspace]
 
 resolver = "3"
-members = ["nv-server", "nv-server-api", "nvdb", "xtask"]
+members = ["nv-server", "nv-server-api", "nvdb", "spookey", "xtask"]
 default-members = ["nv-server"]
 
 [workspace.dependencies]
@@ -17,3 +17,5 @@ serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.52.1", features = ["fs", "io-util", "io-std", "net", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
 xshell = "0.2.7"
 which = "8.0.2"
+nv-server-api = { path = "nv-server-api" }
+spookey = { path = "spookey" }
