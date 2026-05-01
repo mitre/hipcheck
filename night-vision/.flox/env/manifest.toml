@@ -1,11 +1,3 @@
-## Flox Environment Manifest -----------------------------------------
-##
-##   _Everything_ you need to know about the _manifest_ is here:
-##
-##   https://flox.dev/docs/reference/command-reference/manifest.toml/
-##
-## -------------------------------------------------------------------
-# Flox manifest version managed by Flox CLI
 schema-version = "1.11.0"
 
 
@@ -15,8 +7,12 @@ schema-version = "1.11.0"
 ##  $ flox show gum     <- show all versions of a package
 ## -------------------------------------------------------------------
 [install]
-# gum.pkg-path = "gum"
-# gum.version = "^0.14.5"
+rustup.pkg-path = "rustup"
+cargo-binstall.pkg-path = "cargo-binstall"
+cargo-nextest.pkg-path = "cargo-nextest"
+cargo-autoinherit.pkg-path = "cargo-autoinherit"
+sea-orm-cli.pkg-path = "sea-orm-cli"
+pnpm.pkg-path = "pnpm"
 
 
 ## Environment Variables ---------------------------------------------
