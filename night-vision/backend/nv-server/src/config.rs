@@ -193,100 +193,118 @@ impl Config {
     pub fn report(&self) -> String {
         let mut report = format!("{:-^80}\n", "");
 
-        report.push_str(&self.report_line("server-address", &self.server_address));
-        report.push_str(&self.report_line("database-connection", &self.database_connection));
+        report.push_str(&report_line("server-address", &self.server_address));
+        report.push_str(&report_line(
+            "database-connection",
+            &self.database_connection,
+        ));
 
         if let Some(max_bytes) = self.http_request_body_max_bytes {
-            report
-                .push_str(&self.report_line("http-request-body-max-bytes", &max_bytes.to_string()));
+            report.push_str(&report_line(
+                "http-request-body-max-bytes",
+                &max_bytes.to_string(),
+            ));
         }
 
         if let Some(behavior) = self.http_early_disconnect_behavior {
-            report.push_str(
-                &self.report_line("http-early-disconnect-behavior", &behavior.to_string()),
-            );
+            report.push_str(&report_line(
+                "http-early-disconnect-behavior",
+                &behavior.to_string(),
+            ));
         }
 
         if let Some(max_connections) = self.database_max_connections {
-            report.push_str(
-                &self.report_line("database-max-connections", &max_connections.to_string()),
-            );
+            report.push_str(&report_line(
+                "database-max-connections",
+                &max_connections.to_string(),
+            ));
         }
 
         if let Some(min_connections) = self.database_min_connections {
-            report.push_str(
-                &self.report_line("database-min-connections", &min_connections.to_string()),
-            );
+            report.push_str(&report_line(
+                "database-min-connections",
+                &min_connections.to_string(),
+            ));
         }
 
         if let Some(connect_timeout) = self.database_connect_timeout {
-            report.push_str(
-                &self.report_line("database-connect-timeout", &connect_timeout.to_string()),
-            );
+            report.push_str(&report_line(
+                "database-connect-timeout",
+                &connect_timeout.to_string(),
+            ));
         }
 
         if let Some(idle_timeout) = self.database_idle_timeout {
-            report.push_str(&self.report_line("database-idle-timeout", &idle_timeout.to_string()));
+            report.push_str(&report_line(
+                "database-idle-timeout",
+                &idle_timeout.to_string(),
+            ));
         }
 
         if let Some(acquire_timeout) = self.database_acquire_timeout {
-            report.push_str(
-                &self.report_line("database-acquire-timeout", &acquire_timeout.to_string()),
-            );
+            report.push_str(&report_line(
+                "database-acquire-timeout",
+                &acquire_timeout.to_string(),
+            ));
         }
 
         if let Some(max_lifetime) = self.database_max_lifetime {
-            report.push_str(&self.report_line("database-max-lifetime", &max_lifetime.to_string()));
+            report.push_str(&report_line(
+                "database-max-lifetime",
+                &max_lifetime.to_string(),
+            ));
         }
 
         if let Some(async_worker_threads) = self.async_worker_threads {
-            report.push_str(
-                &self.report_line("async-worker-threads", &async_worker_threads.to_string()),
-            );
+            report.push_str(&report_line(
+                "async-worker-threads",
+                &async_worker_threads.to_string(),
+            ));
         }
 
         if let Some(async_worker_thread_stack_size) = self.async_worker_thread_stack_size {
-            report.push_str(&self.report_line(
+            report.push_str(&report_line(
                 "async-worker-thread-stack-size",
                 &async_worker_thread_stack_size.to_string(),
             ));
         }
 
         if let Some(async_max_blocking_threads) = self.async_max_blocking_threads {
-            report.push_str(&self.report_line(
+            report.push_str(&report_line(
                 "async-max-blocking-threads",
                 &async_max_blocking_threads.to_string(),
             ));
         }
 
         if let Some(async_blocking_thread_keep_alive) = self.async_blocking_thread_keep_alive {
-            report.push_str(&self.report_line(
+            report.push_str(&report_line(
                 "async-blocking-thread-keep-alive",
                 &async_blocking_thread_keep_alive.to_string(),
             ));
         }
 
         if let Some(async_global_queue_interval) = self.async_global_queue_interval {
-            report.push_str(&self.report_line(
+            report.push_str(&report_line(
                 "async-global-queue-interval",
                 &async_global_queue_interval.to_string(),
             ));
         }
 
         if let Some(async_event_interval) = self.async_event_interval {
-            report.push_str(
-                &self.report_line("async-event-interval", &async_event_interval.to_string()),
-            );
+            report.push_str(&report_line(
+                "async-event-interval",
+                &async_event_interval.to_string(),
+            ));
         }
 
         report.push_str(&format!("{:-^80}\n", ""));
 
         report
     }
+}
 
-    fn report_line(&self, key: &str, value: &str) -> String {
-        format!("{:>32}: {}\n", key, value)
-    }
+fn report_line(key: &str, value: &str) -> String {
+    format!("{:>32}: {}\n", key, value)
 }
 
 /// Parse a value from the config map, returning `None` if the value is unset.
