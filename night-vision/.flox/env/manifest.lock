@@ -1,0 +1,10 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "schema-version": "1.11.0",
+    "hook": {},
+    "profile": {},
+    "options": {}
+  },
+  "packages": []
+}
