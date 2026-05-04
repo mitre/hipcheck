@@ -16,6 +16,8 @@ stand, they are a synthesis of two key sources:
 - [Oxide's RFD 576, "Using LLMs at Oxide"](https://rfd.shared.oxide.computer/rfd/0576)
 - [Kubernetes' "AI Guidance" for OSS contributors](https://www.kubernetes.dev/docs/guide/pull-requests/#ai-guidance)
 
+## Table of Contents
+
 [[_TOC_]]
 
 ## Terminology
@@ -188,8 +190,8 @@ rejected by a human operator.
 
 Third, AI's coherence and controls will degrade as the length of a conversation
 extends to infinity. AI models have a limited "context window" (the length
-of "tokens" they can take as input). That context window is made to include
-1) the "system prompt" (an always-present prompt provided by the model's
+of "tokens" they can take as input). That context window is made to include 1)
+the "system prompt" (an always-present prompt provided by the model's
 creator), 2) any persistant user prompts you've configured, 3) the history of
 messages sent in a conversation, and 4) your actual current prompt (the
 specific message you've sent just now). One of the jobs of AI harnesses is to
