@@ -55,7 +55,7 @@ and so neither does Flox. To use Flox on Windows, we recommend using WSL
 [Rust]: https://rust-lang.org/
 [PostgreSQL]: https://www.postgresql.org/
 [TypeScript]: https://www.typescriptlang.org/
-[SvelteKit]: https://svelte.dev/
+[Svelte]: https://svelte.dev/
 [pnpm]: https://pnpm.io/
 [Flox]: https://flox.dev/
 [Jujutsu]: https://github.com/jj-vcs/jj
