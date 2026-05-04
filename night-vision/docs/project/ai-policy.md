@@ -35,6 +35,10 @@ First, quickly, let's lay out some definitions:
   <dd>Specialized software built around an AI model that turns it into a usable tool for some set of tasks.</dd>
   <dt>AI Agent</dt>
   <dd>An AI model plus a harness that enables the AI to perform tasks autonomously as directed by the user (writing code, gathering and summarizing materials, etc.).</dd>
+  <dt>Slop</dt>
+  <dd>LLM-generated material, created and used without care for quality.</dd>
+  <dt>LLM Sycophancy</dt>
+  <dd>The tendency of LLMs to behave sycophantically toward their users, effusively praising them or being dangerously uncritical.</dd>
 </dl>
 
 ## The Rules
@@ -44,11 +48,15 @@ First, quickly, let's lay out some definitions:
    etc., just as you would for any contribution you wrote by hand. Please
    respect the other contributors and do not waste their time submitting code
    you haven't read or can't justify or explain.
-2. Do not use commit trailers such as "Co-Authored-By" or "Assisted-By" when
+2. Disclose in Merge Requests when AI has been used to help prepare changes,
+   and explain the nature of how it was used. This is intended to raise
+   teammates' awareness so they can be appropriately cautious about errors
+   which LLMs tend to introduce.
+3. Do not use commit trailers such as "Co-Authored-By" or "Assisted-By" when
    using AI tools. These are tools, not co-authors, and we don't have a
    practice of disclosing tools used in the prepation of a Merge Request within
    commit messages.
-3. Do not use AI to generate replies to your coworkers in discussions. We talk
+4. Do not use AI to generate replies to your coworkers in discussions. We talk
    to each other, not to chatbots.
 
 ## AI, Rigor, and Respect
