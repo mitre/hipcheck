@@ -6,6 +6,10 @@ works together to solve difficult problems.
 
 The following are a set of expectations and recommendations for the team.
 
+## Table of Contents
+
+[[_TOC_]]
+
 ## Writing Code
 
 The number one task we do day-to-day on this project is writing code. As such,
