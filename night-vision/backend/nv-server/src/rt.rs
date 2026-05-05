@@ -1,10 +1,9 @@
-use crate::config::Config;
-use anyhow::{Context as _, Result};
+use crate::{config::Config, error::FatalError};
 use std::time::Duration;
 use tokio::runtime::{Builder, Runtime};
 
 /// Construct a Tokio runtime using the given configuration.
-pub fn build(config: &Config) -> Result<Runtime> {
+pub fn build(config: &Config) -> Result<Runtime, FatalError> {
     let mut builder = Builder::new_multi_thread();
 
     // Make sure to turn on IO and timers, otherwise it won't run at all.
@@ -34,7 +33,9 @@ pub fn build(config: &Config) -> Result<Runtime> {
         builder.event_interval(event_interval);
     }
 
-    let runtime = builder.build().context("failed to build Tokio runtime")?;
+    let runtime = builder
+        .build()
+        .map_err(FatalError::FailedToBuildTokioRuntime)?;
 
     Ok(runtime)
 }

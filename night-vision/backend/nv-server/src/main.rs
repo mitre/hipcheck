@@ -1,21 +1,22 @@
 mod api;
 mod config;
 mod db;
+mod error;
 mod rt;
 mod version;
 
 use crate::{
     api::{Api, ApiCtx},
     config::Config,
+    error::FatalError,
 };
-use anyhow::{Context, Result, anyhow};
 use camino::Utf8PathBuf;
 use dropshot::{ConfigLogging, ConfigLoggingLevel, ServerBuilder};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
     if let Err(err) = run() {
-        eprintln!("error: {}", err);
+        report_error(err);
         return ExitCode::FAILURE;
     }
 
@@ -23,7 +24,7 @@ fn main() -> ExitCode {
 }
 
 /// Create the async runtime and launch the server.
-fn run() -> Result<()> {
+fn run() -> Result<(), FatalError> {
     // NOTE: In general, prefer to add items to the configuration file rather
     // than adding flags to the CLI. The configuration file can be tracked
     // and managed more easily, and is the standard way to configure the server.
@@ -57,8 +58,8 @@ fn run() -> Result<()> {
 }
 
 /// Launch the server.
-async fn launch_server(config: &Config) -> Result<()> {
-    let api = Api::new();
+async fn launch_server(config: &Config) -> Result<(), FatalError> {
+    let api = Api::new()?;
 
     let ctx = ApiCtx {
         db: db::connection(config).await?,
@@ -67,14 +68,15 @@ async fn launch_server(config: &Config) -> Result<()> {
     let log = ConfigLogging::StderrTerminal {
         level: ConfigLoggingLevel::Info,
     }
-    .to_logger("nv-server")?;
+    .to_logger("nv-server")
+    .map_err(FatalError::FailedToInitializeLogger)?;
 
     let server = ServerBuilder::new(api, ctx, log)
         .config(config.dropshot_config()?)
         .start()
-        .context("failed to start server")?;
+        .map_err(FatalError::FailedToStartDropshotServer)?;
 
-    server.await.map_err(|e| anyhow!("server error: {}", e))?;
+    server.await.map_err(FatalError::UnknownServerError)?;
 
     Ok(())
 }
@@ -82,4 +84,19 @@ async fn launch_server(config: &Config) -> Result<()> {
 /// Get the crate name, replacing underscores with hyphens.
 fn crate_name() -> String {
     env!("CARGO_CRATE_NAME").replace("_", "-").to_string()
+}
+
+/// Report the full error chain to stderr.
+fn report_error<E: std::error::Error>(err: E) {
+    fn inner<E: std::error::Error>(err: E, msg: &mut String) {
+        msg.push_str(&format!(": {}", err));
+
+        if let Some(source) = err.source() {
+            inner(source, msg);
+        }
+    }
+
+    let mut msg = "error".to_string();
+    inner(err, &mut msg);
+    eprintln!("{}", msg);
 }

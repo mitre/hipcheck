@@ -84,7 +84,7 @@ impl ParseResult {
         Self {
             required_keys: Default::default(),
             // Since they're optional, initialize them to None.
-            optional_keys: optional_keys.into_iter().map(|f| (*f, None)).collect(),
+            optional_keys: optional_keys.iter().map(|f| (*f, None)).collect(),
             warnings: Default::default(),
         }
     }
@@ -185,7 +185,7 @@ where
         // Update `required_keys` if key matches, warn if already set, but take the second value.
         if let Some(key) = config.optional_keys.iter().find(|k| **k == key) {
             if let Some(prior_value) = result.optional_keys.insert(key, Some(value.clone()))
-                && prior_value != None
+                && prior_value.is_some()
             {
                 result.warnings.push(Warning {
                     line_number,
@@ -280,7 +280,7 @@ impl From<std::io::Error> for Error {
 ///
 /// Since `Warning` implements the `Error` trait, you can still treat it as
 /// a hard error if you want.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Warning {
     /// The line number of the warning (1-indexed).
     pub line_number: usize,
@@ -307,7 +307,7 @@ impl StdError for Warning {
 }
 
 /// The kind of issue encountered in the document.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum WarningKind {
     /// Line is missing a key.
     MissingKey { value: Box<str> },

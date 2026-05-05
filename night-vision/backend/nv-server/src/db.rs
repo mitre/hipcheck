@@ -1,10 +1,9 @@
-use crate::config::Config;
-use anyhow::{Context as _, Result};
+use crate::{config::Config, error::FatalError};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use std::time::Duration;
 
 /// Connect to the database using the given configuration.
-pub async fn connection(config: &Config) -> Result<DatabaseConnection> {
+pub async fn connection(config: &Config) -> Result<DatabaseConnection, FatalError> {
     let mut opt = ConnectOptions::new(&config.database_connection);
 
     if let Some(database_max_connections) = config.database_max_connections {
@@ -33,7 +32,7 @@ pub async fn connection(config: &Config) -> Result<DatabaseConnection> {
 
     let db = Database::connect(opt)
         .await
-        .context("failed to connect to database")?;
+        .map_err(FatalError::FailedToConnectToDatabase)?;
 
     Ok(db)
 }

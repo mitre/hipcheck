@@ -5,7 +5,6 @@ edition = "2024"
 publish = false
 
 [dependencies]
-anyhow = { workspace = true }
 camino = { workspace = true }
 clap = { workspace = true }
 dropshot = { workspace = true }

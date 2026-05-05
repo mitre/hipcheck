@@ -1,13 +1,22 @@
 //! Defines configuration for the Night Vision server.
 
-use anyhow::{Context as _, Result, anyhow};
-use camino::Utf8Path;
+use crate::error::FatalError;
+use camino::{Utf8Path, Utf8PathBuf};
 use dropshot::{ConfigDropshot, HandlerTaskMode};
-use std::{fmt::Display, fs::File, io::BufReader, str::FromStr};
+use std::{
+    fmt::{Debug, Display},
+    fs::File,
+    io::BufReader,
+    net::AddrParseError,
+    str::FromStr,
+};
 
 /// Configuration for the Night Vision server.
 #[derive(Debug)]
 pub struct Config {
+    /// The path to the configuration file.
+    config_file_path: Utf8PathBuf,
+
     /// The address to bind the server to.
     ///
     /// The default is `127.0.0.1` at an arbitrary available port..
@@ -92,7 +101,7 @@ impl Config {
     /// Parsing will fail on unknown keys, or on keys that fail to parse. This is purposefully
     /// pretty strict; these are server configuration items, and a malformed key or value should
     /// be considered a configuration failure.
-    pub fn parse(path: &Utf8Path) -> Result<Config> {
+    pub fn parse(path: &Utf8Path) -> Result<Config, FatalError> {
         let parsed = spookey::parse(
             spookey::ParseConfig {
                 required_keys: vec!["server-address", "database-connection"],
@@ -114,13 +123,15 @@ impl Config {
                 ],
             },
             BufReader::new(
-                File::open(path).context(format!("failed to open config file '{}'", path))?,
+                File::open(path).map_err(|e| FatalError::FailedToOpenConfigFile(path.into(), e))?,
             ),
-        )?;
+        )
+        .map_err(|e| FatalError::FailedToParseConfigFile(path.into(), e))?;
 
         // Construct the config object, parsing fields into the proper types and collecting errors.
         let mut errors = Vec::new();
         let config = Config {
+            config_file_path: path.into(),
             // PANIC SAFETY: We've already checked that it's Some above.
             server_address: parse_value(&parsed, "server-address", &mut errors)
                 .expect("server-address is required"),
@@ -167,16 +178,26 @@ impl Config {
             async_event_interval: parse_value(&parsed, "async-event-interval", &mut errors),
         };
 
-        check_errors(path, &parsed.warnings, &errors)?;
+        check_errors(path, parsed.warnings, errors)?;
 
         Ok(config)
     }
 
     /// Get the Dropshot server configuration items out of the overall config.
-    pub fn dropshot_config(&self) -> Result<ConfigDropshot> {
-        let mut config = ConfigDropshot::default();
-
-        config.bind_address = self.server_address.parse()?;
+    pub fn dropshot_config(&self) -> Result<ConfigDropshot, FatalError> {
+        let mut config = ConfigDropshot {
+            bind_address: self.server_address.parse().map_err(|e: AddrParseError| {
+                FatalError::FailedToParseConfigFileFields(
+                    self.config_file_path.clone(),
+                    ParseErrors(vec![ParseError::StrParse(StrParseError {
+                        key: "server-address".to_string().into_boxed_str(),
+                        value: self.server_address.clone().into_boxed_str(),
+                        err: e.to_string().into_boxed_str(),
+                    })]),
+                )
+            })?,
+            ..Default::default()
+        };
 
         if let Some(max_bytes) = self.http_request_body_max_bytes {
             config.default_request_body_max_bytes = max_bytes;
@@ -313,7 +334,7 @@ fn report_line(key: &str, value: &str) -> String {
 fn parse_value<T: std::str::FromStr>(
     results: &spookey::ParseResult,
     key: &str,
-    errors: &mut Vec<String>,
+    errors: &mut Vec<StrParseError>,
 ) -> Option<T>
 where
     <T as FromStr>::Err: Display,
@@ -327,15 +348,17 @@ where
         // Known key, but not set in the parsed document.
         (None, Some(None)) => None,
         // Known key, set in the parsed document.
-        (None, Some(Some(value))) | (Some(value), None) => value
-            .parse()
-            .map_err(|err| {
-                errors.push(format!(
-                    "failed to parse key {} with value {}: {}",
-                    key, value, err
-                ));
-            })
-            .ok(),
+        (None, Some(Some(value))) | (Some(value), None) => match value.parse() {
+            Ok(value) => Some(value),
+            Err(err) => {
+                errors.push(StrParseError {
+                    key: key.to_string().into_boxed_str(),
+                    value: value.clone().into_boxed_str(),
+                    err: err.to_string().into_boxed_str(),
+                });
+                None
+            }
+        },
         // Known key, somehow found in both "required" and "optional" maps.
         (Some(_), Some(_)) => unreachable!(
             "spookey doesn't permit a single key to be in `required_keys` and `optional_keys`"
@@ -345,26 +368,29 @@ where
 
 fn check_errors(
     path: &Utf8Path,
-    parsed_warnings: &[spookey::Warning],
-    value_parsing_errors: &[String],
-) -> Result<()> {
+    parsed_warnings: Vec<spookey::Warning>,
+    value_parsing_errors: Vec<StrParseError>,
+) -> Result<(), FatalError> {
     let num_errors = parsed_warnings.len() + value_parsing_errors.len();
 
     if num_errors == 0 {
         return Ok(());
     }
 
-    let mut msg = format!("{} errors found in config file '{}':\n", num_errors, path);
+    let mut errors = vec![];
 
     for warning in parsed_warnings {
-        msg.push_str(&format!("\t{}\n", warning));
+        errors.push(ParseError::Warning(warning));
     }
 
     for error in value_parsing_errors {
-        msg.push_str(&format!("\t{}\n", error));
+        errors.push(ParseError::StrParse(error));
     }
 
-    return Err(anyhow!(msg));
+    Err(FatalError::FailedToParseConfigFileFields(
+        path.to_owned(),
+        ParseErrors(errors),
+    ))
 }
 
 /// How to handle early disconnects from clients.
@@ -376,17 +402,27 @@ pub enum EarlyDisconnectBehavior {
     Continue,
 }
 
+#[derive(Debug)]
+pub struct EarlyDisconnectParseError(Box<str>);
+
+impl Display for EarlyDisconnectParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "invalid early disconnect behavior (must be 'cancel' or 'continue'): {}",
+            self.0
+        )
+    }
+}
+
 impl FromStr for EarlyDisconnectBehavior {
-    type Err = anyhow::Error;
+    type Err = EarlyDisconnectParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.trim() {
             "cancel" => Ok(Self::Cancel),
             "continue" => Ok(Self::Continue),
-            _ => Err(anyhow::anyhow!(
-                "invalid early disconnect behavior (must be 'cancel' or 'continue'): {}",
-                s
-            )),
+            s => Err(EarlyDisconnectParseError(s.to_owned().into_boxed_str())),
         }
     }
 }
@@ -408,3 +444,67 @@ impl From<EarlyDisconnectBehavior> for HandlerTaskMode {
         }
     }
 }
+
+/// Failure to parse a single configuration file key/value.
+pub struct StrParseError {
+    /// The key of the value that failed to parse.
+    pub key: Box<str>,
+    /// The value that failed to parse.
+    pub value: Box<str>,
+    /// The error message from the parser (converted to a string).
+    pub err: Box<str>,
+}
+
+impl Debug for StrParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "failed to parse key '{}' with value '{}': {}",
+            self.key, self.value, self.err
+        )
+    }
+}
+
+impl Display for StrParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "failed to parse key '{}' with value '{}': {}",
+            self.key, self.value, self.err
+        )
+    }
+}
+
+/// Bundles up spookey warnings and field parse errors.
+#[derive(Debug)]
+pub enum ParseError {
+    Warning(spookey::Warning),
+    StrParse(StrParseError),
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseError::Warning(w) => write!(f, "{}", w),
+            ParseError::StrParse(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+/// Bundles up a collection of [`ParseError`]s.
+#[derive(Debug)]
+pub struct ParseErrors(Vec<ParseError>);
+
+impl Display for ParseErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let msg = self
+            .0
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "parse errors: {}", msg)
+    }
+}
+
+impl std::error::Error for ParseErrors {}
