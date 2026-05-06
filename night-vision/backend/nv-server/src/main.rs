@@ -89,14 +89,14 @@ fn crate_name() -> String {
 /// Report the full error chain to stderr.
 fn report_error<E: std::error::Error>(err: E) {
     fn inner<E: std::error::Error>(err: E, msg: &mut String) {
-        msg.push_str(&format!(": {}", err));
+        msg.push_str(&format!("\t{}\n", err));
 
         if let Some(source) = err.source() {
             inner(source, msg);
         }
     }
 
-    let mut msg = "error".to_string();
+    let mut msg = format!("Error: {}\n\nCaused by:\n", err);
     inner(err, &mut msg);
     eprintln!("{}", msg);
 }
