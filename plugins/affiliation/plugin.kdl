@@ -1,15 +1,16 @@
 publisher "mitre"
 name "affiliation"
-version "0.5.2"
+version "0.6.0"
 license "Apache-2.0"
 
 entrypoint {
   on arch="aarch64-apple-darwin" "affiliation"
   on arch="x86_64-apple-darwin" "affiliation"
+  on arch="aarch64-unknown-linux-gnu" "affiliation"
   on arch="x86_64-unknown-linux-gnu" "affiliation"
   on arch="x86_64-pc-windows-msvc" "affiliation.exe"
 }
 
 dependencies {
-  plugin "mitre/git" version="^0.5" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/git.kdl"
+  plugin "mitre/git" version="^0.6" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/git.kdl"
 }

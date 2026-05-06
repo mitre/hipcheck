@@ -1,15 +1,16 @@
 publisher "mitre"
 name "fuzz"
-version "0.3.2"
+version "0.4.0"
 license "Apache-2.0"
 
 entrypoint {
   on arch="aarch64-apple-darwin" "fuzz"
   on arch="x86_64-apple-darwin" "fuzz"
+  on arch="aarch64-unknown-linux-gnu" "fuzz"
   on arch="x86_64-unknown-linux-gnu" "fuzz"
   on arch="x86_64-pc-windows-msvc" "fuzz.exe"
 }
 
 dependencies {
-  plugin "mitre/github" version="^0.4" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/github.kdl"
+  plugin "mitre/github" version="^0.5" manifest="https://hipcheck.mitre.org/dl/plugin/mitre/github.kdl"
 }
