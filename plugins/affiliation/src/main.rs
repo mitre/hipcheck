@@ -60,20 +60,46 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 		},
 	) = key.remote
 	{
-		let repo_collaborators = engine
-			.query("mitre/github/repo_collaborators", repo)
-			.await?;
-		let repo_collaborators: Vec<GitHubCollaborator> =
-			serde_json::from_value(repo_collaborators).map_err(|e| {
-				tracing::error!("Error parsing output from mitre/github/repo_collaborators: {e}");
-				Error::UnspecifiedQueryState
-			})?;
-		let repo_collaborators: HashMap<String, GitHubCollaborator> = repo_collaborators
-			.into_iter()
-			.map(|collaborator| (collaborator.email.clone(), collaborator))
-			.collect();
+		// let repo_collaborators = engine
+		// 	.query("mitre/github/repo_collaborators", repo)
+		// 	.await?;
+		tracing::error!("Quering mitre/github/repo_collaborators");
+		match engine.query("mitre/github/repo_collaborators", repo).await {
+			Ok(repo_collaborators) => {
+				tracing::error!("No immediate error");
+				let repo_collaborators: Vec<GitHubCollaborator> =
+					serde_json::from_value(repo_collaborators).map_err(|e| {
+						tracing::error!(
+							"Error parsing output from mitre/github/repo_collaborators: {e}"
+						);
+						Error::UnspecifiedQueryState
+					})?;
+				let repo_collaborators: HashMap<String, GitHubCollaborator> = repo_collaborators
+					.into_iter()
+					.map(|collaborator| (collaborator.email.clone(), collaborator))
+					.collect();
 
-		repo_collaborators
+				repo_collaborators
+			}
+			Err(e) => {
+				tracing::error!("Encountered an error!");
+				tracing::warn!(
+					"Unable to get collaborators from GitHub API: {e}\nUsing only basic git information"
+				);
+				HashMap::new()
+			}
+		}
+		// let repo_collaborators: Vec<GitHubCollaborator> =
+		// 	serde_json::from_value(repo_collaborators).map_err(|e| {
+		// 		tracing::error!("Error parsing output from mitre/github/repo_collaborators: {e}");
+		// 		Error::UnspecifiedQueryState
+		// 	})?;
+		// let repo_collaborators: HashMap<String, GitHubCollaborator> = repo_collaborators
+		// 	.into_iter()
+		// 	.map(|collaborator| (collaborator.email.clone(), collaborator))
+		// 	.collect();
+
+		// repo_collaborators
 	} else {
 		HashMap::new()
 	};
@@ -161,16 +187,16 @@ async fn affiliation(engine: &mut PluginEngine, key: Target) -> Result<Vec<bool>
 	for (email, enriched) in &mut contributors {
 		if let Some(github_repo_contributor) = github_repo_contributors.get(email)
 			&& let Some(email) = &github_repo_contributor.email
-				&& let Some(login) = &github_repo_contributor.login
-				&& enriched.github.is_none()
-			{
-				enriched.github = Some(GitHubCollaborator {
-					login: login.clone(),
-					email: email.clone(),
-					profile_employer: None,
-					github_orgs: vec![],
-				})
-			}
+			&& let Some(login) = &github_repo_contributor.login
+			&& enriched.github.is_none()
+		{
+			enriched.github = Some(GitHubCollaborator {
+				login: login.clone(),
+				email: email.clone(),
+				profile_employer: None,
+				github_orgs: vec![],
+			})
+		}
 	}
 
 	// TODO: Fix deduplication.

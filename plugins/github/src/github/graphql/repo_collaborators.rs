@@ -32,9 +32,16 @@ pub fn get_repo_collaborators(
 	let body = make_request(agent, query)?;
 
 	if let Some(errors) = body.errors {
+		let mut error_string = String::new();
 		for error in errors {
-			tracing::error!("mitre/github/repo_collaborators, error from GitHub API: {error}")
+			error_string.push_str(&format!("{error}"));
+			error_string.push('\n');
 		}
+		error_string.pop().unwrap();
+		tracing::error!("Error string: {error_string}");
+		return Err(anyhow!(
+			"mitre/github/repo_collaborators, error here from GitHub API: {error_string}"
+		));
 	}
 
 	let repository = body
