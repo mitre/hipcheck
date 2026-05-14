@@ -1906,8 +1906,7 @@ dependencies = [
  "sea-orm",
  "spookey",
  "tokio",
- "which",
- "xshell",
+ "workspace-hack",
 ]
 
 [[package]]
@@ -1917,6 +1916,7 @@ dependencies = [
  "dropshot",
  "schemars",
  "serde",
+ "workspace-hack",
 ]
 
 [[package]]
@@ -1925,6 +1925,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "workspace-hack",
 ]
 
 [[package]]
@@ -4113,6 +4114,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "deranged",
+ "digest",
+ "either",
+ "futures-io",
+ "getrandom 0.2.17",
+ "memchr",
+ "num-traits",
+ "serde",
+ "serde_core",
+ "serde_json",
+ "smallvec",
+ "syn 2.0.117",
+ "thiserror",
+ "time",
+ "time-macros",
+ "tracing",
+]
+
+[[package]]
 name = "writeable"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4149,6 +4172,7 @@ dependencies = [
  "anyhow",
  "clap",
  "which",
+ "workspace-hack",
  "xshell",
 ]
 

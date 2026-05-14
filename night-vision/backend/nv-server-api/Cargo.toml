@@ -7,3 +7,4 @@ edition = "2024"
 dropshot.workspace = true
 schemars.workspace = true
 serde.workspace = true
+workspace-hack = { workspace = true }

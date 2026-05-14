@@ -20,6 +20,7 @@ postgresql_18.pkg-path = "postgresql_18"
 rustup.pkg-path = "rustup"
 sea-orm-cli.pkg-path = "sea-orm-cli"
 pgadmin4.pkg-path = "pgadmin4"
+cargo-hakari.pkg-path = "cargo-hakari"
 
 
 ## Environment Variables ---------------------------------------------

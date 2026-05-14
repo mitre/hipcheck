@@ -1,7 +1,7 @@
 [workspace]
 
 resolver = "3"
-members = ["nv-server", "nv-server-api", "nvdb", "spookey", "xtask"]
+members = ["nv-server", "nv-server-api", "nvdb", "spookey", "workspace-hack", "xtask"]
 default-members = ["nv-server"]
 
 [workspace.dependencies]
@@ -9,14 +9,15 @@ anyhow = "1.0.102"
 camino = "1.2.2"
 clap = { version = "4.6.1", features = ["string"] }
 dropshot = "0.17.0"
+itertools = "0.14.0"
+nv-server-api = { path = "nv-server-api" }
 sea-orm = { version = "2.0.0-rc", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
 # This an outdated version, required to match the one expected by dropshot.
 # See: https://github.com/oxidecomputer/dropshot/issues/1375
 schemars = "0.8.22"
 serde = { version = "1.0.228", features = ["derive"] }
+spookey = { path = "spookey" }
 tokio = { version = "1.52.1", features = ["fs", "io-util", "io-std", "net", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
 xshell = "0.2.7"
 which = "8.0.2"
-nv-server-api = { path = "nv-server-api" }
-spookey = { path = "spookey" }
-itertools = "0.14.0"
+workspace-hack = { path = "workspace-hack" }

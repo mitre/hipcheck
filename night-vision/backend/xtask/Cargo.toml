@@ -8,4 +8,5 @@ publish = false
 anyhow = { workspace = true }
 clap = { workspace = true }
 which = { workspace = true }
+workspace-hack = { workspace = true }
 xshell = { workspace = true }

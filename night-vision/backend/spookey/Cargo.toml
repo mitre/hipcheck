@@ -5,3 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+
+# We purposefully do not have dependencies in `spookey`.
+# It's intended to be simple and to compile as fast as possible.
+# Please do not add dependencies.

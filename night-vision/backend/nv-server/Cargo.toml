@@ -8,11 +8,9 @@ publish = false
 camino = { workspace = true }
 clap = { workspace = true }
 dropshot = { workspace = true }
-sea-orm = { workspace = true }
-tokio = { workspace = true }
-which = { workspace = true }
-xshell = { workspace = true }
-
-nv-server-api = { workspace = true }
-spookey = { workspace = true }
 itertools = { workspace = true }
+nv-server-api = { workspace = true }
+sea-orm = { workspace = true }
+spookey = { workspace = true }
+tokio = { workspace = true }
+workspace-hack = { workspace = true }

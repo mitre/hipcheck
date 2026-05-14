@@ -6,6 +6,9 @@
       "cargo-autoinherit": {
         "pkg-path": "cargo-autoinherit"
       },
+      "cargo-hakari": {
+        "pkg-path": "cargo-hakari"
+      },
       "cargo-nextest": {
         "pkg-path": "cargo-nextest"
       },
@@ -147,6 +150,122 @@
       ],
       "outputs": {
         "out": "/nix/store/7qzxn6cyhwa544hywgwgh488wvgs3xxm-cargo-autoinherit-0.1.6"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-hakari",
+      "broken": false,
+      "derivation": "/nix/store/mxb61hzhdqdi2x3bk8y1wkc8qifm5nc3-cargo-hakari-0.9.36.drv",
+      "description": "Manage workspace-hack packages to speed up builds in large workspaces",
+      "install_id": "cargo-hakari",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-hakari-0.9.36",
+      "pname": "cargo-hakari",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:10:22.208591Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.36",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/vzgx81qkqngjxfwshyxm1jh723yiwbb1-cargo-hakari-0.9.36"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-hakari",
+      "broken": false,
+      "derivation": "/nix/store/9ab57hwbl573wix5cfzvnrscz0qqh3li-cargo-hakari-0.9.36.drv",
+      "description": "Manage workspace-hack packages to speed up builds in large workspaces",
+      "install_id": "cargo-hakari",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-hakari-0.9.36",
+      "pname": "cargo-hakari",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:44:33.710057Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.36",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/w5gvmnhlza510f1zk3z9405fyv3140ml-cargo-hakari-0.9.36"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-hakari",
+      "broken": false,
+      "derivation": "/nix/store/38ps58mdnxc0ayjsyha9gpfbfm5bl3z2-cargo-hakari-0.9.36.drv",
+      "description": "Manage workspace-hack packages to speed up builds in large workspaces",
+      "install_id": "cargo-hakari",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-hakari-0.9.36",
+      "pname": "cargo-hakari",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:15:55.192761Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.36",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/84p9xma2ynllq1gsnqyycjkh03gg5p91-cargo-hakari-0.9.36"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-hakari",
+      "broken": false,
+      "derivation": "/nix/store/clm592smsggcsybl7wz3fmggcknqvrb0-cargo-hakari-0.9.36.drv",
+      "description": "Manage workspace-hack packages to speed up builds in large workspaces",
+      "install_id": "cargo-hakari",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-hakari-0.9.36",
+      "pname": "cargo-hakari",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:52:10.927299Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.36",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/zg4pb24iza7bnjyfmil7bmgcarvxwjbq-cargo-hakari-0.9.36"
       },
       "system": "x86_64-linux",
       "group": "toplevel",
