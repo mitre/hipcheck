@@ -1,9 +1,13 @@
+//! Errors and error-handling helpers.
+
 use crate::config::ConfigErrors;
 use camino::Utf8PathBuf;
-use std::fmt::Display;
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+};
 
 /// Fatal errors that stop the server from starting or force it to exit.
-#[derive(Debug)]
 pub enum FatalError {
     FailedToBuildDropshotServer(dropshot::ApiDescriptionBuildErrors),
     FailedToStartDropshotServer(dropshot::BuildError),
@@ -14,6 +18,25 @@ pub enum FatalError {
     FailedToParseConfigFile(Utf8PathBuf, spookey::Error),
     FailedToParseConfigFileFields(Utf8PathBuf, ConfigErrors),
     UnknownServerError(String),
+}
+
+// The `Debug` representation for `FatalError` is intended to match the debug printing for
+// `anyhow::Error`, with a top-level error and then a series of causes.
+impl Debug for FatalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut msg = format!("{}\n", self);
+
+        // If there are causes, then print the "caused by" section.
+        if let Some(source) = self.source() {
+            msg.push_str("\nCaused by:\n");
+
+            for source in source.sources_iter() {
+                msg.push_str(&format!("\t{}\n", source));
+            }
+        }
+
+        write!(f, "{}", msg)
+    }
 }
 
 impl Display for FatalError {
@@ -60,6 +83,7 @@ impl std::error::Error for FatalError {
 
 /// A generic iterator over causes of an error.
 pub struct ErrorSourceIter<'a> {
+    /// The "current" error the iterator is handling; if empty, the source chain is done.
     current: Option<&'a dyn std::error::Error>,
 }
 

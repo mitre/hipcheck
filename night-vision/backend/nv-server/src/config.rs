@@ -12,6 +12,8 @@ use std::{
     str::FromStr,
 };
 
+/// The default configuration file, relative to the root of the workspace. This is used by the CLI
+/// if `-c`/`--config` is not set.
 pub const DEFAULT_CONFIG_FILE: &str = "nv-server.spookey";
 
 /// Configuration for the Night Vision server.
@@ -215,140 +217,112 @@ impl Config {
 
         Ok(config)
     }
+}
 
-    /// Get a friendly report on the configuration being used.
-    pub fn report(&self) -> String {
-        let mut report = format!("{:-^80}\n", "");
+/// Write a "separator" line of 80 dashes, used at the start and end of the config report.
+macro_rules! write_report_separator {
+    ($f:ident) => {
+        write!($f, "{:-^80}\n", "")
+    };
+}
+
+/// Write a single line of the config report.
+macro_rules! write_report_line {
+    // Note that the "32" value is set by-hand based on the length in characters of the longest
+    // configuration key we accept. If we introduce longer configuration keys in the future, this will
+    // likely need to be bumped.
+    ($f:ident, $key:literal, $value:expr) => {
+        write!($f, "{:>32}: {}\n", $key, $value)
+    };
+}
+
+impl Display for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write_report_separator!(f)?;
 
         // Make sure to report the source configuration file we're using, if we're using something
         // other than the default. This may help people catch mistakes during debugging, for
         // example if they meant to use the default and forgot. Always good to say where config
         // values are coming from when it's unexpected.
         if self.config_file_path != DEFAULT_CONFIG_FILE {
-            report.push_str(&report_line(
-                "Using configuration file",
-                self.config_file_path.as_ref(),
-            ));
+            write_report_line!(f, "Using configuration file", self.config_file_path)?;
         }
 
-        report.push_str(&report_line("server-address", &self.server_address));
-        report.push_str(&report_line(
-            "database-connection",
-            &self.database_connection,
-        ));
+        write_report_line!(f, "server-address", &self.server_address)?;
+        write_report_line!(f, "database-connection", &self.database_connection)?;
 
         if let Some(max_bytes) = self.http_request_body_max_bytes {
-            report.push_str(&report_line(
-                "http-request-body-max-bytes",
-                &max_bytes.to_string(),
-            ));
+            write_report_line!(f, "http-request-body-max-bytes", &max_bytes)?;
         }
 
         if let Some(behavior) = self.http_early_disconnect_behavior {
-            report.push_str(&report_line(
-                "http-early-disconnect-behavior",
-                &behavior.to_string(),
-            ));
+            write_report_line!(f, "http-early-disconnect-behavior", &behavior)?;
         }
 
         if let Some(max_connections) = self.database_max_connections {
-            report.push_str(&report_line(
-                "database-max-connections",
-                &max_connections.to_string(),
-            ));
+            write_report_line!(f, "database-max-connections", &max_connections)?;
         }
 
         if let Some(min_connections) = self.database_min_connections {
-            report.push_str(&report_line(
-                "database-min-connections",
-                &min_connections.to_string(),
-            ));
+            write_report_line!(f, "database-min-connections", &min_connections)?;
         }
 
         if let Some(connect_timeout) = self.database_connect_timeout {
-            report.push_str(&report_line(
-                "database-connect-timeout",
-                &connect_timeout.to_string(),
-            ));
+            write_report_line!(f, "database-connect-timeout", &connect_timeout)?;
         }
 
         if let Some(idle_timeout) = self.database_idle_timeout {
-            report.push_str(&report_line(
-                "database-idle-timeout",
-                &idle_timeout.to_string(),
-            ));
+            write_report_line!(f, "database-idle-timeout", &idle_timeout)?;
         }
 
         if let Some(acquire_timeout) = self.database_acquire_timeout {
-            report.push_str(&report_line(
-                "database-acquire-timeout",
-                &acquire_timeout.to_string(),
-            ));
+            write_report_line!(f, "database-acquire-timeout", &acquire_timeout)?;
         }
 
         if let Some(max_lifetime) = self.database_max_lifetime {
-            report.push_str(&report_line(
-                "database-max-lifetime",
-                &max_lifetime.to_string(),
-            ));
+            write_report_line!(f, "database-max-lifetime", &max_lifetime)?;
         }
 
         if let Some(async_worker_threads) = self.async_worker_threads {
-            report.push_str(&report_line(
-                "async-worker-threads",
-                &async_worker_threads.to_string(),
-            ));
+            write_report_line!(f, "async-worker-threads", &async_worker_threads)?;
         }
 
         if let Some(async_worker_thread_stack_size) = self.async_worker_thread_stack_size {
-            report.push_str(&report_line(
+            write_report_line!(
+                f,
                 "async-worker-thread-stack-size",
-                &async_worker_thread_stack_size.to_string(),
-            ));
+                &async_worker_thread_stack_size
+            )?;
         }
 
         if let Some(async_max_blocking_threads) = self.async_max_blocking_threads {
-            report.push_str(&report_line(
-                "async-max-blocking-threads",
-                &async_max_blocking_threads.to_string(),
-            ));
+            write_report_line!(f, "async-max-blocking-threads", &async_max_blocking_threads)?;
         }
 
         if let Some(async_blocking_thread_keep_alive) = self.async_blocking_thread_keep_alive {
-            report.push_str(&report_line(
+            write_report_line!(
+                f,
                 "async-blocking-thread-keep-alive",
-                &async_blocking_thread_keep_alive.to_string(),
-            ));
+                &async_blocking_thread_keep_alive
+            )?;
         }
 
         if let Some(async_global_queue_interval) = self.async_global_queue_interval {
-            report.push_str(&report_line(
+            write_report_line!(
+                f,
                 "async-global-queue-interval",
-                &async_global_queue_interval.to_string(),
-            ));
+                &async_global_queue_interval
+            )?;
         }
 
         if let Some(async_event_interval) = self.async_event_interval {
-            report.push_str(&report_line(
-                "async-event-interval",
-                &async_event_interval.to_string(),
-            ));
+            write_report_line!(f, "async-event-interval", &async_event_interval)?;
         }
 
-        report.push_str(&format!("{:-^80}\n", ""));
+        write_report_separator!(f)?;
 
-        report
+        Ok(())
     }
-}
-
-#[inline]
-/// A single line of our configuration report.
-///
-/// Note that the "32" value is set by-hand based on the length in characters of the longest
-/// configuration key we accept. If we introduce longer configuration keys in the future, this will
-/// likely need to be bumped.
-fn report_line(key: &str, value: &str) -> String {
-    format!("{:>32}: {}\n", key, value)
 }
 
 /// Parse a value from the config map, returning `None` if the value is unset.

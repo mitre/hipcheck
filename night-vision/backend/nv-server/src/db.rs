@@ -1,3 +1,5 @@
+//! Handles interactions with the database.
+
 use crate::{config::Config, error::FatalError};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use std::time::Duration;
