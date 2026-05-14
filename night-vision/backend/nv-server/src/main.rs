@@ -20,5 +20,5 @@ fn main() -> Result<(), error::FatalError> {
     // the server; should run continuously unless some catastrophic error is encountered which
     // causes the server to die.
     println!("{}", config);
-    runtime.block_on(api::RestApi::new()?.serve(&config))
+    runtime.block_on(api::RestApi::new()?.serve(&env, &config))
 }

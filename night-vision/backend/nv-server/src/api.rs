@@ -1,6 +1,6 @@
 //! Defines the API endpoints for the Night Vision server.
 
-use crate::{config::Config, error::FatalError};
+use crate::{config::Config, env::Env, error::FatalError};
 use dropshot::{
     ConfigLogging, ConfigLoggingLevel, HttpError, HttpResponseOk, RequestContext, ServerBuilder,
 };
@@ -9,7 +9,7 @@ use sea_orm::DatabaseConnection;
 
 /// The REST API interface.
 ///
-/// This is a wrapper for the `dropshot` `ApiDescription` populate with our `AppCtx` (the shared
+/// This is a wrapper for the `dropshot` `ApiDescription` populate with our `ApiCtx` (the shared
 /// data available to every endpoint handler).
 pub struct RestApi(dropshot::ApiDescription<ApiCtx>);
 
@@ -25,25 +25,25 @@ impl RestApi {
     ///
     /// Returns `FatalError` if the server encounters a problem that either blocks launching or
     /// causes the server to be unable to serve more requests.
-    pub async fn serve(self, config: &Config) -> Result<(), FatalError> {
-        let ctx = ApiCtx {
-            db: crate::db::connection(config).await?,
-        };
+    pub async fn serve(self, env: &Env, config: &Config) -> Result<(), FatalError> {
+        let api = self.0;
+        let ctx = ApiCtx::init(&config).await?;
 
+        // TODO: Factor logger-setup into its own function. Currently waiting on dropshot#1607 [1].
+        //
+        // [1]: https://github.com/oxidecomputer/dropshot/issues/1607
         let log = ConfigLogging::StderrTerminal {
             level: ConfigLoggingLevel::Info,
         }
-        .to_logger("nv-server")
+        .to_logger(env.bin_name())
         .map_err(FatalError::FailedToInitializeLogger)?;
 
-        let server = ServerBuilder::new(self.0, ctx, log)
+        ServerBuilder::new(api, ctx, log)
             .config(config.dropshot_config()?)
             .start()
-            .map_err(FatalError::FailedToStartDropshotServer)?;
-
-        server.await.map_err(FatalError::UnknownServerError)?;
-
-        Ok(())
+            .map_err(FatalError::FailedToStartDropshotServer)?
+            .await
+            .map_err(FatalError::UnknownServerError)
     }
 }
 
@@ -65,4 +65,12 @@ pub struct ApiCtx {
     #[allow(unused)]
     /// Handle to the database.
     pub db: DatabaseConnection,
+}
+
+impl ApiCtx {
+    /// Try to initialize the application context.
+    async fn init(config: &Config) -> Result<Self, FatalError> {
+        let db = crate::db::connection(config).await?;
+        Ok(ApiCtx { db })
+    }
 }
