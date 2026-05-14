@@ -15,3 +15,4 @@ xshell = { workspace = true }
 
 nv-server-api = { workspace = true }
 spookey = { workspace = true }
+itertools = { workspace = true }

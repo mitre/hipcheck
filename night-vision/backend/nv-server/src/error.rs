@@ -1,4 +1,4 @@
-use crate::config::ParseErrors;
+use crate::config::ConfigErrors;
 use camino::Utf8PathBuf;
 use std::fmt::Display;
 
@@ -12,7 +12,7 @@ pub enum FatalError {
     FailedToInitializeLogger(std::io::Error),
     FailedToOpenConfigFile(Utf8PathBuf, std::io::Error),
     FailedToParseConfigFile(Utf8PathBuf, spookey::Error),
-    FailedToParseConfigFileFields(Utf8PathBuf, ParseErrors),
+    FailedToParseConfigFileFields(Utf8PathBuf, ConfigErrors),
     UnknownServerError(String),
 }
 
@@ -54,6 +54,40 @@ impl std::error::Error for FatalError {
             FatalError::FailedToParseConfigFile(_, err) => Some(err),
             FatalError::FailedToParseConfigFileFields(_, err) => Some(err),
             FatalError::UnknownServerError(_) => None,
+        }
+    }
+}
+
+/// A generic iterator over causes of an error.
+pub struct ErrorSourceIter<'a> {
+    current: Option<&'a dyn std::error::Error>,
+}
+
+impl<'a> Iterator for ErrorSourceIter<'a> {
+    type Item = &'a dyn std::error::Error;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = self.current;
+        self.current = self.current.and_then(|e| e.source());
+        current
+    }
+}
+
+/// Extension trait adding `sources_iter` method to all `std::error::Error` types.
+pub trait ErrorSourceIterator {
+    // We'd prefer to call this "sources," but the standard library has a nightly-only API to do
+    // this exact functionality, and it uses that name, so we get a warning about future
+    // incompatibility if we use it ourselves. So we have to use this slightly worse name.
+    fn sources_iter<'s>(&'s self) -> ErrorSourceIter<'s>;
+}
+
+impl<E: std::error::Error> ErrorSourceIterator for E {
+    /// Provides an iterator over all sources of an error, _including_ the original error itself.
+    ///
+    /// To skip the error itself, call `skip(1)` on the iterator.
+    fn sources_iter<'s>(&'s self) -> ErrorSourceIter<'s> {
+        ErrorSourceIter {
+            current: Some(self),
         }
     }
 }

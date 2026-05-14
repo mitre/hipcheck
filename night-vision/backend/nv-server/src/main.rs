@@ -8,7 +8,7 @@ mod version;
 use crate::{
     api::{Api, ApiCtx},
     config::Config,
-    error::FatalError,
+    error::{ErrorSourceIterator, FatalError},
 };
 use camino::Utf8PathBuf;
 use dropshot::{ConfigLogging, ConfigLoggingLevel, ServerBuilder};
@@ -38,7 +38,7 @@ fn run() -> Result<(), FatalError> {
                 .long("config")
                 .value_name("FILE")
                 .value_parser(clap::value_parser!(Utf8PathBuf))
-                .default_value("nv-server.spookey")
+                .default_value(config::DEFAULT_CONFIG_FILE)
                 .help("Path to the configuration file"),
         )
         .get_matches();
@@ -87,16 +87,17 @@ fn crate_name() -> String {
 }
 
 /// Report the full error chain to stderr.
-fn report_error<E: std::error::Error>(err: E) {
-    fn inner<E: std::error::Error>(err: E, msg: &mut String) {
-        msg.push_str(&format!("\t{}\n", err));
+fn report_error<E: std::error::Error + 'static>(err: E) {
+    let mut msg = format!("Error: {}\n", err);
 
-        if let Some(source) = err.source() {
-            inner(source, msg);
+    // If there are causes, then print the "caused by" section.
+    if let Some(source) = err.source() {
+        msg.push_str("\nCaused by:\n");
+
+        for source in source.sources_iter() {
+            msg.push_str(&format!("\t{}\n", source));
         }
     }
 
-    let mut msg = format!("Error: {}\n\nCaused by:\n", err);
-    inner(err, &mut msg);
     eprintln!("{}", msg);
 }

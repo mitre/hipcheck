@@ -19,3 +19,4 @@ xshell = "0.2.7"
 which = "8.0.2"
 nv-server-api = { path = "nv-server-api" }
 spookey = { path = "spookey" }
+itertools = "0.14.0"
