@@ -29,15 +29,49 @@
 //! [hipcheck_plugins]: https://hipcheck.mitre.org/docs/guide/making-plugins/creating-a-plugin/
 //! [web_sdk_docs]: https://hipcheck.mitre.org/docs/guide/making-plugins/rust-sdk/
 
-use crate::error::{ConfigError, Error, Result};
-pub use engine::PluginEngine;
-pub use engine::QueryBuilder;
+//================================================================================================
+// Re-exports
+//------------------------------------------------------------------------------------------------
+
+// All of these will appear as "top-level" items in the SDK.
+pub use crate::config::PluginConfig;
+pub use crate::engine::PluginEngine;
+pub use crate::engine::QueryBuilder;
+pub use crate::log::init_tracing_logger;
+pub use crate::plugin::Plugin;
+pub use crate::query::{DynQuery, NamedQuery, Query, QuerySchema};
+pub use crate::server::PluginServer;
+pub use crate::target::QueryTarget;
 pub use hipcheck_common::types::LogLevel;
-use schemars::Schema as JsonSchema;
-use serde_json::Value as JsonValue;
-pub use server::PluginServer;
-use std::result::Result as StdResult;
-use std::str::FromStr;
+
+//================================================================================================
+// Private Modules
+//------------------------------------------------------------------------------------------------
+
+#[cfg(feature = "print-timings")]
+mod benchmarking;
+mod config;
+mod engine;
+mod log;
+mod plugin;
+mod query;
+mod server;
+mod target;
+
+//================================================================================================
+// Public Modules
+//------------------------------------------------------------------------------------------------
+
+/// Re-export of user-facing third-party dependencies
+pub mod deps {
+	pub use jiff::{Span, Zoned};
+	pub use schemars::{Schema as JsonSchema, schema_for};
+	pub use serde_json::{Value, from_str, from_value, to_value};
+	pub use tonic::async_trait;
+}
+
+// Materials for error reporting and handling.
+pub mod error;
 
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
@@ -46,33 +80,12 @@ pub mod macros {
 	pub use hipcheck_sdk_macros::*;
 }
 
-/// The trait used to deserialized plugin config input from the Policy File.
-/// The trait is applied to a plugin RawConfig struct and works in tandem with
-/// the derive_plugin_config procedural macro re-imported to this sdk crate
-/// via hipcheck_sdk_macros.
-pub trait PluginConfig<'de> {
-	fn deserialize(config: &serde_json::Value) -> StdResult<Self, ConfigError>
-	where
-		Self: Sized;
-}
-
-#[cfg(feature = "print-timings")]
-mod benchmarking;
-
-mod engine;
-pub mod error;
-mod server;
-
 #[cfg(feature = "mock_engine")]
 #[cfg_attr(docsrs, doc(cfg(feature = "mock_engine")))]
 /// Tools for unit-testing plugin `Query` implementations
 pub mod mock {
 	pub use crate::engine::MockResponses;
 }
-
-/// The definitions of Hipcheck's analysis `Target` object and its sub-types for use in writing
-/// query endpoints.
-pub mod types;
 
 /// A utility module containing everything needed to write a plugin, just write `use
 /// hipcheck_sdk::prelude::*`.
@@ -83,6 +96,7 @@ pub mod prelude {
 	pub use crate::server::{Host, PluginServer, QueryResult};
 	pub use crate::types::{KnownRemote, RemoteGitRepo};
 	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
+
 	// Re-export macros
 	#[cfg(feature = "macros")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
@@ -93,185 +107,6 @@ pub mod prelude {
 	pub use crate::engine::MockResponses;
 }
 
-/// Re-export of user-facing third-party dependencies
-pub mod deps {
-	pub use jiff::{Span, Zoned};
-	pub use schemars::{Schema as JsonSchema, schema_for};
-	pub use serde_json::{Value, from_str, from_value, to_value};
-	pub use tonic::async_trait;
-}
-
-/// Identifies the target plugin and endpoint of a Hipcheck query.
-///
-/// The `publisher` and `plugin` fields are necessary from Hipcheck core's perspective to identify
-/// a plugin process. Plugins may define one or more query endpoints, and may include an unnamed
-/// endpoint as the "default", hence why the `query` field is optional. `QueryTarget` implements
-/// `FromStr` so it can be parsed from strings of the format `"publisher/plugin[/query]"`, where
-/// the bracketed substring is optional.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct QueryTarget {
-	pub publisher: String,
-	pub plugin: String,
-	pub query: Option<String>,
-}
-
-impl FromStr for QueryTarget {
-	type Err = Error;
-
-	fn from_str(s: &str) -> StdResult<Self, Self::Err> {
-		let parts: Vec<&str> = s.split('/').collect();
-		match parts.as_slice() {
-			[publisher, plugin, query] => Ok(Self {
-				publisher: publisher.to_string(),
-				plugin: plugin.to_string(),
-				query: Some(query.to_string()),
-			}),
-			[publisher, plugin] => Ok(Self {
-				publisher: publisher.to_string(),
-				plugin: plugin.to_string(),
-				query: None,
-			}),
-			_ => Err(Error::InvalidQueryTargetFormat),
-		}
-	}
-}
-impl std::fmt::Display for QueryTarget {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match &self.query {
-			Some(query) => write!(f, "{}/{}/{}", self.publisher, self.plugin, query),
-			None => write!(f, "{}/{}", self.publisher, self.plugin),
-		}
-	}
-}
-
-impl TryInto<QueryTarget> for &str {
-	type Error = Error;
-	fn try_into(self) -> StdResult<QueryTarget, Self::Error> {
-		QueryTarget::from_str(self)
-	}
-}
-
-/// Describes the signature of a particular `NamedQuery`.
-///
-/// Instances of this type are usually created by the default implementation of `Plugin::schemas()`
-/// and would not need to be created by hand unless you are doing something very unorthodox.
-pub struct QuerySchema {
-	/// The name of the query being described.
-	query_name: &'static str,
-
-	/// The query's input schema as a `schemars::schema::SchemaObject`.
-	input_schema: JsonSchema,
-
-	/// The query's output schema as a `schemars::schema::SchemaObject`.
-	output_schema: JsonSchema,
-}
-
-/// A `Query` trait object.
-pub type DynQuery = Box<dyn Query>;
-
-/// Pairs a query endpoint name with a particular `Query` trait implementation.
-///
-/// Since the `Query` trait needs to be made into a trait object, we can't use a static associated
-/// string to store the query's name in the trait itself. This object wraps a `Query` trait object
-/// and allows us to associate a name with it so that when the plugin receives a query from
-/// Hipcheck core, it can look up the proper behavior to invoke.
-pub struct NamedQuery {
-	/// The name of the query.
-	pub name: &'static str,
-
-	/// The `Query` trait object.
-	pub inner: DynQuery,
-}
-
-impl NamedQuery {
-	/// Returns whether the current query is the plugin's default query, determined by whether the
-	/// query name is empty.
-	fn is_default(&self) -> bool {
-		self.name.is_empty()
-	}
-}
-
-/// Defines a single query endpoint for the plugin.
-#[tonic::async_trait]
-pub trait Query: Send {
-	/// Get the input schema for the query as a `schemars::schema::SchemaObject`.
-	fn input_schema(&self) -> JsonSchema;
-
-	/// Get the output schema for the query as a `schemars::schema::SchemaObject`.
-	fn output_schema(&self) -> JsonSchema;
-
-	/// Run the query endpoint logic on `input`, returning a JSONified return value on success.
-	/// The `PluginEngine` reference allows the endpoint to query other Hipcheck plugins by
-	/// calling `engine::query()`.
-	async fn run(&self, engine: &mut PluginEngine, input: JsonValue) -> Result<JsonValue>;
-}
-
-/// The core trait that a plugin author must implement using the Hipcheck SDK.
-///
-/// Declares basic information about the plugin and its query endpoints, and accepts a
-/// configuration map from Hipcheck core.
-pub trait Plugin: Send + Sync + 'static {
-	/// The name of the plugin publisher.
-	const PUBLISHER: &'static str;
-
-	/// The name of the plugin.
-	const NAME: &'static str;
-
-	/// Handle setting configuration. The `config` parameter is a JSON object of `String, String`
-	/// pairs.
-	fn set_config(&self, config: JsonValue) -> StdResult<(), ConfigError>;
-
-	/// Get the plugin's default policy expression. This will only ever be called after
-	/// `Plugin::set_config()`. For more information on policy expression syntax, see the Hipcheck
-	/// website.
-	fn default_policy_expr(&self) -> Result<String> {
-		Ok(String::new())
-	}
-
-	/// Get an unstructured description of what is returned by the plugin's default query.
-	fn explain_default_query(&self) -> Result<Option<String>> {
-		Ok(None)
-	}
-
-	/// Get all the queries supported by the plugin. Each query endpoint in a plugin will have its
-	/// own `trait Query` implementation. This function should return an iterator containing one
-	/// `NamedQuery` instance for each `trait Query` implementation defined by the plugin author.
-	fn queries(&self) -> impl Iterator<Item = NamedQuery>;
-
-	/// Get the plugin's default query, if it has one. The default query is a `NamedQuery` with an
-	/// empty `name` string. In most cases users should not need to override the default
-	/// implementation.
-	fn default_query(&self) -> Option<DynQuery> {
-		self.queries()
-			.find_map(|named| named.is_default().then_some(named.inner))
-	}
-
-	/// Get all schemas for queries provided by the plugin. In most cases users should not need to
-	/// override the default implementation.
-	fn schemas(&self) -> impl Iterator<Item = QuerySchema> {
-		self.queries().map(|query| QuerySchema {
-			query_name: query.name,
-			input_schema: query.inner.input_schema(),
-			output_schema: query.inner.output_schema(),
-		})
-	}
-}
-
-/// Initializes a `tracing-subscriber` for plugin logging and forwards logs to Hipcheck core.
-///
-/// Initializes a `tracing-subscriber` which writes log messages produced via the `tracing` crate macros to stdout/stderr.
-/// These plugin logs are then piped to Hipcheck core's stdout/stderr log output during execution.
-///
-/// `tracing-subscriber` uses an `EnvFilter` to filter logs to up to the log-level passed as argument `log-level`
-/// to the plugin by `HC Core`.
-///
-/// log_forwarding() is enabled as a default feature, but could be disabled and replaced by setting `default-features = false`
-/// in the `dependencies` section of a plugin's `Cargo.toml` prior to compilation.
-#[cfg(feature = "log_forwarding")]
-pub fn init_tracing_logger(log_level: LogLevel) {
-	tracing_subscriber::fmt()
-		.json()
-		.with_writer(std::io::stderr)
-		.with_env_filter(log_level.to_string())
-		.init();
-}
+/// The definitions of Hipcheck's analysis `Target` object and its sub-types for use in writing
+/// query endpoints.
+pub mod types;
