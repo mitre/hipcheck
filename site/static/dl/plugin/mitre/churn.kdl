@@ -223,42 +223,37 @@ plugin version="0.5.2" arch="x86_64-unknown-linux-gnu" {
     size bytes=2066128
 }
 
-plugin version="0.6.0" arch=aarch64-apple-darwin{
-url "https://github.com/mitre/hipcheck/releases/download/churn-v0.6.0/churn-aarch64-apple-darwin.tar.xz"
-hash alg=SHA256 digest=a32a9403cb46eb26f284de2fcf930e408531785509121714deb2ec67a15d34ea
-compress format=tar.xz
-size bytes=1424900
+plugin version="0.6.0" arch="aarch64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/churn-v0.6.0/churn-aarch64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="a32a9403cb46eb26f284de2fcf930e408531785509121714deb2ec67a15d34ea"
+    compress format="tar.xz"
+    size bytes=1424900
 }
 
-
-plugin version="0.6.0" arch=aarch64-unknown-linux-gnu{
-url "https://github.com/mitre/hipcheck/releases/download/churn-v0.6.0/churn-aarch64-unknown-linux-gnu.tar.xz"
-hash alg=SHA256 digest=cdea39390ea227f0d435ca22db0a709e4057f48ade8002aa34fd0137aadead23
-compress format=tar.xz
-size bytes=1555196
+plugin version="0.6.0" arch="aarch64-unknown-linux-gnu" {
+    url "https://github.com/mitre/hipcheck/releases/download/churn-v0.6.0/churn-aarch64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="cdea39390ea227f0d435ca22db0a709e4057f48ade8002aa34fd0137aadead23"
+    compress format="tar.xz"
+    size bytes=1555196
 }
 
-
-plugin version="0.6.0" arch=x86_64-apple-darwin{
-url "https://github.com/mitre/hipcheck/releases/download/churn-v0.6.0/churn-x86_64-apple-darwin.tar.xz"
-hash alg=SHA256 digest="1a00c71e00af003a883c7bcb0b5bb93d0e8392fc8339b230762a9f1cb81246a5"
-compress format=tar.xz
-size bytes=1548716
+plugin version="0.6.0" arch="x86_64-apple-darwin" {
+    url "https://github.com/mitre/hipcheck/releases/download/churn-v0.6.0/churn-x86_64-apple-darwin.tar.xz"
+    hash alg="SHA256" digest="1a00c71e00af003a883c7bcb0b5bb93d0e8392fc8339b230762a9f1cb81246a5"
+    compress format="tar.xz"
+    size bytes=1548716
 }
 
-
-plugin version="0.6.0" arch=x86_64-pc-windows-msvc{
-url "https://github.com/mitre/hipcheck/releases/download/churn-v0.6.0/churn-x86_64-pc-windows-msvc.zip"
-hash alg=SHA256 digest="1672a6a5811aa2897ecc93e5f16f10b1d3e7ed2c1d63c4c0ecb02618889f46c9"
-compress format=zip
-size bytes=2091519
+plugin version="0.6.0" arch="x86_64-pc-windows-msvc" {
+    url "https://github.com/mitre/hipcheck/releases/download/churn-v0.6.0/churn-x86_64-pc-windows-msvc.zip"
+    hash alg="SHA256" digest="1672a6a5811aa2897ecc93e5f16f10b1d3e7ed2c1d63c4c0ecb02618889f46c9"
+    compress format="zip"
+    size bytes=2091519
 }
 
-
-plugin version="0.6.0" arch=x86_64-unknown-linux-gnu{
-url "https://github.com/mitre/hipcheck/releases/download/churn-v0.6.0/churn-x86_64-unknown-linux-gnu.tar.xz"
-hash alg=SHA256 digest="9e8f1f6613957236177efa4d326cc5544eedc62dff5fe5b63229d3fa0b8bcfb3"
-compress format=tar.xz
-size bytes=1652680
+plugin version="0.6.0" arch="x86_64-unknown-linux-gnu" {
+    url "https://github.com/mitre/hipcheck/releases/download/churn-v0.6.0/churn-x86_64-unknown-linux-gnu.tar.xz"
+    hash alg="SHA256" digest="9e8f1f6613957236177efa4d326cc5544eedc62dff5fe5b63229d3fa0b8bcfb3"
+    compress format="tar.xz"
+    size bytes=1652680
 }
-

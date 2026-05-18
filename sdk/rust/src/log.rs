@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use hipcheck_common::types::LogLevel;
 
 /// Initializes a `tracing-subscriber` for plugin logging and forwards logs to Hipcheck core.

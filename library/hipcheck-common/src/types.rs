@@ -10,7 +10,7 @@ use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug)]
 pub struct Query {
-	pub id: usize,
+	pub id: i32,
 	pub direction: QueryDirection,
 	pub publisher: String,
 	pub plugin: String,
@@ -91,7 +91,7 @@ impl TryFrom<PluginQuery> for Query {
 		};
 
 		Ok(Query {
-			id: value.id as usize,
+			id: value.id,
 			direction,
 			publisher: value.publisher_name,
 			plugin: value.plugin_name,
@@ -124,7 +124,7 @@ impl TryFrom<Query> for PluginQuery {
 		}
 
 		Ok(PluginQuery {
-			id: value.id as i32,
+			id: value.id,
 			state: state as i32,
 			publisher_name: value.publisher,
 			plugin_name: value.plugin,

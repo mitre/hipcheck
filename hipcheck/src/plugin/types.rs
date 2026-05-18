@@ -437,7 +437,7 @@ impl PluginTransport {
 
 	pub async fn query(&self, query: Query) -> Result<Option<Query>> {
 		// Send the query
-		let id = query.id as i32;
+		let id = query.id;
 		let queries = hipcheck_common::chunk::prepare(query).map_err(|e| hc_error!("{}", e))?;
 
 		for query in queries {
@@ -480,7 +480,7 @@ impl From<PluginContextWithConfig> for (PluginContext, Value) {
 
 #[derive(Clone, Debug)]
 pub struct AwaitingResult {
-	pub id: usize,
+	pub id: i32,
 	pub publisher: String,
 	pub plugin: String,
 	pub query: String,

@@ -189,7 +189,7 @@ pub fn query(_attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn queries(item: TokenStream) -> TokenStream {
 	let query_list = parse_macro_input!(item as QueryList);
 
-	// Create a NamedQuery for each #query func we've seen
+	// Create a QueryEndpoint for each #query func we've seen
 	let agg = query_list
 		.inner
 		.iter()
@@ -210,7 +210,7 @@ pub fn queries(item: TokenStream) -> TokenStream {
 			);
 
 			quote::quote! {
-				NamedQuery {
+				QueryEndpoint {
 					name: #name,
 					inner: Box::new(#struct_name {})
 				},
@@ -223,9 +223,9 @@ pub fn queries(item: TokenStream) -> TokenStream {
 		query_list.inner.len()
 	);
 
-	// Impl `Plugin::queries` as a vec of generated NamedQuery instances
+	// Impl `Plugin::queries` as a vec of generated QueryEndpoint instances
 	let out = quote::quote! {
-		fn queries(&self) -> impl Iterator<Item = NamedQuery> {
+		fn queries(&self) -> impl Iterator<Item = QueryEndpoint> {
 			vec![#agg].into_iter()
 		}
 	};
