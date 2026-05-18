@@ -170,12 +170,12 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 		let (tx, rx) = mpsc::channel(10);
 		tokio::spawn(async move {
 			for x in query_schemas {
-				let input_schema = serde_json::to_string(&x.input_schema);
-				let output_schema = serde_json::to_string(&x.output_schema);
+				let input_schema = serde_json::to_string(&x.input_schema());
+				let output_schema = serde_json::to_string(&x.output_schema());
 
 				let schema_resp = match (input_schema, output_schema) {
 					(Ok(input_schema), Ok(output_schema)) => Ok(GetQuerySchemasResp {
-						query_name: x.query_name.to_string(),
+						query_name: x.query_name().to_string(),
 						key_schema: input_schema,
 						output_schema,
 					}),
