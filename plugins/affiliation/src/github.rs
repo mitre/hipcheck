@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use serde::Deserialize;
 
 /// Repository collaborator data pulled from the GitHub API.

@@ -36,10 +36,10 @@
 // All of these will appear as "top-level" items in the SDK.
 pub use crate::config::PluginConfig;
 pub use crate::engine::PluginEngine;
-pub use crate::engine::QueryBuilder;
+pub use crate::engine::query_builder::QueryBuilder;
 pub use crate::log::init_tracing_logger;
 pub use crate::plugin::Plugin;
-pub use crate::query::{DynQuery, NamedQuery, Query, QuerySchema};
+pub use crate::query::{DynQuery, Query, query_endpoint::QueryEndpoint, query_schema::QuerySchema};
 pub use crate::server::PluginServer;
 pub use crate::target::QueryTarget;
 pub use hipcheck_common::types::LogLevel;
@@ -72,6 +72,8 @@ pub mod deps {
 
 // Materials for error reporting and handling.
 pub mod error;
+// Type representing the host to connect a server to.
+pub mod host;
 
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
@@ -84,18 +86,19 @@ pub mod macros {
 #[cfg_attr(docsrs, doc(cfg(feature = "mock_engine")))]
 /// Tools for unit-testing plugin `Query` implementations
 pub mod mock {
-	pub use crate::engine::MockResponses;
+	pub use crate::engine::mock_responses::MockResponses;
 }
 
 /// A utility module containing everything needed to write a plugin, just write `use
 /// hipcheck_sdk::prelude::*`.
 pub mod prelude {
 	pub use crate::deps::*;
-	pub use crate::engine::{PluginEngine, QueryBuilder};
+	pub use crate::engine::{PluginEngine, query_builder::QueryBuilder};
 	pub use crate::error::{ConfigError, ConfigResult, Error, Result};
-	pub use crate::server::{Host, PluginServer, QueryResult};
+	pub use crate::host::Host;
+	pub use crate::server::{PluginServer, QueryResult};
 	pub use crate::types::{KnownRemote, RemoteGitRepo};
-	pub use crate::{DynQuery, NamedQuery, Plugin, Query, QuerySchema, QueryTarget};
+	pub use crate::{DynQuery, Plugin, Query, QueryEndpoint, QuerySchema, QueryTarget};
 
 	// Re-export macros
 	#[cfg(feature = "macros")]
@@ -104,7 +107,7 @@ pub mod prelude {
 
 	#[cfg(feature = "mock_engine")]
 	#[cfg_attr(docsrs, doc(cfg(feature = "mock_engine")))]
-	pub use crate::engine::MockResponses;
+	pub use crate::engine::mock_responses::MockResponses;
 }
 
 /// The definitions of Hipcheck's analysis `Target` object and its sub-types for use in writing

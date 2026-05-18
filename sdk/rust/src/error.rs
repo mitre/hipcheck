@@ -115,6 +115,14 @@ impl From<Infallible> for Error {
 	}
 }
 
+// Convert from a tonic::Status (indicating a gRPC failure into our Error type).
+impl From<tonic::Status> for Error {
+	fn from(_value: tonic::Status) -> Error {
+		// TODO: higher-fidelity handling?
+		Error::SessionChannelClosed
+	}
+}
+
 /// A Result type using `hipcheck_sdk::Error`
 pub type Result<T> = StdResult<T, Error>;
 

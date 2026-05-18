@@ -74,7 +74,7 @@ pub async fn initialize_plugins(
 
 #[derive(Debug)]
 pub struct ActivePlugin {
-	next_id: Mutex<usize>,
+	next_id: Mutex<i32>,
 	channel: PluginTransport,
 }
 
@@ -94,9 +94,9 @@ impl ActivePlugin {
 		self.channel.opt_explain_default_query.as_ref()
 	}
 
-	async fn get_unique_id(&self) -> usize {
+	async fn get_unique_id(&self) -> i32 {
 		let mut id_lock = self.next_id.lock().await;
-		let res: usize = *id_lock;
+		let res = *id_lock;
 		// even IDs reserved for plugin-originated queries, so skip to next odd ID
 		*id_lock += 2;
 		drop(id_lock);

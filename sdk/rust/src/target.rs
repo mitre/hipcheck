@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::error::Error;
 use std::{result::Result as StdResult, str::FromStr};
 

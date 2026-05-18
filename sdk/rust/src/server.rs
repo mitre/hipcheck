@@ -2,8 +2,9 @@
 
 use crate::{
 	Plugin, QuerySchema,
-	engine::HcSessionSocket,
+	engine::session_socket::HcSessionSocket,
 	error::{Error, Result},
+	host::Host,
 };
 use hipcheck_common::{
 	proto::{
@@ -21,35 +22,11 @@ use hipcheck_common::{
 	},
 	types::LogLevel,
 };
-use std::{
-	net::{Ipv4Addr, SocketAddr},
-	result::Result as StdResult,
-	sync::Arc,
-};
+use std::{result::Result as StdResult, sync::Arc};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream as RecvStream;
 use tonic::{Code, Request as Req, Response as Resp, Status, Streaming, transport::Server};
 use tracing::error;
-
-#[derive(Debug, Clone)]
-pub enum Host {
-	// 127.0.0.1
-	Loopback,
-	// 0.0.0.0
-	Any,
-	// Any other IP address.
-	Other(Ipv4Addr),
-}
-
-impl Host {
-	fn to_socket_addr(&self, port: u16) -> SocketAddr {
-		match self {
-			Host::Loopback => SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), port),
-			Host::Any => SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), port),
-			Host::Other(ip) => SocketAddr::new((*ip).into(), port),
-		}
-	}
-}
 
 /// Runs the Hipcheck plugin protocol based on the user's implementation of the `Plugin` trait.
 ///
@@ -82,6 +59,7 @@ impl<P: Plugin> PluginServer<P> {
 	/// Run the plugin server on the provided port.
 	pub async fn listen(mut self, host: Host, port: u16) -> Result<()> {
 		self.curr_host = host.clone();
+
 		let service = PluginServiceServer::new(self);
 		let host_addr = host.to_socket_addr(port);
 
@@ -164,10 +142,11 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 		&self,
 		_req: Req<GetQuerySchemasReq>,
 	) -> QueryResult<Resp<Self::GetQuerySchemasStream>> {
-		// Ignore the input, it's empty.
 		let query_schemas = self.plugin.schemas().collect::<Vec<QuerySchema>>();
+
 		// TODO: does this need to be configurable?
 		let (tx, rx) = mpsc::channel(10);
+
 		tokio::spawn(async move {
 			for x in query_schemas {
 				let input_schema = serde_json::to_string(&x.input_schema());
@@ -198,10 +177,11 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 
 				if tx.send(schema_resp).await.is_err() {
 					// TODO: handle this?
-					panic!();
+					panic!("failed to send query schema");
 				}
 			}
 		});
+
 		Ok(Resp::new(RecvStream::new(rx)))
 	}
 
@@ -210,18 +190,22 @@ impl<P: Plugin> PluginService for PluginServer<P> {
 		req: Req<Streaming<InitiateQueryProtocolReq>>,
 	) -> QueryResult<Resp<Self::InitiateQueryProtocolStream>> {
 		let rx = req.into_inner();
+
 		// TODO: - make channel size configurable
 		let (tx, out_rx) = match self.curr_host {
-			Host::Loopback => mpsc::channel::<QueryResult<InitiateQueryProtocolResp>>(10),
-			_ => mpsc::channel::<QueryResult<InitiateQueryProtocolResp>>(100),
+			Host::Loopback => mpsc::channel(10),
+			_ => mpsc::channel(100),
 		};
 
 		let cloned_plugin = self.plugin.clone();
 		let tx_clone = tx.clone();
+
 		tokio::spawn(async move {
 			let mut channel = HcSessionSocket::new(tx, rx);
+
 			if let Err(e) = channel.run(cloned_plugin).await {
 				error!("Channel error: {e}");
+
 				if !tx_clone.is_closed()
 					&& let Err(send_err) = tx_clone
 						.send(Err(tonic::Status::internal(format!("Session error: {e}"))))

@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{
 	error::{ConfigError, Result},
-	query::{DynQuery, NamedQuery, QuerySchema},
+	query::{DynQuery, query_endpoint::QueryEndpoint, query_schema::QuerySchema},
 };
 use serde_json::Value as JsonValue;
 use std::result::Result as StdResult;
@@ -35,7 +37,7 @@ pub trait Plugin: Send + Sync + 'static {
 	/// Get all the queries supported by the plugin. Each query endpoint in a plugin will have its
 	/// own `trait Query` implementation. This function should return an iterator containing one
 	/// `NamedQuery` instance for each `trait Query` implementation defined by the plugin author.
-	fn queries(&self) -> impl Iterator<Item = NamedQuery>;
+	fn queries(&self) -> impl Iterator<Item = QueryEndpoint>;
 
 	/// Get the plugin's default query, if it has one. The default query is a `NamedQuery` with an
 	/// empty `name` string. In most cases users should not need to override the default
