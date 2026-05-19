@@ -1,5 +1,4 @@
 [workspace]
-
 resolver = "3"
 members = ["nv-server", "nv-server-api", "nvdb", "spookey", "workspace-hack", "xtask"]
 default-members = ["nv-server"]
@@ -20,7 +19,19 @@ serde = { version = "1.0.228", features = ["derive"] }
 # See: https://github.com/oxidecomputer/dropshot/issues/1607
 slog = "2.8.2"
 spookey = { path = "spookey" }
-tokio = { version = "1.52.1", features = ["fs", "io-util", "io-std", "net", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
 xshell = "0.2.7"
 which = "8.0.2"
 workspace-hack = { path = "workspace-hack" }
+
+[workspace.dependencies.tokio]
+version = "1.52.1"
+# TODO: Audit these features to see if we can make this list smaller.
+features = [
+    "fs", "io-util", "io-std", "net", "parking_lot", "process", "rt", "rt-multi-thread",
+    "signal", "sync", "time"
+]
+
+[workspace.metadata.cargo-autoinherit]
+# Make sure autoinherit doesn't include the workspace-hack crate, since that crate technically
+# pulls in a bunch of transitive deps we don't want to unecessarily turn into direct deps.
+exclude-members = ["workspace-hack"]
