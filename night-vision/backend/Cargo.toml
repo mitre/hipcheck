@@ -22,6 +22,8 @@ spookey = { path = "spookey" }
 xshell = "0.2.7"
 which = "8.0.2"
 workspace-hack = { path = "workspace-hack" }
+cargo-manifest = "0.21.0"
+pathbuf = "1.0.0"
 
 [workspace.dependencies.tokio]
 version = "1.52.1"

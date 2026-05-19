@@ -6,7 +6,10 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
+cargo-manifest = { workspace = true }
 clap = { workspace = true }
+itertools.workspace = true
+pathbuf = { workspace = true }
 which = { workspace = true }
 workspace-hack = { workspace = true }
 xshell = { workspace = true }

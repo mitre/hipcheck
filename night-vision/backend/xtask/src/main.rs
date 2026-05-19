@@ -29,10 +29,12 @@ fn run() -> Result<()> {
                         .trailing_var_arg(true),
                 ),
         )
+        .subcommand(Command::new("lint").about("Lint crates in the workspace"))
         .get_matches();
 
     match matches.subcommand() {
         Some(("add", cmd)) => command::add(cmd)?,
+        Some(("lint", cmd)) => command::lint(cmd)?,
         Some(_) => unimplemented!("unknown command"),
         None => {}
     }

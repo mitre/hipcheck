@@ -480,6 +480,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-manifest"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fae5b96898dec422317cc18037ff6ddd3f7d0766e74a230e9aeddfc21f878267"
+dependencies = [
+ "serde",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1898,7 +1909,6 @@ dependencies = [
 name = "nv-server"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "camino",
  "clap",
  "dropshot",
@@ -2020,6 +2030,12 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pathbuf"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc5ef818343d9b62a8391bfbc8fbd449acf2e6ddd2f1a9aede0eae4c7d91c25c"
 
 [[package]]
 name = "pem-rfc7468"
@@ -4124,6 +4140,7 @@ dependencies = [
  "either",
  "futures-io",
  "getrandom 0.2.17",
+ "indexmap",
  "memchr",
  "num-traits",
  "serde",
@@ -4134,6 +4151,7 @@ dependencies = [
  "thiserror",
  "time",
  "time-macros",
+ "toml",
  "tracing",
 ]
 
@@ -4172,7 +4190,10 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cargo-manifest",
  "clap",
+ "itertools",
+ "pathbuf",
  "which",
  "workspace-hack",
  "xshell",
