@@ -1,9 +1,10 @@
 //! Defines the API endpoints for the Night Vision server.
 
-use crate::{config::Config, env::Env, error::FatalError, log::logger};
+pub mod ctx;
+
+use crate::{api::ctx::ApiCtx, config::Config, env::Env, error::FatalError, log::logger};
 use dropshot::{HttpError, HttpResponseOk, RequestContext, ServerBuilder};
 use nv_server_api::{NvServerApi, Stub, nv_server_api_mod::api_description};
-use sea_orm::DatabaseConnection;
 
 /// The REST API interface.
 ///
@@ -38,29 +39,19 @@ impl RestApi {
 }
 
 // Implementation of the `NvServerApi` trait. This is where our actual endpoint handlers go.
+//
+// Note that the trait and relevant API types are defined in the `nv-server-api` crate.
 impl NvServerApi for RestApi {
     type Context = ApiCtx;
 
     async fn example_endpoint(
-        _ctx: RequestContext<Self::Context>,
+        ctx: RequestContext<Self::Context>,
     ) -> Result<HttpResponseOk<Stub>, HttpError> {
+        // This silences an unused warning on `ApiCtx::db`, which we need for now.
+        let _db = ctx.context().db();
+
         Ok(HttpResponseOk(Stub {
             name: "example".to_string(),
         }))
-    }
-}
-
-/// Shared app context, available to every endpoint handler.
-pub struct ApiCtx {
-    #[allow(unused)]
-    /// Handle to the database.
-    pub db: DatabaseConnection,
-}
-
-impl ApiCtx {
-    /// Try to initialize the application context.
-    async fn init(config: &Config) -> Result<Self, FatalError> {
-        let db = crate::db::connection(config).await?;
-        Ok(ApiCtx { db })
     }
 }
