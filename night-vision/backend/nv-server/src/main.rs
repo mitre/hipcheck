@@ -4,6 +4,7 @@ mod config;
 mod db;
 mod env;
 mod error;
+mod log;
 mod rt;
 
 /// Run the Night Vision server.

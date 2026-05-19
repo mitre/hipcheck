@@ -1904,6 +1904,7 @@ dependencies = [
  "itertools",
  "nv-server-api",
  "sea-orm",
+ "slog",
  "spookey",
  "tokio",
  "workspace-hack",

@@ -11,6 +11,7 @@ dropshot = { workspace = true }
 itertools = { workspace = true }
 nv-server-api = { workspace = true }
 sea-orm = { workspace = true }
+slog = { workspace = true }
 spookey = { workspace = true }
 tokio = { workspace = true }
 workspace-hack = { workspace = true }

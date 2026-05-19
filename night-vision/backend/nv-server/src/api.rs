@@ -1,9 +1,7 @@
 //! Defines the API endpoints for the Night Vision server.
 
-use crate::{config::Config, env::Env, error::FatalError};
-use dropshot::{
-    ConfigLogging, ConfigLoggingLevel, HttpError, HttpResponseOk, RequestContext, ServerBuilder,
-};
+use crate::{config::Config, env::Env, error::FatalError, log::logger};
+use dropshot::{HttpError, HttpResponseOk, RequestContext, ServerBuilder};
 use nv_server_api::{NvServerApi, Stub, nv_server_api_mod::api_description};
 use sea_orm::DatabaseConnection;
 
@@ -28,15 +26,7 @@ impl RestApi {
     pub async fn serve(self, env: &Env, config: &Config) -> Result<(), FatalError> {
         let api = self.0;
         let ctx = ApiCtx::init(&config).await?;
-
-        // TODO: Factor logger-setup into its own function. Currently waiting on dropshot#1607 [1].
-        //
-        // [1]: https://github.com/oxidecomputer/dropshot/issues/1607
-        let log = ConfigLogging::StderrTerminal {
-            level: ConfigLoggingLevel::Info,
-        }
-        .to_logger(env.bin_name())
-        .map_err(FatalError::FailedToInitializeLogger)?;
+        let log = logger(env)?;
 
         ServerBuilder::new(api, ctx, log)
             .config(config.dropshot_config()?)

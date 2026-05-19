@@ -16,6 +16,9 @@ sea-orm = { version = "2.0.0-rc", features = ["sqlx-postgres", "runtime-tokio-ru
 # See: https://github.com/oxidecomputer/dropshot/issues/1375
 schemars = "0.8.22"
 serde = { version = "1.0.228", features = ["derive"] }
+# This needs to be compatible with the version used by dropshot.
+# See: https://github.com/oxidecomputer/dropshot/issues/1607
+slog = "2.8.2"
 spookey = { path = "spookey" }
 tokio = { version = "1.52.1", features = ["fs", "io-util", "io-std", "net", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
 xshell = "0.2.7"
