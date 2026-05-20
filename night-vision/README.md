@@ -64,7 +64,7 @@ To get started with developing on Night Vision:
   After activating Flox, you'll have access to the latest version of Git, as
   provided by Flox. This initial install is only necessary to clone the Night
   Vision repository.
-- __Install Flox__: See the [Flox install guide] for more. Install Flox version
+- __Install Flox__: See our [Flox guide] for more. Install Flox version
   1.11.4 or later.
 - __Clone the Night Vision repository__: Run
   `git clone git@github.com:mitre/hipcheck.git`
@@ -95,6 +95,6 @@ and so neither does Flox. To use Flox on Windows, we recommend using WSL
 [Flox]: https://flox.dev/
 [Jujutsu]: https://github.com/jj-vcs/jj
 [Git install guide]: https://git-scm.com/install/
-[Flox install guide]: https://flox.dev/docs/install-flox/install/
+[Flox guide]: ./docs/project/flox.md
 [Nix]: https://nix.dev/
 [NPM]: https://www.npmjs.com/
