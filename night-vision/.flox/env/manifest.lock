@@ -3,6 +3,9 @@
   "manifest": {
     "schema-version": "1.11.0",
     "install": {
+      "cargo-audit": {
+        "pkg-path": "cargo-audit"
+      },
       "cargo-autoinherit": {
         "pkg-path": "cargo-autoinherit"
       },
@@ -11,6 +14,12 @@
       },
       "cargo-nextest": {
         "pkg-path": "cargo-nextest"
+      },
+      "cargo-outdated": {
+        "pkg-path": "cargo-outdated"
+      },
+      "cargo-udeps": {
+        "pkg-path": "cargo-udeps"
       },
       "git": {
         "pkg-path": "git"
@@ -39,6 +48,122 @@
     "options": {}
   },
   "packages": [
+    {
+      "attr_path": "cargo-audit",
+      "broken": false,
+      "derivation": "/nix/store/sm9hk4fn3rwxxjlgfa25x6ijds1f96x7-cargo-audit-0.22.1.drv",
+      "description": "Audit Cargo.lock files for crates with security vulnerabilities",
+      "install_id": "cargo-audit",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-audit-0.22.1",
+      "pname": "cargo-audit",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:10:22.201357Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.22.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/pp46ajc7wslgks5dbqdjn6pw5b0sn8wj-cargo-audit-0.22.1"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-audit",
+      "broken": false,
+      "derivation": "/nix/store/fq3rggmgxankl0x0v6359msr1g2r6lc2-cargo-audit-0.22.1.drv",
+      "description": "Audit Cargo.lock files for crates with security vulnerabilities",
+      "install_id": "cargo-audit",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-audit-0.22.1",
+      "pname": "cargo-audit",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:44:33.701574Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.22.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/1fvfnryrd8z1kzcinyxjaffx43726alx-cargo-audit-0.22.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-audit",
+      "broken": false,
+      "derivation": "/nix/store/jfqisrr97qnyx4mg0hfjj4rsr3ym3laq-cargo-audit-0.22.1.drv",
+      "description": "Audit Cargo.lock files for crates with security vulnerabilities",
+      "install_id": "cargo-audit",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-audit-0.22.1",
+      "pname": "cargo-audit",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:15:55.185695Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.22.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/9x8l24s3dwgr6bpaadkm5plqnai0l8jb-cargo-audit-0.22.1"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-audit",
+      "broken": false,
+      "derivation": "/nix/store/lqn0qsf7qc8a6zpnx7y0jjinkpcmg7wp-cargo-audit-0.22.1.drv",
+      "description": "Audit Cargo.lock files for crates with security vulnerabilities",
+      "install_id": "cargo-audit",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-audit-0.22.1",
+      "pname": "cargo-audit",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:52:10.918382Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.22.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/c9k5wjcq9y37aa12iggg7fcjy9kfhda9-cargo-audit-0.22.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
     {
       "attr_path": "cargo-autoinherit",
       "broken": false,
@@ -382,6 +507,238 @@
       ],
       "outputs": {
         "out": "/nix/store/h4x1f2sqjgs4qfbdhrsnb4d23bv0wiv6-cargo-nextest-0.9.133"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-outdated",
+      "broken": false,
+      "derivation": "/nix/store/yvpgb0w4pw7fxnf0v32hhyiif1jc6rq1-cargo-outdated-0.19.0.drv",
+      "description": "Cargo subcommand for displaying when Rust dependencies are out of date",
+      "install_id": "cargo-outdated",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-outdated-0.19.0",
+      "pname": "cargo-outdated",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:10:22.211705Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.19.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/pbclhxj468p8fqw61qhlbixymgidz52x-cargo-outdated-0.19.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-outdated",
+      "broken": false,
+      "derivation": "/nix/store/iw6zbpbzkq06f82sjk540gkp0c914ry4-cargo-outdated-0.19.0.drv",
+      "description": "Cargo subcommand for displaying when Rust dependencies are out of date",
+      "install_id": "cargo-outdated",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-outdated-0.19.0",
+      "pname": "cargo-outdated",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:44:33.713491Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.19.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/x2ds35q78p6aab4zbkprzikcj6nk72y2-cargo-outdated-0.19.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-outdated",
+      "broken": false,
+      "derivation": "/nix/store/c0w83j8la46s69zcdlz6my2bwj7w92db-cargo-outdated-0.19.0.drv",
+      "description": "Cargo subcommand for displaying when Rust dependencies are out of date",
+      "install_id": "cargo-outdated",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-outdated-0.19.0",
+      "pname": "cargo-outdated",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:15:55.195813Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.19.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/rvjfxhm9wrc92h3fw95gkv55q78fsikl-cargo-outdated-0.19.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-outdated",
+      "broken": false,
+      "derivation": "/nix/store/ci8hvhz0igz38d2cdm9lvakl7qahvx5s-cargo-outdated-0.19.0.drv",
+      "description": "Cargo subcommand for displaying when Rust dependencies are out of date",
+      "install_id": "cargo-outdated",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-outdated-0.19.0",
+      "pname": "cargo-outdated",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:52:10.930973Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.19.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/4gh60awfm7b9xbijw81g620m5sss1fg0-cargo-outdated-0.19.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-udeps",
+      "broken": false,
+      "derivation": "/nix/store/84qry7f5fxc0i4fykrg3ll96007vy6z5-cargo-udeps-0.1.61.drv",
+      "description": "Find unused dependencies in Cargo.toml",
+      "install_id": "cargo-udeps",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-udeps-0.1.61",
+      "pname": "cargo-udeps",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:10:22.217497Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.61",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/x721327qpylq4cvxv7nw6rhzng04j7i9-cargo-udeps-0.1.61"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-udeps",
+      "broken": false,
+      "derivation": "/nix/store/jzsb6xvrwkkhcabryvs9sv658363kzkb-cargo-udeps-0.1.61.drv",
+      "description": "Find unused dependencies in Cargo.toml",
+      "install_id": "cargo-udeps",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-udeps-0.1.61",
+      "pname": "cargo-udeps",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:44:33.720139Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.61",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/h67rvpl7i05j261k7ar47ab6bgg360lx-cargo-udeps-0.1.61"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-udeps",
+      "broken": false,
+      "derivation": "/nix/store/pl779i2bs3dsmsmz35b9yi095hzqk0j8-cargo-udeps-0.1.61.drv",
+      "description": "Find unused dependencies in Cargo.toml",
+      "install_id": "cargo-udeps",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-udeps-0.1.61",
+      "pname": "cargo-udeps",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:15:55.201387Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.61",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/7kyqjpcb298v0cs6m5v5i7l41p3qvwsm-cargo-udeps-0.1.61"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-udeps",
+      "broken": false,
+      "derivation": "/nix/store/b07dc99yf196llf03hybgmf89a6w5ssy-cargo-udeps-0.1.61.drv",
+      "description": "Find unused dependencies in Cargo.toml",
+      "install_id": "cargo-udeps",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "cargo-udeps-0.1.61",
+      "pname": "cargo-udeps",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:52:10.938842Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.61",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/4bjxb3nxqj0lazs9986c1lxlw9ysbd2b-cargo-udeps-0.1.61"
       },
       "system": "x86_64-linux",
       "group": "toplevel",

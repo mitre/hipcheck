@@ -1,0 +1,12 @@
+# Methods that are not permitted to be called anywhere in our codebase.
+disallowed-methods = [
+    # TODO: Add disallowed methods as we encounter them.
+]
+
+# Macros that are not permitted to be used anywhere in our codebase.
+[[disallowed-macros]]
+path = "tokio::main"
+reason = """\
+    `nv-server` should always use its own custom runtime initialization \
+    logic, rather than relying on what Tokio does by default.\
+"""

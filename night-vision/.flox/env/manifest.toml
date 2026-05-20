@@ -21,6 +21,9 @@ rustup.pkg-path = "rustup"
 sea-orm-cli.pkg-path = "sea-orm-cli"
 pgadmin4.pkg-path = "pgadmin4"
 cargo-hakari.pkg-path = "cargo-hakari"
+cargo-outdated.pkg-path = "cargo-outdated"
+cargo-udeps.pkg-path = "cargo-udeps"
+cargo-audit.pkg-path = "cargo-audit"
 
 
 ## Environment Variables ---------------------------------------------

@@ -1,12 +1,32 @@
+# ================================================================================================
+# Workspace Definition
+# ------------------------------------------------------------------------------------------------
+
 [workspace]
+
 resolver = "3"
 members = ["nv-server", "nv-server-api", "nvdb", "spookey", "workspace-hack", "xtask"]
 default-members = ["nv-server"]
 
+
+# ================================================================================================
+# Dependencies
+# ------------------------------------------------------------------------------------------------
+
+# We explicitly define all dependencies in the workspace-level `Cargo.toml`, using
+# `cargo-autoinherit` to move any crate-level deps definitions up here to the top-level. This
+# helps ensure we avoid desync in versions used for common dependencies across workspace crates.
+
 [workspace.dependencies]
+
 anyhow = "1.0.102"
 camino = "1.2.2"
 clap = { version = "4.6.1", features = ["string"] }
+# SECURITY: Note there are four known vulnerabilities in Dropshot 0.17.0 [1], but 0.18.0 (which
+# will include the fixes) has not been released yet. These vulnerabilities are likely low-risk for
+# us anyway, but they're worth fixing.
+#
+# [1]: https://github.com/oxidecomputer/dropshot/pull/1590#issuecomment-4503186241
 dropshot = "0.17.0"
 itertools = "0.14.0"
 nv-server-api = { path = "nv-server-api" }
@@ -26,6 +46,7 @@ cargo-manifest = "0.21.0"
 pathbuf = "1.0.0"
 
 [workspace.dependencies.tokio]
+
 version = "1.52.1"
 # TODO: Audit these features to see if we can make this list smaller.
 features = [
@@ -33,7 +54,358 @@ features = [
     "signal", "sync", "time"
 ]
 
+
+# ================================================================================================
+# `cargo-udeps` Configuration
+# ------------------------------------------------------------------------------------------------
+
+[workspace.metadata.cargo-udeps.ignore]
+
+# `workspace-hack` is purposefully unused, so don't warn about it.
+normal = ["workspace-hack"]
+
+
+# ================================================================================================
+# `cargo-autoinherit` Configuration
+# ------------------------------------------------------------------------------------------------
+
 [workspace.metadata.cargo-autoinherit]
+
 # Make sure autoinherit doesn't include the workspace-hack crate, since that crate technically
 # pulls in a bunch of transitive deps we don't want to unecessarily turn into direct deps.
 exclude-members = ["workspace-hack"]
+
+
+# ================================================================================================
+# LintingConfiguration
+# ------------------------------------------------------------------------------------------------
+
+[workspace.lints.rust]
+
+# Disallow all unsafe code.
+unsafe_code = "forbid"
+
+# Disallow version requirements in `Cargo.toml` files that don't fully enumerate the
+# `<MAJOR>.<MINOR>.<PATCH>` segments.
+implicit_minimum_version_req = "forbid"
+
+[workspace.lints.clippy]
+
+# Disallow integer (and integer-like) operations that can implicitly overflow.
+#
+# In debug mode, the Rust language guarantees that integer overflows panic. In release mode, they
+# currently will wrap around, but this behavior is not guaranteed. Moreover, while even
+# convention-defined wraparound is preferable to automatic undefined behavior, it's still a
+# potential source of serious bugs, and not something we should accept.
+#
+# This lint ensures Clippy complains loudly when operations of integer or integer-like types may
+# overflow, prompting us to apply the appropriate wrapper type from the Rust standard library to
+# select our desired behavior on overflow. The options are:
+#
+# - `std::num::Wrapping`: Wraps on overflow (values continue from the lowest possible value for the
+#   type).
+# - `std::num::Saturating`: Saturates on overflow (values becomes "saturated" at the highest
+#   possible value for the type).
+#
+# See: https://rust-lang.github.io/rust-clippy/master/index.html?search=overflow#arithmetic_side_effects
+# See: https://doc.rust-lang.org/reference/expressions/operator-expr.html#overflow
+arithmetic_side_effects = "deny"
+
+# Disallow as-conversions where the target type is implicit. Denying these conversions means all
+# `as` conversions must fully specify the target type, which helps ensure code is easier to audit
+# and that bad conversions don't slip into the codebase.
+as_understore = "deny"
+as_pointer_underscore = "deny"
+
+# Disallow as-conversions that aren't lossy but where there's a `From` impl that can be used
+# instead. This is a bit of defensive programming, to ensure that if a conversion ever becomes
+# lossy in the future to a type change, compilation will fail (because there are no `From` impls
+# for lossy conversions).
+cast_lossless = "deny"
+
+# Disallow as-conversions that may truncate the value. Use `TryFrom`/`TryInto` instead, to
+# explicitly handle the failure case and avoid silent data corruption or loss.
+cast_possible_truncation = "deny"
+
+# Disallow as-conversions that may wrap, for the same reason we ban implicit truncation.
+cast_possible_wrap = "deny"
+
+# Disallow as-conversions that can lose precision (meaning going from integer types to float types
+# where the float type can't exactly represent the integer). There may be times where this loss
+# of precision is unavoidable, but it should be opted into explicitly.
+cast_precision_loss = "deny"
+
+# Disallow as-conversions from a less strictly aligned pointer to a more strictly aligned pointer,
+# as the result of the conversion may be undefined behavior to dereference in the normal way.
+#
+# Mis-aligned pointers *can* be dereferenced in Rust, but only through specialty functions:
+# `std::ptr::read_unaligned` and `std::ptr::write_unaligned`.
+cast_ptr_alignment = "deny"
+
+# Disallow as-conversions from a signed to an unsigned integer type. Such a conversion causes
+# negative values to wrap to large positive values.
+cast_sign_loss = "deny"
+
+# Disallows casts in the context of bounds-checking a type. See the Clippy guide for a clearer and
+# more-correct alternative.
+#
+# See: https://rust-lang.github.io/rust-clippy/master/index.html?search=cast#checked_conversions
+checked_conversions = "deny"
+
+# Catch cases where you have a `Box<dyn Any>` and accidentally coerce the *`Box` itself* to a
+# `dyn Any` instead of accessing the existing `dyn Any` inside of the `Box`.
+coerce_container_to_any = "deny"
+
+# Disallow casting function pointers to integer types. This conversion is rarely what you want, but
+# is easy to do accidentally by mis-writing a different intended conversion.
+fn_to_numeric_cast_any = "deny"
+
+# Disallow comparison of just-converted-values which are inherently always true or false because
+# of the bounds on the converted-from type.
+invalid_upcast_comparisons = "deny"
+
+# Check for cases where a type is defined in one type but always cast to a different type before
+# being used.
+needless_type_cast = "deny"
+
+# Effectively disallow pointer as-casts. Use the `cast`, `cast_mut`, and `cast_const` methods on
+# pointer types instead, and use `std::ptr::null` or `std::ptr::null_mut` to materialize null
+# pointers.
+ptr_as_ptr = "deny"
+ptr_cast_constness = "deny"
+
+# Disallow casting a reference to a pointer. Use `std::ptr::from_ref` and `std::ptr::from_mut`.
+ref_as_ptr = "deny"
+
+# Disallow transmutes between pointer types, use casting methods instead.
+transmute_ptr_to_ptr = "deny"
+
+# Disallows `allow` annotations, requiring `expect`, which will produce a warning if a lint *stops*
+# triggering. This is good for catching improvements in lints over time, so we don't retain
+# lint-suppressions that are no longer needed.
+allow_attributes = "deny"
+
+# Disallow assertions with results that lose the actual result contents. They produce worse error
+# messages than `unwrap` or `unwrap_err`.
+assertions_on_result_states = "deny"
+
+# Disallow bool-to-int conversions done with an `if`. They're awkward and have a more ergonomic
+# alternative.
+bool_to_int_with_if = "deny"
+
+# Don't use ref-to-pointer coercions, since these can be subtly wrong. Use `&raw` instead.
+borrow_as_ptr = "deny"
+
+# Don't use `drain` just to clear a container. Use `clear`, which avoids building an iterator.
+clear_with_drain = "deny"
+
+# Don't use `cloned` on iterator or optionals when `copied` is available.
+cloned_instead_of_copied = "deny"
+
+# Don't permit if/else constructions that can be collapsed into `else if` branches.
+collapsible_else_if = "deny"
+
+# Warn on the use of the debug macro (we'll fail on clippy warnings in CI, so this helps ensure we
+# don't ship debug macro usage to production).
+dbg_macro = "warn"
+
+# Don't permit types that derive `PartialEq` without `Eq` when they could impl `Eq` too.
+derive_partial_eq_without_eq = "deny"
+
+# Disallow constructing `Duration` with smaller units when larger units are available.
+duration_suboptimal_units = "deny"
+
+# Disallow explicit lifetime names that can be replaced with elided lifetimes.
+elidable_lifetime_names = "deny"
+
+# Disallow importing enum variants without their enum type name.
+enum_glob_use = "deny"
+
+# Disallow `if let`s that can be expressed with equality.
+equatable_if_let = "deny"
+
+# Disallow standalone explicit `deref` and `deref_mut` calls.
+explicit_deref_methods = "deny"
+
+# Disallow for loops over `y.into_iter()` when you can just use `y`.
+explicit_into_iter_loop = "deny"
+
+# Disallow for loops over `y.iter()` when you can just use `&y`.
+explicit_iter_loop = "deny"
+
+# Disallow `filter_map().next()`, use `find_map()` instead.
+filter_map_next = "deny"
+
+# Disallow `Iterator::flat_map` where `Iterator::filter_map` can be used.
+flat_map_option = "deny"
+
+# Disallow negation in an `if` with an `else` branch.
+if_not_else = "deny"
+
+# Disallow `if` when `then` or `then_some` can be used.
+if_then_some_else_none = "deny"
+
+# Disallow using `_` in patterns when the type of the ignored value is `()`.
+ignored_unit_patterns = "deny"
+
+# Disallow methods that are implicitly clones, use `clone()` instead.
+implicit_clone = "deny"
+
+# Require explicit construction to always match the order of the fields' definitions.
+inconsistent_struct_constructor = "deny"
+
+# Check for inefficient uses of `ToString::to_string` on multi-reference types.
+inefficient_to_string = "deny"
+
+# Require trait bounds to be expressed with "where" clauses. This is done for consistency across
+# the codebase.
+inline_trait_bounds = "deny"
+
+# Disallow manually-defined IP address types when an alternative constant is available.
+ip_constant = "deny"
+
+# Disallow float literals that can't be precisely represented by their type.
+lossy_float_literal = "deny"
+
+# Disallow manual implementations of common standard library functions.
+manual_assert = "deny"
+manual_assert_eq = "deny"
+manual_ilog2 = "deny"
+manual_instant_elapsed = "deny"
+manual_is_power_of_two = "deny"
+manual_is_variant_and = "deny"
+manual_midpoint = "deny"
+manual_string_new = "deny"
+
+# Disallow confusing map constructs that can be replaced by simpler methods.
+map_unwrap_or = "deny"
+
+# Disallow matching on bools. Use if/else instead.
+match_bool = "deny"
+
+# Require length asserts before multiple array indexes, which hints to the compiler that it can
+# elide bounds checks.
+missing_asserts_for_indexing = "deny"
+
+# Disallow doing bitwise stuff for bools when you can use logical operators instead.
+needless_bitwise_bool = "deny"
+
+# Disallow needless collects when methods exist directly on an iterator.
+needless_collect = "deny"
+
+# Disallow for-each in favor of for loops. For loops offer more predictable control flow
+# affordances in the face of `?` early returns.
+needless_for_each = "deny"
+
+# Disallow excessive hashes around raw string literals.
+needless_raw_string_hashes = "deny"
+
+# Disallow raw strings that can be regular strings.
+needless_raw_strings = "deny"
+
+# Disallow `lazy_static` and `once_cell` since `std` has equivalent APIs now.
+non_std_lazy_statics = "deny"
+
+# Disallow conversions from `NonZero` types to regular integers, losing the non-zero hint.
+non_zero_suggestions = "deny"
+
+# Disallow nonminimal boolean conditionals.
+nonminimal_bool = "deny"
+
+# Disallow using non-standard braces on common macros.
+nonstandard_macro_braces = "deny"
+
+# Disallow inefficient option cloning.
+option_as_ref_cloned = "deny"
+
+# Disallow certain combinations of bitwise operations without parenthese to clarify precedence.
+precedence_bits = "deny"
+
+# Disallow offset pointer method with integer literals. Use `add` and `sub` instead.
+ptr_offset_by_literal = "deny"
+
+# Disallow range-minus-one and range-plus-one patterns.
+range_minus_one = "deny"
+range_plus_one = "deny"
+
+# Disallow redundant operations.
+redundant_clone = "deny"
+redundant_closure_for_method_calls = "deny"
+redundant_else = "deny"
+redundant_pub_crate = "deny"
+
+# Disallow `ref` pattern bindings that bind to a reference (creating a double reference).
+ref_binding_to_reference = "deny"
+
+# Disallow `..` in fully-enumerated structs.
+rest_pat_in_fully_bound_structs = "deny"
+
+# Disallow returning from `Option::and_then` or `Result::and_then`.
+return_and_then = "deny"
+
+# Disallow search followed by `is_some`. Use `any` or `contains` instead.
+search_is_some = "deny"
+
+# Disallow omitting the semicolon in a function with no return.
+semicolon_if_nothing_returned = "deny"
+
+# Require an underscore between a numeric literal's value and the type suffix.
+unseparated_literal_suffix = "deny"
+
+# Disallow single-char strings in search patterns. Use the `char` type instead.
+single_char_pattern = "deny"
+
+# Disallow `to_string` on `&str`. Use `to_owned` instead.
+str_to_string = "deny"
+
+# Disallow `.as_bytes()` on a string literal. Use a bytestring literal instead.
+string_lit_as_bytes = "deny"
+
+# Disallow `chars().any()` on a string literal. Use pattern matching instead.
+string_lit_chars_any = "deny"
+
+# Disallow inefficient floating point operations when faster standard-library alternatives exist.
+suboptimal_flops = "deny"
+
+# Require a short first line in doc comments.
+#
+# This plays nicely with how rustdoc produces documentation.
+too_long_first_doc_paragraph = "deny"
+
+# Disallow awkward use of `Err` constructor.
+try_err = "deny"
+
+# Disallow unchecked subtraction between time types.
+unchecked_time_subtraction = "deny"
+
+# Require all unicode in string literals to be in their NFC-recomposition form.
+unicode_not_nfc = "deny"
+
+# Require inlining of format args when possible.
+uninlined_format_args = "deny"
+
+# Disallow a number of unnecessary constructs where shorter alternatives exist.
+unnecessary_join = "deny"
+unnecessary_literal_bound = "deny"
+unnecessary_safety_comment = "deny"
+unnecessary_semicolon = "deny"
+unnecessary_struct_initialization = "deny"
+unnecessary_trailing_comma = "deny"
+
+# Require nested `|` patterns when possible.
+unnested_or_patterns = "deny"
+
+# Disallow gratiutous float rounding.
+unused_rounding = "deny"
+
+# Require `use Trait as _` when a trait is only imported for its methods.
+unused_trait_names = "deny"
+
+# Require use of `Self` rather than an explicit type name when possible.
+use_self = "deny"
+
+# Disallow wildcard imports. Import only the things you need to use.
+wildcard_imports = "deny"
+
+# Disallow format followed by pushing onto a string. Use `write!` instead.
+format_push_string = "deny"

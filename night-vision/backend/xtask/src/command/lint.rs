@@ -21,14 +21,13 @@ pub fn lint(_args: &ArgMatches) -> Result<()> {
 
 /// Run any checks we want to apply to package manifests.
 fn apply_checks(manifest: &Manifest, problems: &mut Vec<anyhow::Error>) -> Result<()> {
-    if let Some(pkg) = &manifest.package {
-        if pkg.can_publish() {
+    if let Some(pkg) = &manifest.package
+        && pkg.can_publish() {
             problems.push(anyhow!(
                 "'{}' does not have `publish = false` in its `Cargo.toml`",
                 pkg.name
             ));
         }
-    }
 
     Ok(())
 }

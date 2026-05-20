@@ -26,7 +26,7 @@ impl RestApi {
     /// causes the server to be unable to serve more requests.
     pub async fn serve(self, env: &Env, config: &Config) -> Result<(), FatalError> {
         let api = self.0;
-        let ctx = ApiCtx::init(&config).await?;
+        let ctx = ApiCtx::init(config).await?;
         let log = logger(env)?;
 
         ServerBuilder::new(api, ctx, log)
