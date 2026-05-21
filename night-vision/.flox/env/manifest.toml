@@ -24,6 +24,7 @@ cargo-hakari.pkg-path = "cargo-hakari"
 cargo-outdated.pkg-path = "cargo-outdated"
 cargo-udeps.pkg-path = "cargo-udeps"
 cargo-audit.pkg-path = "cargo-audit"
+graphviz.pkg-path = "graphviz"
 
 
 ## Environment Variables ---------------------------------------------

@@ -1,9 +1,10 @@
+use crate::workspace::get_workspace_path;
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_manifest::{Manifest, MaybeInherited, Publish};
 use clap::ArgMatches;
 use itertools::Itertools;
 use pathbuf::pathbuf;
-use std::{ops::Not, path::PathBuf};
+use std::ops::Not as _;
 
 pub fn lint(_args: &ArgMatches) -> Result<()> {
     let mut problems = vec![];
@@ -22,12 +23,13 @@ pub fn lint(_args: &ArgMatches) -> Result<()> {
 /// Run any checks we want to apply to package manifests.
 fn apply_checks(manifest: &Manifest, problems: &mut Vec<anyhow::Error>) -> Result<()> {
     if let Some(pkg) = &manifest.package
-        && pkg.can_publish() {
-            problems.push(anyhow!(
-                "'{}' does not have `publish = false` in its `Cargo.toml`",
-                pkg.name
-            ));
-        }
+        && pkg.can_publish()
+    {
+        problems.push(anyhow!(
+            "'{}' does not have `publish = false` in its `Cargo.toml`",
+            pkg.name
+        ));
+    }
 
     Ok(())
 }
@@ -59,15 +61,6 @@ fn get_workspace_manifests() -> Result<Vec<Manifest>> {
     }
 
     Ok(manifests)
-}
-
-/// Get the path to the root `Cargo.toml` of the workspace.
-fn get_workspace_path() -> Result<PathBuf> {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .ok_or_else(|| anyhow!("failed to get workspace root dir"))?
-        .to_owned();
-    Ok(root)
 }
 
 // Implementing this check as an extension trait for ergonomic reasons.

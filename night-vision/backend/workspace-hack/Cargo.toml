@@ -20,6 +20,7 @@ digest = { version = "0.10", features = ["mac", "std"] }
 either = { version = "1", features = ["serde", "use_std"] }
 futures-io = { version = "0.3" }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
+hashbrown = { version = "0.15" }
 indexmap = { version = "2", features = ["serde"] }
 memchr = { version = "2" }
 num-traits = { version = "0.2", default-features = false, features = ["i128", "std"] }
@@ -31,6 +32,7 @@ thiserror = { version = "2" }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing", "serde"] }
 toml = { version = "1", features = ["preserve_order"] }
 tracing = { version = "0.1", features = ["log"] }
+uuid = { version = "1", features = ["serde", "v4", "v7"] }
 
 [build-dependencies]
 either = { version = "1", features = ["serde", "use_std"] }

@@ -1,8 +1,9 @@
 pub mod command;
+pub mod workspace;
 
 use anyhow::Result;
-use clap::{Arg, Command};
-use std::process::ExitCode;
+use clap::{Arg, Command, value_parser};
+use std::{path::PathBuf, process::ExitCode};
 
 fn main() -> ExitCode {
     if let Err(e) = run() {
@@ -30,11 +31,34 @@ fn run() -> Result<()> {
                 ),
         )
         .subcommand(Command::new("lint").about("Lint crates in the workspace"))
+        .subcommand(
+            Command::new("unit-graph")
+                .about("Generate a unit graph visualizing Cargo builds (experimental)")
+                .long_about("\
+Generates a visualization of Cargo's \"unit graph\" (the individual codegen steps Cargo will take to complete a build)
+based on the output of the `--unit-graph` flag from Cargo.
+
+The `--unit-graph` flag is unstable, so you'll need to run 1) on nightly, and 2) use `-Z unstable-options`.
+Then you can pipe the output to `cargo xtask unit-graph`, using `-` to indicate you're reading from `stdin`.
+
+Invocations look like:
+
+$ cargo +nightly -Z unstable-options <BUILD_CMD> --unit-graph | cargo xtask unit-graph - \
+                    ")
+                .arg(
+                    Arg::new("input")
+                        .help("input file name or `-` to read from stdin")
+                        .default_value("-")
+                        .value_parser(value_parser!(PathBuf))
+                        .required(true),
+                ),
+        )
         .get_matches();
 
     match matches.subcommand() {
         Some(("add", cmd)) => command::add(cmd)?,
         Some(("lint", cmd)) => command::lint(cmd)?,
+        Some(("unit-graph", cmd)) => command::unit_graph(cmd)?,
         Some(_) => unimplemented!("unknown command"),
         None => {}
     }

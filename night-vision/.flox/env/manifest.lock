@@ -24,6 +24,9 @@
       "git": {
         "pkg-path": "git"
       },
+      "graphviz": {
+        "pkg-path": "graphviz"
+      },
       "jujutsu": {
         "pkg-path": "jujutsu"
       },
@@ -867,6 +870,124 @@
         "debug": "/nix/store/qyqya20z59d164d6692hlyb9pkq10ykk-git-2.53.0-debug",
         "doc": "/nix/store/vv1ap6qaxdzpa4jqg71myxh5wcvnlqv8-git-2.53.0-doc",
         "out": "/nix/store/c0277k5giric1mn9dklllavbzvxl6hzb-git-2.53.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "graphviz",
+      "broken": false,
+      "derivation": "/nix/store/9xwvlajcdh0gl5d8b67bhm5sn200ifxs-graphviz-12.2.1.drv",
+      "description": "Graph visualization tools",
+      "install_id": "graphviz",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "graphviz-12.2.1",
+      "pname": "graphviz",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:10:23.578722Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "12.2.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/yj8gmffm970dw3cnq199nhbjgn0m95mi-graphviz-12.2.1"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "graphviz",
+      "broken": false,
+      "derivation": "/nix/store/3ijjl82mdp650dxpb5f05rf2vyyx4ck0-graphviz-12.2.1.drv",
+      "description": "Graph visualization tools",
+      "install_id": "graphviz",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "graphviz-12.2.1",
+      "pname": "graphviz",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:44:36.312655Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "12.2.1",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/fhbcz1xn4nh6b4wvll65y2fzy68xyc1w-graphviz-12.2.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "graphviz",
+      "broken": false,
+      "derivation": "/nix/store/0882f8gzfid18fybqd1hb9iz7s8mrbqi-graphviz-12.2.1.drv",
+      "description": "Graph visualization tools",
+      "install_id": "graphviz",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "graphviz-12.2.1",
+      "pname": "graphviz",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:15:56.545420Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "12.2.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/a0cbx7w52x7yjh0jglw2fwh9qi5p53wh-graphviz-12.2.1"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "graphviz",
+      "broken": false,
+      "derivation": "/nix/store/pbp52ahq6gcjivs805zikdw5znkzbxam-graphviz-12.2.1.drv",
+      "description": "Graph visualization tools",
+      "install_id": "graphviz",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "graphviz-12.2.1",
+      "pname": "graphviz",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:52:13.666100Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "12.2.1",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/1jvl91vm30pwpxx64vmr0kpq4wpsx5sq-graphviz-12.2.1"
       },
       "system": "x86_64-linux",
       "group": "toplevel",
