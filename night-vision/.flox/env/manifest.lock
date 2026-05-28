@@ -5,7 +5,8 @@
     "install": {
       "cargo": {
         "pkg-path": "cargo",
-        "pkg-group": "rust-toolchain"
+        "pkg-group": "rust-toolchain",
+        "version": "1.95.0"
       },
       "cargo-audit": {
         "pkg-path": "cargo-audit"

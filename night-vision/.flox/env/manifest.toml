@@ -20,7 +20,16 @@ jujutsu = { pkg-path = "jujutsu" }
 # All "rust toolchain" pieces are installed into their own pkg-group, to ensure we're always using
 # compatible versions of the tools together. These are basically the things `rustup` would normally
 # manage for us.
-cargo = { pkg-path = "cargo", pkg-group = "rust-toolchain" }
+#
+# Note that we set the "version" here to ensure we're being precise about the version of the Rust
+# toolchain in use. The way that package groups work in Flox, this also ensures that *everything
+# else in the same package group (the "rust-toolchain" group) will use a compatible version with
+# Rust 1.95.0.
+#
+# Since we're managing toolchains with Flox, we will always have *some* delay in our ability to
+# adopt new Rust versions, since we have to wait for new releases to be packaged and published
+# to FloxHub.
+cargo = { pkg-path = "cargo", version = "1.95.0", pkg-group = "rust-toolchain" }
 # Note that we import this, even though it's technically already present as a dependency of
 # `cargo`, because in Nix packages don't inherently "export" their dependencies, so without this
 # import, `rustc` would be available to `cargo`, but not to anything else. This way, if we need to
