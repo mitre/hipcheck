@@ -219,7 +219,7 @@ It's possible in the future that we may want to enable users to perhaps upload
 bundles of their local project workspace (perhaps via a helper CLI), but doing
 so would involve substantial challenges and barriers to adoption. For example,
 it's doubtful many users would be comfortable potentially exporting highly
-sensitive intellectual property from their project ought to a third-party
+sensitive intellectual property from their project out to a third-party
 service. By comparison, a single package source file is much easier for a user
 to review and to strip of any sensitive IP.
 
