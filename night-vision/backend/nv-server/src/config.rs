@@ -5,6 +5,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use dropshot::{ConfigDropshot, HandlerTaskMode};
 use itertools::Itertools;
 use std::{
+    borrow::Cow,
     fmt::{Debug, Display},
     fs::File,
     io::BufReader,
@@ -249,7 +250,12 @@ impl Display for Config {
         }
 
         write_report_line!(f, "server-address", &self.server_address)?;
-        write_report_line!(f, "database-connection", &self.database_connection)?;
+
+        write_report_line!(
+            f,
+            "database-connection",
+            &redact_database_conn(&self.database_connection)
+        )?;
 
         if let Some(max_bytes) = self.http_request_body_max_bytes {
             write_report_line!(f, "http-request-body-max-bytes", &max_bytes)?;
@@ -323,6 +329,23 @@ impl Display for Config {
 
         Ok(())
     }
+}
+
+/// Redact the password from a database connection string.
+fn redact_database_conn(conn: &str) -> Cow<'_, str> {
+    let Some((scheme, rest)) = conn.split_once("://") else {
+        return Cow::Borrowed(conn);
+    };
+
+    let Some((userinfo, host_and_path)) = rest.split_once('@') else {
+        return Cow::Borrowed(conn);
+    };
+
+    let Some((user, _password)) = userinfo.rsplit_once(':') else {
+        return Cow::Borrowed(conn);
+    };
+
+    Cow::Owned(format!("{scheme}://{user}:<redacted>@{host_and_path}"))
 }
 
 /// Parse a value from the config map, returning `None` if the value is unset.
@@ -940,5 +963,29 @@ mod tests {
         };
         assert_eq!(&*parse_error.key, "server-address");
         assert_eq!(&*parse_error.value, "not an address");
+    }
+
+    #[test]
+    fn redact_database_conn_redacts_password() {
+        let conn = "postgres://nv-server:night-vision@postgres:5432/nv";
+
+        assert_eq!(
+            redact_database_conn(conn),
+            "postgres://nv-server:<redacted>@postgres:5432/nv"
+        );
+    }
+
+    #[test]
+    fn redact_database_conn_preserves_connection_without_password() {
+        let conn = "postgres://postgres:5432/nv";
+
+        assert_eq!(redact_database_conn(conn), conn);
+    }
+
+    #[test]
+    fn redact_database_conn_preserves_connection_without_userinfo() {
+        let conn = "postgres://localhost/nv";
+
+        assert_eq!(redact_database_conn(conn), conn);
     }
 }

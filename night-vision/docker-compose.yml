@@ -1,0 +1,100 @@
+x-common-service: &common-service
+  # Shared lifecycle, resource, and logging defaults for local development.
+  restart: unless-stopped
+  pull_policy: missing
+  stop_grace_period: 30s
+  cpus: 1.0
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  nv-server:
+    <<: *common-service
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: nv-server:local
+    labels:
+      org.opencontainers.image.source: "https://github.com/mitre/hipcheck/night-vision"
+      org.opencontainers.image.title: "Night Vision Server"
+      org.opencontainers.image.description: "Night Vision backend server"
+    init: true
+    mem_limit: 512m
+    read_only: true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_HOST: ${POSTGRES_HOST:?POSTGRES_HOST is required}
+      POSTGRES_PORT: ${POSTGRES_PORT:?POSTGRES_PORT is required}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      # TODO: When nv-server supports loading secrets via environment variables, remove this dynamic
+      #       config generation and use that instead.
+      - |
+        set -eu
+        {
+          echo 'server-address = "0.0.0.0:8080"'
+          echo "database-connection = \"postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@$${POSTGRES_HOST}:$${POSTGRES_PORT}/$${POSTGRES_DB}\""
+        } > /tmp/nv-server.compose.spookey
+        exec /usr/local/bin/nv-server --config /tmp/nv-server.compose.spookey
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error http://127.0.0.1:8080/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - public
+      - database
+
+  postgres:
+    <<: *common-service
+    # NOTE: Keep this version synced with the PostgreSQL version set in `.flox/env/manifest.toml`.
+    image: postgres:18.4
+    # The official image defines this user and can initialize a fresh volume without root.
+    user: postgres
+    labels:
+      org.opencontainers.image.source: "https://github.com/mitre/hipcheck/night-vision"
+      org.opencontainers.image.title: "Night Vision PostgreSQL"
+      org.opencontainers.image.description: "Night Vision development database"
+    mem_limit: 2g
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    healthcheck:
+      test:
+        ["CMD-SHELL", 'pg_isready -d "$${POSTGRES_DB}" -U "$${POSTGRES_USER}"']
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    volumes:
+      # PostgreSQL 18+ stores data in a major-versioned subdirectory under this path.
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - database
+
+volumes:
+  postgres-data:
+
+networks:
+  public:
+  database:
+    # Keep PostgreSQL reachable only by services attached to this Compose network.
+    internal: true

@@ -99,7 +99,7 @@ LABEL org.opencontainers.image.title="nv-server" \
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates \
+    && apt-get install --yes --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --home-dir /nonexistent --shell /usr/sbin/nologin nv-server \
     && mkdir -p /etc/night-vision

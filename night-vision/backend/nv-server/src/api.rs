@@ -4,7 +4,7 @@ pub mod ctx;
 
 use crate::{api::ctx::ApiCtx, config::Config, env::Env, error::FatalError, log::logger};
 use dropshot::{HttpError, HttpResponseOk, RequestContext, ServerBuilder};
-use nv_server_api::{NvServerApi, Stub, nv_server_api_mod::api_description};
+use nv_server_api::{Health, NvServerApi, nv_server_api_mod::api_description};
 
 /// The REST API interface.
 ///
@@ -44,14 +44,14 @@ impl RestApi {
 impl NvServerApi for RestApi {
     type Context = ApiCtx;
 
-    async fn example_endpoint(
+    async fn health(
         ctx: RequestContext<Self::Context>,
-    ) -> Result<HttpResponseOk<Stub>, HttpError> {
+    ) -> Result<HttpResponseOk<Health>, HttpError> {
         // This silences an unused warning on `ApiCtx::db`, which we need for now.
         let _db = ctx.context().db();
 
-        Ok(HttpResponseOk(Stub {
-            name: "example".to_string(),
+        Ok(HttpResponseOk(Health {
+            status: "ok".to_string(),
         }))
     }
 }

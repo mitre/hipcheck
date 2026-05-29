@@ -87,6 +87,20 @@ Unfortunately, [Nix] (which Flox uses under the hood) does not support Windows,
 and so neither does Flox. To use Flox on Windows, we recommend using WSL
 (the Windows Subsystem for Linux), which Flox supports.
 
+### Running with Docker Compose
+
+Copy `.env.example` to `.env`. The `.env` path is ignored by Git so local
+database connection settings and passwords are not committed.
+
+If you change `POSTGRES_DB`, `POSTGRES_USER`, or the Postgres password after
+the database volume has already been initialized, recreate the volume before
+starting Compose again:
+
+```sh
+docker compose down -v
+docker compose up --build
+```
+
 ## License
 
 

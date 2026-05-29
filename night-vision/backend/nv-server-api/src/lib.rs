@@ -8,14 +8,14 @@ pub trait NvServerApi {
 
     #[endpoint {
         method = GET,
-        path = "/example_endpoint",
+        path = "/health",
     }]
-    async fn example_endpoint(
+    async fn health(
         ctx: RequestContext<Self::Context>,
-    ) -> Result<HttpResponseOk<Stub>, HttpError>;
+    ) -> Result<HttpResponseOk<Health>, HttpError>;
 }
 
 #[derive(Serialize, JsonSchema)]
-pub struct Stub {
-    pub name: String,
+pub struct Health {
+    pub status: String,
 }
