@@ -75,6 +75,9 @@ postgresql_18 = { pkg-path = "postgresql_18" }
 sea-orm-cli = { pkg-path = "sea-orm-cli" }
 pgadmin4 = { pkg-path = "pgadmin4" }
 
+# GitLab CLI
+glab.pkg-path = "glab"
+
 [options]
 
 # Explicitly list the supported systems for our environment. This list was already implied, in that

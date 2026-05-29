@@ -43,6 +43,9 @@
       "graphviz": {
         "pkg-path": "graphviz"
       },
+      "glab": {
+        "pkg-path": "glab"
+      },
       "jujutsu": {
         "pkg-path": "jujutsu"
       },
@@ -1677,6 +1680,122 @@
       ],
       "outputs": {
         "out": "/nix/store/12rgns2296s4qcja778gvcbx61z77rc4-graphviz-12.2.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/33kzy40r6mxhg8zpix1jbr5fbq2f5xz4-glab-1.93.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "glab-1.93.0",
+      "pname": "glab",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:10:23.373736Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.93.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/9bb7i82yacnnqi7m3af0bivfg268jbvh-glab-1.93.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/1cayz6hxk289lljz7glcwi9xaxr8lgxd-glab-1.93.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "glab-1.93.0",
+      "pname": "glab",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T08:44:35.443355Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.93.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/xvwbvdpirfd9hz5kpxcrv1h29ialrlps-glab-1.93.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/gfry2y9zvjyqly8az15kn2rfz08dnima-glab-1.93.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "glab-1.93.0",
+      "pname": "glab",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:15:56.294153Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.93.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/3cybh6sb693w8rgk0ci1x7iwihlf97g5-glab-1.93.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/7gsvsfdxd98fvh8kar5kdswxyflxzhn6-glab-1.93.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "name": "glab-1.93.0",
+      "pname": "glab",
+      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "rev_count": 990025,
+      "rev_date": "2026-04-30T19:45:37Z",
+      "scrape_date": "2026-05-03T09:52:12.763123Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.93.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/dxn5gcfk241yyxslgzvax7y5bnpi6hbs-glab-1.93.0"
       },
       "system": "x86_64-linux",
       "group": "toplevel",
