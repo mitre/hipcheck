@@ -13,6 +13,7 @@ This is the internal documentation for the Night Vision project.
 
 - [AI Policy](./project/ai-policy.md)
 - [Dev Practices](./project/dev-practices.md)
+- [Flox](./project/flox.md)
 
 ## System Info
 
@@ -22,5 +23,6 @@ This is the internal documentation for the Night Vision project.
 
 - [Dev Tools](./backend/dev-tools.md)
 - [HTTP Error Codes](./backend/http-error-codes)
+- [Resolving Packages](./backend/resolving-packages.md)
 - [Rust Best Practices](./backend/rust-best-practices.md)
 - [Rust Error Handling](./backend/rust-error-handling.md)
