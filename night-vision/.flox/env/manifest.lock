@@ -14,6 +14,9 @@
       "cargo-autoinherit": {
         "pkg-path": "cargo-autoinherit"
       },
+      "cargo-chef": {
+        "pkg-path": "cargo-chef"
+      },
       "cargo-hakari": {
         "pkg-path": "cargo-hakari"
       },
@@ -914,6 +917,126 @@
       "priority": 5
     },
     {
+      "attr_path": "cargo-chef",
+      "broken": false,
+      "derivation": "/nix/store/ihpkbmwgahsjx05axsfj7bj91a9k6zai-cargo-chef-0.1.77.drv",
+      "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
+      "install_id": "cargo-chef",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
+      "name": "cargo-chef-0.1.77",
+      "pname": "cargo-chef",
+      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
+      "rev_count": 998534,
+      "rev_date": "2026-05-15T18:21:44Z",
+      "scrape_date": "2026-05-17T07:05:50.679966Z",
+      "stabilities": [
+        "unstable",
+        "staging"
+      ],
+      "unfree": false,
+      "version": "0.1.77",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/w3lw1rjwr6akl6shigpmfy414l7azl30-cargo-chef-0.1.77"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-chef",
+      "broken": false,
+      "derivation": "/nix/store/jb3kmjapca23hfqbqbq3fy23nf4h7wv1-cargo-chef-0.1.77.drv",
+      "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
+      "install_id": "cargo-chef",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
+      "name": "cargo-chef-0.1.77",
+      "pname": "cargo-chef",
+      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
+      "rev_count": 998534,
+      "rev_date": "2026-05-15T18:21:44Z",
+      "scrape_date": "2026-05-17T07:33:29.037786Z",
+      "stabilities": [
+        "unstable",
+        "staging"
+      ],
+      "unfree": false,
+      "version": "0.1.77",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/gwiwhx95d4g9naaw5d2sk5cfc1s3i9n3-cargo-chef-0.1.77"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-chef",
+      "broken": false,
+      "derivation": "/nix/store/8z9pmxy4v7h4kjvzi40nl6sxq1ird9aa-cargo-chef-0.1.77.drv",
+      "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
+      "install_id": "cargo-chef",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
+      "name": "cargo-chef-0.1.77",
+      "pname": "cargo-chef",
+      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
+      "rev_count": 998534,
+      "rev_date": "2026-05-15T18:21:44Z",
+      "scrape_date": "2026-05-17T08:01:17.205840Z",
+      "stabilities": [
+        "unstable",
+        "staging"
+      ],
+      "unfree": false,
+      "version": "0.1.77",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/y3kgb601vprj5liwdzlvjcznabkmks60-cargo-chef-0.1.77"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-chef",
+      "broken": false,
+      "derivation": "/nix/store/39llrds5zrj9rgczxsjbds5y380np40y-cargo-chef-0.1.77.drv",
+      "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
+      "install_id": "cargo-chef",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
+      "name": "cargo-chef-0.1.77",
+      "pname": "cargo-chef",
+      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
+      "rev_count": 998534,
+      "rev_date": "2026-05-15T18:21:44Z",
+      "scrape_date": "2026-05-17T08:32:09.237993Z",
+      "stabilities": [
+        "unstable",
+        "staging"
+      ],
+      "unfree": false,
+      "version": "0.1.77",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/06387pr994rg44lk9czsdxf5p4nvbk0c-cargo-chef-0.1.77"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "cargo-hakari",
       "broken": false,
       "derivation": "/nix/store/l72bds42v0x4a099abii318x5arn5ann-cargo-hakari-0.9.38.drv",
@@ -1692,15 +1815,16 @@
       "description": "GitLab CLI tool bringing GitLab to your command line",
       "install_id": "glab",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
       "name": "glab-1.93.0",
       "pname": "glab",
-      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
-      "rev_count": 990025,
-      "rev_date": "2026-04-30T19:45:37Z",
-      "scrape_date": "2026-05-03T08:10:23.373736Z",
+      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
+      "rev_count": 998534,
+      "rev_date": "2026-05-15T18:21:44Z",
+      "scrape_date": "2026-05-17T07:05:51.857427Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "1.93.0",
@@ -1721,15 +1845,16 @@
       "description": "GitLab CLI tool bringing GitLab to your command line",
       "install_id": "glab",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
       "name": "glab-1.93.0",
       "pname": "glab",
-      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
-      "rev_count": 990025,
-      "rev_date": "2026-04-30T19:45:37Z",
-      "scrape_date": "2026-05-03T08:44:35.443355Z",
+      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
+      "rev_count": 998534,
+      "rev_date": "2026-05-15T18:21:44Z",
+      "scrape_date": "2026-05-17T07:33:30.678793Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "1.93.0",
@@ -1750,15 +1875,16 @@
       "description": "GitLab CLI tool bringing GitLab to your command line",
       "install_id": "glab",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
       "name": "glab-1.93.0",
       "pname": "glab",
-      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
-      "rev_count": 990025,
-      "rev_date": "2026-04-30T19:45:37Z",
-      "scrape_date": "2026-05-03T09:15:56.294153Z",
+      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
+      "rev_count": 998534,
+      "rev_date": "2026-05-15T18:21:44Z",
+      "scrape_date": "2026-05-17T08:01:18.338690Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "1.93.0",
@@ -1779,15 +1905,16 @@
       "description": "GitLab CLI tool bringing GitLab to your command line",
       "install_id": "glab",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=15f4ee454b1dce334612fa6843b3e05cf546efab",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
       "name": "glab-1.93.0",
       "pname": "glab",
-      "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
-      "rev_count": 990025,
-      "rev_date": "2026-04-30T19:45:37Z",
-      "scrape_date": "2026-05-03T09:52:12.763123Z",
+      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
+      "rev_count": 998534,
+      "rev_date": "2026-05-15T18:21:44Z",
+      "scrape_date": "2026-05-17T08:32:11.075224Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "1.93.0",

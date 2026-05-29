@@ -26,6 +26,8 @@ jujutsu = { pkg-path = "jujutsu" }
 # else in the same package group (the "rust-toolchain" group) will use a compatible version with
 # Rust 1.95.0.
 #
+# NOTE: Keep this Rust version in sync with the version set in `backend/Dockerfile`.
+#
 # Since we're managing toolchains with Flox, we will always have *some* delay in our ability to
 # adopt new Rust versions, since we have to wait for new releases to be packaged and published
 # to FloxHub.
@@ -76,7 +78,10 @@ sea-orm-cli = { pkg-path = "sea-orm-cli" }
 pgadmin4 = { pkg-path = "pgadmin4" }
 
 # GitLab CLI
-glab.pkg-path = "glab"
+glab = { pkg-path = "glab" }
+
+# NOTE: Keep the version of this synced with the version in `backend/Dockerfile`.
+cargo-chef = { pkg-path = "cargo-chef", version = "0.1.77" }
 
 [options]
 
