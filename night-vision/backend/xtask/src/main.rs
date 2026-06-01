@@ -38,12 +38,14 @@ fn run() -> Result<()> {
 Generates a visualization of Cargo's \"unit graph\" (the individual codegen steps Cargo will take to complete a build)
 based on the output of the `--unit-graph` flag from Cargo.
 
-The `--unit-graph` flag is unstable, so you'll need to run 1) on nightly, and 2) use `-Z unstable-options`.
+The `--unit-graph` flag is unstable, but this project uses a pinned stable toolchain rather than Cargo nightly.
+Use `RUSTC_BOOTSTRAP=1` with `-Z unstable-options` to enable the unstable Cargo flags for this invocation.
+`RUSTC_BOOTSTRAP` is itself a permanently-unstable escape hatch, so use it only for this kind of narrow tooling command.
 Then you can pipe the output to `cargo xtask unit-graph`, using `-` to indicate you're reading from `stdin`.
 
 Invocations look like:
 
-$ cargo +nightly -Z unstable-options <BUILD_CMD> --unit-graph | cargo xtask unit-graph - \
+$ RUSTC_BOOTSTRAP=1 cargo -Z unstable-options <BUILD_CMD> --unit-graph | cargo xtask unit-graph - \
                     ")
                 .arg(
                     Arg::new("input")
