@@ -585,6 +585,175 @@ mod tests {
         .join("\n")
     }
 
+    struct ConfigFieldParseCase {
+        name: &'static str,
+        server_address: &'static str,
+        database_connection: &'static str,
+        extra_config: &'static str,
+        assert: fn(&Config, &Utf8Path),
+    }
+
+    impl ConfigFieldParseCase {
+        fn new(
+            name: &'static str,
+            extra_config: &'static str,
+            assert: fn(&Config, &Utf8Path),
+        ) -> Self {
+            Self {
+                name,
+                server_address: "127.0.0.1:0",
+                database_connection: "sqlite::memory:",
+                extra_config,
+                assert,
+            }
+        }
+
+        fn with_server_address(mut self, server_address: &'static str) -> Self {
+            self.server_address = server_address;
+            self
+        }
+
+        fn with_database_connection(mut self, database_connection: &'static str) -> Self {
+            self.database_connection = database_connection;
+            self
+        }
+
+        fn contents(&self) -> String {
+            [
+                format!("server-address = {}", self.server_address),
+                format!("database-connection = {}", self.database_connection),
+                self.extra_config.to_string(),
+            ]
+            .join("\n")
+        }
+    }
+
+    #[test]
+    fn parses_every_config_field_from_spookey_config() {
+        let cases = [
+            ConfigFieldParseCase::new("config_file_path", "", |config, path| {
+                assert_eq!(config.config_file_path, path);
+            }),
+            ConfigFieldParseCase::new("server_address", "", |config, _| {
+                assert_eq!(config.server_address, "0.0.0.0:9000");
+            })
+            .with_server_address("0.0.0.0:9000"),
+            ConfigFieldParseCase::new(
+                "http_request_body_max_bytes",
+                "http-request-body-max-bytes = 2048",
+                |config, _| {
+                    assert_eq!(config.http_request_body_max_bytes, Some(2048));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "http_early_disconnect_behavior",
+                "http-early-disconnect-behavior = cancel",
+                |config, _| {
+                    assert!(matches!(
+                        config.http_early_disconnect_behavior,
+                        Some(EarlyDisconnectBehavior::Cancel)
+                    ));
+                },
+            ),
+            ConfigFieldParseCase::new("database_connection", "", |config, _| {
+                assert_eq!(config.database_connection, "postgres://localhost:5432/nv");
+            })
+            .with_database_connection("postgres://localhost:5432/nv"),
+            ConfigFieldParseCase::new(
+                "database_max_connections",
+                "database-max-connections = 25",
+                |config, _| {
+                    assert_eq!(config.database_max_connections, Some(25));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "database_min_connections",
+                "database-min-connections = 5",
+                |config, _| {
+                    assert_eq!(config.database_min_connections, Some(5));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "database_connect_timeout",
+                "database-connect-timeout = 1000",
+                |config, _| {
+                    assert_eq!(config.database_connect_timeout, Some(1000));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "database_idle_timeout",
+                "database-idle-timeout = 2000",
+                |config, _| {
+                    assert_eq!(config.database_idle_timeout, Some(2000));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "database_acquire_timeout",
+                "database-acquire-timeout = 3000",
+                |config, _| {
+                    assert_eq!(config.database_acquire_timeout, Some(3000));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "database_max_lifetime",
+                "database-max-lifetime = 4000",
+                |config, _| {
+                    assert_eq!(config.database_max_lifetime, Some(4000));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "async_worker_threads",
+                "async-worker-threads = 8",
+                |config, _| {
+                    assert_eq!(config.async_worker_threads, Some(8));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "async_worker_thread_stack_size",
+                "async-worker-thread-stack-size = 2097152",
+                |config, _| {
+                    assert_eq!(config.async_worker_thread_stack_size, Some(2_097_152));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "async_max_blocking_threads",
+                "async-max-blocking-threads = 64",
+                |config, _| {
+                    assert_eq!(config.async_max_blocking_threads, Some(64));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "async_blocking_thread_keep_alive",
+                "async-blocking-thread-keep-alive = 5000",
+                |config, _| {
+                    assert_eq!(config.async_blocking_thread_keep_alive, Some(5000));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "async_global_queue_interval",
+                "async-global-queue-interval = 31",
+                |config, _| {
+                    assert_eq!(config.async_global_queue_interval, Some(31));
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "async_event_interval",
+                "async-event-interval = 61",
+                |config, _| {
+                    assert_eq!(config.async_event_interval, Some(61));
+                },
+            ),
+        ];
+
+        for case in cases {
+            let file = TempConfigFile::new(&case.contents());
+            let config = Config::parse(file.path())
+                .unwrap_or_else(|error| panic!("{} should parse: {error}", case.name));
+
+            (case.assert)(&config, file.path());
+        }
+    }
+
     #[test]
     fn parses_required_and_optional_values_from_spookey_config() {
         let file = TempConfigFile::new(&format!(
@@ -605,6 +774,60 @@ mod tests {
             Some(EarlyDisconnectBehavior::Continue)
         ));
         assert_eq!(config.async_event_interval, Some(17));
+    }
+
+    #[test]
+    fn invalid_typed_field_values_are_returned_as_str_parse_config_errors() {
+        let cases = [
+            ("http-request-body-max-bytes", "many", "invalid digit"),
+            (
+                "http-early-disconnect-behavior",
+                "detach",
+                "invalid early disconnect behavior",
+            ),
+            ("database-max-connections", "many", "invalid digit"),
+            ("database-min-connections", "few", "invalid digit"),
+            ("database-connect-timeout", "soon", "invalid digit"),
+            ("database-idle-timeout", "later", "invalid digit"),
+            ("database-acquire-timeout", "eventually", "invalid digit"),
+            ("database-max-lifetime", "forever", "invalid digit"),
+            ("async-worker-threads", "several", "invalid digit"),
+            ("async-worker-thread-stack-size", "large", "invalid digit"),
+            ("async-max-blocking-threads", "lots", "invalid digit"),
+            (
+                "async-blocking-thread-keep-alive",
+                "briefly",
+                "invalid digit",
+            ),
+            ("async-global-queue-interval", "sometimes", "invalid digit"),
+            ("async-event-interval", "often", "invalid digit"),
+        ];
+
+        for (key, value, expected_error) in cases {
+            let file =
+                TempConfigFile::new(&format!("{}\n{} = {}", valid_required_config(), key, value,));
+
+            let error =
+                Config::parse(file.path()).expect_err(&format!("{key} = {value} should fail"));
+
+            let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+            else {
+                panic!("expected FailedToParseConfigFileFields, got {error:?}");
+            };
+
+            assert_eq!(error_path, file.path);
+            assert_eq!(errors.len(), 1);
+            let ConfigError::StrParse(parse_error) = &errors[0] else {
+                panic!("expected StrParse config error, got {:?}", errors[0]);
+            };
+            assert_eq!(&*parse_error.key, key);
+            assert_eq!(&*parse_error.value, value);
+            assert!(
+                parse_error.err.contains(expected_error),
+                "expected parse error for {key} to contain {expected_error:?}, got {:?}",
+                parse_error.err
+            );
+        }
     }
 
     #[test]
