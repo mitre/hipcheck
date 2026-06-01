@@ -379,3 +379,188 @@ impl Display for WarningKind {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        error::Error as _,
+        io::{self, BufReader, Cursor, Read},
+    };
+
+    use super::*;
+
+    fn parse_str(config: ParseConfig, document: &str) -> Result<ParseResult, Error> {
+        parse(config, BufReader::new(Cursor::new(document)))
+    }
+
+    #[test]
+    fn missing_required_keys_returns_missing_required_fields_error() {
+        let error = parse_str(
+            ParseConfig {
+                required_keys: vec!["host", "port"],
+                optional_keys: vec![],
+            },
+            "host = localhost\n",
+        )
+        .expect_err("missing required key should be a fatal parse error");
+
+        let Error::MissingRequiredFields(fields) = error else {
+            panic!("expected MissingRequiredFields, got {error:?}");
+        };
+
+        assert_eq!(&*fields, &["port"]);
+    }
+
+    #[test]
+    fn missing_required_keys_ignores_empty_values() {
+        let error = parse_str(
+            ParseConfig {
+                required_keys: vec!["host"],
+                optional_keys: vec![],
+            },
+            "host = \n",
+        )
+        .expect_err("empty required key value should count as missing");
+
+        let Error::MissingRequiredFields(fields) = error else {
+            panic!("expected MissingRequiredFields, got {error:?}");
+        };
+
+        assert_eq!(&*fields, &["host"]);
+    }
+
+    #[test]
+    fn io_errors_are_returned_as_io_errors_with_source() {
+        #[derive(Debug)]
+        struct BrokenReader;
+
+        impl Read for BrokenReader {
+            fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
+                Err(io::Error::new(io::ErrorKind::PermissionDenied, "denied"))
+            }
+        }
+
+        let error = parse(
+            ParseConfig {
+                required_keys: vec![],
+                optional_keys: vec![],
+            },
+            BufReader::new(BrokenReader),
+        )
+        .expect_err("reader I/O failure should be a fatal parse error");
+
+        let Error::Io(io_error) = &error else {
+            panic!("expected Io, got {error:?}");
+        };
+
+        assert_eq!(io_error.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(io_error.to_string(), "denied");
+        assert!(error.source().is_some());
+    }
+
+    #[test]
+    fn duplicate_required_key_returns_warning_and_uses_new_value() {
+        let result = parse_str(
+            ParseConfig {
+                required_keys: vec!["host"],
+                optional_keys: vec![],
+            },
+            "host = old\nhost = new\n",
+        )
+        .expect("duplicate key is a warning, not a fatal parse error");
+
+        assert_eq!(
+            result.required_keys.get("host").map(String::as_str),
+            Some("new")
+        );
+        assert_eq!(result.warnings.len(), 1);
+
+        let warning = &result.warnings[0];
+        assert_eq!(warning.line_number, 2);
+        let WarningKind::KeySetMoreThanOnce {
+            key,
+            prior_value,
+            new_value,
+            second_line_number,
+        } = &warning.kind
+        else {
+            panic!("expected KeySetMoreThanOnce, got {warning:?}");
+        };
+
+        assert_eq!(&**key, "host");
+        assert_eq!(&**prior_value, "old");
+        assert_eq!(&**new_value, "new");
+        assert_eq!(*second_line_number, 2);
+    }
+
+    #[test]
+    fn duplicate_optional_key_returns_warning_and_uses_new_value() {
+        let result = parse_str(
+            ParseConfig {
+                required_keys: vec![],
+                optional_keys: vec!["theme"],
+            },
+            "theme = light\ntheme = dark\n",
+        )
+        .expect("duplicate optional key is a warning, not a fatal parse error");
+
+        assert_eq!(
+            result
+                .optional_keys
+                .get("theme")
+                .and_then(|value| value.as_deref()),
+            Some("dark")
+        );
+        assert_eq!(result.warnings.len(), 1);
+
+        let WarningKind::KeySetMoreThanOnce {
+            key,
+            prior_value,
+            new_value,
+            second_line_number,
+        } = &result.warnings[0].kind
+        else {
+            panic!("expected KeySetMoreThanOnce, got {:?}", result.warnings[0]);
+        };
+
+        assert_eq!(&**key, "theme");
+        assert_eq!(&**prior_value, "light");
+        assert_eq!(&**new_value, "dark");
+        assert_eq!(*second_line_number, 2);
+    }
+
+    #[test]
+    fn invalid_lines_are_returned_as_warnings() {
+        let result = parse_str(
+            ParseConfig {
+                required_keys: vec![],
+                optional_keys: vec!["known"],
+            },
+            "not key value\n= value\nunknown = value\nknown = set\n",
+        )
+        .expect("invalid lines should be warnings when no required keys are missing");
+
+        assert_eq!(result.warnings.len(), 3);
+
+        let WarningKind::LineNotKeyValueFormat { line } = &result.warnings[0].kind else {
+            panic!(
+                "expected LineNotKeyValueFormat, got {:?}",
+                result.warnings[0]
+            );
+        };
+        assert_eq!(result.warnings[0].line_number, 1);
+        assert_eq!(&**line, "not key value");
+
+        let WarningKind::MissingKey { value } = &result.warnings[1].kind else {
+            panic!("expected MissingKey, got {:?}", result.warnings[1]);
+        };
+        assert_eq!(result.warnings[1].line_number, 2);
+        assert_eq!(&**value, "value");
+
+        let WarningKind::UnexpectedKey { key } = &result.warnings[2].kind else {
+            panic!("expected UnexpectedKey, got {:?}", result.warnings[2]);
+        };
+        assert_eq!(result.warnings[2].line_number, 3);
+        assert_eq!(&**key, "unknown");
+    }
+}

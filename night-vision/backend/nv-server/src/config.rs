@@ -532,3 +532,190 @@ impl Display for ConfigErrors {
 }
 
 impl std::error::Error for ConfigErrors {}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+
+    use super::*;
+
+    static TEST_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    struct TempConfigFile {
+        path: Utf8PathBuf,
+    }
+
+    impl TempConfigFile {
+        fn new(contents: &str) -> Self {
+            let id = TEST_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "nv-server-config-test-{}-{id}.spookey",
+                std::process::id()
+            ));
+            fs::write(&path, contents).expect("failed to write test config file");
+
+            Self {
+                path: Utf8PathBuf::from_path_buf(path)
+                    .expect("test temp path should be valid UTF-8"),
+            }
+        }
+
+        fn path(&self) -> &Utf8Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TempConfigFile {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+
+    fn valid_required_config() -> String {
+        [
+            // The port here is irrelevant; we're not making real connections in these tests.
+            "server-address = 127.0.0.1:0",
+            // We don't actually use sqlite; but we're not making real DB connections in these
+            // tests, only validating that we can parse the config field correctly.
+            "database-connection = sqlite::memory:",
+        ]
+        .join("\n")
+    }
+
+    #[test]
+    fn parses_required_and_optional_values_from_spookey_config() {
+        let file = TempConfigFile::new(&format!(
+            "{}\n{}\n{}\n{}",
+            valid_required_config(),
+            "http-request-body-max-bytes = 2048",
+            "http-early-disconnect-behavior = continue",
+            "async-event-interval = 17",
+        ));
+
+        let config = Config::parse(file.path()).expect("config should parse");
+
+        assert_eq!(config.server_address, "127.0.0.1:0");
+        assert_eq!(config.database_connection, "sqlite::memory:");
+        assert_eq!(config.http_request_body_max_bytes, Some(2048));
+        assert!(matches!(
+            config.http_early_disconnect_behavior,
+            Some(EarlyDisconnectBehavior::Continue)
+        ));
+        assert_eq!(config.async_event_interval, Some(17));
+    }
+
+    #[test]
+    fn missing_config_file_returns_open_config_file_error() {
+        let path = Utf8PathBuf::from(format!(
+            "/tmp/nv-server-missing-config-test-{}-{}.spookey",
+            std::process::id(),
+            TEST_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+
+        let error = Config::parse(&path).expect_err("missing config file should fail");
+
+        let FatalError::FailedToOpenConfigFile(error_path, io_error) = error else {
+            panic!("expected FailedToOpenConfigFile, got {error:?}");
+        };
+
+        assert_eq!(error_path, path);
+        assert_eq!(io_error.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn missing_required_key_returns_spookey_parse_error() {
+        let file = TempConfigFile::new("server-address = 127.0.0.1:0\n");
+
+        let error = Config::parse(file.path()).expect_err("missing required key should fail");
+
+        let FatalError::FailedToParseConfigFile(error_path, spookey_error) = error else {
+            panic!("expected FailedToParseConfigFile, got {error:?}");
+        };
+
+        assert_eq!(error_path, file.path);
+        let spookey::Error::MissingRequiredFields(fields) = spookey_error else {
+            panic!("expected MissingRequiredFields, got {spookey_error:?}");
+        };
+        assert_eq!(&*fields, &["database-connection"]);
+    }
+
+    #[test]
+    fn spookey_warnings_are_returned_as_config_field_errors() {
+        let file = TempConfigFile::new(&format!(
+            "{}\n{}",
+            valid_required_config(),
+            "unexpected-key = value",
+        ));
+
+        let error =
+            Config::parse(file.path()).expect_err("unexpected key should fail config parse");
+
+        let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+        else {
+            panic!("expected FailedToParseConfigFileFields, got {error:?}");
+        };
+
+        assert_eq!(error_path, file.path);
+        assert_eq!(errors.len(), 1);
+        let ConfigError::Warning(warning) = &errors[0] else {
+            panic!("expected Warning config error, got {:?}", errors[0]);
+        };
+        assert_eq!(warning.line_number, 3);
+        let spookey::WarningKind::UnexpectedKey { key } = &warning.kind else {
+            panic!("expected UnexpectedKey warning, got {warning:?}");
+        };
+        assert_eq!(&**key, "unexpected-key");
+    }
+
+    #[test]
+    fn invalid_field_value_is_returned_as_str_parse_config_error() {
+        let file = TempConfigFile::new(&format!(
+            "{}\n{}",
+            valid_required_config(),
+            "database-max-connections = many",
+        ));
+
+        let error = Config::parse(file.path()).expect_err("invalid typed value should fail");
+
+        let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+        else {
+            panic!("expected FailedToParseConfigFileFields, got {error:?}");
+        };
+
+        assert_eq!(error_path, file.path);
+        assert_eq!(errors.len(), 1);
+        let ConfigError::StrParse(parse_error) = &errors[0] else {
+            panic!("expected StrParse config error, got {:?}", errors[0]);
+        };
+        assert_eq!(&*parse_error.key, "database-max-connections");
+        assert_eq!(&*parse_error.value, "many");
+        assert!(parse_error.err.contains("invalid digit"));
+    }
+
+    #[test]
+    fn dropshot_config_returns_field_error_for_invalid_server_address() {
+        let file = TempConfigFile::new(&valid_required_config());
+        let mut config = Config::parse(file.path()).expect("config should parse");
+        config.server_address = "not an address".to_string();
+
+        let error = config
+            .dropshot_config()
+            .expect_err("invalid dropshot bind address should fail");
+
+        let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+        else {
+            panic!("expected FailedToParseConfigFileFields, got {error:?}");
+        };
+
+        assert_eq!(error_path, file.path);
+        assert_eq!(errors.len(), 1);
+        let ConfigError::StrParse(parse_error) = &errors[0] else {
+            panic!("expected StrParse config error, got {:?}", errors[0]);
+        };
+        assert_eq!(&*parse_error.key, "server-address");
+        assert_eq!(&*parse_error.value, "not an address");
+    }
+}
