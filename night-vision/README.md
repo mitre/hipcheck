@@ -65,7 +65,7 @@ To get started with developing on Night Vision:
   provided by Flox. This initial install is only necessary to clone the Night
   Vision repository.
 - __Install Flox__: See our [Flox guide] for more. Install Flox version
-  1.11.4 or later.
+  1.12.0 or later.
 - __Clone the Night Vision repository__: Run
   `git clone git@github.com:mitre/hipcheck.git`
 - __Activate Flox__: Inside the new `night-vision/` folder, run `flox activate`.

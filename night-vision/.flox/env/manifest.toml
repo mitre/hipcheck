@@ -67,7 +67,7 @@ graphviz = { pkg-path = "graphviz" }
 
 ## Frontend Tools
 
-pnpm = { pkg-path = "pnpm" }
+pnpm = { pkg-path = "pnpm", version = "11.4.0" }
 
 ## Database Stuff
 

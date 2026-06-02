@@ -29,7 +29,7 @@ certificate guidance is in [docs/project/flox.md](docs/project/flox.md).
 At a high level:
 
 1. Install Git.
-2. Install Flox version 1.11.4 or later.
+2. Install Flox version 1.12.0 or later.
 3. Clone the repository:
 
    ```sh
