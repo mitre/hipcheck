@@ -38,3 +38,27 @@ time, including by keeping compile times reasonable.
 Night Vision's database of choice is PostgreSQL version 18. Make sure to
 install PostgreSQL locally for development. We also recommend installing
 pgAdmin if you want a GUI for inspecting the database.
+
+## Secret Configuration
+
+`nv-server` supports database connection secrets through the server
+configuration file. For local development without credentials, it is acceptable
+to use `database-connection` directly:
+
+```spookey
+database-connection = "postgres://localhost:5432/nv"
+```
+
+For deployed environments, prefer `database-connection-file`:
+
+```spookey
+database-connection-file = "/run/secrets/nv-server/database-url"
+```
+
+The secret file must contain exactly one line with the full database connection
+string. On Unix systems, the file must not grant any group or world
+permissions; use mode `0600` or stricter.
+
+Startup config output intentionally redacts both inline secret values and
+file-backed secret paths. If secret loading fails, the startup error may name
+the secret file path, but it must not print the secret value.

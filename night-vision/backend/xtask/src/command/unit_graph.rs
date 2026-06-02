@@ -307,9 +307,8 @@ impl Workspace {
             let local_prefix = format!("path+file://{}/", self.workspace_root_dir.display());
 
             let pkg_id = node.pkg_id.replace(crates_io_prefix, "crates.io:");
-            let pkg_id = pkg_id.replace(&local_prefix, "local:");
 
-            pkg_id
+            pkg_id.replace(&local_prefix, "local:")
         });
         write_field!(
             &mut out,

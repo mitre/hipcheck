@@ -50,6 +50,7 @@ uuid = "1.18.1"
 which = "8.0.2"
 workspace-hack = { path = "workspace-hack" }
 xshell = "0.2.7"
+secrecy = "0.10.3"
 
 [workspace.dependencies.tokio]
 

@@ -5,13 +5,20 @@
 # Values can be quoted-wrapped if you want. Values are optional, and if not
 # provided the key will use the default value.
 #
-# `server-address` and `database-connection` are required.
+# `server-address` is required. Exactly one of `database-connection` or
+# `database-connection-file` is required.
 
 # The address to bind the Night Vision server to.
 server-address = "127.0.0.1:8080"
 
 # The connection string for the database.
+#
+# Use `database-connection-file` for deployed environments where the connection
+# string contains credentials. The file should contain a single line with the
+# connection string. On Unix systems, the file must have no group or world
+# permissions; use mode 0600 or stricter.
 database-connection = "postgres://localhost:5432/nv"
+database-connection-file =
 
 # Maximum size in bytes for the request body.
 #

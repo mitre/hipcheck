@@ -2,11 +2,13 @@
 
 use crate::{config::Config, error::FatalError};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use secrecy::ExposeSecret;
 use std::time::Duration;
 
 /// Connect to the database using the given configuration.
 pub async fn connection(config: &Config) -> Result<DatabaseConnection, FatalError> {
-    let mut opt = ConnectOptions::new(&config.database_connection);
+    let database_connection = config.database_connection();
+    let mut opt = ConnectOptions::new(database_connection.expose_secret());
 
     if let Some(database_max_connections) = config.database_max_connections {
         opt.max_connections(database_max_connections);

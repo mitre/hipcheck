@@ -1,6 +1,6 @@
 //! Errors and error-handling helpers.
 
-use crate::config::ConfigErrors;
+use crate::{config::ConfigErrors, secret::SecretFileError};
 use camino::Utf8PathBuf;
 use std::{
     error::Error,
@@ -17,6 +17,7 @@ pub enum FatalError {
     FailedToOpenConfigFile(Utf8PathBuf, std::io::Error),
     FailedToParseConfigFile(Utf8PathBuf, spookey::Error),
     FailedToParseConfigFileFields(Utf8PathBuf, ConfigErrors),
+    FailedToReadSecretFile(Utf8PathBuf, SecretFileError),
     UnknownServerError(String),
 }
 
@@ -60,6 +61,9 @@ impl Display for FatalError {
             FatalError::FailedToParseConfigFileFields(path, _) => {
                 write!(f, "failed to parse config file '{}'", path)
             }
+            FatalError::FailedToReadSecretFile(path, _) => {
+                write!(f, "failed to read secret file '{}'", path)
+            }
             FatalError::UnknownServerError(s) => write!(f, "unknown server error: {}", s),
         }
     }
@@ -76,6 +80,7 @@ impl std::error::Error for FatalError {
             FatalError::FailedToOpenConfigFile(_, err) => Some(err),
             FatalError::FailedToParseConfigFile(_, err) => Some(err),
             FatalError::FailedToParseConfigFileFields(_, err) => Some(err),
+            FatalError::FailedToReadSecretFile(_, err) => Some(err),
             FatalError::UnknownServerError(_) => None,
         }
     }

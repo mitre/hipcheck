@@ -1,11 +1,14 @@
 //! Defines configuration for the Night Vision server.
 
-use crate::error::{ErrorSourceIterator, FatalError};
+use crate::{
+    error::{ErrorSourceIterator, FatalError},
+    secret::{SecretSource, SecretSourceKind},
+};
 use camino::{Utf8Path, Utf8PathBuf};
 use dropshot::{ConfigDropshot, HandlerTaskMode};
 use itertools::Itertools;
+use secrecy::SecretString;
 use std::{
-    borrow::Cow,
     fmt::{Debug, Display},
     fs::File,
     io::BufReader,
@@ -36,8 +39,11 @@ pub struct Config {
     /// The default behavior for HTTP handler functions when clients disconnect early.
     pub http_early_disconnect_behavior: Option<EarlyDisconnectBehavior>,
 
+    /// Source for the string used to connect to the database.
+    database_connection_source: SecretSourceKind,
+
     /// String used to connect to the database.
-    pub database_connection: String,
+    database_connection: SecretString,
 
     /// The maximum number of connections to the database.
     pub database_max_connections: Option<u32>,
@@ -110,10 +116,16 @@ impl Config {
     pub fn parse(path: &Utf8Path) -> Result<Config, FatalError> {
         let parsed = spookey::parse(
             spookey::ParseConfig {
-                required_keys: vec!["server-address", "database-connection"],
+                // While we *do* require some form of database connection information, either via
+                // `database-connection` or `database-connection-file`, they're both listed as
+                // optional here because we validate that only one of them is present after
+                // parsing with `spookey`.
+                required_keys: vec!["server-address"],
                 optional_keys: vec![
                     "http-request-body-max-bytes",
                     "http-early-disconnect-behavior",
+                    "database-connection",
+                    "database-connection-file",
                     "database-max-connections",
                     "database-min-connections",
                     "database-connect-timeout",
@@ -136,55 +148,70 @@ impl Config {
 
         // Construct the config object, parsing fields into the proper types and collecting errors.
         let mut errors = Vec::new();
-        let config = Config {
-            config_file_path: path.into(),
-            // PANIC SAFETY: We've already checked that it's Some above.
-            server_address: parse_value(&parsed, "server-address", &mut errors)
-                .expect("server-address is required"),
-            http_request_body_max_bytes: parse_value(
-                &parsed,
-                "http-request-body-max-bytes",
-                &mut errors,
-            ),
-            http_early_disconnect_behavior: parse_value(
-                &parsed,
-                "http-early-disconnect-behavior",
-                &mut errors,
-            ),
-            // PANIC SAFETY: We've already checked that it's Some above.
-            database_connection: parse_value(&parsed, "database-connection", &mut errors)
-                .expect("database-connection is required"),
-            database_max_connections: parse_value(&parsed, "database-max-connections", &mut errors),
-            database_min_connections: parse_value(&parsed, "database-min-connections", &mut errors),
-            database_connect_timeout: parse_value(&parsed, "database-connect-timeout", &mut errors),
-            database_idle_timeout: parse_value(&parsed, "database-idle-timeout", &mut errors),
-            database_acquire_timeout: parse_value(&parsed, "database-acquire-timeout", &mut errors),
-            database_max_lifetime: parse_value(&parsed, "database-max-lifetime", &mut errors),
-            async_worker_threads: parse_value(&parsed, "async-worker-threads", &mut errors),
-            async_worker_thread_stack_size: parse_value(
-                &parsed,
-                "async-worker-thread-stack-size",
-                &mut errors,
-            ),
-            async_max_blocking_threads: parse_value(
-                &parsed,
-                "async-max-blocking-threads",
-                &mut errors,
-            ),
-            async_blocking_thread_keep_alive: parse_value(
-                &parsed,
-                "async-blocking-thread-keep-alive",
-                &mut errors,
-            ),
-            async_global_queue_interval: parse_value(
-                &parsed,
-                "async-global-queue-interval",
-                &mut errors,
-            ),
-            async_event_interval: parse_value(&parsed, "async-event-interval", &mut errors),
-        };
+        let database_connection =
+            parse_value::<String>(&parsed, "database-connection", &mut errors)
+                .map(SecretString::from);
+        let database_connection_file =
+            parse_value(&parsed, "database-connection-file", &mut errors);
+        let database_connection_source = parse_database_connection_source(
+            database_connection,
+            database_connection_file,
+            &mut errors,
+        );
+
+        // PANIC SAFETY: We've already checked that it's Some above.
+        let server_address: String = parse_value(&parsed, "server-address", &mut errors)
+            .expect("server-address is required");
+        let http_request_body_max_bytes =
+            parse_value(&parsed, "http-request-body-max-bytes", &mut errors);
+        let http_early_disconnect_behavior =
+            parse_value(&parsed, "http-early-disconnect-behavior", &mut errors);
+        let database_max_connections =
+            parse_value(&parsed, "database-max-connections", &mut errors);
+        let database_min_connections =
+            parse_value(&parsed, "database-min-connections", &mut errors);
+        let database_connect_timeout =
+            parse_value(&parsed, "database-connect-timeout", &mut errors);
+        let database_idle_timeout = parse_value(&parsed, "database-idle-timeout", &mut errors);
+        let database_acquire_timeout =
+            parse_value(&parsed, "database-acquire-timeout", &mut errors);
+        let database_max_lifetime = parse_value(&parsed, "database-max-lifetime", &mut errors);
+        let async_worker_threads = parse_value(&parsed, "async-worker-threads", &mut errors);
+        let async_worker_thread_stack_size =
+            parse_value(&parsed, "async-worker-thread-stack-size", &mut errors);
+        let async_max_blocking_threads =
+            parse_value(&parsed, "async-max-blocking-threads", &mut errors);
+        let async_blocking_thread_keep_alive =
+            parse_value(&parsed, "async-blocking-thread-keep-alive", &mut errors);
+        let async_global_queue_interval =
+            parse_value(&parsed, "async-global-queue-interval", &mut errors);
+        let async_event_interval = parse_value(&parsed, "async-event-interval", &mut errors);
 
         check_errors(path, parsed.warnings, errors)?;
+
+        let (database_connection_source, database_connection) =
+            resolve_database_connection_source(database_connection_source)?;
+
+        let config = Config {
+            config_file_path: path.into(),
+            server_address,
+            http_request_body_max_bytes,
+            http_early_disconnect_behavior,
+            database_connection_source,
+            database_connection,
+            database_max_connections,
+            database_min_connections,
+            database_connect_timeout,
+            database_idle_timeout,
+            database_acquire_timeout,
+            database_max_lifetime,
+            async_worker_threads,
+            async_worker_thread_stack_size,
+            async_max_blocking_threads,
+            async_blocking_thread_keep_alive,
+            async_global_queue_interval,
+            async_event_interval,
+        };
 
         Ok(config)
     }
@@ -218,6 +245,11 @@ impl Config {
 
         Ok(config)
     }
+
+    /// Get the configured database connection string.
+    pub fn database_connection(&self) -> &SecretString {
+        &self.database_connection
+    }
 }
 
 /// Write a "separator" line of 80 dashes, used at the start and end of the config report.
@@ -250,12 +282,7 @@ impl Display for Config {
         }
 
         write_report_line!(f, "server-address", &self.server_address)?;
-
-        write_report_line!(
-            f,
-            "database-connection",
-            &redact_database_conn(&self.database_connection)
-        )?;
+        write_report_line!(f, "database-connection", &self.database_connection_source)?;
 
         if let Some(max_bytes) = self.http_request_body_max_bytes {
             write_report_line!(f, "http-request-body-max-bytes", &max_bytes)?;
@@ -331,30 +358,13 @@ impl Display for Config {
     }
 }
 
-/// Redact the password from a database connection string.
-fn redact_database_conn(conn: &str) -> Cow<'_, str> {
-    let Some((scheme, rest)) = conn.split_once("://") else {
-        return Cow::Borrowed(conn);
-    };
-
-    let Some((userinfo, host_and_path)) = rest.split_once('@') else {
-        return Cow::Borrowed(conn);
-    };
-
-    let Some((user, _password)) = userinfo.rsplit_once(':') else {
-        return Cow::Borrowed(conn);
-    };
-
-    Cow::Owned(format!("{scheme}://{user}:<redacted>@{host_and_path}"))
-}
-
 /// Parse a value from the config map, returning `None` if the value is unset.
 ///
 /// This also records any parsing failures as warnings.
 fn parse_value<T: std::str::FromStr>(
     results: &spookey::ParseResult,
     key: &str,
-    errors: &mut Vec<StrParseError>,
+    errors: &mut Vec<ConfigError>,
 ) -> Option<T>
 where
     <T as FromStr>::Err: std::error::Error,
@@ -371,7 +381,7 @@ where
         (None, Some(Some(value))) | (Some(value), None) => match value.parse() {
             Ok(value) => Some(value),
             Err(err) => {
-                errors.push(StrParseError {
+                errors.push(ConfigError::StrParse(StrParseError {
                     key: key.to_string().into_boxed_str(),
                     value: value.clone().into_boxed_str(),
                     // Make sure we package up the full error chain, not just the top-level error.
@@ -380,7 +390,7 @@ where
                         .map(ToString::to_string)
                         .join(": ")
                         .into_boxed_str(),
-                });
+                }));
                 // We treat parse errors as not setting the key; though this is meaningless since
                 // parse errors are treated as fatal anyway, so the program won't continue past
                 // construction of `Config` if one occurs.
@@ -396,11 +406,45 @@ where
     }
 }
 
+/// Parse the mutually-exclusive database connection source fields.
+fn parse_database_connection_source(
+    database_connection: Option<SecretString>,
+    database_connection_file: Option<Utf8PathBuf>,
+    errors: &mut Vec<ConfigError>,
+) -> SecretSource {
+    match (database_connection, database_connection_file) {
+        (Some(value), None) => SecretSource::inline(value),
+        (None, Some(path)) => SecretSource::file(path),
+        (Some(_), Some(_)) => {
+            errors.push(ConfigError::MutuallyExclusive {
+                keys: Box::new(["database-connection", "database-connection-file"]),
+            });
+            SecretSource::inline(String::new().into())
+        }
+        (None, None) => {
+            errors.push(ConfigError::MissingOneOf {
+                keys: Box::new(["database-connection", "database-connection-file"]),
+            });
+            SecretSource::inline(String::new().into())
+        }
+    }
+}
+
+/// Resolve the database connection source, preserving file path context for startup errors.
+fn resolve_database_connection_source(
+    source: SecretSource,
+) -> Result<(SecretSourceKind, SecretString), FatalError> {
+    source
+        .resolve()
+        .map(|secret| secret.into_parts())
+        .map_err(|err| FatalError::FailedToReadSecretFile(err.path, err.error))
+}
+
 /// Check collected warnings and field parsing errors, bundling them in a `FatalError` to report.
 fn check_errors(
     path: &Utf8Path,
     parsed_warnings: Vec<spookey::Warning>,
-    value_parsing_errors: Vec<StrParseError>,
+    value_parsing_errors: Vec<ConfigError>,
 ) -> Result<(), FatalError> {
     let num_errors = parsed_warnings.len() + value_parsing_errors.len();
 
@@ -415,7 +459,7 @@ fn check_errors(
     }
 
     for error in value_parsing_errors {
-        errors.push(ConfigError::StrParse(error));
+        errors.push(error);
     }
 
     Err(FatalError::FailedToParseConfigFileFields(
@@ -532,6 +576,8 @@ impl Display for StrParseError {
 pub enum ConfigError {
     Warning(spookey::Warning),
     StrParse(StrParseError),
+    MissingOneOf { keys: Box<[&'static str; 2]> },
+    MutuallyExclusive { keys: Box<[&'static str; 2]> },
 }
 
 impl Display for ConfigError {
@@ -539,6 +585,14 @@ impl Display for ConfigError {
         match self {
             ConfigError::Warning(w) => write!(f, "{}", w),
             ConfigError::StrParse(e) => write!(f, "{}", e),
+            ConfigError::MissingOneOf { keys } => write!(
+                f,
+                "exactly one of '{}' or '{}' must be configured",
+                keys[0], keys[1]
+            ),
+            ConfigError::MutuallyExclusive { keys } => {
+                write!(f, "'{}' and '{}' are mutually exclusive", keys[0], keys[1])
+            }
         }
     }
 }
@@ -558,6 +612,8 @@ impl std::error::Error for ConfigErrors {}
 
 #[cfg(test)]
 mod tests {
+    use crate::secret::SecretFileError;
+    use secrecy::ExposeSecret;
     use std::{
         fs,
         sync::atomic::{AtomicUsize, Ordering},
@@ -595,6 +651,35 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_file(&self.path);
         }
+    }
+
+    #[cfg(unix)]
+    fn set_file_mode(path: &Utf8Path, mode: u32) {
+        let permissions = std::os::unix::fs::PermissionsExt::from_mode(mode);
+        fs::set_permissions(path, permissions).expect("failed to set test file permissions");
+    }
+
+    #[cfg(not(unix))]
+    fn set_file_mode(_path: &Utf8Path, _mode: u32) {}
+
+    fn restrict_secret_file_permissions(path: &Utf8Path) {
+        set_file_mode(path, 0o600);
+    }
+
+    fn redact_database_conn_password(conn: &str) -> String {
+        let Some((scheme, rest)) = conn.split_once("://") else {
+            return conn.to_string();
+        };
+
+        let Some((userinfo, host_and_path)) = rest.split_once('@') else {
+            return conn.to_string();
+        };
+
+        let Some((user, _password)) = userinfo.rsplit_once(':') else {
+            return conn.to_string();
+        };
+
+        format!("{scheme}://{user}:<redacted>@{host_and_path}")
     }
 
     fn valid_required_config() -> String {
@@ -679,7 +764,14 @@ mod tests {
                 },
             ),
             ConfigFieldParseCase::new("database_connection", "", |config, _| {
-                assert_eq!(config.database_connection, "postgres://localhost:5432/nv");
+                assert!(matches!(
+                    config.database_connection_source,
+                    SecretSourceKind::Inline
+                ));
+                assert_eq!(
+                    config.database_connection().expose_secret(),
+                    "postgres://localhost:5432/nv"
+                );
             })
             .with_database_connection("postgres://localhost:5432/nv"),
             ConfigFieldParseCase::new(
@@ -790,13 +882,76 @@ mod tests {
         let config = Config::parse(file.path()).expect("config should parse");
 
         assert_eq!(config.server_address, "127.0.0.1:0");
-        assert_eq!(config.database_connection, "sqlite::memory:");
+        assert!(matches!(
+            config.database_connection_source,
+            SecretSourceKind::Inline
+        ));
+        assert_eq!(
+            config.database_connection().expose_secret(),
+            "sqlite::memory:"
+        );
         assert_eq!(config.http_request_body_max_bytes, Some(2048));
         assert!(matches!(
             config.http_early_disconnect_behavior,
             Some(EarlyDisconnectBehavior::Continue)
         ));
         assert_eq!(config.async_event_interval, Some(17));
+    }
+
+    #[test]
+    fn parses_database_connection_file_from_spookey_config() {
+        let secret_file = TempConfigFile::new("postgres://user:password@localhost:5432/nv\n");
+        restrict_secret_file_permissions(secret_file.path());
+        let file = TempConfigFile::new(&format!(
+            "server-address = 127.0.0.1:0\n\
+            database-connection-file = {}\n",
+            secret_file.path()
+        ));
+
+        let config = Config::parse(file.path()).expect("config should parse");
+
+        assert_eq!(
+            config.database_connection().expose_secret(),
+            "postgres://user:password@localhost:5432/nv"
+        );
+        assert!(matches!(
+            config.database_connection_source,
+            SecretSourceKind::File
+        ));
+    }
+
+    #[test]
+    fn config_display_redacts_inline_database_connection() {
+        let file = TempConfigFile::new(
+            "server-address = 127.0.0.1:0\n\
+            database-connection = postgres://user:password@localhost:5432/nv\n",
+        );
+
+        let config = Config::parse(file.path()).expect("config should parse");
+        let report = format!("{}", config);
+
+        assert!(report.contains("<redacted inline secret>"));
+        assert!(!report.contains("password"));
+        assert!(!report.contains("postgres://user:password@localhost:5432/nv"));
+    }
+
+    #[test]
+    fn config_display_redacts_database_connection_file_path_and_contents() {
+        let secret_file = TempConfigFile::new("postgres://user:password@localhost:5432/nv\n");
+        restrict_secret_file_permissions(secret_file.path());
+        let file = TempConfigFile::new(&format!(
+            "server-address = 127.0.0.1:0\n\
+            database-connection-file = {}\n",
+            secret_file.path()
+        ));
+
+        let config = Config::parse(file.path()).expect("config should parse");
+        let report = format!("{}", config);
+
+        assert!(report.contains("<redacted file-backed secret>"));
+        assert!(!report.contains(secret_file.path().as_str()));
+        assert!(!report.contains("password"));
+        assert!(!report.contains("postgres://user:password@localhost:5432/nv"));
     }
 
     #[test]
@@ -872,8 +1027,29 @@ mod tests {
     }
 
     #[test]
-    fn missing_required_key_returns_spookey_parse_error() {
+    fn missing_database_connection_source_returns_config_field_error() {
         let file = TempConfigFile::new("server-address = 127.0.0.1:0\n");
+
+        let error =
+            Config::parse(file.path()).expect_err("missing database connection should fail");
+
+        let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+        else {
+            panic!("expected FailedToParseConfigFileFields, got {error:?}");
+        };
+
+        assert_eq!(error_path, file.path);
+        assert_eq!(errors.len(), 1);
+        let ConfigError::MissingOneOf { keys } = &errors[0] else {
+            panic!("expected MissingOneOf config error, got {:?}", errors[0]);
+        };
+        assert_eq!(keys[0], "database-connection");
+        assert_eq!(keys[1], "database-connection-file");
+    }
+
+    #[test]
+    fn missing_required_key_returns_spookey_parse_error() {
+        let file = TempConfigFile::new("database-connection = sqlite::memory:\n");
 
         let error = Config::parse(file.path()).expect_err("missing required key should fail");
 
@@ -885,7 +1061,57 @@ mod tests {
         let spookey::Error::MissingRequiredFields(fields) = spookey_error else {
             panic!("expected MissingRequiredFields, got {spookey_error:?}");
         };
-        assert_eq!(&*fields, &["database-connection"]);
+        assert_eq!(&*fields, &["server-address"]);
+    }
+
+    #[test]
+    fn mutually_exclusive_database_connection_sources_fail_config_parse() {
+        let file = TempConfigFile::new(
+            "server-address = 127.0.0.1:0\n\
+            database-connection = sqlite::memory:\n\
+            database-connection-file = /run/secrets/nv-server/database-url\n",
+        );
+
+        let error = Config::parse(file.path()).expect_err("exclusive database sources should fail");
+
+        let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+        else {
+            panic!("expected FailedToParseConfigFileFields, got {error:?}");
+        };
+
+        assert_eq!(error_path, file.path);
+        assert_eq!(errors.len(), 1);
+        let ConfigError::MutuallyExclusive { keys } = &errors[0] else {
+            panic!(
+                "expected MutuallyExclusive config error, got {:?}",
+                errors[0]
+            );
+        };
+        assert_eq!(keys[0], "database-connection");
+        assert_eq!(keys[1], "database-connection-file");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn config_parse_rejects_insecure_database_connection_file_permissions() {
+        let secret_file = TempConfigFile::new("postgres://user:password@localhost:5432/nv\n");
+        set_file_mode(secret_file.path(), 0o644);
+        let file = TempConfigFile::new(&format!(
+            "server-address = 127.0.0.1:0\n\
+            database-connection-file = {}\n",
+            secret_file.path()
+        ));
+
+        let error = Config::parse(file.path()).expect_err("insecure secret file should fail");
+
+        let FatalError::FailedToReadSecretFile(error_path, secret_error) = error else {
+            panic!("expected FailedToReadSecretFile, got {error:?}");
+        };
+        assert_eq!(error_path, secret_file.path);
+        assert!(matches!(
+            secret_error,
+            SecretFileError::InsecurePermissions(0o644)
+        ));
     }
 
     #[test]
@@ -970,7 +1196,7 @@ mod tests {
         let conn = "postgres://nv-server:night-vision@postgres:5432/nv";
 
         assert_eq!(
-            redact_database_conn(conn),
+            redact_database_conn_password(conn),
             "postgres://nv-server:<redacted>@postgres:5432/nv"
         );
     }
@@ -979,13 +1205,13 @@ mod tests {
     fn redact_database_conn_preserves_connection_without_password() {
         let conn = "postgres://postgres:5432/nv";
 
-        assert_eq!(redact_database_conn(conn), conn);
+        assert_eq!(redact_database_conn_password(conn), conn);
     }
 
     #[test]
     fn redact_database_conn_preserves_connection_without_userinfo() {
         let conn = "postgres://localhost/nv";
 
-        assert_eq!(redact_database_conn(conn), conn);
+        assert_eq!(redact_database_conn_password(conn), conn);
     }
 }

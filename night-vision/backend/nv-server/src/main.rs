@@ -6,6 +6,7 @@ mod env;
 mod error;
 mod log;
 mod rt;
+mod secret;
 
 /// Run the Night Vision server.
 fn main() -> Result<(), error::FatalError> {
