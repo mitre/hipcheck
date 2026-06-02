@@ -4,7 +4,7 @@
 #
 # Usage:
 #
-#   docker/scripts/test.sh
+#   scripts/test.sh
 #
 # The tests run ShellCheck, POSIX shell syntax checks, local Docker Compose
 # config validation, and temp-dir checks for local secret generation behavior.
@@ -36,6 +36,30 @@ error() {
     printf '%s%s%s\n' "$color_red" "$1" "$color_reset" >&2
 }
 
+current_test=
+current_test_complete=true
+
+start_test() {
+    current_test=$1
+    current_test_complete=false
+    printf '%s%s ... %s' "$color_blue" "$current_test" "$color_reset"
+}
+
+pass_test() {
+    current_test_complete=true
+    printf '%sPASS%s\n' "$color_green" "$color_reset"
+}
+
+finish() {
+    status=$?
+
+    if [ "$status" -ne 0 ] && [ -n "$current_test" ] && [ "$current_test_complete" = false ]; then
+        printf '%sFAIL%s\n' "$color_red" "$color_reset" >&2
+    fi
+
+    rm -rf "$tmp_dir"
+}
+
 script_dir=$(
     CDPATH=
     cd -- "$(dirname -- "$0")"
@@ -43,12 +67,13 @@ script_dir=$(
 )
 repo_root=$(
     CDPATH=
-    cd -- "$script_dir/../.."
+    cd -- "$script_dir/.."
     pwd
 )
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/night-vision-docker-scripts.XXXXXX")
-trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
+trap finish EXIT HUP INT TERM
+export DOCKER_SECRET_MOUNT_DIR="$tmp_dir/docker-mount"
 
 setup_script="$script_dir/setup-compose-secrets.sh"
 compose_script="$script_dir/docker-compose-local.sh"
@@ -107,10 +132,46 @@ assert_contains() {
 cd "$repo_root"
 
 info 'Running Docker shell script tests...'
+start_test 'shellcheck'
 shellcheck "$script_dir"/*.sh
-sh -n "$script_dir"/*.sh
-"$compose_script" --env-file .env.local.example config --quiet
+pass_test
 
+start_test 'POSIX shell syntax'
+sh -n "$script_dir"/*.sh
+pass_test
+
+start_test 'local Compose uses staged secrets'
+printf '%s\n' replace-me > "$tmp_dir/source-postgres-password"
+printf '%s\n' postgres://nv-server:replace-me@postgres:5432/nv > "$tmp_dir/source-nv-server-database-url"
+chmod 600 "$tmp_dir/source-postgres-password" "$tmp_dir/source-nv-server-database-url"
+
+POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
+NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
+    "$compose_script" --env-file .env.local.example config --quiet >/dev/null
+local_compose_config=$(
+    POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
+    NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
+        "$compose_script" --env-file .env.local.example config
+)
+if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT_DIR/night-vision-local/postgres-password" >/dev/null; then
+    error 'error: local Docker Compose config should use the staged Postgres secret file'
+    exit 1
+fi
+if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT_DIR/night-vision-local/nv-server-database-url" >/dev/null; then
+    error 'error: local Docker Compose config should use the staged nv-server database URL secret file'
+    exit 1
+fi
+if ! cmp -s "$tmp_dir/source-postgres-password" "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/postgres-password"; then
+    error 'error: staged Postgres secret should match the source secret file'
+    exit 1
+fi
+if ! cmp -s "$tmp_dir/source-nv-server-database-url" "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/nv-server-database-url"; then
+    error 'error: staged nv-server database URL secret should match the source secret file'
+    exit 1
+fi
+pass_test
+
+start_test 'execute creates secret files with strict modes'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
 ENV_FILE=/dev/null \
@@ -125,7 +186,9 @@ assert_file_mode "$tmp_dir/postgres-password" 600
 assert_file_mode "$tmp_dir/nv-server-database-url" 600
 assert_line_count "$tmp_dir/postgres-password" 1
 assert_line_count "$tmp_dir/nv-server-database-url" 1
+pass_test
 
+start_test 'plan mode leaves existing secrets unchanged'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
 ENV_FILE=/dev/null \
@@ -139,7 +202,9 @@ POSTGRES_PASSWORD=different-password \
     "$setup_script" >/dev/null
 
 assert_contains "$tmp_dir/postgres-password" 'replace-me'
+pass_test
 
+start_test 'execute overwrites changed password'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
 ENV_FILE=/dev/null \
@@ -147,7 +212,9 @@ POSTGRES_PASSWORD=different-password \
     "$setup_script" -x >/dev/null
 
 assert_contains "$tmp_dir/postgres-password" 'different-password'
+pass_test
 
+start_test 'removed flags fail'
 assert_fails "removed force flag" \
     env \
         POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
@@ -164,7 +231,9 @@ assert_fails "removed force database URL flag" \
 
 assert_fails "removed dry-run flag" \
     "$setup_script" --dry-run
+pass_test
 
+start_test 'plan mode does not create new files'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/planned-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/planned-url" \
 ENV_FILE=/dev/null \
@@ -172,40 +241,77 @@ POSTGRES_PASSWORD=planned-password \
     "$setup_script" >/dev/null
 assert_not_exists "$tmp_dir/planned-password"
 assert_not_exists "$tmp_dir/planned-url"
+pass_test
 
+start_test 'print paths resolves defaults under repo'
 "$setup_script" \
     -p \
     >/dev/null
 
+paths_output=$("$setup_script" -p)
+if ! printf '%s\n' "$paths_output" | grep -F "Postgres password secret file: $repo_root/.secrets/postgres-password" >/dev/null; then
+    error "error: default Postgres password secret path should resolve under $repo_root/.secrets"
+    exit 1
+fi
+if ! printf '%s\n' "$paths_output" | grep -F "nv-server database URL secret file: $repo_root/.secrets/nv-server-database-url" >/dev/null; then
+    error "error: default nv-server database URL secret path should resolve under $repo_root/.secrets"
+    exit 1
+fi
+
 "$setup_script" \
     --print-paths \
     >/dev/null
+pass_test
 
+start_test 'combined short flags execute and validate'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/combined-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/combined-url" \
 ENV_FILE=/dev/null \
 POSTGRES_PASSWORD=replace-me \
     "$setup_script" -xc >/dev/null
+pass_test
 
+start_test 'quoted env values are parsed'
+cat > "$tmp_dir/quoted.env" <<EOF
+export POSTGRES_DB="quoted db"
+POSTGRES_USER='quoted user'
+POSTGRES_HOST=postgres # inline comment
+POSTGRES_PORT=5432
+POSTGRES_PASSWORD_SECRET_FILE=$tmp_dir/quoted-password
+NV_SERVER_DATABASE_URL_SECRET_FILE=$tmp_dir/quoted-url
+EOF
+ENV_FILE="$tmp_dir/quoted.env" \
+POSTGRES_PASSWORD=quoted-password \
+    "$setup_script" -x >/dev/null
+assert_contains "$tmp_dir/quoted-url" 'quoted%20user:quoted-password@postgres:5432/quoted%20db'
+pass_test
+
+start_test 'database URL components are percent encoded'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/symbol-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/symbol-url" \
 ENV_FILE=/dev/null \
 POSTGRES_PASSWORD='bad:value@with/slash%space value' \
     "$setup_script" -x >/dev/null
 assert_contains "$tmp_dir/symbol-url" 'bad%3Avalue%40with%2Fslash%25space%20value'
+pass_test
 
+start_test 'long execute and validate flags work'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/long-validate-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/long-validate-url" \
 ENV_FILE=/dev/null \
 POSTGRES_PASSWORD=replace-me \
     "$setup_script" --execute --validate-compose >/dev/null
+pass_test
 
+start_test 'invalid flag combinations fail'
 assert_fails "print paths with execute" \
     "$setup_script" -px
 
 assert_fails "print paths with validate compose" \
     "$setup_script" --print-paths --validate-compose
+pass_test
 
+start_test 'invalid ports fail'
 assert_fails "invalid high port" \
     env \
         POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/high-port-password" \
@@ -221,7 +327,9 @@ assert_fails "invalid non-numeric port" \
         ENV_FILE=/dev/null \
         POSTGRES_PORT=abc \
         "$setup_script"
+pass_test
 
+start_test 'multiline password fails'
 assert_fails "multiline password" \
     env \
         POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/multiline-password" \
@@ -229,5 +337,6 @@ assert_fails "multiline password" \
         ENV_FILE=/dev/null \
         POSTGRES_PASSWORD="$(printf 'bad\nvalue')" \
         "$setup_script"
+pass_test
 
 success 'Docker shell script tests passed.'

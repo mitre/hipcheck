@@ -17,6 +17,6 @@ volumes:
 
 secrets:
   nv-server-database-url:
-    file: ${NV_SERVER_DATABASE_URL_SECRET_FILE:-.secrets/nv-server-database-url}
+    file: ${NV_SERVER_DATABASE_URL_SECRET_FILE:?NV_SERVER_DATABASE_URL_SECRET_FILE is required}
   postgres-password:
-    file: ${POSTGRES_PASSWORD_SECRET_FILE:-.secrets/postgres-password}
+    file: ${POSTGRES_PASSWORD_SECRET_FILE:?POSTGRES_PASSWORD_SECRET_FILE is required}

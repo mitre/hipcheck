@@ -4,10 +4,10 @@
 #
 # Usage:
 #
-#   docker/scripts/setup-compose-secrets.sh
-#   docker/scripts/setup-compose-secrets.sh -x
-#   docker/scripts/setup-compose-secrets.sh -p
-#   POSTGRES_PASSWORD='replace-me' docker/scripts/setup-compose-secrets.sh -x
+#   scripts/setup-compose-secrets.sh
+#   scripts/setup-compose-secrets.sh -x
+#   scripts/setup-compose-secrets.sh -p
+#   POSTGRES_PASSWORD='replace-me' scripts/setup-compose-secrets.sh -x
 #
 # The script reads non-secret database settings from `.env` by default and
 # plans the matching Postgres password and `nv-server` database URL secret
@@ -56,15 +56,16 @@ error() {
 
 usage() {
     section 'Usage:'
-    printf '  %sdocker/scripts/setup-compose-secrets.sh [-c]%s\n' "$color_yellow" "$color_reset"
-    printf '  %sdocker/scripts/setup-compose-secrets.sh -x [-c]%s\n' "$color_yellow" "$color_reset"
-    printf '  %sdocker/scripts/setup-compose-secrets.sh -p%s\n' "$color_yellow" "$color_reset"
-    printf '  %sPOSTGRES_PASSWORD='\''replace-me'\'' docker/scripts/setup-compose-secrets.sh -x%s\n\n' "$color_yellow" "$color_reset"
+    printf '  %sscripts/setup-compose-secrets.sh [-c]%s\n' "$color_yellow" "$color_reset"
+    printf '  %sscripts/setup-compose-secrets.sh -x [-c]%s\n' "$color_yellow" "$color_reset"
+    printf '  %sscripts/setup-compose-secrets.sh -p%s\n' "$color_yellow" "$color_reset"
+    printf '  %sPOSTGRES_PASSWORD='\''replace-me'\'' scripts/setup-compose-secrets.sh -x%s\n\n' "$color_yellow" "$color_reset"
 
     cat <<'EOF'
 Plans local Docker Compose secret files for Postgres and nv-server. Pass
 -x/--execute to write the planned changes. By default, non-secret database
 settings are read from .env in the repository root.
+
 The .env parser supports KEY=value and export KEY=value lines, quoted values,
 and whitespace-prefixed inline comments on unquoted values.
 
@@ -169,7 +170,7 @@ script_dir=$(
 )
 repo_root=$(
     CDPATH=
-    cd -- "$script_dir/../.."
+    cd -- "$script_dir/.."
     pwd
 )
 env_file=${ENV_FILE:-"$repo_root/.env"}
@@ -186,9 +187,9 @@ absolute_path() {
     esac
 }
 
-require_python3() {
-    if ! command -v python3 >/dev/null 2>&1; then
-        error 'error: python3 is required to parse .env files and percent-encode database URLs'
+require_node() {
+    if ! command -v node >/dev/null 2>&1; then
+        error 'error: node is required to parse .env files and percent-encode database URLs'
         exit 1
     fi
 }
@@ -205,41 +206,75 @@ env_value() {
 
     if [ -f "$env_file" ]; then
         from_file=$(
-            python3 - "$env_file" "$key" <<'PY'
-import re
-import shlex
-import sys
+            node - "$env_file" "$key" <<'JS'
+const fs = require("fs");
 
-env_file, requested_key = sys.argv[1], sys.argv[2]
-value = None
+const [, , envFile, requestedKey] = process.argv;
+let value;
 
-with open(env_file, encoding="utf-8") as handle:
-    for raw_line in handle:
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[7:].lstrip()
-        if "=" not in line:
-            continue
-        key, raw_value = line.split("=", 1)
-        if key.strip() != requested_key:
-            continue
+function parseQuoted(rawValue, quote, lineNumber) {
+  let parsed = "";
+  let escaped = false;
 
-        raw_value = raw_value.strip()
-        if raw_value.startswith(("'", '"')):
-            try:
-                parts = shlex.split(raw_value, comments=False, posix=True)
-            except ValueError as error:
-                print(f"error: failed to parse {requested_key} in {env_file}: {error}", file=sys.stderr)
-                sys.exit(2)
-            value = parts[0] if parts else ""
-        else:
-            value = re.sub(r"\s+#.*$", "", raw_value).strip()
+  for (let i = 1; i < rawValue.length; i += 1) {
+    const character = rawValue[i];
 
-if value is not None:
-    print(value, end="")
-PY
+    if (escaped) {
+      parsed += character;
+      escaped = false;
+      continue;
+    }
+
+    if (character === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (character === quote) {
+      return parsed;
+    }
+
+    parsed += character;
+  }
+
+  console.error(`error: failed to parse ${requestedKey} in ${envFile}:${lineNumber}: unterminated quoted value`);
+  process.exit(2);
+}
+
+const lines = fs.readFileSync(envFile, "utf8").split(/\r?\n/);
+
+for (const [index, rawLine] of lines.entries()) {
+  let line = rawLine.trim();
+  if (line === "" || line.startsWith("#")) {
+    continue;
+  }
+
+  if (line.startsWith("export ")) {
+    line = line.slice(7).trimStart();
+  }
+
+  const equalsIndex = line.indexOf("=");
+  if (equalsIndex === -1) {
+    continue;
+  }
+
+  const key = line.slice(0, equalsIndex).trim();
+  if (key !== requestedKey) {
+    continue;
+  }
+
+  const rawValue = line.slice(equalsIndex + 1).trim();
+  if (rawValue.startsWith("'") || rawValue.startsWith('"')) {
+    value = parseQuoted(rawValue, rawValue[0], index + 1);
+  } else {
+    value = rawValue.replace(/\s+#.*$/, "").trim();
+  }
+}
+
+if (value !== undefined) {
+  process.stdout.write(value);
+}
+JS
         )
         if [ -n "$from_file" ]; then
             printf '%s\n' "$from_file"
@@ -278,7 +313,7 @@ percent_encode() {
     value=$2
 
     require_single_line "$name" "$value"
-    printf '%s' "$value" | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read(), safe="-._~"), end="")'
+    printf '%s' "$value" | node -e "const fs = require('fs'); const value = fs.readFileSync(0, 'utf8'); process.stdout.write(encodeURIComponent(value));"
 }
 
 require_port() {
@@ -346,7 +381,7 @@ write_secret_file() {
     esac
 }
 
-require_python3
+require_node
 
 postgres_db=$(env_value POSTGRES_DB nv)
 postgres_user=$(env_value POSTGRES_USER nv-server)

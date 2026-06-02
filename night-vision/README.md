@@ -91,18 +91,23 @@ and so neither does Flox. To use Flox on Windows, we recommend using WSL
 
 Local Compose uses `docker-compose.yml` plus `docker-compose.local.yml`. The
 local override builds `nv-server:local`, binds `127.0.0.1:8080`, and uses a
-clearly named local Postgres volume.
+clearly named local Postgres volume. The setup script writes local secret files;
+the local Compose wrapper stages those files into a Docker-approved host mount
+directory before passing them to containers as Compose secrets. The default
+staging directory is `/Users/Shared/Docker/night-vision` on macOS and
+`C:\Users\Public\Docker\night-vision` on Windows. Set
+`DOCKER_SECRET_MOUNT_DIR` to override it.
 
 ```sh
 cp .env.local.example .env
-docker/scripts/setup-compose-secrets.sh -x
-docker/scripts/docker-compose-local.sh up --build
+scripts/setup-compose-secrets.sh -x
+scripts/docker-compose-local.sh up --build
 ```
 
 To choose a different local password, pass it only to the setup command:
 
 ```sh
-POSTGRES_PASSWORD='replace-me' docker/scripts/setup-compose-secrets.sh -x
+POSTGRES_PASSWORD='replace-me' scripts/setup-compose-secrets.sh -x
 ```
 
 If you change `POSTGRES_DB`, `POSTGRES_USER`, or the Postgres password after the
@@ -110,14 +115,14 @@ database volume has already been initialized, recreate the volume before
 starting Compose again:
 
 ```sh
-docker/scripts/docker-compose-local.sh down -v
-docker/scripts/docker-compose-local.sh up --build
+scripts/docker-compose-local.sh down -v
+scripts/docker-compose-local.sh up --build
 ```
 
 To validate the Docker shell scripts and local Compose configuration, run:
 
 ```sh
-docker/scripts/test.sh
+scripts/test.sh
 ```
 
 ### Production Deployment
@@ -131,10 +136,10 @@ Production Compose uses `docker-compose.yml` only. Copy
 docker compose up -d
 ```
 
-Compose secrets are mounted from host files. They keep secret values out of
-container environment inspection and generated Compose config, but they are not
-an encrypted secret store. Secret files must contain exactly one line and must
-not be readable by group or world.
+Production Compose secrets are mounted from host files. They keep secret values
+out of container environment inspection and generated Compose config, but they
+are not an encrypted secret store. Secret files must contain exactly one line
+and must not be readable by group or world.
 
 ## License
 

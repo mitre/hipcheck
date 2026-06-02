@@ -64,6 +64,9 @@ cargo-audit = { pkg-path = "cargo-audit" }
 
 ## Other Backend Tools
 
+# Used by `scripts/test.sh` to lint POSIX shell scripts.
+shellcheck = { pkg-path = "shellcheck" }
+
 # Used to visualize unit-graphs by 'xtask' (provided the `dot` CLI)
 graphviz = { pkg-path = "graphviz" }
 
