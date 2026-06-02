@@ -15,7 +15,8 @@
         "pkg-path": "cargo-autoinherit"
       },
       "cargo-chef": {
-        "pkg-path": "cargo-chef"
+        "pkg-path": "cargo-chef",
+        "version": "0.1.77"
       },
       "cargo-hakari": {
         "pkg-path": "cargo-hakari"
@@ -43,11 +44,11 @@
       "git": {
         "pkg-path": "git"
       },
-      "graphviz": {
-        "pkg-path": "graphviz"
-      },
       "glab": {
         "pkg-path": "glab"
+      },
+      "graphviz": {
+        "pkg-path": "graphviz"
       },
       "jujutsu": {
         "pkg-path": "jujutsu"
@@ -919,20 +920,19 @@
     {
       "attr_path": "cargo-chef",
       "broken": false,
-      "derivation": "/nix/store/ihpkbmwgahsjx05axsfj7bj91a9k6zai-cargo-chef-0.1.77.drv",
+      "derivation": "/nix/store/wx9g2ybnlqx9v7njh9pczh9nz1vjm7r3-cargo-chef-0.1.77.drv",
       "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
       "install_id": "cargo-chef",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
       "name": "cargo-chef-0.1.77",
       "pname": "cargo-chef",
-      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
-      "rev_count": 998534,
-      "rev_date": "2026-05-15T18:21:44Z",
-      "scrape_date": "2026-05-17T07:05:50.679966Z",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:40.016009Z",
       "stabilities": [
-        "unstable",
-        "staging"
+        "unstable"
       ],
       "unfree": false,
       "version": "0.1.77",
@@ -940,7 +940,7 @@
         "out"
       ],
       "outputs": {
-        "out": "/nix/store/w3lw1rjwr6akl6shigpmfy414l7azl30-cargo-chef-0.1.77"
+        "out": "/nix/store/wszd6x76yvlbqvprmyzhh0hzi6y6sy51-cargo-chef-0.1.77"
       },
       "system": "aarch64-darwin",
       "group": "toplevel",
@@ -949,20 +949,19 @@
     {
       "attr_path": "cargo-chef",
       "broken": false,
-      "derivation": "/nix/store/jb3kmjapca23hfqbqbq3fy23nf4h7wv1-cargo-chef-0.1.77.drv",
+      "derivation": "/nix/store/w491wv62ifv05ji9pfhfah6hbvfqf0js-cargo-chef-0.1.77.drv",
       "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
       "install_id": "cargo-chef",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
       "name": "cargo-chef-0.1.77",
       "pname": "cargo-chef",
-      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
-      "rev_count": 998534,
-      "rev_date": "2026-05-15T18:21:44Z",
-      "scrape_date": "2026-05-17T07:33:29.037786Z",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:18.730555Z",
       "stabilities": [
-        "unstable",
-        "staging"
+        "unstable"
       ],
       "unfree": false,
       "version": "0.1.77",
@@ -970,7 +969,7 @@
         "out"
       ],
       "outputs": {
-        "out": "/nix/store/gwiwhx95d4g9naaw5d2sk5cfc1s3i9n3-cargo-chef-0.1.77"
+        "out": "/nix/store/dlczsn3vpi211kd7nx3zz44s91zv76bm-cargo-chef-0.1.77"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
@@ -979,20 +978,19 @@
     {
       "attr_path": "cargo-chef",
       "broken": false,
-      "derivation": "/nix/store/8z9pmxy4v7h4kjvzi40nl6sxq1ird9aa-cargo-chef-0.1.77.drv",
+      "derivation": "/nix/store/v7gzbwc7wlp41k7lx1zkjdh5sbszgj19-cargo-chef-0.1.77.drv",
       "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
       "install_id": "cargo-chef",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
       "name": "cargo-chef-0.1.77",
       "pname": "cargo-chef",
-      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
-      "rev_count": 998534,
-      "rev_date": "2026-05-15T18:21:44Z",
-      "scrape_date": "2026-05-17T08:01:17.205840Z",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:47.225579Z",
       "stabilities": [
-        "unstable",
-        "staging"
+        "unstable"
       ],
       "unfree": false,
       "version": "0.1.77",
@@ -1000,7 +998,7 @@
         "out"
       ],
       "outputs": {
-        "out": "/nix/store/y3kgb601vprj5liwdzlvjcznabkmks60-cargo-chef-0.1.77"
+        "out": "/nix/store/mix4pbs7dfkpjrlg2j7xjwqhq44zh763-cargo-chef-0.1.77"
       },
       "system": "x86_64-darwin",
       "group": "toplevel",
@@ -1009,20 +1007,19 @@
     {
       "attr_path": "cargo-chef",
       "broken": false,
-      "derivation": "/nix/store/39llrds5zrj9rgczxsjbds5y380np40y-cargo-chef-0.1.77.drv",
+      "derivation": "/nix/store/icyg1y0pky53kq3m96k7y9rwhazlj010-cargo-chef-0.1.77.drv",
       "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
       "install_id": "cargo-chef",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
       "name": "cargo-chef-0.1.77",
       "pname": "cargo-chef",
-      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
-      "rev_count": 998534,
-      "rev_date": "2026-05-15T18:21:44Z",
-      "scrape_date": "2026-05-17T08:32:09.237993Z",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:42.722537Z",
       "stabilities": [
-        "unstable",
-        "staging"
+        "unstable"
       ],
       "unfree": false,
       "version": "0.1.77",
@@ -1030,7 +1027,7 @@
         "out"
       ],
       "outputs": {
-        "out": "/nix/store/06387pr994rg44lk9czsdxf5p4nvbk0c-cargo-chef-0.1.77"
+        "out": "/nix/store/35qds405yxhg2w6csvnkhpl5ivxz1sg3-cargo-chef-0.1.77"
       },
       "system": "x86_64-linux",
       "group": "toplevel",
@@ -1691,6 +1688,122 @@
       "priority": 5
     },
     {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/8q2w01isaphqap5lxmfxdyiihfp5l3cb-glab-1.99.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "glab-1.99.0",
+      "pname": "glab",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:41.240227Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.99.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5qw6qx43ax9n1sh57szrigkwk2b4j4wj-glab-1.99.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/bml6bpm01z18vvjpz1r5f2k28gsc178g-glab-1.99.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "glab-1.99.0",
+      "pname": "glab",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:20.923513Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.99.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/76gj5sbvkkxrvx4nw34r1g5h5sxb8igp-glab-1.99.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/ifdgzgxh62x69spapv2mavsyva4hnz82-glab-1.99.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "glab-1.99.0",
+      "pname": "glab",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:48.378801Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.99.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/1dk55336bidacqai27z6c2bjzyw9ga4s-glab-1.99.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/7wlafrv5xab6v2z91rpgcs3wb9vzd5j8-glab-1.99.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "glab-1.99.0",
+      "pname": "glab",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:44.682136Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.99.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/a146bdilqcxacscd6xfmy0vigl3bjvxq-glab-1.99.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "graphviz",
       "broken": false,
       "derivation": "/nix/store/qdpip5fcflnbqfglyhjhkzai5xq8i52v-graphviz-12.2.1.drv",
@@ -1803,126 +1916,6 @@
       ],
       "outputs": {
         "out": "/nix/store/12rgns2296s4qcja778gvcbx61z77rc4-graphviz-12.2.1"
-      },
-      "system": "x86_64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "glab",
-      "broken": false,
-      "derivation": "/nix/store/33kzy40r6mxhg8zpix1jbr5fbq2f5xz4-glab-1.93.0.drv",
-      "description": "GitLab CLI tool bringing GitLab to your command line",
-      "install_id": "glab",
-      "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
-      "name": "glab-1.93.0",
-      "pname": "glab",
-      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
-      "rev_count": 998534,
-      "rev_date": "2026-05-15T18:21:44Z",
-      "scrape_date": "2026-05-17T07:05:51.857427Z",
-      "stabilities": [
-        "unstable",
-        "staging"
-      ],
-      "unfree": false,
-      "version": "1.93.0",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/9bb7i82yacnnqi7m3af0bivfg268jbvh-glab-1.93.0"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "glab",
-      "broken": false,
-      "derivation": "/nix/store/1cayz6hxk289lljz7glcwi9xaxr8lgxd-glab-1.93.0.drv",
-      "description": "GitLab CLI tool bringing GitLab to your command line",
-      "install_id": "glab",
-      "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
-      "name": "glab-1.93.0",
-      "pname": "glab",
-      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
-      "rev_count": 998534,
-      "rev_date": "2026-05-15T18:21:44Z",
-      "scrape_date": "2026-05-17T07:33:30.678793Z",
-      "stabilities": [
-        "unstable",
-        "staging"
-      ],
-      "unfree": false,
-      "version": "1.93.0",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/xvwbvdpirfd9hz5kpxcrv1h29ialrlps-glab-1.93.0"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "glab",
-      "broken": false,
-      "derivation": "/nix/store/gfry2y9zvjyqly8az15kn2rfz08dnima-glab-1.93.0.drv",
-      "description": "GitLab CLI tool bringing GitLab to your command line",
-      "install_id": "glab",
-      "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
-      "name": "glab-1.93.0",
-      "pname": "glab",
-      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
-      "rev_count": 998534,
-      "rev_date": "2026-05-15T18:21:44Z",
-      "scrape_date": "2026-05-17T08:01:18.338690Z",
-      "stabilities": [
-        "unstable",
-        "staging"
-      ],
-      "unfree": false,
-      "version": "1.93.0",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/3cybh6sb693w8rgk0ci1x7iwihlf97g5-glab-1.93.0"
-      },
-      "system": "x86_64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "glab",
-      "broken": false,
-      "derivation": "/nix/store/7gsvsfdxd98fvh8kar5kdswxyflxzhn6-glab-1.93.0.drv",
-      "description": "GitLab CLI tool bringing GitLab to your command line",
-      "install_id": "glab",
-      "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=d233902339c02a9c334e7e593de68855ad26c4cb",
-      "name": "glab-1.93.0",
-      "pname": "glab",
-      "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
-      "rev_count": 998534,
-      "rev_date": "2026-05-15T18:21:44Z",
-      "scrape_date": "2026-05-17T08:32:11.075224Z",
-      "stabilities": [
-        "unstable",
-        "staging"
-      ],
-      "unfree": false,
-      "version": "1.93.0",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/dxn5gcfk241yyxslgzvax7y5bnpi6hbs-glab-1.93.0"
       },
       "system": "x86_64-linux",
       "group": "toplevel",

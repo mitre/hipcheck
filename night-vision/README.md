@@ -9,7 +9,7 @@ threat indicators on the open source software they use.
 > This project is currently in __early development__ and is not yet suitable
 > for production deployment.
 
-## What Night Vision Does
+## What is Night Vision?
 
 With Night Vision, users will provide their package files (like `package.json`
 for most JavaScript packages) to subscribe to alerts for new cyber threats for
@@ -32,8 +32,6 @@ will be supported in future versions of Night Vision.
 ```
 
 ## Getting Started
-
-### Onboarding
 
 Before you start contributing to the project, it's a good idea to read the
 following docs:
@@ -81,25 +79,62 @@ yourself.
 Whenever you want to stop using the Flox environment, run `exit` or quit
 your terminal.
 
-### Developing on Windows
+### Limitations on Windows
 
 Unfortunately, [Nix] (which Flox uses under the hood) does not support Windows,
 and so neither does Flox. To use Flox on Windows, we recommend using WSL
 (the Windows Subsystem for Linux), which Flox supports.
 
-### Running with Docker Compose
+## Running with Docker Compose
 
-Copy `.env.example` to `.env`. The `.env` path is ignored by Git so local
-database connection settings and passwords are not committed.
+### Local Development
 
-If you change `POSTGRES_DB`, `POSTGRES_USER`, or the Postgres password after
-the database volume has already been initialized, recreate the volume before
+Local Compose uses `docker-compose.yml` plus `docker-compose.local.yml`. The
+local override builds `nv-server:local`, binds `127.0.0.1:8080`, and uses a
+clearly named local Postgres volume.
+
+```sh
+cp .env.local.example .env
+docker/scripts/setup-compose-secrets.sh -x
+docker/scripts/docker-compose-local.sh up --build
+```
+
+To choose a different local password, pass it only to the setup command:
+
+```sh
+POSTGRES_PASSWORD='replace-me' docker/scripts/setup-compose-secrets.sh -x
+```
+
+If you change `POSTGRES_DB`, `POSTGRES_USER`, or the Postgres password after the
+database volume has already been initialized, recreate the volume before
 starting Compose again:
 
 ```sh
-docker compose down -v
-docker compose up --build
+docker/scripts/docker-compose-local.sh down -v
+docker/scripts/docker-compose-local.sh up --build
 ```
+
+To validate the Docker shell scripts and local Compose configuration, run:
+
+```sh
+docker/scripts/test.sh
+```
+
+### Production Deployment
+
+Production Compose uses `docker-compose.yml` only. Copy
+`.env.production.example` to `.env` and provide explicit values for
+`NV_SERVER_IMAGE`, `NV_SERVER_DATABASE_URL_SECRET_FILE`, and
+`POSTGRES_PASSWORD_SECRET_FILE`.
+
+```sh
+docker compose up -d
+```
+
+Compose secrets are mounted from host files. They keep secret values out of
+container environment inspection and generated Compose config, but they are not
+an encrypted secret store. Secret files must contain exactly one line and must
+not be readable by group or world.
 
 ## License
 

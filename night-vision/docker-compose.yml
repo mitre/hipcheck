@@ -1,7 +1,6 @@
 x-common-service: &common-service
-  # Shared lifecycle, resource, and logging defaults for local development.
+  # Shared lifecycle, resource, and logging defaults.
   restart: unless-stopped
-  pull_policy: missing
   stop_grace_period: 30s
   cpus: 1.0
   security_opt:
@@ -15,10 +14,7 @@ x-common-service: &common-service
 services:
   nv-server:
     <<: *common-service
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: nv-server:local
+    image: ${NV_SERVER_IMAGE:?NV_SERVER_IMAGE is required}
     labels:
       org.opencontainers.image.source: "https://github.com/mitre/hipcheck/night-vision"
       org.opencontainers.image.title: "Night Vision Server"
@@ -30,23 +26,12 @@ services:
       - ALL
     tmpfs:
       - /tmp
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_HOST: ${POSTGRES_HOST:?POSTGRES_HOST is required}
-      POSTGRES_PORT: ${POSTGRES_PORT:?POSTGRES_PORT is required}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      # TODO: When nv-server supports loading secrets via environment variables, remove this dynamic
-      #       config generation and use that instead.
-      - |
-        set -eu
-        {
-          echo 'server-address = "0.0.0.0:8080"'
-          echo "database-connection = \"postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@$${POSTGRES_HOST}:$${POSTGRES_PORT}/$${POSTGRES_DB}\""
-        } > /tmp/nv-server.compose.spookey
-        exec /usr/local/bin/nv-server --config /tmp/nv-server.compose.spookey
+    secrets:
+      - source: nv-server-database-url
+        target: nv-server/database-url
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,8 +41,6 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 5
-    ports:
-      - "127.0.0.1:8080:8080"
     networks:
       - public
       - database
@@ -76,7 +59,13 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres/password
+    secrets:
+      - source: postgres-password
+        target: postgres/password
+        uid: "999"
+        gid: "999"
+        mode: 0400
     healthcheck:
       test:
         ["CMD-SHELL", 'pg_isready -d "$${POSTGRES_DB}" -U "$${POSTGRES_USER}"']
@@ -98,3 +87,9 @@ networks:
   database:
     # Keep PostgreSQL reachable only by services attached to this Compose network.
     internal: true
+
+secrets:
+  nv-server-database-url:
+    file: ${NV_SERVER_DATABASE_URL_SECRET_FILE:?NV_SERVER_DATABASE_URL_SECRET_FILE is required}
+  postgres-password:
+    file: ${POSTGRES_PASSWORD_SECRET_FILE:?POSTGRES_PASSWORD_SECRET_FILE is required}

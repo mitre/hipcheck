@@ -1,0 +1,22 @@
+services:
+  nv-server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: nv-server:local
+    pull_policy: missing
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  postgres:
+    pull_policy: missing
+
+volumes:
+  postgres-data:
+    name: night-vision-local-postgres-data
+
+secrets:
+  nv-server-database-url:
+    file: ${NV_SERVER_DATABASE_URL_SECRET_FILE:-.secrets/nv-server-database-url}
+  postgres-password:
+    file: ${POSTGRES_PASSWORD_SECRET_FILE:-.secrets/postgres-password}

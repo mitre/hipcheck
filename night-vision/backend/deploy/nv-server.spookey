@@ -7,8 +7,11 @@
 # service routing can reach the server.
 server-address = "0.0.0.0:8080"
 
-# The connection string for the database.
-database-connection = "postgres://postgres:5432/nv"
+# The path to the secret file containing the database connection string.
+#
+# This file is mounted as part of starting up the container in our
+# `docker compose` configuration.
+database-connection-file = "/run/secrets/nv-server/database-url"
 
 # Maximum size in bytes for the request body.
 #
