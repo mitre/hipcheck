@@ -65,7 +65,8 @@ COPY --from=planner /usr/src/night-vision/recipe.json recipe.json
 # As before, use cache mounts for better perf.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    cargo chef cook --locked --release --recipe-path recipe.json
+    cargo chef cook --locked --release --recipe-path recipe.json \
+    && chown -R root:root target
 
 COPY . .
 

@@ -21,41 +21,8 @@ the [README](README.md#getting-started):
 
 ## Development Environment
 
-Night Vision uses [Flox](https://flox.dev/) to provide a consistent developer
-environment. The canonical setup instructions are in the
-[README](README.md#installing-tools), and the Flox-specific MITRE network and
-certificate guidance is in [docs/project/flox.md](docs/project/flox.md).
-
-At a high level:
-
-1. Install Git.
-2. Install Flox version 1.12.0 or later.
-3. Clone the repository:
-
-   ```sh
-   git clone git@gitlab.mitre.org:night-vision/night-vision.git
-   ```
-
-4. Enter the repository and activate Flox:
-
-   ```sh
-   cd night-vision
-   flox activate
-   ```
-
-5. If Flox or Nix cannot access GitLab or other network resources while you are
-   on the MITRE network, follow [docs/project/flox.md](docs/project/flox.md) to
-   configure MITRE root certificates for Nix.
-
-Windows contributors should use WSL for Flox, as described in the
-[README](README.md#developing-on-windows).
-
-Some contributors use [Jujutsu](https://www.jj-vcs.dev/) locally. If you want
-to use it, activate Flox first, then run:
-
-```sh
-jj git init --colocate
-```
+Follow the [getting started instructions in the project README](README.md#getting-started)
+to set up your development environment.
 
 ## Working on Changes
 
@@ -83,11 +50,10 @@ For backend changes:
 
 ```sh
 cd backend
-cargo fmt --check
-cargo clippy --workspace --all-targets
-cargo nextest run
-cargo xtask lint
+cargo xtask ci
 ```
+
+Confirm `cargo xtask ci` completes cleanly before submitting an MR.
 
 For frontend changes:
 

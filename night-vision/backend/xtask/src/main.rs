@@ -30,6 +30,7 @@ fn run() -> Result<()> {
                         .trailing_var_arg(true),
                 ),
         )
+        .subcommand(Command::new("ci").about("Run CI checks for the workspace"))
         .subcommand(Command::new("lint").about("Lint crates in the workspace"))
         .subcommand(
             Command::new("unit-graph")
@@ -59,6 +60,7 @@ $ RUSTC_BOOTSTRAP=1 cargo -Z unstable-options <BUILD_CMD> --unit-graph | cargo x
 
     match matches.subcommand() {
         Some(("add", cmd)) => command::add(cmd)?,
+        Some(("ci", cmd)) => command::ci(cmd)?,
         Some(("lint", cmd)) => command::lint(cmd)?,
         Some(("unit-graph", cmd)) => command::unit_graph(cmd)?,
         Some(_) => unimplemented!("unknown command"),
