@@ -17,3 +17,12 @@ $ pnpm run build
 # Preview the production build
 $ pnpm run preview
 ```
+
+## Docker
+
+Build and run the production container from the repository root:
+
+```sh
+$ docker build -f frontend/Dockerfile -t nv-app:local frontend
+$ docker run --rm -p 127.0.0.1:3000:3000 nv-app:local
+```

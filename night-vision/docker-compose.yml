@@ -12,6 +12,36 @@ x-common-service: &common-service
       max-file: "3"
 
 services:
+  nv-app:
+    <<: *common-service
+    image: ${NV_APP_IMAGE:?NV_APP_IMAGE is required}
+    labels:
+      org.opencontainers.image.source: "https://github.com/mitre/hipcheck/night-vision"
+      org.opencontainers.image.title: "Night Vision App"
+      org.opencontainers.image.description: "Night Vision frontend application"
+    init: true
+    mem_limit: 256m
+    read_only: true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    networks:
+      - public
+
   nv-server:
     <<: *common-service
     image: ${NV_SERVER_IMAGE:?NV_SERVER_IMAGE is required}
