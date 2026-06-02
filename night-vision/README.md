@@ -26,9 +26,16 @@ will be supported in future versions of Night Vision.
 
 ```text
 .
-├── backend/    The backend REST API (in Rust) and PostgreSQL database.
-├── docs/       Internal project documentation.
-└── frontend/   The frontend application (in TypeScript w/ SvelteKit).
+├── .env.local.example        Example environment file for local Docker Compose.
+├── .env.production.example   Example environment file for production Docker Compose.
+├── .flox/                    Flox development environment configuration.
+├── backend/                  The backend REST API and database handling.
+├── docs/                     Internal project documentation.
+├── frontend/                 The frontend application in TypeScript w/ SvelteKit.
+├── scripts/                  Helper scripts for local Docker Compose and testing.
+├── CONTRIBUTING.md           Contribution workflow and project conventions.
+├── docker-compose.local.yml  Local Docker Compose overrides.
+└── docker-compose.yml        Base Docker Compose configuration.
 ```
 
 ## Getting Started
