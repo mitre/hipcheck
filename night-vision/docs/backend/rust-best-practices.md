@@ -1,7 +1,7 @@
 
 # Rust Best Practices
 
-The following a living document of recommendations for how to write Rust code
+The following is a living document of recommendations for how to write Rust code
 effectively. The lessons learned here are from a mix of personal experiences
 and folk knowledge passed on from public retrospectives and discussions with
 Rustaceans inside and outside of MITRE.
@@ -19,7 +19,7 @@ editors of the code to understand why the code is designed the way it is,
 and to make informed decisions about whether the deviation is justified or
 ought to be maintained in the future.
 
-Many of the items which _would_ be recommendations listed here are instead
+Many of the items that _would_ be recommendations listed here are instead
 enforced via our custom `cargo clippy` configuration ("clippy" is Rust's
 standard linter, which implements a variety of checks beyond those provided
 by the Rust compiler itself).
@@ -34,7 +34,7 @@ The following are some basic ideas for writing clear and idiomatic Rust code.
 
 ### Follow the Rust API Guidelines on Naming
 
-Rust has specific expected patterns for how to name things (crates, modules, 
+Rust has specific expected patterns for how to name things (crates, modules,
 types, etc.), which you can find in the [Rust API Guidelines' section on
 naming][naming].
 
@@ -46,7 +46,7 @@ code.
 
 ### Be Very Careful About Cancellation Safety
 
-In async Rust, futures only run whe `poll`-ed. As such, a future is "cancelled"
+In async Rust, futures only run when `poll`-ed. As such, a future is "cancelled"
 if it is never polled again; usually because it's been dropped.
 
 A future is "cancellation safe" if it can be dropped at any time without
@@ -73,11 +73,11 @@ through. That said, we may re-evaluate that choice in the future, and request
 handlers shouldn't _rely_ on the `continue` behavior as a guarantee of
 cancellation safety.
 
-### Use `spawn_blocking` for Heavy Work On-CPU
+### Use `spawn_blocking` for Heavy Work On CPU
 
 One of the key challenges in working with any asynchronous system is minimizing
 any single task's use of a thread. Async Rust tasks offer cooperative,
-rather than preemptive, concurrency; meaning that a misbehaving task that
+rather than preemptive, concurrency, meaning that a misbehaving task that
 monopolizes a thread to which it's been scheduled can't be removed by the Tokio
 scheduler until it hits its next `await` point.
 
@@ -98,13 +98,13 @@ and the bound should be made configurable via `nv-server`'s configuration file.
 The reason is simple: channels hitting max depth is an inherent mechanism
 for backpressure, i.e. it lets senders know they need to slow down.
 
-Without a built in mechanism for backpressure, you get what Bryan Cantrill
+Without a built-in mechanism for backpressure, you get what Bryan Cantrill
 calls ["God's own backpressure"][backpressure], meaning that the system will
 start to break in ways that apply uncontrolled "backpressure" on senders in the
 form of things like allocation problems.
 
 "God's own backpressure" is *much* harder to deal with, and can have a much
-larger blast-radius (impacting the entire server) vs. planned backpressure
+larger blast radius (impacting the entire server) vs. planned backpressure,
 which may increase latency on a single request.
 
 ## Supply Chain Security
@@ -128,7 +128,7 @@ Use `cargo udeps` to identify and remove unused dependencies.
 ### Keep Dependencies Up-to-Date
 
 Use `cargo outdated` to identify and update or remove outdated dependencies.
-When the outdated dependencies are transient dependencies, consider reaching
+When the outdated dependencies are transitive dependencies, consider reaching
 out to the upstream project that integrates the out-of-date dependency to get
 them to upgrade or help them to do so.
 
@@ -178,7 +178,7 @@ you want to ensure that both building and running build scripts is as fast as
 possible.
 
 To keep build scripts building fast, minimize build script dependencies, even
-if it means you need to write more code yourself. Avoid lots of generic in
+if it means you need to write more code yourself. Avoid lots of generic code in
 build scripts as well, to minimize the time spent on codegen when building
 them. Ideal build scripts have only a few small dependencies, if any, and
 incorporate no generic code.
@@ -222,7 +222,7 @@ be slow to compile. The most common libraries used in these crates include
 parsing for Rust source code, and which is itself very large.
 
 If you're considering using a third-party procedural macro crate, check if it's
-using `syn` as a dependency, and if it is, check the feature it's compiling
+using `syn` as a dependency, and if it is, check the features it's compiling
 `syn` with. `syn`'s feature-set is rich, and the crate offers a variety of
 features which can be turned on or off to include or exclude features. Users of
 `syn` should ideally trim those features down to only the ones they are using,
@@ -232,7 +232,7 @@ transitive dependencies, thanks to the use of a `workspace-hack` crate managed
 by `cargo-hakari`.
 
 If you're considering writing your own procedural macro crate, consider
-alternatives to `syn`, such as `unsynn` or `facet`, which trade-off some of
+alternatives to `syn`, such as `unsynn` or `facet`, which trade off some of
 `syn`'s power for much faster compilation.
 
 ### Reduce Dependencies and Reduce Features
@@ -262,7 +262,7 @@ place.
 
 While freely cloning data can be a useful crutch when first learning the
 language, it's something to avoid most of the time in production code. Often,
-issues with insuffuciently-long lifetimes are an indicator that the code is
+issues with insufficiently long lifetimes are an indicator that the code is
 structured improperly and needs to be refactored such that the owner *does*
 live long enough.
 
@@ -325,17 +325,17 @@ CLI that bring an enormous number of improvements, such as:
 - The ability to output Perfetto traces of tests, for performance analysis.
 - The ability to partition tests across CI runners.
 - Support for setup scripts to run before tests.
-- A bunch of additional tool integrations for debugging, mutation testing, 
+- A bunch of additional tool integrations for debugging, mutation testing,
   coverage analysis, and more.
 
-Use `cargo nextest r` to run tests, instead of the default `cargo text`
+Use `cargo nextest run` to run tests, instead of the default `cargo test`
 command.
 
 ### Use `insta` and `cargo-insta` For Snapshot Tests
 
 Sometimes you want to have tests which validate that some output does not
 change over time. In our context for `nv-server`, this can be very useful for
-validating the endpoint responses do not change over time, catching things
+validating that endpoint responses do not change over time, catching things
 like error code regressions.
 
 For snapshot testing, use the library `insta` and the `cargo-insta` CLI.
