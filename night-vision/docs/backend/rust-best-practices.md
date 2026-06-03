@@ -38,6 +38,75 @@ Rust has specific expected patterns for how to name things (crates, modules,
 types, etc.), which you can find in the [Rust API Guidelines' section on
 naming][naming].
 
+## Async Rust
+
+`dropshot`, which we're using as our REST API library, makes extensive use of
+`async` in Rust. As such, it's important we know how to write correct async
+code.
+
+### Be Very Careful About Cancellation Safety
+
+In async Rust, futures only run whe `poll`-ed. As such, a future is "cancelled"
+if it is never polled again; usually because it's been dropped.
+
+A future is "cancellation safe" if it can be dropped at any time without
+causing 1) data corruption, 2) data loss, or 3) leaving shared state in an
+invalid condition.
+
+The Oxide guide, ["Dealing with cancel safety in async Rust"][cancel] does an
+excellent job covering the technical details of what cancellation safety is,
+when it can cause problems, and how to deal with it.
+
+Cancellation is of [particular concern in `dropshot`][cancel_dropshot] and by
+extension `nv-server` because each request handler is running in a Tokio task
+(a "top-level" `Future` that Tokio takes responsibility for scheduling), and
+that `Future` may be dropped if the user disconnects before the response is
+completed.
+
+This behavior on disconnect is configurable in `nv-server`'s configuration
+file with the `http-early-disconnect-behavior` key. This is set to `continue`
+by default, meaning that if a user disconnects we will still run our request
+handler to completion even though they won't get our reply. We consider this
+the most-safe option, since we're less likely to encounter unusual broken
+states in-memory or in the database due to handlers that were cancelled partway
+through. That said, we may re-evaluate that choice in the future, and request
+handlers shouldn't _rely_ on the `continue` behavior as a guarantee of
+cancellation safety.
+
+### Use `spawn_blocking` for Heavy Work On-CPU
+
+One of the key challenges in working with any asynchronous system is minimizing
+any single task's use of a thread. Async Rust tasks offer cooperative,
+rather than preemptive, concurrency; meaning that a misbehaving task that
+monopolizes a thread to which it's been scheduled can't be removed by the Tokio
+scheduler until it hits its next `await` point.
+
+For that reason, it's important to put any work which may take a long time
+on-CPU onto the "blocking" thread pool that Tokio maintains, with
+`spawn_blocking`.
+
+This is, of course, a judgment call about how long is "too long," and while
+some cases may be obvious a priori, others may only be discovered as necessary
+based on performance analysis.
+
+### Bound All Channels
+
+There may be situations where it's necessary to establish a channel between two
+Tokio tasks. When that arises, the channel's maximum depth *must* be bounded,
+and the bound should be made configurable via `nv-server`'s configuration file.
+
+The reason is simple: channels hitting max depth is an inherent mechanism
+for backpressure, i.e. it lets senders know they need to slow down.
+
+Without a built in mechanism for backpressure, you get what Bryan Cantrill
+calls ["God's own backpressure"][backpressure], meaning that the system will
+start to break in ways that apply uncontrolled "backpressure" on senders in the
+form of things like allocation problems.
+
+"God's own backpressure" is *much* harder to deal with, and can have a much
+larger blast-radius (impacting the entire server) vs. planned backpressure
+which may increase latency on a single request.
+
 ## Supply Chain Security
 
 Open source software is a double-edged sword. On the one hand, you get the
@@ -300,5 +369,8 @@ incorrect behavior to ensure the system does not _regress_ and behave
 incorrectly in those situations again.
 
 [api]: https://rust-lang.github.io/api-guidelines/about.html
+[backpressure]: https://www.youtube.com/watch?v=1NHbPN9pNPM
+[cancel]: https://rfd.shared.oxide.computer/rfd/0400
+[cancel_dropshot]: https://rfd.shared.oxide.computer/rfd/0397
 [naming]: https://rust-lang.github.io/api-guidelines/naming.html#casing-conforms-to-rfc-430-c-case
 [ngif]: https://www.possiblerust.com/pattern/non-generic-inner-functions
