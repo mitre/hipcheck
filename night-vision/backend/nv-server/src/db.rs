@@ -1,6 +1,7 @@
 //! Handles interactions with the database.
 
 use crate::{config::Config, error::FatalError};
+use migration::{Migrator, MigratorTrait as _};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use secrecy::ExposeSecret;
 use std::time::Duration;
@@ -38,5 +39,14 @@ pub async fn connection(config: &Config) -> Result<DatabaseConnection, FatalErro
         .await
         .map_err(FatalError::FailedToConnectToDatabase)?;
 
+    run_all_migrations(&db).await?;
+
     Ok(db)
+}
+
+pub async fn run_all_migrations(db: &DatabaseConnection) -> Result<(), FatalError> {
+    Migrator::up(db, None)
+        .await
+        .map_err(FatalError::FailedToConnectToDatabase)?;
+    Ok(())
 }
