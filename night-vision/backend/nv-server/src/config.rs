@@ -31,6 +31,10 @@ pub struct Config {
     /// The default is `127.0.0.1` at an arbitrary available port..
     pub server_address: String,
 
+    /// The path to the OpenAPI Definition file to write on startup.
+    /// If unset, will not write out the OpenAPI Definition.
+    pub openapi_dest_path: Option<Utf8PathBuf>,
+
     /// The maximum size in bytes for the request body.
     ///
     /// The default is 1024 bytes.
@@ -122,6 +126,7 @@ impl Config {
                 // parsing with `spookey`.
                 required_keys: vec!["server-address"],
                 optional_keys: vec![
+                    "openapi-dest-path",
                     "http-request-body-max-bytes",
                     "http-early-disconnect-behavior",
                     "database-connection",
@@ -162,6 +167,8 @@ impl Config {
         // PANIC SAFETY: We've already checked that it's Some above.
         let server_address: String = parse_value(&parsed, "server-address", &mut errors)
             .expect("server-address is required");
+        let openapi_dest_path: Option<Utf8PathBuf> =
+            parse_value(&parsed, "openapi-dest-path", &mut errors);
         let http_request_body_max_bytes =
             parse_value(&parsed, "http-request-body-max-bytes", &mut errors);
         let http_early_disconnect_behavior =
@@ -195,6 +202,7 @@ impl Config {
         let config = Config {
             config_file_path: path.into(),
             server_address,
+            openapi_dest_path,
             http_request_body_max_bytes,
             http_early_disconnect_behavior,
             database_connection_source,
@@ -283,6 +291,10 @@ impl Display for Config {
 
         write_report_line!(f, "server-address", &self.server_address)?;
         write_report_line!(f, "database-connection", &self.database_connection_source)?;
+
+        if let Some(openapi_dest_path) = &self.openapi_dest_path {
+            write_report_line!(f, "openapi-dest-path", openapi_dest_path)?;
+        }
 
         if let Some(max_bytes) = self.http_request_body_max_bytes {
             write_report_line!(f, "http-request-body-max-bytes", &max_bytes)?;

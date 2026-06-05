@@ -20,6 +20,11 @@ server-address = "127.0.0.1:8080"
 database-connection = "postgres://localhost:5432/nv"
 database-connection-file =
 
+# The destination path to write the OpenAPI Definition file.
+# If this is a relative directory, it will be treated as relative to the rust
+# workspace directory where nv-server was compiled.
+openapi-dest-path = "openapi/nv-server-openapi.json"
+
 # Maximum size in bytes for the request body.
 #
 # Default: 1024

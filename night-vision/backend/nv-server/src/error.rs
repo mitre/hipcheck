@@ -18,6 +18,9 @@ pub enum FatalError {
     FailedToParseConfigFile(Utf8PathBuf, spookey::Error),
     FailedToParseConfigFileFields(Utf8PathBuf, ConfigErrors),
     FailedToReadSecretFile(Utf8PathBuf, SecretFileError),
+    FailedToCreateOpenApiDescFile(Utf8PathBuf, std::io::Error),
+    FailedToWriteOpenApiDescFile(Utf8PathBuf, serde_json::Error),
+    NoOpenApiDestPathInOpenApiMode(),
     UnknownServerError(String),
 }
 
@@ -64,6 +67,18 @@ impl Display for FatalError {
             FatalError::FailedToReadSecretFile(path, _) => {
                 write!(f, "failed to read secret file '{}'", path)
             }
+            FatalError::FailedToCreateOpenApiDescFile(path, _) => {
+                write!(f, "failed to create OpenAPI Description file '{path}'")
+            }
+            FatalError::FailedToWriteOpenApiDescFile(path, _) => {
+                write!(f, "failed to write OpenAPI Description file '{path}'")
+            }
+            FatalError::NoOpenApiDestPathInOpenApiMode() => {
+                write!(
+                    f,
+                    "cannot write OpenAPI Description with no destination path set in config file"
+                )
+            }
             FatalError::UnknownServerError(s) => write!(f, "unknown server error: {}", s),
         }
     }
@@ -81,6 +96,9 @@ impl std::error::Error for FatalError {
             FatalError::FailedToParseConfigFile(_, err) => Some(err),
             FatalError::FailedToParseConfigFileFields(_, err) => Some(err),
             FatalError::FailedToReadSecretFile(_, err) => Some(err),
+            FatalError::FailedToCreateOpenApiDescFile(_, err) => Some(err),
+            FatalError::FailedToWriteOpenApiDescFile(_, err) => Some(err),
+            FatalError::NoOpenApiDestPathInOpenApiMode() => None,
             FatalError::UnknownServerError(_) => None,
         }
     }

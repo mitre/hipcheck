@@ -2086,6 +2086,7 @@ dependencies = [
  "nv-server-api",
  "sea-orm",
  "secrecy",
+ "serde_json",
  "slog",
  "spookey",
  "tokio",

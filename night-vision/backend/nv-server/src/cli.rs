@@ -9,6 +9,12 @@ pub struct Cli {
     matches: ArgMatches,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum RunMode {
+    Normal,
+    WriteOpenApi,
+}
+
 impl Cli {
     /// Get the args passed on the CLI.
     pub fn args(env: &Env) -> Self {
@@ -28,6 +34,12 @@ impl Cli {
                     .default_value(crate::config::DEFAULT_CONFIG_FILE)
                     .help("Path to the configuration file"),
             )
+            .arg(
+                clap::Arg::new("openapi")
+                    .long("openapi")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Write the OpenAPI Description and exit without starting the server"),
+            )
             .get_matches();
 
         Self { matches }
@@ -39,5 +51,13 @@ impl Cli {
         self.matches
             .get_one::<Utf8PathBuf>("config")
             .expect("config path is required")
+    }
+
+    pub fn run_mode(&self) -> RunMode {
+        if self.matches.get_flag("openapi") {
+            RunMode::WriteOpenApi
+        } else {
+            RunMode::Normal
+        }
     }
 }

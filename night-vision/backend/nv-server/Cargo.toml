@@ -13,6 +13,7 @@ nv-server-api.workspace = true
 migration.workspace = true
 sea-orm.workspace = true
 secrecy.workspace = true
+serde_json.workspace = true
 slog.workspace = true
 spookey.workspace = true
 tokio.workspace = true
