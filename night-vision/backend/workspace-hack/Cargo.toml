@@ -16,6 +16,7 @@ publish = false
 ### BEGIN HAKARI SECTION
 [dependencies]
 base64 = { version = "0.22" }
+camino = { version = "1", default-features = false, features = ["serde1"] }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive", "env", "string"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "env", "help", "std", "string", "suggestions", "usage"] }

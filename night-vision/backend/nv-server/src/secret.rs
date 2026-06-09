@@ -10,6 +10,8 @@ use std::{
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(windows)]
+use windows_acls::FilePermissionsExt;
 
 /// A configured source for a secret value.
 #[derive(Debug)]
@@ -103,11 +105,7 @@ impl Display for SecretFileError {
             SecretFileError::Read(_) => write!(f, "failed to read secret file"),
             SecretFileError::Metadata(_) => write!(f, "failed to read secret file metadata"),
             SecretFileError::Empty => write!(f, "secret file is empty"),
-            SecretFileError::InsecurePermissions(mode) => write!(
-                f,
-                "secret file permissions are too broad: expected no group or world permissions, got {:o}",
-                mode
-            ),
+            SecretFileError::InsecurePermissions(mode) => display_insecure_permissions(f, *mode),
             SecretFileError::MultipleLines => write!(f, "secret file contains multiple lines"),
         }
     }
@@ -122,6 +120,28 @@ impl Error for SecretFileError {
             | SecretFileError::MultipleLines => None,
         }
     }
+}
+
+#[cfg(unix)]
+fn display_insecure_permissions(f: &mut std::fmt::Formatter<'_>, mode: u32) -> std::fmt::Result {
+    write!(
+        f,
+        "secret file permissions are too broad: expected no group or world permissions, got {:o}",
+        mode
+    )
+}
+
+#[cfg(windows)]
+fn display_insecure_permissions(f: &mut std::fmt::Formatter<'_>, _mode: u32) -> std::fmt::Result {
+    write!(
+        f,
+        "secret file permissions are too broad: expected no broad Windows principals with read access"
+    )
+}
+
+#[cfg(not(any(unix, windows)))]
+fn display_insecure_permissions(f: &mut std::fmt::Formatter<'_>, _mode: u32) -> std::fmt::Result {
+    write!(f, "secret file permissions are too broad")
 }
 
 fn read_secret_file(path: &Utf8Path) -> Result<SecretString, SecretFileError> {
@@ -149,6 +169,7 @@ fn validate_secret_file_permissions(path: &Utf8Path) -> Result<(), SecretFileErr
         .mode()
         & 0o777;
 
+    // The secret file must not be accessible to anyone other than its owner.
     if mode & 0o077 != 0 {
         return Err(SecretFileError::InsecurePermissions(mode));
     }
@@ -156,7 +177,19 @@ fn validate_secret_file_permissions(path: &Utf8Path) -> Result<(), SecretFileErr
     Ok(())
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+fn validate_secret_file_permissions(path: &Utf8Path) -> Result<(), SecretFileError> {
+    let allows_broad_read = path
+        .allows_broad_read()
+        .map_err(SecretFileError::Metadata)?;
+    if allows_broad_read {
+        return Err(SecretFileError::InsecurePermissions(0));
+    }
+
+    Ok(())
+}
+
+#[cfg(not(any(unix, windows)))]
 fn validate_secret_file_permissions(_path: &Utf8Path) -> Result<(), SecretFileError> {
     Ok(())
 }

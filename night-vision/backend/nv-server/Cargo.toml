@@ -16,4 +16,5 @@ secrecy.workspace = true
 slog.workspace = true
 spookey.workspace = true
 tokio.workspace = true
+windows-acls.workspace = true
 workspace-hack.workspace = true

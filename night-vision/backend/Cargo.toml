@@ -5,7 +5,16 @@
 [workspace]
 
 resolver = "3"
-members = ["migration", "nv-server", "nv-server-api", "nvdb", "spookey", "workspace-hack", "xtask"]
+members = [
+    "migration",
+    "nv-server",
+    "nv-server-api",
+    "nvdb",
+    "spookey",
+    "windows-acls",
+    "workspace-hack",
+    "xtask",
+]
 default-members = ["nv-server"]
 
 
@@ -51,6 +60,7 @@ spookey = { path = "spookey" }
 # Should match the version used by `newtype-uuid`.
 uuid = "1.18.1"
 which = "8.0.2"
+windows-acls = { path = "windows-acls" }
 workspace-hack = { path = "workspace-hack" }
 xshell = "0.2.7"
 secrecy = "0.10.3"

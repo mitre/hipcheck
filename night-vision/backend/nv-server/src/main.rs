@@ -1,3 +1,5 @@
+#![deny(unsafe_code)]
+
 mod api;
 mod cli;
 mod config;

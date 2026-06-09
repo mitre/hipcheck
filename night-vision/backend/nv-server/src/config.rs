@@ -619,6 +619,9 @@ mod tests {
         sync::atomic::{AtomicUsize, Ordering},
     };
 
+    #[cfg(windows)]
+    use std::process::Command;
+
     use super::*;
 
     static TEST_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -664,6 +667,37 @@ mod tests {
 
     fn restrict_secret_file_permissions(path: &Utf8Path) {
         set_file_mode(path, 0o600);
+    }
+
+    #[cfg(windows)]
+    struct GrantReadAclGuard<'a> {
+        path: &'a Utf8Path,
+    }
+
+    #[cfg(windows)]
+    impl<'a> GrantReadAclGuard<'a> {
+        fn new(path: &'a Utf8Path) -> Self {
+            // Grants access to "everyone". `*S-1-1-0` is the SID for "Everyone" and `:R` means
+            // we're setting a read permission, so this makes our secure file readable to everyone.
+            let status = Command::new("icacls")
+                .arg(path.as_std_path())
+                .args(["/grant", "*S-1-1-0:R"])
+                .status()
+                .expect("failed to grant test file read access");
+            assert!(status.success(), "failed to grant test file read access");
+
+            Self { path }
+        }
+    }
+
+    #[cfg(windows)]
+    impl Drop for GrantReadAclGuard<'_> {
+        fn drop(&mut self) {
+            let _ = Command::new("icacls")
+                .arg(self.path.as_std_path())
+                .args(["/remove:g", "*S-1-1-0"])
+                .status();
+        }
     }
 
     fn redact_database_conn_password(conn: &str) -> String {
@@ -1111,6 +1145,30 @@ mod tests {
         assert!(matches!(
             secret_error,
             SecretFileError::InsecurePermissions(0o644)
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn config_parse_rejects_insecure_database_connection_file_permissions() {
+        let secret_file = TempConfigFile::new("postgres://user:password@localhost:5432/nv\n");
+        let _grant_read = GrantReadAclGuard::new(secret_file.path());
+        let file = TempConfigFile::new(&format!(
+            "server-address = 127.0.0.1:0\n\
+            database-connection-file = {}\n",
+            secret_file.path()
+        ));
+
+        let error =
+            Config::parse(file.path()).expect_err("broadly-readable secret file should fail");
+
+        let FatalError::FailedToReadSecretFile(error_path, secret_error) = error else {
+            panic!("expected FailedToReadSecretFile, got {error:?}");
+        };
+        assert_eq!(error_path, secret_file.path);
+        assert!(matches!(
+            secret_error,
+            SecretFileError::InsecurePermissions(0)
         ));
     }
 
