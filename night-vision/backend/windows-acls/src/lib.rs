@@ -30,7 +30,7 @@ pub trait FilePermissionsExt {
 }
 
 #[cfg(not(windows))]
-impl FilePermissionsExt for Path {
+impl FilePermissionsExt for std::path::Path {
     fn allows_broad_read(&self) -> io::Result<bool> {
         Ok(false)
     }
