@@ -613,6 +613,9 @@ impl std::error::Error for ConfigErrors {}
 #[cfg(test)]
 mod tests {
     use crate::secret::SecretFileError;
+    #[cfg(unix)]
+    use crate::test_util::TestFilePermissions;
+    use crate::test_util::{restrict_secret_file_permissions, set_file_permissions};
     use secrecy::ExposeSecret;
     use std::{
         fs,
@@ -654,19 +657,6 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_file(&self.path);
         }
-    }
-
-    #[cfg(unix)]
-    fn set_file_mode(path: &Utf8Path, mode: u32) {
-        let permissions = std::os::unix::fs::PermissionsExt::from_mode(mode);
-        fs::set_permissions(path, permissions).expect("failed to set test file permissions");
-    }
-
-    #[cfg(not(unix))]
-    fn set_file_mode(_path: &Utf8Path, _mode: u32) {}
-
-    fn restrict_secret_file_permissions(path: &Utf8Path) {
-        set_file_mode(path, 0o600);
     }
 
     #[cfg(windows)]
@@ -1129,7 +1119,10 @@ mod tests {
     #[test]
     fn config_parse_rejects_insecure_database_connection_file_permissions() {
         let secret_file = TempConfigFile::new("postgres://user:password@localhost:5432/nv\n");
-        set_file_mode(secret_file.path(), 0o644);
+        set_file_permissions(
+            secret_file.path(),
+            TestFilePermissions::UnixGroupOrWorldReadable,
+        );
         let file = TempConfigFile::new(&format!(
             "server-address = 127.0.0.1:0\n\
             database-connection-file = {}\n",

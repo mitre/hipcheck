@@ -9,6 +9,8 @@ mod error;
 mod log;
 mod rt;
 mod secret;
+#[cfg(test)]
+mod test_util;
 
 /// Run the Night Vision server.
 fn main() -> Result<(), error::FatalError> {
