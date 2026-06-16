@@ -5,7 +5,7 @@
 //! this crate keeps that code out of callers such as `nv-server`.
 
 use camino::{Utf8Path, Utf8PathBuf};
-use std::{io, path::Path};
+use std::io;
 
 #[cfg(windows)]
 mod windows;

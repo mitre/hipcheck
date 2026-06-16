@@ -199,7 +199,9 @@ mod tests {
     use super::*;
     #[cfg(unix)]
     use crate::test_util::TestFilePermissions;
-    use crate::test_util::{restrict_secret_file_permissions, set_file_permissions};
+    #[cfg(unix)]
+    use crate::test_util::set_file_permissions;
+    use crate::test_util::restrict_secret_file_permissions;
     use secrecy::ExposeSecret;
     use std::{
         fs,
