@@ -3,7 +3,7 @@
 # Build with:
 #
 #   docker build \
-#     --secret id=ca_file,src="$HOME/.config/certs/SystemCerts.pem" \
+#     --secret id=ca_file,src="$HOME/.config/certs/system_certs.pem" \
 #     --build-arg IMAGE_CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 #     --build-arg IMAGE_REVISION="$(git rev-parse HEAD)" \
 #     --build-arg IMAGE_VERSION="0.1.0" \

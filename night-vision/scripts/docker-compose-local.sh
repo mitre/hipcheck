@@ -9,8 +9,9 @@
 #
 # The wrapper applies `docker-compose.local.yml`, stages local secret files into
 # a Docker-approved host mount directory, sets a local Compose project name, and
-# defaults `NV_SERVER_IMAGE` to `nv-server:local`. Pass any normal `docker
-# compose` arguments after the script name.
+# defaults the local service image names. If `CA_FILE_SECRET_FILE` is set, it is
+# staged and passed to the backend Dockerfile as the `ca_file` build secret. Pass
+# any normal `docker compose` arguments after the script name.
 
 set -eu
 
@@ -47,8 +48,10 @@ usage() {
     cat <<'EOF'
 Runs Docker Compose from the repository root with docker-compose.yml and
 docker-compose.local.yml. COMPOSE_PROJECT_NAME defaults to night-vision-local,
-NV_SERVER_IMAGE defaults to nv-server:local, and DOCKER_SECRET_MOUNT_DIR
-overrides the Docker-approved host directory used for staged local secrets.
+NV_APP_IMAGE defaults to nv-app:local, NV_SERVER_IMAGE defaults to
+nv-server:local, and DOCKER_SECRET_MOUNT_DIR overrides the Docker-approved host
+directory used for staged local secrets. Set CA_FILE_SECRET_FILE to pass network
+CA certificates to the backend image build.
 EOF
 }
 
@@ -161,15 +164,45 @@ stage_secret_file() {
     install -m 600 "$source_path" "$target_path"
 }
 
+yaml_single_quote() {
+    printf "'"
+    printf '%s' "$1" | sed "s/'/''/g"
+    printf "'\n"
+}
+
+write_ca_file_compose_override() {
+    target_path=$1
+    ca_file_secret_file=$2
+    quoted_ca_file_secret_file=$(yaml_single_quote "$ca_file_secret_file")
+
+    install -d -m 700 "$(dirname "$target_path")"
+    {
+        printf '%s\n' 'services:'
+        printf '%s\n' '  nv-server:'
+        printf '%s\n' '    build:'
+        printf '%s\n' '      secrets:'
+        printf '%s\n' '        - source: ca_file'
+        printf '%s\n' '          target: ca_file'
+        printf '%s\n' ''
+        printf '%s\n' 'secrets:'
+        printf '%s\n' '  ca_file:'
+        printf '    file: %s\n' "$quoted_ca_file_secret_file"
+    } > "$target_path"
+    chmod 600 "$target_path"
+}
+
 source_postgres_password_secret_file=$(absolute_path "$(env_file_value POSTGRES_PASSWORD_SECRET_FILE .secrets/postgres-password)")
 source_nv_server_database_url_secret_file=$(absolute_path "$(env_file_value NV_SERVER_DATABASE_URL_SECRET_FILE .secrets/nv-server-database-url)")
+source_ca_file_secret_file=$(env_file_value CA_FILE_SECRET_FILE "")
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-night-vision-local}"
+export NV_APP_IMAGE="${NV_APP_IMAGE:-nv-app:local}"
 export NV_SERVER_IMAGE="${NV_SERVER_IMAGE:-nv-server:local}"
 
 staged_secret_dir=$(approved_mount_root)/$COMPOSE_PROJECT_NAME
 postgres_password_secret_file=$staged_secret_dir/postgres-password
 nv_server_database_url_secret_file=$staged_secret_dir/nv-server-database-url
+ca_file_compose_override_file=
 
 stage_secret_file "Postgres password secret" "$source_postgres_password_secret_file" "$postgres_password_secret_file"
 stage_secret_file "nv-server database URL secret" "$source_nv_server_database_url_secret_file" "$nv_server_database_url_secret_file"
@@ -177,11 +210,28 @@ stage_secret_file "nv-server database URL secret" "$source_nv_server_database_ur
 export POSTGRES_PASSWORD_SECRET_FILE="$postgres_password_secret_file"
 export NV_SERVER_DATABASE_URL_SECRET_FILE="$nv_server_database_url_secret_file"
 
+if [ -n "$source_ca_file_secret_file" ]; then
+    source_ca_file_secret_file=$(absolute_path "$source_ca_file_secret_file")
+    ca_file_secret_file=$staged_secret_dir/ca_file
+    ca_file_compose_override_file=$staged_secret_dir/docker-compose.ca-file.yml
+
+    stage_secret_file "CA file secret" "$source_ca_file_secret_file" "$ca_file_secret_file"
+    write_ca_file_compose_override "$ca_file_compose_override_file" "$ca_file_secret_file"
+fi
+
 cd "$repo_root"
 
 info "Running local Docker Compose project: $COMPOSE_PROJECT_NAME"
 
-exec docker compose \
-    -f docker-compose.yml \
-    -f docker-compose.local.yml \
-    "$@"
+if [ -n "$ca_file_compose_override_file" ]; then
+    exec docker compose \
+        -f docker-compose.yml \
+        -f docker-compose.local.yml \
+        -f "$ca_file_compose_override_file" \
+        "$@"
+else
+    exec docker compose \
+        -f docker-compose.yml \
+        -f docker-compose.local.yml \
+        "$@"
+fi

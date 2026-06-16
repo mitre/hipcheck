@@ -145,14 +145,17 @@ pass_test
 start_test 'local Compose uses staged secrets'
 printf '%s\n' replace-me > "$tmp_dir/source-postgres-password"
 printf '%s\n' postgres://nv-server:replace-me@postgres:5432/nv > "$tmp_dir/source-nv-server-database-url"
-chmod 600 "$tmp_dir/source-postgres-password" "$tmp_dir/source-nv-server-database-url"
+printf '%s\n' test-ca > "$tmp_dir/source-ca-file"
+chmod 600 "$tmp_dir/source-postgres-password" "$tmp_dir/source-nv-server-database-url" "$tmp_dir/source-ca-file"
 
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
+CA_FILE_SECRET_FILE="$tmp_dir/source-ca-file" \
     "$compose_script" --env-file .env.local.example config --quiet >/dev/null
 local_compose_config=$(
     POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
     NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
+    CA_FILE_SECRET_FILE="$tmp_dir/source-ca-file" \
         "$compose_script" --env-file .env.local.example config
 )
 if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT_DIR/night-vision-local/postgres-password" >/dev/null; then
@@ -163,6 +166,14 @@ if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT
     error 'error: local Docker Compose config should use the staged nv-server database URL secret file'
     exit 1
 fi
+if ! printf '%s\n' "$local_compose_config" | grep -F "source: ca_file" >/dev/null; then
+    error 'error: local Docker Compose config should pass ca_file as a build secret'
+    exit 1
+fi
+if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT_DIR/night-vision-local/ca_file" >/dev/null; then
+    error 'error: local Docker Compose config should use the staged CA file build secret'
+    exit 1
+fi
 if ! cmp -s "$tmp_dir/source-postgres-password" "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/postgres-password"; then
     error 'error: staged Postgres secret should match the source secret file'
     exit 1
@@ -171,6 +182,16 @@ if ! cmp -s "$tmp_dir/source-nv-server-database-url" "$DOCKER_SECRET_MOUNT_DIR/n
     error 'error: staged nv-server database URL secret should match the source secret file'
     exit 1
 fi
+if ! cmp -s "$tmp_dir/source-ca-file" "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/ca_file"; then
+    error 'error: staged CA file should match the source secret file'
+    exit 1
+fi
+pass_test
+
+start_test 'local Compose does not require CA file'
+POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
+NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
+    "$compose_script" --env-file .env.local.example config --quiet >/dev/null
 pass_test
 
 start_test 'execute creates secret files with strict modes'
