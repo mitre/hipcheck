@@ -10,8 +10,8 @@ pub fn ci(_args: &ArgMatches) -> Result<()> {
 
     cmd!(s, "cargo xtask lint").run()?;
     cmd!(s, "cargo fmt --all --check").run()?;
-    cmd!(s, "cargo clippy --workspace -- -D warnings").run()?;
-    cmd!(s, "cargo nextest r --workspace").run()?;
+    cmd!(s, "cargo clippy --locked --workspace -- -D warnings").run()?;
+    cmd!(s, "cargo nextest r --locked --workspace --profile ci").run()?;
 
     Ok(())
 }

@@ -1,0 +1,27 @@
+services:
+  nv-app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: ${NV_APP_IMAGE:?NV_APP_IMAGE is required}
+    pull_policy: never
+
+  nv-server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      secrets:
+        - ca_file
+    image: ${NV_SERVER_IMAGE:?NV_SERVER_IMAGE is required}
+    pull_policy: never
+
+  postgres:
+    pull_policy: missing
+
+volumes:
+  postgres-data:
+    name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required}-postgres-data
+
+secrets:
+  ca_file:
+    file: ${BUILD_CA_FILE:-/dev/null}

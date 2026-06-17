@@ -72,6 +72,7 @@ graphviz = { pkg-path = "graphviz" }
 
 ## Frontend Tools
 
+nodejs_24 = { pkg-path = "nodejs_24" }
 pnpm = { pkg-path = "pnpm", version = "11.4.0" }
 
 ## Database Stuff

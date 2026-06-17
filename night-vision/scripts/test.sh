@@ -74,6 +74,8 @@ repo_root=$(
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/night-vision-docker-scripts.XXXXXX")
 trap finish EXIT HUP INT TERM
 export DOCKER_SECRET_MOUNT_DIR="$tmp_dir/docker-mount"
+export NV_APP_IMAGE=nv-app:local
+export NV_SERVER_IMAGE=nv-server:local
 
 setup_script="$script_dir/setup-compose-secrets.sh"
 compose_script="$script_dir/docker-compose-local.sh"
@@ -92,7 +94,7 @@ assert_file_mode() {
     path=$1
     expected=$2
 
-    mode=$(stat -f '%Lp' "$path" 2>/dev/null || stat -c '%a' "$path")
+    mode=$(stat -c '%a' "$path" 2>/dev/null || stat -f '%Lp' "$path")
     if [ "$mode" != "$expected" ]; then
         error "error: expected $path to have mode $expected, got $mode"
         exit 1

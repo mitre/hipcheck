@@ -12,6 +12,7 @@ This is the internal documentation for the Night Vision project.
 ## Project Info
 
 - [AI Policy](./project/ai-policy.md)
+- [Continuous Integration](./project/ci.md)
 - [Dev Practices](./project/dev-practices.md)
 - [Flox](./project/flox.md)
 

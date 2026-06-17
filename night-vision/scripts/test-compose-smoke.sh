@@ -1,0 +1,93 @@
+#!/bin/sh
+
+# Build and smoke-test the Docker Compose stack with temporary secrets.
+
+set -eu
+
+script_dir=$(
+    CDPATH=
+    cd -- "$(dirname -- "$0")"
+    pwd
+)
+repo_root=$(
+    CDPATH=
+    cd -- "$script_dir/.."
+    pwd
+)
+
+tmp_parent_dir=${DOCKER_COMPOSE_TMPDIR:-"$repo_root/compose-smoke-secrets"}
+mkdir -p "$tmp_parent_dir"
+tmp_dir=$(mktemp -d "$tmp_parent_dir/night-vision-compose-smoke.XXXXXX")
+chmod 755 "$tmp_dir"
+compose_project_name=night-vision-ci-${CI_JOB_ID:-local}
+
+finish() {
+    status=$?
+
+    if [ "$status" -ne 0 ]; then
+        COMPOSE_PROJECT_NAME="$compose_project_name" \
+        BUILD_CA_FILE="${BUILD_CA_FILE:-/dev/null}" \
+        NV_APP_IMAGE="${NV_APP_IMAGE:-nv-app:ci-smoke}" \
+        NV_SERVER_IMAGE="${NV_SERVER_IMAGE:-nv-server:ci-smoke}" \
+        POSTGRES_DB=nv \
+        POSTGRES_USER=nv-server \
+        POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
+        NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
+            docker compose \
+                -f "$repo_root/docker-compose.yml" \
+                -f "$repo_root/docker-compose.ci.yml" \
+                ps || true
+
+        COMPOSE_PROJECT_NAME="$compose_project_name" \
+        BUILD_CA_FILE="${BUILD_CA_FILE:-/dev/null}" \
+        NV_APP_IMAGE="${NV_APP_IMAGE:-nv-app:ci-smoke}" \
+        NV_SERVER_IMAGE="${NV_SERVER_IMAGE:-nv-server:ci-smoke}" \
+        POSTGRES_DB=nv \
+        POSTGRES_USER=nv-server \
+        POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
+        NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
+            docker compose \
+                -f "$repo_root/docker-compose.yml" \
+                -f "$repo_root/docker-compose.ci.yml" \
+                logs --no-color nv-server postgres || true
+    fi
+
+    COMPOSE_PROJECT_NAME="$compose_project_name" \
+    BUILD_CA_FILE="${BUILD_CA_FILE:-/dev/null}" \
+    NV_APP_IMAGE="${NV_APP_IMAGE:-nv-app:ci-smoke}" \
+    NV_SERVER_IMAGE="${NV_SERVER_IMAGE:-nv-server:ci-smoke}" \
+    POSTGRES_DB=nv \
+    POSTGRES_USER=nv-server \
+    POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
+    NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
+        docker compose \
+            -f "$repo_root/docker-compose.yml" \
+            -f "$repo_root/docker-compose.ci.yml" \
+            down -v --remove-orphans >/dev/null 2>&1 || true
+
+    rm -rf "$tmp_dir"
+    exit "$status"
+}
+trap finish EXIT HUP INT TERM
+
+printf '%s\n' replace-me > "$tmp_dir/postgres-password"
+printf '%s\n' postgres://nv-server:replace-me@postgres:5432/nv > "$tmp_dir/nv-server-database-url"
+# Compose file-backed secrets are bind-mounted into containers by Docker
+# Compose. Make the smoke-test fixtures readable by the non-root container
+# users while matching Docker's default /run/secrets file mode.
+chmod 444 "$tmp_dir/postgres-password" "$tmp_dir/nv-server-database-url"
+
+cd "$repo_root"
+
+COMPOSE_PROJECT_NAME="$compose_project_name" \
+BUILD_CA_FILE="${BUILD_CA_FILE:-/dev/null}" \
+NV_APP_IMAGE="${NV_APP_IMAGE:-nv-app:ci-smoke}" \
+NV_SERVER_IMAGE="${NV_SERVER_IMAGE:-nv-server:ci-smoke}" \
+POSTGRES_DB=nv \
+POSTGRES_USER=nv-server \
+POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
+NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
+    docker compose \
+        -f docker-compose.yml \
+        -f docker-compose.ci.yml \
+        up --build --detach --wait --wait-timeout 180

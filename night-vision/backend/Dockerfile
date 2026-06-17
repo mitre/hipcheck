@@ -34,14 +34,18 @@ WORKDIR /usr/src/night-vision
 
 # Create an optional secret mount to pass any necessary corporate network certs into the container image.
 #
-# Use `--secret id=ca_file,src=<CA_FILE>` to pass the CA cert file into the container.
+# Use `--secret id=ca_file,src=<CA_FILE>` to pass the CA cert file or bundle into the
+# container.
 #
 # See: https://docs.docker.com/build/building/secrets/#secret-mounts
-RUN --mount=type=secret,id=ca_file,target=/usr/local/share/ca-certificates/build-ca.crt,required=false \
+RUN --mount=type=secret,id=ca_file,target=/tmp/build-ca.crt,required=false \
     # Use cache mounts to improve rebuild performance.
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     update-ca-certificates \
+    && if [ -s /tmp/build-ca.crt ]; then \
+        cat /tmp/build-ca.crt >> /etc/ssl/certs/ca-certificates.crt; \
+    fi \
     && cargo install cargo-chef --locked --version "${CARGO_CHEF_VERSION}"
 
 # ================================================================================================

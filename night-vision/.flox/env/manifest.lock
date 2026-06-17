@@ -60,6 +60,9 @@
           "x86_64-darwin"
         ]
       },
+      "nodejs_24": {
+        "pkg-path": "nodejs_24"
+      },
       "pgadmin4": {
         "pkg-path": "pgadmin4"
       },
@@ -703,6 +706,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:40.013480Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -732,6 +736,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:18.727717Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -761,6 +766,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:24:47.223065Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -790,6 +796,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:42.719248Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -819,6 +826,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:40.013905Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -848,6 +856,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:18.728190Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -877,6 +886,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:24:47.223477Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -906,6 +916,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:42.719754Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -935,6 +946,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:40.016009Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -964,6 +976,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:18.730555Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -993,6 +1006,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:24:47.225579Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1022,6 +1036,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:42.722537Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1051,6 +1066,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:40.020881Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1080,6 +1096,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:18.735943Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1109,6 +1126,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:24:47.230434Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1138,6 +1156,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:42.728520Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1167,6 +1186,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:40.023915Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1196,6 +1216,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:18.739295Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1225,6 +1246,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:24:47.233398Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1254,6 +1276,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:42.732103Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1283,6 +1306,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:40.024069Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1312,6 +1336,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:18.739456Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1341,6 +1366,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:24:47.233536Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1370,6 +1396,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:42.732271Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1399,6 +1426,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:40.038598Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1428,6 +1456,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:18.746800Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1457,6 +1486,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:24:47.239334Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1486,6 +1516,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:42.739522Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1515,6 +1546,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:20.692034Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1548,12 +1580,15 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:44.428049Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
       "version": "15.2.0",
       "outputs_to_install": [
         "man",
+        "man",
+        "out",
         "out",
         "out"
       ],
@@ -1581,6 +1616,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:41.164896Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1611,6 +1647,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:20.832239Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1642,6 +1679,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:24:48.307415Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1672,11 +1710,13 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:44.582080Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
       "version": "2.54.0",
       "outputs_to_install": [
+        "out",
         "out",
         "out",
         "out"
@@ -1705,6 +1745,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:41.240227Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1734,6 +1775,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:20.923513Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1763,6 +1805,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:24:48.378801Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1792,6 +1835,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:44.682136Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1821,6 +1865,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:41.457888Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1850,6 +1895,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:21.796913Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1880,6 +1926,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:24:48.632521Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1909,6 +1956,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:06:45.672408Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1939,6 +1987,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:57.334256Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1968,6 +2017,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:40:42.936501Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1997,6 +2047,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:25:04.837930Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2026,6 +2077,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:07:06.882060Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2055,11 +2107,14 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:55:58.743966Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
       "version": "113",
       "outputs_to_install": [
+        "out",
+        "out",
         "out",
         "out"
       ],
@@ -2086,6 +2141,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:25:06.295634Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2099,6 +2155,126 @@
         "out": "/nix/store/jk7dsfjs2i6d1jgchzxlv8083dhl20rh-libiconv-113"
       },
       "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "nodejs_24",
+      "broken": false,
+      "derivation": "/nix/store/vbx35am7lar9zvwhk4nfl3lysmbd0ils-nodejs-24.15.0.drv",
+      "description": "Event-driven I/O framework for the V8 JavaScript engine",
+      "install_id": "nodejs_24",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "nodejs-24.15.0",
+      "pname": "nodejs_24",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:56:05.116399Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "24.15.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/3mvbmkd7lmxi3xlka1avra24flwbgjv9-nodejs-24.15.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "nodejs_24",
+      "broken": false,
+      "derivation": "/nix/store/zc41z1042wi0d1gmyc8mlwv5av8fds2q-nodejs-24.15.0.drv",
+      "description": "Event-driven I/O framework for the V8 JavaScript engine",
+      "install_id": "nodejs_24",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "nodejs-24.15.0",
+      "pname": "nodejs_24",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:59.223548Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "24.15.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/rmdjmd0iy5zlyg0j2i1cd0s7ha1562fs-nodejs-24.15.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "nodejs_24",
+      "broken": false,
+      "derivation": "/nix/store/f0ay9hny5gn4c0lfrb95xrakm7yf3s2q-nodejs-24.15.0.drv",
+      "description": "Event-driven I/O framework for the V8 JavaScript engine",
+      "install_id": "nodejs_24",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "nodejs-24.15.0",
+      "pname": "nodejs_24",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:25:13.039295Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "24.15.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/rhv8jiklgw2bw4ljh4nm3h3r3bpnkcl3-nodejs-24.15.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "nodejs_24",
+      "broken": false,
+      "derivation": "/nix/store/f8i8jydaqs0ngxm97c091zna2mnjb43f-nodejs-24.15.0.drv",
+      "description": "Event-driven I/O framework for the V8 JavaScript engine",
+      "install_id": "nodejs_24",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "nodejs-24.15.0",
+      "pname": "nodejs_24",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:07:24.676553Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "24.15.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5a8ysg1jnj8jmzzyfcfw7rvpvnp5rfpa-nodejs-24.15.0"
+      },
+      "system": "x86_64-linux",
       "group": "toplevel",
       "priority": 5
     },
@@ -2117,6 +2293,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:56:17.459275Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2147,6 +2324,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:41:16.129231Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2177,6 +2355,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:25:25.565087Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2207,6 +2386,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:07:42.168967Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2237,6 +2417,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:56:18.989861Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2266,6 +2447,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:41:18.314750Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2295,6 +2477,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:25:27.082463Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2324,6 +2507,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:07:44.537804Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2353,6 +2537,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:56:19.958096Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2391,6 +2576,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:41:19.609158Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2430,6 +2616,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:25:28.026257Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2468,6 +2655,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:07:45.874457Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2507,6 +2695,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:57:12.935829Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2536,6 +2725,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:42:26.231398Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2565,6 +2755,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:26:21.495335Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2594,6 +2785,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:08:55.959459Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2623,6 +2815,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:57:27.177595Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2652,6 +2845,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:42:42.943700Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2681,6 +2875,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:26:35.754675Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2710,6 +2905,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:09:13.373579Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2739,6 +2935,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T08:57:27.630624Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2773,6 +2970,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T09:42:43.692434Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2807,6 +3005,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T10:26:36.217503Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2841,6 +3040,7 @@
       "rev_date": "2026-05-31T16:09:29Z",
       "scrape_date": "2026-06-02T11:09:14.191850Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,

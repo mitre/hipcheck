@@ -169,12 +169,21 @@ fn validate_secret_file_permissions(path: &Utf8Path) -> Result<(), SecretFileErr
         .mode()
         & 0o777;
 
-    // The secret file must not be accessible to anyone other than its owner.
-    if mode & 0o077 != 0 {
+    if !secret_file_permissions_are_acceptable(path, mode) {
         return Err(SecretFileError::InsecurePermissions(mode));
     }
 
     Ok(())
+}
+
+#[cfg(unix)]
+fn secret_file_permissions_are_acceptable(path: &Utf8Path, mode: u32) -> bool {
+    if path.as_str().starts_with("/run/secrets/") && mode == 0o444 {
+        return true;
+    }
+
+    // The secret file must not be accessible to anyone other than its owner.
+    mode & 0o077 == 0
 }
 
 #[cfg(windows)]
@@ -298,6 +307,33 @@ mod tests {
         assert!(matches!(
             error.error,
             SecretFileError::InsecurePermissions(0o644)
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn docker_secret_path_accepts_default_read_only_permissions() {
+        assert!(secret_file_permissions_are_acceptable(
+            Utf8Path::new("/run/secrets/nv-server/database-url"),
+            0o444
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn docker_secret_path_rejects_other_broad_permissions() {
+        assert!(!secret_file_permissions_are_acceptable(
+            Utf8Path::new("/run/secrets/nv-server/database-url"),
+            0o644
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_docker_secret_path_rejects_default_docker_secret_permissions() {
+        assert!(!secret_file_permissions_are_acceptable(
+            Utf8Path::new("/tmp/run/secrets/nv-server/database-url"),
+            0o444
         ));
     }
 }
