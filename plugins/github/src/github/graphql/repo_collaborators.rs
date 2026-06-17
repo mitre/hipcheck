@@ -29,12 +29,21 @@ pub fn get_repo_collaborators(
 		name: name.to_owned(),
 	});
 
-	let body = make_request(agent, query)?;
+	// If the response errors, print a warning message and return an empty list of collaborators
+	// This gives other plugins the option of handling failures to get collaborators more gracefully than they would if the GitHub plugin errors out
+	let body = match make_request(agent, query) {
+		Ok(body) => body,
+		Err(error) => {
+			println!("mitre/github/repo_collaborators, error from GitHub API: {error}");
+			return Ok(Vec::new());
+		}
+	};
 
 	if let Some(errors) = body.errors {
 		for error in errors {
-			tracing::error!("mitre/github/repo_collaborators, error from GitHub API: {error}")
+			println!("mitre/github/repo_collaborators, error from GitHub API: {error}")
 		}
+		return Ok(Vec::new());
 	}
 
 	let repository = body
