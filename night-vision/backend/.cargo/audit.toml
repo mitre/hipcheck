@@ -12,5 +12,12 @@ ignore = [
     # If something did happen to require a security response in `paste` that would be very
     # surprising, and would also be big news within the Rust community given how widely `paste`
     # continues to be used. As such, we're comfortable silencing this notice.
-    "RUSTSEC-2024-0436"
+    "RUSTSEC-2024-0436",
+
+    # This is an unmaintained notice for `proc-macro-error2`. We're not supremely concerned about
+    # unmaintained notices right now.
+    "RUSTSEC-2026-0173",
+
+    # Ditto, also an unmaintained notice. This one for `rustls-pemfile`.
+    "RUSTSEC-2025-0134"
 ]
