@@ -108,18 +108,19 @@
     {
       "attr_path": "cargo",
       "broken": false,
-      "derivation": "/nix/store/i3wanwihpf5c4m5vr50da8jfgkj1k5sm-cargo-1.95.0.drv",
+      "derivation": "/nix/store/b14dqy4kjc9q9jrlhky152garvv35hpz-cargo-1.95.0.drv",
       "description": "Downloads your Rust project's dependencies and builds your project",
       "install_id": "cargo",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "cargo-1.95.0",
       "pname": "cargo",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T08:55:40.012326Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:13:13.733229Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -137,18 +138,19 @@
     {
       "attr_path": "cargo",
       "broken": false,
-      "derivation": "/nix/store/y7c5m0xdmigfryrd5zc3p7ggkyx1138h-cargo-1.95.0.drv",
+      "derivation": "/nix/store/x38r6h8lcv13fan2pp27kcwvb06qagrn-cargo-1.95.0.drv",
       "description": "Downloads your Rust project's dependencies and builds your project",
       "install_id": "cargo",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "cargo-1.95.0",
       "pname": "cargo",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T09:40:18.726470Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:44:08.093160Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -166,18 +168,19 @@
     {
       "attr_path": "cargo",
       "broken": false,
-      "derivation": "/nix/store/4s0nk3ijs08dwjnml3cjbn9j3jnm3z0k-cargo-1.95.0.drv",
+      "derivation": "/nix/store/pvwl1nixrgwmgqa82ka4f8977qyd2iky-cargo-1.95.0.drv",
       "description": "Downloads your Rust project's dependencies and builds your project",
       "install_id": "cargo",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "cargo-1.95.0",
       "pname": "cargo",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T10:24:47.221933Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:13:05.992821Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -195,18 +198,19 @@
     {
       "attr_path": "cargo",
       "broken": false,
-      "derivation": "/nix/store/ppn0zk880wbmyp80ibpzjyjwdzp89fky-cargo-1.95.0.drv",
+      "derivation": "/nix/store/nq57nj4q6nqfbqvy36n0zsy4qzbqcy4r-cargo-1.95.0.drv",
       "description": "Downloads your Rust project's dependencies and builds your project",
       "install_id": "cargo",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "cargo-1.95.0",
       "pname": "cargo",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T11:06:42.717884Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:47:04.115485Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -224,18 +228,19 @@
     {
       "attr_path": "clippy",
       "broken": false,
-      "derivation": "/nix/store/bkl88ixkkfpzhr6jm0dbrl63gy17jamz-clippy-1.95.0.drv",
+      "derivation": "/nix/store/q0q9zkyyssgcaz3q8h0sygylf1wsac7a-clippy-1.95.0.drv",
       "description": "Bunch of lints to catch common mistakes and improve your Rust code",
       "install_id": "clippy",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "clippy-1.95.0",
       "pname": "clippy",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T08:55:40.223052Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:13:13.927927Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -253,18 +258,19 @@
     {
       "attr_path": "clippy",
       "broken": false,
-      "derivation": "/nix/store/xf5wzj7crg3cgrlciz4lhhjrh06drfsw-clippy-1.95.0.drv",
+      "derivation": "/nix/store/kkic99bv2aw2567drfs4sqpawcz2589y-clippy-1.95.0.drv",
       "description": "Bunch of lints to catch common mistakes and improve your Rust code",
       "install_id": "clippy",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "clippy-1.95.0",
       "pname": "clippy",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T09:40:19.402307Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:44:08.340930Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -283,18 +289,19 @@
     {
       "attr_path": "clippy",
       "broken": false,
-      "derivation": "/nix/store/y8scwb103w5izf6n07sp2mvpqn5a961z-clippy-1.95.0.drv",
+      "derivation": "/nix/store/hxq96whjslqccrq1225yn4bygvlwxg8s-clippy-1.95.0.drv",
       "description": "Bunch of lints to catch common mistakes and improve your Rust code",
       "install_id": "clippy",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "clippy-1.95.0",
       "pname": "clippy",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T10:24:47.414988Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:13:06.193420Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -312,18 +319,19 @@
     {
       "attr_path": "clippy",
       "broken": false,
-      "derivation": "/nix/store/crz3dnv911ywzp1phcz2k79m4vilj43k-clippy-1.95.0.drv",
+      "derivation": "/nix/store/p4ljsv7dv7pshx5vx98556hywhzqm2ak-clippy-1.95.0.drv",
       "description": "Bunch of lints to catch common mistakes and improve your Rust code",
       "install_id": "clippy",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "clippy-1.95.0",
       "pname": "clippy",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T11:06:42.982861Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:47:04.382852Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -344,19 +352,21 @@
       "broken": false,
       "derivation": "/nix/store/py3d3rzb3w2gbwpwf1ni3js616s1f09n-rust-lib-src.drv",
       "install_id": "rust-lib-src",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rust-lib-src",
       "pname": "rustLibSrc",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T08:58:28.112100Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:16:20.414964Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
       "version": "rust-lib-src",
       "outputs_to_install": [
+        "out",
         "out"
       ],
       "outputs": {
@@ -371,19 +381,21 @@
       "broken": false,
       "derivation": "/nix/store/xqa1irwks15wlv89vw09bz5iz64gjc5s-rust-lib-src.drv",
       "install_id": "rust-lib-src",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rust-lib-src",
       "pname": "rustLibSrc",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T09:44:05.771342Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:48:05.957935Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
       "version": "rust-lib-src",
       "outputs_to_install": [
+        "out",
         "out"
       ],
       "outputs": {
@@ -398,19 +410,21 @@
       "broken": false,
       "derivation": "/nix/store/g0ak8hi052hmrq9df3iz7sdjwzkg8cly-rust-lib-src.drv",
       "install_id": "rust-lib-src",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rust-lib-src",
       "pname": "rustLibSrc",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T10:27:37.101327Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:16:14.660266Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
       "version": "rust-lib-src",
       "outputs_to_install": [
+        "out",
         "out"
       ],
       "outputs": {
@@ -425,19 +439,21 @@
       "broken": false,
       "derivation": "/nix/store/pmy61a1cx8m0xi9rqdl0r7m6ffjmhbv2-rust-lib-src.drv",
       "install_id": "rust-lib-src",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rust-lib-src",
       "pname": "rustLibSrc",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T11:10:39.268842Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:51:10.278867Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
       "version": "rust-lib-src",
       "outputs_to_install": [
+        "out",
         "out"
       ],
       "outputs": {
@@ -454,14 +470,15 @@
       "description": "Safe, concurrent, practical language (wrapper script)",
       "install_id": "rustc",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rustc-wrapper-1.95.0",
       "pname": "rustc",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T08:57:12.984788Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:14:54.756317Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -486,14 +503,15 @@
       "description": "Safe, concurrent, practical language (wrapper script)",
       "install_id": "rustc",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rustc-wrapper-1.95.0",
       "pname": "rustc",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T09:42:26.292298Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:46:19.640328Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -518,14 +536,15 @@
       "description": "Safe, concurrent, practical language (wrapper script)",
       "install_id": "rustc",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rustc-wrapper-1.95.0",
       "pname": "rustc",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T10:26:21.545626Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:14:48.783178Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -550,14 +569,15 @@
       "description": "Safe, concurrent, practical language (wrapper script)",
       "install_id": "rustc",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rustc-wrapper-1.95.0",
       "pname": "rustc",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T11:08:56.022397Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:49:22.177030Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -578,18 +598,19 @@
     {
       "attr_path": "rustfmt",
       "broken": false,
-      "derivation": "/nix/store/lfwl2bjr7nic3gvcj17fgkp35mvnd9j5-rustfmt-1.95.0.drv",
+      "derivation": "/nix/store/j2j1v4b9v8ghdchz3gjzyzpzsc5bk626-rustfmt-1.95.0.drv",
       "description": "Tool for formatting Rust code according to style guidelines",
       "install_id": "rustfmt",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rustfmt-1.95.0",
       "pname": "rustfmt",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T08:57:13.009304Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:14:54.784367Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -607,18 +628,19 @@
     {
       "attr_path": "rustfmt",
       "broken": false,
-      "derivation": "/nix/store/1agbcb0aqx99ixv0axbxvlnvqff6byri-rustfmt-1.95.0.drv",
+      "derivation": "/nix/store/8xhn34a7297mm63rdxa503200ydv621d-rustfmt-1.95.0.drv",
       "description": "Tool for formatting Rust code according to style guidelines",
       "install_id": "rustfmt",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rustfmt-1.95.0",
       "pname": "rustfmt",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T09:42:26.324460Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:46:19.673234Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -636,18 +658,19 @@
     {
       "attr_path": "rustfmt",
       "broken": false,
-      "derivation": "/nix/store/mprnvk6b47mv2drki8p5sg5z1m491kg5-rustfmt-1.95.0.drv",
+      "derivation": "/nix/store/9j29rhdks393ngqkbhn18l8dhsncpv69-rustfmt-1.95.0.drv",
       "description": "Tool for formatting Rust code according to style guidelines",
       "install_id": "rustfmt",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rustfmt-1.95.0",
       "pname": "rustfmt",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T10:26:21.570707Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:14:48.812686Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -665,18 +688,19 @@
     {
       "attr_path": "rustfmt",
       "broken": false,
-      "derivation": "/nix/store/xxrm8dmp0wyhflcsj1mw7vvhyxxqf9kw-rustfmt-1.95.0.drv",
+      "derivation": "/nix/store/6j9nwg470f823hs3nrgylfciny1y8izh-rustfmt-1.95.0.drv",
       "description": "Tool for formatting Rust code according to style guidelines",
       "install_id": "rustfmt",
       "license": "[ MIT, Apache-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
       "name": "rustfmt-1.95.0",
       "pname": "rustfmt",
-      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
-      "rev_count": 1008282,
-      "rev_date": "2026-05-31T16:09:29Z",
-      "scrape_date": "2026-06-02T11:08:56.055796Z",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:49:22.210658Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1622,6 +1646,8 @@
       "unfree": false,
       "version": "2.54.0",
       "outputs_to_install": [
+        "out",
+        "out",
         "out"
       ],
       "outputs": {
@@ -1653,6 +1679,7 @@
       "unfree": false,
       "version": "2.54.0",
       "outputs_to_install": [
+        "out",
         "out"
       ],
       "outputs": {
@@ -1685,6 +1712,7 @@
       "unfree": false,
       "version": "2.54.0",
       "outputs_to_install": [
+        "out",
         "out"
       ],
       "outputs": {
@@ -1716,6 +1744,7 @@
       "unfree": false,
       "version": "2.54.0",
       "outputs_to_install": [
+        "out",
         "out",
         "out",
         "out",
@@ -2116,6 +2145,8 @@
         "out",
         "out",
         "out",
+        "out",
+        "out",
         "out"
       ],
       "outputs": {
@@ -2148,6 +2179,7 @@
       "version": "113",
       "outputs_to_install": [
         "out",
+        "out",
         "out"
       ],
       "outputs": {
@@ -2179,6 +2211,8 @@
       "unfree": false,
       "version": "24.15.0",
       "outputs_to_install": [
+        "out",
+        "out",
         "out"
       ],
       "outputs": {
@@ -2209,6 +2243,7 @@
       "unfree": false,
       "version": "24.15.0",
       "outputs_to_install": [
+        "out",
         "out"
       ],
       "outputs": {
@@ -2239,6 +2274,7 @@
       "unfree": false,
       "version": "24.15.0",
       "outputs_to_install": [
+        "out",
         "out"
       ],
       "outputs": {
@@ -2269,6 +2305,7 @@
       "unfree": false,
       "version": "24.15.0",
       "outputs_to_install": [
+        "out",
         "out"
       ],
       "outputs": {
