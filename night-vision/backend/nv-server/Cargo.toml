@@ -6,6 +6,11 @@ publish = false
 
 [dependencies]
 camino.workspace = true
+# We'd prefer to use `jiff` over `chrono`, but `dropshot` depends on
+# an old version of `schemars` that doesn't support `jiff`. When we
+# can use a newer version of `schemars`, we should switch to using
+# `jiff`.
+chrono.workspace = true
 clap.workspace = true
 dropshot.workspace = true
 itertools.workspace = true
@@ -17,5 +22,6 @@ serde_json.workspace = true
 slog.workspace = true
 spookey.workspace = true
 tokio.workspace = true
+uuid.workspace = true
 windows-acls.workspace = true
 workspace-hack.workspace = true

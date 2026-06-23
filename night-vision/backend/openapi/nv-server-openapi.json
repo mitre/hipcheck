@@ -27,6 +27,73 @@
           }
         }
       }
+    },
+    "/package-sources": {
+      "post": {
+        "operationId": "post_package_source",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostPackageSourceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "successfully enqueued operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPackageSourceResponse"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/package-sources/{id}": {
+      "get": {
+        "operationId": "get_package_source",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageSourceStatus"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -59,6 +126,156 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "PackageSource": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "$ref": "#/components/schemas/PackageSourceEcosystem"
+          },
+          "fileName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "contents",
+          "ecosystem",
+          "fileName"
+        ]
+      },
+      "PackageSourceEcosystem": {
+        "type": "string",
+        "enum": [
+          "npm"
+        ]
+      },
+      "PackageSourceStatus": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "processing"
+                ]
+              }
+            },
+            "required": [
+              "createdAt",
+              "id",
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "source": {
+                "$ref": "#/components/schemas/PackageSource"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "completed"
+                ]
+              },
+              "versionedPackages": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VersionedPackage"
+                }
+              }
+            },
+            "required": [
+              "createdAt",
+              "id",
+              "source",
+              "status",
+              "versionedPackages"
+            ]
+          }
+        ]
+      },
+      "PostPackageSourceBody": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "contents",
+          "fileName"
+        ]
+      },
+      "PostPackageSourceResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "VersionedPackage": {
+        "type": "object",
+        "properties": {
+          "derivation": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ecosystem": {
+            "$ref": "#/components/schemas/PackageSourceEcosystem"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "purl": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "derivation",
+          "ecosystem",
+          "id",
+          "name",
+          "purl",
+          "version"
         ]
       }
     },

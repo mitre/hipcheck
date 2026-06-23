@@ -5,7 +5,13 @@ edition = "2024"
 publish = false
 
 [dependencies]
+# We'd prefer to use `jiff` over `chrono`, but `dropshot` depends on
+# an old version of `schemars` that doesn't support `jiff`. When we
+# can use a newer version of `schemars`, we should switch to using
+# `jiff`.
+chrono.workspace = true
 dropshot.workspace = true
 schemars.workspace = true
 serde.workspace = true
+uuid.workspace = true
 workspace-hack.workspace = true

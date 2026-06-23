@@ -31,6 +31,7 @@ default-members = ["nv-server"]
 anyhow = "1.0.102"
 camino = "1.2.2"
 cargo-manifest = "0.21.0"
+chrono = "0.4.44"
 clap = { version = "4.6.1", features = ["string"] }
 # SECURITY: Note there are four known vulnerabilities in Dropshot 0.17.0 [1], but 0.18.0 (which
 # will include the fixes) has not been released yet. These vulnerabilities are likely low-risk for
@@ -50,7 +51,10 @@ sea-orm = { version = "=2.0.0-rc.38", features = ["sqlx-postgres", "runtime-toki
 sea-orm-migration = { version = "=2.0.0-rc.38", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 # This an outdated version, required to match the one expected by dropshot.
 # See: https://github.com/oxidecomputer/dropshot/issues/1375
-schemars = "0.8.22"
+# We'd prefer to use `jiff` over `chrono`, but this old version of
+# `schemars` doesn't support `jiff`. When we can use a newer version
+# of `schemars`, we should switch to using `jiff`.
+schemars = { version = "0.8.22", features = ["chrono"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 # This needs to be compatible with the version used by dropshot.

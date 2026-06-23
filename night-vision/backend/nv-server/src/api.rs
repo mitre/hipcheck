@@ -4,9 +4,23 @@ pub mod ctx;
 
 use crate::{api::ctx::ApiCtx, config::Config, env::Env, error::FatalError, log::logger};
 use camino::{Utf8Path, Utf8PathBuf};
-use dropshot::{HttpError, HttpResponseOk, RequestContext, ServerBuilder};
+// We'd prefer to use `jiff` over `chrono`, but `dropshot` depends on
+// an old version of `schemars` that doesn't support `jiff`. When we
+// can use a newer version of `schemars`, we should switch to using
+// `jiff`.
+use chrono::{TimeZone as _, Utc};
+use dropshot::{
+    HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, ServerBuilder, TypedBody,
+};
 use nv_server_api::{Health, NvServerApi, nv_server_api_mod::api_description};
+use nv_server_api::{
+    PackageSource, PackageSourceEcosystem, PackageSourcePathParams, PackageSourceStatus,
+    PackageSourceStatusCompleted, PackageSourceStatusProcessing, PostPackageSourceBody,
+    PostPackageSourceResponse, VersionedPackage,
+};
+use sea_orm::DatabaseConnection;
 use std::fs::File;
+use uuid::Uuid;
 
 /// The REST API interface.
 ///
@@ -97,13 +111,105 @@ impl NvServerApi for RestApi {
     type Context = ApiCtx;
 
     async fn health(
-        ctx: RequestContext<Self::Context>,
+        _ctx: RequestContext<Self::Context>,
     ) -> Result<HttpResponseOk<Health>, HttpError> {
-        // This silences an unused warning on `ApiCtx::db`, which we need for now.
-        let _db = ctx.context().db();
-
         Ok(HttpResponseOk(Health {
             status: "ok".to_string(),
         }))
     }
+
+    async fn post_package_source(
+        ctx: RequestContext<Self::Context>,
+        body_param: TypedBody<PostPackageSourceBody>,
+    ) -> Result<HttpResponseAccepted<PostPackageSourceResponse>, HttpError> {
+        let db = ctx.context().db();
+        let body = body_param.into_inner();
+        let file_name = body.file_name;
+        let contents = body.contents;
+
+        let uuid = store_package_source(db, file_name, contents).await?;
+        let resp = HttpResponseAccepted(PostPackageSourceResponse { id: uuid });
+
+        Ok(resp)
+    }
+
+    async fn get_package_source(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<PackageSourcePathParams>,
+    ) -> Result<HttpResponseOk<PackageSourceStatus>, HttpError> {
+        let db = ctx.context().db();
+        let id = path_params.into_inner().id;
+        let pkg_src = lookup_package_source(db, id).await?;
+        match pkg_src {
+            Some(status) => Ok(HttpResponseOk(status)),
+            None => Err(HttpError::for_not_found(
+                None,
+                format!("unknown package source {id}"),
+            )),
+        }
+    }
+}
+
+/// Placeholder implementation of storing a submitted Package Source
+/// to persistent storage.
+/// TODO implement it via real database calls.
+async fn store_package_source(
+    _db: &DatabaseConnection,
+    _file_name: String,
+    _contents: String,
+) -> Result<Uuid, HttpError> {
+    // TODO replace this hardcoded value
+    let uuid_a = Uuid::from_u64_pair(0, 1);
+    Ok(uuid_a)
+}
+
+/// Placeholder implementation of looking up the status of a Package Source
+/// from persistent storage.
+/// TODO implement it via real database calls.
+async fn lookup_package_source(
+    _db: &DatabaseConnection,
+    id: Uuid,
+) -> Result<Option<PackageSourceStatus>, HttpError> {
+    use std::collections::HashMap;
+    // TODO replace these hardcoded values
+    let uuid_a = Uuid::from_u64_pair(0, 1);
+    let uuid_b = Uuid::from_u64_pair(0, 2);
+    let uuid_c = Uuid::from_u64_pair(0, 3);
+
+    // TODO replace this hardcoded value
+    let dt = Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap();
+
+    // TODO replace these hardcoded values
+    let fake_statuses: HashMap<Uuid, PackageSourceStatus> = HashMap::from([
+        (
+            uuid_a,
+            PackageSourceStatus::Processing(PackageSourceStatusProcessing {
+                id: uuid_a,
+                created_at: dt,
+            }),
+        ),
+        (
+            uuid_b,
+            PackageSourceStatus::Completed(PackageSourceStatusCompleted {
+                id: uuid_b,
+                created_at: dt,
+                source: PackageSource {
+                    ecosystem: PackageSourceEcosystem::Npm,
+                    file_name: "package.json".to_string(),
+                    contents: "{}".to_string(),
+                },
+                versioned_packages: vec![VersionedPackage {
+                    id: uuid_c,
+                    name: "react".to_string(),
+                    version: "18.2.0".to_string(),
+                    ecosystem: PackageSourceEcosystem::Npm,
+                    purl: "pkg:npm/react@18.2.0".to_string(),
+                    derivation: vec!["<root>".to_string(), "pkg:npm/react@18.2.0".to_string()],
+                }],
+            }),
+        ),
+    ]);
+
+    let status = fake_statuses.get(&id).cloned();
+    Ok(status)
 }
