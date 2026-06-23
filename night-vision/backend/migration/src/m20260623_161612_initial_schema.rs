@@ -32,7 +32,7 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum PackageSources {
+pub enum PackageSources {
     Table,
     Id,
     SourceId,
