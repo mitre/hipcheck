@@ -2,28 +2,26 @@
 
 ## Status
 
-Draft
+Accepted
 
 ## Date
 
 2026-06-23
 
+## Table of Contents
+
 [[_TOC_]]
 
 ## Summary
 
-Night Vision's Minimum Viable Product (MVP) should be reoriented from a
-general cyber threat intelligence alerting system for open source software
-packages toward a narrower decision-support system for assessing whether users
-can safely move from a known-insecure package version to a newer patch
-version. This MVP is explicitly motivated by support for Federal Civilian
-Executive Branch (FCEB) compliance with CISA's BOD 26-04, but it does not take
-on responsibility for calculating BOD 26-04 remediation timelines.
+Night Vision's MVP should shift from broad package threat alerting to upgrade
+assessment. Given a vulnerable package version, Night Vision should help users
+decide whether a newer patch version is a lower-risk upgrade.
 
-This keeps the project focused on package security, vulnerability intelligence,
-and dependency analysis, but changes the central product question from "what
-new threats affect packages I use?" to "given that this version is unsafe, is
-this newer version a reasonable upgrade?"
+The assessment should check whether the candidate appears to fix the known
+vulnerability, whether it has known supply chain risk signals, and what evidence
+supports the recommendation. The MVP is motivated by FCEB compliance work under
+CISA's BOD 26-04.
 
 ## Background
 
@@ -33,21 +31,19 @@ alerts for packages reachable from those sources, and receive alerts when new
 threats are discovered.
 
 After discussion with our government sponsor, the higher-value MVP appears to
-be helping users respond to already-identified insecure package versions. A
+be helping users respond to already-identified vulnerable package versions. A
 common motivating case is a package version affected by a vulnerability listed
 in the Known Exploited Vulnerabilities (KEV) catalog. In that case, the urgent
 user need is not only to know that the current version is bad. The user must
 decide which newer version is a suitable move, how much risk that move carries,
-and what evidence supports that judgment.
+whether it introduces supply chain concerns, and what evidence supports that
+judgment.
 
 This need is sharpened by [CISA's BOD 26-04][bod-26-04] for FCEB agencies.
 BOD 26-04, issued June 10, 2026, supersedes and revokes BOD 19-02 and BOD
-22-01. It consolidates federal vulnerability remediation guidance and uses a
-risk-based timeline model for agency remediation requirements. Night Vision
-should not attempt to calculate those timelines in the MVP. Instead, Night
-Vision should support the earlier technical decision users need to make once a
-package version reaches KEV: identify the affected OSS package versions and
-determine which newer versions are reasonable upgrade targets.
+22-01. Night Vision should support the technical decision users need to make
+once a package version reaches KEV: identify the affected OSS package versions
+and determine which newer versions are reasonable upgrade targets.
 
 ## BOD 26-04 MVP Boundary
 
@@ -58,6 +54,8 @@ vulnerabilities are published in KEV. The MVP should support that response by:
   KEV;
 - identifying newer package versions that appear to remove the KEV-listed
   exposure;
+- identifying supply chain risk signals that may make a candidate version a
+  poor upgrade target even if it removes the known vulnerability exposure;
 - explaining the evidence behind each upgrade recommendation.
 
 The MVP should explicitly not calculate BOD 26-04 remediation timelines,
@@ -80,7 +78,7 @@ flowchart TD
     record["Create or update vulnerability instance"]
     affected["Identify reachable affected package versions"]
     assess["Generate upgrade safety assessment"]
-    candidates["Find candidate safer versions"]
+    candidates["Find lower-risk candidate versions"]
     monitor["Continue monitoring KEV and vulnerability data"]
 
     cve --> record
@@ -93,17 +91,19 @@ flowchart TD
 ```
 
 For Night Vision, this means upgrade assessment should focus on whether a
-candidate version appears to remove the vulnerable package version, not on when
-the user must complete remediation under BOD 26-04.
+candidate version appears to reduce the user's package risk, including both
+known vulnerability exposure and known supply chain risk signals.
 
 ## Goals
 
 - Make upgrade safety assessment the central MVP workflow.
 - Support FCEB compliance work under CISA's BOD 26-04 by noticing KEV-listed
   package exposure and helping users assess upgrade options.
-- Focus the initial assessment on moving from an insecure version to a newer
-  patch version of the same package.
+- Focus the initial assessment on moving from a vulnerable package version to a
+  newer patch version of the same package.
 - Explain recommendations with evidence, confidence, and caveats.
+- Include supply chain risk signals in upgrade assessments where defensible
+  data is available.
 - Preserve the existing package and vulnerability analysis direction where it
   supports the assessment workflow.
 - Avoid claiming that Night Vision can prove runtime compatibility or absolute
@@ -117,86 +117,63 @@ the user must complete remediation under BOD 26-04.
 - Supporting every package ecosystem in the MVP.
 - Building a complete malware detection system.
 - Designing the MVP around production-scale queueing or worker infrastructure.
-- Calculating BOD 26-04 remediation timelines, deadlines, forensic triage
-  obligations, or CDM-derived start dates, because Night Vision cannot observe
-  the CDM trigger and could otherwise present a deadline that is too loose.
 
 ## Proposed MVP Workflow
 
 The primary MVP workflow should be:
 
-1. The user provides a package source containing their project's OSS
-   dependencies, such as an NPM `package.json`.
-2. Night Vision resolves the package source to identify reachable direct and
-   transitive package dependencies.
-3. Night Vision checks all reachable package versions for known CVEs and KEV
-   entries.
-4. Night Vision records when a reachable package version is associated with a
-   CVE that has entered KEV.
-5. Night Vision continuously updates that KEV association as upstream
-   vulnerability and KEV data changes.
-6. For each KEV-affected package version, Night Vision identifies candidate newer
-   patch versions.
-7. Night Vision compares the KEV-affected package version with each candidate.
-8. Night Vision produces upgrade safety assessments with verdicts, confidence
-   levels, evidence, and caveats.
+1. The user provides a package source, such as an NPM `package.json`.
+2. Night Vision resolves reachable direct and transitive dependencies.
+3. Night Vision checks reachable versions against vulnerability and KEV data.
+4. For each KEV-affected package version, Night Vision finds newer patch
+   candidates.
+5. Night Vision assesses each candidate for vulnerability fixes, supply chain
+   risk, dependency changes, confidence, and caveats.
 
 The assessment should answer a question like:
 
 > This package source can reach `package@1.2.3`, which is affected by a
-> KEV-linked vulnerability. Is `package@1.2.7` a reasonable patch upgrade?
+> KEV-linked vulnerability. Is `package@1.2.7` a reasonable lower-risk patch
+> upgrade?
 
 ## Assessment Verdicts
 
-Night Vision should use cautious decision language. Suggested MVP verdicts are:
+Night Vision should use cautious verdicts:
 
-- `recommended`: available evidence supports the candidate as a safer patch
-  upgrade.
-- `caution`: the candidate may address the known issue, but other risk signals
-  need review.
-- `avoid`: the candidate remains affected by known serious vulnerability
-  intelligence or presents a clear new risk.
-- `unknown`: available evidence is insufficient for a useful recommendation.
+- `recommended`: the candidate appears to fix the known issue and has no known
+  serious vulnerability or supply chain risk signals.
+- `caution`: the candidate may fix the known issue, but some risk signals need
+  review.
+- `avoid`: the candidate remains vulnerable or has a clear serious risk.
+- `unknown`: Night Vision does not have enough evidence to recommend it.
 
-Night Vision should avoid unqualified claims that a package version is "safe."
-The system should instead describe what is known, what changed, and what is not
-known.
+Night Vision should not call a package version "safe." It should explain what
+is known, what changed, which risk signals were checked, and what is not known.
 
 ## Assessment Dimensions
 
-The MVP assessment should consider these dimensions where data is available:
+The MVP assessment should consider:
 
-- Vulnerability coverage: whether the candidate version falls outside known
-  affected version ranges.
+- Vulnerability status: whether the candidate appears to fix the known issue and
+  avoids other known serious vulnerabilities.
 - KEV relevance: whether the current or candidate version is affected by a
-  vulnerability present in KEV.
-- Patch-line distance: whether the candidate is a patch, minor, or major
-  upgrade relative to the current version.
-- New known exposure: whether the candidate is affected by other known
-  vulnerabilities.
-- Dependency delta: what direct or transitive dependencies change between the
-  current version and candidate version.
-- Package metadata signals: whether the candidate is deprecated, unpublished,
-  unusually new, or otherwise notable.
-- Evidence quality: whether the recommendation is supported by strong source
-  agreement or limited by incomplete data.
+  KEV-listed vulnerability.
+- Upgrade distance: whether the candidate is a patch, minor, or major upgrade.
+- Upgrade risk signals: dependency changes, deprecation or unpublishing,
+  suspicious maintainer changes, unusual release timing, provenance gaps, or
+  other ecosystem-specific concerns.
+- Evidence quality: whether the recommendation is based on reliable, agreeing
+  sources or limited data.
 
 ## Product Implications
 
 The frontend should prioritize an assessment-oriented experience over a passive
 alert inbox. The first useful screen should help a user assess a package
-upgrade, review the recommendation, and inspect supporting evidence. For FCEB
-users and their support organizations, the experience should make it clear when
-an assessment is connected to a KEV-published vulnerability. It should not
-present BOD 26-04 remediation timelines or compliance deadlines.
-
-Likely MVP views include:
-
-- an upgrade assessment form;
-- an assessment result page with verdict, confidence, and rationale;
-- a current-versus-candidate version comparison;
-- a dependency-delta view when dependency data is available;
-- links to source vulnerability records and package metadata.
+upgrade, review the recommendation, and inspect supporting evidence. It should
+center on an upgrade assessment form, a result page, a version comparison,
+dependency changes, and links to source evidence. For FCEB users and their
+support organizations, the experience should make it clear when an assessment
+is connected to a KEV-published vulnerability.
 
 Subscription and alerting workflows remain useful, but they should feed users
 toward assessments rather than being the only product surface.
@@ -207,17 +184,9 @@ The backend should treat an upgrade assessment as a first-class domain object.
 This does not require a major architectural change for the MVP, but it does
 change the shape of the application model.
 
-Likely domain concepts include:
-
-- `Package`
-- `PackageVersion`
-- `Vulnerability`
-- `AffectedVersionRange`
-- `ExploitSignal`
-- `UpgradeCandidate`
-- `UpgradeAssessment`
-- `AssessmentFinding`
-- `EvidenceSource`
+Likely domain concepts include packages, package versions, vulnerabilities,
+affected ranges, upgrade candidates, assessments, findings, and evidence
+sources.
 
 The existing package-resolution work remains relevant, but its role expands.
 It should support both broad package discovery and comparison of dependency
@@ -229,17 +198,9 @@ dependency sets.
 ## Data Source Implications
 
 The MVP should prefer a small number of defensible data sources over broad but
-weak aggregation. KEV is central to the motivating use case, but KEV alone is
-not enough to identify fixed versions or all affected package ranges.
-
-The MVP likely needs:
-
-- vulnerability records and affected-version ranges;
-- KEV membership or exploited-in-the-wild signals;
-- package registry version metadata;
-- package dependency metadata for current and candidate versions;
-- deprecation, yanking, or unpublishing metadata where the ecosystem provides
-  it.
+weak aggregation. It needs reliable sources for vulnerability ranges, KEV
+status, package versions, dependency metadata, and available supply chain
+metadata such as ownership, provenance, integrity, and release history.
 
 Each assessment should retain enough source detail for a reviewer to understand
 where the conclusion came from.
@@ -266,29 +227,12 @@ The initial MVP should be constrained to:
 - patch-version candidate discovery;
 - KEV-linked vulnerability context;
 - direct package vulnerability assessment;
+- supply chain risk assessment where defensible package metadata is available;
 - dependency-delta assessment where feasible.
-
-## Open Questions
-
-- Which vulnerability data source should be authoritative for affected ranges
-  and fixed versions?
-- How should Night Vision prioritize assessment results when a package source
-  resolves to many reachable vulnerable package versions?
-- How should Night Vision represent confidence in a way that is useful but not
-  falsely precise?
-- How much dependency-delta analysis is necessary for the first demonstration?
-- Should assessment results be persisted, or generated on demand and cached
-  only for performance?
 
 ## Consequences
 
-This reorientation gives the MVP a sharper user promise and a clearer demo
-path. It narrows the initial product around a concrete operational decision:
-moving off a KEV-affected OSS package version without taking on agency-specific
-BOD 26-04 timeline calculation.
-
-It also means some existing language should be updated. Night Vision can still
-be described as cyber threat intelligence for open source packages, but the MVP
-should emphasize actionable upgrade assessment over general alerting.
+This gives the MVP a clearer promise: help users move off KEV-affected OSS
+package versions by choosing lower-risk patch upgrades.
 
 [bod-26-04]: https://www.cisa.gov/news-events/directives/bod-26-04-prioritizing-security-updates-based-risk
