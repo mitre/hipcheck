@@ -1,9 +1,15 @@
 
 # Resolving Packages from Package Sources
 
-The first action any new user of Night Vision will perform will be to provide a
-"package source" (like a `package.json` file) so they can subscribe to threat
-alerts for all the dependencies represented in that package source.
+One important action a new user of Night Vision may perform is to provide a
+"package source" (like a `package.json` file) so Night Vision can identify
+packages relevant to that user. This supports both threat alerting and the MVP
+goal described in
+[RFD 0001](../rfds/0001-mvp-upgrade-safety-assessments.md): assessing whether a
+newer patch version is a reasonable move from a known-insecure package version,
+with explicit motivation to support Federal Civilian Executive Branch (FCEB)
+compliance with CISA's BOD 26-04 by noticing KEV-listed package exposure and
+identifying safer versions to upgrade to.
 
 It turns out this is a fairly complex operation! So it's worth breaking down
 exactly how it works and why it's designed in the way it is.

@@ -19,6 +19,7 @@ This is the internal documentation for the Night Vision project.
 
 ## System Info
 
+- [Requests For Discussion](./rfds/README.md)
 - [System Architecture](./system/architecture.md)
 
 ## Backend Info

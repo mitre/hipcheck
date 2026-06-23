@@ -2,8 +2,10 @@
 # Night Vision: 🔭 CTI for OSS Packages
 
 __Night Vision__ is a cyber threat intelligence (CTI) system for open source
-software (OSS) packages. It allows users to subscribe for alerts to new cyber
-threat indicators on the open source software they use.
+software (OSS) packages. Its Minimum Viable Product (MVP) helps users assess
+whether newer patch versions are reasonable moves from known-insecure package
+versions, with explicit motivation to support Federal Civilian Executive
+Branch (FCEB) compliance with CISA's BOD 26-04.
 
 > [!important]
 > This project is currently in __early development__ and is not yet suitable
@@ -11,16 +13,19 @@ threat indicators on the open source software they use.
 
 ## What is Night Vision?
 
-With Night Vision, users will provide their package files (like `package.json`
-for most JavaScript packages) to subscribe to alerts for new cyber threats for
-all the dependencies in those package files. Night Vision will thereafter
-monitor those packages for new threats, and alert users when any are discovered
-so they can take action.
+With Night Vision, users will assess packages they depend on, starting with
+newer patch versions that may help them move away from known-insecure package
+versions. Over time, Night Vision will also support package-source analysis,
+ongoing monitoring, and alerts for new cyber threats affecting dependencies.
 
 Currently, we are building the Minimum Viable Product, with the intent to
-support analyzing packages hosted on [NPM] found in users' `package.json`
-files. More package hosts, package files, source repository hosts, and beyond
-will be supported in future versions of Night Vision.
+support upgrade safety assessments for packages hosted on [NPM]. The MVP is
+motivated by CISA's BOD 26-04, and focuses on noticing when reachable package
+versions enter the Known Exploited Vulnerabilities (KEV) catalog and
+identifying safer versions to upgrade to. See
+[RFD 0001](docs/rfds/0001-mvp-upgrade-safety-assessments.md) for the MVP
+discussion. More package hosts, package files, source repository hosts, and
+beyond will be supported in future versions of Night Vision.
 
 ## Repository Contents
 
