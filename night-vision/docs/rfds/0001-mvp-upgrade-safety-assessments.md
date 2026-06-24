@@ -165,6 +165,52 @@ The MVP assessment should consider:
 - Evidence quality: whether the recommendation is based on reliable, agreeing
   sources or limited data.
 
+## Supply Chain Risk Detections in Recommendations
+
+Supply chain detections should feed the assessment verdict as weighted findings,
+not as independent alerts. Each finding should describe the detected condition,
+the affected version or version range, the evidence source, the confidence, and
+the recommended user action. Findings should be grouped into a small number of
+recommendation effects:
+
+- Blocking findings should normally move the candidate to `avoid` unless a
+  reviewer explicitly accepts the risk.
+- High-risk review findings should normally move the candidate to `caution`,
+  and may move it to `avoid` when multiple high-risk findings agree.
+- Context findings should appear as caveats without changing a candidate that is
+  otherwise `recommended`.
+- Missing-check findings should reduce evidence quality and may produce
+  `unknown` when Night Vision cannot check an important risk class.
+
+For the MVP, detections should affect recommendations as follows:
+
+| Detection | Recommendation effect | User-facing guidance |
+| --- | --- | --- |
+| Discontiguous version | High-risk review finding. Use `caution` because an unexpected version jump may indicate republishing, yanking, or release-process irregularity. | Ask the user to review release history, changelog continuity, and maintainer notes before upgrading. |
+| Package size increase | High-risk review finding when the increase is large or unexplained. Use `caution`; combine with obfuscation, new install scripts, or dependency changes to consider `avoid`. | Show the size delta and ask the user to inspect added files and build artifacts. |
+| New package maintainer | High-risk review finding. Use `caution`; consider `avoid` if paired with unusual publication timing, new scripts, or provenance gaps. | Show who gained publish access and recommend confirming the change against project governance or maintainer communication. |
+| Broken provenance attestation | High-risk review finding for packages that previously had valid provenance. Use `caution`, or `unknown` if provenance is a required evidence source for the package. | Explain that the release cannot be tied to the expected build provenance and recommend choosing a candidate with valid attestation when available. |
+| New install script | High-risk review finding. Use `caution`; consider `avoid` when the script is unexplained or paired with obfuscated code, binary drops, or maintainer changes. | Show the script command and recommend manual review before installation in trusted environments. |
+| Source/tag mismatch | Blocking finding when the source repository and published tarball disagree materially. Use `avoid` unless the mismatch is explained and reviewed. | Tell the user that the published package does not match the referenced source and recommend a different candidate version. |
+| Overly broad dependency range | Context or high-risk review finding depending on reachability and dependency sensitivity. Use `caution` when the range can pull SemVer-unsafe updates. | Show the widened range and recommend lockfile review or pinning before accepting the upgrade. |
+| Malicious `bin` entries | Blocking finding when a package binary shadows a common command or conflicts with known popular packages. Use `avoid`. | Warn that the package may intercept expected commands and recommend rejecting the candidate unless the entry is clearly intended. |
+| Introduction of `node-gyp` dependency | High-risk review finding. Use `caution` because native build paths can hide behavior and create install-time execution risk. | Show the new native-build dependency and recommend reviewing why native code is now required. |
+| Malicious publication behavior | Blocking finding when CI or release-process weaknesses create a credible publication-risk signal. Use `avoid` for serious findings; otherwise use `caution`. | Summarize the release-process weakness and recommend a candidate without the publication-risk signal. |
+| Introduction of obfuscated code | Blocking finding for new obfuscation in a package that was not previously obfuscated. Use `avoid` unless the obfuscation is expected and reviewed. | Show the obfuscation indicators and recommend manual source review or selecting a cleaner candidate. |
+
+The recommendation should also explain combined risk. A single context finding
+may be acceptable for a patch that clearly removes KEV exposure, while several
+review findings in the same release should raise the verdict. In particular,
+new maintainers, new install scripts, broken provenance, large package-size
+changes, and obfuscated code should compound because together they describe a
+plausible malicious-publication path.
+
+The UI should make these detections legible as part of the assessment result:
+show the overall verdict first, then a short "why this verdict" explanation,
+then the findings with evidence links and checked-but-not-found risk classes.
+This keeps the product centered on upgrade decisions while still exposing the
+security evidence needed for review.
+
 ## Product Implications
 
 The frontend should prioritize an assessment-oriented experience over a passive
