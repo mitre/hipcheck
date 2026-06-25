@@ -29,9 +29,10 @@ impl<'haystack> Affiliator<'haystack> {
 
 			for org in &github_account.github_orgs {
 				if let Some(org_email) = &org.email
-					&& self.email_is_match(org_email) {
-						return true;
-					}
+					&& self.email_is_match(org_email)
+				{
+					return true;
+				}
 			}
 		}
 

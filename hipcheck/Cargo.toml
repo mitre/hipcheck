@@ -20,16 +20,6 @@ publish = false
 name = "hc"
 path = "src/main.rs"
 
-[features]
-
-# Print timings feature is used to print timing information throughout
-# Hipcheck's runtime.
-print-timings = ["benchmarking"]
-
-# Benchmarking enables the benchmarking module, containing special utilities
-# for benchmarking.
-benchmarking = []
-
 [dependencies]
 
 async-channel = { workspace = true }
