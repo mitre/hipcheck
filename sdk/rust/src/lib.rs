@@ -48,8 +48,6 @@ pub use hipcheck_common::types::LogLevel;
 // Private Modules
 //------------------------------------------------------------------------------------------------
 
-#[cfg(feature = "print-timings")]
-mod benchmarking;
 mod config;
 mod engine;
 mod log;

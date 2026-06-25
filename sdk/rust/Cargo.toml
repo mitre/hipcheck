@@ -36,7 +36,6 @@ hipcheck-workspace-hack = { workspace = true }
 default = ["log_forwarding"]
 macros = ["dep:hipcheck-sdk-macros"]
 mock_engine = []
-print-timings = []
 log_forwarding = ["tracing", "tracing-subscriber"]
 
 [package.metadata.docs.rs]

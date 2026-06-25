@@ -23,8 +23,8 @@ pub fn run() -> Result<()> {
 		let local_manifest_path = local::get_download_manifest_path("mitre", &name)?;
 		let local_entries = local::try_parse_download_manifest(&local_manifest_path)?;
 
-		let remote_set = HashSet::<DownloadManifestEntry>::from_iter(remote_entries.into_iter());
-		let local_set = HashSet::<DownloadManifestEntry>::from_iter(local_entries.into_iter());
+		let remote_set = HashSet::<DownloadManifestEntry>::from_iter(remote_entries);
+		let local_set = HashSet::<DownloadManifestEntry>::from_iter(local_entries);
 
 		let diff = remote_set.difference(&local_set);
 		let diff_vec = diff.collect::<Vec<_>>();

@@ -17,12 +17,6 @@ use std::{
 };
 use verbosity::{SilenceGuard, Verbosity};
 
-#[cfg(feature = "print-timings")]
-use console::style;
-
-#[cfg(feature = "print-timings")]
-use std::time::Instant;
-
 pub mod color_choice;
 pub mod iter;
 pub mod macros;
@@ -189,24 +183,6 @@ impl Shell {
 	#[allow(unused)]
 	pub fn progress_bars() -> MultiProgress {
 		Self::get().multi_progress.clone()
-	}
-
-	/// Print timing info. Only enabled while hipcheck is being benchmarked.
-	#[allow(unused)]
-	#[cfg(feature = "benchmarking")]
-	pub fn print_timing(timing: &crate::benchmarking::PrintTime) {
-		use crate::benchmarking::PrintTime;
-
-		// Destructure timing object.
-		let PrintTime { location, start } = timing;
-
-		Shell::in_suspend(|| {
-			eprintln!(
-				"[TIMINGS]: {}: {:.6} seconds elapsed.",
-				style(location).bold(),
-				(Instant::now() - *start).as_secs_f64()
-			);
-		})
 	}
 
 	/// Print a message to the standard output if the standard output is a terminal.

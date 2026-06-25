@@ -133,9 +133,6 @@ impl TargetResolver {
 
 	/// Main function entrypoint for the resolution algorithm
 	pub async fn resolve(config: TargetResolverConfig, seed: SingleTargetSeed) -> Result<Target> {
-		#[cfg(feature = "print-timings")]
-		let _0 = crate::benchmarking::print_scope_time!("resolve_target");
-
 		let mut resolver = TargetResolver {
 			config,
 			seed: seed.clone(),

@@ -32,9 +32,6 @@ pub fn retrieve_plugins(
 	policy_plugins: &[PolicyPlugin],
 	plugin_cache: &HcPluginCache,
 ) -> Result<HashSet<PluginId>, Error> {
-	#[cfg(feature = "print-timings")]
-	let _0 = crate::benchmarking::print_scope_time!("retrieve plugins");
-
 	let mut required_plugins = HashSet::new();
 
 	let num_plugins = policy_plugins.len();

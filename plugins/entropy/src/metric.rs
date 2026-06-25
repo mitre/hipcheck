@@ -49,9 +49,6 @@ pub fn grapheme_freqs(
 	source_files: &HashSet<String>,
 	commit_diff: &CommitDiff,
 ) -> CommitGraphemeFreq {
-	// #[cfg(feature = "print-timings")]
-	// let _0 = crate::benchmarking::print_scope_time!("grapheme_freqs");
-
 	// Dashmap (fast concurrent hashmap) to store counts for each grapheme.
 	let grapheme_table: DashMap<String, u64> = DashMap::new();
 

@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(feature = "benchmarking")]
-mod benchmarking;
 mod cache;
 mod cli;
 mod config;
@@ -76,14 +74,6 @@ use which::which;
 /// Entry point for Hipcheck.
 fn main() -> ExitCode {
 	init::init();
-
-	if cfg!(feature = "print-timings") {
-		Shell::eprintln("[TIMINGS]: Timing information will be printed.");
-	}
-
-	// Start tracking the timing for `main` after logging is initiated.
-	#[cfg(feature = "print-timings")]
-	let _0 = benchmarking::print_scope_time!("main");
 
 	let config = CliConfig::load();
 
