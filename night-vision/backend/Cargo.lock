@@ -4397,12 +4397,11 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "camino",
+ "cc",
  "chrono",
  "clap",
  "clap_builder",
- "crypto-common 0.1.7",
  "deranged",
- "digest 0.10.7",
  "either",
  "form_urlencoded",
  "futures-channel",
@@ -4418,6 +4417,8 @@ dependencies = [
  "percent-encoding",
  "regex-automata",
  "regex-syntax",
+ "rustls",
+ "rustls-webpki",
  "scopeguard",
  "serde",
  "serde_core",
@@ -4431,6 +4432,7 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
+ "typenum",
  "uuid",
 ]
 

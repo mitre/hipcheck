@@ -20,9 +20,7 @@ camino = { version = "1", default-features = false, features = ["serde1"] }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive", "env", "string"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "env", "help", "std", "string", "suggestions", "usage"] }
-crypto-common = { version = "0.1", default-features = false, features = ["std"] }
 deranged = { version = "0.5", features = ["powerfmt", "serde"] }
-digest = { version = "0.10", features = ["mac", "std"] }
 either = { version = "1", features = ["serde", "use_std"] }
 form_urlencoded = { version = "1" }
 futures-channel = { version = "0.3", features = ["sink"] }
@@ -38,6 +36,8 @@ num-traits = { version = "0.2", default-features = false, features = ["i128", "s
 percent-encoding = { version = "2" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
 regex-syntax = { version = "0.8" }
+rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "aws_lc_rs", "logging", "ring", "std", "tls12"] }
+rustls-webpki = { version = "0.103", default-features = false, features = ["aws-lc-rs", "ring", "std"] }
 scopeguard = { version = "1" }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_core = { version = "1", features = ["alloc", "rc"] }
@@ -49,9 +49,11 @@ time = { version = "0.3", features = ["formatting", "local-offset", "macros", "p
 tokio = { version = "1", features = ["full"] }
 toml = { version = "1", features = ["preserve_order"] }
 tracing = { version = "0.1", features = ["log"] }
+typenum = { version = "1", default-features = false, features = ["const-generics"] }
 uuid = { version = "1", features = ["serde", "v4", "v7"] }
 
 [build-dependencies]
+cc = { version = "1", default-features = false, features = ["parallel"] }
 either = { version = "1", features = ["serde", "use_std"] }
 memchr = { version = "2" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
