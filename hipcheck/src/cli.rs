@@ -170,10 +170,6 @@ struct DeprecatedArgs {
 	#[arg(long = "print-config", hide = true, global = true)]
 	print_config: Option<bool>,
 
-	/// Path to the configuration folder.
-	#[arg(skip)]
-	config: Option<Provenance>,
-
 	/// Path to the Hipcheck home folder.
 	#[arg(short = 'H', long = "home", hide = true, global = true)]
 	home: Option<PathBuf>,
@@ -238,12 +234,12 @@ impl CliConfig {
 	/// Determine which ConfigMode to use, based on the combination of options
 	/// passed to Hipcheck.
 	pub fn config_mode(&self) -> Result<ConfigMode> {
-		match (&self.path_args.policy, &self.deprecated_args.config) {
+		match (&self.path_args.policy, default_config()) {
 			(Some(Provenance::FromUser(policy_path)), _) => Ok(ConfigMode::ForcePolicy {
 				policy: policy_path.to_path_buf(),
 			}),
 			(_, Some(Provenance::FromUser(config_path))) => Ok(ConfigMode::ForceConfig {
-				config: config_path.to_path_buf(),
+				config: config_path,
 			}),
 			(
 				Some(Provenance::FromDefaults(policy_path)),
@@ -327,8 +323,8 @@ impl CliConfig {
 	}
 
 	/// Get the path to the configuration directory.
-	pub fn config(&self) -> Option<&Path> {
-		self.deprecated_args.config.as_deref()
+	pub fn config(&self) -> Option<PathBuf> {
+		default_config().map(|path| path.to_path_buf())
 	}
 
 	/// Get the path to the exec config file
@@ -378,7 +374,6 @@ impl CliConfig {
 				exec: None,
 			},
 			deprecated_args: DeprecatedArgs {
-				config: hc_env_var("config").map(Provenance::FromUser),
 				home: hc_env_var("home"),
 				..Default::default()
 			},
@@ -398,10 +393,6 @@ impl CliConfig {
 					.map(|dir| Provenance::FromDefaults(pathbuf![&dir, "Hipcheck.kdl"])),
 				exec: None,
 			},
-			deprecated_args: DeprecatedArgs {
-				config: platform_config().map(Provenance::FromDefaults),
-				..Default::default()
-			},
 			..Default::default()
 		}
 	}
@@ -415,11 +406,6 @@ impl CliConfig {
 					.ok()
 					.map(|dir| Provenance::FromDefaults(pathbuf![&dir, "Hipcheck.kdl"])),
 				exec: None,
-			},
-			deprecated_args: DeprecatedArgs {
-				config: dirs::home_dir()
-					.map(|dir| Provenance::FromDefaults(pathbuf![&dir, "hipcheck", "config"])),
-				..Default::default()
 			},
 			..Default::default()
 		}
@@ -446,6 +432,17 @@ fn platform_config() -> Option<PathBuf> {
 	} else {
 		base
 	}
+}
+
+/// Get the default path to the legacy configuration directory.
+fn default_config() -> Option<Provenance> {
+	hc_env_var("config")
+		.map(Provenance::FromUser)
+		.or_else(|| platform_config().map(Provenance::FromDefaults))
+		.or_else(|| {
+			dirs::home_dir()
+				.map(|dir| Provenance::FromDefaults(pathbuf![&dir, "hipcheck", "config"]))
+		})
 }
 
 /// Get a Hipcheck configuration environment variable.
