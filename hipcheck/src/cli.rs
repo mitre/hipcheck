@@ -166,10 +166,6 @@ struct DeprecatedArgs {
 	#[arg(long = "print-home", hide = true, global = true)]
 	print_home: Option<bool>,
 
-	/// Print the config file path for Hipcheck.
-	#[arg(long = "print-config", hide = true, global = true)]
-	print_config: Option<bool>,
-
 	/// Path to the Hipcheck home folder.
 	#[arg(short = 'H', long = "home", hide = true, global = true)]
 	home: Option<PathBuf>,
@@ -260,10 +256,6 @@ impl CliConfig {
 			return Some(FullCommands::PrintCache);
 		}
 
-		if self.print_config() {
-			return Some(FullCommands::PrintConfig);
-		}
-
 		self.command.as_ref().map(FullCommands::from)
 	}
 
@@ -335,11 +327,6 @@ impl CliConfig {
 	/// Check if the `--print-home` flag was used.
 	pub fn print_home(&self) -> bool {
 		self.deprecated_args.print_home.unwrap_or(false)
-	}
-
-	/// Check if the `--print-config` flag was used.
-	pub fn print_config(&self) -> bool {
-		self.deprecated_args.print_config.unwrap_or(false)
 	}
 
 	/// Get an empty configuration object with nothing set.
@@ -474,7 +461,6 @@ pub enum FullCommands {
 	CacheTarget(CacheTargetArgs),
 	CachePlugin(CachePluginArgs),
 	Plugin(PluginArgs),
-	PrintConfig,
 	PrintCache,
 	Scoring,
 	ExplainTargetTriple,
@@ -1555,6 +1541,17 @@ mod tests {
 
 		let path = pathbuf![tempdir.path(), "hipcheck"];
 		let parsed = CliConfig::try_parse_from(["hc", "--config", path.to_str().unwrap()]);
+
+		assert!(parsed.is_err());
+		assert_eq!(
+			parsed.unwrap_err().kind(),
+			clap::error::ErrorKind::UnknownArgument
+		);
+	}
+
+	#[test]
+	fn rejects_print_config_flag() {
+		let parsed = CliConfig::try_parse_from(["hc", "--print-config"]);
 
 		assert!(parsed.is_err());
 		assert_eq!(

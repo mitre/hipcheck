@@ -105,7 +105,6 @@ fn main() -> ExitCode {
 		Some(FullCommands::CacheTarget(args)) => return cmd_cache_target(args, &config),
 		Some(FullCommands::CachePlugin(args)) => return cmd_cache_plugin(args, &config),
 		Some(FullCommands::Plugin(args)) => return cmd_plugin(args, &config),
-		Some(FullCommands::PrintConfig) => cmd_print_config(config.config()),
 		Some(FullCommands::PrintCache) => cmd_print_home(config.cache()),
 		Some(FullCommands::Scoring) => {
 			return cmd_print_weights(&config)
@@ -874,20 +873,6 @@ fn cmd_cache_plugin(args: CachePluginArgs, config: &CliConfig) -> ExitCode {
 /// Exits `Ok` if home directory is specified, `Err` otherwise.
 fn cmd_print_home(path: Option<&Path>) {
 	match path.ok_or_else(|| hc_error!("can't find cache directory")) {
-		Ok(path_buffer) => {
-			println!("{}", path_buffer.display());
-		}
-		Err(err) => {
-			Shell::print_error(&err, Format::Human);
-		}
-	}
-}
-
-/// Print the current config path for Hipcheck.
-///
-/// Exits `Ok` if config path is specified, `Err` otherwise.
-fn cmd_print_config(config_path: Option<PathBuf>) {
-	match config_path.ok_or_else(|| hc_error!("can't find config directory")) {
 		Ok(path_buffer) => {
 			println!("{}", path_buffer.display());
 		}
