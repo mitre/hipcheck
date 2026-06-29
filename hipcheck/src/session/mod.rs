@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+	analysis::unresolved_analysis_tree_from_policy,
 	cache::plugin::HcPluginCache,
 	cli::{ConfigMode, Format},
-	config::unresolved_analysis_tree_from_policy,
 	engine::{HcPluginCore, PluginCore, start_plugins},
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
@@ -296,16 +296,8 @@ async fn setup_base_session(
 	 *  Loading configuration.
 	 *-----------------------------------------------------------------*/
 
-	use ConfigMode::*;
 	let config_msg = match config_mode {
-		PreferPolicy { policy, config: _ } => use_policy(policy, &mut session_builder)?,
-		ForcePolicy { policy } => use_policy(policy, &mut session_builder)?,
-		ForceConfig { config } => {
-			return Err(hc_error!(
-				"Legacy Config TOML directories are no longer supported: {}. Please provide a Policy KDL file with --policy.",
-				config.display()
-			));
-		}
+		ConfigMode::ForcePolicy { policy } => use_policy(policy, &mut session_builder)?,
 	};
 	Shell::print_config(config_msg);
 

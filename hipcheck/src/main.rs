@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
+mod analysis;
 mod cache;
 mod cli;
-mod config;
 mod engine;
 mod error;
 mod exec;
@@ -22,9 +22,9 @@ mod util;
 mod version;
 
 use crate::{
+	analysis::normalized_unresolved_analysis_tree_from_policy,
 	cache::{plugin::HcPluginCache, repo::HcRepoCache},
 	cli::Format,
-	config::normalized_unresolved_analysis_tree_from_policy,
 	engine::HcEngine,
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
@@ -38,13 +38,13 @@ use crate::{
 	setup::write_config_binaries,
 	shell::Shell,
 };
+use analysis::AnalysisTreeNode;
 use async_channel::bounded;
 use async_stream::stream;
 use cli::{
 	CacheOp, CachePluginArgs, CacheTargetArgs, CheckArgs, CliConfig, ConfigMode, FullCommands,
 	PluginArgs, PluginOp, ReadyArgs, SchemaArgs, SchemaCommand, UpdateArgs,
 };
-use config::AnalysisTreeNode;
 use core::fmt;
 use engine::PluginCore;
 use indextree::{Arena, NodeId};

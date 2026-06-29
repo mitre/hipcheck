@@ -4,7 +4,6 @@ use crate::{
 	error::{Context as _, Result},
 	hc_error,
 };
-use serde::de::DeserializeOwned;
 use sha2::Digest;
 use std::{
 	fs::{self},
@@ -29,14 +28,6 @@ pub fn read_bytes<P: AsRef<Path>>(path: P) -> Result<Vec<u8>> {
 	}
 
 	inner(path.as_ref())
-}
-
-/// Read file to a struct that can be deserialized from TOML format.
-pub fn read_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P) -> Result<T> {
-	let path = path.as_ref();
-	let contents = read_string(path)?;
-	toml::de::from_str(&contents)
-		.with_context(|| format!("failed to read as TOML '{}'", path.display()))
 }
 
 /// Create a directory and missing parents.

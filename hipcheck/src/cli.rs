@@ -171,39 +171,18 @@ struct DeprecatedArgs {
 	home: Option<PathBuf>,
 }
 
-/// Select how Hipcheck searches for its configuration.
-/// Hipcheck supports a legacy configuration format called config TOML.
-/// The default system is called a Policy file, in KDL format.
-/// If a user explicitly selects one of these modes, then Hipcheck
-/// will only attempt to use that source of configuration.
-/// Otherwise, Hipcheck will try to use a Policy file, falling back
-/// to config TOML if that fails.
+/// Select how Hipcheck finds its policy file.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConfigMode {
-	/// Try to load policy first, but fall back to config.
-	PreferPolicy { policy: PathBuf, config: PathBuf },
-	/// Only attempt to load from policy.
+	/// Load from a policy file.
 	ForcePolicy { policy: PathBuf },
-	/// Only attempt to load from config.
-	ForceConfig { config: PathBuf },
 }
 
 impl Display for ConfigMode {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		use ConfigMode::*;
 		match &self {
-			PreferPolicy { policy, config } => {
-				write!(
-					f,
-					"Default to Policy KDL file at path:\n{:?}\nFallback Legacy Config TOML directory at path:\n{:?}",
-					policy, config
-				)
-			}
-			ForcePolicy { policy } => {
+			ConfigMode::ForcePolicy { policy } => {
 				write!(f, "Policy KDL file at path:\n{:?}", policy)
-			}
-			ForceConfig { config } => {
-				write!(f, "Legacy Config TOML directory at path:\n{:?}", config)
 			}
 		}
 	}
@@ -230,21 +209,11 @@ impl CliConfig {
 	/// Determine which ConfigMode to use, based on the combination of options
 	/// passed to Hipcheck.
 	pub fn config_mode(&self) -> Result<ConfigMode> {
-		match (&self.path_args.policy, default_config()) {
-			(Some(Provenance::FromUser(policy_path)), _) => Ok(ConfigMode::ForcePolicy {
+		match &self.path_args.policy {
+			Some(policy_path) => Ok(ConfigMode::ForcePolicy {
 				policy: policy_path.to_path_buf(),
 			}),
-			(_, Some(Provenance::FromUser(config_path))) => Ok(ConfigMode::ForceConfig {
-				config: config_path,
-			}),
-			(
-				Some(Provenance::FromDefaults(policy_path)),
-				Some(Provenance::FromDefaults(config_path)),
-			) => Ok(ConfigMode::PreferPolicy {
-				policy: policy_path.to_path_buf(),
-				config: config_path.to_path_buf(),
-			}),
-			_ => Err(hc_error!(
+			None => Err(hc_error!(
 				"Could not find any source of configuration. Use --policy to configure Hipcheck."
 			)),
 		}
@@ -316,7 +285,8 @@ impl CliConfig {
 
 	/// Get the path to the configuration directory.
 	pub fn config(&self) -> Option<PathBuf> {
-		default_config().map(|path| path.to_path_buf())
+		platform_config()
+			.or_else(|| dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]))
 	}
 
 	/// Get the path to the exec config file
@@ -419,13 +389,6 @@ fn platform_config() -> Option<PathBuf> {
 	} else {
 		base
 	}
-}
-
-/// Get the default path to the legacy configuration directory.
-fn default_config() -> Option<Provenance> {
-	platform_config().map(Provenance::FromDefaults).or_else(|| {
-		dirs::home_dir().map(|dir| Provenance::FromDefaults(pathbuf![&dir, "hipcheck", "config"]))
-	})
 }
 
 /// Get a Hipcheck configuration environment variable.
@@ -1481,7 +1444,7 @@ mod tests {
 
 	#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 	#[test]
-	fn resolve_config_with_platform() {
+	fn resolve_policy_with_platform() {
 		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 
 		let vars = vec![
@@ -1493,10 +1456,7 @@ mod tests {
 		with_env_vars(vars, || {
 			let config_dir = platform_config().unwrap();
 			let path = pathbuf![&config_dir, "Hipcheck.kdl"];
-			let expected = ConfigMode::PreferPolicy {
-				policy: path,
-				config: config_dir,
-			};
+			let expected = ConfigMode::ForcePolicy { policy: path };
 
 			let config = {
 				let mut temp = CliConfig::empty();

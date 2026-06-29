@@ -7,7 +7,6 @@ use std::{fs::File, path::Path};
 static BINARY_KDL: &str = include_str!("../../config/Binary.kdl");
 static EXEC_KDL: &str = include_str!("../../config/Exec.kdl");
 static HIPCHECK_KDL: &str = include_str!("../../config/Hipcheck.kdl");
-static HIPCHECK_TOML: &str = include_str!("../../config/Hipcheck.toml");
 static LANGS_KDL: &str = include_str!("../../config/Langs.kdl");
 static ORGS_KDL: &str = include_str!("../../config/Orgs.kdl");
 static TYPOS_KDL: &str = include_str!("../../config/Typos.kdl");
@@ -21,7 +20,6 @@ pub fn write_config_binaries(path: &Path) -> Result<()> {
 		("Binary.kdl", BINARY_KDL),
 		("Exec.kdl", EXEC_KDL),
 		("Hipcheck.kdl", HIPCHECK_KDL),
-		("Hipcheck.toml", HIPCHECK_TOML),
 		("Orgs.kdl", ORGS_KDL),
 	];
 
