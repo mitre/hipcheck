@@ -42,20 +42,16 @@ The precedence is, in increasing order:
 
 ## Path Flags
 
-"Path flags" are flags which modify the paths Hipcheck uses for configuration,
-data, and caching repositories locally. The current flags are:
+"Path flags" are flags which modify the paths Hipcheck uses for policy,
+execution configuration, and caching repositories locally. The current flags are:
 
-- `-c <CONFIG>`/`--config <CONFIG>`: the path to the configuration folder to
-  use.
-- `-d <DATA>`/`--data <DATA>`: the path to the data folder to use.
 - `-C <CACHE>`/`--cache <CACHE>`: the path to the cache folder to use.
+- `-p <POLICY>`/`--policy <POLICY>`: the path to the policy file to use.
 - `-e <EXEC>`/`--exec <EXEC>`: the path to the execution configuration file.
 
 Each of these is inferred by default based on the user's platform. They can
 also be set with environment variables:
 
-- `HC_CONFIG`
-- `HC_DATA`
 - `HC_CACHE`
 
 The priority (in increasing precedence), is:
