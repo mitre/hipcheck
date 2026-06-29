@@ -44,7 +44,7 @@ impl AsyncRuntime {
             .build()
             .map_err(FatalError::FailedToBuildTokioRuntime)?;
 
-        Ok(AsyncRuntime(runtime))
+        Ok(Self(runtime))
     }
 
     /// Run a future to completion on the async runtime.

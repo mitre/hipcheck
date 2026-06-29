@@ -1,8 +1,8 @@
 use crate::workspace::get_workspace_path;
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context as _, Result, anyhow, bail};
 use cargo_manifest::{Manifest, MaybeInherited, Publish};
 use clap::ArgMatches;
-use itertools::Itertools;
+use itertools::Itertools as _;
 use pathbuf::pathbuf;
 use std::ops::Not as _;
 
@@ -27,6 +27,15 @@ fn apply_checks(manifest: &Manifest, problems: &mut Vec<anyhow::Error>) -> Resul
     {
         problems.push(anyhow!(
             "'{}' does not have `publish = false` in its `Cargo.toml`",
+            pkg.name
+        ));
+    }
+
+    if let Some(pkg) = &manifest.package
+        && manifest.inherits_workspace_lints().not()
+    {
+        problems.push(anyhow!(
+            "'{}' does not inherit workspace lint configuration with `[lints] workspace = true`",
             pkg.name
         ));
     }
@@ -79,11 +88,101 @@ impl CanPublish for cargo_manifest::Package {
             // `publish = true` or `publish = false`
             Some(MaybeInherited::Local(Publish::Flag(flag))) => flag,
             // `publish = ["registry-name"]`
-            Some(MaybeInherited::Local(Publish::Registry(_)))
+            Some(
+                MaybeInherited::Local(Publish::Registry(_))
             // `publish.workspace = true` or `publish = { workspace = true }`
-            | Some(MaybeInherited::Inherited { .. })
+            | MaybeInherited::Inherited { .. },
+            )
             // No `publish` field specified.
             | None => true,
         }
+    }
+}
+
+// Implementing this check as an extension trait for ergonomic reasons.
+trait InheritsWorkspaceLints {
+    fn inherits_workspace_lints(&self) -> bool;
+}
+
+impl InheritsWorkspaceLints for Manifest {
+    /// Check whether the package inherits workspace lint configuration.
+    fn inherits_workspace_lints(&self) -> bool {
+        self.lints
+            .as_ref()
+            .is_some_and(cargo_manifest::MaybeInheritedLintsSet::is_inherited)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn manifest(contents: &str) -> Manifest {
+        Manifest::from_slice(contents.as_bytes()).expect("test manifest should parse")
+    }
+
+    #[test]
+    fn inherited_workspace_lints_pass_manifest_checks() {
+        let manifest = manifest(
+            r#"
+[package]
+name = "example"
+version = "0.1.0"
+publish = false
+
+[lints]
+workspace = true
+"#,
+        );
+        let mut problems = vec![];
+
+        apply_checks(&manifest, &mut problems).expect("manifest checks should run");
+
+        assert!(problems.is_empty());
+    }
+
+    #[test]
+    fn missing_workspace_lints_fail_manifest_checks() {
+        let manifest = manifest(
+            r#"
+[package]
+name = "example"
+version = "0.1.0"
+publish = false
+"#,
+        );
+        let mut problems = vec![];
+
+        apply_checks(&manifest, &mut problems).expect("manifest checks should run");
+
+        assert_eq!(problems.len(), 1);
+        assert_eq!(
+            problems[0].to_string(),
+            "'example' does not inherit workspace lint configuration with `[lints] workspace = true`"
+        );
+    }
+
+    #[test]
+    fn local_lints_without_workspace_inheritance_fail_manifest_checks() {
+        let manifest = manifest(
+            r#"
+[package]
+name = "example"
+version = "0.1.0"
+publish = false
+
+[lints.clippy]
+dbg_macro = "deny"
+"#,
+        );
+        let mut problems = vec![];
+
+        apply_checks(&manifest, &mut problems).expect("manifest checks should run");
+
+        assert_eq!(problems.len(), 1);
+        assert_eq!(
+            problems[0].to_string(),
+            "'example' does not inherit workspace lint configuration with `[lints] workspace = true`"
+        );
     }
 }

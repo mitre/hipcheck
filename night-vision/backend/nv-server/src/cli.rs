@@ -9,7 +9,7 @@ pub struct Cli {
     matches: ArgMatches,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RunMode {
     Normal,
     WriteOpenApi,
@@ -47,7 +47,6 @@ impl Cli {
 
     /// Get the config path provided by the user.
     pub fn config_path(&self) -> &Utf8Path {
-        // PANIC SAFETY: `config` is required, so this is always `Some`.
         self.matches
             .get_one::<Utf8PathBuf>("config")
             .expect("config path is required")

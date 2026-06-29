@@ -1,7 +1,7 @@
 use crate::workspace::get_workspace_path;
 use anyhow::{Context as _, Result, anyhow};
 use clap::ArgMatches;
-use itertools::Itertools;
+use itertools::Itertools as _;
 use newtype_uuid::{Timestamp, TypedUuid, TypedUuidKind, TypedUuidTag};
 use patharg::InputArg;
 use pathbuf::pathbuf;
@@ -151,7 +151,7 @@ impl Workspace {
         // we'd need to instead maintain a mapping from "JSON-indices" (the indices used in the
         // source JSON file) and "petgraph-indices" (the indices used in the petgraph graph
         // data structure).
-        for unit in json.units.into_iter() {
+        for unit in json.units {
             graph.add_node(unit);
         }
 
@@ -165,7 +165,7 @@ impl Workspace {
 
             if node.dependencies.is_empty() {
                 continue;
-            };
+            }
 
             // Note the neat iterator trick here! We're `zip`-ing an infinite-length iterator
             // (`iter::repeat`, though it's not actually infinite, since Rust iterators are lazy)
@@ -217,7 +217,7 @@ impl Workspace {
     fn write_dot(&self, graph: &UnitGraph) -> Result<PathBuf> {
         let graph = graph.map(
             |idx, node| self.pretty_print_node(idx, node),
-            |_, _| String::new(),
+            |_, ()| String::new(),
         );
 
         let dot = Dot::with_attr_getters(
@@ -229,10 +229,7 @@ impl Workspace {
                 // By default, GraphViz will use oval node shapes, no margin, and a serif font.
                 // This overrides all of that, giving us rectangles with a small margin, and a
                 // basic monospace font (whatever your system default is).
-                format!(
-                    "shape=box, margin=0.3, fontname=\"monospace\", label=\"{}\"",
-                    node
-                )
+                format!("shape=box, margin=0.3, fontname=\"monospace\", label=\"{node}\"")
             },
         );
 

@@ -78,9 +78,9 @@ impl CommitInfo {
     }
 
     fn from_string(s: &str) -> Option<Self> {
-        let mut parts = s.split_whitespace().map(|s| s.to_string());
+        let mut parts = s.split_whitespace().map(ToOwned::to_owned);
 
-        Some(CommitInfo {
+        Some(Self {
             hash: parts.next()?,
             short_hash: parts.next()?,
             date: parts.next()?,

@@ -5,7 +5,7 @@ use std::fs;
 #[cfg(windows)]
 use std::process::Command;
 
-pub(crate) enum TestFilePermissions {
+pub enum TestFilePermissions {
     #[cfg(unix)]
     UnixOwnerOnly,
     #[cfg(unix)]
@@ -17,7 +17,7 @@ pub(crate) enum TestFilePermissions {
 }
 
 #[cfg(unix)]
-pub(crate) fn set_file_permissions(path: &Utf8Path, permissions: TestFilePermissions) {
+pub fn set_file_permissions(path: &Utf8Path, permissions: TestFilePermissions) {
     let mode = match permissions {
         TestFilePermissions::UnixOwnerOnly => 0o600,
         TestFilePermissions::UnixGroupOrWorldReadable => 0o644,
@@ -41,7 +41,7 @@ pub(crate) fn set_file_permissions(_path: &Utf8Path, permissions: TestFilePermis
 }
 
 #[cfg(unix)]
-pub(crate) fn restrict_secret_file_permissions(path: &Utf8Path) {
+pub fn restrict_secret_file_permissions(path: &Utf8Path) {
     set_file_permissions(path, TestFilePermissions::UnixOwnerOnly);
 }
 

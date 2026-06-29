@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 fn main() -> ExitCode {
     if let Err(e) = run() {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         return ExitCode::FAILURE;
     }
 

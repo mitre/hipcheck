@@ -121,11 +121,11 @@ where
         let line = line?;
 
         // Make line_number 1-indexed, trim whitespace from line.
-        let line_number = line_number + 1;
+        let line_number = line_number.saturating_add(1);
         let line = line.trim();
 
         // Skip empty lines and comments.
-        if line.is_empty() || line.starts_with("#") {
+        if line.is_empty() || line.starts_with('#') {
             continue;
         }
 
@@ -138,14 +138,14 @@ where
             continue;
         };
 
-        let key = key.trim().to_string();
+        let key = key.trim().to_owned();
 
         // If the value is quoted-wrapped, then remove the quotes.
         let value = value
             .trim()
             .trim_start_matches('"')
             .trim_end_matches('"')
-            .to_string();
+            .to_owned();
 
         if key.is_empty() {
             result.warnings.push(Warning {
@@ -176,7 +176,7 @@ where
                         &value,
                         line_number,
                     ),
-                })
+                });
             }
 
             continue;
@@ -196,7 +196,7 @@ where
                         &value,
                         line_number,
                     ),
-                })
+                });
             }
 
             continue;
@@ -205,7 +205,7 @@ where
         result.warnings.push(Warning {
             line_number,
             kind: WarningKind::unexpected_key(&key),
-        })
+        });
     }
 
     if let Some(missing) = missing_required_keys(&config, &result) {
@@ -243,17 +243,17 @@ pub enum Error {
 
 impl Error {
     pub(crate) fn missing_required_keys(fields: &[&'static str]) -> Self {
-        Error::MissingRequiredFields(fields.to_owned().into_boxed_slice())
+        Self::MissingRequiredFields(fields.to_owned().into_boxed_slice())
     }
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            Error::MissingRequiredFields(items) => {
+            Self::MissingRequiredFields(items) => {
                 write!(f, "missing required fields: {}", items.join(", "))
             }
-            Error::Io(error) => error.fmt(f),
+            Self::Io(error) => error.fmt(f),
         }
     }
 }
@@ -261,15 +261,15 @@ impl Display for Error {
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
-            Error::MissingRequiredFields(_) => None,
-            Error::Io(error) => Some(error),
+            Self::MissingRequiredFields(_) => None,
+            Self::Io(error) => Some(error),
         }
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(value: std::io::Error) -> Self {
-        Error::Io(value)
+        Self::Io(value)
     }
 }
 
@@ -327,13 +327,13 @@ pub enum WarningKind {
 impl WarningKind {
     pub(crate) fn missing_key(value: &str) -> Self {
         Self::MissingKey {
-            value: value.to_string().into_boxed_str(),
+            value: value.to_owned().into_boxed_str(),
         }
     }
 
     pub(crate) fn line_not_key_value_format(line: &str) -> Self {
         Self::LineNotKeyValueFormat {
-            line: line.to_string().into_boxed_str(),
+            line: line.to_owned().into_boxed_str(),
         }
     }
 
@@ -344,16 +344,16 @@ impl WarningKind {
         second_line_number: usize,
     ) -> Self {
         Self::KeySetMoreThanOnce {
-            key: key.to_string().into_boxed_str(),
-            prior_value: prior_value.to_string().into_boxed_str(),
-            new_value: new_value.to_string().into_boxed_str(),
+            key: key.to_owned().into_boxed_str(),
+            prior_value: prior_value.to_owned().into_boxed_str(),
+            new_value: new_value.to_owned().into_boxed_str(),
             second_line_number,
         }
     }
 
     pub(crate) fn unexpected_key(key: &str) -> Self {
         Self::UnexpectedKey {
-            key: key.to_string().into_boxed_str(),
+            key: key.to_owned().into_boxed_str(),
         }
     }
 }
@@ -361,21 +361,21 @@ impl WarningKind {
 impl Display for WarningKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            WarningKind::MissingKey { value } => write!(f, "missing key; value is '{}'", value),
-            WarningKind::LineNotKeyValueFormat { line } => {
-                write!(f, "line is not key-value format: '{}'", line)
+            Self::MissingKey { value } => write!(f, "missing key; value is '{value}'"),
+            Self::LineNotKeyValueFormat { line } => {
+                write!(f, "line is not key-value format: '{line}'")
             }
-            WarningKind::KeySetMoreThanOnce {
+            Self::KeySetMoreThanOnce {
                 key,
                 prior_value,
                 new_value,
                 second_line_number,
             } => write!(
                 f,
-                "key '{}' set more than once; was previously '{}', overriden by '{}' on line {}",
-                key, prior_value, new_value, second_line_number
+                "key '{key}' set more than once; was previously '{prior_value}', overriden by \
+                 '{new_value}' on line {second_line_number}",
             ),
-            WarningKind::UnexpectedKey { key } => write!(f, "unexpected key '{}'", key),
+            Self::UnexpectedKey { key } => write!(f, "unexpected key '{key}'"),
         }
     }
 }

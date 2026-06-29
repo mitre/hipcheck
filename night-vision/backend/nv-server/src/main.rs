@@ -40,7 +40,7 @@ fn main() -> Result<(), error::FatalError> {
             // not actually kill the server; should run continuously
             // unless some catastrophic error is encountered which
             // causes the server to die.
-            println!("{}", config);
+            println!("{config}");
             runtime.block_on(api.serve(&env, &config))?;
         }
     }

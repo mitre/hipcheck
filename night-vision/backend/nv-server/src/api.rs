@@ -31,7 +31,7 @@ pub struct RestApi(dropshot::ApiDescription<ApiCtx>);
 impl RestApi {
     /// Initialize the API.
     pub fn new() -> Result<Self, FatalError> {
-        api_description::<RestApi>()
+        api_description::<Self>()
             .map(RestApi)
             .map_err(FatalError::FailedToBuildDropshotServer)
     }
@@ -114,7 +114,7 @@ impl NvServerApi for RestApi {
         _ctx: RequestContext<Self::Context>,
     ) -> Result<HttpResponseOk<Health>, HttpError> {
         Ok(HttpResponseOk(Health {
-            status: "ok".to_string(),
+            status: "ok".to_owned(),
         }))
     }
 
@@ -195,16 +195,16 @@ async fn lookup_package_source(
                 created_at: dt,
                 source: PackageSource {
                     ecosystem: PackageSourceEcosystem::Npm,
-                    file_name: "package.json".to_string(),
-                    contents: "{}".to_string(),
+                    file_name: "package.json".to_owned(),
+                    contents: "{}".to_owned(),
                 },
                 versioned_packages: vec![VersionedPackage {
                     id: uuid_c,
-                    name: "react".to_string(),
-                    version: "18.2.0".to_string(),
+                    name: "react".to_owned(),
+                    version: "18.2.0".to_owned(),
                     ecosystem: PackageSourceEcosystem::Npm,
-                    purl: "pkg:npm/react@18.2.0".to_string(),
-                    derivation: vec!["<root>".to_string(), "pkg:npm/react@18.2.0".to_string()],
+                    purl: "pkg:npm/react@18.2.0".to_owned(),
+                    derivation: vec!["<root>".to_owned(), "pkg:npm/react@18.2.0".to_owned()],
                 }],
             }),
         ),

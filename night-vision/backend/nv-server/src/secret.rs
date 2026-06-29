@@ -9,13 +9,13 @@ use std::{
 };
 
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::PermissionsExt as _;
 #[cfg(windows)]
 use windows_acls::FilePermissionsExt;
 
 /// A configured source for a secret value.
 #[derive(Debug)]
-pub(crate) enum SecretSource {
+pub enum SecretSource {
     /// The secret value was provided directly in the server configuration.
     Inline(SecretString),
     /// The secret value should be read from a file at startup.
@@ -34,11 +34,11 @@ impl SecretSource {
     /// Resolve this source into a concrete secret value and redacted source kind.
     pub(crate) fn resolve(self) -> Result<ResolvedSecret, SecretSourceError> {
         match self {
-            SecretSource::Inline(secret) => Ok(ResolvedSecret {
+            Self::Inline(secret) => Ok(ResolvedSecret {
                 kind: SecretSourceKind::Inline,
                 value: secret,
             }),
-            SecretSource::File(path) => {
+            Self::File(path) => {
                 let value = read_secret_file(&path).map_err(|error| SecretSourceError {
                     path: path.clone(),
                     error,
@@ -55,7 +55,7 @@ impl SecretSource {
 
 /// A resolved secret, preserving only a redacted source kind for reporting.
 #[derive(Debug)]
-pub(crate) struct ResolvedSecret {
+pub struct ResolvedSecret {
     kind: SecretSourceKind,
     value: SecretString,
 }
@@ -68,7 +68,7 @@ impl ResolvedSecret {
 
 /// Redacted source kind for a secret value.
 #[derive(Debug)]
-pub(crate) enum SecretSourceKind {
+pub enum SecretSourceKind {
     Inline,
     File,
 }
@@ -76,15 +76,15 @@ pub(crate) enum SecretSourceKind {
 impl Display for SecretSourceKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SecretSourceKind::Inline => write!(f, "<redacted inline secret>"),
-            SecretSourceKind::File => write!(f, "<redacted file-backed secret>"),
+            Self::Inline => write!(f, "<redacted inline secret>"),
+            Self::File => write!(f, "<redacted file-backed secret>"),
         }
     }
 }
 
 /// A secret source failed to resolve.
 #[derive(Debug)]
-pub(crate) struct SecretSourceError {
+pub struct SecretSourceError {
     pub(crate) path: Utf8PathBuf,
     pub(crate) error: SecretFileError,
 }
@@ -102,11 +102,11 @@ pub enum SecretFileError {
 impl Display for SecretFileError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SecretFileError::Read(_) => write!(f, "failed to read secret file"),
-            SecretFileError::Metadata(_) => write!(f, "failed to read secret file metadata"),
-            SecretFileError::Empty => write!(f, "secret file is empty"),
-            SecretFileError::InsecurePermissions(mode) => display_insecure_permissions(f, *mode),
-            SecretFileError::MultipleLines => write!(f, "secret file contains multiple lines"),
+            Self::Read(_) => write!(f, "failed to read secret file"),
+            Self::Metadata(_) => write!(f, "failed to read secret file metadata"),
+            Self::Empty => write!(f, "secret file is empty"),
+            Self::InsecurePermissions(mode) => display_insecure_permissions(f, *mode),
+            Self::MultipleLines => write!(f, "secret file contains multiple lines"),
         }
     }
 }
@@ -114,10 +114,8 @@ impl Display for SecretFileError {
 impl Error for SecretFileError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            SecretFileError::Read(err) | SecretFileError::Metadata(err) => Some(err),
-            SecretFileError::Empty
-            | SecretFileError::InsecurePermissions(_)
-            | SecretFileError::MultipleLines => None,
+            Self::Read(err) | Self::Metadata(err) => Some(err),
+            Self::Empty | Self::InsecurePermissions(_) | Self::MultipleLines => None,
         }
     }
 }
@@ -126,8 +124,7 @@ impl Error for SecretFileError {
 fn display_insecure_permissions(f: &mut std::fmt::Formatter<'_>, mode: u32) -> std::fmt::Result {
     write!(
         f,
-        "secret file permissions are too broad: expected no group or world permissions, got {:o}",
-        mode
+        "secret file permissions are too broad: expected no group or world permissions, got {mode:o}"
     )
 }
 
@@ -158,7 +155,7 @@ fn read_secret_file(path: &Utf8Path) -> Result<SecretString, SecretFileError> {
         return Err(SecretFileError::MultipleLines);
     }
 
-    Ok(trimmed.to_string().into())
+    Ok(trimmed.to_owned().into())
 }
 
 #[cfg(unix)]
@@ -211,7 +208,7 @@ mod tests {
     use crate::test_util::restrict_secret_file_permissions;
     #[cfg(unix)]
     use crate::test_util::set_file_permissions;
-    use secrecy::ExposeSecret;
+    use secrecy::ExposeSecret as _;
     use std::{
         fs,
         sync::atomic::{AtomicUsize, Ordering},

@@ -1,12 +1,12 @@
 //! Defines configuration for the Night Vision server.
 
 use crate::{
-    error::{ErrorSourceIterator, FatalError},
+    error::{ErrorSourceIterator as _, FatalError},
     secret::{SecretSource, SecretSourceKind},
 };
 use camino::{Utf8Path, Utf8PathBuf};
 use dropshot::{ConfigDropshot, HandlerTaskMode};
-use itertools::Itertools;
+use itertools::Itertools as _;
 use secrecy::SecretString;
 use std::{
     fmt::{Debug, Display},
@@ -117,7 +117,7 @@ impl Config {
     /// Parsing will fail on unknown keys, or on keys that fail to parse. This is purposefully
     /// pretty strict; these are server configuration items, and a malformed key or value should
     /// be considered a configuration failure.
-    pub fn parse(path: &Utf8Path) -> Result<Config, FatalError> {
+    pub fn parse(path: &Utf8Path) -> Result<Self, FatalError> {
         let parsed = spookey::parse(
             spookey::ParseConfig {
                 // While we *do* require some form of database connection information, either via
@@ -164,7 +164,6 @@ impl Config {
             &mut errors,
         );
 
-        // PANIC SAFETY: We've already checked that it's Some above.
         let server_address: String = parse_value(&parsed, "server-address", &mut errors)
             .expect("server-address is required");
         let openapi_dest_path: Option<Utf8PathBuf> =
@@ -199,7 +198,7 @@ impl Config {
         let (database_connection_source, database_connection) =
             resolve_database_connection_source(database_connection_source)?;
 
-        let config = Config {
+        let config = Self {
             config_file_path: path.into(),
             server_address,
             openapi_dest_path,
@@ -234,7 +233,7 @@ impl Config {
                 FatalError::FailedToParseConfigFileFields(
                     self.config_file_path.clone(),
                     ConfigErrors(vec![ConfigError::StrParse(StrParseError {
-                        key: "server-address".to_string().into_boxed_str(),
+                        key: "server-address".to_owned().into_boxed_str(),
                         value: self.server_address.clone().into_boxed_str(),
                         err: e.to_string().into_boxed_str(),
                     })]),
@@ -394,7 +393,7 @@ where
             Ok(value) => Some(value),
             Err(err) => {
                 errors.push(ConfigError::StrParse(StrParseError {
-                    key: key.to_string().into_boxed_str(),
+                    key: key.to_owned().into_boxed_str(),
                     value: value.clone().into_boxed_str(),
                     // Make sure we package up the full error chain, not just the top-level error.
                     err: err
@@ -448,7 +447,7 @@ fn resolve_database_connection_source(
 ) -> Result<(SecretSourceKind, SecretString), FatalError> {
     source
         .resolve()
-        .map(|secret| secret.into_parts())
+        .map(super::secret::ResolvedSecret::into_parts)
         .map_err(|err| FatalError::FailedToReadSecretFile(err.path, err.error))
 }
 
@@ -458,9 +457,7 @@ fn check_errors(
     parsed_warnings: Vec<spookey::Warning>,
     value_parsing_errors: Vec<ConfigError>,
 ) -> Result<(), FatalError> {
-    let num_errors = parsed_warnings.len() + value_parsing_errors.len();
-
-    if num_errors == 0 {
+    if parsed_warnings.is_empty() && value_parsing_errors.is_empty() {
         return Ok(());
     }
 
@@ -504,8 +501,8 @@ impl FromStr for EarlyDisconnectBehavior {
 impl std::fmt::Display for EarlyDisconnectBehavior {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EarlyDisconnectBehavior::Cancel => write!(f, "cancel"),
-            EarlyDisconnectBehavior::Continue => write!(f, "continue"),
+            Self::Cancel => write!(f, "cancel"),
+            Self::Continue => write!(f, "continue"),
         }
     }
 }
@@ -513,8 +510,8 @@ impl std::fmt::Display for EarlyDisconnectBehavior {
 impl From<EarlyDisconnectBehavior> for HandlerTaskMode {
     fn from(value: EarlyDisconnectBehavior) -> Self {
         match value {
-            EarlyDisconnectBehavior::Cancel => HandlerTaskMode::CancelOnDisconnect,
-            EarlyDisconnectBehavior::Continue => HandlerTaskMode::Detached,
+            EarlyDisconnectBehavior::Cancel => Self::CancelOnDisconnect,
+            EarlyDisconnectBehavior::Continue => Self::Detached,
         }
     }
 }
@@ -595,14 +592,14 @@ pub enum ConfigError {
 impl Display for ConfigError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigError::Warning(w) => write!(f, "{}", w),
-            ConfigError::StrParse(e) => write!(f, "{}", e),
-            ConfigError::MissingOneOf { keys } => write!(
+            Self::Warning(w) => write!(f, "{w}"),
+            Self::StrParse(e) => write!(f, "{e}"),
+            Self::MissingOneOf { keys } => write!(
                 f,
                 "exactly one of '{}' or '{}' must be configured",
                 keys[0], keys[1]
             ),
-            ConfigError::MutuallyExclusive { keys } => {
+            Self::MutuallyExclusive { keys } => {
                 write!(f, "'{}' and '{}' are mutually exclusive", keys[0], keys[1])
             }
         }
@@ -616,7 +613,7 @@ pub struct ConfigErrors(Vec<ConfigError>);
 impl Display for ConfigErrors {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let msg = self.0.iter().map(ToString::to_string).join(", ");
-        write!(f, "config errors: {}", msg)
+        write!(f, "config errors: {msg}")
     }
 }
 
@@ -630,7 +627,7 @@ mod tests {
     use crate::test_util::restrict_secret_file_permissions;
     #[cfg(unix)]
     use crate::test_util::set_file_permissions;
-    use secrecy::ExposeSecret;
+    use secrecy::ExposeSecret as _;
     use std::{
         fs,
         sync::atomic::{AtomicUsize, Ordering},
@@ -706,15 +703,15 @@ mod tests {
 
     fn redact_database_conn_password(conn: &str) -> String {
         let Some((scheme, rest)) = conn.split_once("://") else {
-            return conn.to_string();
+            return conn.to_owned();
         };
 
         let Some((userinfo, host_and_path)) = rest.split_once('@') else {
-            return conn.to_string();
+            return conn.to_owned();
         };
 
         let Some((user, _password)) = userinfo.rsplit_once(':') else {
-            return conn.to_string();
+            return conn.to_owned();
         };
 
         format!("{scheme}://{user}:<redacted>@{host_and_path}")
@@ -768,7 +765,7 @@ mod tests {
             [
                 format!("server-address = {}", self.server_address),
                 format!("database-connection = {}", self.database_connection),
-                self.extra_config.to_string(),
+                self.extra_config.to_owned(),
             ]
             .join("\n")
         }
@@ -966,7 +963,7 @@ mod tests {
         );
 
         let config = Config::parse(file.path()).expect("config should parse");
-        let report = format!("{}", config);
+        let report = format!("{config}");
 
         assert!(report.contains("<redacted inline secret>"));
         assert!(!report.contains("password"));
@@ -984,7 +981,7 @@ mod tests {
         ));
 
         let config = Config::parse(file.path()).expect("config should parse");
-        let report = format!("{}", config);
+        let report = format!("{config}");
 
         assert!(report.contains("<redacted file-backed secret>"));
         assert!(!report.contains(secret_file.path().as_str()));
@@ -1021,7 +1018,7 @@ mod tests {
 
         for (key, value, expected_error) in cases {
             let file =
-                TempConfigFile::new(&format!("{}\n{} = {}", valid_required_config(), key, value,));
+                TempConfigFile::new(&format!("{}\n{} = {}", valid_required_config(), key, value));
 
             let error =
                 Config::parse(file.path()).expect_err(&format!("{key} = {value} should fail"));
@@ -1236,7 +1233,7 @@ mod tests {
     fn dropshot_config_returns_field_error_for_invalid_server_address() {
         let file = TempConfigFile::new(&valid_required_config());
         let mut config = Config::parse(file.path()).expect("config should parse");
-        config.server_address = "not an address".to_string();
+        config.server_address = "not an address".to_owned();
 
         let error = config
             .dropshot_config()

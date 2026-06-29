@@ -13,7 +13,7 @@ pub struct Env {
 impl Env {
     /// Load environment information.
     pub fn load() -> Self {
-        Env {
+        Self {
             commit_info: CommitInfo::load(),
             bin_name: BinName::load(),
         }
@@ -21,7 +21,7 @@ impl Env {
 
     /// Get the short version string, including just the pkg version and short commit hash.
     pub fn bin_short_version(&self) -> String {
-        let mut s = env!("CARGO_PKG_VERSION").to_string();
+        let mut s = env!("CARGO_PKG_VERSION").to_owned();
 
         if let Some(short_hash) = &self.commit_info.short_hash {
             s.push_str(" (commit hash ");
@@ -34,7 +34,7 @@ impl Env {
 
     /// Get the long version string, including the pkg version, full commit hash, and commit date.
     pub fn bin_long_version(&self) -> String {
-        let mut s = env!("CARGO_PKG_VERSION").to_string();
+        let mut s = env!("CARGO_PKG_VERSION").to_owned();
 
         if let Some(hash) = &self.commit_info.hash
             && let Some(date) = &self.commit_info.date
@@ -69,9 +69,9 @@ impl CommitInfo {
     /// Loads the commit information from environment variables.
     fn load() -> Self {
         Self {
-            hash: option_env!("NV_BUILD_COMMIT_HASH").map(ToString::to_string),
-            short_hash: option_env!("NV_BUILD_COMMIT_SHORT_HASH").map(ToString::to_string),
-            date: option_env!("NV_BUILD_COMMIT_DATE").map(ToString::to_string),
+            hash: option_env!("NV_BUILD_COMMIT_HASH").map(str::to_owned),
+            short_hash: option_env!("NV_BUILD_COMMIT_SHORT_HASH").map(str::to_owned),
+            date: option_env!("NV_BUILD_COMMIT_DATE").map(str::to_owned),
         }
     }
 }
@@ -83,7 +83,7 @@ struct BinName(String);
 impl BinName {
     /// Get the crate name, replacing underscores with hyphens.
     fn load() -> Self {
-        BinName(env!("CARGO_CRATE_NAME").replace("_", "-").to_string())
+        Self(env!("CARGO_CRATE_NAME").replace('_', "-"))
     }
 }
 

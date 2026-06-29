@@ -3,8 +3,8 @@
 use crate::{config::ConfigErrors, secret::SecretFileError};
 use camino::Utf8PathBuf;
 use std::{
-    error::Error,
-    fmt::{Debug, Display},
+    error::Error as _,
+    fmt::{Debug, Display, Write as _},
 };
 
 /// Fatal errors that stop the server from starting or force it to exit.
@@ -28,58 +28,58 @@ pub enum FatalError {
 // `anyhow::Error`, with a top-level error and then a series of causes.
 impl Debug for FatalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut msg = format!("{}\n", self);
+        let mut msg = format!("{self}\n");
 
         // If there are causes, then print the "caused by" section.
         if let Some(source) = self.source() {
             msg.push_str("\nCaused by:\n");
 
             for source in source.sources_iter() {
-                msg.push_str(&format!("\t{}\n", source));
+                let _ = writeln!(msg, "\t{source}");
             }
         }
 
-        write!(f, "{}", msg)
+        write!(f, "{msg}")
     }
 }
 
 impl Display for FatalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FatalError::FailedToBuildDropshotServer(_) => {
+            Self::FailedToBuildDropshotServer(_) => {
                 write!(f, "failed to build dropshot server")
             }
-            FatalError::FailedToStartDropshotServer(_) => {
+            Self::FailedToStartDropshotServer(_) => {
                 write!(f, "failed to start dropshot server")
             }
-            FatalError::FailedToBuildTokioRuntime(_) => write!(f, "failed to build tokio runtime"),
-            FatalError::FailedToConnectToDatabase(_) => write!(f, "failed to connect to database"),
-            FatalError::FailedToInitializeLogger(_) => write!(f, "failed to initialize logger"),
-            FatalError::FailedToOpenConfigFile(path, _) => {
-                write!(f, "failed to open config file '{}'", path)
+            Self::FailedToBuildTokioRuntime(_) => write!(f, "failed to build tokio runtime"),
+            Self::FailedToConnectToDatabase(_) => write!(f, "failed to connect to database"),
+            Self::FailedToInitializeLogger(_) => write!(f, "failed to initialize logger"),
+            Self::FailedToOpenConfigFile(path, _) => {
+                write!(f, "failed to open config file '{path}'")
             }
-            FatalError::FailedToParseConfigFile(path, _) => {
-                write!(f, "failed to parse config file '{}'", path)
+            Self::FailedToParseConfigFile(path, _) => {
+                write!(f, "failed to parse config file '{path}'")
             }
-            FatalError::FailedToParseConfigFileFields(path, _) => {
-                write!(f, "failed to parse config file '{}'", path)
+            Self::FailedToParseConfigFileFields(path, _) => {
+                write!(f, "failed to parse config file '{path}'")
             }
-            FatalError::FailedToReadSecretFile(path, _) => {
-                write!(f, "failed to read secret file '{}'", path)
+            Self::FailedToReadSecretFile(path, _) => {
+                write!(f, "failed to read secret file '{path}'")
             }
-            FatalError::FailedToCreateOpenApiDescFile(path, _) => {
+            Self::FailedToCreateOpenApiDescFile(path, _) => {
                 write!(f, "failed to create OpenAPI Description file '{path}'")
             }
-            FatalError::FailedToWriteOpenApiDescFile(path, _) => {
+            Self::FailedToWriteOpenApiDescFile(path, _) => {
                 write!(f, "failed to write OpenAPI Description file '{path}'")
             }
-            FatalError::NoOpenApiDestPathInOpenApiMode() => {
+            Self::NoOpenApiDestPathInOpenApiMode() => {
                 write!(
                     f,
                     "cannot write OpenAPI Description with no destination path set in config file"
                 )
             }
-            FatalError::UnknownServerError(s) => write!(f, "unknown server error: {}", s),
+            Self::UnknownServerError(s) => write!(f, "unknown server error: {s}"),
         }
     }
 }
@@ -87,19 +87,19 @@ impl Display for FatalError {
 impl std::error::Error for FatalError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            FatalError::FailedToBuildDropshotServer(err) => Some(err),
-            FatalError::FailedToStartDropshotServer(err) => Some(err),
-            FatalError::FailedToBuildTokioRuntime(err) => Some(err),
-            FatalError::FailedToConnectToDatabase(err) => Some(err),
-            FatalError::FailedToInitializeLogger(err) => Some(err),
-            FatalError::FailedToOpenConfigFile(_, err) => Some(err),
-            FatalError::FailedToParseConfigFile(_, err) => Some(err),
-            FatalError::FailedToParseConfigFileFields(_, err) => Some(err),
-            FatalError::FailedToReadSecretFile(_, err) => Some(err),
-            FatalError::FailedToCreateOpenApiDescFile(_, err) => Some(err),
-            FatalError::FailedToWriteOpenApiDescFile(_, err) => Some(err),
-            FatalError::NoOpenApiDestPathInOpenApiMode() => None,
-            FatalError::UnknownServerError(_) => None,
+            Self::FailedToBuildDropshotServer(err) => Some(err),
+            Self::FailedToStartDropshotServer(err) => Some(err),
+            Self::FailedToBuildTokioRuntime(err) => Some(err),
+            Self::FailedToConnectToDatabase(err) => Some(err),
+            Self::FailedToInitializeLogger(err) => Some(err),
+            Self::FailedToOpenConfigFile(_, err) => Some(err),
+            Self::FailedToParseConfigFile(_, err) => Some(err),
+            Self::FailedToParseConfigFileFields(_, err) => Some(err),
+            Self::FailedToReadSecretFile(_, err) => Some(err),
+            Self::FailedToCreateOpenApiDescFile(_, err) => Some(err),
+            Self::FailedToWriteOpenApiDescFile(_, err) => Some(err),
+            Self::NoOpenApiDestPathInOpenApiMode() => None,
+            Self::UnknownServerError(_) => None,
         }
     }
 }
@@ -125,14 +125,14 @@ pub trait ErrorSourceIterator {
     // We'd prefer to call this "sources," but the standard library has a nightly-only API to do
     // this exact functionality, and it uses that name, so we get a warning about future
     // incompatibility if we use it ourselves. So we have to use this slightly worse name.
-    fn sources_iter<'s>(&'s self) -> ErrorSourceIter<'s>;
+    fn sources_iter(&self) -> ErrorSourceIter<'_>;
 }
 
 impl<E: std::error::Error> ErrorSourceIterator for E {
     /// Provides an iterator over all sources of an error, _including_ the original error itself.
     ///
     /// To skip the error itself, call `skip(1)` on the iterator.
-    fn sources_iter<'s>(&'s self) -> ErrorSourceIter<'s> {
+    fn sources_iter(&self) -> ErrorSourceIter<'_> {
         ErrorSourceIter {
             current: Some(self),
         }

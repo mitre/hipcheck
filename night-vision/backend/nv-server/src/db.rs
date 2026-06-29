@@ -3,7 +3,7 @@
 use crate::{config::Config, error::FatalError};
 use migration::{Migrator, MigratorTrait as _};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
-use secrecy::ExposeSecret;
+use secrecy::ExposeSecret as _;
 use std::time::Duration;
 
 /// Connect to the database using the given configuration.

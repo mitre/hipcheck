@@ -109,11 +109,11 @@ exclude-members = ["workspace-hack"]
 # Disallow all unsafe code.
 unsafe_code = "forbid"
 
-# Disallow version requirements in `Cargo.toml` files that don't fully enumerate the
-# `<MAJOR>.<MINOR>.<PATCH>` segments.
-implicit_minimum_version_req = "forbid"
-
 [workspace.lints.clippy]
+
+# TODO: Enable Cargo's `implicit_minimum_version_req` lint once it is usable on the project's
+# stable Cargo toolchain. This lint disallows version requirements in `Cargo.toml` files that don't
+# fully enumerate the `<MAJOR>.<MINOR>.<PATCH>` segments.
 
 # Disallow integer (and integer-like) operations that can implicitly overflow.
 #
@@ -138,7 +138,7 @@ arithmetic_side_effects = "deny"
 # Disallow as-conversions where the target type is implicit. Denying these conversions means all
 # `as` conversions must fully specify the target type, which helps ensure code is easier to audit
 # and that bad conversions don't slip into the codebase.
-as_understore = "deny"
+as_underscore = "deny"
 as_pointer_underscore = "deny"
 
 # Disallow as-conversions that aren't lossy but where there's a `From` impl that can be used
@@ -281,10 +281,6 @@ inconsistent_struct_constructor = "deny"
 # Check for inefficient uses of `ToString::to_string` on multi-reference types.
 inefficient_to_string = "deny"
 
-# Require trait bounds to be expressed with "where" clauses. This is done for consistency across
-# the codebase.
-inline_trait_bounds = "deny"
-
 # Disallow manually-defined IP address types when an alternative constant is available.
 ip_constant = "deny"
 
@@ -293,7 +289,6 @@ lossy_float_literal = "deny"
 
 # Disallow manual implementations of common standard library functions.
 manual_assert = "deny"
-manual_assert_eq = "deny"
 manual_ilog2 = "deny"
 manual_instant_elapsed = "deny"
 manual_is_power_of_two = "deny"
