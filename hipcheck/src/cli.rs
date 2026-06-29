@@ -23,7 +23,6 @@ use hipcheck_macros as hc;
 use pathbuf::pathbuf;
 use semver::VersionReq;
 use std::{
-	fmt::{self, Display, Formatter},
 	path::{Path, PathBuf},
 	str::FromStr,
 };
@@ -171,23 +170,6 @@ struct DeprecatedArgs {
 	home: Option<PathBuf>,
 }
 
-/// Select how Hipcheck finds its policy file.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ConfigMode {
-	/// Load from a policy file.
-	ForcePolicy { policy: PathBuf },
-}
-
-impl Display for ConfigMode {
-	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		match &self {
-			ConfigMode::ForcePolicy { policy } => {
-				write!(f, "Policy KDL file at path:\n{:?}", policy)
-			}
-		}
-	}
-}
-
 impl CliConfig {
 	/// Load CLI configuration.
 	///
@@ -206,13 +188,10 @@ impl CliConfig {
 		config
 	}
 
-	/// Determine which ConfigMode to use, based on the combination of options
-	/// passed to Hipcheck.
-	pub fn config_mode(&self) -> Result<ConfigMode> {
+	/// Get the policy file path Hipcheck should use.
+	pub fn policy_path(&self) -> Result<PathBuf> {
 		match &self.path_args.policy {
-			Some(policy_path) => Ok(ConfigMode::ForcePolicy {
-				policy: policy_path.to_path_buf(),
-			}),
+			Some(policy_path) => Ok(policy_path.to_path_buf()),
 			None => Err(hc_error!(
 				"Could not find any source of configuration. Use --policy to configure Hipcheck."
 			)),
@@ -1455,8 +1434,6 @@ mod tests {
 		with_env_vars(vars, || {
 			let config_dir = platform_config().unwrap();
 			let path = pathbuf![&config_dir, "Hipcheck.kdl"];
-			let expected = ConfigMode::ForcePolicy { policy: path };
-
 			let config = {
 				let mut temp = CliConfig::empty();
 				temp.update(&CliConfig::from_platform());
@@ -1464,7 +1441,7 @@ mod tests {
 				temp
 			};
 
-			assert_eq!(config.config_mode().unwrap(), expected);
+			assert_eq!(config.policy_path().unwrap(), path);
 		});
 	}
 
@@ -1473,10 +1450,6 @@ mod tests {
 		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 
 		let path = pathbuf![tempdir.path(), "HipcheckPolicy.kdl"];
-		let expected = ConfigMode::ForcePolicy {
-			policy: path.clone(),
-		};
-
 		let config = {
 			let mut temp = CliConfig::empty();
 			temp.update(&CliConfig::from_platform());
@@ -1491,7 +1464,7 @@ mod tests {
 			temp
 		};
 
-		assert_eq!(config.config_mode().unwrap(), expected);
+		assert_eq!(config.policy_path().unwrap(), path);
 	}
 
 	#[test]

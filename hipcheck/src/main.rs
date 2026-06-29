@@ -42,8 +42,8 @@ use analysis::AnalysisTreeNode;
 use async_channel::bounded;
 use async_stream::stream;
 use cli::{
-	CacheOp, CachePluginArgs, CacheTargetArgs, CheckArgs, CliConfig, ConfigMode, FullCommands,
-	PluginArgs, PluginOp, ReadyArgs, SchemaArgs, SchemaCommand, UpdateArgs,
+	CacheOp, CachePluginArgs, CacheTargetArgs, CheckArgs, CliConfig, FullCommands, PluginArgs,
+	PluginOp, ReadyArgs, SchemaArgs, SchemaCommand, UpdateArgs,
 };
 use core::fmt;
 use engine::PluginCore;
@@ -140,15 +140,15 @@ async fn cmd_check(args: &mut CheckArgs, config: &CliConfig) -> ExitCode {
 		}
 	};
 
-	let config_mode = match config.config_mode() {
-		Ok(config_mode) => config_mode,
+	let policy_path = match config.policy_path() {
+		Ok(policy_path) => policy_path,
 		Err(e) => {
 			Shell::print_error(&e, Format::Human);
 			return ExitCode::FAILURE;
 		}
 	};
 
-	log::info!("Using configuration source: {}", config_mode);
+	log::info!("Using policy file at path: {:?}", policy_path);
 
 	let num_jobs = match target.is_multi_target() {
 		true => args.num_jobs.unwrap_or(5),
@@ -157,7 +157,7 @@ async fn cmd_check(args: &mut CheckArgs, config: &CliConfig) -> ExitCode {
 
 	match run(
 		target,
-		config_mode,
+		policy_path,
 		config.cache().map(ToOwned::to_owned),
 		config.exec().map(ToOwned::to_owned),
 		config.format(),
@@ -467,12 +467,12 @@ fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 }
 
 fn check_plugins(config: &CliConfig) -> StdResult<(), Error> {
-	let config_mode = config.config_mode()?;
+	let policy_path = config.policy_path()?;
 
-	log::info!("Using configuration source: {}", config_mode);
+	log::info!("Using policy file at path: {:?}", policy_path);
 
 	ReadySession::new(
-		config_mode,
+		policy_path,
 		config.cache().map(ToOwned::to_owned),
 		config.exec().map(ToOwned::to_owned),
 		config.format(),
@@ -907,14 +907,14 @@ impl CheckKind {
 /// Now that we're fully-initialized, run Hipcheck's analyses.
 async fn run(
 	seed: TargetSeed,
-	config_mode: ConfigMode,
+	policy_path: PathBuf,
 	home_dir: Option<PathBuf>,
 	exec_path: Option<PathBuf>,
 	format: Format,
 	jobs: usize,
 ) -> Result<impl StreamExt<Item = Result<Report>>> {
 	// Initialize a base session with an empty db that will have its non-db fields cloned for use in parallel tasks.
-	let base_session = Session::new(config_mode, home_dir, exec_path, format).await?;
+	let base_session = Session::new(policy_path, home_dir, exec_path, format).await?;
 
 	// Create a number of clones of the base session's core determined by the number of simultaneous tasks we want.
 	let cores = vec![base_session.core().clone(); jobs];
