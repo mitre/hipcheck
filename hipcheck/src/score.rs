@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-	config::{Analysis, AnalysisTree, analysis_tree, visit_leaves},
+	analysis::{Analysis, AnalysisTree, analysis_tree, visit_leaves},
 	engine::HcEngine,
 	error::Result,
 	hc_error,

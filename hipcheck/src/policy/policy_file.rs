@@ -615,12 +615,6 @@ pub struct PolicyPatch {
 	pub config: PolicyConfig,
 }
 
-impl PolicyPatch {
-	pub fn new(name: PolicyPluginName, config: PolicyConfig) -> Self {
-		PolicyPatch { name, config }
-	}
-}
-
 impl ParseKdlNode for PolicyPatch {
 	fn kdl_key() -> &'static str {
 		"plugin"
