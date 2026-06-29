@@ -42,7 +42,7 @@ use analysis::AnalysisTreeNode;
 use async_channel::bounded;
 use async_stream::stream;
 use cli::{
-	CacheOp, CachePluginArgs, CacheTargetArgs, CheckArgs, CliConfig, FullCommands, PluginArgs,
+	CacheOp, CachePluginArgs, CacheTargetArgs, CheckArgs, Cli, FullCommands, PluginArgs,
 	PluginOp, ReadyArgs, SchemaArgs, SchemaCommand, UpdateArgs,
 };
 use core::fmt;
@@ -75,7 +75,7 @@ use which::which;
 fn main() -> ExitCode {
 	init::init();
 
-	let config = CliConfig::load();
+	let config = Cli::load();
 
 	// Set the global verbosity.
 	Shell::set_verbosity(config.verbosity());
@@ -124,7 +124,7 @@ fn main() -> ExitCode {
 }
 
 /// Run the `check` command.
-async fn cmd_check(args: &mut CheckArgs, config: &CliConfig) -> ExitCode {
+async fn cmd_check(args: &mut CheckArgs, config: &Cli) -> ExitCode {
 	// Before we do any analysis, set the user-provided arch
 	if let Some(arch) = &args.arch
 		&& let Err(e) = try_set_arch(arch)
@@ -204,7 +204,7 @@ fn cmd_schema(args: &SchemaArgs) {
 	}
 }
 
-fn cmd_print_weights(config: &CliConfig) -> Result<()> {
+fn cmd_print_weights(config: &Cli) -> Result<()> {
 	let policy = if let Some(p) = config.policy() {
 		PolicyFile::load_from(p)
 			.context("Failed to load policy. Plase make sure the policy file is in the provided location and is formatted correctly.")?
@@ -287,7 +287,7 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 	Ok(())
 }
 
-fn cmd_setup(config: &CliConfig) -> ExitCode {
+fn cmd_setup(config: &Cli) -> ExitCode {
 	let Some(tgt_conf_path) = config.setup_policy_dir() else {
 		Shell::print_error(&hc_error!("target policy dir not specified"), Format::Human);
 		return ExitCode::FAILURE;
@@ -445,7 +445,7 @@ fn check_npm_version() -> StdResult<String, VersionCheckError> {
 		})
 }
 
-fn check_cache_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
+fn check_cache_path(config: &Cli) -> StdResult<PathBuf, PathCheckError> {
 	let path = config.cache().ok_or(PathCheckError::PathNotFound)?;
 
 	// Try to create the cache directory if it doesn't exist.
@@ -456,7 +456,7 @@ fn check_cache_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	Ok(path.to_owned())
 }
 
-fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
+fn check_policy_path(config: &Cli) -> StdResult<PathBuf, PathCheckError> {
 	let path = config.policy().ok_or(PathCheckError::PolicyNotFound)?;
 
 	if path.exists().not() {
@@ -466,7 +466,7 @@ fn check_policy_path(config: &CliConfig) -> StdResult<PathBuf, PathCheckError> {
 	Ok(path.to_owned())
 }
 
-fn check_plugins(config: &CliConfig) -> StdResult<(), Error> {
+fn check_plugins(config: &Cli) -> StdResult<(), Error> {
 	let policy_path = config.policy_path()?;
 
 	log::info!("Using policy file at path: {:?}", policy_path);
@@ -480,7 +480,7 @@ fn check_plugins(config: &CliConfig) -> StdResult<(), Error> {
 	.map(|_| ())
 }
 
-fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
+fn cmd_plugin(args: PluginArgs, config: &Cli) -> ExitCode {
 	use crate::engine::{HcEngineImpl, PluginCore, async_query};
 	use std::sync::Arc;
 	use tokio::task::JoinSet;
@@ -604,7 +604,7 @@ fn cmd_plugin(args: PluginArgs, config: &CliConfig) -> ExitCode {
 	ExitCode::SUCCESS
 }
 
-fn cmd_ready(args: &ReadyArgs, config: &CliConfig) -> ExitCode {
+fn cmd_ready(args: &ReadyArgs, config: &Cli) -> ExitCode {
 	// Before we start plugins, set the user-provided arch
 	if let Some(arch) = &args.arch
 		&& let Err(e) = try_set_arch(arch)
@@ -772,7 +772,7 @@ fn cmd_explain_semver(req: &str) -> ExitCode {
 	ExitCode::SUCCESS
 }
 
-fn cmd_cache_target(args: CacheTargetArgs, config: &CliConfig) -> ExitCode {
+fn cmd_cache_target(args: CacheTargetArgs, config: &Cli) -> ExitCode {
 	let Some(path) = config.cache() else {
 		println!("cache path must be defined by cmdline arg or $HC_CACHE env var");
 		return ExitCode::FAILURE;
@@ -802,7 +802,7 @@ fn cmd_cache_target(args: CacheTargetArgs, config: &CliConfig) -> ExitCode {
 	}
 }
 
-fn cmd_cache_plugin(args: CachePluginArgs, config: &CliConfig) -> ExitCode {
+fn cmd_cache_plugin(args: CachePluginArgs, config: &Cli) -> ExitCode {
 	let Some(path) = config.cache() else {
 		println!("cache path must be defined by cmdline arg or $HC_CACHE env var");
 		return ExitCode::FAILURE;
