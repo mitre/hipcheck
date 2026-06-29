@@ -19,6 +19,5 @@ RUN set -eux \
     && curl --proto '=https' --tlsv1.2 -LsSf https://github.com/mitre/hipcheck/releases/download/hipcheck-v${HC_VERSION}/hipcheck-installer.sh | sh \
     && $HOME/.local/bin/hc setup
 
-ENV HC_CONFIG="/home/hc_user/.config/hipcheck"
 ENTRYPOINT ["/home/hc_user/.local/bin/hc"]
 CMD ["help"]
