@@ -171,7 +171,7 @@ struct DeprecatedArgs {
 	print_config: Option<bool>,
 
 	/// Path to the configuration folder.
-	#[arg(short = 'c', long = "config", hide = true, global = true)]
+	#[arg(skip)]
 	config: Option<Provenance>,
 
 	/// Path to the Hipcheck home folder.
@@ -253,7 +253,7 @@ impl CliConfig {
 				config: config_path.to_path_buf(),
 			}),
 			_ => Err(hc_error!(
-				"Could not find any source of configuration. Use --policy or --config to configure Hipcheck."
+				"Could not find any source of configuration. Use --policy to configure Hipcheck."
 			)),
 		}
 	}
@@ -1553,37 +1553,17 @@ mod tests {
 	}
 
 	#[test]
-	fn resolve_config_with_flag() {
+	fn rejects_config_flag() {
 		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 
-		let vars = vec![
-			("HOME", Some(tempdir.path().to_str().unwrap())),
-			("XDG_CONFIG_HOME", None),
-			("HC_CONFIG", None),
-		];
+		let path = pathbuf![tempdir.path(), "hipcheck"];
+		let parsed = CliConfig::try_parse_from(["hc", "--config", path.to_str().unwrap()]);
 
-		with_env_vars(vars, || {
-			let path = pathbuf![tempdir.path(), "hipcheck"];
-			let expected = ConfigMode::ForceConfig {
-				config: path.clone(),
-			};
-
-			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
-				temp.update(&CliConfig {
-					deprecated_args: DeprecatedArgs {
-						config: Some(Provenance::FromUser(path.clone())),
-						..Default::default()
-					},
-					..Default::default()
-				});
-				temp
-			};
-
-			assert_eq!(config.config_mode().unwrap(), expected);
-		});
+		assert!(parsed.is_err());
+		assert_eq!(
+			parsed.unwrap_err().kind(),
+			clap::error::ErrorKind::UnknownArgument
+		);
 	}
 
 	#[test]

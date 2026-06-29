@@ -309,7 +309,7 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 				&hc_error!(
 					"Failed to create target config dir {}. Hipcheck may be
 					defaulting to a directory that requires escalated privileges. You can resolve
-					this by specifying a custom target config directory with `hc setup --config [path]`.
+					this by setting HC_CONFIG to a writable config directory before running `hc setup`.
 					You may alternatively run `hc setup` with elevated privileges.",
 					tgt_conf_path.to_string_lossy()
 				),
