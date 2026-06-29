@@ -4,6 +4,8 @@
 //! implementation details. In particular, Windows ACL inspection requires FFI, so
 //! this crate keeps that code out of callers such as `nv-server`.
 
+#![allow(unsafe_code)]
+
 use camino::{Utf8Path, Utf8PathBuf};
 use std::io;
 

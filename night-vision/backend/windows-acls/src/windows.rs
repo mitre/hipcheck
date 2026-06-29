@@ -1,5 +1,5 @@
 use crate::FilePermissionsExt;
-use std::{ffi::OsStr, io, os::windows::ffi::OsStrExt, path::Path, ptr};
+use std::{ffi::OsStr, io, os::windows::ffi::OsStrExt as _, path::Path, ptr};
 use windows_sys::Win32::{
     Foundation::{ERROR_SUCCESS, GENERIC_READ, LocalFree},
     Security::{
@@ -27,9 +27,9 @@ impl FilePermissionsExt for Path {
                 DACL_SECURITY_INFORMATION,
                 ptr::null_mut(),
                 ptr::null_mut(),
-                &mut dacl,
+                &raw mut dacl,
                 ptr::null_mut(),
-                &mut security_descriptor,
+                &raw mut security_descriptor,
             )
         };
 
@@ -71,7 +71,7 @@ unsafe fn dacl_allows_broad_read(dacl: *mut ACL) -> io::Result<bool> {
         let mut ace = ptr::null_mut();
 
         // SAFETY: The caller guarantees that `dacl` points to a valid Windows ACL.
-        if unsafe { GetAce(dacl, ace_index, &mut ace) } == 0 {
+        if unsafe { GetAce(dacl, ace_index, &raw mut ace) } == 0 {
             return Err(io::Error::last_os_error());
         }
 

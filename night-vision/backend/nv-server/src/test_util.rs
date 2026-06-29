@@ -27,14 +27,14 @@ pub fn set_file_permissions(path: &Utf8Path, permissions: TestFilePermissions) {
 }
 
 #[cfg(windows)]
-pub(crate) fn set_file_permissions(path: &Utf8Path, permissions: TestFilePermissions) {
+pub fn set_file_permissions(path: &Utf8Path, permissions: TestFilePermissions) {
     match permissions {
         TestFilePermissions::WindowsOwnerOnly => restrict_windows_file_permissions(path),
     }
 }
 
 #[cfg(not(any(unix, windows)))]
-pub(crate) fn set_file_permissions(_path: &Utf8Path, permissions: TestFilePermissions) {
+pub fn set_file_permissions(_path: &Utf8Path, permissions: TestFilePermissions) {
     match permissions {
         TestFilePermissions::UncheckedOwnerOnly => {}
     }
@@ -46,12 +46,12 @@ pub fn restrict_secret_file_permissions(path: &Utf8Path) {
 }
 
 #[cfg(windows)]
-pub(crate) fn restrict_secret_file_permissions(path: &Utf8Path) {
+pub fn restrict_secret_file_permissions(path: &Utf8Path) {
     set_file_permissions(path, TestFilePermissions::WindowsOwnerOnly);
 }
 
 #[cfg(not(any(unix, windows)))]
-pub(crate) fn restrict_secret_file_permissions(path: &Utf8Path) {
+pub fn restrict_secret_file_permissions(path: &Utf8Path) {
     set_file_permissions(path, TestFilePermissions::UncheckedOwnerOnly);
 }
 

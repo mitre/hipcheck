@@ -107,7 +107,7 @@ exclude-members = ["workspace-hack"]
 [workspace.lints.rust]
 
 # Disallow all unsafe code.
-unsafe_code = "forbid"
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 

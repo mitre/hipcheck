@@ -11,7 +11,7 @@ use std::{
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt as _;
 #[cfg(windows)]
-use windows_acls::FilePermissionsExt;
+use windows_acls::FilePermissionsExt as _;
 
 /// A configured source for a secret value.
 #[derive(Debug)]
