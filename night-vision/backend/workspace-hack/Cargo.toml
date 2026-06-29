@@ -45,6 +45,7 @@ rustls-webpki = { version = "0.103", default-features = false, features = ["aws-
 schemars = { version = "0.8", features = ["chrono", "uuid1"] }
 scopeguard = { version = "1" }
 sea-orm = { version = "2", features = ["mock", "runtime-tokio-rustls", "schema-sync", "sqlx-postgres"] }
+sea-query = { version = "1", features = ["hashable-value", "postgres-array", "sea-orm", "thread-safe", "with-chrono", "with-json", "with-rust_decimal", "with-time", "with-uuid"] }
 sea-query-sqlx = { version = "0.9", default-features = false, features = ["postgres-array", "runtime-tokio-rustls", "sqlx-postgres", "with-chrono", "with-json", "with-rust_decimal", "with-time", "with-uuid"] }
 sea-schema = { version = "0.18", default-features = false, features = ["discovery", "probe", "runtime-tokio-rustls", "sqlx-postgres", "writer"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }

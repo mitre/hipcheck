@@ -2442,6 +2442,7 @@ dependencies = [
  "proptest",
  "reqwest",
  "sea-orm",
+ "sea-query",
  "secrecy",
  "semver",
  "serde",
@@ -3430,6 +3431,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d190cfb3bcceb8a8d7d04dee5a0c77f60c7627979cdcb47fdcb8934f009badf"
 dependencies = [
  "chrono",
+ "itoa",
  "ordered-float",
  "rust_decimal",
  "sea-query-derive",
@@ -5030,6 +5032,7 @@ dependencies = [
  "schemars",
  "scopeguard",
  "sea-orm",
+ "sea-query",
  "sea-query-sqlx",
  "sea-schema",
  "serde",

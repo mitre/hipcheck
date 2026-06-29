@@ -59,6 +59,8 @@ impl RestApi {
             cve_list_worker_config,
             log.clone(),
         );
+        let _kev_worker =
+            nv_common::kev::spawn_kev_sync_worker(config, ctx.db().clone(), log.clone());
 
         ServerBuilder::new(api, ctx, log)
             .config(config.dropshot_config()?)

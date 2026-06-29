@@ -12,6 +12,7 @@ pub mod cve;
 pub mod db;
 pub mod error;
 pub mod hipcheck;
+pub mod kev;
 pub mod log;
 pub mod npm;
 pub mod npm_semver;

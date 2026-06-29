@@ -1,0 +1,577 @@
+use crate::config::Config;
+use crate::db::DatabaseConnectionError;
+use crate::db::entities::cisa_kev_entries;
+use crate::db::entities::cisa_kev_sync_runs;
+use crate::error::ErrorSourceIterator as _;
+use jiff::civil::Date;
+use reqwest::header::{
+    ETAG, HeaderMap, HeaderValue, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED,
+};
+use reqwest::{Client, Response, StatusCode, Url};
+use sea_orm::{
+    ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait as _, EntityTrait as _,
+    QueryFilter as _, QueryOrder as _, TransactionTrait as _,
+};
+use sea_orm::{DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, Set, Statement};
+use serde::Deserialize;
+use slog::{Logger, debug, error, info, warn};
+use std::{
+    borrow::ToOwned,
+    error::Error as _,
+    fmt::{Debug, Display, Write as _},
+    time::Duration,
+};
+use tokio::time::sleep;
+
+pub const DEFAULT_KEV_URL: &str =
+    "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
+
+/// PostgreSQL advisory lock key used to serialize KEV sync work.
+/// ASCII text: "KEV_SYNC"
+const KEV_SYNC_ADVISORY_LOCK_ID: i64 = 0x4b45_565f_5359_4e43;
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct KevCatalog {
+    #[doc = "Version of the known exploited vulnerabilities catalog"]
+    pub catalog_version: String,
+    #[doc = "Total number of Known Exploited Vulnerabilities in the catalog"]
+    pub count: i64,
+    #[doc = "Date-time of Catalog Release in the format YYYY-MM-DDTHH:mm:ss.sssZ"]
+    // Known issue: this timestamp doesn't directly parse into a `jiff::Zoned`,
+    // because that type expects a bracketed named time zone instead of the `Z` character.
+    pub date_released: String,
+    #[doc = "The exploited vulnerabilities included in this catalog"]
+    // Semantically, each entry in this list is of type `Vulnerability`.
+    // But we need to store the original JSON for each entry in the database,
+    // so we defer parsing them as `Vulnerability` until we insert them.
+    // This has the additional benefit of isolating parse errors to be one entry at a time.
+    pub vulnerabilities: Vec<serde_json::Value>,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Vulnerability {
+    #[doc = "The CVE ID of the vulnerability in the format CVE-YYYY-NNNN, note that the number portion can have more than 4 digits"]
+    #[serde(rename = "cveID")]
+    pub cve_id: String,
+    #[doc = "Common Weakness Enumeration (CWE) codes associated with this vulnerability. CWEs are in the format CWE-NNNN; note that the number portion can have any number of digits"]
+    #[serde(default)]
+    pub cwes: Vec<String>,
+    #[doc = "The date the vulnerability was added to the catalog in the format YYYY-MM-DD"]
+    pub date_added: Date,
+    #[doc = "The date the required action is due in the format YYYY-MM-DD"]
+    pub due_date: Date,
+    #[doc = "'Known' if this vulnerability is known to have been leveraged as part of a ransomware campaign; 'Unknown' if CISA lacks confirmation that the vulnerability has been utilized for ransomware"]
+    #[serde(default)]
+    pub known_ransomware_campaign_use: Option<String>,
+    #[doc = "Any additional notes about the vulnerability"]
+    #[serde(default)]
+    pub notes: Option<String>,
+    #[doc = "The vulnerability product"]
+    pub product: String,
+    #[doc = "The required action to address the vulnerability"]
+    pub required_action: String,
+    #[doc = "A short description of the vulnerability"]
+    pub short_description: String,
+    #[doc = "The vendor or project name for the vulnerability"]
+    pub vendor_project: String,
+    #[doc = "The name of the vulnerability"]
+    pub vulnerability_name: String,
+}
+
+pub enum KevError {
+    DatabaseConnectionError(DatabaseConnectionError),
+    ReqwestError(reqwest::Error),
+    SeaOrmError(sea_orm::DbErr),
+    TransactionLockError,
+}
+
+impl From<DatabaseConnectionError> for KevError {
+    fn from(error: DatabaseConnectionError) -> Self {
+        Self::DatabaseConnectionError(error)
+    }
+}
+
+impl From<reqwest::Error> for KevError {
+    fn from(error: reqwest::Error) -> Self {
+        Self::ReqwestError(error)
+    }
+}
+
+impl From<sea_orm::DbErr> for KevError {
+    fn from(error: sea_orm::DbErr) -> Self {
+        Self::SeaOrmError(error)
+    }
+}
+
+// The `Debug` representation for `KevError` is intended to match the
+// debug printing for `anyhow::Error`, with a top-level error and then
+// a series of causes.
+impl Debug for KevError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut msg = format!("{self}\n");
+
+        // If there are causes, then print the "caused by" section.
+        if let Some(source) = self.source() {
+            msg.push_str("\nCaused by:\n");
+
+            for source in source.sources_iter() {
+                let _ = writeln!(msg, "\t{source}");
+            }
+        }
+
+        write!(f, "{msg}")
+    }
+}
+
+impl Display for KevError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DatabaseConnectionError(_) => {
+                write!(f, "failed to connect to database")
+            }
+            Self::ReqwestError(_) => {
+                write!(f, "failed to fetch KEV data")
+            }
+            Self::SeaOrmError(_) => {
+                write!(f, "failed to access database")
+            }
+            Self::TransactionLockError => {
+                write!(f, "failed to acquire exclusive database lock to sync data")
+            }
+        }
+    }
+}
+
+impl std::error::Error for KevError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::DatabaseConnectionError(err) => Some(err),
+            Self::ReqwestError(err) => Some(err),
+            Self::SeaOrmError(err) => Some(err),
+            Self::TransactionLockError => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequestMode {
+    NoConditionalRequest,
+    UseConditionalRequest,
+}
+
+#[derive(Debug, Clone)]
+struct KevConfig {
+    kev_refresh_interval: Option<jiff::Span>,
+    kev_url: Option<reqwest::Url>,
+}
+
+impl KevConfig {
+    fn from_config(config: &Config) -> Self {
+        Self {
+            kev_refresh_interval: config.kev_refresh_interval,
+            kev_url: config.kev_url.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CacheMetadata {
+    etag: Option<String>,
+    last_modified: Option<String>,
+}
+
+struct RunSummary {
+    // TODO
+}
+
+pub fn spawn_kev_sync_worker(
+    config: &Config,
+    db: DatabaseConnection,
+    log: Logger,
+) -> tokio::task::JoinHandle<()> {
+    let kev_config = KevConfig::from_config(config);
+    tokio::spawn(loop_fetch_kev(kev_config, db, log))
+}
+
+/// Cancellation: TODO
+async fn loop_fetch_kev(config: KevConfig, db: DatabaseConnection, log: Logger) {
+    info!(log, "started KEV sync worker");
+
+    let default_interval = jiff::Span::new().hours(1);
+    let default_interval_duration = Duration::from_hours(1);
+    let refresh_interval = config.kev_refresh_interval.unwrap_or(default_interval);
+    // NOTE: can fail if the Span has units larger than hours
+    let interval = Duration::try_from(refresh_interval)
+        .unwrap_or_else(|e| {
+            warn!(log, "failed to convert KEV refresh interval {refresh_interval} to `std::time::Duration`; defaulting to 1 hour. Caused by:\n\t{e}");
+            default_interval_duration
+    });
+
+    loop {
+        let res = sync_kev(
+            RequestMode::UseConditionalRequest,
+            &config,
+            &db,
+            log.clone(),
+        )
+        .await;
+        if let Err(e) = res {
+            error!(log, "KEV Sync run failed: {e:?}");
+        }
+        sleep(interval).await;
+    }
+}
+
+/// This function provides a way for `nvdb` to start a KEV sync run.
+/// Cancellation: TODO
+pub async fn run_fetch_kev(
+    request_mode: RequestMode,
+    config: &Config,
+    log: Logger,
+) -> Result<(), KevError> {
+    let db = crate::db::connection(config).await?;
+    let kev_config = KevConfig::from_config(config);
+    sync_kev(request_mode, &kev_config, &db, log).await
+}
+
+/// Cancellation: TODO
+async fn sync_kev(
+    request_mode: RequestMode,
+    config: &KevConfig,
+    db: &DatabaseConnection,
+    log: Logger,
+) -> Result<(), KevError> {
+    let xact = acquire_kev_sync_lock(db).await?;
+    let sync_run = create_sync_run(&xact).await?;
+    // NOTE the clone of sync_run. We want to avoid the possibility of saving
+    // an old version of the sync run. We also want to be able to pass it into `fetch_kev`.
+    // Assumption: the result of `create_sync_run` is an ActiveModel with all fields set to
+    // NotChanged.
+    // If that's true, then reusing the ActiveModel should be safe.
+    let res = fetch_kev(request_mode, config, sync_run.clone(), &xact, log.clone()).await;
+    match &res {
+        Ok(()) => update_sync_run_result_success(sync_run, &xact, log).await?,
+        Err(e) => {
+            let error = format!("{e:?}");
+            update_sync_run_result_failure(sync_run, error, &xact, log).await?;
+        }
+    }
+    // Must finish the transaction first, regardless of whether there was an error
+    // during processing.
+    finish_locked_kev_sync(xact).await?;
+    res
+}
+
+/// TODO: name this function better
+/// Cancellation: TODO
+async fn fetch_kev(
+    request_mode: RequestMode,
+    config: &KevConfig,
+    sync_run: cisa_kev_sync_runs::ActiveModel,
+    xact: &DatabaseTransaction,
+    log: Logger,
+) -> Result<(), KevError> {
+    // If using a conditional request, check database for previous sync run,
+    // to retrieve cache metadata.
+    let maybe_run = match request_mode {
+        RequestMode::NoConditionalRequest => None,
+        RequestMode::UseConditionalRequest => {
+            debug!(log, "KEV Sync: Checking for previous sync run");
+            get_latest_run(xact).await?
+        }
+    };
+
+    // If a previous sync run was found, generate appropriate HTTP request headers
+    // for a conditional request.
+    let headers = maybe_run.map_or(HeaderMap::new(), |run| {
+        debug!(log, "KEV Sync: Found previous sync run: {run:?}");
+        let cache_metadata = extract_cache_metadata_from_model(&run);
+        generate_cache_headers(&cache_metadata)
+    });
+
+    let client = Client::new();
+    let url = config
+        .kev_url
+        .clone()
+        .unwrap_or(Url::parse(DEFAULT_KEV_URL).expect("default URL should be valid"));
+    let request = client.get(url.clone()).headers(headers);
+    debug!(log, "KEV Sync: Sending request for KEV Catalog";
+        "url" => ?url,
+        "request" => ?request);
+
+    // TODO
+    // save expires and cache-control from response
+    // cache-control max-age directive provides number of seconds until server
+    // considers it stale; use that as time to refresh
+    let response = request.send().await?;
+    debug!(log, "KEV Sync: Got KEV Catalog response"; "response" => ?response);
+
+    let cache_metadata = extract_cache_metadata_from_headers(&response);
+    debug!(log, "KEV Sync: cache metadata: {cache_metadata:?}");
+
+    let _sync_run =
+        update_sync_run_cache_metadata(cache_metadata, sync_run, xact, log.clone()).await?;
+
+    // Detect 304 Not Modified and exit early
+    let status = response.status();
+    if status == StatusCode::NOT_MODIFIED {
+        info!(
+            log,
+            "KEV Catalog Response was 304 Not Modified; nothing to process"
+        );
+        return Ok(());
+    }
+
+    let catalog = response.json::<KevCatalog>().await?;
+
+    let catalog_version = &catalog.catalog_version;
+    let count = catalog.count;
+    let date_released = &catalog.date_released;
+    debug!(log, "KEV Catalog received";
+    "catalog_version" => catalog_version,
+    "count" => count,
+    "date_released" => date_released
+    );
+
+    let _summary = store_all_entries(&catalog.vulnerabilities, xact, log.clone()).await?;
+    //let sync_run = update_sync_run_summary(summary, sync_run, xact, log.clone()).await?;
+
+    Ok(())
+}
+
+/// This function provides a way for `nvdb` to check KEV status.
+/// Cancellation: TODO
+pub async fn read_status(config: &Config, log: Logger) -> Result<(), KevError> {
+    let db = crate::db::connection(config).await?;
+    // TODO is there a more efficient way of just getting the count?
+    let res: Vec<cisa_kev_entries::Model> = cisa_kev_entries::Entity::find().all(&db).await?;
+    let count = res.len();
+    info!(log, "KEV Sync DB contains {count} entries");
+
+    if let Some(entry) = res.first() {
+        debug!(log, "first entry: {entry:?}");
+    }
+
+    // TODO is there a more efficient way of just getting the count?
+    let res: Vec<cisa_kev_sync_runs::Model> = cisa_kev_sync_runs::Entity::find()
+        .order_by_desc(cisa_kev_sync_runs::Column::Generation)
+        .all(&db)
+        .await?;
+    let count = res.len();
+    info!(log, "KEV Sync DB contains {count} sync runs");
+
+    if let Some(run) = res.first() {
+        debug!(log, "most recent run: {run:?}");
+        let cache_metadata = extract_cache_metadata_from_model(run);
+        debug!(log, "cache metadata: {cache_metadata:?}");
+    }
+
+    Ok(())
+}
+
+fn convert_one_entry(
+    value: &serde_json::Value,
+) -> Result<cisa_kev_entries::ActiveModel, serde_json::Error> {
+    let vulnerability: Vulnerability = serde_json::from_value(value.clone())?;
+    let cve_id = vulnerability.cve_id;
+
+    Ok(cisa_kev_entries::ActiveModel {
+        cve_id: Set(cve_id),
+        entry: Set(value.clone()),
+        ..Default::default()
+    })
+}
+
+/// Cancellation: TODO
+async fn store_all_entries(
+    values: &[serde_json::Value],
+    xact: &DatabaseTransaction,
+    log: Logger,
+) -> Result<RunSummary, KevError> {
+    let models = values.iter().map(convert_one_entry).filter_map(|res| {
+        if let Err(e) = &res {
+            error!(
+                log,
+                "KEV Sync: failed to parse JSON as Vulnerability struct, caused by:\n\t{e}"
+            );
+        }
+        res.ok()
+    });
+
+    let res = cisa_kev_entries::Entity::insert_many(models)
+        // TODO update fields instead of doing nothing
+        .on_conflict(
+            sea_query::OnConflict::column(cisa_kev_entries::Column::CveId)
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec(xact)
+        .await;
+    match res {
+        // Ignore SeaORM errors that say no records were updated or inserted.
+        // That is not an error in this case.
+        Err(DbErr::RecordNotInserted) => {}
+        Err(DbErr::RecordNotUpdated) => {}
+        Err(e) => return Err(KevError::SeaOrmError(e)),
+        Ok(_) => {}
+    }
+    debug!(log, "KEV Sync: insert_many result: {res:?}");
+
+    // TODO how to get information on how many entries were inserted/updated?
+    let summary = RunSummary {};
+    Ok(summary)
+}
+
+/// Cancellation: TODO
+async fn get_latest_run(
+    xact: &DatabaseTransaction,
+) -> Result<Option<cisa_kev_sync_runs::Model>, KevError> {
+    let run: Option<cisa_kev_sync_runs::Model> = cisa_kev_sync_runs::Entity::find()
+        .filter(cisa_kev_sync_runs::Column::Status.eq("success"))
+        .order_by_desc(cisa_kev_sync_runs::Column::Generation)
+        .one(xact)
+        .await?;
+    Ok(run)
+}
+
+/// Cancellation: TODO
+async fn create_sync_run(
+    xact: &DatabaseTransaction,
+) -> Result<cisa_kev_sync_runs::ActiveModel, KevError> {
+    let run = cisa_kev_sync_runs::ActiveModel {
+        status: Set("running".to_owned()),
+        ..Default::default()
+    };
+    let stored_run = run.insert(xact).await?;
+    Ok(stored_run.into())
+}
+
+/// Cancellation: TODO
+async fn update_sync_run_cache_metadata(
+    cache_metadata: CacheMetadata,
+    mut sync_run: cisa_kev_sync_runs::ActiveModel,
+    xact: &DatabaseTransaction,
+    _log: Logger,
+) -> Result<cisa_kev_sync_runs::ActiveModel, KevError> {
+    sync_run.etag = Set(cache_metadata.etag);
+    sync_run.last_modified = Set(cache_metadata.last_modified);
+    let run = sync_run.save(xact).await?;
+    Ok(run)
+}
+
+/*
+/// Cancellation: TODO
+async fn update_sync_run_summary(summary: RunSummary, mut sync_run: cisa_kev_sync_runs::ActiveModel, xact: &DatabaseTransaction, log: Logger)
+-> Result<cisa_kev_sync_runs::ActiveModel, KevError> {
+    // TODO update stats on number of entries processed, updated, etc
+    let _run = sync_run.save(xact).await?;
+    Ok(run)
+}
+*/
+
+/// Cancellation: TODO
+async fn update_sync_run_result_success(
+    mut sync_run: cisa_kev_sync_runs::ActiveModel,
+    xact: &DatabaseTransaction,
+    _log: Logger,
+) -> Result<(), KevError> {
+    sync_run.status = Set("success".to_owned());
+    let _run = sync_run.save(xact).await?;
+    Ok(())
+}
+
+/// Cancellation: TODO
+async fn update_sync_run_result_failure(
+    mut sync_run: cisa_kev_sync_runs::ActiveModel,
+    error: String,
+    xact: &DatabaseTransaction,
+    _log: Logger,
+) -> Result<(), KevError> {
+    sync_run.status = Set("failure".to_owned());
+    sync_run.error = Set(Some(error));
+    let _run = sync_run.save(xact).await?;
+    Ok(())
+}
+
+/// Start a database transaction, and then attempt to acquire the advisory lock.
+/// If acquiring the lock is successful, return the transaction.
+async fn acquire_kev_sync_lock(db: &DatabaseConnection) -> Result<DatabaseTransaction, KevError> {
+    let transaction = db.begin().await?;
+    let acquired = try_acquire_kev_sync_lock(&transaction).await?;
+
+    if acquired {
+        Ok(transaction)
+    } else {
+        Err(KevError::TransactionLockError)
+    }
+}
+
+async fn finish_locked_kev_sync(xact: DatabaseTransaction) -> Result<(), KevError> {
+    xact.commit().await?;
+    Ok(())
+}
+
+/// Attempt to acquire a PostgreSQL advisory lock using raw SQL.
+/// The bool result indicates whether the lock was actually acquired.
+/// By using the SQL function `pg_try_advisory_xact_lock`, this will return
+/// immediately with a result instead of waiting indefinitely for the lock.
+async fn try_acquire_kev_sync_lock(db: &DatabaseTransaction) -> Result<bool, KevError> {
+    let statement = Statement::from_string(
+        DatabaseBackend::Postgres,
+        format!("SELECT pg_try_advisory_xact_lock({KEV_SYNC_ADVISORY_LOCK_ID})"),
+    );
+
+    let res: bool = db
+        .query_one_raw(statement)
+        .await?
+        .expect("pg_try_advisory_xact_lock should always return a row")
+        .try_get_by_index(0)?;
+
+    Ok(res)
+}
+
+fn extract_cache_metadata_from_model(run: &cisa_kev_sync_runs::Model) -> CacheMetadata {
+    CacheMetadata {
+        etag: run.etag.clone(),
+        last_modified: run.last_modified.clone(),
+    }
+}
+
+fn header_to_string(header_value: Option<&HeaderValue>) -> Option<String> {
+    header_value
+        // If the header is not entirely visible ASCII characters, return None
+        .and_then(|h| h.to_str().ok())
+        .map(ToOwned::to_owned)
+}
+
+fn extract_cache_metadata_from_headers(resp: &Response) -> CacheMetadata {
+    let headers = resp.headers();
+    CacheMetadata {
+        etag: header_to_string(headers.get(ETAG)),
+        last_modified: header_to_string(headers.get(LAST_MODIFIED)),
+    }
+}
+
+fn generate_cache_headers(cache_metadata: &CacheMetadata) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+
+    // The appropriate header to send with the ETag value is If-None-Match
+    if let Some(etag) = &cache_metadata.etag {
+        // If the string cannot be converted to a HeaderValue, ignore it
+        if let Ok(value) = HeaderValue::from_str(etag) {
+            headers.insert(IF_NONE_MATCH, value);
+        }
+    }
+
+    // The appropriate header to send with the Last-Modified value is If-Modified-Since
+    if let Some(last_modified) = &cache_metadata.last_modified {
+        // If the string cannot be converted to a HeaderValue, ignore it
+        if let Ok(value) = HeaderValue::from_str(last_modified) {
+            headers.insert(IF_MODIFIED_SINCE, value);
+        }
+    }
+
+    headers
+}
