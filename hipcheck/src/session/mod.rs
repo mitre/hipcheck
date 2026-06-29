@@ -27,7 +27,6 @@ use tokio::runtime::Runtime;
 use tokio_stream::StreamExt;
 
 struct SessionBuilder {
-	config_dir: Option<PathBuf>,
 	cache_dir: Option<PathBuf>,
 	policy_file_path: Option<PathBuf>,
 	policy_file: Option<PolicyFile>,
@@ -40,7 +39,6 @@ struct SessionBuilder {
 impl SessionBuilder {
 	fn new(start_time: chrono::DateTime<Local>, format: Format) -> Self {
 		Self {
-			config_dir: None,
 			cache_dir: None,
 			policy_file_path: None,
 			policy_file: None,
@@ -49,11 +47,6 @@ impl SessionBuilder {
 			format,
 			started_at: start_time,
 		}
-	}
-
-	fn set_config_dir(&mut self, config_dir: Option<PathBuf>) -> &mut Self {
-		self.config_dir = config_dir;
-		self
 	}
 
 	fn set_cache_dir(&mut self, cache_dir: PathBuf) -> &mut Self {
@@ -364,11 +357,10 @@ fn use_policy(policy_path: PathBuf, session_builder: &mut SessionBuilder) -> Res
 
 	let out = format!("using policy located at {}", policy_path.display());
 
-	// No config dir
 	session_builder
-		.set_config_dir(None)
 		.set_policy(policy)
 		.set_policy_path(Some(policy_path));
+
 	Ok(out)
 }
 

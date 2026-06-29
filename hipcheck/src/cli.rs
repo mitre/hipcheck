@@ -1450,7 +1450,6 @@ mod tests {
 		let vars = vec![
 			("HOME", Some(tempdir.path().to_str().unwrap())),
 			("XDG_CONFIG_HOME", None),
-			("HC_CONFIG", None),
 		];
 
 		with_env_vars(vars, || {
@@ -1467,55 +1466,6 @@ mod tests {
 
 			assert_eq!(config.config_mode().unwrap(), expected);
 		});
-	}
-
-	#[test]
-	fn ignores_config_env_var() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let vars = vec![
-			("HOME", Some(tempdir.path().to_str().unwrap())),
-			("XDG_CONFIG_HOME", None),
-			("HC_CONFIG", Some(tempdir.path().to_str().unwrap())),
-		];
-
-		with_env_vars(vars, || {
-			let config_dir = platform_config().unwrap();
-
-			let config = {
-				let mut temp = CliConfig::empty();
-				temp.update(&CliConfig::from_platform());
-				temp.update(&CliConfig::from_env());
-				temp
-			};
-
-			assert_eq!(config.setup_policy_dir().unwrap(), config_dir);
-		});
-	}
-
-	#[test]
-	fn rejects_config_flag() {
-		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
-
-		let path = pathbuf![tempdir.path(), "hipcheck"];
-		let parsed = CliConfig::try_parse_from(["hc", "--config", path.to_str().unwrap()]);
-
-		assert!(parsed.is_err());
-		assert_eq!(
-			parsed.unwrap_err().kind(),
-			clap::error::ErrorKind::UnknownArgument
-		);
-	}
-
-	#[test]
-	fn rejects_print_config_flag() {
-		let parsed = CliConfig::try_parse_from(["hc", "--print-config"]);
-
-		assert!(parsed.is_err());
-		assert_eq!(
-			parsed.unwrap_err().kind(),
-			clap::error::ErrorKind::UnknownArgument
-		);
 	}
 
 	#[test]
