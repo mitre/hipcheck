@@ -283,8 +283,8 @@ impl CliConfig {
 		self.path_args.policy.as_deref()
 	}
 
-	/// Get the path to the configuration directory.
-	pub fn config(&self) -> Option<PathBuf> {
+	/// Get the directory where `hc setup` writes configuration files.
+	pub fn setup_policy_dir(&self) -> Option<PathBuf> {
 		platform_config()
 			.or_else(|| dirs::home_dir().map(|dir| pathbuf![&dir, "hipcheck", "config"]))
 	}
@@ -1489,7 +1489,7 @@ mod tests {
 				temp
 			};
 
-			assert_eq!(config.config().unwrap(), config_dir);
+			assert_eq!(config.setup_policy_dir().unwrap(), config_dir);
 		});
 	}
 
