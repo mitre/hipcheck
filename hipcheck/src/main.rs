@@ -210,9 +210,9 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 		PolicyFile::load_from(p)
 		.context("Failed to load policy. Plase make sure the policy file is in the provided location and is formatted correctly.")?
 	} else if let Some(c) = config.config() {
-		let config = Config::load_from(c)
+		let config = Config::load_from(&c)
 		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
-		config_to_policy(config, c)?
+		config_to_policy(config, &c)?
 	} else {
 		return Err(hc_error!(
 			"No policy file or (deprecated) config file found. Please provide a policy file before running Hipcheck."
@@ -304,7 +304,7 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 			"{:?} does not exist. Attempting to create directory",
 			tgt_conf_path
 		);
-		if create_dir_all(tgt_conf_path).is_err() {
+		if create_dir_all(&tgt_conf_path).is_err() {
 			Shell::print_error(
 				&hc_error!(
 					"Failed to create target config dir {}. Hipcheck may be
@@ -332,7 +332,7 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 
 	// Write config file binaries to target directory
 	log::debug!("Attempted to write config binaries to {:?}", tgt_conf_path);
-	if let Err(e) = write_config_binaries(tgt_conf_path) {
+	if let Err(e) = write_config_binaries(&tgt_conf_path) {
 		Shell::print_error(
 			&hc_error!("failed to write config binaries to config dir {}", e),
 			Format::Human,
@@ -886,7 +886,7 @@ fn cmd_print_home(path: Option<&Path>) {
 /// Print the current config path for Hipcheck.
 ///
 /// Exits `Ok` if config path is specified, `Err` otherwise.
-fn cmd_print_config(config_path: Option<&Path>) {
+fn cmd_print_config(config_path: Option<PathBuf>) {
 	match config_path.ok_or_else(|| hc_error!("can't find config directory")) {
 		Ok(path_buffer) => {
 			println!("{}", path_buffer.display());
