@@ -115,6 +115,13 @@ pub struct Config {
     /// If unset, will not write out the OpenAPI Definition.
     pub openapi_dest_path: Option<Utf8PathBuf>,
 
+    /// The URL from which Known Exploited Vulnerabilities (KEV) data
+    /// should be fetched.
+    pub kev_url: Option<reqwest::Url>,
+
+    /// The time interval between refreshes of the KEV data from its source URL.
+    pub kev_refresh_interval: Option<jiff::Span>,
+
     /// The maximum size in bytes for the request body.
     ///
     /// The default is 1024 bytes.
@@ -373,6 +380,8 @@ impl Config {
                 required_keys: vec!["server-address", "cve-list-checkout-path"],
                 optional_keys: vec![
                     "openapi-dest-path",
+                    "kev-url",
+                    "kev-refresh-interval",
                     "http-request-body-max-bytes",
                     "http-early-disconnect-behavior",
                     "database-connection",
@@ -424,6 +433,9 @@ impl Config {
             .expect("server-address is required");
         let openapi_dest_path: Option<Utf8PathBuf> =
             parse_value(&parsed, "openapi-dest-path", &mut errors);
+        let kev_url: Option<reqwest::Url> = parse_value(&parsed, "kev-url", &mut errors);
+        let kev_refresh_interval: Option<jiff::Span> =
+            parse_value(&parsed, "kev-refresh-interval", &mut errors);
         let http_request_body_max_bytes =
             parse_value(&parsed, "http-request-body-max-bytes", &mut errors);
         let http_early_disconnect_behavior =
@@ -502,6 +514,8 @@ impl Config {
             config_file_path: path.into(),
             server_address,
             openapi_dest_path,
+            kev_url,
+            kev_refresh_interval,
             http_request_body_max_bytes,
             http_early_disconnect_behavior,
             database_connection_source,
@@ -673,6 +687,14 @@ impl Display for Config {
 
         if let Some(openapi_dest_path) = &self.openapi_dest_path {
             write_report_line!(f, "openapi-dest-path", openapi_dest_path)?;
+        }
+
+        if let Some(kev_url) = &self.kev_url {
+            write_report_line!(f, "kev-url", kev_url)?;
+        }
+
+        if let Some(kev_refresh_interval) = &self.kev_refresh_interval {
+            write_report_line!(f, "kev-refresh-interval", kev_refresh_interval)?;
         }
 
         if let Some(max_bytes) = self.http_request_body_max_bytes {

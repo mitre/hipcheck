@@ -20,6 +20,22 @@ database-connection-file = "../.secrets/local-development-database-url"
 # workspace directory where nv-server was compiled.
 openapi-dest-path = "openapi/nv-server-openapi.json"
 
+# The URL from which the Known Exploited Vulnerabilities (KEV) Catalog
+# should be downloaded.
+#
+# Default: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+kev-url =
+
+# The time interval between KEV Catalog sync runs. The format is an
+# ISO 8601 time span string, or more specifically, what `jiff::Span`
+# parses.
+#
+# Must not contain time units larger than hours.
+# Must be a positive time span.
+#
+# Default: "PT1h" (1 hour)
+kev-refresh-interval =
+
 # Maximum size in bytes for the request body.
 #
 # Default: 1024
