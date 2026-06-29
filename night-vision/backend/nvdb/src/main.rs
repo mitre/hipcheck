@@ -58,7 +58,7 @@ fn run() -> Result<()> {
     let verbosity_filter = Verbosity::<InfoLevel>::from_arg_matches(&matches)
         .expect("verbose and quiet args are always present and default to 0")
         .filter();
-    let _log = logger(verbosity_filter);
+    let log = logger(verbosity_filter);
 
     if let Some(npm_matches) = matches.subcommand_matches("npm") {
         return cmd::npm::run(npm_matches);
@@ -94,6 +94,15 @@ fn run() -> Result<()> {
         return cmd::cve::run(&config, cve_matches);
     }
 
+    if let Some(kev_matches) = matches.subcommand_matches("kev") {
+        if let Some(pull_matches) = kev_matches.subcommand_matches("pull") {
+            let force = pull_matches.get_flag("force");
+            return cmd::kev::pull::run(force, &config, log);
+        } else if let Some(_matches) = kev_matches.subcommand_matches("status") {
+            return cmd::kev::status::run(&config, log);
+        }
+    }
+
     Ok(())
 }
 
@@ -127,8 +136,14 @@ fn command() -> clap::Command {
                 .subcommand(cmd::db::migrate::command()),
         )
         .subcommand(cmd::cve::command())
-        .subcommand(cmd::npm::command());
-
+        .subcommand(cmd::npm::command())
+        .subcommand(
+            clap::Command::new("kev")
+                .about("Manage KEV data")
+                .arg_required_else_help(true)
+                .subcommand(cmd::kev::pull::command())
+                .subcommand(cmd::kev::status::command()),
+        );
     Verbosity::<InfoLevel>::augment_args(command)
 }
 

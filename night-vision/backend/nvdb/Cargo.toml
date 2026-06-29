@@ -20,6 +20,7 @@ sea-orm.workspace = true
 secrecy.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+slog.workspace = true
 reqwest.workspace = true
 url.workspace = true
 workspace-hack.workspace = true
