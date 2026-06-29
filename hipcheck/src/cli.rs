@@ -423,13 +423,9 @@ fn platform_config() -> Option<PathBuf> {
 
 /// Get the default path to the legacy configuration directory.
 fn default_config() -> Option<Provenance> {
-	hc_env_var("config")
-		.map(Provenance::FromUser)
-		.or_else(|| platform_config().map(Provenance::FromDefaults))
-		.or_else(|| {
-			dirs::home_dir()
-				.map(|dir| Provenance::FromDefaults(pathbuf![&dir, "hipcheck", "config"]))
-		})
+	platform_config().map(Provenance::FromDefaults).or_else(|| {
+		dirs::home_dir().map(|dir| Provenance::FromDefaults(pathbuf![&dir, "hipcheck", "config"]))
+	})
 }
 
 /// Get a Hipcheck configuration environment variable.
@@ -1514,16 +1510,18 @@ mod tests {
 	}
 
 	#[test]
-	fn resolve_config_with_env_var() {
+	fn ignores_config_env_var() {
 		let tempdir = TempDir::with_prefix(TEMPDIR_PREFIX).unwrap();
 
 		let vars = vec![
-			("HOME", None),
+			("HOME", Some(tempdir.path().to_str().unwrap())),
 			("XDG_CONFIG_HOME", None),
 			("HC_CONFIG", Some(tempdir.path().to_str().unwrap())),
 		];
 
 		with_env_vars(vars, || {
+			let config_dir = platform_config().unwrap();
+
 			let config = {
 				let mut temp = CliConfig::empty();
 				temp.update(&CliConfig::from_platform());
@@ -1531,7 +1529,7 @@ mod tests {
 				temp
 			};
 
-			assert_eq!(config.config().unwrap(), tempdir.path());
+			assert_eq!(config.config().unwrap(), config_dir);
 		});
 	}
 

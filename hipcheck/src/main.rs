@@ -308,26 +308,13 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 				&hc_error!(
 					"Failed to create target config dir {}. Hipcheck may be
 					defaulting to a directory that requires escalated privileges. You can resolve
-					this by setting HC_CONFIG to a writable config directory before running `hc setup`.
-					You may alternatively run `hc setup` with elevated privileges.",
+					this by running `hc setup` with elevated privileges.",
 					tgt_conf_path.to_string_lossy()
 				),
 				Format::Human,
 			);
 		}
 	}
-
-	log::debug!(
-		"Attempting to canonicalize HC_CONFIG path {:?}",
-		tgt_conf_path
-	);
-	let Ok(abs_conf_path) = tgt_conf_path.canonicalize() else {
-		Shell::print_error(
-			&hc_error!("failed to canonicalize HC_CONFIG path"),
-			Format::Human,
-		);
-		return ExitCode::FAILURE;
-	};
 
 	// Write config file binaries to target directory
 	log::debug!("Attempted to write config binaries to {:?}", tgt_conf_path);
@@ -340,20 +327,6 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 	}
 
 	println!("Hipcheck setup completed successfully.");
-
-	// Recommend exportation of HC_CONFIG/HC_DATA env vars if applicable
-	let shell_profile = match std::env::var("SHELL").as_ref().map(String::as_str) {
-		Ok("/bin/zsh") | Ok("/usr/bin/zsh") => ".zshrc",
-		Ok("/bin/bash") | Ok("/usr/bin/bash") => ".bash_profile",
-		_ => ".profile",
-	};
-
-	println!(
-		"Manually add the following to your '$HOME/{}' (or similar) if you haven't already",
-		shell_profile
-	);
-	println!("\texport HC_CONFIG={:?}", abs_conf_path);
-
 	println!("Run `hc help` to get started");
 
 	ExitCode::SUCCESS

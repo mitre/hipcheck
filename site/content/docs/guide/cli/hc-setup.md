@@ -15,11 +15,7 @@ When installing Hipcheck, regardless of method, you are only installing the
 the correct location in your system for configuration files and writes the
 files to that directory.
 
-It also produces an export command that should be used to set the `HC_CONFIG`
-environmental variable to the relevant directory, as necessary to run `hc check`.
-
 Please note that in some cases, `hc setup` may default to a directory that
-requires escalated privileges. You can resolve this by running `sudo hc setup` or
-setting `HC_CONFIG` to your desired directory before running `hc setup`.
+requires escalated privileges. You can resolve this by running `sudo hc setup`.
 
 `hc setup` supports Hipcheck's [General Flags](@/docs/guide/cli/general-flags.md).
