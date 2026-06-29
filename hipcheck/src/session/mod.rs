@@ -3,7 +3,7 @@
 use crate::{
 	analysis::unresolved_analysis_tree_from_policy,
 	cache::plugin::HcPluginCache,
-	cli::{ConfigMode, Format},
+	cli::Format,
 	engine::{HcPluginCore, PluginCore, start_plugins},
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
@@ -184,12 +184,12 @@ impl Session {
 	/// Construct a new `Session` which owns all the data needed in later phases.
 	#[allow(clippy::too_many_arguments)]
 	pub async fn new(
-		config_mode: ConfigMode,
+		policy_path: PathBuf,
 		home_dir: Option<PathBuf>,
 		exec_path: Option<PathBuf>,
 		format: Format,
 	) -> StdResult<Session, Error> {
-		let session_builder = setup_base_session(config_mode, home_dir, exec_path, format).await?;
+		let session_builder = setup_base_session(policy_path, home_dir, exec_path, format).await?;
 
 		session_builder.build()
 	}
@@ -255,7 +255,7 @@ pub struct ReadySession {
 impl ReadySession {
 	/// Construct a new `ReadySession` which owns all the data needed in later phases.
 	pub fn new(
-		config_mode: ConfigMode,
+		policy_path: PathBuf,
 		home_dir: Option<PathBuf>,
 		exec_path: Option<PathBuf>,
 		format: Format,
@@ -265,7 +265,7 @@ impl ReadySession {
 		// Panic: Safe to unwrap as Runtime::new() always returns as Ok
 		let runtime = Runtime::new().unwrap();
 		let session_builder =
-			runtime.block_on(setup_base_session(config_mode, home_dir, exec_path, format))?;
+			runtime.block_on(setup_base_session(policy_path, home_dir, exec_path, format))?;
 		session_builder.build_ready()
 	}
 }
@@ -274,7 +274,7 @@ impl ReadySession {
 /// This allows the setup logic to be shared between `hc check`
 /// and `hc ready`, since `hc ready` does not use a target.
 async fn setup_base_session(
-	config_mode: ConfigMode,
+	policy_path: PathBuf,
 	home_dir: Option<PathBuf>,
 	exec_path: Option<PathBuf>,
 	format: Format,
@@ -289,9 +289,7 @@ async fn setup_base_session(
 	 *  Loading configuration.
 	 *-----------------------------------------------------------------*/
 
-	let config_msg = match config_mode {
-		ConfigMode::ForcePolicy { policy } => use_policy(policy, &mut session_builder)?,
-	};
+	let config_msg = use_policy(policy_path, &mut session_builder)?;
 	Shell::print_config(config_msg);
 
 	// Force eval the risk policy expr - wouldn't be necessary if the PolicyFile parsed
