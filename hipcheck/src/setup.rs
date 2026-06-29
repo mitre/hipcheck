@@ -11,7 +11,7 @@ static LANGS_KDL: &str = include_str!("../../config/Langs.kdl");
 static ORGS_KDL: &str = include_str!("../../config/Orgs.kdl");
 static TYPOS_KDL: &str = include_str!("../../config/Typos.kdl");
 
-pub fn write_config_binaries(path: &Path) -> Result<()> {
+pub fn write_policy_files(path: &Path) -> Result<()> {
 	std::fs::create_dir_all(path)?;
 
 	let files = [

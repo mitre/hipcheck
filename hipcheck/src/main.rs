@@ -35,7 +35,7 @@ use crate::{
 	report::report_builder::Report,
 	session::ReadySession,
 	session::Session,
-	setup::write_config_binaries,
+	setup::write_policy_files,
 	shell::Shell,
 };
 use analysis::AnalysisTreeNode;
@@ -288,9 +288,8 @@ fn cmd_print_weights(config: &CliConfig) -> Result<()> {
 }
 
 fn cmd_setup(config: &CliConfig) -> ExitCode {
-	// Make config dir if not exist
-	let Some(tgt_conf_path) = config.config() else {
-		Shell::print_error(&hc_error!("target config dir not specified"), Format::Human);
+	let Some(tgt_conf_path) = config.setup_policy_dir() else {
+		Shell::print_error(&hc_error!("target policy dir not specified"), Format::Human);
 		return ExitCode::FAILURE;
 	};
 
@@ -302,21 +301,24 @@ fn cmd_setup(config: &CliConfig) -> ExitCode {
 		if create_dir_all(&tgt_conf_path).is_err() {
 			Shell::print_error(
 				&hc_error!(
-					"Failed to create target config dir {}. Hipcheck may be
+					"Failed to create policy dir '{}'. Hipcheck may be
 					defaulting to a directory that requires escalated privileges. You can resolve
 					this by running `hc setup` with elevated privileges.",
-					tgt_conf_path.to_string_lossy()
+					tgt_conf_path.display().to_string()
 				),
 				Format::Human,
 			);
 		}
 	}
 
-	// Write config file binaries to target directory
-	log::debug!("Attempted to write config binaries to {:?}", tgt_conf_path);
-	if let Err(e) = write_config_binaries(&tgt_conf_path) {
+	log::debug!(
+		"Attempted to write policy files to '{}'",
+		tgt_conf_path.display()
+	);
+
+	if let Err(e) = write_policy_files(&tgt_conf_path) {
 		Shell::print_error(
-			&hc_error!("failed to write config binaries to config dir {}", e),
+			&hc_error!("failed to write policy files to policy dir {}", e),
 			Format::Human,
 		);
 		return ExitCode::FAILURE;
