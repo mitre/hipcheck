@@ -4,15 +4,13 @@
 #[cfg(test)]
 mod test {
 	use crate::{
-		config::Config,
 		plugin::PluginVersionReq,
-		policy::{PolicyFile, PolicyPatchList, config_to_policy::config_to_policy, policy_file::*},
+		policy::{PolicyFile, PolicyPatchList, policy_file::*},
 	};
 	use hipcheck_kdl::ParseKdlNode;
 	use hipcheck_kdl::kdl::KdlNode;
-	use pathbuf::pathbuf;
 	use serde_json::Value;
-	use std::{env, str::FromStr};
+	use std::str::FromStr;
 	use url::Url;
 
 	#[test]
@@ -337,24 +335,5 @@ mod test {
 		};
 
 		assert_eq!(expected, PolicyFile::from_str(data).unwrap())
-	}
-
-	#[test]
-	fn test_config_to_policy() {
-		let config_path = pathbuf![&env::current_dir().unwrap(), "..", "config"];
-		let config = Config::load_from(&config_path).unwrap();
-		let test_cfg_path = pathbuf!["./config"];
-		let policy_file = config_to_policy(config, &test_cfg_path).unwrap();
-
-		let expected_path = pathbuf![
-			&env::current_dir().unwrap(),
-			"src",
-			"policy",
-			"test_example.kdl"
-		];
-
-		let expected = PolicyFile::load_from(&expected_path).unwrap();
-
-		assert_eq!(expected, policy_file)
 	}
 }

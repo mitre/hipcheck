@@ -3,12 +3,12 @@
 use crate::{
 	cache::plugin::HcPluginCache,
 	cli::{ConfigMode, Format},
-	config::{Config, unresolved_analysis_tree_from_policy},
+	config::unresolved_analysis_tree_from_policy,
 	engine::{HcPluginCore, PluginCore, start_plugins},
 	error::{Context as _, Error, Result},
 	exec::ExecConfig,
 	hc_error,
-	policy::{PolicyFile, config_to_policy},
+	policy::PolicyFile,
 	report::{Report, report_builder::build_report},
 	score::score_results,
 	shell::{Shell, spinner_phase::SpinnerPhase},
@@ -298,19 +298,14 @@ async fn setup_base_session(
 
 	use ConfigMode::*;
 	let config_msg = match config_mode {
-		PreferPolicy { policy, config } => match use_policy(policy, &mut session_builder) {
-			Err(err) => {
-				log::info!(
-					"Failed to load default policy KDL file; trying legacy config TOML directory instead. Error: {:#?}",
-					err
-				);
-
-				use_config(config, &mut session_builder)?
-			}
-			Ok(s) => s,
-		},
+		PreferPolicy { policy, config: _ } => use_policy(policy, &mut session_builder)?,
 		ForcePolicy { policy } => use_policy(policy, &mut session_builder)?,
-		ForceConfig { config } => use_config(config, &mut session_builder)?,
+		ForceConfig { config } => {
+			return Err(hc_error!(
+				"Legacy Config TOML directories are no longer supported: {}. Please provide a Policy KDL file with --policy.",
+				config.display()
+			));
+		}
 	};
 	Shell::print_config(config_msg);
 
@@ -372,23 +367,6 @@ async fn setup_base_session(
 	Ok(session_builder)
 }
 
-fn use_config(config_path: PathBuf, session_builder: &mut SessionBuilder) -> Result<String> {
-	let policy = load_config_and_data(&config_path)?;
-
-	let out = format!(
-		"using policy derived from config dir at {}",
-		config_path.display()
-	);
-
-	// Set config dir
-	session_builder
-		.set_config_dir(Some(config_path))
-		.set_policy(policy)
-		.set_policy_path(None);
-
-	Ok(out)
-}
-
 fn use_policy(policy_path: PathBuf, session_builder: &mut SessionBuilder) -> Result<String> {
 	let policy = load_policy_and_data(&policy_path)?;
 
@@ -400,28 +378,6 @@ fn use_policy(policy_path: PathBuf, session_builder: &mut SessionBuilder) -> Res
 		.set_policy(policy)
 		.set_policy_path(Some(policy_path));
 	Ok(out)
-}
-
-pub fn load_config_and_data(config_path: &Path) -> Result<PolicyFile> {
-	// Start the phase.
-	let phase = SpinnerPhase::start(
-		"loading configuration and data files from config file. Note: The use of a config TOML file is deprecated. Please consider using a policy KDL file in the future.",
-	);
-	// Increment the phase into the "running" stage.
-	phase.inc();
-	// Set the spinner phase to tick constantly, 10 times a second.
-	phase.enable_steady_tick(Duration::from_millis(100));
-
-	// Load the configuration file.
-	let config = Config::load_from(config_path)
-		.context("Failed to load configuration. If you have not yet done so on this system, try running `hc setup`. Otherwise, please make sure the config files are in the config directory.")?;
-
-	// Convert the Config struct to a PolicyFile struct
-	let policy = config_to_policy(config, config_path)?;
-
-	phase.finish_successful();
-
-	Ok(policy)
 }
 
 pub fn load_policy_and_data(policy_path: &Path) -> Result<PolicyFile> {
