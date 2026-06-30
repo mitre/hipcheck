@@ -9,6 +9,7 @@ pub fn ci(_args: &ArgMatches) -> Result<()> {
     let _dir = s.push_dir(workspace_path);
 
     cmd!(s, "cargo xtask lint").run()?;
+    cmd!(s, "cargo hakari generate --diff").run()?;
     cmd!(s, "cargo fmt --all --check").run()?;
     cmd!(s, "cargo clippy --locked --workspace -- -D warnings").run()?;
     cmd!(s, "cargo nextest r --locked --workspace --profile ci").run()?;
