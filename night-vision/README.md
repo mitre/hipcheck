@@ -108,8 +108,8 @@ named local Postgres volume. The setup script writes local secret files; the
 local Compose wrapper stages those files into a Docker-approved host mount
 directory before passing them to containers as Compose secrets. The default
 staging directory is `/Users/Shared/Docker/night-vision` on macOS and
-`C:\Users\Public\Docker\night-vision` on Windows. Set
-`DOCKER_SECRET_MOUNT_DIR` to override it.
+`C:\Users\Public\Docker\night-vision` on Windows, or `.secrets/docker` on
+native Linux. Set `DOCKER_SECRET_MOUNT_DIR` to override it.
 
 ```sh
 cp .env.local.example .env

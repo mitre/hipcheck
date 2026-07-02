@@ -186,6 +186,11 @@ if ! cmp -s "$tmp_dir/source-ca-file" "$DOCKER_SECRET_MOUNT_DIR/night-vision-loc
     error 'error: staged CA file should match the source secret file'
     exit 1
 fi
+assert_file_mode \
+    "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/postgres-password" 444
+assert_file_mode \
+    "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/nv-server-database-url" 444
+assert_file_mode "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/ca_file" 444
 pass_test
 
 start_test 'local Compose does not require CA file'

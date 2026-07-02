@@ -137,8 +137,7 @@ approved_mount_root() {
             if grep -qi microsoft /proc/version 2>/dev/null; then
                 printf '%s\n' /mnt/c/Users/Public/Docker/night-vision
             else
-                error 'error: set DOCKER_SECRET_MOUNT_DIR to a Docker-approved host mount path'
-                exit 1
+                printf '%s\n' "$repo_root/.secrets/docker"
             fi
             ;;
         *)
@@ -161,7 +160,7 @@ stage_secret_file() {
     fi
 
     install -d -m 700 "$(dirname "$target_path")"
-    install -m 600 "$source_path" "$target_path"
+    install -m 444 "$source_path" "$target_path"
 }
 
 yaml_single_quote() {
