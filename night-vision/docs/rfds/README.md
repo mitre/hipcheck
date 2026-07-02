@@ -8,3 +8,5 @@ implementation guidance.
 
 - [RFD 0001: MVP Upgrade Safety Assessments for BOD 26-04
   Support](./0001-mvp-upgrade-safety-assessments.md)
+- [RFD 0002: Use Hipcheck for Supply Chain
+  Analysis](./0002-use-hipcheck-for-supply-chain-analysis.md)
