@@ -70,6 +70,7 @@ windows-acls = { path = "windows-acls" }
 workspace-hack = { path = "workspace-hack" }
 xshell = "0.2.7"
 secrecy = "0.10.3"
+url = "2.5.7"
 
 [workspace.dependencies.tokio]
 

@@ -9,6 +9,9 @@ workspace = true
 
 [dependencies]
 anyhow.workspace = true
+camino.workspace = true
 clap.workspace = true
 nv-common.workspace = true
+secrecy.workspace = true
+url.workspace = true
 workspace-hack.workspace = true

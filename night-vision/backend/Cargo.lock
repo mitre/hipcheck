@@ -2124,8 +2124,11 @@ name = "nvdb"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "camino",
  "clap",
  "nv-common",
+ "secrecy",
+ "url",
  "workspace-hack",
 ]
 
