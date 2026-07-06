@@ -1,14 +1,13 @@
 //! Handles interactions with the database.
 
-use crate::error::FatalError;
+use crate::config::Config;
 use migration::{Migrator, MigratorTrait as _};
-use nv_common::config::Config;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use secrecy::ExposeSecret as _;
 use std::time::Duration;
 
 /// Connect to the database using the given configuration.
-pub async fn connection(config: &Config) -> Result<DatabaseConnection, FatalError> {
+pub async fn connection(config: &Config) -> Result<DatabaseConnection, DatabaseConnectionError> {
     let database_connection = config.database_connection();
     let mut opt = ConnectOptions::new(database_connection.expose_secret());
 
@@ -38,16 +37,40 @@ pub async fn connection(config: &Config) -> Result<DatabaseConnection, FatalErro
 
     let db = Database::connect(opt)
         .await
-        .map_err(FatalError::FailedToConnectToDatabase)?;
+        .map_err(DatabaseConnectionError::Connect)?;
 
     run_all_migrations(&db).await?;
 
     Ok(db)
 }
 
-pub async fn run_all_migrations(db: &DatabaseConnection) -> Result<(), FatalError> {
+pub async fn run_all_migrations(db: &DatabaseConnection) -> Result<(), DatabaseConnectionError> {
     Migrator::up(db, None)
         .await
-        .map_err(FatalError::FailedToConnectToDatabase)?;
+        .map_err(DatabaseConnectionError::Migrate)?;
     Ok(())
+}
+
+/// Failure to connect to or prepare the database.
+#[derive(Debug)]
+pub enum DatabaseConnectionError {
+    Connect(sea_orm::DbErr),
+    Migrate(sea_orm::DbErr),
+}
+
+impl std::fmt::Display for DatabaseConnectionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Connect(_) => write!(f, "failed to connect to database"),
+            Self::Migrate(_) => write!(f, "failed to run database migrations"),
+        }
+    }
+}
+
+impl std::error::Error for DatabaseConnectionError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Connect(err) | Self::Migrate(err) => Some(err),
+        }
+    }
 }

@@ -1,7 +1,10 @@
 //! Errors and error-handling helpers.
 
 use camino::Utf8PathBuf;
-use nv_common::error::{ConfigLoadError, ErrorSourceIterator as _};
+use nv_common::{
+    db::DatabaseConnectionError,
+    error::{ConfigLoadError, ErrorSourceIterator as _},
+};
 use std::{
     error::Error as _,
     fmt::{Debug, Display, Write as _},
@@ -12,7 +15,7 @@ pub enum FatalError {
     FailedToBuildDropshotServer(dropshot::ApiDescriptionBuildErrors),
     FailedToStartDropshotServer(dropshot::BuildError),
     FailedToBuildTokioRuntime(std::io::Error),
-    FailedToConnectToDatabase(sea_orm::DbErr),
+    FailedToConnectToDatabase(DatabaseConnectionError),
     FailedToInitializeLogger(std::io::Error),
     FailedToLoadConfig(ConfigLoadError),
     FailedToCreateOpenApiDescFile(Utf8PathBuf, std::io::Error),
@@ -90,5 +93,11 @@ impl std::error::Error for FatalError {
 impl From<ConfigLoadError> for FatalError {
     fn from(error: ConfigLoadError) -> Self {
         Self::FailedToLoadConfig(error)
+    }
+}
+
+impl From<DatabaseConnectionError> for FatalError {
+    fn from(error: DatabaseConnectionError) -> Self {
+        Self::FailedToConnectToDatabase(error)
     }
 }

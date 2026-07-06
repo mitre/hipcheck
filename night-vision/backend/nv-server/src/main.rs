@@ -2,7 +2,6 @@
 
 mod api;
 mod cli;
-mod db;
 mod env;
 mod error;
 mod log;

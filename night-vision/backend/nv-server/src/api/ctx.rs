@@ -13,7 +13,7 @@ pub struct ApiCtx {
 impl ApiCtx {
     /// Try to initialize the application context.
     pub async fn init(config: &Config) -> Result<Self, FatalError> {
-        let db = crate::db::connection(config).await?;
+        let db = nv_common::db::connection(config).await?;
         Ok(Self { db })
     }
 
