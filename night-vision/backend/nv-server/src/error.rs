@@ -2,8 +2,7 @@
 
 use camino::Utf8PathBuf;
 use nv_common::{
-    db::DatabaseConnectionError,
-    error::{ConfigLoadError, ErrorSourceIterator as _},
+    config::ConfigLoadError, db::DatabaseConnectionError, error::ErrorSourceIterator as _,
 };
 use std::{
     error::Error as _,
