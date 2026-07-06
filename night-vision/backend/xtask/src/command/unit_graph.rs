@@ -420,8 +420,8 @@ type UnitGraph = Graph<BuildUnit, ()>;
 /// deserialize them as strings here, since our only goal is to output them anyway, not to take
 /// action based on their implied structure.
 ///
-/// See: https://doc.rust-lang.org/cargo/reference/unstable.html#unit-graph
-/// See: https://github.com/rust-lang/cargo/blob/master/src/cargo/core/compiler/unit_graph.rs#L56
+/// See: <https://doc.rust-lang.org/cargo/reference/unstable.html#unit-graph>
+/// See: <https://github.com/rust-lang/cargo/blob/master/src/cargo/core/compiler/unit_graph.rs#L56>
 #[derive(Deserialize)]
 struct RawUnitGraph {
     units: Vec<BuildUnit>,
