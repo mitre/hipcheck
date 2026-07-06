@@ -5,6 +5,8 @@ use secrecy::ExposeSecret as _;
 use std::process::{Command, ExitCode};
 use url::Url;
 
+use destructive::DestructiveOperationToken;
+
 fn main() -> ExitCode {
     if let Err(e) = run() {
         eprintln!("{e}");
@@ -15,7 +17,39 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<()> {
-    let matches = clap::Command::new("nvdb")
+    let matches = command().get_matches();
+
+    if let Some(_matches) = matches.subcommand_matches("api") {
+        todo!("api subcommand not yet implemented")
+    }
+
+    let config_file = matches
+        .get_one::<Utf8PathBuf>("config")
+        .expect("config has a default value");
+    let config = Config::parse(config_file)?;
+
+    if let Some(db_matches) = matches.subcommand_matches("db") {
+        if let Some(_matches) = db_matches.subcommand_matches("schema") {
+            return print_database_schema(&config);
+        }
+
+        if let Some(migrate_matches) = db_matches.subcommand_matches("migrate") {
+            let token = DestructiveOperationToken::new(migrate_matches);
+            let args = migrate_matches
+                .get_many::<String>("args")
+                .into_iter()
+                .flatten()
+                .map(String::as_str);
+
+            return run_database_migrations(&config, token, args);
+        }
+    }
+
+    Ok(())
+}
+
+fn command() -> clap::Command {
+    clap::Command::new("nvdb")
         .about("Night Vision debugger")
         .arg_required_else_help(true)
         .arg(
@@ -37,28 +71,28 @@ fn run() -> Result<()> {
             clap::Command::new("db")
                 .about("Manage the database")
                 .arg_required_else_help(true)
+                .subcommand(clap::Command::new("schema").about("Print the current database schema"))
                 .subcommand(
-                    clap::Command::new("schema").about("Print the current database schema"),
+                    clap::Command::new("migrate")
+                        .about("Run database migrations")
+                        .arg(
+                            clap::Arg::new("destructive")
+                                .short('w')
+                                .long("destructive")
+                                .required(true)
+                                .action(clap::ArgAction::SetTrue)
+                                .help("Acknowledge this command may modify database state"),
+                        )
+                        .arg(
+                            clap::Arg::new("args")
+                                .value_name("ARGS")
+                                .num_args(0..)
+                                .allow_hyphen_values(true)
+                                .trailing_var_arg(true)
+                                .help("Arguments to pass to sea-orm-cli migrate"),
+                        ),
                 ),
         )
-        .get_matches();
-
-    if let Some(_matches) = matches.subcommand_matches("api") {
-        todo!("api subcommand not yet implemented")
-    }
-
-    if let Some(db_matches) = matches.subcommand_matches("db")
-        && let Some(_matches) = db_matches.subcommand_matches("schema")
-    {
-        let config_file = matches
-            .get_one::<Utf8PathBuf>("config")
-            .expect("config has a default value");
-        let config = Config::parse(config_file)?;
-
-        return print_database_schema(&config);
-    }
-
-    Ok(())
 }
 
 fn print_database_schema(config: &Config) -> Result<()> {
@@ -82,6 +116,58 @@ fn print_database_schema(config: &Config) -> Result<()> {
     print!("{}", String::from_utf8_lossy(&output.stdout));
 
     Ok(())
+}
+
+fn run_database_migrations<'a>(
+    config: &Config,
+    _token: DestructiveOperationToken,
+    args: impl IntoIterator<Item = &'a str>,
+) -> Result<()> {
+    let status = sea_orm_migrate_command(config, args)
+        .status()
+        .context("failed to run sea-orm-cli migrate")?;
+
+    if !status.success() {
+        bail!("sea-orm-cli migrate failed");
+    }
+
+    Ok(())
+}
+
+mod destructive {
+    #[must_use]
+    pub struct DestructiveOperationToken {
+        _private: (),
+    }
+
+    impl DestructiveOperationToken {
+        pub fn new(matches: &clap::ArgMatches) -> Self {
+            assert!(
+                matches.get_flag("destructive"),
+                "destructive operation token requires --destructive"
+            );
+            Self { _private: () }
+        }
+    }
+}
+
+fn sea_orm_migrate_command<'a>(
+    config: &Config,
+    args: impl IntoIterator<Item = &'a str>,
+) -> Command {
+    sea_orm_migrate_command_with_database_url(config.database_connection().expose_secret(), args)
+}
+
+fn sea_orm_migrate_command_with_database_url<'a>(
+    database_url: &str,
+    args: impl IntoIterator<Item = &'a str>,
+) -> Command {
+    let mut command = Command::new("sea-orm-cli");
+    command
+        .arg("migrate")
+        .args(args)
+        .env("DATABASE_URL", database_url);
+    command
 }
 
 struct PostgresConnection<'a> {
@@ -140,7 +226,8 @@ impl<'a> PostgresConnection<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::PostgresConnection;
+    use super::{PostgresConnection, command, sea_orm_migrate_command_with_database_url};
+    use clap::error::ErrorKind;
     use std::{collections::BTreeMap, ffi::OsStr, process::Command};
 
     #[test]
@@ -172,6 +259,64 @@ mod tests {
             !command
                 .get_args()
                 .any(|arg| arg == OsStr::new("postgres://user:password@localhost:5432/nv"))
+        );
+    }
+
+    #[test]
+    fn database_migrate_requires_destructive_flag() {
+        let error = command()
+            .try_get_matches_from(["nvdb", "db", "migrate", "up"])
+            .expect_err("missing destructive flag should fail");
+
+        assert_eq!(error.kind(), ErrorKind::MissingRequiredArgument);
+    }
+
+    #[test]
+    fn database_migrate_accepts_trailing_sea_orm_args() {
+        let matches = command()
+            .try_get_matches_from(["nvdb", "db", "migrate", "-w", "up", "-n", "2"])
+            .expect("migrate args should parse");
+        let db_matches = matches
+            .subcommand_matches("db")
+            .expect("db subcommand should be present");
+        let migrate_matches = db_matches
+            .subcommand_matches("migrate")
+            .expect("migrate subcommand should be present");
+        let args = migrate_matches
+            .get_many::<String>("args")
+            .expect("migrate args should be present")
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+
+        assert_eq!(args, ["up", "-n", "2"]);
+    }
+
+    #[test]
+    fn sea_orm_migrate_command_sets_database_url_and_forwards_args() {
+        let command = sea_orm_migrate_command_with_database_url(
+            "postgres://user:password@localhost:5432/nv",
+            ["up", "-n", "2"],
+        );
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        let env = command
+            .get_envs()
+            .filter_map(|(key, value)| {
+                value.map(|value| {
+                    (
+                        key.to_string_lossy().into_owned(),
+                        value.to_string_lossy().into_owned(),
+                    )
+                })
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        assert_eq!(args, ["migrate", "up", "-n", "2"]);
+        assert_eq!(
+            env.get("DATABASE_URL"),
+            Some(&"postgres://user:password@localhost:5432/nv".to_owned())
         );
     }
 }
