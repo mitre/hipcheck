@@ -1,6 +1,7 @@
 //! Interface for configuring and working with the Tokio async runtime.
 
-use crate::{config::Config, error::FatalError};
+use crate::error::FatalError;
+use nv_common::config::Config;
 use std::time::Duration;
 
 /// Our asynchronous runtime, which handled scheduling and execution of all async tasks.

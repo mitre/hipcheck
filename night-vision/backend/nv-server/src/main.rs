@@ -2,15 +2,11 @@
 
 mod api;
 mod cli;
-mod config;
 mod db;
 mod env;
 mod error;
 mod log;
 mod rt;
-mod secret;
-#[cfg(test)]
-mod test_util;
 
 /// Run the Night Vision server.
 fn main() -> Result<(), error::FatalError> {
@@ -18,7 +14,7 @@ fn main() -> Result<(), error::FatalError> {
     // If any of these fails, we bail out and report the error without starting the REST API server.
     let env = env::Env::load();
     let args = cli::Cli::args(&env);
-    let config = config::Config::parse(args.config_path())?;
+    let config = nv_common::config::Config::parse(args.config_path())?;
 
     if args.run_mode() == cli::RunMode::WriteOpenApi && config.openapi_dest_path.is_none() {
         return Err(error::FatalError::NoOpenApiDestPathInOpenApiMode());

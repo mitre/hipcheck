@@ -1,4 +1,5 @@
-use crate::{config::Config, error::FatalError};
+use crate::error::FatalError;
+use nv_common::config::Config;
 use sea_orm::DatabaseConnection;
 
 /// Shared app context, available to every endpoint handler.

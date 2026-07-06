@@ -2,7 +2,7 @@
 
 pub mod ctx;
 
-use crate::{api::ctx::ApiCtx, config::Config, env::Env, error::FatalError, log::logger};
+use crate::{api::ctx::ApiCtx, env::Env, error::FatalError, log::logger};
 use camino::{Utf8Path, Utf8PathBuf};
 // We'd prefer to use `jiff` over `chrono`, but `dropshot` depends on
 // an old version of `schemars` that doesn't support `jiff`. When we
@@ -12,6 +12,7 @@ use chrono::{TimeZone as _, Utc};
 use dropshot::{
     HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, ServerBuilder, TypedBody,
 };
+use nv_common::config::Config;
 use nv_server_api::{Health, NvServerApi, nv_server_api_mod::api_description};
 use nv_server_api::{
     PackageSource, PackageSourceEcosystem, PackageSourcePathParams, PackageSourceStatus,

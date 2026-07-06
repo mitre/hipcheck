@@ -1,0 +1,17 @@
+[package]
+name = "nv-common"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+camino.workspace = true
+dropshot.workspace = true
+itertools.workspace = true
+secrecy.workspace = true
+spookey.workspace = true
+windows-acls.workspace = true
+workspace-hack.workspace = true

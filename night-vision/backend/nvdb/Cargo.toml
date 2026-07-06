@@ -10,4 +10,5 @@ workspace = true
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+nv-common.workspace = true
 workspace-hack.workspace = true

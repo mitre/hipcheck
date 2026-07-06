@@ -7,6 +7,7 @@
 resolver = "3"
 members = [
     "migration",
+    "nv-common",
     "nv-server",
     "nv-server-api",
     "nvdb",
@@ -46,6 +47,7 @@ patharg = "0.4.1"
 pathbuf = "1.0.0"
 petgraph = "0.8.3"
 migration = { path = "migration" }
+nv-common = { path = "nv-common" }
 # NOTE that the version numbers of sea-orm components should match
 sea-orm = { version = "=2.0.0-rc.38", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
 sea-orm-migration = { version = "=2.0.0-rc.38", features = ["sqlx-postgres", "runtime-tokio-rustls"] }

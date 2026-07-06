@@ -3,6 +3,7 @@
 use crate::env::Env;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::ArgMatches;
+use nv_common::config::DEFAULT_CONFIG_FILE;
 
 #[derive(Debug)]
 pub struct Cli {
@@ -31,7 +32,7 @@ impl Cli {
                     .long("config")
                     .value_name("FILE")
                     .value_parser(clap::value_parser!(Utf8PathBuf))
-                    .default_value(crate::config::DEFAULT_CONFIG_FILE)
+                    .default_value(DEFAULT_CONFIG_FILE)
                     .help("Path to the configuration file"),
             )
             .arg(

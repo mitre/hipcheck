@@ -2075,6 +2075,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nv-common"
+version = "0.1.0"
+dependencies = [
+ "camino",
+ "dropshot",
+ "itertools",
+ "secrecy",
+ "spookey",
+ "windows-acls",
+ "workspace-hack",
+]
+
+[[package]]
 name = "nv-server"
 version = "0.1.0"
 dependencies = [
@@ -2084,15 +2097,14 @@ dependencies = [
  "dropshot",
  "itertools",
  "migration",
+ "nv-common",
  "nv-server-api",
  "sea-orm",
  "secrecy",
  "serde_json",
  "slog",
- "spookey",
  "tokio",
  "uuid",
- "windows-acls",
  "workspace-hack",
 ]
 
@@ -2114,6 +2126,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "nv-common",
  "workspace-hack",
 ]
 
@@ -4424,6 +4437,7 @@ dependencies = [
  "regex-syntax",
  "rustls",
  "rustls-webpki",
+ "schemars",
  "scopeguard",
  "serde",
  "serde_core",

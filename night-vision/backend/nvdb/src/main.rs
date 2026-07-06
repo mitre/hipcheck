@@ -1,4 +1,5 @@
 use anyhow::Result;
+use nv_common::config::DEFAULT_CONFIG_FILE;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -14,6 +15,15 @@ fn run() -> Result<()> {
     let matches = clap::Command::new("nvdb")
         .about("Night Vision debugger")
         .arg_required_else_help(true)
+        .arg(
+            clap::Arg::new("config")
+                .short('c')
+                .long("config")
+                .value_name("FILE")
+                .default_value(DEFAULT_CONFIG_FILE)
+                .global(true)
+                .help("Path to the configuration file"),
+        )
         .subcommand(
             clap::Command::new("api")
                 .about("Interact with the REST API")

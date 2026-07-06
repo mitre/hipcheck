@@ -1,7 +1,8 @@
 //! Handles interactions with the database.
 
-use crate::{config::Config, error::FatalError};
+use crate::error::FatalError;
 use migration::{Migrator, MigratorTrait as _};
+use nv_common::config::Config;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use secrecy::ExposeSecret as _;
 use std::time::Duration;

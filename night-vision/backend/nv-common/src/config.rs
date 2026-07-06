@@ -1,7 +1,7 @@
 //! Defines configuration for the Night Vision server.
 
 use crate::{
-    error::{ErrorSourceIterator as _, FatalError},
+    error::{ConfigLoadError, ErrorSourceIterator as _},
     secret::{SecretSource, SecretSourceKind},
 };
 use camino::{Utf8Path, Utf8PathBuf};
@@ -117,7 +117,7 @@ impl Config {
     /// Parsing will fail on unknown keys, or on keys that fail to parse. This is purposefully
     /// pretty strict; these are server configuration items, and a malformed key or value should
     /// be considered a configuration failure.
-    pub fn parse(path: &Utf8Path) -> Result<Self, FatalError> {
+    pub fn parse(path: &Utf8Path) -> Result<Self, ConfigLoadError> {
         let parsed = spookey::parse(
             spookey::ParseConfig {
                 // While we *do* require some form of database connection information, either via
@@ -146,10 +146,11 @@ impl Config {
                 ],
             },
             BufReader::new(
-                File::open(path).map_err(|e| FatalError::FailedToOpenConfigFile(path.into(), e))?,
+                File::open(path)
+                    .map_err(|e| ConfigLoadError::FailedToOpenConfigFile(path.into(), e))?,
             ),
         )
-        .map_err(|e| FatalError::FailedToParseConfigFile(path.into(), e))?;
+        .map_err(|e| ConfigLoadError::FailedToParseConfigFile(path.into(), e))?;
 
         // Construct the config object, parsing fields into the proper types and collecting errors.
         let mut errors = Vec::new();
@@ -227,10 +228,10 @@ impl Config {
     ///
     /// The `ConfigDropshot` type is the type that Dropshot expects for its own configuration,
     /// so we take the fields that apply to Dropshot and pull them out here.
-    pub fn dropshot_config(&self) -> Result<ConfigDropshot, FatalError> {
+    pub fn dropshot_config(&self) -> Result<ConfigDropshot, ConfigLoadError> {
         let mut config = ConfigDropshot {
             bind_address: self.server_address.parse().map_err(|e: AddrParseError| {
-                FatalError::FailedToParseConfigFileFields(
+                ConfigLoadError::FailedToParseConfigFileFields(
                     self.config_file_path.clone(),
                     ConfigErrors(vec![ConfigError::StrParse(StrParseError {
                         key: "server-address".to_owned().into_boxed_str(),
@@ -444,19 +445,19 @@ fn parse_database_connection_source(
 /// Resolve the database connection source, preserving file path context for startup errors.
 fn resolve_database_connection_source(
     source: SecretSource,
-) -> Result<(SecretSourceKind, SecretString), FatalError> {
+) -> Result<(SecretSourceKind, SecretString), ConfigLoadError> {
     source
         .resolve()
-        .map(super::secret::ResolvedSecret::into_parts)
-        .map_err(|err| FatalError::FailedToReadSecretFile(err.path, err.error))
+        .map(crate::secret::ResolvedSecret::into_parts)
+        .map_err(|err| ConfigLoadError::FailedToReadSecretFile(err.path, err.error))
 }
 
-/// Check collected warnings and field parsing errors, bundling them in a `FatalError` to report.
+/// Check collected warnings and field parsing errors, bundling them in a `ConfigLoadError` to report.
 fn check_errors(
     path: &Utf8Path,
     parsed_warnings: Vec<spookey::Warning>,
     value_parsing_errors: Vec<ConfigError>,
-) -> Result<(), FatalError> {
+) -> Result<(), ConfigLoadError> {
     if parsed_warnings.is_empty() && value_parsing_errors.is_empty() {
         return Ok(());
     }
@@ -471,7 +472,7 @@ fn check_errors(
         errors.push(error);
     }
 
-    Err(FatalError::FailedToParseConfigFileFields(
+    Err(ConfigLoadError::FailedToParseConfigFileFields(
         path.to_owned(),
         ConfigErrors(errors),
     ))
@@ -1023,7 +1024,8 @@ mod tests {
             let error =
                 Config::parse(file.path()).expect_err(&format!("{key} = {value} should fail"));
 
-            let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+            let ConfigLoadError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) =
+                error
             else {
                 panic!("expected FailedToParseConfigFileFields, got {error:?}");
             };
@@ -1053,7 +1055,7 @@ mod tests {
 
         let error = Config::parse(&path).expect_err("missing config file should fail");
 
-        let FatalError::FailedToOpenConfigFile(error_path, io_error) = error else {
+        let ConfigLoadError::FailedToOpenConfigFile(error_path, io_error) = error else {
             panic!("expected FailedToOpenConfigFile, got {error:?}");
         };
 
@@ -1068,7 +1070,8 @@ mod tests {
         let error =
             Config::parse(file.path()).expect_err("missing database connection should fail");
 
-        let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+        let ConfigLoadError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) =
+            error
         else {
             panic!("expected FailedToParseConfigFileFields, got {error:?}");
         };
@@ -1088,7 +1091,7 @@ mod tests {
 
         let error = Config::parse(file.path()).expect_err("missing required key should fail");
 
-        let FatalError::FailedToParseConfigFile(error_path, spookey_error) = error else {
+        let ConfigLoadError::FailedToParseConfigFile(error_path, spookey_error) = error else {
             panic!("expected FailedToParseConfigFile, got {error:?}");
         };
 
@@ -1109,7 +1112,8 @@ mod tests {
 
         let error = Config::parse(file.path()).expect_err("exclusive database sources should fail");
 
-        let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+        let ConfigLoadError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) =
+            error
         else {
             panic!("expected FailedToParseConfigFileFields, got {error:?}");
         };
@@ -1142,7 +1146,7 @@ mod tests {
 
         let error = Config::parse(file.path()).expect_err("insecure secret file should fail");
 
-        let FatalError::FailedToReadSecretFile(error_path, secret_error) = error else {
+        let ConfigLoadError::FailedToReadSecretFile(error_path, secret_error) = error else {
             panic!("expected FailedToReadSecretFile, got {error:?}");
         };
         assert_eq!(error_path, secret_file.path);
@@ -1166,7 +1170,7 @@ mod tests {
         let error =
             Config::parse(file.path()).expect_err("broadly-readable secret file should fail");
 
-        let FatalError::FailedToReadSecretFile(error_path, secret_error) = error else {
+        let ConfigLoadError::FailedToReadSecretFile(error_path, secret_error) = error else {
             panic!("expected FailedToReadSecretFile, got {error:?}");
         };
         assert_eq!(error_path, secret_file.path);
@@ -1187,7 +1191,8 @@ mod tests {
         let error =
             Config::parse(file.path()).expect_err("unexpected key should fail config parse");
 
-        let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+        let ConfigLoadError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) =
+            error
         else {
             panic!("expected FailedToParseConfigFileFields, got {error:?}");
         };
@@ -1214,7 +1219,8 @@ mod tests {
 
         let error = Config::parse(file.path()).expect_err("invalid typed value should fail");
 
-        let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+        let ConfigLoadError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) =
+            error
         else {
             panic!("expected FailedToParseConfigFileFields, got {error:?}");
         };
@@ -1239,7 +1245,8 @@ mod tests {
             .dropshot_config()
             .expect_err("invalid dropshot bind address should fail");
 
-        let FatalError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) = error
+        let ConfigLoadError::FailedToParseConfigFileFields(error_path, ConfigErrors(errors)) =
+            error
         else {
             panic!("expected FailedToParseConfigFileFields, got {error:?}");
         };
