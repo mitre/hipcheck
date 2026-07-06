@@ -2085,6 +2085,7 @@ dependencies = [
  "sea-orm",
  "secrecy",
  "spookey",
+ "tokio",
  "windows-acls",
  "workspace-hack",
 ]
@@ -2102,7 +2103,6 @@ dependencies = [
  "sea-orm",
  "serde_json",
  "slog",
- "tokio",
  "uuid",
  "workspace-hack",
 ]

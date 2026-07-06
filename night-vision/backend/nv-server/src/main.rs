@@ -5,7 +5,6 @@ mod cli;
 mod env;
 mod error;
 mod log;
-mod rt;
 
 /// Run the Night Vision server.
 fn main() -> Result<(), error::FatalError> {
@@ -19,7 +18,7 @@ fn main() -> Result<(), error::FatalError> {
         return Err(error::FatalError::NoOpenApiDestPathInOpenApiMode());
     }
 
-    let runtime = rt::AsyncRuntime::new(&config)?;
+    let runtime = nv_common::rt::AsyncRuntime::new(&config)?;
     let api = api::RestApi::new()?;
 
     if let Some(openapi_dest_path) = &config.openapi_dest_path {

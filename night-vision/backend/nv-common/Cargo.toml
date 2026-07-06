@@ -15,5 +15,6 @@ migration.workspace = true
 sea-orm.workspace = true
 secrecy.workspace = true
 spookey.workspace = true
+tokio.workspace = true
 windows-acls.workspace = true
 workspace-hack.workspace = true

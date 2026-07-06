@@ -1,7 +1,6 @@
 //! Interface for configuring and working with the Tokio async runtime.
 
-use crate::error::FatalError;
-use nv_common::config::Config;
+use crate::config::Config;
 use std::time::Duration;
 
 /// Our asynchronous runtime, which handled scheduling and execution of all async tasks.
@@ -11,7 +10,7 @@ pub struct AsyncRuntime(tokio::runtime::Runtime);
 
 impl AsyncRuntime {
     /// Construct a new async runtime using the given configuration.
-    pub fn new(config: &Config) -> Result<Self, FatalError> {
+    pub fn new(config: &Config) -> Result<Self, RuntimeBuildError> {
         let mut builder = tokio::runtime::Builder::new_multi_thread();
 
         // Make sure to turn on IO and timers, otherwise it won't run at all.
@@ -41,9 +40,7 @@ impl AsyncRuntime {
             builder.event_interval(event_interval);
         }
 
-        let runtime = builder
-            .build()
-            .map_err(FatalError::FailedToBuildTokioRuntime)?;
+        let runtime = builder.build().map_err(RuntimeBuildError)?;
 
         Ok(Self(runtime))
     }
@@ -54,5 +51,21 @@ impl AsyncRuntime {
         F: Future,
     {
         self.0.block_on(fut)
+    }
+}
+
+/// Failure to build the Tokio async runtime.
+#[derive(Debug)]
+pub struct RuntimeBuildError(std::io::Error);
+
+impl std::fmt::Display for RuntimeBuildError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "failed to build tokio runtime")
+    }
+}
+
+impl std::error::Error for RuntimeBuildError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
     }
 }

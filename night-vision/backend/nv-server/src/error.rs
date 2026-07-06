@@ -3,6 +3,7 @@
 use camino::Utf8PathBuf;
 use nv_common::{
     config::ConfigLoadError, db::DatabaseConnectionError, error::ErrorSourceIterator as _,
+    rt::RuntimeBuildError,
 };
 use std::{
     error::Error as _,
@@ -13,7 +14,7 @@ use std::{
 pub enum FatalError {
     FailedToBuildDropshotServer(dropshot::ApiDescriptionBuildErrors),
     FailedToStartDropshotServer(dropshot::BuildError),
-    FailedToBuildTokioRuntime(std::io::Error),
+    FailedToBuildTokioRuntime(RuntimeBuildError),
     FailedToConnectToDatabase(DatabaseConnectionError),
     FailedToInitializeLogger(std::io::Error),
     FailedToLoadConfig(ConfigLoadError),
@@ -98,5 +99,11 @@ impl From<ConfigLoadError> for FatalError {
 impl From<DatabaseConnectionError> for FatalError {
     fn from(error: DatabaseConnectionError) -> Self {
         Self::FailedToConnectToDatabase(error)
+    }
+}
+
+impl From<RuntimeBuildError> for FatalError {
+    fn from(error: RuntimeBuildError) -> Self {
+        Self::FailedToBuildTokioRuntime(error)
     }
 }
