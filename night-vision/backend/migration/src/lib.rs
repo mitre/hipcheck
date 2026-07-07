@@ -8,8 +8,10 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20260623_161612_initial_schema::Migration),
             Box::new(m20260706_000000_create_cisa_kev_tables::Migration),
+            Box::new(m20260707_000000_create_cve_list_tables::Migration),
         ]
     }
 }
 mod m20260623_161612_initial_schema;
 mod m20260706_000000_create_cisa_kev_tables;
+mod m20260707_000000_create_cve_list_tables;
