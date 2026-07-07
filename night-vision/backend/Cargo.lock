@@ -2440,6 +2440,7 @@ dependencies = [
  "node-semver",
  "percent-encoding",
  "proptest",
+ "reqwest",
  "sea-orm",
  "secrecy",
  "semver",
