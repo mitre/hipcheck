@@ -2148,6 +2148,7 @@ dependencies = [
  "nv-common",
  "sea-orm",
  "secrecy",
+ "serde_json",
  "url",
  "workspace-hack",
 ]
