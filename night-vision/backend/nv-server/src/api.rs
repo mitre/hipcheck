@@ -12,7 +12,13 @@ use chrono::{TimeZone as _, Utc};
 use dropshot::{
     HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, ServerBuilder, TypedBody,
 };
-use nv_common::config::Config;
+use nv_common::{
+    config::Config,
+    cve::{
+        git::GitCliCveListGit,
+        sync::{CveListSyncSummary, sync_cve_list_once},
+    },
+};
 use nv_server_api::{Health, NvServerApi, nv_server_api_mod::api_description};
 use nv_server_api::{
     PackageSource, PackageSourceEcosystem, PackageSourcePathParams, PackageSourceStatus,
@@ -20,7 +26,7 @@ use nv_server_api::{
     PostPackageSourceResponse, VersionedPackage,
 };
 use sea_orm::DatabaseConnection;
-use slog::Logger;
+use slog::{Logger, info};
 use std::fs::File;
 use uuid::Uuid;
 
@@ -45,6 +51,8 @@ impl RestApi {
     pub async fn serve(self, config: &Config, log: Logger) -> Result<(), FatalError> {
         let api = self.0;
         let ctx = ApiCtx::init(config).await?;
+        let log = logger(env)?;
+        sync_cve_list_on_startup(&ctx, config, &log).await?;
 
         ServerBuilder::new(api, ctx, log)
             .config(config.dropshot_config()?)
@@ -84,6 +92,49 @@ impl RestApi {
             .map_err(|e| FatalError::FailedToWriteOpenApiDescFile(path, e))?;
         Ok(())
     }
+}
+
+async fn sync_cve_list_on_startup(
+    ctx: &ApiCtx,
+    config: &Config,
+    log: &slog::Logger,
+) -> Result<(), FatalError> {
+    let git = GitCliCveListGit::new(
+        config.cve_list_checkout_path.clone(),
+        config.cve_list_repository_url.clone(),
+        config.cve_list_repository_ref.clone(),
+    );
+    let summary = sync_cve_list_once(
+        ctx.db(),
+        &git,
+        &config.cve_list_repository_url,
+        &config.cve_list_repository_ref,
+        config.cve_list_write_batch_size,
+    )
+    .await?;
+
+    log_cve_list_sync_summary(log, &summary);
+
+    Ok(())
+}
+
+fn log_cve_list_sync_summary(log: &slog::Logger, summary: &CveListSyncSummary) {
+    let commit_sha = summary
+        .commit_sha
+        .as_ref()
+        .map(|commit_sha| commit_sha.as_str())
+        .unwrap_or("<none>");
+
+    info!(
+        log,
+        "completed startup CVE List sync";
+        "generation" => summary.generation,
+        "status" => summary.status.to_string(),
+        "commit_sha" => commit_sha,
+        "records_seen" => summary.records_seen,
+        "records_inserted" => summary.records_inserted,
+        "records_updated" => summary.records_updated,
+    );
 }
 
 /// Create the path to store an OpenAPI Description.
