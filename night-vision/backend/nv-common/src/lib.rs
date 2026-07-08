@@ -8,6 +8,7 @@
 #![deny(unsafe_code)]
 
 pub mod config;
+pub mod cve;
 pub mod db;
 pub mod error;
 pub mod log;

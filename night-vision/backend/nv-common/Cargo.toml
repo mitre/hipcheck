@@ -8,6 +8,7 @@ publish = false
 workspace = true
 
 [dependencies]
+async-trait.workspace = true
 camino.workspace = true
 clap-verbosity-flag.workspace = true
 dropshot.workspace = true
@@ -20,5 +21,6 @@ slog-term.workspace = true
 slog-async.workspace = true
 spookey.workspace = true
 tokio.workspace = true
+url.workspace = true
 windows-acls.workspace = true
 workspace-hack.workspace = true

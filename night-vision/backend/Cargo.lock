@@ -2087,6 +2087,7 @@ dependencies = [
 name = "nv-common"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "camino",
  "clap-verbosity-flag",
  "dropshot",
@@ -2099,6 +2100,7 @@ dependencies = [
  "slog-term",
  "spookey",
  "tokio",
+ "url",
  "windows-acls",
  "workspace-hack",
 ]
