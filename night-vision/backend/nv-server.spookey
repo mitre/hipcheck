@@ -86,6 +86,11 @@ cve-list-sync-interval =
 # The local checkout path for the CVE List repository cache.
 cve-list-checkout-path = "target/cve-list/cvelistV5"
 
+# The maximum number of CVE List records to write in one database batch.
+#
+# Default: 500
+cve-list-write-batch-size =
+
 # The number of async worker threads to use for handling requests.
 #
 # Default: (the number of CPU cores available on the system)

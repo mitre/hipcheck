@@ -1,7 +1,7 @@
 //! Defines configuration for the Night Vision server.
 
 use crate::{
-    cve::git::GitRef,
+    cve::{git::GitRef, storage::DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE},
     error::ErrorSourceIterator as _,
     secret::{SecretFileError, SecretSource, SecretSourceKind},
 };
@@ -26,6 +26,7 @@ pub const DEFAULT_CONFIG_FILE: &str = "nv-server.spookey";
 const DEFAULT_CVE_LIST_REPOSITORY_URL: &str = "https://github.com/CVEProject/cvelistV5.git";
 const DEFAULT_CVE_LIST_REPOSITORY_REF: &str = "main";
 const DEFAULT_CVE_LIST_SYNC_INTERVAL: u64 = 420_000;
+const DEFAULT_CVE_LIST_WRITE_BATCH_SIZE: usize = DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE;
 
 /// Errors that can occur while loading configuration.
 pub enum ConfigLoadError {
@@ -183,6 +184,9 @@ pub struct Config {
 
     /// The local checkout path for the CVE List repository cache.
     pub cve_list_checkout_path: Utf8PathBuf,
+
+    /// The maximum number of CVE List records to write in one database batch.
+    pub cve_list_write_batch_size: usize,
 }
 
 impl Config {
@@ -223,6 +227,7 @@ impl Config {
                     "cve-list-repository-url",
                     "cve-list-repository-ref",
                     "cve-list-sync-interval",
+                    "cve-list-write-batch-size",
                 ],
             },
             BufReader::new(
@@ -282,6 +287,12 @@ impl Config {
         let cve_list_checkout_path: Utf8PathBuf =
             parse_value(&parsed, "cve-list-checkout-path", &mut errors)
                 .expect("cve-list-checkout-path is required");
+        let cve_list_write_batch_size = parse_positive_usize(
+            &parsed,
+            "cve-list-write-batch-size",
+            DEFAULT_CVE_LIST_WRITE_BATCH_SIZE,
+            &mut errors,
+        );
 
         check_errors(path, parsed.warnings, errors)?;
 
@@ -312,6 +323,7 @@ impl Config {
             cve_list_repository_ref,
             cve_list_sync_interval,
             cve_list_checkout_path,
+            cve_list_write_batch_size,
         };
 
         Ok(config)
@@ -460,8 +472,12 @@ impl Display for Config {
         write_report_line!(f, "cve-list-repository-url", &self.cve_list_repository_url)?;
         write_report_line!(f, "cve-list-repository-ref", &self.cve_list_repository_ref)?;
         write_report_line!(f, "cve-list-sync-interval", &self.cve_list_sync_interval)?;
-
         write_report_line!(f, "cve-list-checkout-path", &self.cve_list_checkout_path)?;
+        write_report_line!(
+            f,
+            "cve-list-write-batch-size",
+            &self.cve_list_write_batch_size
+        )?;
 
         write_report_separator!(f)?;
 
@@ -523,6 +539,29 @@ where
         (Some(_), Some(_)) => unreachable!(
             "spookey doesn't permit a single key to be in `required_keys` and `optional_keys`"
         ),
+    }
+}
+
+fn parse_positive_usize(
+    parsed: &spookey::ParseResult,
+    key: &'static str,
+    default: usize,
+    errors: &mut Vec<ConfigError>,
+) -> usize {
+    let Some(value) = parse_value::<usize>(parsed, key, errors) else {
+        return default;
+    };
+
+    if value == 0 {
+        errors.push(ConfigError::StrParse(StrParseError {
+            key: key.to_owned().into_boxed_str(),
+            value: value.to_string().into_boxed_str(),
+            err: "must be greater than 0".into(),
+        }));
+
+        default
+    } else {
+        value
     }
 }
 
@@ -1042,6 +1081,13 @@ mod tests {
                     );
                 },
             ),
+            ConfigFieldParseCase::new(
+                "cve_list_write_batch_size",
+                "cve-list-write-batch-size = 250",
+                |config, _| {
+                    assert_eq!(config.cve_list_write_batch_size, 250);
+                },
+            ),
         ];
 
         for case in cases {
@@ -1095,6 +1141,10 @@ mod tests {
         assert_eq!(
             config.cve_list_checkout_path,
             Utf8Path::new("/tmp/night-vision-test-cvelistV5")
+        );
+        assert_eq!(
+            config.cve_list_write_batch_size,
+            DEFAULT_CVE_LIST_WRITE_BATCH_SIZE
         );
     }
 
@@ -1189,6 +1239,7 @@ mod tests {
             ),
             ("cve-list-repository-ref", "bad..ref", "invalid Git ref"),
             ("cve-list-sync-interval", "rarely", "invalid digit"),
+            ("cve-list-write-batch-size", "0", "must be greater than 0"),
         ];
 
         for (key, value, expected_error) in cases {

@@ -16,6 +16,9 @@ use sea_orm::{
 use std::{collections::HashSet, fmt};
 use url::Url;
 
+/// Default number of CVE List records to write per database batch.
+pub const DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE: usize = 500;
+
 /// A CVE List sync-run status.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CveListSyncRunStatus {
@@ -91,6 +94,19 @@ pub async fn write_cve_list_records<C>(
 where
     C: ConnectionTrait,
 {
+    write_cve_list_records_with_batch_size(db, records, DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE)
+        .await
+}
+
+/// Upsert parsed CVE List records in batches and return insert/update counts.
+pub async fn write_cve_list_records_with_batch_size<C>(
+    db: &C,
+    records: &[ParsedCveListFile],
+    batch_size: usize,
+) -> Result<WriteCveListRecordsSummary, WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+{
     if records.is_empty() {
         return Ok(WriteCveListRecordsSummary {
             records_seen: 0,
@@ -99,15 +115,21 @@ where
         });
     }
 
+    if batch_size == 0 {
+        return Err(WriteCveListRecordsError::InvalidBatchSize);
+    }
+
     let cve_ids = collect_unique_cve_ids(records)?;
-    let existing_cve_ids = existing_cve_ids(db, &cve_ids).await?;
+    let existing_cve_ids = existing_cve_ids(db, &cve_ids, batch_size).await?;
     let records_updated = existing_cve_ids.len();
     let records_inserted = cve_ids
         .len()
         .checked_sub(records_updated)
         .expect("existing CVE IDs were selected from supplied CVE IDs");
 
-    upsert_cve_records(db, records).await?;
+    for chunk in records.chunks(batch_size) {
+        upsert_cve_records(db, chunk).await?;
+    }
 
     Ok(WriteCveListRecordsSummary {
         records_seen: records.len(),
@@ -259,19 +281,27 @@ fn collect_unique_cve_ids(
 async fn existing_cve_ids<C>(
     db: &C,
     cve_ids: &[String],
+    batch_size: usize,
 ) -> Result<HashSet<String>, WriteCveListRecordsError>
 where
     C: ConnectionTrait,
 {
-    cve_list_records::Entity::find()
-        .select_only()
-        .column(cve_list_records::Column::CveId)
-        .filter(cve_list_records::Column::CveId.is_in(cve_ids.iter().cloned()))
-        .into_tuple::<String>()
-        .all(db)
-        .await
-        .map(|ids| ids.into_iter().collect())
-        .map_err(WriteCveListRecordsError::Db)
+    let mut existing = HashSet::new();
+
+    for chunk in cve_ids.chunks(batch_size) {
+        existing.extend(
+            cve_list_records::Entity::find()
+                .select_only()
+                .column(cve_list_records::Column::CveId)
+                .filter(cve_list_records::Column::CveId.is_in(chunk.iter().cloned()))
+                .into_tuple::<String>()
+                .all(db)
+                .await
+                .map_err(WriteCveListRecordsError::Db)?,
+        );
+    }
+
+    Ok(existing)
 }
 
 async fn upsert_cve_records<C>(
@@ -320,6 +350,8 @@ pub enum WriteCveListRecordsError {
     Db(sea_orm::DbErr),
     /// The batch contained the same CVE ID more than once.
     DuplicateCveId(String),
+    /// The configured write batch size was zero.
+    InvalidBatchSize,
 }
 
 impl std::fmt::Display for WriteCveListRecordsError {
@@ -332,6 +364,7 @@ impl std::fmt::Display for WriteCveListRecordsError {
                     "CVE List record batch contains duplicate CVE ID {cve_id}"
                 )
             }
+            Self::InvalidBatchSize => write!(f, "CVE List write batch size must be greater than 0"),
         }
     }
 }
@@ -340,7 +373,7 @@ impl std::error::Error for WriteCveListRecordsError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Db(err) => Some(err),
-            Self::DuplicateCveId(_) => None,
+            Self::DuplicateCveId(_) | Self::InvalidBatchSize => None,
         }
     }
 }
@@ -446,6 +479,75 @@ mod tests {
                 records_updated: 1,
             }
         );
+    }
+
+    #[test]
+    fn write_cve_list_records_batches_large_writes() {
+        let batch_size = 2;
+        let record_count = batch_size + 1;
+        let records = (0..record_count)
+            .map(|index| parsed_file(&format!("CVE-2026-{}", 1000 + index)))
+            .collect::<Vec<_>>();
+        let existing_cve_id = format!("CVE-2026-{}", 1000 + batch_size);
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                Vec::<BTreeMap<String, Value>>::new(),
+                vec![mock_cve_id_row(&existing_cve_id)],
+            ])
+            .append_exec_results([
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: batch_size as u64,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+            ])
+            .into_connection();
+
+        let summary = run_async(write_cve_list_records_with_batch_size(
+            &db, &records, batch_size,
+        ))
+        .expect("write should succeed");
+
+        assert_eq!(
+            summary,
+            WriteCveListRecordsSummary {
+                records_seen: record_count,
+                records_inserted: record_count - 1,
+                records_updated: 1,
+            }
+        );
+
+        let transaction_log = db.into_transaction_log();
+        let select_count = transaction_log
+            .iter()
+            .filter(|entry| entry.statements()[0].sql.starts_with("SELECT"))
+            .count();
+        let upsert_count = transaction_log
+            .iter()
+            .filter(|entry| {
+                entry.statements()[0]
+                    .sql
+                    .contains(r#"INSERT INTO "public"."cve_list_records""#)
+            })
+            .count();
+
+        assert_eq!(select_count, 2);
+        assert_eq!(upsert_count, 2);
+    }
+
+    #[test]
+    fn write_cve_list_records_rejects_zero_batch_size() {
+        let records = vec![parsed_file("CVE-2026-1000")];
+        let db = MockDatabase::new(DbBackend::Postgres).into_connection();
+
+        let err = run_async(write_cve_list_records_with_batch_size(&db, &records, 0))
+            .expect_err("write should fail");
+
+        assert!(matches!(err, WriteCveListRecordsError::InvalidBatchSize));
+        assert!(db.into_transaction_log().is_empty());
     }
 
     #[test]
