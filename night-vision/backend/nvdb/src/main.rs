@@ -32,6 +32,10 @@ fn run() -> Result<()> {
             return cmd::db::schema::run(&config);
         }
 
+        if let Some(entity_matches) = db_matches.subcommand_matches("entity") {
+            return cmd::db::entity::run(&config, entity_matches);
+        }
+
         if let Some(migrate_matches) = db_matches.subcommand_matches("migrate") {
             return cmd::db::migrate::run(&config, migrate_matches);
         }
@@ -63,6 +67,7 @@ fn command() -> clap::Command {
             clap::Command::new("db")
                 .about("Manage the database")
                 .arg_required_else_help(true)
+                .subcommand(cmd::db::entity::command())
                 .subcommand(cmd::db::schema::command())
                 .subcommand(cmd::db::migrate::command()),
         )

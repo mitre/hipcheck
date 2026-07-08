@@ -1,5 +1,7 @@
 //! Handles interactions with the database.
 
+pub mod entities;
+
 use crate::config::Config;
 use migration::{Migrator, MigratorTrait as _};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
