@@ -11,6 +11,7 @@ workspace = true
 anyhow.workspace = true
 camino.workspace = true
 clap.workspace = true
+clap-verbosity-flag.workspace = true
 nv-common.workspace = true
 secrecy.workspace = true
 url.workspace = true

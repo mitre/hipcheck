@@ -1,10 +1,11 @@
 #![deny(unsafe_code)]
 
+use nv_common::log::logger;
+
 mod api;
 mod cli;
 mod env;
 mod error;
-mod log;
 
 /// Run the Night Vision server.
 fn main() -> Result<(), error::FatalError> {
@@ -12,6 +13,7 @@ fn main() -> Result<(), error::FatalError> {
     // If any of these fails, we bail out and report the error without starting the REST API server.
     let env = env::Env::load();
     let args = cli::Cli::args(&env);
+    let log = logger(args.verbosity_filter());
     let config = nv_common::config::Config::parse(args.config_path())?;
 
     if args.run_mode() == cli::RunMode::WriteOpenApi && config.openapi_dest_path.is_none() {
@@ -35,7 +37,7 @@ fn main() -> Result<(), error::FatalError> {
             // unless some catastrophic error is encountered which
             // causes the server to die.
             println!("{config}");
-            runtime.block_on(api.serve(&env, &config))?;
+            runtime.block_on(api.serve(&config, log))?;
         }
     }
 

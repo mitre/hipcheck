@@ -2,7 +2,7 @@
 
 pub mod ctx;
 
-use crate::{api::ctx::ApiCtx, env::Env, error::FatalError, log::logger};
+use crate::{api::ctx::ApiCtx, error::FatalError};
 use camino::{Utf8Path, Utf8PathBuf};
 // We'd prefer to use `jiff` over `chrono`, but `dropshot` depends on
 // an old version of `schemars` that doesn't support `jiff`. When we
@@ -20,6 +20,7 @@ use nv_server_api::{
     PostPackageSourceResponse, VersionedPackage,
 };
 use sea_orm::DatabaseConnection;
+use slog::Logger;
 use std::fs::File;
 use uuid::Uuid;
 
@@ -41,10 +42,9 @@ impl RestApi {
     ///
     /// Returns `FatalError` if the server encounters a problem that either blocks launching or
     /// causes the server to be unable to serve more requests.
-    pub async fn serve(self, env: &Env, config: &Config) -> Result<(), FatalError> {
+    pub async fn serve(self, config: &Config, log: Logger) -> Result<(), FatalError> {
         let api = self.0;
         let ctx = ApiCtx::init(config).await?;
-        let log = logger(env)?;
 
         ServerBuilder::new(api, ctx, log)
             .config(config.dropshot_config()?)

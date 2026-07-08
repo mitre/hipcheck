@@ -570,6 +570,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap-verbosity-flag"
+version = "3.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d92b1fab272fe943881b77cc6e920d6543e5b1bfadbd5ed81c7c5a755742394"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "clap_builder"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2079,11 +2088,15 @@ name = "nv-common"
 version = "0.1.0"
 dependencies = [
  "camino",
+ "clap-verbosity-flag",
  "dropshot",
  "itertools",
  "migration",
  "sea-orm",
  "secrecy",
+ "slog",
+ "slog-async",
+ "slog-term",
  "spookey",
  "tokio",
  "windows-acls",
@@ -2097,6 +2110,7 @@ dependencies = [
  "camino",
  "chrono",
  "clap",
+ "clap-verbosity-flag",
  "dropshot",
  "nv-common",
  "nv-server-api",
@@ -2126,6 +2140,7 @@ dependencies = [
  "anyhow",
  "camino",
  "clap",
+ "clap-verbosity-flag",
  "nv-common",
  "secrecy",
  "url",
@@ -4445,6 +4460,7 @@ dependencies = [
  "serde_core",
  "serde_json",
  "slab",
+ "slog",
  "smallvec",
  "syn 2.0.117",
  "thiserror",

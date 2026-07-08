@@ -15,6 +15,7 @@ camino.workspace = true
 # `jiff`.
 chrono.workspace = true
 clap.workspace = true
+clap-verbosity-flag.workspace = true
 dropshot.workspace = true
 nv-common.workspace = true
 nv-server-api.workspace = true

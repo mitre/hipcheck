@@ -1,6 +1,9 @@
 use anyhow::Result;
 use camino::Utf8PathBuf;
+use clap::{Args as _, FromArgMatches as _};
+use clap_verbosity_flag::{InfoLevel, Verbosity};
 use nv_common::config::{Config, DEFAULT_CONFIG_FILE};
+use nv_common::log::logger;
 use std::process::ExitCode;
 
 mod cmd;
@@ -17,6 +20,10 @@ fn main() -> ExitCode {
 
 fn run() -> Result<()> {
     let matches = command().get_matches();
+    let verbosity_filter = Verbosity::<InfoLevel>::from_arg_matches(&matches)
+        .expect("verbose and quiet args are always present and default to 0")
+        .filter();
+    let _log = logger(verbosity_filter);
 
     if let Some(_matches) = matches.subcommand_matches("api") {
         todo!("api subcommand not yet implemented")
@@ -45,7 +52,7 @@ fn run() -> Result<()> {
 }
 
 fn command() -> clap::Command {
-    clap::Command::new("nvdb")
+    let command = clap::Command::new("nvdb")
         .about("Night Vision debugger")
         .arg_required_else_help(true)
         .arg(
@@ -70,5 +77,6 @@ fn command() -> clap::Command {
                 .subcommand(cmd::db::entity::command())
                 .subcommand(cmd::db::schema::command())
                 .subcommand(cmd::db::migrate::command()),
-        )
+        );
+    Verbosity::<InfoLevel>::augment_args(command)
 }

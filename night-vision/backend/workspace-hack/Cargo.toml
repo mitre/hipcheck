@@ -47,6 +47,7 @@ serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_core = { version = "1", features = ["alloc", "rc"] }
 serde_json = { version = "1", features = ["raw_value"] }
 slab = { version = "0.4" }
+slog = { version = "2", features = ["dynamic-keys", "release_max_level_debug"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "serde"] }
 thiserror = { version = "2" }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing", "serde"] }
