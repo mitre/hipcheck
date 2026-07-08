@@ -56,6 +56,10 @@ services:
       - ALL
     tmpfs:
       - /tmp
+    volumes:
+      # The root filesystem stays read-only, but CVE List Git sync needs a
+      # persistent writable parent directory for its checkout path.
+      - nv-server-cache:/var/cache/night-vision
     secrets:
       - source: nv-server-database-url
         target: nv-server/database-url
@@ -104,6 +108,7 @@ services:
       - database
 
 volumes:
+  nv-server-cache:
   postgres-data:
 
 networks:

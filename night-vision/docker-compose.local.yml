@@ -21,6 +21,8 @@ services:
     pull_policy: missing
 
 volumes:
+  nv-server-cache:
+    name: night-vision-local-nv-server-cache
   postgres-data:
     name: night-vision-local-postgres-data
 

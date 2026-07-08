@@ -19,6 +19,8 @@ services:
     pull_policy: missing
 
 volumes:
+  nv-server-cache:
+    name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required}-nv-server-cache
   postgres-data:
     name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required}-postgres-data
 

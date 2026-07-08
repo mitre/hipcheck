@@ -104,9 +104,10 @@ and so neither does Flox. To use Flox on Windows, we recommend using WSL
 Local Compose uses `docker-compose.yml` plus `docker-compose.local.yml`. The
 local override builds `nv-app:local` and `nv-server:local`, binds the frontend
 to `127.0.0.1:3000`, binds the backend to `127.0.0.1:8080`, and uses a clearly
-named local Postgres volume. The setup script writes local secret files; the
-local Compose wrapper stages those files into a Docker-approved host mount
-directory before passing them to containers as Compose secrets. The default
+named local Postgres volume and CVE List cache volume. The setup script writes
+local secret files; the local Compose wrapper stages those files into a
+Docker-approved host mount directory before passing them to containers as
+Compose secrets. The default
 staging directory is `/Users/Shared/Docker/night-vision` on macOS and
 `C:\Users\Public\Docker\night-vision` on Windows, or `.secrets/docker` on
 native Linux. Set `DOCKER_SECRET_MOUNT_DIR` to override it.
