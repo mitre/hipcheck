@@ -2146,6 +2146,7 @@ dependencies = [
  "clap",
  "clap-verbosity-flag",
  "nv-common",
+ "sea-orm",
  "secrecy",
  "url",
  "workspace-hack",

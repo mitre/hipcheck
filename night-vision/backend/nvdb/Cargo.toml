@@ -13,6 +13,7 @@ camino.workspace = true
 clap.workspace = true
 clap-verbosity-flag.workspace = true
 nv-common.workspace = true
+sea-orm.workspace = true
 secrecy.workspace = true
 url.workspace = true
 workspace-hack.workspace = true
