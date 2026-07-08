@@ -4,3 +4,4 @@ pub mod git;
 pub mod record;
 pub mod repository;
 pub mod storage;
+pub mod sync;
