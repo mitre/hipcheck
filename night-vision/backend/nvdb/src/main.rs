@@ -48,6 +48,10 @@ fn run() -> Result<()> {
         }
     }
 
+    if let Some(cve_matches) = matches.subcommand_matches("cve") {
+        return cmd::cve::run(&config, cve_matches);
+    }
+
     Ok(())
 }
 
@@ -77,6 +81,8 @@ fn command() -> clap::Command {
                 .subcommand(cmd::db::entity::command())
                 .subcommand(cmd::db::schema::command())
                 .subcommand(cmd::db::migrate::command()),
-        );
+        )
+        .subcommand(cmd::cve::command());
+
     Verbosity::<InfoLevel>::augment_args(command)
 }
