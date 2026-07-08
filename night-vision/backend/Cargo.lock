@@ -2095,6 +2095,7 @@ dependencies = [
  "migration",
  "sea-orm",
  "secrecy",
+ "serde_json",
  "slog",
  "slog-async",
  "slog-term",

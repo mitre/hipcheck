@@ -19,6 +19,7 @@ secrecy.workspace = true
 slog.workspace = true
 slog-term.workspace = true
 slog-async.workspace = true
+serde_json.workspace = true
 spookey.workspace = true
 tokio.workspace = true
 url.workspace = true
