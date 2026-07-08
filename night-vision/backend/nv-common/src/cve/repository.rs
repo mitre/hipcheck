@@ -2,6 +2,7 @@
 
 use crate::cve::{
     git::{CommitSha, CveListGit, CveListGitError},
+    progress::{CveListSyncProgress, CveListSyncProgressReporter, NoopCveListSyncProgress},
     record::{CveRecordParseError, ParsedCveRecord, parse_cve_record},
 };
 use camino::Utf8PathBuf;
@@ -23,12 +24,26 @@ pub async fn parse_all_cve_files<G>(
 where
     G: CveListGit + Sync,
 {
+    parse_all_cve_files_with_progress(git, commit, &NoopCveListSyncProgress).await
+}
+
+/// Parse every CVE JSON record present at `commit`, reporting progress.
+pub async fn parse_all_cve_files_with_progress<G, P>(
+    git: &G,
+    commit: &CommitSha,
+    progress: &P,
+) -> Result<Vec<ParsedCveListFile>, CveListRepositoryError>
+where
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    progress.report(CveListSyncProgress::CveFileListStarted);
     let paths = git
         .all_cve_files(commit)
         .await
         .map_err(CveListRepositoryError::Git)?;
 
-    parse_cve_files(git, commit, paths).await
+    parse_cve_files(git, commit, paths, progress).await
 }
 
 /// Parse CVE JSON records that were added, modified, or renamed between commits.
@@ -40,22 +55,42 @@ pub async fn parse_changed_cve_files<G>(
 where
     G: CveListGit + Sync,
 {
+    parse_changed_cve_files_with_progress(git, old, new, &NoopCveListSyncProgress).await
+}
+
+/// Parse CVE JSON records added, modified, or renamed between commits, reporting progress.
+pub async fn parse_changed_cve_files_with_progress<G, P>(
+    git: &G,
+    old: &CommitSha,
+    new: &CommitSha,
+    progress: &P,
+) -> Result<Vec<ParsedCveListFile>, CveListRepositoryError>
+where
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    progress.report(CveListSyncProgress::CveFileListStarted);
     let paths = git
         .changed_cve_files(old, new)
         .await
         .map_err(CveListRepositoryError::Git)?;
 
-    parse_cve_files(git, new, paths).await
+    parse_cve_files(git, new, paths, progress).await
 }
 
-async fn parse_cve_files<G>(
+async fn parse_cve_files<G, P>(
     git: &G,
     commit: &CommitSha,
     paths: Vec<Utf8PathBuf>,
+    progress: &P,
 ) -> Result<Vec<ParsedCveListFile>, CveListRepositoryError>
 where
     G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
 {
+    let total = paths.len();
+    progress.report(CveListSyncProgress::CveFileListCompleted { records: total });
+
     let mut records = Vec::with_capacity(paths.len());
 
     for path in paths {
@@ -67,6 +102,10 @@ where
             .map_err(|err| CveListRepositoryError::Record(path.clone(), err))?;
 
         records.push(ParsedCveListFile { path, record });
+        progress.report(CveListSyncProgress::CveFileParsed {
+            parsed: records.len(),
+            total,
+        });
     }
 
     Ok(records)

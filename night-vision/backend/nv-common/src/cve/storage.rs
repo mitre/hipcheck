@@ -3,6 +3,7 @@
 use crate::{
     cve::{
         git::{CommitSha, CveListGitError, GitRef},
+        progress::{CveListSyncProgress, CveListSyncProgressReporter, NoopCveListSyncProgress},
         repository::ParsedCveListFile,
     },
     db::entities::{cve_list_records, cve_list_sync_runs},
@@ -107,6 +108,26 @@ pub async fn write_cve_list_records_with_batch_size<C>(
 where
     C: ConnectionTrait,
 {
+    write_cve_list_records_with_batch_size_and_progress(
+        db,
+        records,
+        batch_size,
+        &NoopCveListSyncProgress,
+    )
+    .await
+}
+
+/// Upsert parsed CVE List records in batches, reporting progress.
+pub async fn write_cve_list_records_with_batch_size_and_progress<C, P>(
+    db: &C,
+    records: &[ParsedCveListFile],
+    batch_size: usize,
+    progress: &P,
+) -> Result<WriteCveListRecordsSummary, WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+    P: CveListSyncProgressReporter + ?Sized,
+{
     if records.is_empty() {
         return Ok(WriteCveListRecordsSummary {
             records_seen: 0,
@@ -120,15 +141,30 @@ where
     }
 
     let cve_ids = collect_unique_cve_ids(records)?;
+    progress.report(CveListSyncProgress::ExistingRecordLookupStarted {
+        records: cve_ids.len(),
+    });
     let existing_cve_ids = existing_cve_ids(db, &cve_ids, batch_size).await?;
+    progress.report(CveListSyncProgress::ExistingRecordLookupCompleted {
+        records: existing_cve_ids.len(),
+    });
     let records_updated = existing_cve_ids.len();
     let records_inserted = cve_ids
         .len()
         .checked_sub(records_updated)
         .expect("existing CVE IDs were selected from supplied CVE IDs");
 
+    progress.report(CveListSyncProgress::RecordWriteStarted {
+        records: records.len(),
+    });
+    let mut written = 0;
     for chunk in records.chunks(batch_size) {
         upsert_cve_records(db, chunk).await?;
+        written += chunk.len();
+        progress.report(CveListSyncProgress::RecordWriteBatchCompleted {
+            written,
+            total: records.len(),
+        });
     }
 
     Ok(WriteCveListRecordsSummary {

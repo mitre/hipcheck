@@ -1,6 +1,7 @@
 //! CVE List ingestion support.
 
 pub mod git;
+pub mod progress;
 pub mod record;
 pub mod repository;
 pub mod storage;

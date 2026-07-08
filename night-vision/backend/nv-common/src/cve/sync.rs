@@ -2,11 +2,15 @@
 
 use crate::cve::{
     git::{CommitSha, CveListGit, CveListGitError, GitRef},
-    repository::{CveListRepositoryError, parse_all_cve_files, parse_changed_cve_files},
+    progress::{CveListSyncProgress, CveListSyncProgressReporter, NoopCveListSyncProgress},
+    repository::{
+        CveListRepositoryError, parse_all_cve_files_with_progress,
+        parse_changed_cve_files_with_progress,
+    },
     storage::{
         CveListSyncRunError, CveListSyncRunStatus, FinishCveListSyncRun, WriteCveListRecordsError,
         finish_cve_list_sync_run, last_successful_cve_list_sync_commit, start_cve_list_sync_run,
-        write_cve_list_records_with_batch_size,
+        write_cve_list_records_with_batch_size_and_progress,
     },
 };
 use sea_orm::ConnectionTrait;
@@ -41,12 +45,39 @@ where
     C: ConnectionTrait,
     G: CveListGit + Sync,
 {
+    sync_cve_list_once_with_progress(
+        db,
+        git,
+        repository_url,
+        repository_ref,
+        write_batch_size,
+        &NoopCveListSyncProgress,
+    )
+    .await
+}
+
+/// Sync CVE List records from Git into database storage once, reporting progress.
+pub async fn sync_cve_list_once_with_progress<C, G, P>(
+    db: &C,
+    git: &G,
+    repository_url: &Url,
+    repository_ref: &GitRef,
+    write_batch_size: usize,
+    progress: &P,
+) -> Result<CveListSyncSummary, CveListSyncError>
+where
+    C: ConnectionTrait,
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
     let generation = start_cve_list_sync_run(db, repository_url, repository_ref)
         .await
         .map_err(CveListSyncError::StartSyncRun)?;
+    progress.report(CveListSyncProgress::Started { generation });
     let mut resolved_commit = None;
 
-    let sync_result = run_cve_list_sync(db, git, write_batch_size, &mut resolved_commit).await;
+    let sync_result =
+        run_cve_list_sync(db, git, write_batch_size, &mut resolved_commit, progress).await;
 
     let completion = match sync_result {
         Ok(completion) => completion,
@@ -72,9 +103,11 @@ where
         }
     };
 
+    progress.report(CveListSyncProgress::FinishStarted);
     finish_cve_list_sync_run(db, generation, completion.clone())
         .await
         .map_err(CveListSyncError::FinishSyncRun)?;
+    progress.report(CveListSyncProgress::Finished);
 
     Ok(CveListSyncSummary {
         generation,
@@ -86,30 +119,37 @@ where
     })
 }
 
-async fn run_cve_list_sync<C, G>(
+async fn run_cve_list_sync<C, G, P>(
     db: &C,
     git: &G,
     write_batch_size: usize,
     resolved_commit: &mut Option<CommitSha>,
+    progress: &P,
 ) -> Result<FinishCveListSyncRun, CveListSyncError>
 where
     C: ConnectionTrait,
     G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
 {
+    progress.report(CveListSyncProgress::GitCheckoutStarted);
     git.ensure_checkout().await.map_err(CveListSyncError::Git)?;
+    progress.report(CveListSyncProgress::GitFetchStarted);
     git.fetch().await.map_err(CveListSyncError::Git)?;
 
+    progress.report(CveListSyncProgress::GitRefResolveStarted);
     let new_commit = git
         .resolve_ref("FETCH_HEAD")
         .await
         .map_err(CveListSyncError::Git)?;
     *resolved_commit = Some(new_commit.clone());
 
+    progress.report(CveListSyncProgress::PreviousSyncLookupStarted);
     let last_successful_commit = last_successful_cve_list_sync_commit(db)
         .await
         .map_err(CveListSyncError::SyncRunMetadata)?;
 
     if last_successful_commit.as_ref() == Some(&new_commit) {
+        progress.report(CveListSyncProgress::NotModified);
         return Ok(FinishCveListSyncRun {
             status: CveListSyncRunStatus::NotModified,
             commit_sha: Some(new_commit),
@@ -121,14 +161,21 @@ where
     }
 
     let records = match last_successful_commit {
-        Some(old_commit) => parse_changed_cve_files(git, &old_commit, &new_commit).await,
-        None => parse_all_cve_files(git, &new_commit).await,
+        Some(old_commit) => {
+            parse_changed_cve_files_with_progress(git, &old_commit, &new_commit, progress).await
+        }
+        None => parse_all_cve_files_with_progress(git, &new_commit, progress).await,
     }
     .map_err(CveListSyncError::Repository)?;
 
-    let write_summary = write_cve_list_records_with_batch_size(db, &records, write_batch_size)
-        .await
-        .map_err(CveListSyncError::Storage)?;
+    let write_summary = write_cve_list_records_with_batch_size_and_progress(
+        db,
+        &records,
+        write_batch_size,
+        progress,
+    )
+    .await
+    .map_err(CveListSyncError::Storage)?;
 
     Ok(FinishCveListSyncRun {
         status: CveListSyncRunStatus::Success,

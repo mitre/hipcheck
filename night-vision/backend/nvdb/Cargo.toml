@@ -12,6 +12,7 @@ anyhow.workspace = true
 camino.workspace = true
 clap.workspace = true
 clap-verbosity-flag.workspace = true
+indicatif.workspace = true
 nv-common.workspace = true
 sea-orm.workspace = true
 secrecy.workspace = true
