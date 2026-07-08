@@ -42,8 +42,8 @@ use analysis::AnalysisTreeNode;
 use async_channel::bounded;
 use async_stream::stream;
 use cli::{
-	CacheOp, CachePluginArgs, CacheTargetArgs, CheckArgs, Cli, FullCommands, PluginArgs,
-	PluginOp, ReadyArgs, SchemaArgs, SchemaCommand, UpdateArgs,
+	CacheOp, CachePluginArgs, CacheTargetArgs, CheckArgs, Cli, FullCommands, PluginArgs, PluginOp,
+	ReadyArgs, UpdateArgs,
 };
 use core::fmt;
 use engine::PluginCore;
@@ -98,7 +98,7 @@ fn main() -> ExitCode {
 				),
 			}
 		}
-		Some(FullCommands::Schema(args)) => cmd_schema(&args),
+		Some(FullCommands::Schema) => cmd_schema(),
 		Some(FullCommands::Setup) => return cmd_setup(&config),
 		Some(FullCommands::Ready(args)) => return cmd_ready(&args, &config),
 		Some(FullCommands::Update(args)) => cmd_update(&args),
@@ -195,13 +195,10 @@ async fn cmd_check(args: &mut CheckArgs, config: &Cli) -> ExitCode {
 }
 
 /// Run the `schema` command.
-fn cmd_schema(args: &SchemaArgs) {
-	match args.command {
-		SchemaCommand::Maven => print_maven_schema(),
-		SchemaCommand::Npm => print_npm_schema(),
-		SchemaCommand::Pypi => print_pypi_schema(),
-		SchemaCommand::Repo => print_report_schema(),
-	}
+fn cmd_schema() {
+	let schema = schema_for!(Report);
+	let report_text = serde_json::to_string_pretty(&schema).unwrap();
+	println!("{}", report_text);
 }
 
 fn cmd_print_weights(config: &Cli) -> Result<()> {
@@ -851,33 +848,6 @@ fn cmd_print_home(path: Option<&Path>) {
 			Shell::print_error(&err, Format::Human);
 		}
 	}
-}
-
-/// Print the JSON schema of the report.
-fn print_report_schema() {
-	let schema = schema_for!(Report);
-	let report_text = serde_json::to_string_pretty(&schema).unwrap();
-	println!("{}", report_text);
-}
-
-/// Print the JSON schema of the maven package
-fn print_maven_schema() {
-	print_missing()
-}
-
-/// Print the JSON schema of the npm package
-fn print_npm_schema() {
-	print_missing()
-}
-
-/// Print the JSON schema of the pypi package
-fn print_pypi_schema() {
-	print_missing()
-}
-
-/// Prints a message telling the user that this functionality has not been implemented yet
-fn print_missing() {
-	println!("This feature is not implemented yet.");
 }
 
 /// An `f64` that is never `NaN`.
