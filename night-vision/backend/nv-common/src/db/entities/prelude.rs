@@ -2,4 +2,6 @@
 
 pub use super::cisa_kev_entries::Entity as CisaKevEntries;
 pub use super::cisa_kev_sync_runs::Entity as CisaKevSyncRuns;
+pub use super::cve_list_records::Entity as CveListRecords;
+pub use super::cve_list_sync_runs::Entity as CveListSyncRuns;
 pub use super::package_sources::Entity as PackageSources;

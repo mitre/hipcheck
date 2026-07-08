@@ -4,4 +4,6 @@ pub mod prelude;
 
 pub mod cisa_kev_entries;
 pub mod cisa_kev_sync_runs;
+pub mod cve_list_records;
+pub mod cve_list_sync_runs;
 pub mod package_sources;
