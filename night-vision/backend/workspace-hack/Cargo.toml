@@ -27,22 +27,22 @@ deranged = { version = "0.5", features = ["powerfmt", "serde"] }
 either = { version = "1", features = ["serde", "use_std"] }
 form_urlencoded = { version = "1" }
 futures-channel = { version = "0.3", features = ["sink"] }
-futures-core = { version = "0.3" }
 futures-io = { version = "0.3" }
 futures-sink = { version = "0.3" }
 futures-util = { version = "0.3", default-features = false, features = ["async-await-macro", "channel", "io", "sink"] }
-getrandom = { version = "0.2", default-features = false, features = ["std"] }
 hashbrown = { version = "0.15" }
 indexmap = { version = "2", features = ["serde"] }
 memchr = { version = "2" }
 num-traits = { version = "0.2", default-features = false, features = ["i128", "std"] }
-percent-encoding = { version = "2" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
 regex-syntax = { version = "0.8" }
 rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "aws_lc_rs", "logging", "ring", "std", "tls12"] }
 rustls-webpki = { version = "0.103", default-features = false, features = ["aws-lc-rs", "ring", "std"] }
 schemars = { version = "0.8", features = ["chrono", "uuid1"] }
 scopeguard = { version = "1" }
+sea-orm = { version = "2.0.0-rc.38", features = ["mock", "runtime-tokio-rustls", "schema-sync", "sqlx-postgres"] }
+sea-query-sqlx = { version = "0.8.0-rc.15", default-features = false, features = ["postgres-array", "runtime-tokio-rustls", "sqlx-postgres", "with-chrono", "with-json", "with-rust_decimal", "with-time", "with-uuid"] }
+sea-schema = { version = "0.17.0-rc.17", default-features = false, features = ["discovery", "probe", "runtime-tokio-rustls", "sqlx-postgres", "writer"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_core = { version = "1", features = ["alloc", "rc"] }
 serde_json = { version = "1", features = ["raw_value"] }

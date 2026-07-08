@@ -16,6 +16,7 @@ use std::{
     io::BufReader,
     net::AddrParseError,
     str::FromStr,
+    time::Duration,
 };
 use url::Url;
 
@@ -189,6 +190,43 @@ pub struct Config {
     pub cve_list_write_batch_size: usize,
 }
 
+/// Runtime configuration for the CVE List worker.
+#[derive(Clone, Debug)]
+pub struct CveListWorkerConfig {
+    repository_url: Url,
+    repository_ref: GitRef,
+    sync_interval: Duration,
+    checkout_path: Utf8PathBuf,
+    write_batch_size: usize,
+}
+
+impl CveListWorkerConfig {
+    /// The Git repository URL to fetch CVE List data from.
+    pub fn repository_url(&self) -> &Url {
+        &self.repository_url
+    }
+
+    /// The Git repository ref to fetch CVE List data from.
+    pub fn repository_ref(&self) -> &GitRef {
+        &self.repository_ref
+    }
+
+    /// The interval between CVE List sync attempts.
+    pub fn sync_interval(&self) -> Duration {
+        self.sync_interval
+    }
+
+    /// The local checkout path for the CVE List repository cache.
+    pub fn checkout_path(&self) -> &Utf8Path {
+        &self.checkout_path
+    }
+
+    /// The maximum number of CVE List records to write in one database batch.
+    pub fn write_batch_size(&self) -> usize {
+        self.write_batch_size
+    }
+}
+
 impl Config {
     /// Parse configuration from a configuration file.
     ///
@@ -282,8 +320,12 @@ impl Config {
             .unwrap_or_else(default_cve_list_repository_url);
         let cve_list_repository_ref = parse_value(&parsed, "cve-list-repository-ref", &mut errors)
             .unwrap_or_else(default_cve_list_repository_ref);
-        let cve_list_sync_interval = parse_value(&parsed, "cve-list-sync-interval", &mut errors)
-            .unwrap_or(DEFAULT_CVE_LIST_SYNC_INTERVAL);
+        let cve_list_sync_interval = parse_positive_u64(
+            &parsed,
+            "cve-list-sync-interval",
+            DEFAULT_CVE_LIST_SYNC_INTERVAL,
+            &mut errors,
+        );
         let cve_list_checkout_path: Utf8PathBuf =
             parse_value(&parsed, "cve-list-checkout-path", &mut errors)
                 .expect("cve-list-checkout-path is required");
@@ -362,6 +404,17 @@ impl Config {
     /// Get the configured database connection string.
     pub fn database_connection(&self) -> &SecretString {
         &self.database_connection
+    }
+
+    /// Build runtime configuration for the CVE List worker.
+    pub fn cve_list_worker_config(&self) -> CveListWorkerConfig {
+        CveListWorkerConfig {
+            repository_url: self.cve_list_repository_url.clone(),
+            repository_ref: self.cve_list_repository_ref.clone(),
+            sync_interval: Duration::from_millis(self.cve_list_sync_interval),
+            checkout_path: self.cve_list_checkout_path.clone(),
+            write_batch_size: self.cve_list_write_batch_size,
+        }
     }
 }
 
@@ -549,6 +602,29 @@ fn parse_positive_usize(
     errors: &mut Vec<ConfigError>,
 ) -> usize {
     let Some(value) = parse_value::<usize>(parsed, key, errors) else {
+        return default;
+    };
+
+    if value == 0 {
+        errors.push(ConfigError::StrParse(StrParseError {
+            key: key.to_owned().into_boxed_str(),
+            value: value.to_string().into_boxed_str(),
+            err: "must be greater than 0".into(),
+        }));
+
+        default
+    } else {
+        value
+    }
+}
+
+fn parse_positive_u64(
+    parsed: &spookey::ParseResult,
+    key: &'static str,
+    default: u64,
+    errors: &mut Vec<ConfigError>,
+) -> u64 {
+    let Some(value) = parse_value::<u64>(parsed, key, errors) else {
         return default;
     };
 
@@ -1239,6 +1315,7 @@ mod tests {
             ),
             ("cve-list-repository-ref", "bad..ref", "invalid Git ref"),
             ("cve-list-sync-interval", "rarely", "invalid digit"),
+            ("cve-list-sync-interval", "0", "must be greater than 0"),
             ("cve-list-write-batch-size", "0", "must be greater than 0"),
         ];
 

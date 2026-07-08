@@ -22,5 +22,6 @@ nv-server-api.workspace = true
 sea-orm.workspace = true
 serde_json.workspace = true
 slog.workspace = true
+tokio.workspace = true
 uuid.workspace = true
 workspace-hack.workspace = true
