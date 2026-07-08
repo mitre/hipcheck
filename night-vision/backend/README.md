@@ -51,6 +51,23 @@ steps, see the
 For migration, entity-generation, local test database, rollback, and schema
 review workflows, see the [database workflow guide](migration/README.md).
 
+## Integration Tests
+
+Most backend tests run without external services. Postgres-backed integration
+tests are ignored by default. The checked-in integration-test configuration
+points to `postgres://localhost:5432/nv_integration_test`. The database name
+must contain `test` or `integration` because these tests can clear tables they
+own.
+
+From `backend/`, run:
+
+```sh
+cargo test -p nv-common cve::integration_tests -- --ignored
+```
+
+Set `NV_POSTGRES_INTEGRATION_CONFIG_PATH` to point at another server config file
+when your local Postgres setup needs different connection details.
+
 ## Secret Configuration
 
 `nv-server` supports database connection secrets through the server
