@@ -68,6 +68,24 @@ database-acquire-timeout =
 # Default: (no timeout)
 database-max-lifetime =
 
+# The Git repository URL for CVE List data.
+#
+# Default: https://github.com/CVEProject/cvelistV5.git
+cve-list-repository-url =
+
+# The Git repository ref for CVE List data.
+#
+# Default: main
+cve-list-repository-ref =
+
+# The interval in milliseconds between CVE List sync attempts.
+#
+# Default: 420000
+cve-list-sync-interval =
+
+# The local checkout path for the CVE List repository cache.
+cve-list-checkout-path = "target/cve-list/cvelistV5"
+
 # The number of async worker threads to use for handling requests.
 #
 # Default: (the number of CPU cores available on the system)

@@ -112,6 +112,20 @@ impl GitRef {
     }
 }
 
+impl std::fmt::Display for GitRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::str::FromStr for GitRef {
+    type Err = GitRefParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s)
+    }
+}
+
 fn is_valid_git_ref(value: &str) -> bool {
     if value.is_empty()
         || value == "@"

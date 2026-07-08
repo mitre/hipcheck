@@ -1,6 +1,7 @@
 //! Defines configuration for the Night Vision server.
 
 use crate::{
+    cve::git::GitRef,
     error::ErrorSourceIterator as _,
     secret::{SecretFileError, SecretSource, SecretSourceKind},
 };
@@ -16,10 +17,15 @@ use std::{
     net::AddrParseError,
     str::FromStr,
 };
+use url::Url;
 
 /// The default configuration file, relative to the root of the workspace. This is used by the CLI
 /// if `-c`/`--config` is not set.
 pub const DEFAULT_CONFIG_FILE: &str = "nv-server.spookey";
+
+const DEFAULT_CVE_LIST_REPOSITORY_URL: &str = "https://github.com/CVEProject/cvelistV5.git";
+const DEFAULT_CVE_LIST_REPOSITORY_REF: &str = "main";
+const DEFAULT_CVE_LIST_SYNC_INTERVAL: u64 = 420_000;
 
 /// Errors that can occur while loading configuration.
 pub enum ConfigLoadError {
@@ -165,6 +171,18 @@ pub struct Config {
     ///
     /// The default is 61 ticks.
     pub async_event_interval: Option<u32>,
+
+    /// The Git repository URL to fetch CVE List data from.
+    pub cve_list_repository_url: Url,
+
+    /// The Git repository ref to fetch CVE List data from.
+    pub cve_list_repository_ref: GitRef,
+
+    /// The interval in milliseconds between CVE List sync attempts.
+    pub cve_list_sync_interval: u64,
+
+    /// The local checkout path for the CVE List repository cache.
+    pub cve_list_checkout_path: Utf8PathBuf,
 }
 
 impl Config {
@@ -183,7 +201,7 @@ impl Config {
                 // `database-connection` or `database-connection-file`, they're both listed as
                 // optional here because we validate that only one of them is present after
                 // parsing with `spookey`.
-                required_keys: vec!["server-address"],
+                required_keys: vec!["server-address", "cve-list-checkout-path"],
                 optional_keys: vec![
                     "openapi-dest-path",
                     "http-request-body-max-bytes",
@@ -202,6 +220,9 @@ impl Config {
                     "async-blocking-thread-keep-alive",
                     "async-global-queue-interval",
                     "async-event-interval",
+                    "cve-list-repository-url",
+                    "cve-list-repository-ref",
+                    "cve-list-sync-interval",
                 ],
             },
             BufReader::new(
@@ -252,6 +273,15 @@ impl Config {
         let async_global_queue_interval =
             parse_value(&parsed, "async-global-queue-interval", &mut errors);
         let async_event_interval = parse_value(&parsed, "async-event-interval", &mut errors);
+        let cve_list_repository_url = parse_value(&parsed, "cve-list-repository-url", &mut errors)
+            .unwrap_or_else(default_cve_list_repository_url);
+        let cve_list_repository_ref = parse_value(&parsed, "cve-list-repository-ref", &mut errors)
+            .unwrap_or_else(default_cve_list_repository_ref);
+        let cve_list_sync_interval = parse_value(&parsed, "cve-list-sync-interval", &mut errors)
+            .unwrap_or(DEFAULT_CVE_LIST_SYNC_INTERVAL);
+        let cve_list_checkout_path: Utf8PathBuf =
+            parse_value(&parsed, "cve-list-checkout-path", &mut errors)
+                .expect("cve-list-checkout-path is required");
 
         check_errors(path, parsed.warnings, errors)?;
 
@@ -278,6 +308,10 @@ impl Config {
             async_blocking_thread_keep_alive,
             async_global_queue_interval,
             async_event_interval,
+            cve_list_repository_url,
+            cve_list_repository_ref,
+            cve_list_sync_interval,
+            cve_list_checkout_path,
         };
 
         Ok(config)
@@ -423,10 +457,25 @@ impl Display for Config {
             write_report_line!(f, "async-event-interval", &async_event_interval)?;
         }
 
+        write_report_line!(f, "cve-list-repository-url", &self.cve_list_repository_url)?;
+        write_report_line!(f, "cve-list-repository-ref", &self.cve_list_repository_ref)?;
+        write_report_line!(f, "cve-list-sync-interval", &self.cve_list_sync_interval)?;
+
+        write_report_line!(f, "cve-list-checkout-path", &self.cve_list_checkout_path)?;
+
         write_report_separator!(f)?;
 
         Ok(())
     }
+}
+
+fn default_cve_list_repository_url() -> Url {
+    Url::parse(DEFAULT_CVE_LIST_REPOSITORY_URL).expect("default CVE List repository URL is valid")
+}
+
+fn default_cve_list_repository_ref() -> GitRef {
+    GitRef::parse(DEFAULT_CVE_LIST_REPOSITORY_REF)
+        .expect("default CVE List repository ref is valid")
 }
 
 /// Parse a value from the config map, returning `None` if the value is unset.
@@ -784,6 +833,7 @@ mod tests {
             // We don't actually use sqlite; but we're not making real DB connections in these
             // tests, only validating that we can parse the config field correctly.
             "database-connection = sqlite::memory:",
+            "cve-list-checkout-path = /tmp/night-vision-test-cvelistV5",
         ]
         .join("\n")
     }
@@ -822,12 +872,17 @@ mod tests {
         }
 
         fn contents(&self) -> String {
-            [
+            let mut lines = vec![
                 format!("server-address = {}", self.server_address),
                 format!("database-connection = {}", self.database_connection),
-                self.extra_config.to_owned(),
-            ]
-            .join("\n")
+            ];
+
+            if !self.extra_config.contains("cve-list-checkout-path") {
+                lines.push("cve-list-checkout-path = /tmp/night-vision-test-cvelistV5".to_owned());
+            }
+
+            lines.push(self.extra_config.to_owned());
+            lines.join("\n")
         }
     }
 
@@ -953,6 +1008,40 @@ mod tests {
                     assert_eq!(config.async_event_interval, Some(61));
                 },
             ),
+            ConfigFieldParseCase::new(
+                "cve_list_repository_url",
+                "cve-list-repository-url = https://github.com/CVEProject/cvelistV5.git",
+                |config, _| {
+                    assert_eq!(
+                        config.cve_list_repository_url.as_str(),
+                        "https://github.com/CVEProject/cvelistV5.git"
+                    );
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "cve_list_repository_ref",
+                "cve-list-repository-ref = main",
+                |config, _| {
+                    assert_eq!(config.cve_list_repository_ref.as_str(), "main");
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "cve_list_sync_interval",
+                "cve-list-sync-interval = 900000",
+                |config, _| {
+                    assert_eq!(config.cve_list_sync_interval, 900_000);
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "cve_list_checkout_path",
+                "cve-list-checkout-path = /var/cache/night-vision/cvelistV5",
+                |config, _| {
+                    assert_eq!(
+                        config.cve_list_checkout_path,
+                        Utf8Path::new("/var/cache/night-vision/cvelistV5")
+                    );
+                },
+            ),
         ];
 
         for case in cases {
@@ -991,6 +1080,22 @@ mod tests {
             Some(EarlyDisconnectBehavior::Continue)
         ));
         assert_eq!(config.async_event_interval, Some(17));
+        assert_eq!(
+            config.cve_list_repository_url.as_str(),
+            DEFAULT_CVE_LIST_REPOSITORY_URL
+        );
+        assert_eq!(
+            config.cve_list_repository_ref.as_str(),
+            DEFAULT_CVE_LIST_REPOSITORY_REF
+        );
+        assert_eq!(
+            config.cve_list_sync_interval,
+            DEFAULT_CVE_LIST_SYNC_INTERVAL
+        );
+        assert_eq!(
+            config.cve_list_checkout_path,
+            Utf8Path::new("/tmp/night-vision-test-cvelistV5")
+        );
     }
 
     #[test]
@@ -999,6 +1104,7 @@ mod tests {
         restrict_secret_file_permissions(secret_file.path());
         let file = TempConfigFile::new(&format!(
             "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection-file = {}\n",
             secret_file.path()
         ));
@@ -1019,6 +1125,7 @@ mod tests {
     fn config_display_redacts_inline_database_connection() {
         let file = TempConfigFile::new(
             "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection = postgres://user:password@localhost:5432/nv\n",
         );
 
@@ -1036,6 +1143,7 @@ mod tests {
         restrict_secret_file_permissions(secret_file.path());
         let file = TempConfigFile::new(&format!(
             "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection-file = {}\n",
             secret_file.path()
         ));
@@ -1074,6 +1182,13 @@ mod tests {
             ),
             ("async-global-queue-interval", "sometimes", "invalid digit"),
             ("async-event-interval", "often", "invalid digit"),
+            (
+                "cve-list-repository-url",
+                "not-a-url",
+                "relative URL without a base",
+            ),
+            ("cve-list-repository-ref", "bad..ref", "invalid Git ref"),
+            ("cve-list-sync-interval", "rarely", "invalid digit"),
         ];
 
         for (key, value, expected_error) in cases {
@@ -1124,7 +1239,10 @@ mod tests {
 
     #[test]
     fn missing_database_connection_source_returns_config_field_error() {
-        let file = TempConfigFile::new("server-address = 127.0.0.1:0\n");
+        let file = TempConfigFile::new(
+            "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n",
+        );
 
         let error =
             Config::parse(file.path()).expect_err("missing database connection should fail");
@@ -1146,7 +1264,10 @@ mod tests {
 
     #[test]
     fn missing_required_key_returns_spookey_parse_error() {
-        let file = TempConfigFile::new("database-connection = sqlite::memory:\n");
+        let file = TempConfigFile::new(
+            "database-connection = sqlite::memory:\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n",
+        );
 
         let error = Config::parse(file.path()).expect_err("missing required key should fail");
 
@@ -1162,9 +1283,30 @@ mod tests {
     }
 
     #[test]
+    fn missing_cve_list_checkout_path_returns_spookey_parse_error() {
+        let file = TempConfigFile::new(
+            "server-address = 127.0.0.1:0\n\
+            database-connection = sqlite::memory:\n",
+        );
+
+        let error = Config::parse(file.path()).expect_err("missing checkout path should fail");
+
+        let ConfigLoadError::FailedToParseConfigFile(error_path, spookey_error) = error else {
+            panic!("expected FailedToParseConfigFile, got {error:?}");
+        };
+
+        assert_eq!(error_path, file.path);
+        let spookey::Error::MissingRequiredFields(fields) = spookey_error else {
+            panic!("expected MissingRequiredFields, got {spookey_error:?}");
+        };
+        assert_eq!(&*fields, &["cve-list-checkout-path"]);
+    }
+
+    #[test]
     fn mutually_exclusive_database_connection_sources_fail_config_parse() {
         let file = TempConfigFile::new(
             "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection = sqlite::memory:\n\
             database-connection-file = /run/secrets/nv-server/database-url\n",
         );
@@ -1199,6 +1341,7 @@ mod tests {
         );
         let file = TempConfigFile::new(&format!(
             "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection-file = {}\n",
             secret_file.path()
         ));
@@ -1222,6 +1365,7 @@ mod tests {
         let _grant_read = GrantReadAclGuard::new(secret_file.path());
         let file = TempConfigFile::new(&format!(
             "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection-file = {}\n",
             secret_file.path()
         ));
@@ -1261,7 +1405,7 @@ mod tests {
         let ConfigError::Warning(warning) = &errors[0] else {
             panic!("expected Warning config error, got {:?}", errors[0]);
         };
-        assert_eq!(warning.line_number, 3);
+        assert_eq!(warning.line_number, 4);
         let spookey::WarningKind::UnexpectedKey { key } = &warning.kind else {
             panic!("expected UnexpectedKey warning, got {warning:?}");
         };
