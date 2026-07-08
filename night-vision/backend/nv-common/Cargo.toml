@@ -25,3 +25,6 @@ tokio.workspace = true
 url.workspace = true
 windows-acls.workspace = true
 workspace-hack.workspace = true
+
+[dev-dependencies]
+sea-orm = { workspace = true, features = ["mock"] }
