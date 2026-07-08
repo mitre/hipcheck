@@ -392,7 +392,7 @@ fn hc_env_var_value_enum<E: ValueEnum>(name: &'static str) -> Option<E> {
 /// All commands, both subcommands and flag-like commands.
 pub enum FullCommands {
 	Check(CheckArgs),
-	Schema(SchemaArgs),
+	Schema,
 	Setup,
 	Ready(ReadyArgs),
 	Update(UpdateArgs),
@@ -409,7 +409,7 @@ impl From<&Commands> for FullCommands {
 	fn from(command: &Commands) -> Self {
 		match command {
 			Commands::Check(args) => FullCommands::Check(args.clone()),
-			Commands::Schema(args) => FullCommands::Schema(args.clone()),
+			Commands::Schema => FullCommands::Schema,
 			Commands::Setup => FullCommands::Setup,
 			Commands::Ready(args) => FullCommands::Ready(args.clone()),
 			Commands::Scoring => FullCommands::Scoring,
@@ -437,7 +437,7 @@ pub enum Commands {
 	/// Analyze a package, source repository, SBOM, or pull request.
 	Check(CheckArgs),
 	/// Print the JSON schema for output of a specific `check` command.
-	Schema(SchemaArgs),
+	Schema,
 	/// Initialize Hipcheck config file and script file locations.
 	Setup,
 	/// Check if Hipcheck is ready to run.
@@ -832,24 +832,6 @@ impl ToTargetSeedKind for CheckSbomArgs {
 			Err(hc_error!("The provided SBOM file does not exist"))
 		}
 	}
-}
-
-#[derive(Debug, Clone, clap::Args)]
-pub struct SchemaArgs {
-	#[clap(subcommand)]
-	pub command: SchemaCommand,
-}
-
-#[derive(Debug, Clone, clap::Subcommand)]
-pub enum SchemaCommand {
-	/// Print the JSON schema for running Hipcheck against a Maven package
-	Maven,
-	/// Print the JSON schema for running Hipcheck against a NPM package
-	Npm,
-	/// Print the JSON schema for running Hipcheck against a PyPI package
-	Pypi,
-	/// Print the JSON schema for running Hipcheck against a source repository
-	Repo,
 }
 
 #[derive(Debug, Clone, clap::Args)]
