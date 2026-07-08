@@ -25,6 +25,16 @@ pub trait CveListGit {
         old: &CommitSha,
         new: &CommitSha,
     ) -> Result<Vec<Utf8PathBuf>, CveListGitError>;
+
+    /// List every CVE JSON file present at a commit.
+    async fn all_cve_files(&self, commit: &CommitSha) -> Result<Vec<Utf8PathBuf>, CveListGitError>;
+
+    /// Read a file from the CVE List repository at a commit.
+    async fn read_file_at_commit(
+        &self,
+        commit: &CommitSha,
+        path: &Utf8Path,
+    ) -> Result<String, CveListGitError>;
 }
 
 /// A Git commit SHA.
@@ -288,6 +298,9 @@ impl CveListGit for GitCliCveListGit {
             .run_git_in_checkout([
                 OsStr::new("diff"),
                 OsStr::new("--name-only"),
+                // Deleted files are intentionally skipped here because there
+                // is no record content to ingest from the new commit.
+                OsStr::new("--diff-filter=AMR"),
                 OsStr::new(old.as_str()),
                 OsStr::new(new.as_str()),
                 OsStr::new("--"),
@@ -296,6 +309,32 @@ impl CveListGit for GitCliCveListGit {
             .await?;
 
         parse_changed_cve_files(&output)
+    }
+
+    async fn all_cve_files(&self, commit: &CommitSha) -> Result<Vec<Utf8PathBuf>, CveListGitError> {
+        let output = self
+            .run_git_in_checkout([
+                OsStr::new("ls-tree"),
+                OsStr::new("-r"),
+                OsStr::new("--name-only"),
+                OsStr::new(commit.as_str()),
+                OsStr::new("--"),
+                OsStr::new("cves/"),
+            ])
+            .await?;
+
+        parse_changed_cve_files(&output)
+    }
+
+    async fn read_file_at_commit(
+        &self,
+        commit: &CommitSha,
+        path: &Utf8Path,
+    ) -> Result<String, CveListGitError> {
+        let rev_path = format!("{}:{path}", commit.as_str());
+
+        self.run_git_in_checkout([OsStr::new("show"), OsStr::new(&rev_path)])
+            .await
     }
 }
 

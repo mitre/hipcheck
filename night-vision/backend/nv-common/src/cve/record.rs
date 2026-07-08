@@ -190,14 +190,14 @@ mod tests {
 
     #[test]
     fn parse_cve_record_rejects_malformed_json() {
-        let err = parse_cve_record(br#"{"#).expect_err("record should fail");
+        let err = parse_cve_record(b"{").expect_err("record should fail");
 
         assert!(matches!(err, CveRecordParseError::Json(_)));
     }
 
     #[test]
     fn parse_cve_record_rejects_non_object_roots() {
-        let err = parse_cve_record(br#"[]"#).expect_err("record should fail");
+        let err = parse_cve_record(b"[]").expect_err("record should fail");
 
         assert!(matches!(err, CveRecordParseError::RootNotObject));
     }
