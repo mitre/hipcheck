@@ -482,18 +482,9 @@ mod tests {
             .append_query_results([
                 vec![mock_generation_row(42)],
                 Vec::<BTreeMap<String, Value>>::new(),
-                Vec::<BTreeMap<String, Value>>::new(),
+                vec![mock_existing_count_row(0)],
             ])
-            .append_exec_results([
-                MockExecResult {
-                    last_insert_id: 0,
-                    rows_affected: 2,
-                },
-                MockExecResult {
-                    last_insert_id: 0,
-                    rows_affected: 1,
-                },
-            ])
+            .append_exec_results(mock_exec_results(5))
             .into_connection();
 
         let summary = run_async(sync_cve_list_once(
@@ -541,18 +532,9 @@ mod tests {
             .append_query_results([
                 vec![mock_generation_row(42)],
                 vec![mock_commit_sha_row(OLD_COMMIT_SHA)],
-                Vec::<BTreeMap<String, Value>>::new(),
+                vec![mock_existing_count_row(0)],
             ])
-            .append_exec_results([
-                MockExecResult {
-                    last_insert_id: 0,
-                    rows_affected: 1,
-                },
-                MockExecResult {
-                    last_insert_id: 0,
-                    rows_affected: 1,
-                },
-            ])
+            .append_exec_results(mock_exec_results(5))
             .into_connection();
 
         let summary = run_async(sync_cve_list_once(
@@ -668,6 +650,19 @@ mod tests {
 
     fn mock_commit_sha_row(commit_sha: &str) -> BTreeMap<String, Value> {
         BTreeMap::from([("commit_sha".to_owned(), commit_sha.to_owned().into())])
+    }
+
+    fn mock_existing_count_row(existing: i64) -> BTreeMap<String, Value> {
+        BTreeMap::from([("existing".to_owned(), existing.into())])
+    }
+
+    fn mock_exec_results(count: usize) -> Vec<MockExecResult> {
+        (0..count)
+            .map(|_| MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            })
+            .collect()
     }
 
     fn parsed_file_path(cve_id: &str) -> Utf8PathBuf {
