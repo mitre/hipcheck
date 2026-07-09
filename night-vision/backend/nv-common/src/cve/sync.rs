@@ -10,7 +10,6 @@ use crate::cve::{
     storage::{
         CveListSyncRunError, CveListSyncRunStatus, DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
         FinishCveListSyncRun, WriteCveListRecordsError, finish_cve_list_sync_run,
-        insert_new_cve_list_records_from_receiver_with_batch_size_and_progress,
         last_successful_cve_list_sync_commit, start_cve_list_sync_run,
         write_cve_list_records_from_receiver_with_batch_size_and_progress,
     },
@@ -319,7 +318,6 @@ where
         ));
     }
 
-    let first_run = last_successful_commit.is_none();
     let paths = match last_successful_commit {
         Some(old_commit) => {
             list_changed_cve_files_with_progress(git, &old_commit, &new_commit, progress).await
@@ -338,27 +336,13 @@ where
         pipeline_config.parse_concurrency,
         sender,
     );
-    let write_records = async {
-        if first_run {
-            insert_new_cve_list_records_from_receiver_with_batch_size_and_progress(
-                db,
-                receiver,
-                pipeline_config.write_batch_size,
-                total_records,
-                progress,
-            )
-            .await
-        } else {
-            write_cve_list_records_from_receiver_with_batch_size_and_progress(
-                db,
-                receiver,
-                pipeline_config.write_batch_size,
-                total_records,
-                progress,
-            )
-            .await
-        }
-    };
+    let write_records = write_cve_list_records_from_receiver_with_batch_size_and_progress(
+        db,
+        receiver,
+        pipeline_config.write_batch_size,
+        total_records,
+        progress,
+    );
     let (parse_result, write_result) = tokio::join!(parse_records, write_records);
     let write_summary = write_result.map_err(CveListSyncError::Storage)?;
     parse_result.map_err(CveListSyncError::Repository)?;
@@ -523,8 +507,9 @@ mod tests {
             .append_query_results([
                 vec![mock_generation_row(42)],
                 Vec::<BTreeMap<String, Value>>::new(),
+                vec![mock_existing_count_row(0)],
             ])
-            .append_exec_results(mock_exec_results(2))
+            .append_exec_results(mock_exec_results(5))
             .into_connection();
 
         let summary = run_async(sync_cve_list_once(
@@ -565,20 +550,60 @@ mod tests {
                 .sql
                 .contains(r#"INSERT INTO "public"."cve_list_records""#)
         }));
-        assert!(
-            transaction_log
-                .iter()
-                .all(|entry| !entry.statements()[0].sql.contains("ON CONFLICT"))
-        );
-        assert!(transaction_log.iter().all(|entry| {
-            !entry.statements()[0]
+        assert!(transaction_log.iter().any(|entry| {
+            entry.statements()[0]
+                .sql
+                .contains(r#"ON CONFLICT ("cve_id") DO UPDATE"#)
+        }));
+        assert!(transaction_log.iter().any(|entry| {
+            entry.statements()[0]
                 .sql
                 .contains("cve_list_records_staging")
         }));
-        assert!(
-            transaction_log
-                .iter()
-                .all(|entry| !entry.statements()[0].sql.contains("SELECT COUNT"))
+    }
+
+    #[test]
+    fn sync_cve_list_once_upserts_all_records_without_prior_success() {
+        let records = [
+            parsed_file_path("CVE-2026-1000"),
+            parsed_file_path("CVE-2026-1001"),
+        ];
+        let git = MockCveListGit {
+            all_paths: records.to_vec(),
+            files: HashMap::from([
+                (records[0].clone(), cve_record("CVE-2026-1000")),
+                (records[1].clone(), cve_record("CVE-2026-1001")),
+            ]),
+            ..Default::default()
+        };
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_generation_row(42)],
+                Vec::<BTreeMap<String, Value>>::new(),
+                vec![mock_existing_count_row(1)],
+            ])
+            .append_exec_results(mock_exec_results(5))
+            .into_connection();
+
+        let summary = run_async(sync_cve_list_once(
+            &db,
+            &git,
+            &repository_url(),
+            &repository_ref(),
+            500,
+        ))
+        .expect("sync should succeed");
+
+        assert_eq!(
+            summary,
+            CveListSyncSummary {
+                generation: 42,
+                status: CveListSyncRunStatus::Success,
+                commit_sha: Some(CommitSha::parse(NEW_COMMIT_SHA).expect("valid commit")),
+                records_seen: 2,
+                records_inserted: 1,
+                records_updated: 1,
+            }
         );
     }
 
