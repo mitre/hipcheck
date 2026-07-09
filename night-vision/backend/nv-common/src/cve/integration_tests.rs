@@ -204,9 +204,12 @@ async fn connect_to_integration_database() -> DatabaseConnection {
     let database_url = config.database_connection().expose_secret();
     assert_disposable_database_url(&database_url);
 
-    connection(&config)
-        .await
-        .expect("Postgres integration database should connect and migrate")
+    connection(&config).await.unwrap_or_else(|error| {
+        panic!(
+            "{}",
+            integration_database_connection_error(&config_path, database_url, &error)
+        )
+    })
 }
 
 fn integration_config_path() -> Utf8PathBuf {
@@ -232,6 +235,35 @@ fn assert_disposable_database_url(database_url: &str) {
         database.contains("test") || database.contains("integration"),
         "integration test database name must contain 'test' or 'integration'; got {database:?}"
     );
+}
+
+fn integration_database_connection_error(
+    config_path: &Utf8Path,
+    database_url: &str,
+    error: &dyn std::error::Error,
+) -> String {
+    let database = Url::parse(database_url)
+        .ok()
+        .map(|url| url.path().trim_start_matches('/').to_owned())
+        .filter(|database| !database.is_empty())
+        .unwrap_or_else(|| "<unknown>".to_owned());
+
+    format!(
+        "Postgres integration database should connect and migrate.\n\
+         \n\
+         Config path: {config_path}\n\
+         Database: {database}\n\
+         \n\
+         If the database does not exist, create it first:\n\
+         \n\
+             createdb {database}\n\
+         \n\
+         To use another disposable Postgres database, set {CONFIG_PATH_ENV} to a \
+         server config file with a database-connection value whose database name \
+         contains 'test' or 'integration'.\n\
+         \n\
+         Original error: {error:#}"
+    )
 }
 
 async fn clear_cve_list_tables(db: &DatabaseConnection) {
