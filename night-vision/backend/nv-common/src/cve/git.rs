@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
+use tokio::io::AsyncWriteExt as _;
 use tokio::process::Command;
 use url::Url;
 
@@ -35,6 +36,22 @@ pub trait CveListGit {
         commit: &CommitSha,
         path: &Utf8Path,
     ) -> Result<String, CveListGitError>;
+
+    /// Read files from the CVE List repository at a commit.
+    async fn read_files_at_commit(
+        &self,
+        commit: &CommitSha,
+        paths: &[Utf8PathBuf],
+    ) -> Result<Vec<(Utf8PathBuf, String)>, CveListGitError> {
+        let mut files = Vec::with_capacity(paths.len());
+
+        for path in paths {
+            let contents = self.read_file_at_commit(commit, path).await?;
+            files.push((path.clone(), contents));
+        }
+
+        Ok(files)
+    }
 }
 
 /// A Git commit SHA.
@@ -238,6 +255,24 @@ impl GitCliCveListGit {
 
         run_command(self.git_program.as_std_path(), git_args).await
     }
+
+    async fn run_git_in_checkout_with_stdin<I, S>(
+        &self,
+        args: I,
+        stdin: Vec<u8>,
+    ) -> Result<Vec<u8>, CveListGitError>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        let mut git_args = vec![
+            OsString::from("-C"),
+            OsString::from(self.checkout_dir.as_str()),
+        ];
+        git_args.extend(args.into_iter().map(|arg| arg.as_ref().to_owned()));
+
+        run_command_with_stdin(self.git_program.as_std_path(), git_args, stdin).await
+    }
 }
 
 #[async_trait]
@@ -331,10 +366,39 @@ impl CveListGit for GitCliCveListGit {
         commit: &CommitSha,
         path: &Utf8Path,
     ) -> Result<String, CveListGitError> {
-        let rev_path = format!("{}:{path}", commit.as_str());
+        let files = self
+            .read_files_at_commit(commit, &[path.to_owned()])
+            .await?;
 
-        self.run_git_in_checkout([OsStr::new("show"), OsStr::new(&rev_path)])
-            .await
+        Ok(files
+            .into_iter()
+            .next()
+            .expect("single path read returns one file")
+            .1)
+    }
+
+    async fn read_files_at_commit(
+        &self,
+        commit: &CommitSha,
+        paths: &[Utf8PathBuf],
+    ) -> Result<Vec<(Utf8PathBuf, String)>, CveListGitError> {
+        if paths.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut input = Vec::new();
+        for path in paths {
+            input.extend_from_slice(commit.as_str().as_bytes());
+            input.push(b':');
+            input.extend_from_slice(path.as_str().as_bytes());
+            input.push(b'\n');
+        }
+
+        let output = self
+            .run_git_in_checkout_with_stdin([OsStr::new("cat-file"), OsStr::new("--batch")], input)
+            .await?;
+
+        parse_cat_file_batch_output(paths, &output)
     }
 }
 
@@ -359,6 +423,120 @@ where
     }
 }
 
+async fn run_command_with_stdin<I, S>(
+    program: &Path,
+    args: I,
+    stdin: Vec<u8>,
+) -> Result<Vec<u8>, CveListGitError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let mut child = Command::new(program)
+        .args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(CveListGitError::RunGit)?;
+
+    let mut child_stdin = child.stdin.take().expect("stdin was piped");
+    let write_stdin = tokio::spawn(async move {
+        child_stdin.write_all(&stdin).await?;
+        drop(child_stdin);
+
+        Ok::<(), std::io::Error>(())
+    });
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(CveListGitError::RunGit)?;
+    let stdin_result = write_stdin
+        .await
+        .map_err(CveListGitError::GitStdinTask)?
+        .map_err(CveListGitError::GitStdin);
+
+    if output.status.success() {
+        stdin_result?;
+        Ok(output.stdout)
+    } else {
+        Err(CveListGitError::GitFailed {
+            status: output.status,
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+        })
+    }
+}
+
+fn parse_cat_file_batch_output(
+    paths: &[Utf8PathBuf],
+    output: &[u8],
+) -> Result<Vec<(Utf8PathBuf, String)>, CveListGitError> {
+    let mut files = Vec::with_capacity(paths.len());
+    let mut offset = 0;
+
+    for path in paths {
+        let header_end = output[offset..]
+            .iter()
+            .position(|byte| *byte == b'\n')
+            .map(|position| offset + position)
+            .ok_or_else(|| CveListGitError::CatFileTruncated(path.clone()))?;
+        let header = String::from_utf8(output[offset..header_end].to_vec())
+            .map_err(CveListGitError::GitStdoutUtf8)?;
+
+        if header.ends_with(" missing") {
+            return Err(CveListGitError::CatFileMissing(path.clone()));
+        }
+
+        let mut parts = header.split(' ');
+        let _object_id = parts
+            .next()
+            .ok_or_else(|| CveListGitError::InvalidCatFileHeader(path.clone(), header.clone()))?;
+        let object_type = parts
+            .next()
+            .ok_or_else(|| CveListGitError::InvalidCatFileHeader(path.clone(), header.clone()))?;
+        let size = parts
+            .next()
+            .ok_or_else(|| CveListGitError::InvalidCatFileHeader(path.clone(), header.clone()))?
+            .parse::<usize>()
+            .map_err(|_| CveListGitError::InvalidCatFileHeader(path.clone(), header.clone()))?;
+
+        if parts.next().is_some() {
+            return Err(CveListGitError::InvalidCatFileHeader(path.clone(), header));
+        }
+
+        if object_type != "blob" {
+            return Err(CveListGitError::UnexpectedCatFileObjectType {
+                path: path.clone(),
+                object_type: object_type.to_owned(),
+            });
+        }
+
+        let content_start = header_end + 1;
+        let content_end = content_start
+            .checked_add(size)
+            .ok_or_else(|| CveListGitError::CatFileTruncated(path.clone()))?;
+        let separator = content_end;
+        if output.len() <= separator {
+            return Err(CveListGitError::CatFileTruncated(path.clone()));
+        }
+        if output[separator] != b'\n' {
+            return Err(CveListGitError::InvalidCatFileSeparator(path.clone()));
+        }
+
+        let contents = String::from_utf8(output[content_start..content_end].to_vec())
+            .map_err(CveListGitError::GitStdoutUtf8)?;
+        files.push((path.clone(), contents));
+        offset = separator + 1;
+    }
+
+    if offset != output.len() {
+        return Err(CveListGitError::CatFileTrailingData);
+    }
+
+    Ok(files)
+}
+
 fn parse_changed_cve_files(output: &str) -> Result<Vec<Utf8PathBuf>, CveListGitError> {
     output
         .lines()
@@ -373,6 +551,12 @@ fn parse_changed_cve_files(output: &str) -> Result<Vec<Utf8PathBuf>, CveListGitE
 /// Failure while accessing the CVE List Git repository.
 #[derive(Debug)]
 pub enum CveListGitError {
+    /// Git cat-file returned a missing object response for a requested file.
+    CatFileMissing(Utf8PathBuf),
+    /// Git cat-file output ended before a requested file was fully decoded.
+    CatFileTruncated(Utf8PathBuf),
+    /// Git cat-file returned extra data after all requested files were decoded.
+    CatFileTrailingData,
     /// Failed to create the checkout parent directory.
     CreateCheckoutParent(Utf8PathBuf, std::io::Error),
     /// Git resolved a ref to empty output.
@@ -386,6 +570,14 @@ pub enum CveListGitError {
     },
     /// Git produced stdout that was not valid UTF-8.
     GitStdoutUtf8(std::string::FromUtf8Error),
+    /// Failed to write requests to git stdin.
+    GitStdin(std::io::Error),
+    /// Failed to join the task writing requests to git stdin.
+    GitStdinTask(tokio::task::JoinError),
+    /// Git cat-file returned an invalid object header.
+    InvalidCatFileHeader(Utf8PathBuf, String),
+    /// Git cat-file did not place a newline separator after object content.
+    InvalidCatFileSeparator(Utf8PathBuf),
     /// The checkout path already exists but is not a Git repository.
     InvalidCheckoutDir(Utf8PathBuf),
     /// Git resolved a ref to an invalid commit SHA.
@@ -394,17 +586,41 @@ pub enum CveListGitError {
     NonUtf8Path(String),
     /// Failed to run the Git command.
     RunGit(std::io::Error),
+    /// Git cat-file returned an object that was not a blob.
+    UnexpectedCatFileObjectType {
+        /// Requested path.
+        path: Utf8PathBuf,
+        /// Object type returned by Git.
+        object_type: String,
+    },
 }
 
 impl std::fmt::Display for CveListGitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::CatFileMissing(path) => {
+                write!(f, "git cat-file did not find CVE List file {path}")
+            }
+            Self::CatFileTruncated(path) => {
+                write!(f, "git cat-file output ended while reading {path}")
+            }
+            Self::CatFileTrailingData => {
+                write!(f, "git cat-file returned unexpected trailing data")
+            }
             Self::CreateCheckoutParent(path, _) => {
                 write!(f, "failed to create CVE List checkout parent {path}")
             }
             Self::EmptyCommitSha => write!(f, "git resolved an empty commit SHA"),
             Self::GitFailed { status, .. } => write!(f, "git command failed with {status}"),
             Self::GitStdoutUtf8(_) => write!(f, "git command stdout was not valid UTF-8"),
+            Self::GitStdin(_) => write!(f, "failed to write git command stdin"),
+            Self::GitStdinTask(_) => write!(f, "failed to join git stdin writer task"),
+            Self::InvalidCatFileHeader(path, _) => {
+                write!(f, "git cat-file returned an invalid header for {path}")
+            }
+            Self::InvalidCatFileSeparator(path) => {
+                write!(f, "git cat-file returned an invalid separator after {path}")
+            }
             Self::InvalidCheckoutDir(path) => {
                 write!(
                     f,
@@ -414,6 +630,9 @@ impl std::fmt::Display for CveListGitError {
             Self::InvalidCommitSha(sha) => write!(f, "git resolved an invalid commit SHA: {sha}"),
             Self::NonUtf8Path(path) => write!(f, "git returned a non-UTF-8 path: {path}"),
             Self::RunGit(_) => write!(f, "failed to run git command"),
+            Self::UnexpectedCatFileObjectType { path, object_type } => {
+                write!(f, "git cat-file returned {object_type} for {path}")
+            }
         }
     }
 }
@@ -421,9 +640,18 @@ impl std::fmt::Display for CveListGitError {
 impl std::error::Error for CveListGitError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::CreateCheckoutParent(_, err) | Self::RunGit(err) => Some(err),
+            Self::CreateCheckoutParent(_, err) | Self::RunGit(err) | Self::GitStdin(err) => {
+                Some(err)
+            }
+            Self::GitStdinTask(err) => Some(err),
             Self::GitStdoutUtf8(err) => Some(err),
-            Self::EmptyCommitSha
+            Self::CatFileMissing(_)
+            | Self::CatFileTrailingData
+            | Self::CatFileTruncated(_)
+            | Self::InvalidCatFileHeader(_, _)
+            | Self::InvalidCatFileSeparator(_)
+            | Self::UnexpectedCatFileObjectType { .. }
+            | Self::EmptyCommitSha
             | Self::GitFailed { .. }
             | Self::InvalidCheckoutDir(_)
             | Self::InvalidCommitSha(_)
@@ -532,5 +760,67 @@ mod tests {
             files,
             vec![Utf8PathBuf::from("cves/2024/1xxx/CVE-2024-1000.json")]
         );
+    }
+
+    #[test]
+    fn parse_cat_file_batch_output_reads_requested_blobs() {
+        let paths = vec![
+            Utf8PathBuf::from("cves/2025/1xxx/CVE-2025-1000.json"),
+            Utf8PathBuf::from("cves/2026/1xxx/CVE-2026-1000.json"),
+        ];
+        let first = br#"{"cveMetadata":{"cveId":"CVE-2025-1000"}}"#;
+        let second = br#"{"cveMetadata":{"cveId":"CVE-2026-1000"}}"#;
+        let output = cat_file_output([(first.as_slice(), "blob"), (second.as_slice(), "blob")]);
+
+        let files =
+            parse_cat_file_batch_output(&paths, &output).expect("cat-file output should parse");
+
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[0].0, paths[0]);
+        assert_eq!(files[0].1.as_bytes(), first);
+        assert_eq!(files[1].0, paths[1]);
+        assert_eq!(files[1].1.as_bytes(), second);
+    }
+
+    #[test]
+    fn parse_cat_file_batch_output_rejects_missing_objects() {
+        let path = Utf8PathBuf::from("cves/2025/1xxx/CVE-2025-1000.json");
+        let output = b"0123456789abcdef0123456789abcdef01234567 missing\n";
+
+        let err = parse_cat_file_batch_output(std::slice::from_ref(&path), output)
+            .expect_err("missing object should fail");
+
+        assert!(matches!(err, CveListGitError::CatFileMissing(error_path) if error_path == path));
+    }
+
+    #[test]
+    fn parse_cat_file_batch_output_rejects_non_blob_objects() {
+        let path = Utf8PathBuf::from("cves/2025/1xxx/CVE-2025-1000.json");
+        let output = cat_file_output([(b"tree-content".as_slice(), "tree")]);
+
+        let err = parse_cat_file_batch_output(std::slice::from_ref(&path), &output)
+            .expect_err("non-blob object should fail");
+
+        assert!(matches!(
+            err,
+            CveListGitError::UnexpectedCatFileObjectType { path: error_path, object_type }
+                if error_path == path && object_type == "tree"
+        ));
+    }
+
+    fn cat_file_output<const N: usize>(objects: [(&[u8], &str); N]) -> Vec<u8> {
+        let mut output = Vec::new();
+
+        for (contents, object_type) in objects {
+            output.extend_from_slice(b"0123456789abcdef0123456789abcdef01234567 ");
+            output.extend_from_slice(object_type.as_bytes());
+            output.push(b' ');
+            output.extend_from_slice(contents.len().to_string().as_bytes());
+            output.push(b'\n');
+            output.extend_from_slice(contents);
+            output.push(b'\n');
+        }
+
+        output
     }
 }

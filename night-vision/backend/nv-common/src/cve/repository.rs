@@ -167,13 +167,13 @@ where
 
     let total = paths.len();
     progress.report(CveListSyncProgress::CveFileListCompleted { records: total });
+    let files = git
+        .read_files_at_commit(commit, &paths)
+        .await
+        .map_err(CveListRepositoryError::Git)?;
 
-    let mut parsed_files = stream::iter(paths.into_iter().enumerate())
-        .map(|(index, path)| async move {
-            let contents = git
-                .read_file_at_commit(commit, &path)
-                .await
-                .map_err(CveListRepositoryError::Git)?;
+    let mut parsed_files = stream::iter(files.into_iter().enumerate())
+        .map(|(index, (path, contents))| async move {
             let record_path = path.clone();
             let task_path = path.clone();
             let record = tokio::task::spawn_blocking(move || parse_cve_record(contents.as_bytes()))
@@ -217,13 +217,13 @@ where
 
     let total = paths.len();
     progress.report(CveListSyncProgress::CveFileListCompleted { records: total });
+    let files = git
+        .read_files_at_commit(commit, &paths)
+        .await
+        .map_err(CveListRepositoryError::Git)?;
 
-    let mut parsed_files = stream::iter(paths)
-        .map(|path| async move {
-            let contents = git
-                .read_file_at_commit(commit, &path)
-                .await
-                .map_err(CveListRepositoryError::Git)?;
+    let mut parsed_files = stream::iter(files)
+        .map(|(path, contents)| async move {
             let record_path = path.clone();
             let task_path = path.clone();
             let record = tokio::task::spawn_blocking(move || parse_cve_record(contents.as_bytes()))
