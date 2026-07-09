@@ -239,6 +239,63 @@ where
     Ok(summary)
 }
 
+/// Insert new parsed CVE List records from a channel in batches, reporting progress.
+///
+/// This is intended for true first-run imports where CVE List storage is empty.
+/// It avoids staging-table merge work and fails on database uniqueness conflicts
+/// rather than converting them into updates.
+pub async fn insert_new_cve_list_records_from_receiver_with_batch_size_and_progress<C, P>(
+    db: &C,
+    mut records: mpsc::Receiver<ParsedCveListFile>,
+    batch_size: usize,
+    total_records: usize,
+    progress: &P,
+) -> Result<WriteCveListRecordsSummary, WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    if batch_size == 0 {
+        return Err(WriteCveListRecordsError::InvalidBatchSize);
+    }
+
+    let mut seen = HashSet::new();
+    let mut batch = Vec::with_capacity(batch_size);
+    let mut summary = WriteCveListRecordsSummary {
+        records_seen: 0,
+        records_inserted: 0,
+        records_updated: 0,
+    };
+    let mut write_started = false;
+
+    while let Some(record) = records.recv().await {
+        if !write_started {
+            progress.report(CveListSyncProgress::RecordWriteStarted {
+                records: total_records,
+            });
+            write_started = true;
+        }
+
+        let cve_id = record.record.cve_id.as_str().to_owned();
+        if !seen.insert(cve_id.clone()) {
+            return Err(WriteCveListRecordsError::DuplicateCveId(cve_id));
+        }
+
+        batch.push(record);
+        if batch.len() == batch_size {
+            insert_new_cve_list_record_batch(db, &batch, total_records, &mut summary, progress)
+                .await?;
+            batch.clear();
+        }
+    }
+
+    if !batch.is_empty() {
+        insert_new_cve_list_record_batch(db, &batch, total_records, &mut summary, progress).await?;
+    }
+
+    Ok(summary)
+}
+
 /// Create a running CVE List sync run.
 pub async fn start_cve_list_sync_run<C>(
     db: &C,
@@ -433,6 +490,68 @@ where
     });
 
     Ok(())
+}
+
+async fn insert_new_cve_list_record_batch<C, P>(
+    db: &C,
+    records: &[ParsedCveListFile],
+    total_records: usize,
+    summary: &mut WriteCveListRecordsSummary,
+    progress: &P,
+) -> Result<(), WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    insert_cve_list_record_batch(db, records).await?;
+
+    summary.records_seen = summary
+        .records_seen
+        .checked_add(records.len())
+        .expect("seen record count cannot exceed streamed record count");
+    summary.records_inserted = summary
+        .records_inserted
+        .checked_add(records.len())
+        .expect("inserted record count cannot exceed streamed record count");
+
+    progress.report(CveListSyncProgress::RecordWriteBatchCompleted {
+        written: summary.records_seen,
+        total: total_records,
+    });
+
+    Ok(())
+}
+
+async fn insert_cve_list_record_batch<C>(
+    db: &C,
+    records: &[ParsedCveListFile],
+) -> Result<(), WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+{
+    let mut insert = Query::insert();
+    insert
+        .into_table((CveListSchema::Public, CveListRecords::Table))
+        .columns([
+            CveListRecords::CveId,
+            CveListRecords::RecordFormatVersion,
+            CveListRecords::Record,
+        ]);
+
+    for record in records {
+        insert
+            .values([
+                Expr::val(record.record.cve_id.as_str().to_owned()),
+                Expr::val(record.record.record_format_version.as_str().to_owned()),
+                Expr::val(record.record.record.clone()),
+            ])
+            .map_err(|err| WriteCveListRecordsError::QueryBuild(err.to_string()))?;
+    }
+
+    db.execute(&insert)
+        .await
+        .map(|_| ())
+        .map_err(WriteCveListRecordsError::Db)
 }
 
 async fn prepare_cve_list_record_staging_table<C>(db: &C) -> Result<(), WriteCveListRecordsError>
@@ -892,6 +1011,72 @@ mod tests {
                 records_inserted: 2,
                 records_updated: 1,
             }
+        );
+    }
+
+    #[test]
+    fn insert_new_cve_list_records_from_receiver_batches_streamed_inserts() {
+        let batch_size = 2;
+        let records = vec![
+            parsed_file("CVE-2026-1000"),
+            parsed_file("CVE-2026-1001"),
+            parsed_file("CVE-2026-1002"),
+        ];
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results(mock_exec_results(2))
+            .into_connection();
+
+        let summary = run_async(async {
+            let (sender, receiver) = mpsc::channel(records.len());
+            for record in records {
+                sender.send(record).await.expect("receiver should be open");
+            }
+            drop(sender);
+
+            insert_new_cve_list_records_from_receiver_with_batch_size_and_progress(
+                &db,
+                receiver,
+                batch_size,
+                3,
+                &NoopCveListSyncProgress,
+            )
+            .await
+        })
+        .expect("write should succeed");
+
+        assert_eq!(
+            summary,
+            WriteCveListRecordsSummary {
+                records_seen: 3,
+                records_inserted: 3,
+                records_updated: 0,
+            }
+        );
+
+        let transaction_log = db.into_transaction_log();
+        let insert_count = transaction_log
+            .iter()
+            .filter(|entry| {
+                entry.statements()[0]
+                    .sql
+                    .contains(r#"INSERT INTO "public"."cve_list_records""#)
+            })
+            .count();
+        assert_eq!(insert_count, 2);
+        assert!(
+            transaction_log
+                .iter()
+                .all(|entry| !entry.statements()[0].sql.contains("ON CONFLICT"))
+        );
+        assert!(transaction_log.iter().all(|entry| {
+            !entry.statements()[0]
+                .sql
+                .contains("cve_list_records_staging")
+        }));
+        assert!(
+            transaction_log
+                .iter()
+                .all(|entry| !entry.statements()[0].sql.contains("SELECT COUNT"))
         );
     }
 

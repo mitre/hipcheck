@@ -10,6 +10,7 @@ use crate::cve::{
     storage::{
         CveListSyncRunError, CveListSyncRunStatus, DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
         FinishCveListSyncRun, WriteCveListRecordsError, finish_cve_list_sync_run,
+        insert_new_cve_list_records_from_receiver_with_batch_size_and_progress,
         last_successful_cve_list_sync_commit, start_cve_list_sync_run,
         write_cve_list_records_from_receiver_with_batch_size_and_progress,
     },
@@ -318,6 +319,7 @@ where
         ));
     }
 
+    let first_run = last_successful_commit.is_none();
     let paths = match last_successful_commit {
         Some(old_commit) => {
             list_changed_cve_files_with_progress(git, &old_commit, &new_commit, progress).await
@@ -336,13 +338,27 @@ where
         pipeline_config.parse_concurrency,
         sender,
     );
-    let write_records = write_cve_list_records_from_receiver_with_batch_size_and_progress(
-        db,
-        receiver,
-        pipeline_config.write_batch_size,
-        total_records,
-        progress,
-    );
+    let write_records = async {
+        if first_run {
+            insert_new_cve_list_records_from_receiver_with_batch_size_and_progress(
+                db,
+                receiver,
+                pipeline_config.write_batch_size,
+                total_records,
+                progress,
+            )
+            .await
+        } else {
+            write_cve_list_records_from_receiver_with_batch_size_and_progress(
+                db,
+                receiver,
+                pipeline_config.write_batch_size,
+                total_records,
+                progress,
+            )
+            .await
+        }
+    };
     let (parse_result, write_result) = tokio::join!(parse_records, write_records);
     let write_summary = write_result.map_err(CveListSyncError::Storage)?;
     parse_result.map_err(CveListSyncError::Repository)?;
@@ -507,9 +523,8 @@ mod tests {
             .append_query_results([
                 vec![mock_generation_row(42)],
                 Vec::<BTreeMap<String, Value>>::new(),
-                vec![mock_existing_count_row(0)],
             ])
-            .append_exec_results(mock_exec_results(5))
+            .append_exec_results(mock_exec_results(2))
             .into_connection();
 
         let summary = run_async(sync_cve_list_once(
@@ -542,6 +557,28 @@ mod tests {
                 "read_file",
                 "read_file",
             ]
+        );
+
+        let transaction_log = db.into_transaction_log();
+        assert!(transaction_log.iter().any(|entry| {
+            entry.statements()[0]
+                .sql
+                .contains(r#"INSERT INTO "public"."cve_list_records""#)
+        }));
+        assert!(
+            transaction_log
+                .iter()
+                .all(|entry| !entry.statements()[0].sql.contains("ON CONFLICT"))
+        );
+        assert!(transaction_log.iter().all(|entry| {
+            !entry.statements()[0]
+                .sql
+                .contains("cve_list_records_staging")
+        }));
+        assert!(
+            transaction_log
+                .iter()
+                .all(|entry| !entry.statements()[0].sql.contains("SELECT COUNT"))
         );
     }
 
