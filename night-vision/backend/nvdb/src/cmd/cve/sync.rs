@@ -1,5 +1,5 @@
 use anyhow::{Context as _, Result};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use nv_common::{
     config::Config,
     cve::{
@@ -63,33 +63,64 @@ async fn sync(config: &Config, _token: DestructiveOperationToken) -> Result<()> 
 }
 
 struct CveSyncProgressBar {
-    bar: ProgressBar,
+    multi: MultiProgress,
+    status_bar: ProgressBar,
+    parse_bar: ProgressBar,
+    write_bar: ProgressBar,
 }
 
 impl CveSyncProgressBar {
     fn new() -> Self {
-        let bar = ProgressBar::new_spinner();
-        bar.set_style(spinner_style());
-        bar.enable_steady_tick(Duration::from_millis(100));
+        let multi = MultiProgress::new();
+        let status_bar = multi.add(ProgressBar::new_spinner());
+        status_bar.set_style(spinner_style());
+        status_bar.enable_steady_tick(Duration::from_millis(100));
 
-        Self { bar }
+        let parse_bar = multi.add(ProgressBar::new(0));
+        parse_bar.set_style(bar_style());
+        parse_bar.set_message("parsing CVE records");
+
+        let write_bar = multi.add(ProgressBar::new(0));
+        write_bar.set_style(bar_style());
+        write_bar.set_message("writing CVE records");
+
+        Self {
+            multi,
+            status_bar,
+            parse_bar,
+            write_bar,
+        }
     }
 
     fn finish(&self) {
-        self.bar.finish_and_clear();
+        let _ = self.multi.clear();
     }
 
     fn set_spinner_message(&self, message: &'static str) {
-        self.bar.set_style(spinner_style());
-        self.bar.enable_steady_tick(Duration::from_millis(100));
-        self.bar.set_message(message);
+        self.status_bar.set_style(spinner_style());
+        self.status_bar
+            .enable_steady_tick(Duration::from_millis(100));
+        self.status_bar.set_message(message);
     }
 
-    fn set_bar(&self, len: usize, message: &'static str) {
-        self.bar.set_style(bar_style());
-        self.bar.set_length(len as u64);
-        self.bar.set_position(0);
-        self.bar.set_message(message);
+    fn reset_parse_bar(&self, len: usize) {
+        self.parse_bar.set_length(len as u64);
+        self.parse_bar.set_position(0);
+    }
+
+    fn set_parse_position(&self, parsed: usize, total: usize) {
+        self.parse_bar.set_length(total as u64);
+        self.parse_bar.set_position(parsed as u64);
+    }
+
+    fn reset_write_bar(&self, len: usize) {
+        self.write_bar.set_length(len as u64);
+        self.write_bar.set_position(0);
+    }
+
+    fn set_write_position(&self, written: usize, total: usize) {
+        self.write_bar.set_length(total as u64);
+        self.write_bar.set_position(written as u64);
     }
 }
 
@@ -97,7 +128,7 @@ impl CveListSyncProgressReporter for CveSyncProgressBar {
     fn report(&self, progress: CveListSyncProgress) {
         match progress {
             CveListSyncProgress::Started { generation } => {
-                self.bar
+                self.status_bar
                     .set_message(format!("started CVE List sync run {generation}"));
             }
             CveListSyncProgress::GitCheckoutStarted => {
@@ -116,11 +147,10 @@ impl CveListSyncProgressReporter for CveSyncProgressBar {
                 self.set_spinner_message("listing CVE records");
             }
             CveListSyncProgress::CveFileListCompleted { records } => {
-                self.set_bar(records, "parsing CVE records");
+                self.reset_parse_bar(records);
             }
             CveListSyncProgress::CveFileParsed { parsed, total } => {
-                self.bar.set_length(total as u64);
-                self.bar.set_position(parsed as u64);
+                self.set_parse_position(parsed, total);
             }
             CveListSyncProgress::ExistingRecordLookupStarted { records } => {
                 self.set_spinner_message(if records == 1 {
@@ -133,11 +163,10 @@ impl CveListSyncProgressReporter for CveSyncProgressBar {
                 self.set_spinner_message("preparing database writes");
             }
             CveListSyncProgress::RecordWriteStarted { records } => {
-                self.set_bar(records, "writing CVE records");
+                self.reset_write_bar(records);
             }
             CveListSyncProgress::RecordWriteBatchCompleted { written, total } => {
-                self.bar.set_length(total as u64);
-                self.bar.set_position(written as u64);
+                self.set_write_position(written, total);
             }
             CveListSyncProgress::NotModified => {
                 self.set_spinner_message("CVE List data is already current");
@@ -158,7 +187,7 @@ fn spinner_style() -> ProgressStyle {
 }
 
 fn bar_style() -> ProgressStyle {
-    ProgressStyle::with_template("{wide_bar:.cyan/blue} {pos}/{len} {msg}")
+    ProgressStyle::with_template("{wide_bar:.cyan/blue} {human_pos}/{human_len} {msg}")
         .expect("bar progress template should be valid")
         .progress_chars("=> ")
 }
