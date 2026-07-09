@@ -10,9 +10,9 @@ use crate::{
 };
 use sea_orm::{
     ActiveValue::{NotSet, Set},
-    ColumnTrait as _, ConnectionTrait, DeriveIden, EntityTrait as _, ExprTrait as _,
-    PaginatorTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _, Statement,
-    sea_query::{Asterisk, ColumnDef, Expr, Func, Iden as _, JoinType, OnConflict, Query, Table},
+    ColumnTrait as _, ConnectionTrait, DeriveIden, EntityTrait as _, PaginatorTrait as _,
+    QueryFilter as _, QueryOrder as _, QuerySelect as _, Statement,
+    sea_query::{Expr, OnConflict, Query},
 };
 use std::{collections::HashSet, fmt};
 use tokio::sync::mpsc;
@@ -163,17 +163,8 @@ where
         records_inserted: 0,
         records_updated: 0,
     };
-    let mut staging_prepared = false;
     for chunk in records.chunks(batch_size) {
-        write_cve_list_record_batch(
-            db,
-            chunk,
-            records.len(),
-            &mut summary,
-            progress,
-            &mut staging_prepared,
-        )
-        .await?;
+        write_cve_list_record_batch(db, chunk, records.len(), &mut summary, progress).await?;
     }
 
     Ok(summary)
@@ -203,7 +194,6 @@ where
         records_updated: 0,
     };
     let mut write_started = false;
-    let mut staging_prepared = false;
 
     while let Some(record) = records.recv().await {
         if !write_started {
@@ -220,29 +210,13 @@ where
 
         batch.push(record);
         if batch.len() == batch_size {
-            write_cve_list_record_batch(
-                db,
-                &batch,
-                total_records,
-                &mut summary,
-                progress,
-                &mut staging_prepared,
-            )
-            .await?;
+            write_cve_list_record_batch(db, &batch, total_records, &mut summary, progress).await?;
             batch.clear();
         }
     }
 
     if !batch.is_empty() {
-        write_cve_list_record_batch(
-            db,
-            &batch,
-            total_records,
-            &mut summary,
-            progress,
-            &mut staging_prepared,
-        )
-        .await?;
+        write_cve_list_record_batch(db, &batch, total_records, &mut summary, progress).await?;
     }
 
     Ok(summary)
@@ -502,29 +476,21 @@ async fn write_cve_list_record_batch<C, P>(
     total_records: usize,
     summary: &mut WriteCveListRecordsSummary,
     progress: &P,
-    staging_prepared: &mut bool,
 ) -> Result<(), WriteCveListRecordsError>
 where
     C: ConnectionTrait,
     P: CveListSyncProgressReporter + ?Sized,
 {
     let cve_ids = collect_unique_cve_ids(records)?;
-    if !*staging_prepared {
-        prepare_cve_list_record_staging_table(db).await?;
-        *staging_prepared = true;
-    }
-    truncate_cve_list_record_staging_table(db).await?;
-    insert_cve_list_record_staging_batch(db, records).await?;
-
     progress.report(CveListSyncProgress::ExistingRecordLookupStarted {
         records: cve_ids.len(),
     });
-    let records_updated = count_existing_staged_cve_records(db).await?;
+    let records_updated = count_existing_cve_records(db, &cve_ids).await?;
     progress.report(CveListSyncProgress::ExistingRecordLookupCompleted {
         records: records_updated,
     });
 
-    merge_cve_list_record_staging_table(db).await?;
+    upsert_cve_list_record_batch(db, records).await?;
 
     let records_inserted = cve_ids
         .len()
@@ -614,52 +580,23 @@ where
         .map_err(WriteCveListRecordsError::Db)
 }
 
-async fn prepare_cve_list_record_staging_table<C>(db: &C) -> Result<(), WriteCveListRecordsError>
+async fn count_existing_cve_records<C>(
+    db: &C,
+    cve_ids: &[String],
+) -> Result<usize, WriteCveListRecordsError>
 where
     C: ConnectionTrait,
 {
-    let table = Table::create()
-        .table(CveListRecordsStaging::Table)
-        .temporary()
-        .if_not_exists()
-        .col(
-            ColumnDef::new(CveListRecordsStaging::CveId)
-                .text()
-                .not_null()
-                .primary_key(),
-        )
-        .col(
-            ColumnDef::new(CveListRecordsStaging::RecordFormatVersion)
-                .text()
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(CveListRecordsStaging::Record)
-                .json_binary()
-                .not_null(),
-        )
-        .extra("ON COMMIT PRESERVE ROWS")
-        .take();
-
-    db.execute(&table)
+    let count = cve_list_records::Entity::find()
+        .filter(cve_list_records::Column::CveId.is_in(cve_ids.iter().cloned()))
+        .count(db)
         .await
-        .map(|_| ())
-        .map_err(WriteCveListRecordsError::Db)
+        .map_err(WriteCveListRecordsError::Db)?;
+
+    usize::try_from(count).map_err(|_| WriteCveListRecordsError::CountTooLarge(count))
 }
 
-async fn truncate_cve_list_record_staging_table<C>(db: &C) -> Result<(), WriteCveListRecordsError>
-where
-    C: ConnectionTrait,
-{
-    let table = Table::truncate().table(CveListRecordsStaging::Table).take();
-
-    db.execute(&table)
-        .await
-        .map(|_| ())
-        .map_err(WriteCveListRecordsError::Db)
-}
-
-async fn insert_cve_list_record_staging_batch<C>(
+async fn upsert_cve_list_record_batch<C>(
     db: &C,
     records: &[ParsedCveListFile],
 ) -> Result<(), WriteCveListRecordsError>
@@ -667,11 +604,22 @@ where
     C: ConnectionTrait,
 {
     let mut insert = Query::insert();
-    insert.into_table(CveListRecordsStaging::Table).columns([
-        CveListRecordsStaging::CveId,
-        CveListRecordsStaging::RecordFormatVersion,
-        CveListRecordsStaging::Record,
-    ]);
+    insert
+        .into_table((CveListSchema::Public, CveListRecords::Table))
+        .columns([
+            CveListRecords::CveId,
+            CveListRecords::RecordFormatVersion,
+            CveListRecords::Record,
+        ])
+        .on_conflict(
+            OnConflict::column(CveListRecords::CveId)
+                .update_columns([CveListRecords::RecordFormatVersion, CveListRecords::Record])
+                .values([
+                    (CveListRecords::LastSeenAt, Expr::current_timestamp()),
+                    (CveListRecords::UpdatedAt, Expr::current_timestamp()),
+                ])
+                .to_owned(),
+        );
 
     for record in records {
         insert
@@ -682,84 +630,6 @@ where
             ])
             .map_err(|err| WriteCveListRecordsError::QueryBuild(err.to_string()))?;
     }
-
-    db.execute(&insert)
-        .await
-        .map(|_| ())
-        .map_err(WriteCveListRecordsError::Db)
-}
-
-async fn count_existing_staged_cve_records<C>(db: &C) -> Result<usize, WriteCveListRecordsError>
-where
-    C: ConnectionTrait,
-{
-    let select = Query::select()
-        .expr_as(
-            Func::count(Expr::col(Asterisk)),
-            CveListRecordCountAlias::Existing,
-        )
-        .from_as(
-            CveListRecordsStaging::Table,
-            CveListRecordTableAlias::Staging,
-        )
-        .join_as(
-            JoinType::InnerJoin,
-            (CveListSchema::Public, CveListRecords::Table),
-            CveListRecordTableAlias::Records,
-            Expr::col((CveListRecordTableAlias::Records, CveListRecords::CveId)).equals((
-                CveListRecordTableAlias::Staging,
-                CveListRecordsStaging::CveId,
-            )),
-        )
-        .to_owned();
-    let row = db
-        .query_one(&select)
-        .await
-        .map_err(WriteCveListRecordsError::Db)?
-        .ok_or_else(|| {
-            WriteCveListRecordsError::Db(sea_orm::DbErr::Custom(
-                "count query returned no rows".to_owned(),
-            ))
-        })?;
-    let existing_count_alias = CveListRecordCountAlias::Existing.to_string();
-    let count = row
-        .try_get::<i64>("", existing_count_alias.as_str())
-        .map_err(WriteCveListRecordsError::Db)?;
-
-    usize::try_from(count).map_err(|_| WriteCveListRecordsError::NegativeExistingCount(count))
-}
-
-async fn merge_cve_list_record_staging_table<C>(db: &C) -> Result<(), WriteCveListRecordsError>
-where
-    C: ConnectionTrait,
-{
-    let select = Query::select()
-        .columns([
-            CveListRecordsStaging::CveId,
-            CveListRecordsStaging::RecordFormatVersion,
-            CveListRecordsStaging::Record,
-        ])
-        .from(CveListRecordsStaging::Table)
-        .to_owned();
-    let mut insert = Query::insert();
-    insert
-        .into_table((CveListSchema::Public, CveListRecords::Table))
-        .columns([
-            CveListRecords::CveId,
-            CveListRecords::RecordFormatVersion,
-            CveListRecords::Record,
-        ])
-        .select_from(select)
-        .map_err(|err| WriteCveListRecordsError::QueryBuild(err.to_string()))?
-        .on_conflict(
-            OnConflict::column(CveListRecords::CveId)
-                .update_columns([CveListRecords::RecordFormatVersion, CveListRecords::Record])
-                .values([
-                    (CveListRecords::LastSeenAt, Expr::current_timestamp()),
-                    (CveListRecords::UpdatedAt, Expr::current_timestamp()),
-                ])
-                .to_owned(),
-        );
 
     db.execute(&insert)
         .await
@@ -782,28 +652,11 @@ enum CveListRecords {
     UpdatedAt,
 }
 
-#[derive(DeriveIden)]
-enum CveListRecordsStaging {
-    Table,
-    CveId,
-    RecordFormatVersion,
-    Record,
-}
-
-#[derive(DeriveIden)]
-enum CveListRecordTableAlias {
-    Staging,
-    Records,
-}
-
-#[derive(DeriveIden)]
-enum CveListRecordCountAlias {
-    Existing,
-}
-
 /// Failure while writing CVE List records to storage.
 #[derive(Debug)]
 pub enum WriteCveListRecordsError {
+    /// An existing-record count exceeded platform storage limits.
+    CountTooLarge(u64),
     /// A database operation failed.
     Db(sea_orm::DbErr),
     /// The batch contained the same CVE ID more than once.
@@ -812,8 +665,6 @@ pub enum WriteCveListRecordsError {
     InvalidBatchSize,
     /// The configured parse-to-write channel size was zero.
     InvalidWriteChannelSize,
-    /// A staging-table count returned a negative value.
-    NegativeExistingCount(i64),
     /// A SeaQuery statement could not be built.
     QueryBuild(String),
 }
@@ -821,6 +672,9 @@ pub enum WriteCveListRecordsError {
 impl std::fmt::Display for WriteCveListRecordsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::CountTooLarge(count) => {
+                write!(f, "CVE List existing-record count is too large: {count}")
+            }
             Self::Db(_) => write!(f, "failed to write CVE List records"),
             Self::DuplicateCveId(cve_id) => {
                 write!(
@@ -832,9 +686,6 @@ impl std::fmt::Display for WriteCveListRecordsError {
             Self::InvalidWriteChannelSize => {
                 write!(f, "CVE List write channel size must be greater than 0")
             }
-            Self::NegativeExistingCount(count) => {
-                write!(f, "CVE List staging count was negative: {count}")
-            }
             Self::QueryBuild(_) => write!(f, "failed to build CVE List storage query"),
         }
     }
@@ -843,11 +694,11 @@ impl std::fmt::Display for WriteCveListRecordsError {
 impl std::error::Error for WriteCveListRecordsError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::CountTooLarge(_) => None,
             Self::Db(err) => Some(err),
             Self::DuplicateCveId(_)
             | Self::InvalidBatchSize
             | Self::InvalidWriteChannelSize
-            | Self::NegativeExistingCount(_)
             | Self::QueryBuild(_) => None,
         }
     }
@@ -968,8 +819,8 @@ mod tests {
             parsed_file("CVE-2026-1001"),
         ];
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([vec![mock_existing_count_row(1)]])
-            .append_exec_results(mock_exec_results(4))
+            .append_query_results([vec![mock_num_items_row(1)]])
+            .append_exec_results(mock_exec_results(1))
             .into_connection();
 
         let summary =
@@ -988,18 +839,26 @@ mod tests {
         assert!(
             transaction_log[0].statements()[0]
                 .sql
-                .contains(r#"CREATE TEMPORARY TABLE IF NOT EXISTS "cve_list_records_staging""#)
+                .contains("SELECT COUNT")
         );
         assert!(
-            transaction_log[2].statements()[0]
+            transaction_log[1].statements()[0]
                 .sql
-                .contains(r#"INSERT INTO "cve_list_records_staging""#)
+                .contains("INSERT INTO")
+                && transaction_log[1].statements()[0]
+                    .sql
+                    .contains("cve_list_records")
         );
         assert!(
-            transaction_log[4].statements()[0]
+            transaction_log[1].statements()[0]
                 .sql
-                .contains(r#"INSERT INTO "public"."cve_list_records""#)
+                .contains(r#"ON CONFLICT ("cve_id") DO UPDATE"#)
         );
+        assert!(transaction_log.iter().all(|entry| {
+            !entry.statements()[0]
+                .sql
+                .contains("cve_list_records_staging")
+        }));
     }
 
     #[test]
@@ -1010,11 +869,8 @@ mod tests {
             .map(|index| parsed_file(&format!("CVE-2026-{}", 1000 + index)))
             .collect::<Vec<_>>();
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([
-                vec![mock_existing_count_row(0)],
-                vec![mock_existing_count_row(1)],
-            ])
-            .append_exec_results(mock_exec_results(7))
+            .append_query_results([vec![mock_num_items_row(0)], vec![mock_num_items_row(1)]])
+            .append_exec_results(mock_exec_results(2))
             .into_connection();
 
         let summary = run_async(write_cve_list_records_with_batch_size(
@@ -1034,32 +890,23 @@ mod tests {
         let transaction_log = db.into_transaction_log();
         let count_count = transaction_log
             .iter()
-            .filter(|entry| {
-                entry.statements()[0]
-                    .sql
-                    .contains(r#"SELECT COUNT(*) AS "existing""#)
-            })
+            .filter(|entry| entry.statements()[0].sql.contains("SELECT COUNT"))
             .count();
-        let merge_count = transaction_log
+        let upsert_count = transaction_log
             .iter()
             .filter(|entry| {
-                entry.statements()[0]
-                    .sql
-                    .contains(r#"INSERT INTO "public"."cve_list_records""#)
-            })
-            .count();
-        let staging_insert_count = transaction_log
-            .iter()
-            .filter(|entry| {
-                entry.statements()[0]
-                    .sql
-                    .contains(r#"INSERT INTO "cve_list_records_staging""#)
+                entry.statements()[0].sql.contains("INSERT INTO")
+                    && entry.statements()[0].sql.contains("cve_list_records")
             })
             .count();
 
         assert_eq!(count_count, 2);
-        assert_eq!(merge_count, 2);
-        assert_eq!(staging_insert_count, 2);
+        assert_eq!(upsert_count, 2);
+        assert!(transaction_log.iter().all(|entry| {
+            !entry.statements()[0]
+                .sql
+                .contains("cve_list_records_staging")
+        }));
     }
 
     #[test]
@@ -1071,11 +918,8 @@ mod tests {
             parsed_file("CVE-2026-1002"),
         ];
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([
-                vec![mock_existing_count_row(0)],
-                vec![mock_existing_count_row(1)],
-            ])
-            .append_exec_results(mock_exec_results(7))
+            .append_query_results([vec![mock_num_items_row(0)], vec![mock_num_items_row(1)]])
+            .append_exec_results(mock_exec_results(2))
             .into_connection();
 
         let summary = run_async(async {
@@ -1180,8 +1024,8 @@ mod tests {
             parsed_file("CVE-2026-1000"),
         ];
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([vec![mock_existing_count_row(0)]])
-            .append_exec_results(mock_exec_results(4))
+            .append_query_results([vec![mock_num_items_row(0)]])
+            .append_exec_results(mock_exec_results(1))
             .into_connection();
 
         let err = run_async(async {
@@ -1209,7 +1053,7 @@ mod tests {
         ));
 
         let transaction_log = db.into_transaction_log();
-        let merge_count = transaction_log
+        let upsert_count = transaction_log
             .iter()
             .filter(|entry| {
                 entry.statements()[0]
@@ -1217,7 +1061,7 @@ mod tests {
                     .contains(r#"INSERT INTO "public"."cve_list_records""#)
             })
             .count();
-        assert_eq!(merge_count, 1);
+        assert_eq!(upsert_count, 1);
     }
 
     #[test]
@@ -1236,22 +1080,22 @@ mod tests {
     fn write_cve_list_records_upserts_without_replacing_first_seen_at() {
         let records = vec![parsed_file("CVE-2026-1000")];
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([vec![mock_existing_count_row(1)]])
-            .append_exec_results(mock_exec_results(4))
+            .append_query_results([vec![mock_num_items_row(1)]])
+            .append_exec_results(mock_exec_results(1))
             .into_connection();
 
         run_async(write_cve_list_records(&db, &records)).expect("write should succeed");
 
         let transaction_log = db.into_transaction_log();
-        let merge_sql = &transaction_log[4].statements()[0].sql;
-        assert!(merge_sql.contains("ON CONFLICT"));
+        let upsert_sql = &transaction_log[1].statements()[0].sql;
+        assert!(upsert_sql.contains("ON CONFLICT"));
         assert!(
-            merge_sql.contains(r#""record_format_version" = "excluded"."record_format_version""#)
+            upsert_sql.contains(r#""record_format_version" = "excluded"."record_format_version""#)
         );
-        assert!(merge_sql.contains(r#""record" = "excluded"."record""#));
-        assert!(merge_sql.contains(r#""last_seen_at" = CURRENT_TIMESTAMP"#));
-        assert!(merge_sql.contains(r#""updated_at" = CURRENT_TIMESTAMP"#));
-        assert!(!merge_sql.contains(r#""first_seen_at" = "#));
+        assert!(upsert_sql.contains(r#""record" = "excluded"."record""#));
+        assert!(upsert_sql.contains(r#""last_seen_at" = CURRENT_TIMESTAMP"#));
+        assert!(upsert_sql.contains(r#""updated_at" = CURRENT_TIMESTAMP"#));
+        assert!(!upsert_sql.contains(r#""first_seen_at" = "#));
     }
 
     #[test]
@@ -1521,10 +1365,6 @@ mod tests {
                 sync_runs_deleted: 3,
             }
         );
-    }
-
-    fn mock_existing_count_row(existing: i64) -> BTreeMap<String, Value> {
-        BTreeMap::from([("existing".to_owned(), existing.into())])
     }
 
     fn mock_num_items_row(num_items: i64) -> BTreeMap<String, Value> {

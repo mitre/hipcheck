@@ -555,8 +555,8 @@ mod tests {
                 .sql
                 .contains(r#"ON CONFLICT ("cve_id") DO UPDATE"#)
         }));
-        assert!(transaction_log.iter().any(|entry| {
-            entry.statements()[0]
+        assert!(transaction_log.iter().all(|entry| {
+            !entry.statements()[0]
                 .sql
                 .contains("cve_list_records_staging")
         }));
@@ -740,7 +740,7 @@ mod tests {
     }
 
     fn mock_existing_count_row(existing: i64) -> BTreeMap<String, Value> {
-        BTreeMap::from([("existing".to_owned(), existing.into())])
+        BTreeMap::from([("num_items".to_owned(), existing.into())])
     }
 
     fn mock_exec_results(count: usize) -> Vec<MockExecResult> {
