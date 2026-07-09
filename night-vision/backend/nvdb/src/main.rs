@@ -4,18 +4,53 @@ use clap::{Args as _, FromArgMatches as _};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use nv_common::config::{Config, DEFAULT_CONFIG_FILE};
 use nv_common::log::logger;
-use std::process::ExitCode;
+use std::{fmt::Write as _, process::ExitCode};
 
 mod cmd;
 mod destructive;
 
 fn main() -> ExitCode {
     if let Err(e) = run() {
-        eprintln!("{e}");
+        eprintln!("{}", format_error_report(&e));
         return ExitCode::FAILURE;
     }
 
     ExitCode::SUCCESS
+}
+
+fn format_error_report(error: &anyhow::Error) -> String {
+    let mut report = error.to_string();
+    let causes = error.chain().skip(1).collect::<Vec<_>>();
+
+    if !causes.is_empty() {
+        report.push_str("\n\nCaused by:\n");
+
+        for (index, cause) in causes.iter().enumerate() {
+            let _ = writeln!(
+                report,
+                "    {index}: {}",
+                format_cause_without_duplicated_source(*cause)
+            );
+        }
+    }
+
+    report
+}
+
+fn format_cause_without_duplicated_source(error: &(dyn std::error::Error + 'static)) -> String {
+    let message = error.to_string();
+    let Some(source) = error.source() else {
+        return message;
+    };
+
+    let source_message = source.to_string();
+    let duplicated_source = format!(": {source_message}");
+
+    message
+        .strip_suffix(&duplicated_source)
+        .filter(|prefix| !prefix.is_empty())
+        .unwrap_or(&message)
+        .to_owned()
 }
 
 fn run() -> Result<()> {
@@ -85,4 +120,60 @@ fn command() -> clap::Command {
         .subcommand(cmd::cve::command());
 
     Verbosity::<InfoLevel>::augment_args(command)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_error_report;
+    use anyhow::anyhow;
+
+    #[test]
+    fn error_report_prints_causes_on_separate_lines() {
+        let error = anyhow!("leaf").context("middle").context("top");
+
+        let report = format_error_report(&error);
+
+        assert!(report.starts_with("top\n\nCaused by:\n"));
+        assert!(report.contains("\n    0: middle\n"));
+        assert!(report.contains("\n    1: leaf"));
+        assert!(!report.contains("top: middle: leaf"));
+    }
+
+    #[test]
+    fn error_report_does_not_duplicate_source_in_cause_display() {
+        let error = anyhow!(ExecutionError(DatabaseError)).context("failed to sync CVE List data");
+
+        let report = format_error_report(&error);
+
+        assert_eq!(
+            report,
+            "failed to sync CVE List data\n\nCaused by:\n    0: Execution Error\n    1: error returned from database\n"
+        );
+    }
+
+    #[derive(Debug)]
+    struct ExecutionError(DatabaseError);
+
+    impl std::fmt::Display for ExecutionError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "Execution Error: {}", self.0)
+        }
+    }
+
+    impl std::error::Error for ExecutionError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            Some(&self.0)
+        }
+    }
+
+    #[derive(Debug)]
+    struct DatabaseError;
+
+    impl std::fmt::Display for DatabaseError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "error returned from database")
+        }
+    }
+
+    impl std::error::Error for DatabaseError {}
 }

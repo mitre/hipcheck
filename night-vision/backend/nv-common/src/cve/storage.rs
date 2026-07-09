@@ -12,7 +12,7 @@ use sea_orm::{
     ActiveValue::{NotSet, Set},
     ColumnTrait as _, ConnectionTrait, DeriveIden, EntityTrait as _, ExprTrait as _,
     PaginatorTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _, Statement,
-    sea_query::{Asterisk, ColumnDef, Expr, Func, Iden, JoinType, OnConflict, Query, Table},
+    sea_query::{Asterisk, ColumnDef, Expr, Func, Iden as _, JoinType, OnConflict, Query, Table},
 };
 use std::{collections::HashSet, fmt};
 use tokio::sync::mpsc;

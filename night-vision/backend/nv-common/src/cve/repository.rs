@@ -7,6 +7,10 @@ use crate::cve::{
 };
 use camino::Utf8PathBuf;
 use futures_util::{StreamExt as _, stream};
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use tokio::sync::mpsc;
 
 /// Default number of CVE List records to read and parse concurrently.
@@ -167,24 +171,56 @@ where
 
     let total = paths.len();
     progress.report(CveListSyncProgress::CveFileListCompleted { records: total });
-    let files = git
-        .read_files_at_commit(commit, &paths)
-        .await
-        .map_err(CveListRepositoryError::Git)?;
+    progress.report(CveListSyncProgress::CveFileReadStarted { records: total });
+    let (file_sender, file_receiver) = mpsc::channel(parse_concurrency);
+    let read_files = git.send_files_at_commit(commit, &paths, file_sender);
+    let parse_files =
+        parse_cve_file_receiver(file_receiver, total, progress, parse_concurrency, true);
+    let (read_result, parse_result) = tokio::join!(read_files, parse_files);
+    read_result.map_err(CveListRepositoryError::Git)?;
 
-    let mut parsed_files = stream::iter(files.into_iter().enumerate())
-        .map(|(index, (path, contents))| async move {
-            let record_path = path.clone();
-            let task_path = path.clone();
-            let record = tokio::task::spawn_blocking(move || parse_cve_record(contents.as_bytes()))
-                .await
-                .map_err(|err| CveListRepositoryError::ParseTask(task_path, err))?
-                .map_err(|err| CveListRepositoryError::Record(record_path, err))?;
+    parse_result
+}
 
-            Ok((index, ParsedCveListFile { path, record }))
+async fn parse_cve_file_receiver<P>(
+    file_receiver: mpsc::Receiver<(Utf8PathBuf, String)>,
+    total: usize,
+    progress: &P,
+    parse_concurrency: usize,
+    preserve_order: bool,
+) -> Result<Vec<ParsedCveListFile>, CveListRepositoryError>
+where
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    let read = Arc::new(AtomicUsize::new(0));
+    let files = stream::unfold(file_receiver, |mut file_receiver| async move {
+        file_receiver.recv().await.map(|file| (file, file_receiver))
+    });
+
+    let parsed_files = files
+        .enumerate()
+        .map(|(index, (path, contents))| {
+            let read = Arc::clone(&read);
+            async move {
+                let read = read
+                    .fetch_add(1, Ordering::Relaxed)
+                    .checked_add(1)
+                    .expect("read count cannot exceed listed CVE file count");
+                progress.report(CveListSyncProgress::CveFileReadCompleted { read, total });
+                let record_path = path.clone();
+                let task_path = path.clone();
+                let record =
+                    tokio::task::spawn_blocking(move || parse_cve_record(contents.as_bytes()))
+                        .await
+                        .map_err(|err| CveListRepositoryError::ParseTask(task_path, err))?
+                        .map_err(|err| CveListRepositoryError::Record(record_path, err))?;
+
+                Ok((index, ParsedCveListFile { path, record }))
+            }
         })
         .buffer_unordered(parse_concurrency);
 
+    futures_util::pin_mut!(parsed_files);
     let mut records = Vec::with_capacity(total);
     while let Some(parsed_file) = parsed_files.next().await {
         records.push(parsed_file?);
@@ -194,7 +230,15 @@ where
         });
     }
 
-    records.sort_by_key(|(index, _)| *index);
+    if read.load(Ordering::Relaxed) != total {
+        return Err(CveListRepositoryError::Git(
+            CveListGitError::CatFileTruncated(Utf8PathBuf::from("<stream>")),
+        ));
+    }
+
+    if preserve_order {
+        records.sort_by_key(|(index, _)| *index);
+    }
 
     Ok(records.into_iter().map(|(_, record)| record).collect())
 }
@@ -217,24 +261,55 @@ where
 
     let total = paths.len();
     progress.report(CveListSyncProgress::CveFileListCompleted { records: total });
-    let files = git
-        .read_files_at_commit(commit, &paths)
-        .await
-        .map_err(CveListRepositoryError::Git)?;
+    progress.report(CveListSyncProgress::CveFileReadStarted { records: total });
+    let (file_sender, file_receiver) = mpsc::channel(parse_concurrency);
+    let read_files = git.send_files_at_commit(commit, &paths, file_sender);
+    let parse_files =
+        send_cve_file_receiver(file_receiver, total, progress, parse_concurrency, sender);
+    let (read_result, parse_result) = tokio::join!(read_files, parse_files);
+    read_result.map_err(CveListRepositoryError::Git)?;
 
-    let mut parsed_files = stream::iter(files)
-        .map(|(path, contents)| async move {
-            let record_path = path.clone();
-            let task_path = path.clone();
-            let record = tokio::task::spawn_blocking(move || parse_cve_record(contents.as_bytes()))
-                .await
-                .map_err(|err| CveListRepositoryError::ParseTask(task_path, err))?
-                .map_err(|err| CveListRepositoryError::Record(record_path, err))?;
+    parse_result
+}
 
-            Ok(ParsedCveListFile { path, record })
+async fn send_cve_file_receiver<P>(
+    file_receiver: mpsc::Receiver<(Utf8PathBuf, String)>,
+    total: usize,
+    progress: &P,
+    parse_concurrency: usize,
+    sender: mpsc::Sender<ParsedCveListFile>,
+) -> Result<usize, CveListRepositoryError>
+where
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    let read = Arc::new(AtomicUsize::new(0));
+    let files = stream::unfold(file_receiver, |mut file_receiver| async move {
+        file_receiver.recv().await.map(|file| (file, file_receiver))
+    });
+
+    let parsed_files = files
+        .map(|(path, contents)| {
+            let read = Arc::clone(&read);
+            async move {
+                let read = read
+                    .fetch_add(1, Ordering::Relaxed)
+                    .checked_add(1)
+                    .expect("read count cannot exceed listed CVE file count");
+                progress.report(CveListSyncProgress::CveFileReadCompleted { read, total });
+                let record_path = path.clone();
+                let task_path = path.clone();
+                let record =
+                    tokio::task::spawn_blocking(move || parse_cve_record(contents.as_bytes()))
+                        .await
+                        .map_err(|err| CveListRepositoryError::ParseTask(task_path, err))?
+                        .map_err(|err| CveListRepositoryError::Record(record_path, err))?;
+
+                Ok(ParsedCveListFile { path, record })
+            }
         })
         .buffer_unordered(parse_concurrency);
 
+    futures_util::pin_mut!(parsed_files);
     let mut parsed: usize = 0;
     while let Some(parsed_file) = parsed_files.next().await {
         let parsed_file = parsed_file?;
@@ -246,6 +321,12 @@ where
             .checked_add(1)
             .expect("parsed count cannot exceed listed CVE file count");
         progress.report(CveListSyncProgress::CveFileParsed { parsed, total });
+    }
+
+    if read.load(Ordering::Relaxed) != total {
+        return Err(CveListRepositoryError::Git(
+            CveListGitError::CatFileTruncated(Utf8PathBuf::from("<stream>")),
+        ));
     }
 
     Ok(parsed)

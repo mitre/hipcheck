@@ -17,6 +17,10 @@ pub enum CveListSyncProgress {
     CveFileListStarted,
     /// The repository file list has been loaded.
     CveFileListCompleted { records: usize },
+    /// Repository CVE file contents are being read.
+    CveFileReadStarted { records: usize },
+    /// One repository CVE file has been read.
+    CveFileReadCompleted { read: usize, total: usize },
     /// One repository CVE file has been parsed.
     CveFileParsed { parsed: usize, total: usize },
     /// Existing database records are being loaded.

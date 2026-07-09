@@ -65,6 +65,7 @@ async fn sync(config: &Config, _token: DestructiveOperationToken) -> Result<()> 
 struct CveSyncProgressBar {
     multi: MultiProgress,
     status_bar: ProgressBar,
+    read_bar: ProgressBar,
     parse_bar: ProgressBar,
     write_bar: ProgressBar,
 }
@@ -75,6 +76,10 @@ impl CveSyncProgressBar {
         let status_bar = multi.add(ProgressBar::new_spinner());
         status_bar.set_style(spinner_style());
         status_bar.enable_steady_tick(Duration::from_millis(100));
+
+        let read_bar = multi.add(ProgressBar::new(0));
+        read_bar.set_style(bar_style());
+        read_bar.set_message("reading CVE records");
 
         let parse_bar = multi.add(ProgressBar::new(0));
         parse_bar.set_style(bar_style());
@@ -87,6 +92,7 @@ impl CveSyncProgressBar {
         Self {
             multi,
             status_bar,
+            read_bar,
             parse_bar,
             write_bar,
         }
@@ -106,6 +112,16 @@ impl CveSyncProgressBar {
     fn reset_parse_bar(&self, len: usize) {
         self.parse_bar.set_length(len as u64);
         self.parse_bar.set_position(0);
+    }
+
+    fn reset_read_bar(&self, len: usize) {
+        self.read_bar.set_length(len as u64);
+        self.read_bar.set_position(0);
+    }
+
+    fn set_read_position(&self, read: usize, total: usize) {
+        self.read_bar.set_length(total as u64);
+        self.read_bar.set_position(read as u64);
     }
 
     fn set_parse_position(&self, parsed: usize, total: usize) {
@@ -148,6 +164,12 @@ impl CveListSyncProgressReporter for CveSyncProgressBar {
             }
             CveListSyncProgress::CveFileListCompleted { records } => {
                 self.reset_parse_bar(records);
+            }
+            CveListSyncProgress::CveFileReadStarted { records } => {
+                self.reset_read_bar(records);
+            }
+            CveListSyncProgress::CveFileReadCompleted { read, total } => {
+                self.set_read_position(read, total);
             }
             CveListSyncProgress::CveFileParsed { parsed, total } => {
                 self.set_parse_position(parsed, total);
