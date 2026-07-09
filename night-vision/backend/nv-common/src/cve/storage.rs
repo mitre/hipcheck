@@ -6,12 +6,12 @@ use crate::{
         progress::{CveListSyncProgress, CveListSyncProgressReporter, NoopCveListSyncProgress},
         repository::ParsedCveListFile,
     },
-    db::entities::cve_list_sync_runs,
+    db::entities::{cve_list_records, cve_list_sync_runs},
 };
 use sea_orm::{
     ActiveValue::{NotSet, Set},
     ColumnTrait as _, ConnectionTrait, DeriveIden, EntityTrait as _, ExprTrait as _,
-    QueryFilter as _, QueryOrder as _, QuerySelect as _,
+    PaginatorTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _, Statement,
     sea_query::{Asterisk, ColumnDef, Expr, Func, Iden, JoinType, OnConflict, Query, Table},
 };
 use std::{collections::HashSet, fmt};
@@ -85,6 +85,15 @@ pub struct WriteCveListRecordsSummary {
     pub records_inserted: usize,
     /// Number of supplied records that already existed and were updated.
     pub records_updated: usize,
+}
+
+/// Counts from resetting CVE List database storage.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResetCveListStorageSummary {
+    /// Number of stored CVE List records removed.
+    pub records_deleted: u64,
+    /// Number of CVE List sync-run records removed.
+    pub sync_runs_deleted: u64,
 }
 
 /// Upsert parsed CVE List records and return insert/update counts.
@@ -413,6 +422,57 @@ where
         .map(CommitSha::parse)
         .transpose()
         .map_err(CveListSyncRunError::InvalidStoredCommitSha)
+}
+
+/// Clear CVE List records and sync-run metadata from database storage.
+///
+/// Clearing sync-run metadata is part of the reset because the latest
+/// successful sync commit determines whether future syncs can use the
+/// incremental path.
+pub async fn reset_cve_list_storage<C>(
+    db: &C,
+    force: bool,
+) -> Result<ResetCveListStorageSummary, ResetCveListStorageError>
+where
+    C: ConnectionTrait,
+{
+    let running_sync_runs = count_running_cve_list_sync_runs(db).await?;
+    if running_sync_runs > 0 && !force {
+        return Err(ResetCveListStorageError::RunningSyncRuns(running_sync_runs));
+    }
+
+    let records_deleted = cve_list_records::Entity::find()
+        .count(db)
+        .await
+        .map_err(ResetCveListStorageError::Db)?;
+    let sync_runs_deleted = cve_list_sync_runs::Entity::find()
+        .count(db)
+        .await
+        .map_err(ResetCveListStorageError::Db)?;
+    let truncate = Statement::from_string(
+        db.get_database_backend(),
+        "TRUNCATE TABLE public.cve_list_records, public.cve_list_sync_runs RESTART IDENTITY"
+            .to_owned(),
+    );
+
+    db.execute_raw(truncate)
+        .await
+        .map(|_| ResetCveListStorageSummary {
+            records_deleted,
+            sync_runs_deleted,
+        })
+        .map_err(ResetCveListStorageError::Db)
+}
+
+async fn count_running_cve_list_sync_runs<C>(db: &C) -> Result<u64, ResetCveListStorageError>
+where
+    C: ConnectionTrait,
+{
+    cve_list_sync_runs::Entity::find()
+        .filter(cve_list_sync_runs::Column::Status.eq(CveListSyncRunStatus::Running.to_string()))
+        .count(db)
+        .await
+        .map_err(ResetCveListStorageError::Db)
 }
 
 fn count_to_i32(count: usize, field: &'static str) -> Result<i32, CveListSyncRunError> {
@@ -836,6 +896,38 @@ impl std::error::Error for CveListSyncRunError {
             Self::CountTooLarge { .. } | Self::NonTerminalStatus(_) | Self::SyncRunNotFound(_) => {
                 None
             }
+        }
+    }
+}
+
+/// Failure while resetting CVE List database storage.
+#[derive(Debug)]
+pub enum ResetCveListStorageError {
+    /// A database operation failed.
+    Db(sea_orm::DbErr),
+    /// One or more CVE List sync runs are still marked running.
+    RunningSyncRuns(u64),
+}
+
+impl std::fmt::Display for ResetCveListStorageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Db(_) => write!(f, "failed to reset CVE List storage"),
+            Self::RunningSyncRuns(count) => {
+                write!(
+                    f,
+                    "refusing to reset CVE List storage while {count} sync run(s) are running"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for ResetCveListStorageError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Db(err) => Some(err),
+            Self::RunningSyncRuns(_) => None,
         }
     }
 }
@@ -1354,8 +1446,89 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn reset_cve_list_storage_truncates_records_and_sync_runs() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_num_items_row(0)],
+                vec![mock_num_items_row(7)],
+                vec![mock_num_items_row(3)],
+            ])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 0,
+            }])
+            .into_connection();
+
+        let summary = run_async(reset_cve_list_storage(&db, false)).expect("reset should succeed");
+
+        assert_eq!(
+            summary,
+            ResetCveListStorageSummary {
+                records_deleted: 7,
+                sync_runs_deleted: 3,
+            }
+        );
+
+        let transaction_log = db.into_transaction_log();
+        assert!(
+            transaction_log
+                .iter()
+                .any(|entry| entry.statements()[0].sql.contains(
+                    "TRUNCATE TABLE public.cve_list_records, public.cve_list_sync_runs \
+                     RESTART IDENTITY"
+                ))
+        );
+    }
+
+    #[test]
+    fn reset_cve_list_storage_rejects_running_sync_runs_without_force() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_num_items_row(2)]])
+            .into_connection();
+
+        let err = run_async(reset_cve_list_storage(&db, false)).expect_err("reset should fail");
+
+        assert!(matches!(err, ResetCveListStorageError::RunningSyncRuns(2)));
+        let transaction_log = db.into_transaction_log();
+        assert!(
+            transaction_log
+                .iter()
+                .all(|entry| !entry.statements()[0].sql.contains("TRUNCATE TABLE"))
+        );
+    }
+
+    #[test]
+    fn reset_cve_list_storage_accepts_running_sync_runs_with_force() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_num_items_row(2)],
+                vec![mock_num_items_row(7)],
+                vec![mock_num_items_row(3)],
+            ])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 0,
+            }])
+            .into_connection();
+
+        let summary = run_async(reset_cve_list_storage(&db, true)).expect("reset should succeed");
+
+        assert_eq!(
+            summary,
+            ResetCveListStorageSummary {
+                records_deleted: 7,
+                sync_runs_deleted: 3,
+            }
+        );
+    }
+
     fn mock_existing_count_row(existing: i64) -> BTreeMap<String, Value> {
         BTreeMap::from([("existing".to_owned(), existing.into())])
+    }
+
+    fn mock_num_items_row(num_items: i64) -> BTreeMap<String, Value> {
+        BTreeMap::from([("num_items".to_owned(), num_items.into())])
     }
 
     fn mock_exec_results(count: usize) -> Vec<MockExecResult> {
