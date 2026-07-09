@@ -5,7 +5,10 @@ use nv_common::{
     config::CveListWorkerConfig,
     cve::{
         git::{CommitSha, GitCliCveListGit},
-        sync::{CveListSyncError, CveListSyncSummary, sync_cve_list_once_with_parse_concurrency},
+        sync::{
+            CveListSyncError, CveListSyncSummary,
+            sync_cve_list_once_with_parse_and_write_channel_config,
+        },
     },
 };
 use sea_orm::DatabaseConnection;
@@ -68,13 +71,14 @@ async fn sync_cve_list(
         config.repository_ref().clone(),
     );
 
-    sync_cve_list_once_with_parse_concurrency(
+    sync_cve_list_once_with_parse_and_write_channel_config(
         db,
         &git,
         config.repository_url(),
         config.repository_ref(),
         config.write_batch_size(),
         config.parse_concurrency(),
+        config.write_channel_size(),
     )
     .await
 }
@@ -158,6 +162,10 @@ mod tests {
         assert_eq!(
             worker_config.write_batch_size(),
             config.cve_list_write_batch_size
+        );
+        assert_eq!(
+            worker_config.write_channel_size(),
+            config.cve_list_write_channel_size
         );
     }
 }

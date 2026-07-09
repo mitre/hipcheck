@@ -2,8 +2,11 @@
 
 use crate::{
     cve::{
-        git::GitRef, repository::DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
-        storage::DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE,
+        git::GitRef,
+        repository::DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
+        storage::{
+            DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE, DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
+        },
     },
     error::ErrorSourceIterator as _,
     secret::{SecretFileError, SecretSource, SecretSourceKind},
@@ -32,6 +35,7 @@ const DEFAULT_CVE_LIST_REPOSITORY_REF: &str = "main";
 const DEFAULT_CVE_LIST_SYNC_INTERVAL: u64 = 420_000;
 const DEFAULT_CVE_LIST_PARSE_CONCURRENCY: usize = DEFAULT_CVE_RECORD_PARSE_CONCURRENCY;
 const DEFAULT_CVE_LIST_WRITE_BATCH_SIZE: usize = DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE;
+const DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE: usize = DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE;
 
 /// Errors that can occur while loading configuration.
 pub enum ConfigLoadError {
@@ -195,6 +199,9 @@ pub struct Config {
 
     /// The maximum number of CVE List records to write in one database batch.
     pub cve_list_write_batch_size: usize,
+
+    /// The number of parsed CVE List records to buffer before database writes.
+    pub cve_list_write_channel_size: usize,
 }
 
 /// Runtime configuration for the CVE List worker.
@@ -206,6 +213,7 @@ pub struct CveListWorkerConfig {
     checkout_path: Utf8PathBuf,
     parse_concurrency: usize,
     write_batch_size: usize,
+    write_channel_size: usize,
 }
 
 impl CveListWorkerConfig {
@@ -237,6 +245,11 @@ impl CveListWorkerConfig {
     /// The maximum number of CVE List records to write in one database batch.
     pub fn write_batch_size(&self) -> usize {
         self.write_batch_size
+    }
+
+    /// The number of parsed CVE List records to buffer before database writes.
+    pub fn write_channel_size(&self) -> usize {
+        self.write_channel_size
     }
 }
 
@@ -280,6 +293,7 @@ impl Config {
                     "cve-list-sync-interval",
                     "cve-list-parse-concurrency",
                     "cve-list-write-batch-size",
+                    "cve-list-write-channel-size",
                 ],
             },
             BufReader::new(
@@ -355,6 +369,12 @@ impl Config {
             DEFAULT_CVE_LIST_WRITE_BATCH_SIZE,
             &mut errors,
         );
+        let cve_list_write_channel_size = parse_positive_usize(
+            &parsed,
+            "cve-list-write-channel-size",
+            DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE,
+            &mut errors,
+        );
 
         check_errors(path, parsed.warnings, errors)?;
 
@@ -387,6 +407,7 @@ impl Config {
             cve_list_checkout_path,
             cve_list_parse_concurrency,
             cve_list_write_batch_size,
+            cve_list_write_channel_size,
         };
 
         Ok(config)
@@ -436,6 +457,7 @@ impl Config {
             checkout_path: self.cve_list_checkout_path.clone(),
             parse_concurrency: self.cve_list_parse_concurrency,
             write_batch_size: self.cve_list_write_batch_size,
+            write_channel_size: self.cve_list_write_channel_size,
         }
     }
 }
@@ -557,6 +579,11 @@ impl Display for Config {
             f,
             "cve-list-write-batch-size",
             &self.cve_list_write_batch_size
+        )?;
+        write_report_line!(
+            f,
+            "cve-list-write-channel-size",
+            &self.cve_list_write_channel_size
         )?;
 
         write_report_separator!(f)?;
@@ -1198,6 +1225,13 @@ mod tests {
                     assert_eq!(config.cve_list_write_batch_size, 250);
                 },
             ),
+            ConfigFieldParseCase::new(
+                "cve_list_write_channel_size",
+                "cve-list-write-channel-size = 1024",
+                |config, _| {
+                    assert_eq!(config.cve_list_write_channel_size, 1024);
+                },
+            ),
         ];
 
         for case in cases {
@@ -1259,6 +1293,10 @@ mod tests {
         assert_eq!(
             config.cve_list_parse_concurrency,
             DEFAULT_CVE_LIST_PARSE_CONCURRENCY
+        );
+        assert_eq!(
+            config.cve_list_write_channel_size,
+            DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE
         );
     }
 
@@ -1355,6 +1393,7 @@ mod tests {
             ("cve-list-sync-interval", "rarely", "invalid digit"),
             ("cve-list-sync-interval", "0", "must be greater than 0"),
             ("cve-list-write-batch-size", "0", "must be greater than 0"),
+            ("cve-list-write-channel-size", "0", "must be greater than 0"),
         ];
 
         for (key, value, expected_error) in cases {

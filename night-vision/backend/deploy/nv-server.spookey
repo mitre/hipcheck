@@ -82,6 +82,11 @@ cve-list-parse-concurrency =
 # Default: 500
 cve-list-write-batch-size =
 
+# The number of parsed CVE List records to buffer before database writes.
+#
+# Default: 1024
+cve-list-write-channel-size =
+
 # The number of async worker threads to use for handling requests.
 #
 # Default: (the number of CPU cores available on the system)

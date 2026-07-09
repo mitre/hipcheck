@@ -15,10 +15,14 @@ use sea_orm::{
     sea_query::{Expr, OnConflict},
 };
 use std::{collections::HashSet, fmt};
+use tokio::sync::mpsc;
 use url::Url;
 
 /// Default number of CVE List records to write per database batch.
 pub const DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE: usize = 500;
+
+/// Default number of parsed CVE List records to buffer between parsing and writing.
+pub const DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE: usize = 1024;
 
 /// A CVE List sync-run status.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -157,10 +161,12 @@ where
     progress.report(CveListSyncProgress::RecordWriteStarted {
         records: records.len(),
     });
-    let mut written = 0;
+    let mut written: usize = 0;
     for chunk in records.chunks(batch_size) {
         upsert_cve_records(db, chunk).await?;
-        written += chunk.len();
+        written = written
+            .checked_add(chunk.len())
+            .expect("written record count cannot exceed supplied record count");
         progress.report(CveListSyncProgress::RecordWriteBatchCompleted {
             written,
             total: records.len(),
@@ -172,6 +178,74 @@ where
         records_inserted,
         records_updated,
     })
+}
+
+/// Upsert parsed CVE List records from a channel in batches, reporting progress.
+pub async fn write_cve_list_records_from_receiver_with_batch_size_and_progress<C, P>(
+    db: &C,
+    mut records: mpsc::Receiver<ParsedCveListFile>,
+    batch_size: usize,
+    total_records: usize,
+    progress: &P,
+) -> Result<WriteCveListRecordsSummary, WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    if batch_size == 0 {
+        return Err(WriteCveListRecordsError::InvalidBatchSize);
+    }
+
+    let mut seen = HashSet::new();
+    let mut batch = Vec::with_capacity(batch_size);
+    let mut summary = WriteCveListRecordsSummary {
+        records_seen: 0,
+        records_inserted: 0,
+        records_updated: 0,
+    };
+    let mut write_started = false;
+
+    while let Some(record) = records.recv().await {
+        if !write_started {
+            progress.report(CveListSyncProgress::RecordWriteStarted {
+                records: total_records,
+            });
+            write_started = true;
+        }
+
+        let cve_id = record.record.cve_id.as_str().to_owned();
+        if !seen.insert(cve_id.clone()) {
+            return Err(WriteCveListRecordsError::DuplicateCveId(cve_id));
+        }
+
+        batch.push(record);
+        if batch.len() == batch_size {
+            write_cve_list_record_batch(
+                db,
+                &batch,
+                batch_size,
+                total_records,
+                &mut summary,
+                progress,
+            )
+            .await?;
+            batch.clear();
+        }
+    }
+
+    if !batch.is_empty() {
+        write_cve_list_record_batch(
+            db,
+            &batch,
+            batch_size,
+            total_records,
+            &mut summary,
+            progress,
+        )
+        .await?;
+    }
+
+    Ok(summary)
 }
 
 /// Create a running CVE List sync run.
@@ -314,6 +388,50 @@ fn collect_unique_cve_ids(
     Ok(cve_ids)
 }
 
+async fn write_cve_list_record_batch<C, P>(
+    db: &C,
+    records: &[ParsedCveListFile],
+    batch_size: usize,
+    total_records: usize,
+    summary: &mut WriteCveListRecordsSummary,
+    progress: &P,
+) -> Result<(), WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    let cve_ids = collect_unique_cve_ids(records)?;
+    let existing_cve_ids = existing_cve_ids(db, &cve_ids, batch_size).await?;
+
+    upsert_cve_records(db, records).await?;
+
+    let records_updated = existing_cve_ids.len();
+    let records_inserted = cve_ids
+        .len()
+        .checked_sub(records_updated)
+        .expect("existing CVE IDs were selected from supplied CVE IDs");
+
+    summary.records_seen = summary
+        .records_seen
+        .checked_add(records.len())
+        .expect("seen record count cannot exceed streamed record count");
+    summary.records_inserted = summary
+        .records_inserted
+        .checked_add(records_inserted)
+        .expect("inserted record count cannot exceed streamed record count");
+    summary.records_updated = summary
+        .records_updated
+        .checked_add(records_updated)
+        .expect("updated record count cannot exceed streamed record count");
+
+    progress.report(CveListSyncProgress::RecordWriteBatchCompleted {
+        written: summary.records_seen,
+        total: total_records,
+    });
+
+    Ok(())
+}
+
 async fn existing_cve_ids<C>(
     db: &C,
     cve_ids: &[String],
@@ -388,6 +506,8 @@ pub enum WriteCveListRecordsError {
     DuplicateCveId(String),
     /// The configured write batch size was zero.
     InvalidBatchSize,
+    /// The configured parse-to-write channel size was zero.
+    InvalidWriteChannelSize,
 }
 
 impl std::fmt::Display for WriteCveListRecordsError {
@@ -401,6 +521,9 @@ impl std::fmt::Display for WriteCveListRecordsError {
                 )
             }
             Self::InvalidBatchSize => write!(f, "CVE List write batch size must be greater than 0"),
+            Self::InvalidWriteChannelSize => {
+                write!(f, "CVE List write channel size must be greater than 0")
+            }
         }
     }
 }
@@ -409,7 +532,9 @@ impl std::error::Error for WriteCveListRecordsError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Db(err) => Some(err),
-            Self::DuplicateCveId(_) | Self::InvalidBatchSize => None,
+            Self::DuplicateCveId(_) | Self::InvalidBatchSize | Self::InvalidWriteChannelSize => {
+                None
+            }
         }
     }
 }
@@ -572,6 +697,110 @@ mod tests {
 
         assert_eq!(select_count, 2);
         assert_eq!(upsert_count, 2);
+    }
+
+    #[test]
+    fn write_cve_list_records_from_receiver_batches_streamed_writes() {
+        let batch_size = 2;
+        let records = vec![
+            parsed_file("CVE-2026-1000"),
+            parsed_file("CVE-2026-1001"),
+            parsed_file("CVE-2026-1002"),
+        ];
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                Vec::<BTreeMap<String, Value>>::new(),
+                vec![mock_cve_id_row("CVE-2026-1002")],
+            ])
+            .append_exec_results([
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 2,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+            ])
+            .into_connection();
+
+        let summary = run_async(async {
+            let (sender, receiver) = mpsc::channel(records.len());
+            for record in records {
+                sender.send(record).await.expect("receiver should be open");
+            }
+            drop(sender);
+
+            write_cve_list_records_from_receiver_with_batch_size_and_progress(
+                &db,
+                receiver,
+                batch_size,
+                3,
+                &NoopCveListSyncProgress,
+            )
+            .await
+        })
+        .expect("write should succeed");
+
+        assert_eq!(
+            summary,
+            WriteCveListRecordsSummary {
+                records_seen: 3,
+                records_inserted: 2,
+                records_updated: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn write_cve_list_records_from_receiver_rejects_duplicate_cve_ids_across_batches() {
+        let records = vec![
+            parsed_file("CVE-2026-1000"),
+            parsed_file("CVE-2026-1001"),
+            parsed_file("CVE-2026-1000"),
+        ];
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<BTreeMap<String, Value>>::new()])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 2,
+            }])
+            .into_connection();
+
+        let err = run_async(async {
+            let (sender, receiver) = mpsc::channel(records.len());
+            for record in records {
+                sender.send(record).await.expect("receiver should be open");
+            }
+            drop(sender);
+
+            write_cve_list_records_from_receiver_with_batch_size_and_progress(
+                &db,
+                receiver,
+                2,
+                3,
+                &NoopCveListSyncProgress,
+            )
+            .await
+        })
+        .expect_err("write should fail");
+
+        assert!(matches!(
+            err,
+            WriteCveListRecordsError::DuplicateCveId(cve_id)
+                if cve_id == "CVE-2026-1000"
+        ));
+
+        let transaction_log = db.into_transaction_log();
+        let upsert_count = transaction_log
+            .iter()
+            .filter(|entry| {
+                entry.statements()[0]
+                    .sql
+                    .contains(r#"INSERT INTO "public"."cve_list_records""#)
+            })
+            .count();
+        assert_eq!(upsert_count, 1);
     }
 
     #[test]

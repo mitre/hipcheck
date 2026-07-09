@@ -5,16 +5,17 @@ use crate::cve::{
     progress::{CveListSyncProgress, CveListSyncProgressReporter, NoopCveListSyncProgress},
     repository::{
         CveListRepositoryError, DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
-        parse_all_cve_files_with_progress_and_parse_concurrency,
-        parse_changed_cve_files_with_progress_and_parse_concurrency,
+        list_all_cve_files_with_progress, list_changed_cve_files_with_progress, send_cve_files,
     },
     storage::{
-        CveListSyncRunError, CveListSyncRunStatus, FinishCveListSyncRun, WriteCveListRecordsError,
-        finish_cve_list_sync_run, last_successful_cve_list_sync_commit, start_cve_list_sync_run,
-        write_cve_list_records_with_batch_size_and_progress,
+        CveListSyncRunError, CveListSyncRunStatus, DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
+        FinishCveListSyncRun, WriteCveListRecordsError, finish_cve_list_sync_run,
+        last_successful_cve_list_sync_commit, start_cve_list_sync_run,
+        write_cve_list_records_from_receiver_with_batch_size_and_progress,
     },
 };
 use sea_orm::ConnectionTrait;
+use tokio::sync::mpsc;
 use url::Url;
 
 /// Outcome of a CVE List sync attempt.
@@ -34,6 +35,27 @@ pub struct CveListSyncSummary {
     pub records_updated: usize,
 }
 
+/// Pipeline tuning for a CVE List sync attempt.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CveListSyncPipelineConfig {
+    /// Maximum number of CVE List records to write in one database batch.
+    pub write_batch_size: usize,
+    /// Maximum number of CVE List records to parse concurrently.
+    pub parse_concurrency: usize,
+    /// Number of parsed CVE List records to buffer before database writes.
+    pub write_channel_size: usize,
+}
+
+impl CveListSyncPipelineConfig {
+    fn with_write_batch_size(write_batch_size: usize) -> Self {
+        Self {
+            write_batch_size,
+            parse_concurrency: DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
+            write_channel_size: DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
+        }
+    }
+}
+
 /// Sync CVE List records from Git into database storage once.
 pub async fn sync_cve_list_once<C, G>(
     db: &C,
@@ -46,13 +68,15 @@ where
     C: ConnectionTrait,
     G: CveListGit + Sync,
 {
-    sync_cve_list_once_with_progress(
+    let pipeline_config = CveListSyncPipelineConfig::with_write_batch_size(write_batch_size);
+
+    sync_cve_list_once_with_progress_and_parse_concurrency(
         db,
         git,
         repository_url,
         repository_ref,
-        write_batch_size,
         &NoopCveListSyncProgress,
+        pipeline_config,
     )
     .await
 }
@@ -70,14 +94,50 @@ where
     C: ConnectionTrait,
     G: CveListGit + Sync,
 {
+    let pipeline_config = CveListSyncPipelineConfig {
+        write_batch_size,
+        parse_concurrency,
+        write_channel_size: DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
+    };
+
     sync_cve_list_once_with_progress_and_parse_concurrency(
         db,
         git,
         repository_url,
         repository_ref,
-        write_batch_size,
         &NoopCveListSyncProgress,
+        pipeline_config,
+    )
+    .await
+}
+
+/// Sync CVE List records from Git into database storage once.
+pub async fn sync_cve_list_once_with_parse_and_write_channel_config<C, G>(
+    db: &C,
+    git: &G,
+    repository_url: &Url,
+    repository_ref: &GitRef,
+    write_batch_size: usize,
+    parse_concurrency: usize,
+    write_channel_size: usize,
+) -> Result<CveListSyncSummary, CveListSyncError>
+where
+    C: ConnectionTrait,
+    G: CveListGit + Sync,
+{
+    let pipeline_config = CveListSyncPipelineConfig {
+        write_batch_size,
         parse_concurrency,
+        write_channel_size,
+    };
+
+    sync_cve_list_once_with_progress_and_parse_concurrency(
+        db,
+        git,
+        repository_url,
+        repository_ref,
+        &NoopCveListSyncProgress,
+        pipeline_config,
     )
     .await
 }
@@ -96,14 +156,15 @@ where
     G: CveListGit + Sync,
     P: CveListSyncProgressReporter + ?Sized,
 {
+    let pipeline_config = CveListSyncPipelineConfig::with_write_batch_size(write_batch_size);
+
     sync_cve_list_once_with_progress_and_parse_concurrency(
         db,
         git,
         repository_url,
         repository_ref,
-        write_batch_size,
         progress,
-        DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
+        pipeline_config,
     )
     .await
 }
@@ -114,9 +175,8 @@ pub async fn sync_cve_list_once_with_progress_and_parse_concurrency<C, G, P>(
     git: &G,
     repository_url: &Url,
     repository_ref: &GitRef,
-    write_batch_size: usize,
     progress: &P,
-    parse_concurrency: usize,
+    pipeline_config: CveListSyncPipelineConfig,
 ) -> Result<CveListSyncSummary, CveListSyncError>
 where
     C: ConnectionTrait,
@@ -129,15 +189,8 @@ where
     progress.report(CveListSyncProgress::Started { generation });
     let mut resolved_commit = None;
 
-    let sync_result = run_cve_list_sync(
-        db,
-        git,
-        write_batch_size,
-        parse_concurrency,
-        &mut resolved_commit,
-        progress,
-    )
-    .await;
+    let sync_result =
+        run_cve_list_sync(db, git, pipeline_config, &mut resolved_commit, progress).await;
 
     finish_cve_list_sync(db, generation, resolved_commit, sync_result, progress).await
 }
@@ -196,8 +249,7 @@ where
 async fn run_cve_list_sync<C, G, P>(
     db: &C,
     git: &G,
-    write_batch_size: usize,
-    parse_concurrency: usize,
+    pipeline_config: CveListSyncPipelineConfig,
     resolved_commit: &mut Option<CommitSha>,
     progress: &P,
 ) -> Result<FinishCveListSyncRun, CveListSyncError>
@@ -235,37 +287,40 @@ where
         });
     }
 
-    let records = match last_successful_commit {
+    if pipeline_config.write_channel_size == 0 {
+        return Err(CveListSyncError::Storage(
+            WriteCveListRecordsError::InvalidWriteChannelSize,
+        ));
+    }
+
+    let paths = match last_successful_commit {
         Some(old_commit) => {
-            parse_changed_cve_files_with_progress_and_parse_concurrency(
-                git,
-                &old_commit,
-                &new_commit,
-                progress,
-                parse_concurrency,
-            )
-            .await
+            list_changed_cve_files_with_progress(git, &old_commit, &new_commit, progress).await
         }
-        None => {
-            parse_all_cve_files_with_progress_and_parse_concurrency(
-                git,
-                &new_commit,
-                progress,
-                parse_concurrency,
-            )
-            .await
-        }
+        None => list_all_cve_files_with_progress(git, &new_commit, progress).await,
     }
     .map_err(CveListSyncError::Repository)?;
 
-    let write_summary = write_cve_list_records_with_batch_size_and_progress(
-        db,
-        &records,
-        write_batch_size,
+    let total_records = paths.len();
+    let (sender, receiver) = mpsc::channel(pipeline_config.write_channel_size);
+    let parse_records = send_cve_files(
+        git,
+        &new_commit,
+        paths,
         progress,
-    )
-    .await
-    .map_err(CveListSyncError::Storage)?;
+        pipeline_config.parse_concurrency,
+        sender,
+    );
+    let write_records = write_cve_list_records_from_receiver_with_batch_size_and_progress(
+        db,
+        receiver,
+        pipeline_config.write_batch_size,
+        total_records,
+        progress,
+    );
+    let (parse_result, write_result) = tokio::join!(parse_records, write_records);
+    let write_summary = write_result.map_err(CveListSyncError::Storage)?;
+    parse_result.map_err(CveListSyncError::Repository)?;
 
     Ok(FinishCveListSyncRun {
         status: CveListSyncRunStatus::Success,

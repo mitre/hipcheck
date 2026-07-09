@@ -7,6 +7,7 @@ use crate::cve::{
 };
 use camino::Utf8PathBuf;
 use futures_util::{StreamExt as _, stream};
+use tokio::sync::mpsc;
 
 /// Default number of CVE List records to read and parse concurrently.
 pub const DEFAULT_CVE_RECORD_PARSE_CONCURRENCY: usize = 32;
@@ -61,13 +62,25 @@ where
     G: CveListGit + Sync,
     P: CveListSyncProgressReporter + ?Sized,
 {
-    progress.report(CveListSyncProgress::CveFileListStarted);
-    let paths = git
-        .all_cve_files(commit)
-        .await
-        .map_err(CveListRepositoryError::Git)?;
+    let paths = list_all_cve_files_with_progress(git, commit, progress).await?;
 
     parse_cve_files(git, commit, paths, progress, parse_concurrency).await
+}
+
+/// List every CVE JSON record present at `commit`, reporting progress.
+pub(crate) async fn list_all_cve_files_with_progress<G, P>(
+    git: &G,
+    commit: &CommitSha,
+    progress: &P,
+) -> Result<Vec<Utf8PathBuf>, CveListRepositoryError>
+where
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    progress.report(CveListSyncProgress::CveFileListStarted);
+    git.all_cve_files(commit)
+        .await
+        .map_err(CveListRepositoryError::Git)
 }
 
 /// Parse CVE JSON records that were added, modified, or renamed between commits.
@@ -115,13 +128,26 @@ where
     G: CveListGit + Sync,
     P: CveListSyncProgressReporter + ?Sized,
 {
-    progress.report(CveListSyncProgress::CveFileListStarted);
-    let paths = git
-        .changed_cve_files(old, new)
-        .await
-        .map_err(CveListRepositoryError::Git)?;
+    let paths = list_changed_cve_files_with_progress(git, old, new, progress).await?;
 
     parse_cve_files(git, new, paths, progress, parse_concurrency).await
+}
+
+/// List CVE JSON records added, modified, or renamed between commits, reporting progress.
+pub(crate) async fn list_changed_cve_files_with_progress<G, P>(
+    git: &G,
+    old: &CommitSha,
+    new: &CommitSha,
+    progress: &P,
+) -> Result<Vec<Utf8PathBuf>, CveListRepositoryError>
+where
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    progress.report(CveListSyncProgress::CveFileListStarted);
+    git.changed_cve_files(old, new)
+        .await
+        .map_err(CveListRepositoryError::Git)
 }
 
 async fn parse_cve_files<G, P>(
@@ -173,6 +199,58 @@ where
     Ok(records.into_iter().map(|(_, record)| record).collect())
 }
 
+pub(crate) async fn send_cve_files<G, P>(
+    git: &G,
+    commit: &CommitSha,
+    paths: Vec<Utf8PathBuf>,
+    progress: &P,
+    parse_concurrency: usize,
+    sender: mpsc::Sender<ParsedCveListFile>,
+) -> Result<usize, CveListRepositoryError>
+where
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    if parse_concurrency == 0 {
+        return Err(CveListRepositoryError::InvalidParseConcurrency);
+    }
+
+    let total = paths.len();
+    progress.report(CveListSyncProgress::CveFileListCompleted { records: total });
+
+    let mut parsed_files = stream::iter(paths)
+        .map(|path| async move {
+            let contents = git
+                .read_file_at_commit(commit, &path)
+                .await
+                .map_err(CveListRepositoryError::Git)?;
+            let record_path = path.clone();
+            let task_path = path.clone();
+            let record = tokio::task::spawn_blocking(move || parse_cve_record(contents.as_bytes()))
+                .await
+                .map_err(|err| CveListRepositoryError::ParseTask(task_path, err))?
+                .map_err(|err| CveListRepositoryError::Record(record_path, err))?;
+
+            Ok(ParsedCveListFile { path, record })
+        })
+        .buffer_unordered(parse_concurrency);
+
+    let mut parsed: usize = 0;
+    while let Some(parsed_file) = parsed_files.next().await {
+        let parsed_file = parsed_file?;
+        sender
+            .send(parsed_file)
+            .await
+            .map_err(|_| CveListRepositoryError::ParsedRecordReceiverClosed)?;
+        parsed = parsed
+            .checked_add(1)
+            .expect("parsed count cannot exceed listed CVE file count");
+        progress.report(CveListSyncProgress::CveFileParsed { parsed, total });
+    }
+
+    Ok(parsed)
+}
+
 /// Failure while ingesting CVE List repository files.
 #[derive(Debug)]
 pub enum CveListRepositoryError {
@@ -182,6 +260,8 @@ pub enum CveListRepositoryError {
     InvalidParseConcurrency,
     /// The blocking parser task failed.
     ParseTask(Utf8PathBuf, tokio::task::JoinError),
+    /// The parsed-record receiver closed before parsing completed.
+    ParsedRecordReceiverClosed,
     /// A CVE record file could not be parsed.
     Record(Utf8PathBuf, CveRecordParseError),
 }
@@ -196,6 +276,12 @@ impl std::fmt::Display for CveListRepositoryError {
             Self::ParseTask(path, _) => {
                 write!(f, "failed to run CVE List record parser for {path}")
             }
+            Self::ParsedRecordReceiverClosed => {
+                write!(
+                    f,
+                    "parsed CVE List record receiver closed before parsing completed"
+                )
+            }
             Self::Record(path, _) => write!(f, "failed to parse CVE List record {path}"),
         }
     }
@@ -207,6 +293,7 @@ impl std::error::Error for CveListRepositoryError {
             Self::Git(err) => Some(err),
             Self::InvalidParseConcurrency => None,
             Self::ParseTask(_, err) => Some(err),
+            Self::ParsedRecordReceiverClosed => None,
             Self::Record(_, err) => Some(err),
         }
     }
