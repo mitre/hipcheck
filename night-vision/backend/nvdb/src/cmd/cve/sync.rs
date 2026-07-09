@@ -9,7 +9,6 @@ use nv_common::{
     },
     db, rt,
 };
-use std::time::Duration;
 
 use crate::destructive::DestructiveOperationToken;
 
@@ -64,7 +63,6 @@ async fn sync(config: &Config, _token: DestructiveOperationToken) -> Result<()> 
 
 struct CveSyncProgressBar {
     multi: MultiProgress,
-    status_bar: ProgressBar,
     read_bar: ProgressBar,
     parse_bar: ProgressBar,
     write_bar: ProgressBar,
@@ -73,10 +71,6 @@ struct CveSyncProgressBar {
 impl CveSyncProgressBar {
     fn new() -> Self {
         let multi = MultiProgress::new();
-        let status_bar = multi.add(ProgressBar::new_spinner());
-        status_bar.set_style(spinner_style());
-        status_bar.enable_steady_tick(Duration::from_millis(100));
-
         let read_bar = multi.add(ProgressBar::new(0));
         read_bar.set_style(bar_style());
         read_bar.set_message("reading CVE records");
@@ -91,7 +85,6 @@ impl CveSyncProgressBar {
 
         Self {
             multi,
-            status_bar,
             read_bar,
             parse_bar,
             write_bar,
@@ -100,13 +93,6 @@ impl CveSyncProgressBar {
 
     fn finish(&self) {
         let _ = self.multi.clear();
-    }
-
-    fn set_spinner_message(&self, message: &'static str) {
-        self.status_bar.set_style(spinner_style());
-        self.status_bar
-            .enable_steady_tick(Duration::from_millis(100));
-        self.status_bar.set_message(message);
     }
 
     fn reset_parse_bar(&self, len: usize) {
@@ -143,25 +129,6 @@ impl CveSyncProgressBar {
 impl CveListSyncProgressReporter for CveSyncProgressBar {
     fn report(&self, progress: CveListSyncProgress) {
         match progress {
-            CveListSyncProgress::Started { generation } => {
-                self.status_bar
-                    .set_message(format!("started CVE List sync run {generation}"));
-            }
-            CveListSyncProgress::GitCheckoutStarted => {
-                self.set_spinner_message("checking CVE List checkout");
-            }
-            CveListSyncProgress::GitFetchStarted => {
-                self.set_spinner_message("fetching CVE List repository");
-            }
-            CveListSyncProgress::GitRefResolveStarted => {
-                self.set_spinner_message("resolving CVE List ref");
-            }
-            CveListSyncProgress::PreviousSyncLookupStarted => {
-                self.set_spinner_message("checking previous sync");
-            }
-            CveListSyncProgress::CveFileListStarted => {
-                self.set_spinner_message("listing CVE records");
-            }
             CveListSyncProgress::CveFileListCompleted { records } => {
                 self.reset_parse_bar(records);
             }
@@ -174,38 +141,25 @@ impl CveListSyncProgressReporter for CveSyncProgressBar {
             CveListSyncProgress::CveFileParsed { parsed, total } => {
                 self.set_parse_position(parsed, total);
             }
-            CveListSyncProgress::ExistingRecordLookupStarted { records } => {
-                self.set_spinner_message(if records == 1 {
-                    "checking existing CVE record"
-                } else {
-                    "checking existing CVE records"
-                });
-            }
-            CveListSyncProgress::ExistingRecordLookupCompleted { .. } => {
-                self.set_spinner_message("preparing database writes");
-            }
             CveListSyncProgress::RecordWriteStarted { records } => {
                 self.reset_write_bar(records);
             }
             CveListSyncProgress::RecordWriteBatchCompleted { written, total } => {
                 self.set_write_position(written, total);
             }
-            CveListSyncProgress::NotModified => {
-                self.set_spinner_message("CVE List data is already current");
-            }
-            CveListSyncProgress::FinishStarted => {
-                self.set_spinner_message("finalizing sync run");
-            }
-            CveListSyncProgress::Finished => {
-                self.set_spinner_message("finished CVE List sync");
-            }
+            CveListSyncProgress::Started { .. }
+            | CveListSyncProgress::GitCheckoutStarted
+            | CveListSyncProgress::GitFetchStarted
+            | CveListSyncProgress::GitRefResolveStarted
+            | CveListSyncProgress::PreviousSyncLookupStarted
+            | CveListSyncProgress::CveFileListStarted
+            | CveListSyncProgress::ExistingRecordLookupStarted { .. }
+            | CveListSyncProgress::ExistingRecordLookupCompleted { .. }
+            | CveListSyncProgress::NotModified
+            | CveListSyncProgress::FinishStarted
+            | CveListSyncProgress::Finished => {}
         }
     }
-}
-
-fn spinner_style() -> ProgressStyle {
-    ProgressStyle::with_template("{spinner:.green} {msg}")
-        .expect("spinner progress template should be valid")
 }
 
 fn bar_style() -> ProgressStyle {
