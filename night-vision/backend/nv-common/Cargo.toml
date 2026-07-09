@@ -12,6 +12,7 @@ async-trait.workspace = true
 camino.workspace = true
 clap-verbosity-flag.workspace = true
 dropshot.workspace = true
+futures-util.workspace = true
 itertools.workspace = true
 migration.workspace = true
 sea-orm.workspace = true

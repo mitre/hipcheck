@@ -4,8 +4,9 @@ use crate::cve::{
     git::{CommitSha, CveListGit, CveListGitError, GitRef},
     progress::{CveListSyncProgress, CveListSyncProgressReporter, NoopCveListSyncProgress},
     repository::{
-        CveListRepositoryError, parse_all_cve_files_with_progress,
-        parse_changed_cve_files_with_progress,
+        CveListRepositoryError, DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
+        parse_all_cve_files_with_progress_and_parse_concurrency,
+        parse_changed_cve_files_with_progress_and_parse_concurrency,
     },
     storage::{
         CveListSyncRunError, CveListSyncRunStatus, FinishCveListSyncRun, WriteCveListRecordsError,
@@ -56,6 +57,31 @@ where
     .await
 }
 
+/// Sync CVE List records from Git into database storage once.
+pub async fn sync_cve_list_once_with_parse_concurrency<C, G>(
+    db: &C,
+    git: &G,
+    repository_url: &Url,
+    repository_ref: &GitRef,
+    write_batch_size: usize,
+    parse_concurrency: usize,
+) -> Result<CveListSyncSummary, CveListSyncError>
+where
+    C: ConnectionTrait,
+    G: CveListGit + Sync,
+{
+    sync_cve_list_once_with_progress_and_parse_concurrency(
+        db,
+        git,
+        repository_url,
+        repository_ref,
+        write_batch_size,
+        &NoopCveListSyncProgress,
+        parse_concurrency,
+    )
+    .await
+}
+
 /// Sync CVE List records from Git into database storage once, reporting progress.
 pub async fn sync_cve_list_once_with_progress<C, G, P>(
     db: &C,
@@ -70,15 +96,63 @@ where
     G: CveListGit + Sync,
     P: CveListSyncProgressReporter + ?Sized,
 {
+    sync_cve_list_once_with_progress_and_parse_concurrency(
+        db,
+        git,
+        repository_url,
+        repository_ref,
+        write_batch_size,
+        progress,
+        DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
+    )
+    .await
+}
+
+/// Sync CVE List records from Git into database storage once, reporting progress.
+pub async fn sync_cve_list_once_with_progress_and_parse_concurrency<C, G, P>(
+    db: &C,
+    git: &G,
+    repository_url: &Url,
+    repository_ref: &GitRef,
+    write_batch_size: usize,
+    progress: &P,
+    parse_concurrency: usize,
+) -> Result<CveListSyncSummary, CveListSyncError>
+where
+    C: ConnectionTrait,
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
     let generation = start_cve_list_sync_run(db, repository_url, repository_ref)
         .await
         .map_err(CveListSyncError::StartSyncRun)?;
     progress.report(CveListSyncProgress::Started { generation });
     let mut resolved_commit = None;
 
-    let sync_result =
-        run_cve_list_sync(db, git, write_batch_size, &mut resolved_commit, progress).await;
+    let sync_result = run_cve_list_sync(
+        db,
+        git,
+        write_batch_size,
+        parse_concurrency,
+        &mut resolved_commit,
+        progress,
+    )
+    .await;
 
+    finish_cve_list_sync(db, generation, resolved_commit, sync_result, progress).await
+}
+
+async fn finish_cve_list_sync<C, P>(
+    db: &C,
+    generation: i64,
+    resolved_commit: Option<CommitSha>,
+    sync_result: Result<FinishCveListSyncRun, CveListSyncError>,
+    progress: &P,
+) -> Result<CveListSyncSummary, CveListSyncError>
+where
+    C: ConnectionTrait,
+    P: CveListSyncProgressReporter + ?Sized,
+{
     let completion = match sync_result {
         Ok(completion) => completion,
         Err(error) => {
@@ -123,6 +197,7 @@ async fn run_cve_list_sync<C, G, P>(
     db: &C,
     git: &G,
     write_batch_size: usize,
+    parse_concurrency: usize,
     resolved_commit: &mut Option<CommitSha>,
     progress: &P,
 ) -> Result<FinishCveListSyncRun, CveListSyncError>
@@ -162,9 +237,24 @@ where
 
     let records = match last_successful_commit {
         Some(old_commit) => {
-            parse_changed_cve_files_with_progress(git, &old_commit, &new_commit, progress).await
+            parse_changed_cve_files_with_progress_and_parse_concurrency(
+                git,
+                &old_commit,
+                &new_commit,
+                progress,
+                parse_concurrency,
+            )
+            .await
         }
-        None => parse_all_cve_files_with_progress(git, &new_commit, progress).await,
+        None => {
+            parse_all_cve_files_with_progress_and_parse_concurrency(
+                git,
+                &new_commit,
+                progress,
+                parse_concurrency,
+            )
+            .await
+        }
     }
     .map_err(CveListSyncError::Repository)?;
 

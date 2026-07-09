@@ -1,7 +1,10 @@
 //! Defines configuration for the Night Vision server.
 
 use crate::{
-    cve::{git::GitRef, storage::DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE},
+    cve::{
+        git::GitRef, repository::DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
+        storage::DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE,
+    },
     error::ErrorSourceIterator as _,
     secret::{SecretFileError, SecretSource, SecretSourceKind},
 };
@@ -27,6 +30,7 @@ pub const DEFAULT_CONFIG_FILE: &str = "nv-server.spookey";
 const DEFAULT_CVE_LIST_REPOSITORY_URL: &str = "https://github.com/CVEProject/cvelistV5.git";
 const DEFAULT_CVE_LIST_REPOSITORY_REF: &str = "main";
 const DEFAULT_CVE_LIST_SYNC_INTERVAL: u64 = 420_000;
+const DEFAULT_CVE_LIST_PARSE_CONCURRENCY: usize = DEFAULT_CVE_RECORD_PARSE_CONCURRENCY;
 const DEFAULT_CVE_LIST_WRITE_BATCH_SIZE: usize = DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE;
 
 /// Errors that can occur while loading configuration.
@@ -186,6 +190,9 @@ pub struct Config {
     /// The local checkout path for the CVE List repository cache.
     pub cve_list_checkout_path: Utf8PathBuf,
 
+    /// The maximum number of CVE List records to parse concurrently.
+    pub cve_list_parse_concurrency: usize,
+
     /// The maximum number of CVE List records to write in one database batch.
     pub cve_list_write_batch_size: usize,
 }
@@ -197,6 +204,7 @@ pub struct CveListWorkerConfig {
     repository_ref: GitRef,
     sync_interval: Duration,
     checkout_path: Utf8PathBuf,
+    parse_concurrency: usize,
     write_batch_size: usize,
 }
 
@@ -219,6 +227,11 @@ impl CveListWorkerConfig {
     /// The local checkout path for the CVE List repository cache.
     pub fn checkout_path(&self) -> &Utf8Path {
         &self.checkout_path
+    }
+
+    /// The maximum number of CVE List records to parse concurrently.
+    pub fn parse_concurrency(&self) -> usize {
+        self.parse_concurrency
     }
 
     /// The maximum number of CVE List records to write in one database batch.
@@ -265,6 +278,7 @@ impl Config {
                     "cve-list-repository-url",
                     "cve-list-repository-ref",
                     "cve-list-sync-interval",
+                    "cve-list-parse-concurrency",
                     "cve-list-write-batch-size",
                 ],
             },
@@ -329,6 +343,12 @@ impl Config {
         let cve_list_checkout_path: Utf8PathBuf =
             parse_value(&parsed, "cve-list-checkout-path", &mut errors)
                 .expect("cve-list-checkout-path is required");
+        let cve_list_parse_concurrency = parse_positive_usize(
+            &parsed,
+            "cve-list-parse-concurrency",
+            DEFAULT_CVE_LIST_PARSE_CONCURRENCY,
+            &mut errors,
+        );
         let cve_list_write_batch_size = parse_positive_usize(
             &parsed,
             "cve-list-write-batch-size",
@@ -365,6 +385,7 @@ impl Config {
             cve_list_repository_ref,
             cve_list_sync_interval,
             cve_list_checkout_path,
+            cve_list_parse_concurrency,
             cve_list_write_batch_size,
         };
 
@@ -413,6 +434,7 @@ impl Config {
             repository_ref: self.cve_list_repository_ref.clone(),
             sync_interval: Duration::from_millis(self.cve_list_sync_interval),
             checkout_path: self.cve_list_checkout_path.clone(),
+            parse_concurrency: self.cve_list_parse_concurrency,
             write_batch_size: self.cve_list_write_batch_size,
         }
     }
@@ -526,6 +548,11 @@ impl Display for Config {
         write_report_line!(f, "cve-list-repository-ref", &self.cve_list_repository_ref)?;
         write_report_line!(f, "cve-list-sync-interval", &self.cve_list_sync_interval)?;
         write_report_line!(f, "cve-list-checkout-path", &self.cve_list_checkout_path)?;
+        write_report_line!(
+            f,
+            "cve-list-parse-concurrency",
+            &self.cve_list_parse_concurrency
+        )?;
         write_report_line!(
             f,
             "cve-list-write-batch-size",
@@ -1158,6 +1185,13 @@ mod tests {
                 },
             ),
             ConfigFieldParseCase::new(
+                "cve_list_parse_concurrency",
+                "cve-list-parse-concurrency = 16",
+                |config, _| {
+                    assert_eq!(config.cve_list_parse_concurrency, 16);
+                },
+            ),
+            ConfigFieldParseCase::new(
                 "cve_list_write_batch_size",
                 "cve-list-write-batch-size = 250",
                 |config, _| {
@@ -1221,6 +1255,10 @@ mod tests {
         assert_eq!(
             config.cve_list_write_batch_size,
             DEFAULT_CVE_LIST_WRITE_BATCH_SIZE
+        );
+        assert_eq!(
+            config.cve_list_parse_concurrency,
+            DEFAULT_CVE_LIST_PARSE_CONCURRENCY
         );
     }
 
