@@ -70,7 +70,7 @@ where
 {
     let pipeline_config = CveListSyncPipelineConfig::with_write_batch_size(write_batch_size);
 
-    sync_cve_list_once_with_progress_and_parse_concurrency(
+    sync_cve_list_once_with_progress_and_pipeline_config(
         db,
         git,
         repository_url,
@@ -100,7 +100,7 @@ where
         write_channel_size: DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
     };
 
-    sync_cve_list_once_with_progress_and_parse_concurrency(
+    sync_cve_list_once_with_progress_and_pipeline_config(
         db,
         git,
         repository_url,
@@ -131,7 +131,7 @@ where
         write_channel_size,
     };
 
-    sync_cve_list_once_with_progress_and_parse_concurrency(
+    sync_cve_list_once_with_progress_and_pipeline_config(
         db,
         git,
         repository_url,
@@ -158,7 +158,7 @@ where
 {
     let pipeline_config = CveListSyncPipelineConfig::with_write_batch_size(write_batch_size);
 
-    sync_cve_list_once_with_progress_and_parse_concurrency(
+    sync_cve_list_once_with_progress_and_pipeline_config(
         db,
         git,
         repository_url,
@@ -171,6 +171,31 @@ where
 
 /// Sync CVE List records from Git into database storage once, reporting progress.
 pub async fn sync_cve_list_once_with_progress_and_parse_concurrency<C, G, P>(
+    db: &C,
+    git: &G,
+    repository_url: &Url,
+    repository_ref: &GitRef,
+    progress: &P,
+    pipeline_config: CveListSyncPipelineConfig,
+) -> Result<CveListSyncSummary, CveListSyncError>
+where
+    C: ConnectionTrait,
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    sync_cve_list_once_with_progress_and_pipeline_config(
+        db,
+        git,
+        repository_url,
+        repository_ref,
+        progress,
+        pipeline_config,
+    )
+    .await
+}
+
+/// Sync CVE List records from Git into database storage once, reporting progress.
+pub async fn sync_cve_list_once_with_progress_and_pipeline_config<C, G, P>(
     db: &C,
     git: &G,
     repository_url: &Url,

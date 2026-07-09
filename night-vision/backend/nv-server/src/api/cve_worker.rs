@@ -5,9 +5,10 @@ use nv_common::{
     config::CveListWorkerConfig,
     cve::{
         git::{CommitSha, GitCliCveListGit},
+        progress::NoopCveListSyncProgress,
         sync::{
             CveListSyncError, CveListSyncSummary,
-            sync_cve_list_once_with_parse_and_write_channel_config,
+            sync_cve_list_once_with_progress_and_pipeline_config,
         },
     },
 };
@@ -71,14 +72,13 @@ async fn sync_cve_list(
         config.repository_ref().clone(),
     );
 
-    sync_cve_list_once_with_parse_and_write_channel_config(
+    sync_cve_list_once_with_progress_and_pipeline_config(
         db,
         &git,
         config.repository_url(),
         config.repository_ref(),
-        config.write_batch_size(),
-        config.parse_concurrency(),
-        config.write_channel_size(),
+        &NoopCveListSyncProgress,
+        config.sync_pipeline_config(),
     )
     .await
 }

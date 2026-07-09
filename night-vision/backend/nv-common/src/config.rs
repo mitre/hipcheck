@@ -7,6 +7,7 @@ use crate::{
         storage::{
             DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE, DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
         },
+        sync::CveListSyncPipelineConfig,
     },
     error::ErrorSourceIterator as _,
     secret::{SecretFileError, SecretSource, SecretSourceKind},
@@ -250,6 +251,15 @@ impl CveListWorkerConfig {
     /// The number of parsed CVE List records to buffer before database writes.
     pub fn write_channel_size(&self) -> usize {
         self.write_channel_size
+    }
+
+    /// Build pipeline tuning for one CVE List sync attempt.
+    pub fn sync_pipeline_config(&self) -> CveListSyncPipelineConfig {
+        CveListSyncPipelineConfig {
+            write_batch_size: self.write_batch_size,
+            parse_concurrency: self.parse_concurrency,
+            write_channel_size: self.write_channel_size,
+        }
     }
 }
 
