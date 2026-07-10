@@ -36,9 +36,11 @@ const DEFAULT_CVE_LIST_REPOSITORY_REF: &str = "main";
 const DEFAULT_CVE_LIST_SYNC_INTERVAL: u64 = 420_000;
 const DEFAULT_CVE_LIST_SYNC_TIMEOUT: u64 = 3_600_000;
 const DEFAULT_CVE_LIST_FIRST_SYNC_TIMEOUT: u64 = 14_400_000;
-const DEFAULT_CVE_LIST_PARSE_CONCURRENCY: usize = DEFAULT_CVE_RECORD_PARSE_CONCURRENCY;
+const DEFAULT_CVE_LIST_PARSE_CONCURRENCY_CAP: usize = DEFAULT_CVE_RECORD_PARSE_CONCURRENCY;
 const DEFAULT_CVE_LIST_WRITE_BATCH_SIZE: usize = DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE;
-const DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE: usize = DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE;
+const DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE_CAP: usize = DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE;
+const DEFAULT_ASYNC_MAX_BLOCKING_THREADS: usize = 512;
+const MIN_COMPUTED_CVE_LIST_PARSE_CONCURRENCY: usize = 2;
 
 /// Errors that can occur while loading configuration.
 pub enum ConfigLoadError {
@@ -211,6 +213,40 @@ pub struct Config {
 
     /// The number of parsed CVE List records to buffer before database writes.
     pub cve_list_write_channel_size: usize,
+
+    /// Whether CVE List parse concurrency was explicit or computed.
+    pub cve_list_parse_concurrency_source: ConfigValueSource,
+
+    /// Whether CVE List write batch size was explicit or defaulted.
+    pub cve_list_write_batch_size_source: ConfigValueSource,
+
+    /// Whether CVE List write channel size was explicit or computed.
+    pub cve_list_write_channel_size_source: ConfigValueSource,
+}
+
+/// Where a resolved configuration value came from.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConfigValueSource {
+    /// The value was set in the configuration file.
+    Explicit,
+    /// The value was computed because the configuration key was unset.
+    ComputedDefault,
+}
+
+impl ConfigValueSource {
+    /// Whether the value came from an automatic default.
+    pub fn is_computed_default(self) -> bool {
+        matches!(self, Self::ComputedDefault)
+    }
+}
+
+impl Display for ConfigValueSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Explicit => write!(f, "explicit"),
+            Self::ComputedDefault => write!(f, "computed_default"),
+        }
+    }
 }
 
 /// Runtime configuration for the CVE List worker.
@@ -225,6 +261,9 @@ pub struct CveListWorkerConfig {
     parse_concurrency: usize,
     write_batch_size: usize,
     write_channel_size: usize,
+    parse_concurrency_source: ConfigValueSource,
+    write_batch_size_source: ConfigValueSource,
+    write_channel_size_source: ConfigValueSource,
 }
 
 impl CveListWorkerConfig {
@@ -271,6 +310,21 @@ impl CveListWorkerConfig {
     /// The number of parsed CVE List records to buffer before database writes.
     pub fn write_channel_size(&self) -> usize {
         self.write_channel_size
+    }
+
+    /// Whether parse concurrency was explicit or computed.
+    pub fn parse_concurrency_source(&self) -> ConfigValueSource {
+        self.parse_concurrency_source
+    }
+
+    /// Whether write batch size was explicit or defaulted.
+    pub fn write_batch_size_source(&self) -> ConfigValueSource {
+        self.write_batch_size_source
+    }
+
+    /// Whether write channel size was explicit or computed.
+    pub fn write_channel_size_source(&self) -> ConfigValueSource {
+        self.write_channel_size_source
     }
 
     /// Build pipeline tuning for one CVE List sync attempt.
@@ -409,29 +463,24 @@ impl Config {
         let cve_list_checkout_path: Utf8PathBuf =
             parse_value(&parsed, "cve-list-checkout-path", &mut errors)
                 .expect("cve-list-checkout-path is required");
-        let cve_list_parse_concurrency = parse_positive_usize(
-            &parsed,
-            "cve-list-parse-concurrency",
-            DEFAULT_CVE_LIST_PARSE_CONCURRENCY,
-            &mut errors,
-        );
-        let cve_list_write_batch_size = parse_positive_usize(
-            &parsed,
-            "cve-list-write-batch-size",
-            DEFAULT_CVE_LIST_WRITE_BATCH_SIZE,
-            &mut errors,
-        );
-        let cve_list_write_channel_size = parse_positive_usize(
-            &parsed,
-            "cve-list-write-channel-size",
-            DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE,
-            &mut errors,
-        );
+        let cve_list_parse_concurrency =
+            parse_positive_usize_option(&parsed, "cve-list-parse-concurrency", &mut errors);
+        let cve_list_write_batch_size =
+            parse_positive_usize_option(&parsed, "cve-list-write-batch-size", &mut errors);
+        let cve_list_write_channel_size =
+            parse_positive_usize_option(&parsed, "cve-list-write-channel-size", &mut errors);
 
         check_errors(path, parsed.warnings, errors)?;
 
         let (database_connection_source, database_connection) =
             resolve_database_connection_source(database_connection_source)?;
+        let cve_list_pipeline_config = resolve_cve_list_pipeline_config(
+            async_worker_threads,
+            async_max_blocking_threads,
+            cve_list_parse_concurrency,
+            cve_list_write_batch_size,
+            cve_list_write_channel_size,
+        );
 
         let config = Self {
             config_file_path: path.into(),
@@ -459,9 +508,12 @@ impl Config {
             cve_list_sync_timeout,
             cve_list_first_sync_timeout,
             cve_list_checkout_path,
-            cve_list_parse_concurrency,
-            cve_list_write_batch_size,
-            cve_list_write_channel_size,
+            cve_list_parse_concurrency: cve_list_pipeline_config.parse_concurrency,
+            cve_list_write_batch_size: cve_list_pipeline_config.write_batch_size,
+            cve_list_write_channel_size: cve_list_pipeline_config.write_channel_size,
+            cve_list_parse_concurrency_source: cve_list_pipeline_config.parse_concurrency_source,
+            cve_list_write_batch_size_source: cve_list_pipeline_config.write_batch_size_source,
+            cve_list_write_channel_size_source: cve_list_pipeline_config.write_channel_size_source,
         };
 
         Ok(config)
@@ -514,7 +566,58 @@ impl Config {
             parse_concurrency: self.cve_list_parse_concurrency,
             write_batch_size: self.cve_list_write_batch_size,
             write_channel_size: self.cve_list_write_channel_size,
+            parse_concurrency_source: self.cve_list_parse_concurrency_source,
+            write_batch_size_source: self.cve_list_write_batch_size_source,
+            write_channel_size_source: self.cve_list_write_channel_size_source,
         }
+    }
+}
+
+struct ResolvedCveListPipelineConfig {
+    parse_concurrency: usize,
+    write_batch_size: usize,
+    write_channel_size: usize,
+    parse_concurrency_source: ConfigValueSource,
+    write_batch_size_source: ConfigValueSource,
+    write_channel_size_source: ConfigValueSource,
+}
+
+fn resolve_cve_list_pipeline_config(
+    async_worker_threads: Option<usize>,
+    async_max_blocking_threads: Option<usize>,
+    parse_concurrency: Option<usize>,
+    write_batch_size: Option<usize>,
+    write_channel_size: Option<usize>,
+) -> ResolvedCveListPipelineConfig {
+    let (parse_concurrency, parse_concurrency_source) = match parse_concurrency {
+        Some(value) => (value, ConfigValueSource::Explicit),
+        None => (
+            default_cve_list_parse_concurrency(async_worker_threads, async_max_blocking_threads),
+            ConfigValueSource::ComputedDefault,
+        ),
+    };
+    let (write_batch_size, write_batch_size_source) = match write_batch_size {
+        Some(value) => (value, ConfigValueSource::Explicit),
+        None => (
+            DEFAULT_CVE_LIST_WRITE_BATCH_SIZE,
+            ConfigValueSource::ComputedDefault,
+        ),
+    };
+    let (write_channel_size, write_channel_size_source) = match write_channel_size {
+        Some(value) => (value, ConfigValueSource::Explicit),
+        None => (
+            default_cve_list_write_channel_size(parse_concurrency, write_batch_size),
+            ConfigValueSource::ComputedDefault,
+        ),
+    };
+
+    ResolvedCveListPipelineConfig {
+        parse_concurrency,
+        write_batch_size,
+        write_channel_size,
+        parse_concurrency_source,
+        write_batch_size_source,
+        write_channel_size_source,
     }
 }
 
@@ -663,6 +766,33 @@ fn default_cve_list_repository_ref() -> GitRef {
         .expect("default CVE List repository ref is valid")
 }
 
+fn default_cve_list_parse_concurrency(
+    async_worker_threads: Option<usize>,
+    async_max_blocking_threads: Option<usize>,
+) -> usize {
+    let worker_threads = async_worker_threads.unwrap_or_else(available_parallelism);
+    let blocking_threads = async_max_blocking_threads.unwrap_or(DEFAULT_ASYNC_MAX_BLOCKING_THREADS);
+    let cpu_scaled = worker_threads
+        .saturating_mul(2)
+        .max(MIN_COMPUTED_CVE_LIST_PARSE_CONCURRENCY);
+
+    cpu_scaled
+        .min(DEFAULT_CVE_LIST_PARSE_CONCURRENCY_CAP)
+        .min(blocking_threads)
+        .max(1)
+}
+
+fn default_cve_list_write_channel_size(parse_concurrency: usize, write_batch_size: usize) -> usize {
+    write_batch_size
+        .saturating_mul(2)
+        .max(parse_concurrency.saturating_mul(4))
+        .clamp(1, DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE_CAP)
+}
+
+fn available_parallelism() -> usize {
+    std::thread::available_parallelism().map_or(1, usize::from)
+}
+
 /// Parse a value from the config map, returning `None` if the value is unset.
 ///
 /// This also records any parsing failures as warnings.
@@ -711,15 +841,12 @@ where
     }
 }
 
-fn parse_positive_usize(
+fn parse_positive_usize_option(
     parsed: &spookey::ParseResult,
     key: &'static str,
-    default: usize,
     errors: &mut Vec<ConfigError>,
-) -> usize {
-    let Some(value) = parse_value::<usize>(parsed, key, errors) else {
-        return default;
-    };
+) -> Option<usize> {
+    let value = parse_value::<usize>(parsed, key, errors)?;
 
     if value == 0 {
         errors.push(ConfigError::StrParse(StrParseError {
@@ -728,9 +855,9 @@ fn parse_positive_usize(
             err: "must be greater than 0".into(),
         }));
 
-        default
+        None
     } else {
-        value
+        Some(value)
     }
 }
 
@@ -1292,6 +1419,10 @@ mod tests {
                 "cve-list-parse-concurrency = 16",
                 |config, _| {
                     assert_eq!(config.cve_list_parse_concurrency, 16);
+                    assert_eq!(
+                        config.cve_list_parse_concurrency_source,
+                        ConfigValueSource::Explicit
+                    );
                 },
             ),
             ConfigFieldParseCase::new(
@@ -1299,6 +1430,10 @@ mod tests {
                 "cve-list-write-batch-size = 250",
                 |config, _| {
                     assert_eq!(config.cve_list_write_batch_size, 250);
+                    assert_eq!(
+                        config.cve_list_write_batch_size_source,
+                        ConfigValueSource::Explicit
+                    );
                 },
             ),
             ConfigFieldParseCase::new(
@@ -1306,6 +1441,10 @@ mod tests {
                 "cve-list-write-channel-size = 1024",
                 |config, _| {
                     assert_eq!(config.cve_list_write_channel_size, 1024);
+                    assert_eq!(
+                        config.cve_list_write_channel_size_source,
+                        ConfigValueSource::Explicit
+                    );
                 },
             ),
         ];
@@ -1373,11 +1512,55 @@ mod tests {
         );
         assert_eq!(
             config.cve_list_parse_concurrency,
-            DEFAULT_CVE_LIST_PARSE_CONCURRENCY
+            default_cve_list_parse_concurrency(None, None)
         );
         assert_eq!(
             config.cve_list_write_channel_size,
-            DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE
+            default_cve_list_write_channel_size(
+                config.cve_list_parse_concurrency,
+                config.cve_list_write_batch_size
+            )
+        );
+        assert_eq!(
+            config.cve_list_parse_concurrency_source,
+            ConfigValueSource::ComputedDefault
+        );
+        assert_eq!(
+            config.cve_list_write_batch_size_source,
+            ConfigValueSource::ComputedDefault
+        );
+        assert_eq!(
+            config.cve_list_write_channel_size_source,
+            ConfigValueSource::ComputedDefault
+        );
+    }
+
+    #[test]
+    fn computes_cve_pipeline_defaults_from_runtime_settings() {
+        let file = TempConfigFile::new(&format!(
+            "{}\n{}\n{}\n{}",
+            valid_required_config(),
+            "async-worker-threads = 2",
+            "async-max-blocking-threads = 3",
+            "cve-list-write-batch-size = 10",
+        ));
+
+        let config = Config::parse(file.path()).expect("config should parse");
+
+        assert_eq!(config.cve_list_parse_concurrency, 3);
+        assert_eq!(config.cve_list_write_batch_size, 10);
+        assert_eq!(config.cve_list_write_channel_size, 20);
+        assert_eq!(
+            config.cve_list_parse_concurrency_source,
+            ConfigValueSource::ComputedDefault
+        );
+        assert_eq!(
+            config.cve_list_write_batch_size_source,
+            ConfigValueSource::Explicit
+        );
+        assert_eq!(
+            config.cve_list_write_channel_size_source,
+            ConfigValueSource::ComputedDefault
         );
     }
 

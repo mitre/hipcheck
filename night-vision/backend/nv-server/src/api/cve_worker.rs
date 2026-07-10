@@ -23,6 +23,8 @@ pub async fn sync_cve_list_on_startup(
     config: &CveListWorkerConfig,
     log: &slog::Logger,
 ) -> Result<(), FatalError> {
+    log_cve_list_pipeline_config(log, config, "startup");
+
     match sync_cve_list(db, config).await {
         Ok(summary) => {
             log_startup_cve_list_sync_summary(log, &summary);
@@ -49,6 +51,8 @@ async fn run_cve_list_worker(
     config: CveListWorkerConfig,
     log: slog::Logger,
 ) {
+    log_cve_list_pipeline_config(&log, &config, "worker");
+
     info!(
         log,
         "started CVE List sync worker";
@@ -188,6 +192,31 @@ fn log_cve_list_sync_error(log: &slog::Logger, error: &CveListSyncError) {
     );
 }
 
+fn log_cve_list_pipeline_config(
+    log: &slog::Logger,
+    config: &CveListWorkerConfig,
+    sync_context: &str,
+) {
+    if !config.parse_concurrency_source().is_computed_default()
+        && !config.write_batch_size_source().is_computed_default()
+        && !config.write_channel_size_source().is_computed_default()
+    {
+        return;
+    }
+
+    info!(
+        log,
+        "resolved CVE List sync pipeline defaults";
+        "sync_context" => sync_context,
+        "parse_concurrency" => config.parse_concurrency(),
+        "parse_concurrency_source" => config.parse_concurrency_source().to_string(),
+        "write_batch_size" => config.write_batch_size(),
+        "write_batch_size_source" => config.write_batch_size_source().to_string(),
+        "write_channel_size" => config.write_channel_size(),
+        "write_channel_size_source" => config.write_channel_size_source().to_string(),
+    );
+}
+
 fn summary_commit_sha(summary: &CveListSyncSummary) -> &str {
     summary
         .commit_sha
@@ -246,6 +275,18 @@ mod tests {
         assert_eq!(
             worker_config.write_channel_size(),
             config.cve_list_write_channel_size
+        );
+        assert_eq!(
+            worker_config.parse_concurrency_source(),
+            config.cve_list_parse_concurrency_source
+        );
+        assert_eq!(
+            worker_config.write_batch_size_source(),
+            config.cve_list_write_batch_size_source
+        );
+        assert_eq!(
+            worker_config.write_channel_size_source(),
+            config.cve_list_write_channel_size_source
         );
     }
 
