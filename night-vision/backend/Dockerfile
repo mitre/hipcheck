@@ -106,8 +106,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Git is a runtime dependency of nv-server's CVE List ingest path. Use the
 # Debian Bookworm package here; the newer Flox Git is for team development
 # workflows, not for this container runtime.
-RUN apt-get update \
+RUN --mount=type=secret,id=ca_file,target=/tmp/build-ca.crt,required=false \
+    apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates curl git \
+    && if [ -s /tmp/build-ca.crt ]; then \
+        cat /tmp/build-ca.crt >> /etc/ssl/certs/ca-certificates.crt; \
+    fi \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --home-dir /nonexistent --shell /usr/sbin/nologin nv-server \
     && mkdir -p /etc/night-vision /var/cache/night-vision
