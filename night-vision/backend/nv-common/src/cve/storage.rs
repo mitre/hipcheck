@@ -514,7 +514,7 @@ where
         .map_err(CveListSyncRunError::InvalidStoredCommitSha)
 }
 
-/// Return whether any CVE List records are already stored.
+/// Return whether any active CVE List records are already stored.
 pub async fn has_cve_list_records<C>(db: &C) -> Result<bool, CveListRecordLookupError>
 where
     C: ConnectionTrait,
@@ -522,6 +522,7 @@ where
     let cve_id = cve_list_records::Entity::find()
         .select_only()
         .column(cve_list_records::Column::CveId)
+        .filter(cve_list_records::Column::Deleted.eq(false))
         .limit(1)
         .into_tuple::<String>()
         .one(db)
@@ -1813,7 +1814,22 @@ mod tests {
         let transaction_log = db.into_transaction_log();
         let select_sql = &transaction_log[0].statements()[0].sql;
         assert!(select_sql.contains(r#"SELECT "cve_list_records"."cve_id""#));
+        assert!(select_sql.contains(r#""cve_list_records"."deleted" = $"#));
         assert!(select_sql.contains("LIMIT $"));
+    }
+
+    #[test]
+    fn has_cve_list_records_returns_false_for_deleted_only_storage() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<BTreeMap<String, Value>>::new()])
+            .into_connection();
+
+        let has_records = run_async(has_cve_list_records(&db)).expect("lookup should succeed");
+
+        assert!(!has_records);
+        let transaction_log = db.into_transaction_log();
+        let select_sql = &transaction_log[0].statements()[0].sql;
+        assert!(select_sql.contains(r#""cve_list_records"."deleted" = $"#));
     }
 
     #[test]
