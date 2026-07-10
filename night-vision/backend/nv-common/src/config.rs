@@ -34,6 +34,7 @@ pub const DEFAULT_CONFIG_FILE: &str = "nv-server.spookey";
 const DEFAULT_CVE_LIST_REPOSITORY_URL: &str = "https://github.com/CVEProject/cvelistV5.git";
 const DEFAULT_CVE_LIST_REPOSITORY_REF: &str = "main";
 const DEFAULT_CVE_LIST_SYNC_INTERVAL: u64 = 420_000;
+const DEFAULT_CVE_LIST_SYNC_TIMEOUT: u64 = 3_600_000;
 const DEFAULT_CVE_LIST_PARSE_CONCURRENCY: usize = DEFAULT_CVE_RECORD_PARSE_CONCURRENCY;
 const DEFAULT_CVE_LIST_WRITE_BATCH_SIZE: usize = DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE;
 const DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE: usize = DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE;
@@ -192,6 +193,9 @@ pub struct Config {
     /// The interval in milliseconds between CVE List sync attempts.
     pub cve_list_sync_interval: u64,
 
+    /// The timeout in milliseconds for one CVE List sync attempt.
+    pub cve_list_sync_timeout: u64,
+
     /// The local checkout path for the CVE List repository cache.
     pub cve_list_checkout_path: Utf8PathBuf,
 
@@ -211,6 +215,7 @@ pub struct CveListWorkerConfig {
     repository_url: Url,
     repository_ref: GitRef,
     sync_interval: Duration,
+    sync_timeout: Duration,
     checkout_path: Utf8PathBuf,
     parse_concurrency: usize,
     write_batch_size: usize,
@@ -231,6 +236,11 @@ impl CveListWorkerConfig {
     /// The interval between CVE List sync attempts.
     pub fn sync_interval(&self) -> Duration {
         self.sync_interval
+    }
+
+    /// The timeout for one CVE List sync attempt.
+    pub fn sync_timeout(&self) -> Duration {
+        self.sync_timeout
     }
 
     /// The local checkout path for the CVE List repository cache.
@@ -301,6 +311,7 @@ impl Config {
                     "cve-list-repository-url",
                     "cve-list-repository-ref",
                     "cve-list-sync-interval",
+                    "cve-list-sync-timeout",
                     "cve-list-parse-concurrency",
                     "cve-list-write-batch-size",
                     "cve-list-write-channel-size",
@@ -364,6 +375,12 @@ impl Config {
             DEFAULT_CVE_LIST_SYNC_INTERVAL,
             &mut errors,
         );
+        let cve_list_sync_timeout = parse_positive_u64(
+            &parsed,
+            "cve-list-sync-timeout",
+            DEFAULT_CVE_LIST_SYNC_TIMEOUT,
+            &mut errors,
+        );
         let cve_list_checkout_path: Utf8PathBuf =
             parse_value(&parsed, "cve-list-checkout-path", &mut errors)
                 .expect("cve-list-checkout-path is required");
@@ -414,6 +431,7 @@ impl Config {
             cve_list_repository_url,
             cve_list_repository_ref,
             cve_list_sync_interval,
+            cve_list_sync_timeout,
             cve_list_checkout_path,
             cve_list_parse_concurrency,
             cve_list_write_batch_size,
@@ -464,6 +482,7 @@ impl Config {
             repository_url: self.cve_list_repository_url.clone(),
             repository_ref: self.cve_list_repository_ref.clone(),
             sync_interval: Duration::from_millis(self.cve_list_sync_interval),
+            sync_timeout: Duration::from_millis(self.cve_list_sync_timeout),
             checkout_path: self.cve_list_checkout_path.clone(),
             parse_concurrency: self.cve_list_parse_concurrency,
             write_batch_size: self.cve_list_write_batch_size,
@@ -579,6 +598,7 @@ impl Display for Config {
         write_report_line!(f, "cve-list-repository-url", &self.cve_list_repository_url)?;
         write_report_line!(f, "cve-list-repository-ref", &self.cve_list_repository_ref)?;
         write_report_line!(f, "cve-list-sync-interval", &self.cve_list_sync_interval)?;
+        write_report_line!(f, "cve-list-sync-timeout", &self.cve_list_sync_timeout)?;
         write_report_line!(f, "cve-list-checkout-path", &self.cve_list_checkout_path)?;
         write_report_line!(
             f,
@@ -1212,6 +1232,13 @@ mod tests {
                 },
             ),
             ConfigFieldParseCase::new(
+                "cve_list_sync_timeout",
+                "cve-list-sync-timeout = 1800000",
+                |config, _| {
+                    assert_eq!(config.cve_list_sync_timeout, 1_800_000);
+                },
+            ),
+            ConfigFieldParseCase::new(
                 "cve_list_checkout_path",
                 "cve-list-checkout-path = /var/cache/night-vision/cvelistV5",
                 |config, _| {
@@ -1292,6 +1319,7 @@ mod tests {
             config.cve_list_sync_interval,
             DEFAULT_CVE_LIST_SYNC_INTERVAL
         );
+        assert_eq!(config.cve_list_sync_timeout, DEFAULT_CVE_LIST_SYNC_TIMEOUT);
         assert_eq!(
             config.cve_list_checkout_path,
             Utf8Path::new("/tmp/night-vision-test-cvelistV5")
@@ -1402,6 +1430,8 @@ mod tests {
             ("cve-list-repository-ref", "bad..ref", "invalid Git ref"),
             ("cve-list-sync-interval", "rarely", "invalid digit"),
             ("cve-list-sync-interval", "0", "must be greater than 0"),
+            ("cve-list-sync-timeout", "never", "invalid digit"),
+            ("cve-list-sync-timeout", "0", "must be greater than 0"),
             ("cve-list-write-batch-size", "0", "must be greater than 0"),
             ("cve-list-write-channel-size", "0", "must be greater than 0"),
         ];

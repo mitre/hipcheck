@@ -20,7 +20,7 @@ use camino::Utf8PathBuf;
 use sea_orm::{
     ConnectionTrait, DatabaseBackend, Statement, TransactionSession as _, TransactionTrait,
 };
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 use tokio::sync::mpsc;
 use url::Url;
 
@@ -222,16 +222,80 @@ where
         .map_err(CveListSyncError::StartSyncRun)?;
     progress.report(CveListSyncProgress::Started { generation });
     let mut resolved_commit = None;
+    let last_successful_commit = previous_cve_list_sync_commit(db, progress).await;
 
-    let sync_result = run_cve_list_sync(
-        db,
-        generation,
-        git,
-        pipeline_config,
-        &mut resolved_commit,
-        progress,
-    )
-    .await;
+    let sync_result = match last_successful_commit {
+        Ok(last_successful_commit) => {
+            run_cve_list_sync(
+                db,
+                generation,
+                git,
+                pipeline_config,
+                &mut resolved_commit,
+                last_successful_commit,
+                progress,
+            )
+            .await
+        }
+        Err(error) => Err(error),
+    };
+
+    finish_cve_list_sync(db, generation, resolved_commit, sync_result, progress).await
+}
+
+async fn sync_cve_list_once_with_progress_pipeline_config_and_timeout<C, G, P>(
+    db: &C,
+    git: &G,
+    repository_url: &Url,
+    repository_ref: &GitRef,
+    progress: &P,
+    pipeline_config: CveListSyncPipelineConfig,
+    sync_timeout: Duration,
+) -> Result<CveListSyncSummary, CveListSyncError>
+where
+    C: ConnectionTrait + TransactionTrait,
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    let generation = start_cve_list_sync_run(db, repository_url, repository_ref)
+        .await
+        .map_err(CveListSyncError::StartSyncRun)?;
+    progress.report(CveListSyncProgress::Started { generation });
+    let mut resolved_commit = None;
+    let last_successful_commit = previous_cve_list_sync_commit(db, progress).await;
+
+    let sync_result = match last_successful_commit {
+        Ok(Some(last_successful_commit)) => match tokio::time::timeout(
+            sync_timeout,
+            run_cve_list_sync(
+                db,
+                generation,
+                git,
+                pipeline_config,
+                &mut resolved_commit,
+                Some(last_successful_commit),
+                progress,
+            ),
+        )
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => Err(CveListSyncError::TimedOut(sync_timeout)),
+        },
+        Ok(None) => {
+            run_cve_list_sync(
+                db,
+                generation,
+                git,
+                pipeline_config,
+                &mut resolved_commit,
+                None,
+                progress,
+            )
+            .await
+        }
+        Err(error) => Err(error),
+    };
 
     finish_cve_list_sync(db, generation, resolved_commit, sync_result, progress).await
 }
@@ -264,6 +328,40 @@ where
         repository_ref,
         progress,
         pipeline_config,
+    )
+    .await
+}
+
+/// Sync CVE List records once with a timeout while holding a process-scoped database lock.
+pub async fn sync_cve_list_once_exclusive_with_progress_pipeline_config_and_timeout<C, G, P>(
+    db: &C,
+    git: &G,
+    repository_url: &Url,
+    repository_ref: &GitRef,
+    progress: &P,
+    pipeline_config: CveListSyncPipelineConfig,
+    sync_timeout: Duration,
+) -> Result<CveListSyncSummary, CveListSyncError>
+where
+    C: ConnectionTrait + TransactionTrait,
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    let lock = acquire_cve_list_sync_lock(db).await?;
+    if !lock.acquired {
+        return Err(CveListSyncError::StartSyncRun(
+            CveListSyncRunError::SyncAlreadyRunning,
+        ));
+    }
+
+    sync_cve_list_once_with_progress_pipeline_config_and_timeout(
+        db,
+        git,
+        repository_url,
+        repository_ref,
+        progress,
+        pipeline_config,
+        sync_timeout,
     )
     .await
 }
@@ -361,6 +459,7 @@ async fn run_cve_list_sync<C, G, P>(
     git: &G,
     pipeline_config: CveListSyncPipelineConfig,
     resolved_commit: &mut Option<CommitSha>,
+    last_successful_commit: Option<CommitSha>,
     progress: &P,
 ) -> Result<FinishCveListSyncRun, CveListSyncError>
 where
@@ -379,11 +478,6 @@ where
         .await
         .map_err(CveListSyncError::Git)?;
     *resolved_commit = Some(new_commit.clone());
-
-    progress.report(CveListSyncProgress::PreviousSyncLookupStarted);
-    let last_successful_commit = last_successful_cve_list_sync_commit(db)
-        .await
-        .map_err(CveListSyncError::SyncRunMetadata)?;
 
     if last_successful_commit.as_ref() == Some(&new_commit) {
         progress.report(CveListSyncProgress::NotModified);
@@ -474,6 +568,20 @@ where
     })
 }
 
+async fn previous_cve_list_sync_commit<C, P>(
+    db: &C,
+    progress: &P,
+) -> Result<Option<CommitSha>, CveListSyncError>
+where
+    C: ConnectionTrait,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    progress.report(CveListSyncProgress::PreviousSyncLookupStarted);
+    last_successful_cve_list_sync_commit(db)
+        .await
+        .map_err(CveListSyncError::SyncRunMetadata)
+}
+
 fn split_cve_file_changes(changes: Vec<CveListFileChange>) -> (Vec<Utf8PathBuf>, Vec<String>) {
     let mut active_paths = Vec::new();
     let mut deleted_cve_ids = Vec::new();
@@ -518,6 +626,8 @@ pub enum CveListSyncError {
     SyncRunMetadata(CveListSyncRunError),
     /// Failed to finish a successful or not-modified sync run.
     FinishSyncRun(CveListSyncRunError),
+    /// The sync attempt did not complete before the configured timeout.
+    TimedOut(Duration),
     /// Failed to finish sync-run metadata after the sync operation failed.
     FinishFailedSyncRun {
         /// The original sync operation error message.
@@ -539,6 +649,11 @@ impl std::fmt::Display for CveListSyncError {
             Self::Storage(_) => write!(f, "failed to write CVE List records"),
             Self::SyncRunMetadata(_) => write!(f, "failed to read CVE List sync-run metadata"),
             Self::FinishSyncRun(_) => write!(f, "failed to finish CVE List sync run"),
+            Self::TimedOut(timeout) => write!(
+                f,
+                "CVE List sync timed out after {} ms",
+                timeout.as_millis()
+            ),
             Self::FinishFailedSyncRun { sync_error, .. } => write!(
                 f,
                 "failed to mark failed CVE List sync run after sync error: {sync_error}"
@@ -556,6 +671,7 @@ impl std::error::Error for CveListSyncError {
             Self::Git(err) => Some(err),
             Self::Repository(err) => Some(err),
             Self::Storage(err) => Some(err),
+            Self::TimedOut(_) => None,
             Self::FinishFailedSyncRun { finish_error, .. } => Some(finish_error),
         }
     }
@@ -591,6 +707,7 @@ mod tests {
         changed_paths: Vec<Utf8PathBuf>,
         deleted_paths: Vec<Utf8PathBuf>,
         files: HashMap<Utf8PathBuf, String>,
+        fetch_delay: Option<Duration>,
         calls: Mutex<Vec<&'static str>>,
     }
 
@@ -606,6 +723,9 @@ mod tests {
 
         async fn fetch(&self) -> Result<(), CveListGitError> {
             self.calls.lock().expect("calls lock").push("fetch");
+            if let Some(delay) = self.fetch_delay {
+                tokio::time::sleep(delay).await;
+            }
             Ok(())
         }
 
@@ -936,6 +1056,116 @@ mod tests {
         assert!(finish_sql.contains(r#"UPDATE "public"."cve_list_sync_runs""#));
         assert!(finish_sql.contains(r#""status" = $"#));
         assert!(finish_sql.contains(r#""error" = $"#));
+    }
+
+    #[test]
+    fn sync_cve_list_once_marks_run_failed_after_timeout() {
+        let git = MockCveListGit {
+            fetch_delay: Some(Duration::from_millis(50)),
+            ..Default::default()
+        };
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![BTreeMap::from([(
+                    "pg_try_advisory_xact_lock".to_owned(),
+                    true.into(),
+                )])],
+                vec![mock_generation_row(42)],
+                vec![mock_commit_sha_row(OLD_COMMIT_SHA)],
+            ])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        let err = run_async(
+            sync_cve_list_once_exclusive_with_progress_pipeline_config_and_timeout(
+                &db,
+                &git,
+                &repository_url(),
+                &repository_ref(),
+                &NoopCveListSyncProgress,
+                CveListSyncPipelineConfig::with_write_batch_size(500),
+                Duration::from_millis(1),
+            ),
+        )
+        .expect_err("sync should time out");
+
+        assert!(
+            matches!(err, CveListSyncError::TimedOut(timeout) if timeout == Duration::from_millis(1))
+        );
+        assert_eq!(
+            git.calls.lock().expect("calls lock").as_slice(),
+            ["ensure_checkout", "fetch"]
+        );
+        let transaction_log = db.into_transaction_log();
+        let sql_log = transaction_log
+            .iter()
+            .flat_map(|entry| {
+                entry
+                    .statements()
+                    .iter()
+                    .map(|statement| statement.sql.as_str())
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            transaction_log.iter().any(|entry| {
+                entry.statements().iter().any(|statement| {
+                    let sql = &statement.sql;
+                    sql.contains(r#"UPDATE "public"."cve_list_sync_runs""#)
+                        && sql.contains(r#""status" = $"#)
+                        && sql.contains(r#""error" = $"#)
+                })
+            }),
+            "{sql_log}"
+        );
+    }
+
+    #[test]
+    fn sync_cve_list_once_does_not_time_out_first_sync() {
+        let git = MockCveListGit {
+            fetch_delay: Some(Duration::from_millis(50)),
+            ..Default::default()
+        };
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![BTreeMap::from([(
+                    "pg_try_advisory_xact_lock".to_owned(),
+                    true.into(),
+                )])],
+                vec![mock_generation_row(42)],
+                Vec::<BTreeMap<String, Value>>::new(),
+            ])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        let err = run_async(
+            sync_cve_list_once_exclusive_with_progress_pipeline_config_and_timeout(
+                &db,
+                &git,
+                &repository_url(),
+                &repository_ref(),
+                &NoopCveListSyncProgress,
+                CveListSyncPipelineConfig {
+                    write_batch_size: 500,
+                    parse_concurrency: DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
+                    write_channel_size: 0,
+                },
+                Duration::from_millis(1),
+            ),
+        )
+        .expect_err("sync should fail after bypassing timeout");
+
+        assert!(matches!(err, CveListSyncError::Storage(_)));
+        assert_eq!(
+            git.calls.lock().expect("calls lock").as_slice(),
+            ["ensure_checkout", "fetch", "resolve_ref"]
+        );
     }
 
     #[test]

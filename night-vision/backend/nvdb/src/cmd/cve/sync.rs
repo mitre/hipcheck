@@ -7,6 +7,7 @@ use nv_common::{
         progress::{CveListSyncProgress, CveListSyncProgressReporter},
         sync::{
             CveListSyncSummary, sync_cve_list_once_exclusive_with_progress_and_pipeline_config,
+            sync_cve_list_once_exclusive_with_progress_pipeline_config_and_timeout,
         },
     },
     db, rt,
@@ -25,15 +26,22 @@ pub fn command() -> clap::Command {
                 .action(clap::ArgAction::SetTrue)
                 .help("Acknowledge this command may modify database state"),
         )
+        .arg(
+            clap::Arg::new("no-timeout")
+                .long("no-timeout")
+                .action(clap::ArgAction::SetTrue)
+                .help("Disable the CVE List sync timeout for this run"),
+        )
 }
 
 pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let token = DestructiveOperationToken::new(matches);
+    let no_timeout = matches.get_flag("no-timeout");
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
-    runtime.block_on(sync(config, token))
+    runtime.block_on(sync(config, token, no_timeout))
 }
 
-async fn sync(config: &Config, _token: DestructiveOperationToken) -> Result<()> {
+async fn sync(config: &Config, _token: DestructiveOperationToken, no_timeout: bool) -> Result<()> {
     let worker_config = config.cve_list_worker_config();
     let db = db::connection(config)
         .await
@@ -44,15 +52,28 @@ async fn sync(config: &Config, _token: DestructiveOperationToken) -> Result<()> 
         worker_config.repository_ref().clone(),
     );
     let progress = CveSyncProgressBar::new();
-    let sync_result = sync_cve_list_once_exclusive_with_progress_and_pipeline_config(
-        &db,
-        &git,
-        worker_config.repository_url(),
-        worker_config.repository_ref(),
-        &progress,
-        worker_config.sync_pipeline_config(),
-    )
-    .await;
+    let sync_result = if no_timeout {
+        sync_cve_list_once_exclusive_with_progress_and_pipeline_config(
+            &db,
+            &git,
+            worker_config.repository_url(),
+            worker_config.repository_ref(),
+            &progress,
+            worker_config.sync_pipeline_config(),
+        )
+        .await
+    } else {
+        sync_cve_list_once_exclusive_with_progress_pipeline_config_and_timeout(
+            &db,
+            &git,
+            worker_config.repository_url(),
+            worker_config.repository_ref(),
+            &progress,
+            worker_config.sync_pipeline_config(),
+            worker_config.sync_timeout(),
+        )
+        .await
+    };
 
     progress.finish();
 
@@ -205,5 +226,14 @@ mod tests {
         command()
             .try_get_matches_from(["sync", "--destructive"])
             .expect("destructive flag should parse");
+    }
+
+    #[test]
+    fn cve_sync_accepts_no_timeout_flag() {
+        let matches = command()
+            .try_get_matches_from(["sync", "--destructive", "--no-timeout"])
+            .expect("no-timeout flag should parse");
+
+        assert!(matches.get_flag("no-timeout"));
     }
 }

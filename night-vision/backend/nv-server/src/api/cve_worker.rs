@@ -8,7 +8,7 @@ use nv_common::{
         progress::NoopCveListSyncProgress,
         sync::{
             CveListSyncError, CveListSyncSummary,
-            sync_cve_list_once_exclusive_with_progress_and_pipeline_config,
+            sync_cve_list_once_exclusive_with_progress_pipeline_config_and_timeout,
         },
     },
 };
@@ -53,6 +53,7 @@ async fn run_cve_list_worker(
         log,
         "started CVE List sync worker";
         "sync_interval_ms" => config.sync_interval().as_millis().to_string(),
+        "sync_timeout_ms" => config.sync_timeout().as_millis().to_string(),
     );
 
     loop {
@@ -82,13 +83,14 @@ async fn sync_cve_list(
         config.repository_ref().clone(),
     );
 
-    sync_cve_list_once_exclusive_with_progress_and_pipeline_config(
+    sync_cve_list_once_exclusive_with_progress_pipeline_config_and_timeout(
         db,
         &git,
         config.repository_url(),
         config.repository_ref(),
         &NoopCveListSyncProgress,
         config.sync_pipeline_config(),
+        config.sync_timeout(),
     )
     .await
 }
@@ -172,6 +174,10 @@ mod tests {
         assert_eq!(
             worker_config.sync_interval(),
             Duration::from_millis(config.cve_list_sync_interval)
+        );
+        assert_eq!(
+            worker_config.sync_timeout(),
+            Duration::from_millis(config.cve_list_sync_timeout)
         );
         assert_eq!(worker_config.checkout_path(), config.cve_list_checkout_path);
         assert_eq!(
