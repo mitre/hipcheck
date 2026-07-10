@@ -514,6 +514,23 @@ where
         .map_err(CveListSyncRunError::InvalidStoredCommitSha)
 }
 
+/// Return whether any CVE List records are already stored.
+pub async fn has_cve_list_records<C>(db: &C) -> Result<bool, CveListRecordLookupError>
+where
+    C: ConnectionTrait,
+{
+    let cve_id = cve_list_records::Entity::find()
+        .select_only()
+        .column(cve_list_records::Column::CveId)
+        .limit(1)
+        .into_tuple::<String>()
+        .one(db)
+        .await
+        .map_err(CveListRecordLookupError::Db)?;
+
+    Ok(cve_id.is_some())
+}
+
 /// Publish staged CVE List records for a sync run into the live records table.
 pub async fn merge_staged_cve_list_records<C>(
     db: &C,
@@ -1083,6 +1100,29 @@ impl std::error::Error for CveListSyncRunError {
             | Self::NonTerminalStatus(_)
             | Self::SyncAlreadyRunning
             | Self::SyncRunNotFound(_) => None,
+        }
+    }
+}
+
+/// Failure while looking up stored CVE List records.
+#[derive(Debug)]
+pub enum CveListRecordLookupError {
+    /// A database operation failed.
+    Db(sea_orm::DbErr),
+}
+
+impl std::fmt::Display for CveListRecordLookupError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Db(_) => write!(f, "failed to look up stored CVE List records"),
+        }
+    }
+}
+
+impl std::error::Error for CveListRecordLookupError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Db(err) => Some(err),
         }
     }
 }
@@ -1762,6 +1802,32 @@ mod tests {
     }
 
     #[test]
+    fn has_cve_list_records_returns_true_when_record_exists() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_cve_id_row("CVE-2026-1000")]])
+            .into_connection();
+
+        let has_records = run_async(has_cve_list_records(&db)).expect("lookup should succeed");
+
+        assert!(has_records);
+        let transaction_log = db.into_transaction_log();
+        let select_sql = &transaction_log[0].statements()[0].sql;
+        assert!(select_sql.contains(r#"SELECT "cve_list_records"."cve_id""#));
+        assert!(select_sql.contains("LIMIT $"));
+    }
+
+    #[test]
+    fn has_cve_list_records_returns_false_when_storage_is_empty() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<BTreeMap<String, Value>>::new()])
+            .into_connection();
+
+        let has_records = run_async(has_cve_list_records(&db)).expect("lookup should succeed");
+
+        assert!(!has_records);
+    }
+
+    #[test]
     fn reset_cve_list_storage_truncates_records_and_sync_runs() {
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([
@@ -1888,6 +1954,10 @@ mod tests {
 
     fn mock_commit_sha_row(commit_sha: &str) -> BTreeMap<String, Value> {
         BTreeMap::from([("commit_sha".to_owned(), commit_sha.to_owned().into())])
+    }
+
+    fn mock_cve_id_row(cve_id: &str) -> BTreeMap<String, Value> {
+        BTreeMap::from([("cve_id".to_owned(), cve_id.to_owned().into())])
     }
 
     fn parsed_file(cve_id: &str) -> ParsedCveListFile {

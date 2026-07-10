@@ -6,6 +6,7 @@ use nv_common::{
     cve::{
         git::{CommitSha, GitCliCveListGit},
         progress::NoopCveListSyncProgress,
+        storage::has_cve_list_records,
         sync::{
             CveListSyncError, CveListSyncSummary,
             sync_cve_list_once_exclusive_with_progress_pipeline_config_and_timeout,
@@ -13,7 +14,7 @@ use nv_common::{
     },
 };
 use sea_orm::DatabaseConnection;
-use slog::{error, info};
+use slog::{error, info, warn};
 use tokio::task::JoinHandle;
 
 /// Run the startup sync before the server begins accepting requests.
@@ -29,7 +30,13 @@ pub async fn sync_cve_list_on_startup(
         Err(error) if error.is_sync_already_running() => {
             log_skipped_cve_list_sync(log, "startup", &error);
         }
-        Err(error) => return Err(error.into()),
+        Err(error) => {
+            if startup_can_use_stored_cve_list_records(db, log, &error).await {
+                log_startup_cve_list_sync_failure_permitted(log, &error);
+            } else {
+                return Err(error.into());
+            }
+        }
     }
 
     Ok(())
@@ -95,6 +102,25 @@ async fn sync_cve_list(
     .await
 }
 
+async fn startup_can_use_stored_cve_list_records(
+    db: &DatabaseConnection,
+    log: &slog::Logger,
+    sync_error: &CveListSyncError,
+) -> bool {
+    match has_cve_list_records(db).await {
+        Ok(has_records) => has_records,
+        Err(lookup_error) => {
+            error!(
+                log,
+                "failed to check stored CVE List records after startup sync failure";
+                "sync_error" => sync_error.to_string(),
+                "lookup_error" => lookup_error.to_string(),
+            );
+            false
+        }
+    }
+}
+
 fn log_startup_cve_list_sync_summary(log: &slog::Logger, summary: &CveListSyncSummary) {
     let commit_sha = summary_commit_sha(summary);
 
@@ -107,6 +133,14 @@ fn log_startup_cve_list_sync_summary(log: &slog::Logger, summary: &CveListSyncSu
         "records_seen" => summary.records_seen,
         "records_inserted" => summary.records_inserted,
         "records_updated" => summary.records_updated,
+    );
+}
+
+fn log_startup_cve_list_sync_failure_permitted(log: &slog::Logger, error: &CveListSyncError) {
+    warn!(
+        log,
+        "continuing startup after CVE List sync failure because stored records exist";
+        "error" => error.to_string(),
     );
 }
 
@@ -151,9 +185,11 @@ fn summary_commit_sha(summary: &CveListSyncSummary) -> &str {
 
 #[cfg(test)]
 mod tests {
+    use super::{CveListSyncError, startup_can_use_stored_cve_list_records};
     use camino::Utf8PathBuf;
     use nv_common::config::Config;
-    use std::time::Duration;
+    use sea_orm::{DbBackend, MockDatabase, Value};
+    use std::{collections::BTreeMap, time::Duration};
 
     #[test]
     fn worker_config_copies_cve_list_settings() {
@@ -192,5 +228,43 @@ mod tests {
             worker_config.write_channel_size(),
             config.cve_list_write_channel_size
         );
+    }
+
+    #[test]
+    fn startup_can_use_stored_cve_list_records_when_records_exist() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_cve_id_row("CVE-2026-1000")]])
+            .into_connection();
+        let log = slog::Logger::root(slog::Discard, slog::o!());
+        let error = CveListSyncError::TimedOut(Duration::from_secs(1));
+
+        let can_start = run_async(startup_can_use_stored_cve_list_records(&db, &log, &error));
+
+        assert!(can_start);
+    }
+
+    #[test]
+    fn startup_cannot_use_stored_cve_list_records_when_storage_is_empty() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<BTreeMap<String, Value>>::new()])
+            .into_connection();
+        let log = slog::Logger::root(slog::Discard, slog::o!());
+        let error = CveListSyncError::TimedOut(Duration::from_secs(1));
+
+        let can_start = run_async(startup_can_use_stored_cve_list_records(&db, &log, &error));
+
+        assert!(!can_start);
+    }
+
+    fn mock_cve_id_row(cve_id: &str) -> BTreeMap<String, Value> {
+        BTreeMap::from([("cve_id".to_owned(), cve_id.to_owned().into())])
+    }
+
+    fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime should build")
+            .block_on(future)
     }
 }
