@@ -1,7 +1,7 @@
 //! CVE List repository file ingestion.
 
 use crate::cve::{
-    git::{CommitSha, CveListGit, CveListGitError},
+    git::{CommitSha, CveListFileChange, CveListGit, CveListGitError},
     progress::{CveListSyncProgress, CveListSyncProgressReporter, NoopCveListSyncProgress},
     record::{CveRecordParseError, ParsedCveRecord, parse_cve_record},
 };
@@ -132,18 +132,25 @@ where
     G: CveListGit + Sync,
     P: CveListSyncProgressReporter + ?Sized,
 {
-    let paths = list_changed_cve_files_with_progress(git, old, new, progress).await?;
+    let paths = list_changed_cve_files_with_progress(git, old, new, progress)
+        .await?
+        .into_iter()
+        .filter_map(|change| match change {
+            CveListFileChange::Active(path) => Some(path),
+            CveListFileChange::Deleted(_) => None,
+        })
+        .collect();
 
     parse_cve_files(git, new, paths, progress, parse_concurrency).await
 }
 
-/// List CVE JSON records added, modified, or renamed between commits, reporting progress.
+/// List CVE JSON record changes between commits, reporting progress.
 pub(crate) async fn list_changed_cve_files_with_progress<G, P>(
     git: &G,
     old: &CommitSha,
     new: &CommitSha,
     progress: &P,
-) -> Result<Vec<Utf8PathBuf>, CveListRepositoryError>
+) -> Result<Vec<CveListFileChange>, CveListRepositoryError>
 where
     G: CveListGit + Sync,
     P: CveListSyncProgressReporter + ?Sized,
@@ -413,8 +420,13 @@ mod tests {
             &self,
             _old: &CommitSha,
             _new: &CommitSha,
-        ) -> Result<Vec<Utf8PathBuf>, CveListGitError> {
-            Ok(self.changed_paths.clone())
+        ) -> Result<Vec<CveListFileChange>, CveListGitError> {
+            Ok(self
+                .changed_paths
+                .iter()
+                .cloned()
+                .map(CveListFileChange::Active)
+                .collect())
         }
 
         async fn all_cve_files(

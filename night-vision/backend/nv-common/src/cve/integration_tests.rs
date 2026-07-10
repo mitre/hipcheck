@@ -1,7 +1,7 @@
 use crate::{
     config::Config,
     cve::{
-        git::{CommitSha, CveListGit, CveListGitError, GitRef},
+        git::{CommitSha, CveListFileChange, CveListGit, CveListGitError, GitRef},
         sync::sync_cve_list_once,
     },
     db::{connection, entities::cve_list_records, entities::cve_list_sync_runs},
@@ -57,6 +57,7 @@ fn cve_list_sync_writes_records_and_metadata_to_postgres() {
             .expect("record lookup should succeed")
             .expect("record should be stored");
         assert_eq!(stored.record_format_version, "5.2");
+        assert!(!stored.deleted);
         assert_eq!(stored.record["cveMetadata"]["cveId"], TEST_CVE_ID);
         assert_eq!(
             stored.record["containers"]["cna"]["title"],
@@ -79,6 +80,7 @@ fn cve_list_sync_writes_records_and_metadata_to_postgres() {
                     "cveId": "CVE-2026-9000003"
                 }
             })),
+            deleted: Set(false),
             first_seen_at: Default::default(),
             last_seen_at: Default::default(),
             updated_at: Default::default(),
@@ -115,6 +117,7 @@ fn cve_list_sync_writes_records_and_metadata_to_postgres() {
             .expect("record lookup should succeed")
             .expect("record should still be stored");
         assert_eq!(updated.record_format_version, "5.3");
+        assert!(!updated.deleted);
         assert_eq!(
             updated.record["containers"]["cna"]["title"],
             "updated detail"
@@ -174,10 +177,15 @@ impl CveListGit for MockCveListGit {
         &self,
         old: &CommitSha,
         new: &CommitSha,
-    ) -> Result<Vec<Utf8PathBuf>, CveListGitError> {
+    ) -> Result<Vec<CveListFileChange>, CveListGitError> {
         assert_eq!(old.as_str(), OLD_COMMIT_SHA);
         assert_eq!(new.as_str(), NEW_COMMIT_SHA);
-        Ok(self.changed_paths.clone())
+        Ok(self
+            .changed_paths
+            .iter()
+            .cloned()
+            .map(CveListFileChange::Active)
+            .collect())
     }
 
     async fn all_cve_files(&self, commit: &CommitSha) -> Result<Vec<Utf8PathBuf>, CveListGitError> {

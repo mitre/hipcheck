@@ -112,6 +112,43 @@ where
         .await
 }
 
+/// Mark CVE List records deleted without removing their stored payloads.
+pub async fn mark_deleted_cve_list_records<C>(
+    db: &C,
+    cve_ids: &[String],
+) -> Result<WriteCveListRecordsSummary, WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+{
+    if cve_ids.is_empty() {
+        return Ok(WriteCveListRecordsSummary {
+            records_seen: 0,
+            records_inserted: 0,
+            records_updated: 0,
+        });
+    }
+
+    collect_unique_ids(cve_ids)?;
+    let result = cve_list_records::Entity::update_many()
+        .col_expr(cve_list_records::Column::Deleted, Expr::value(true))
+        .col_expr(
+            cve_list_records::Column::UpdatedAt,
+            Expr::current_timestamp(),
+        )
+        .filter(cve_list_records::Column::CveId.is_in(cve_ids.iter().cloned()))
+        .exec(db)
+        .await
+        .map_err(WriteCveListRecordsError::Db)?;
+    let records_updated = usize::try_from(result.rows_affected)
+        .map_err(|_| WriteCveListRecordsError::CountTooLarge(result.rows_affected))?;
+
+    Ok(WriteCveListRecordsSummary {
+        records_seen: cve_ids.len(),
+        records_inserted: 0,
+        records_updated,
+    })
+}
+
 /// Upsert parsed CVE List records in batches and return insert/update counts.
 pub async fn write_cve_list_records_with_batch_size<C>(
     db: &C,
@@ -456,18 +493,27 @@ fn count_to_i32(count: usize, field: &'static str) -> Result<i32, CveListSyncRun
 fn collect_unique_cve_ids(
     records: &[ParsedCveListFile],
 ) -> Result<Vec<String>, WriteCveListRecordsError> {
-    let mut seen = HashSet::with_capacity(records.len());
     let mut cve_ids = Vec::with_capacity(records.len());
 
     for record in records {
-        let cve_id = record.record.cve_id.as_str().to_owned();
-        if !seen.insert(cve_id.clone()) {
-            return Err(WriteCveListRecordsError::DuplicateCveId(cve_id));
-        }
-        cve_ids.push(cve_id);
+        cve_ids.push(record.record.cve_id.as_str().to_owned());
     }
 
+    collect_unique_ids(&cve_ids)?;
+
     Ok(cve_ids)
+}
+
+fn collect_unique_ids(cve_ids: &[String]) -> Result<(), WriteCveListRecordsError> {
+    let mut seen = HashSet::with_capacity(cve_ids.len());
+
+    for cve_id in cve_ids {
+        if !seen.insert(cve_id.clone()) {
+            return Err(WriteCveListRecordsError::DuplicateCveId(cve_id.clone()));
+        }
+    }
+
+    Ok(())
 }
 
 async fn write_cve_list_record_batch<C, P>(
@@ -562,6 +608,7 @@ where
             CveListRecords::CveId,
             CveListRecords::RecordFormatVersion,
             CveListRecords::Record,
+            CveListRecords::Deleted,
         ]);
 
     for record in records {
@@ -570,6 +617,7 @@ where
                 Expr::val(record.record.cve_id.as_str().to_owned()),
                 Expr::val(record.record.record_format_version.as_str().to_owned()),
                 Expr::val(record.record.record.clone()),
+                Expr::val(false),
             ])
             .map_err(|err| WriteCveListRecordsError::QueryBuild(err.to_string()))?;
     }
@@ -610,10 +658,15 @@ where
             CveListRecords::CveId,
             CveListRecords::RecordFormatVersion,
             CveListRecords::Record,
+            CveListRecords::Deleted,
         ])
         .on_conflict(
             OnConflict::column(CveListRecords::CveId)
-                .update_columns([CveListRecords::RecordFormatVersion, CveListRecords::Record])
+                .update_columns([
+                    CveListRecords::RecordFormatVersion,
+                    CveListRecords::Record,
+                    CveListRecords::Deleted,
+                ])
                 .values([
                     (CveListRecords::LastSeenAt, Expr::current_timestamp()),
                     (CveListRecords::UpdatedAt, Expr::current_timestamp()),
@@ -627,6 +680,7 @@ where
                 Expr::val(record.record.cve_id.as_str().to_owned()),
                 Expr::val(record.record.record_format_version.as_str().to_owned()),
                 Expr::val(record.record.record.clone()),
+                Expr::val(false),
             ])
             .map_err(|err| WriteCveListRecordsError::QueryBuild(err.to_string()))?;
     }
@@ -648,6 +702,7 @@ enum CveListRecords {
     CveId,
     RecordFormatVersion,
     Record,
+    Deleted,
     LastSeenAt,
     UpdatedAt,
 }
@@ -1093,9 +1148,60 @@ mod tests {
             upsert_sql.contains(r#""record_format_version" = "excluded"."record_format_version""#)
         );
         assert!(upsert_sql.contains(r#""record" = "excluded"."record""#));
+        assert!(upsert_sql.contains(r#""deleted" = "excluded"."deleted""#));
         assert!(upsert_sql.contains(r#""last_seen_at" = CURRENT_TIMESTAMP"#));
         assert!(upsert_sql.contains(r#""updated_at" = CURRENT_TIMESTAMP"#));
         assert!(!upsert_sql.contains(r#""first_seen_at" = "#));
+    }
+
+    #[test]
+    fn mark_deleted_cve_list_records_sets_deleted_flag() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 2,
+            }])
+            .into_connection();
+
+        let summary = run_async(mark_deleted_cve_list_records(
+            &db,
+            &["CVE-2026-1000".to_owned(), "CVE-2026-1001".to_owned()],
+        ))
+        .expect("mark deleted should succeed");
+
+        assert_eq!(
+            summary,
+            WriteCveListRecordsSummary {
+                records_seen: 2,
+                records_inserted: 0,
+                records_updated: 2,
+            }
+        );
+
+        let transaction_log = db.into_transaction_log();
+        let update_sql = &transaction_log[0].statements()[0].sql;
+        assert!(update_sql.contains(r#"UPDATE "public"."cve_list_records""#));
+        assert!(update_sql.contains(r#""deleted" = $"#));
+        assert!(update_sql.contains(r#""updated_at" = CURRENT_TIMESTAMP"#));
+        assert!(update_sql.contains(r#""cve_id" IN"#));
+    }
+
+    #[test]
+    fn mark_deleted_cve_list_records_rejects_duplicate_cve_ids() {
+        let db = MockDatabase::new(DbBackend::Postgres).into_connection();
+
+        let err = run_async(mark_deleted_cve_list_records(
+            &db,
+            &["CVE-2026-1000".to_owned(), "CVE-2026-1000".to_owned()],
+        ))
+        .expect_err("mark deleted should fail");
+
+        assert!(matches!(
+            err,
+            WriteCveListRecordsError::DuplicateCveId(cve_id)
+                if cve_id == "CVE-2026-1000"
+        ));
+        assert!(db.into_transaction_log().is_empty());
     }
 
     #[test]

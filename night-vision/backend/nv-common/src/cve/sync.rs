@@ -1,5 +1,6 @@
 //! Composed CVE List sync routine.
 
+use crate::cve::git::CveListFileChange;
 use crate::cve::{
     git::{CommitSha, CveListGit, CveListGitError, GitRef},
     progress::{CveListSyncProgress, CveListSyncProgressReporter, NoopCveListSyncProgress},
@@ -10,11 +11,13 @@ use crate::cve::{
     storage::{
         CveListSyncRunError, CveListSyncRunStatus, DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
         FinishCveListSyncRun, WriteCveListRecordsError, finish_cve_list_sync_run,
-        last_successful_cve_list_sync_commit, start_cve_list_sync_run,
-        write_cve_list_records_from_receiver_with_batch_size_and_progress,
+        last_successful_cve_list_sync_commit, mark_deleted_cve_list_records,
+        start_cve_list_sync_run, write_cve_list_records_from_receiver_with_batch_size_and_progress,
     },
 };
+use camino::Utf8PathBuf;
 use sea_orm::ConnectionTrait;
+use std::collections::HashSet;
 use tokio::sync::mpsc;
 use url::Url;
 
@@ -318,15 +321,26 @@ where
         ));
     }
 
-    let paths = match last_successful_commit {
+    let (paths, deleted_cve_ids) = match last_successful_commit {
         Some(old_commit) => {
-            list_changed_cve_files_with_progress(git, &old_commit, &new_commit, progress).await
+            let changes =
+                list_changed_cve_files_with_progress(git, &old_commit, &new_commit, progress)
+                    .await
+                    .map_err(CveListSyncError::Repository)?;
+            split_cve_file_changes(changes)
         }
-        None => list_all_cve_files_with_progress(git, &new_commit, progress).await,
-    }
-    .map_err(CveListSyncError::Repository)?;
+        None => (
+            list_all_cve_files_with_progress(git, &new_commit, progress)
+                .await
+                .map_err(CveListSyncError::Repository)?,
+            Vec::new(),
+        ),
+    };
 
-    let total_records = paths.len();
+    let total_records = paths
+        .len()
+        .checked_add(deleted_cve_ids.len())
+        .expect("changed CVE file count cannot exceed memory limits");
     let (sender, receiver) = mpsc::channel(pipeline_config.write_channel_size);
     let parse_records = send_cve_files(
         git,
@@ -346,15 +360,53 @@ where
     let (parse_result, write_result) = tokio::join!(parse_records, write_records);
     let write_summary = write_result.map_err(CveListSyncError::Storage)?;
     parse_result.map_err(CveListSyncError::Repository)?;
+    let deleted_summary = mark_deleted_cve_list_records(db, &deleted_cve_ids)
+        .await
+        .map_err(CveListSyncError::Storage)?;
 
     Ok(FinishCveListSyncRun {
         status: CveListSyncRunStatus::Success,
         commit_sha: Some(new_commit),
-        records_seen: write_summary.records_seen,
+        records_seen: write_summary
+            .records_seen
+            .checked_add(deleted_summary.records_seen)
+            .expect("seen record count cannot exceed changed CVE file count"),
         records_inserted: write_summary.records_inserted,
-        records_updated: write_summary.records_updated,
+        records_updated: write_summary
+            .records_updated
+            .checked_add(deleted_summary.records_updated)
+            .expect("updated record count cannot exceed changed CVE file count"),
         error: None,
     })
+}
+
+fn split_cve_file_changes(changes: Vec<CveListFileChange>) -> (Vec<Utf8PathBuf>, Vec<String>) {
+    let mut active_paths = Vec::new();
+    let mut deleted_cve_ids = Vec::new();
+    let mut active_cve_ids = HashSet::new();
+
+    for change in changes {
+        match change {
+            CveListFileChange::Active(path) => {
+                let cve_id = path
+                    .file_stem()
+                    .expect("CVE List active changes are validated record paths")
+                    .to_owned();
+                active_cve_ids.insert(cve_id);
+                active_paths.push(path);
+            }
+            CveListFileChange::Deleted(path) => {
+                let cve_id = path
+                    .file_stem()
+                    .expect("CVE List deleted changes are validated record paths")
+                    .to_owned();
+                deleted_cve_ids.push(cve_id);
+            }
+        }
+    }
+    deleted_cve_ids.retain(|cve_id| !active_cve_ids.contains(cve_id));
+
+    (active_paths, deleted_cve_ids)
 }
 
 /// Failure while syncing CVE List data.
@@ -430,6 +482,7 @@ mod tests {
     struct MockCveListGit {
         all_paths: Vec<Utf8PathBuf>,
         changed_paths: Vec<Utf8PathBuf>,
+        deleted_paths: Vec<Utf8PathBuf>,
         files: HashMap<Utf8PathBuf, String>,
         calls: Mutex<Vec<&'static str>>,
     }
@@ -459,11 +512,23 @@ mod tests {
             &self,
             old: &CommitSha,
             new: &CommitSha,
-        ) -> Result<Vec<Utf8PathBuf>, CveListGitError> {
+        ) -> Result<Vec<CveListFileChange>, CveListGitError> {
             assert_eq!(old.as_str(), OLD_COMMIT_SHA);
             assert_eq!(new.as_str(), NEW_COMMIT_SHA);
             self.calls.lock().expect("calls lock").push("changed_files");
-            Ok(self.changed_paths.clone())
+            let mut changes = self
+                .changed_paths
+                .iter()
+                .cloned()
+                .map(CveListFileChange::Active)
+                .collect::<Vec<_>>();
+            changes.extend(
+                self.deleted_paths
+                    .iter()
+                    .cloned()
+                    .map(CveListFileChange::Deleted),
+            );
+            Ok(changes)
         }
 
         async fn all_cve_files(
@@ -645,6 +710,62 @@ mod tests {
                 "read_file",
             ]
         );
+    }
+
+    #[test]
+    fn sync_cve_list_once_marks_deleted_records_after_prior_success() {
+        let deleted_path = parsed_file_path("CVE-2026-1000");
+        let git = MockCveListGit {
+            deleted_paths: vec![deleted_path],
+            ..Default::default()
+        };
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_generation_row(42)],
+                vec![mock_commit_sha_row(OLD_COMMIT_SHA)],
+            ])
+            .append_exec_results(mock_exec_results(5))
+            .into_connection();
+
+        let summary = run_async(sync_cve_list_once(
+            &db,
+            &git,
+            &repository_url(),
+            &repository_ref(),
+            500,
+        ))
+        .expect("sync should succeed");
+
+        assert_eq!(summary.status, CveListSyncRunStatus::Success);
+        assert_eq!(summary.records_seen, 1);
+        assert_eq!(summary.records_inserted, 0);
+        assert_eq!(summary.records_updated, 1);
+        assert_eq!(
+            git.calls.lock().expect("calls lock").as_slice(),
+            ["ensure_checkout", "fetch", "resolve_ref", "changed_files"]
+        );
+
+        let transaction_log = db.into_transaction_log();
+        assert!(transaction_log.iter().any(|entry| {
+            entry.statements()[0]
+                .sql
+                .contains(r#"UPDATE "public"."cve_list_records""#)
+                && entry.statements()[0].sql.contains(r#""deleted" = $"#)
+        }));
+    }
+
+    #[test]
+    fn split_cve_file_changes_keeps_active_record_when_same_cve_is_deleted() {
+        let active_path = parsed_file_path("CVE-2026-1000");
+        let deleted_path = parsed_file_path("CVE-2026-1000");
+
+        let (active_paths, deleted_cve_ids) = split_cve_file_changes(vec![
+            CveListFileChange::Deleted(deleted_path),
+            CveListFileChange::Active(active_path.clone()),
+        ]);
+
+        assert_eq!(active_paths, vec![active_path]);
+        assert!(deleted_cve_ids.is_empty());
     }
 
     #[test]

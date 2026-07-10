@@ -10,6 +10,7 @@ pub struct Model {
     pub record_format_version: String,
     #[sea_orm(column_type = "JsonBinary")]
     pub record: Json,
+    pub deleted: bool,
     pub first_seen_at: DateTimeWithTimeZone,
     pub last_seen_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,

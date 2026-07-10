@@ -26,7 +26,7 @@ pub trait CveListGit {
         &self,
         old: &CommitSha,
         new: &CommitSha,
-    ) -> Result<Vec<Utf8PathBuf>, CveListGitError>;
+    ) -> Result<Vec<CveListFileChange>, CveListGitError>;
 
     /// List every CVE JSON file present at a commit.
     async fn all_cve_files(&self, commit: &CommitSha) -> Result<Vec<Utf8PathBuf>, CveListGitError>;
@@ -71,6 +71,31 @@ pub trait CveListGit {
         }
 
         Ok(())
+    }
+}
+
+/// A changed CVE List file.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CveListFileChange {
+    /// A CVE List file exists in the new commit and should be parsed.
+    Active(Utf8PathBuf),
+    /// A CVE List file was deleted from the new commit.
+    Deleted(Utf8PathBuf),
+}
+
+impl CveListFileChange {
+    /// Return the path for the changed CVE List file.
+    pub fn path(&self) -> &Utf8Path {
+        match self {
+            Self::Active(path) | Self::Deleted(path) => path,
+        }
+    }
+
+    /// Return the CVE ID implied by the changed file path.
+    pub fn cve_id(&self) -> &str {
+        self.path()
+            .file_stem()
+            .expect("CVE List file changes are validated record paths")
     }
 }
 
@@ -357,14 +382,12 @@ impl CveListGit for GitCliCveListGit {
         &self,
         old: &CommitSha,
         new: &CommitSha,
-    ) -> Result<Vec<Utf8PathBuf>, CveListGitError> {
+    ) -> Result<Vec<CveListFileChange>, CveListGitError> {
         let output = self
             .run_git_in_checkout([
                 OsStr::new("diff"),
-                OsStr::new("--name-only"),
-                // Deleted files are intentionally skipped here because there
-                // is no record content to ingest from the new commit.
-                OsStr::new("--diff-filter=AMR"),
+                OsStr::new("--name-status"),
+                OsStr::new("--diff-filter=AMDR"),
                 OsStr::new(old.as_str()),
                 OsStr::new(new.as_str()),
                 OsStr::new("--"),
@@ -372,7 +395,7 @@ impl CveListGit for GitCliCveListGit {
             ])
             .await?;
 
-        parse_changed_cve_files(&output)
+        parse_changed_cve_file_statuses(&output)
     }
 
     async fn all_cve_files(&self, commit: &CommitSha) -> Result<Vec<Utf8PathBuf>, CveListGitError> {
@@ -668,6 +691,46 @@ fn parse_changed_cve_files(output: &str) -> Result<Vec<Utf8PathBuf>, CveListGitE
         .collect()
 }
 
+fn parse_changed_cve_file_statuses(
+    output: &str,
+) -> Result<Vec<CveListFileChange>, CveListGitError> {
+    output
+        .lines()
+        .filter_map(parse_changed_cve_file_status)
+        .collect()
+}
+
+fn parse_changed_cve_file_status(line: &str) -> Option<Result<CveListFileChange, CveListGitError>> {
+    let mut parts = line.split('\t');
+    let status = parts.next()?;
+    let path = match status.as_bytes().first() {
+        Some(b'A' | b'M') => parts.next()?,
+        Some(b'D') => {
+            let path = parts.next()?;
+            if is_cve_record_path(path) {
+                return Some(path_to_utf8_path_buf(path).map(CveListFileChange::Deleted));
+            }
+            return None;
+        }
+        Some(b'R') => {
+            let _old_path = parts.next()?;
+            parts.next()?
+        }
+        _ => return None,
+    };
+
+    if !is_cve_record_path(path) {
+        return None;
+    }
+
+    Some(path_to_utf8_path_buf(path).map(CveListFileChange::Active))
+}
+
+fn path_to_utf8_path_buf(path: &str) -> Result<Utf8PathBuf, CveListGitError> {
+    Utf8PathBuf::from_path_buf(path.into())
+        .map_err(|path| CveListGitError::NonUtf8Path(path.display().to_string()))
+}
+
 fn is_cve_record_path(path: &str) -> bool {
     let Some((path_without_extension, extension)) = path.rsplit_once('.') else {
         return false;
@@ -954,6 +1017,27 @@ mod tests {
             files,
             vec![Utf8PathBuf::from("cves/2024/1xxx/CVE-2024-1000.json")]
         );
+    }
+
+    #[test]
+    fn parse_changed_cve_file_statuses_marks_deleted_records() {
+        let files = parse_changed_cve_file_statuses(
+            "M\tcves/2024/1xxx/CVE-2024-1000.json\n\
+             D\tcves/2025/2xxx/CVE-2025-2000.json\n\
+             R100\tcves/2025/3xxx/CVE-2025-3000.json\tcves/2025/4xxx/CVE-2025-4000.json\n\
+             D\tREADME.md\n",
+        )
+        .expect("valid paths");
+
+        assert_eq!(
+            files,
+            vec![
+                CveListFileChange::Active(Utf8PathBuf::from("cves/2024/1xxx/CVE-2024-1000.json")),
+                CveListFileChange::Deleted(Utf8PathBuf::from("cves/2025/2xxx/CVE-2025-2000.json")),
+                CveListFileChange::Active(Utf8PathBuf::from("cves/2025/4xxx/CVE-2025-4000.json")),
+            ]
+        );
+        assert_eq!(files[1].cve_id(), "CVE-2025-2000");
     }
 
     #[test]

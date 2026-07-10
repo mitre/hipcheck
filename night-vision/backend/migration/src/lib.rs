@@ -7,10 +7,11 @@ impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
         vec![
             Box::new(m20260623_161612_initial_schema::Migration),
+            Box::new(m20260630_173030_create_package_table::Migration),
             Box::new(m20260706_000000_create_cisa_kev_tables::Migration),
             Box::new(m20260707_000000_create_cve_list_tables::Migration),
-            Box::new(m20260630_173030_create_package_table::Migration),
             Box::new(m20260708_150958_create_package_version_table::Migration),
+            Box::new(m20260710_000000_add_cve_list_record_deleted::Migration),
         ]
     }
 }
@@ -19,3 +20,4 @@ mod m20260630_173030_create_package_table;
 mod m20260706_000000_create_cisa_kev_tables;
 mod m20260707_000000_create_cve_list_tables;
 mod m20260708_150958_create_package_version_table;
+mod m20260710_000000_add_cve_list_record_deleted;
