@@ -17,9 +17,7 @@ use crate::cve::{
     },
 };
 use camino::Utf8PathBuf;
-use sea_orm::{
-    ConnectionTrait, DatabaseBackend, Statement, TransactionSession as _, TransactionTrait,
-};
+use sea_orm::{ConnectionTrait, DatabaseBackend, Statement, TransactionSession, TransactionTrait};
 use std::{collections::HashSet, time::Duration};
 use tokio::sync::mpsc;
 use url::Url;
@@ -331,15 +329,16 @@ where
         ));
     }
 
-    sync_cve_list_once_with_progress_and_pipeline_config(
-        db,
+    let result = sync_cve_list_once_with_progress_and_pipeline_config(
+        &lock.transaction,
         git,
         repository_url,
         repository_ref,
         progress,
         pipeline_config,
     )
-    .await
+    .await;
+    finish_locked_cve_list_sync(lock, result).await
 }
 
 /// Sync CVE List records once with a timeout while holding a process-scoped database lock.
@@ -364,8 +363,8 @@ where
         ));
     }
 
-    sync_cve_list_once_with_progress_pipeline_config_and_timeout(
-        db,
+    let result = sync_cve_list_once_with_progress_pipeline_config_and_timeout(
+        &lock.transaction,
         git,
         repository_url,
         repository_ref,
@@ -373,11 +372,12 @@ where
         pipeline_config,
         timeout_config,
     )
-    .await
+    .await;
+    finish_locked_cve_list_sync(lock, result).await
 }
 
 struct CveListSyncLock<T> {
-    _transaction: T,
+    transaction: T,
     acquired: bool,
 }
 
@@ -406,9 +406,51 @@ where
         .map_err(|err| CveListSyncError::StartSyncRun(CveListSyncRunError::Db(err)))?;
 
     Ok(CveListSyncLock {
-        _transaction: transaction,
+        transaction,
         acquired,
     })
+}
+
+async fn finish_locked_cve_list_sync<T>(
+    lock: CveListSyncLock<T>,
+    result: Result<CveListSyncSummary, CveListSyncError>,
+) -> Result<CveListSyncSummary, CveListSyncError>
+where
+    T: TransactionSession,
+{
+    match result {
+        Ok(summary) => {
+            lock.transaction
+                .commit()
+                .await
+                .map_err(|err| CveListSyncError::FinishSyncRun(CveListSyncRunError::Db(err)))?;
+            Ok(summary)
+        }
+        Err(error) if should_commit_failed_locked_cve_list_sync(&error) => {
+            let sync_error = error.to_string();
+            lock.transaction.commit().await.map_err(|err| {
+                CveListSyncError::FinishFailedSyncRun {
+                    sync_error,
+                    finish_error: CveListSyncRunError::Db(err),
+                }
+            })?;
+            Err(error)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn should_commit_failed_locked_cve_list_sync(error: &CveListSyncError) -> bool {
+    match error {
+        CveListSyncError::StartSyncRun(_)
+        | CveListSyncError::FinishSyncRun(_)
+        | CveListSyncError::FinishFailedSyncRun { .. } => false,
+        CveListSyncError::Git(_)
+        | CveListSyncError::Repository(_)
+        | CveListSyncError::Storage(_)
+        | CveListSyncError::SyncRunMetadata(_)
+        | CveListSyncError::TimedOut(_) => true,
+    }
 }
 
 async fn finish_cve_list_sync<C, P>(
