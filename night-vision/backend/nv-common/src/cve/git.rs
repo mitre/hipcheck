@@ -363,7 +363,7 @@ impl CveListGit for GitCliCveListGit {
         self.run_git_in_checkout([
             OsStr::new("fetch"),
             OsStr::new("--prune"),
-            OsStr::new("origin"),
+            OsStr::new(self.repository_url.as_str()),
             OsStr::new(self.repository_ref.as_str()),
         ])
         .await?;
@@ -1282,6 +1282,48 @@ mod tests {
     }
 
     #[test]
+    fn fetch_uses_configured_repository_url() {
+        let test_dir = std::env::temp_dir().join(format!(
+            "nv-common-fetch-uses-repository-url-{}",
+            std::process::id()
+        ));
+        let git_program = test_dir.join("git");
+        let log_path = test_dir.join("git.args");
+        let checkout_dir = test_dir.join("checkout");
+        let git_dir = checkout_dir.join(".git");
+        let _ = std::fs::remove_dir_all(&test_dir);
+        std::fs::create_dir_all(&git_dir).expect("test checkout should be created");
+        std::fs::write(
+            &git_program,
+            "#!/bin/sh\nwhile [ \"$#\" -gt 0 ]; do printf '%s\\n' \"$1\"; shift; done > \"$0.args\"\n",
+        )
+        .expect("test git program should be written");
+        make_test_program_executable(&git_program);
+
+        let git = GitCliCveListGit::with_git_program(
+            Utf8PathBuf::from_path_buf(git_program).expect("test git path should be UTF-8"),
+            Utf8PathBuf::from_path_buf(checkout_dir).expect("checkout path should be UTF-8"),
+            Url::parse("https://example.test/configured-cvelist.git")
+                .expect("repository URL should parse"),
+            GitRef::parse("main").expect("repository ref should parse"),
+        );
+
+        run_async(async {
+            git.fetch().await.expect("fetch should run");
+        });
+
+        let args = std::fs::read_to_string(&log_path).expect("git args should be logged");
+        let _ = std::fs::remove_dir_all(&test_dir);
+        assert_eq!(
+            args,
+            format!(
+                "-C\n{}\nfetch\n--prune\nhttps://example.test/configured-cvelist.git\nmain\n",
+                git.checkout_dir()
+            )
+        );
+    }
+
+    #[test]
     fn run_command_kills_child_when_cancelled() {
         let pid_path = std::env::temp_dir().join(format!(
             "nv-common-run-command-cancelled-{}.pid",
@@ -1370,6 +1412,20 @@ mod tests {
             .expect("test runtime should build")
             .block_on(future)
     }
+
+    #[cfg(unix)]
+    fn make_test_program_executable(path: &Path) {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let mut permissions = std::fs::metadata(path)
+            .expect("test program metadata should read")
+            .permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(path, permissions).expect("test program should be executable");
+    }
+
+    #[cfg(not(unix))]
+    fn make_test_program_executable(_path: &Path) {}
 
     async fn read_test_pid(path: &Path) -> u32 {
         for _ in 0..20 {
