@@ -763,13 +763,18 @@ fn parse_changed_cve_files(output: &str) -> Result<Vec<Utf8PathBuf>, CveListGitE
 fn parse_changed_cve_file_statuses(
     output: &str,
 ) -> Result<Vec<CveListFileChange>, CveListGitError> {
-    output
-        .lines()
-        .filter_map(parse_changed_cve_file_status)
-        .collect()
+    let mut changes = Vec::new();
+    for line in output.lines() {
+        if let Some(line_changes) = parse_changed_cve_file_status(line) {
+            changes.extend(line_changes?);
+        }
+    }
+    Ok(changes)
 }
 
-fn parse_changed_cve_file_status(line: &str) -> Option<Result<CveListFileChange, CveListGitError>> {
+fn parse_changed_cve_file_status(
+    line: &str,
+) -> Option<Result<Vec<CveListFileChange>, CveListGitError>> {
     let mut parts = line.split('\t');
     let status = parts.next()?;
     let path = match status.as_bytes().first() {
@@ -777,13 +782,37 @@ fn parse_changed_cve_file_status(line: &str) -> Option<Result<CveListFileChange,
         Some(b'D') => {
             let path = parts.next()?;
             if is_cve_record_path(path) {
-                return Some(path_to_utf8_path_buf(path).map(CveListFileChange::Deleted));
+                return Some(
+                    path_to_utf8_path_buf(path).map(|path| vec![CveListFileChange::Deleted(path)]),
+                );
             }
             return None;
         }
         Some(b'R') => {
-            let _old_path = parts.next()?;
-            parts.next()?
+            let old_path = parts.next()?;
+            let new_path = parts.next()?;
+            let old_cve_id = cve_id_from_record_path(old_path);
+            let new_cve_id = cve_id_from_record_path(new_path);
+            if old_cve_id.is_none() && new_cve_id.is_none() {
+                return None;
+            }
+
+            let mut changes = Vec::with_capacity(2);
+            if old_cve_id.is_some() && (new_cve_id.is_none() || old_cve_id != new_cve_id) {
+                let old_path = match path_to_utf8_path_buf(old_path) {
+                    Ok(path) => path,
+                    Err(err) => return Some(Err(err)),
+                };
+                changes.push(CveListFileChange::Deleted(old_path));
+            }
+            if new_cve_id.is_some() {
+                let new_path = match path_to_utf8_path_buf(new_path) {
+                    Ok(path) => path,
+                    Err(err) => return Some(Err(err)),
+                };
+                changes.push(CveListFileChange::Active(new_path));
+            }
+            return Some(Ok(changes));
         }
         _ => return None,
     };
@@ -792,12 +821,22 @@ fn parse_changed_cve_file_status(line: &str) -> Option<Result<CveListFileChange,
         return None;
     }
 
-    Some(path_to_utf8_path_buf(path).map(CveListFileChange::Active))
+    Some(path_to_utf8_path_buf(path).map(|path| vec![CveListFileChange::Active(path)]))
 }
 
 fn path_to_utf8_path_buf(path: &str) -> Result<Utf8PathBuf, CveListGitError> {
     Utf8PathBuf::from_path_buf(path.into())
         .map_err(|path| CveListGitError::NonUtf8Path(path.display().to_string()))
+}
+
+fn cve_id_from_record_path(path: &str) -> Option<&str> {
+    if !is_cve_record_path(path) {
+        return None;
+    }
+
+    path.rsplit('/')
+        .next()
+        .and_then(|file_name| file_name.strip_suffix(".json"))
 }
 
 fn is_cve_record_path(path: &str) -> bool {
@@ -1111,10 +1150,26 @@ mod tests {
             vec![
                 CveListFileChange::Active(Utf8PathBuf::from("cves/2024/1xxx/CVE-2024-1000.json")),
                 CveListFileChange::Deleted(Utf8PathBuf::from("cves/2025/2xxx/CVE-2025-2000.json")),
+                CveListFileChange::Deleted(Utf8PathBuf::from("cves/2025/3xxx/CVE-2025-3000.json")),
                 CveListFileChange::Active(Utf8PathBuf::from("cves/2025/4xxx/CVE-2025-4000.json")),
             ]
         );
         assert_eq!(files[1].cve_id(), "CVE-2025-2000");
+    }
+
+    #[test]
+    fn parse_changed_cve_file_statuses_keeps_same_id_renames_active() {
+        let files = parse_changed_cve_file_statuses(
+            "R100\tcves/2025/3xxx/CVE-2025-3000.json\tcves/2025/03xxx/CVE-2025-3000.json\n",
+        )
+        .expect("valid paths");
+
+        assert_eq!(
+            files,
+            vec![CveListFileChange::Active(Utf8PathBuf::from(
+                "cves/2025/03xxx/CVE-2025-3000.json"
+            ))]
+        );
     }
 
     #[test]
