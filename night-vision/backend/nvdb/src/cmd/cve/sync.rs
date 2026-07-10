@@ -70,7 +70,7 @@ async fn sync(config: &Config, _token: DestructiveOperationToken, no_timeout: bo
             worker_config.repository_ref(),
             &progress,
             worker_config.sync_pipeline_config(),
-            worker_config.sync_timeout(),
+            worker_config.sync_timeout_config(),
         )
         .await
     };

@@ -65,6 +65,23 @@ impl CveListSyncPipelineConfig {
     }
 }
 
+/// Timeout policy for CVE List sync attempts.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CveListSyncTimeoutConfig {
+    pub sync_timeout: Duration,
+    pub first_sync_timeout: Duration,
+}
+
+impl CveListSyncTimeoutConfig {
+    fn timeout_for_previous_commit(&self, previous_commit: Option<&CommitSha>) -> Duration {
+        if previous_commit.is_some() {
+            self.sync_timeout
+        } else {
+            self.first_sync_timeout
+        }
+    }
+}
+
 /// Sync CVE List records from Git into database storage once.
 pub async fn sync_cve_list_once<C, G>(
     db: &C,
@@ -250,7 +267,7 @@ async fn sync_cve_list_once_with_progress_pipeline_config_and_timeout<C, G, P>(
     repository_ref: &GitRef,
     progress: &P,
     pipeline_config: CveListSyncPipelineConfig,
-    sync_timeout: Duration,
+    timeout_config: CveListSyncTimeoutConfig,
 ) -> Result<CveListSyncSummary, CveListSyncError>
 where
     C: ConnectionTrait + TransactionTrait,
@@ -265,34 +282,27 @@ where
     let last_successful_commit = previous_cve_list_sync_commit(db, progress).await;
 
     let sync_result = match last_successful_commit {
-        Ok(Some(last_successful_commit)) => match tokio::time::timeout(
-            sync_timeout,
-            run_cve_list_sync(
-                db,
-                generation,
-                git,
-                pipeline_config,
-                &mut resolved_commit,
-                Some(last_successful_commit),
-                progress,
-            ),
-        )
-        .await
-        {
-            Ok(result) => result,
-            Err(_) => Err(CveListSyncError::TimedOut(sync_timeout)),
-        },
-        Ok(None) => {
-            run_cve_list_sync(
-                db,
-                generation,
-                git,
-                pipeline_config,
-                &mut resolved_commit,
-                None,
-                progress,
+        Ok(last_successful_commit) => {
+            let timeout =
+                timeout_config.timeout_for_previous_commit(last_successful_commit.as_ref());
+
+            match tokio::time::timeout(
+                timeout,
+                run_cve_list_sync(
+                    db,
+                    generation,
+                    git,
+                    pipeline_config,
+                    &mut resolved_commit,
+                    last_successful_commit,
+                    progress,
+                ),
             )
             .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(CveListSyncError::TimedOut(timeout)),
+            }
         }
         Err(error) => Err(error),
     };
@@ -340,7 +350,7 @@ pub async fn sync_cve_list_once_exclusive_with_progress_pipeline_config_and_time
     repository_ref: &GitRef,
     progress: &P,
     pipeline_config: CveListSyncPipelineConfig,
-    sync_timeout: Duration,
+    timeout_config: CveListSyncTimeoutConfig,
 ) -> Result<CveListSyncSummary, CveListSyncError>
 where
     C: ConnectionTrait + TransactionTrait,
@@ -361,7 +371,7 @@ where
         repository_ref,
         progress,
         pipeline_config,
-        sync_timeout,
+        timeout_config,
     )
     .await
 }
@@ -1087,7 +1097,10 @@ mod tests {
                 &repository_ref(),
                 &NoopCveListSyncProgress,
                 CveListSyncPipelineConfig::with_write_batch_size(500),
-                Duration::from_millis(1),
+                CveListSyncTimeoutConfig {
+                    sync_timeout: Duration::from_millis(1),
+                    first_sync_timeout: Duration::from_millis(50),
+                },
             ),
         )
         .expect_err("sync should time out");
@@ -1124,7 +1137,7 @@ mod tests {
     }
 
     #[test]
-    fn sync_cve_list_once_does_not_time_out_first_sync() {
+    fn sync_cve_list_once_times_out_first_sync() {
         let git = MockCveListGit {
             fetch_delay: Some(Duration::from_millis(50)),
             ..Default::default()
@@ -1156,15 +1169,20 @@ mod tests {
                     parse_concurrency: DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
                     write_channel_size: 0,
                 },
-                Duration::from_millis(1),
+                CveListSyncTimeoutConfig {
+                    sync_timeout: Duration::from_millis(100),
+                    first_sync_timeout: Duration::from_millis(1),
+                },
             ),
         )
-        .expect_err("sync should fail after bypassing timeout");
+        .expect_err("sync should time out");
 
-        assert!(matches!(err, CveListSyncError::Storage(_)));
+        assert!(
+            matches!(err, CveListSyncError::TimedOut(timeout) if timeout == Duration::from_millis(1))
+        );
         assert_eq!(
             git.calls.lock().expect("calls lock").as_slice(),
-            ["ensure_checkout", "fetch", "resolve_ref"]
+            ["ensure_checkout", "fetch"]
         );
     }
 

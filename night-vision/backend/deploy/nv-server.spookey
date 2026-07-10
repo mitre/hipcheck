@@ -74,6 +74,11 @@ cve-list-sync-interval =
 # Default: 3600000
 cve-list-sync-timeout =
 
+# The timeout in milliseconds for the first CVE List sync attempt.
+#
+# Default: 14400000
+cve-list-first-sync-timeout =
+
 # The local checkout path for the CVE List repository cache.
 cve-list-checkout-path = "/var/cache/night-vision/cvelistV5"
 
