@@ -103,8 +103,11 @@ LABEL org.opencontainers.image.title="nv-server" \
 # Suppress prompts in `apt-get` since we're running under automation.
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Git is a runtime dependency of nv-server's CVE List ingest path. Use the
+# Debian Bookworm package here; the newer Flox Git is for team development
+# workflows, not for this container runtime.
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates curl \
+    && apt-get install --yes --no-install-recommends ca-certificates curl git \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --home-dir /nonexistent --shell /usr/sbin/nologin nv-server \
     && mkdir -p /etc/night-vision

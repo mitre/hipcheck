@@ -4,10 +4,10 @@ schema-version = "1.12.0"
 
 ## Version Control Software (VCS's)
 
-# Even though Git is required to clone this repo in the first place, we
-# choose to include it in the Flox environment because we can't be sure
-# that everyone contributing will be on a good recent version of Git out
-# of the box.
+# This Git is a Night Vision team development tool. Keep it recent for local
+# contribution workflows. It is intentionally separate from the Git installed
+# in the backend container, where Git is a runtime dependency of nv-server's CVE
+# List ingest path.
 git = { pkg-path = "git" }
 jujutsu = { pkg-path = "jujutsu" }
 

@@ -90,4 +90,24 @@ NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
     docker compose \
         -f docker-compose.yml \
         -f docker-compose.ci.yml \
+        build nv-server
+
+printf 'Backend runtime Git version: '
+docker run \
+    --rm \
+    --entrypoint git \
+    "${NV_SERVER_IMAGE:-nv-server:ci-smoke}" \
+    --version
+
+COMPOSE_PROJECT_NAME="$compose_project_name" \
+BUILD_CA_FILE="${BUILD_CA_FILE:-/dev/null}" \
+NV_APP_IMAGE="${NV_APP_IMAGE:-nv-app:ci-smoke}" \
+NV_SERVER_IMAGE="${NV_SERVER_IMAGE:-nv-server:ci-smoke}" \
+POSTGRES_DB=nv \
+POSTGRES_USER=nv-server \
+POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
+NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
+    docker compose \
+        -f docker-compose.yml \
+        -f docker-compose.ci.yml \
         up --build --detach --wait --wait-timeout 180
