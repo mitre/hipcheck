@@ -110,12 +110,12 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates curl git \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --home-dir /nonexistent --shell /usr/sbin/nologin nv-server \
-    && mkdir -p /etc/night-vision
+    && mkdir -p /etc/night-vision /var/cache/night-vision
 
 COPY --from=builder /usr/src/night-vision/target/release/nv-server /usr/local/bin/nv-server
 COPY deploy/nv-server.spookey /etc/night-vision/nv-server.spookey
 
-RUN chown -R nv-server:nv-server /etc/night-vision
+RUN chown -R nv-server:nv-server /etc/night-vision /var/cache/night-vision
 USER nv-server
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/nv-server"]
