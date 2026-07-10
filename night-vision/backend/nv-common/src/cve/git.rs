@@ -505,13 +505,14 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    command
         .args(args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(CveListGitError::RunGit)?;
+        .kill_on_drop(true);
+    let mut child = command.spawn().map_err(CveListGitError::RunGit)?;
 
     let mut child_stdin = child.stdin.take().expect("stdin was piped");
     let child_stdout = child.stdout.take().expect("stdout was piped");
@@ -528,9 +529,77 @@ where
 
         Ok::<Vec<u8>, std::io::Error>(stderr)
     });
+    let stream_paths = paths.to_vec();
+    let mut stream_stdout = tokio::spawn(async move {
+        stream_cat_file_batch_output(&stream_paths, child_stdout, sender).await
+    });
+    let mut wait_child = tokio::spawn(async move { child.wait().await });
 
-    let stream_result = stream_cat_file_batch_output(paths, child_stdout, sender).await;
-    let status = child.wait().await.map_err(CveListGitError::RunGit)?;
+    let (status, stream_result) = tokio::select! {
+        stream_join = &mut stream_stdout => {
+            let stream_result = match stream_join {
+                Ok(stream_result) => stream_result,
+                Err(error) => {
+                    wait_child.abort();
+                    let _ = wait_child.await;
+                    let _ = write_stdin.await;
+                    let _ = read_stderr.await;
+
+                    return Err(CveListGitError::GitStdoutTask(error));
+                }
+            };
+            if stream_result.is_err() {
+                wait_child.abort();
+                let _ = wait_child.await;
+                let _ = write_stdin.await;
+                let _ = read_stderr.await;
+
+                return stream_result;
+            }
+
+            let status = match wait_child.await {
+                Ok(Ok(status)) => status,
+                Ok(Err(error)) => {
+                    let _ = write_stdin.await;
+                    let _ = read_stderr.await;
+
+                    return Err(CveListGitError::RunGit(error));
+                }
+                Err(error) => {
+                    let _ = write_stdin.await;
+                    let _ = read_stderr.await;
+
+                    return Err(CveListGitError::GitWaitTask(error));
+                }
+            };
+            (status, stream_result)
+        }
+        wait_join = &mut wait_child => {
+            let status = match wait_join {
+                Ok(Ok(status)) => status,
+                Ok(Err(error)) => {
+                    stream_stdout.abort();
+                    let _ = stream_stdout.await;
+                    let _ = write_stdin.await;
+                    let _ = read_stderr.await;
+
+                    return Err(CveListGitError::RunGit(error));
+                }
+                Err(error) => {
+                    stream_stdout.abort();
+                    let _ = stream_stdout.await;
+                    let _ = write_stdin.await;
+                    let _ = read_stderr.await;
+
+                    return Err(CveListGitError::GitWaitTask(error));
+                }
+            };
+            let stream_result = stream_stdout
+                .await
+                .map_err(CveListGitError::GitStdoutTask)?;
+            (status, stream_result)
+        }
+    };
     let stdin_result = write_stdin
         .await
         .map_err(CveListGitError::GitStdinTask)?
@@ -803,10 +872,14 @@ pub enum CveListGitError {
     GitStderr(std::io::Error),
     /// Failed to join the task reading git stderr.
     GitStderrTask(tokio::task::JoinError),
+    /// Failed to join the task reading git stdout.
+    GitStdoutTask(tokio::task::JoinError),
     /// Failed to write requests to git stdin.
     GitStdin(std::io::Error),
     /// Failed to join the task writing requests to git stdin.
     GitStdinTask(tokio::task::JoinError),
+    /// Failed to join the task waiting for git to exit.
+    GitWaitTask(tokio::task::JoinError),
     /// The file receiver closed before all Git output was streamed.
     FileReceiverClosed,
     /// Git cat-file returned an invalid object header.
@@ -857,8 +930,10 @@ impl std::fmt::Display for CveListGitError {
             Self::GitStdout(_) => write!(f, "failed to read git command stdout"),
             Self::GitStderr(_) => write!(f, "failed to read git command stderr"),
             Self::GitStderrTask(_) => write!(f, "failed to join git stderr reader task"),
+            Self::GitStdoutTask(_) => write!(f, "failed to join git stdout reader task"),
             Self::GitStdin(_) => write!(f, "failed to write git command stdin"),
             Self::GitStdinTask(_) => write!(f, "failed to join git stdin writer task"),
+            Self::GitWaitTask(_) => write!(f, "failed to join git wait task"),
             Self::FileReceiverClosed => write!(f, "CVE List file receiver closed early"),
             Self::InvalidCatFileHeader(path, _) => {
                 write!(f, "git cat-file returned an invalid header for {path}")
@@ -891,7 +966,9 @@ impl std::error::Error for CveListGitError {
             | Self::GitStderr(err)
             | Self::GitStdin(err) => Some(err),
             Self::GitStderrTask(err) => Some(err),
+            Self::GitStdoutTask(err) => Some(err),
             Self::GitStdinTask(err) => Some(err),
+            Self::GitWaitTask(err) => Some(err),
             Self::GitStdoutUtf8(err) => Some(err),
             Self::CatFileMissing(_)
             | Self::CatFileTrailingData
@@ -1114,6 +1191,37 @@ mod tests {
         assert_eq!(files[0].1.as_bytes(), first);
         assert_eq!(files[1].0, paths[1]);
         assert_eq!(files[1].1.as_bytes(), second);
+    }
+
+    #[test]
+    fn run_command_with_stdin_streaming_cat_file_stops_child_when_receiver_closes() {
+        let paths = vec![Utf8PathBuf::from("cves/2025/1xxx/CVE-2025-1000.json")];
+        let (sender, receiver) = mpsc::channel(1);
+        drop(receiver);
+
+        let err = run_async(async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                run_command_with_stdin_streaming_cat_file(
+                    Path::new("sh"),
+                    [
+                        OsStr::new("-c"),
+                        OsStr::new(
+                            "printf '0123456789abcdef0123456789abcdef01234567 blob 5\\nhello\\n'; \
+                             while :; do printf x; done",
+                        ),
+                    ],
+                    Vec::new(),
+                    &paths,
+                    sender,
+                ),
+            )
+            .await
+            .expect("git command should not hang after the receiver closes")
+            .expect_err("closed receiver should fail")
+        });
+
+        assert!(matches!(err, CveListGitError::FileReceiverClosed));
     }
 
     #[test]
