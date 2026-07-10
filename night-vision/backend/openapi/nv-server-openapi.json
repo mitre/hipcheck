@@ -98,6 +98,74 @@
   },
   "components": {
     "schemas": {
+      "CveIngestHealth": {
+        "type": "object",
+        "properties": {
+          "latestRun": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CveListSyncRunHealth"
+              }
+            ]
+          },
+          "latestSuccessfulCommit": {
+            "nullable": true,
+            "type": "string"
+          },
+          "recordsAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "recordsAvailable"
+        ]
+      },
+      "CveListSyncRunHealth": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "nullable": true,
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recordsInserted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recordsSeen": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recordsUpdated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkedAt",
+          "generation",
+          "recordsInserted",
+          "recordsSeen",
+          "recordsUpdated",
+          "status"
+        ]
+      },
       "Error": {
         "description": "Error information from a response.",
         "type": "object",
@@ -120,11 +188,15 @@
       "Health": {
         "type": "object",
         "properties": {
+          "cveIngest": {
+            "$ref": "#/components/schemas/CveIngestHealth"
+          },
           "status": {
             "type": "string"
           }
         },
         "required": [
+          "cveIngest",
           "status"
         ]
       },

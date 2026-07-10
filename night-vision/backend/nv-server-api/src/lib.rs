@@ -40,8 +40,31 @@ pub trait NvServerApi {
 }
 
 #[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Health {
     pub status: String,
+    pub cve_ingest: CveIngestHealth,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CveIngestHealth {
+    pub records_available: bool,
+    pub latest_successful_commit: Option<String>,
+    pub latest_run: Option<CveListSyncRunHealth>,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CveListSyncRunHealth {
+    pub generation: i64,
+    pub status: String,
+    pub checked_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub records_seen: i32,
+    pub records_inserted: i32,
+    pub records_updated: i32,
+    pub error: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema, Debug, Clone)]

@@ -2,8 +2,8 @@
 
 use camino::Utf8PathBuf;
 use nv_common::{
-    config::ConfigLoadError, cve::sync::CveListSyncError, db::DatabaseConnectionError,
-    error::ErrorSourceIterator as _, rt::RuntimeBuildError,
+    config::ConfigLoadError, db::DatabaseConnectionError, error::ErrorSourceIterator as _,
+    rt::RuntimeBuildError,
 };
 use std::{
     error::Error as _,
@@ -16,7 +16,6 @@ pub enum FatalError {
     FailedToStartDropshotServer(dropshot::BuildError),
     FailedToBuildTokioRuntime(RuntimeBuildError),
     FailedToConnectToDatabase(DatabaseConnectionError),
-    FailedToSyncCveList(CveListSyncError),
     FailedToInitializeLogger(std::io::Error),
     FailedToLoadConfig(ConfigLoadError),
     FailedToCreateOpenApiDescFile(Utf8PathBuf, std::io::Error),
@@ -55,7 +54,6 @@ impl Display for FatalError {
             }
             Self::FailedToBuildTokioRuntime(_) => write!(f, "failed to build tokio runtime"),
             Self::FailedToConnectToDatabase(_) => write!(f, "failed to connect to database"),
-            Self::FailedToSyncCveList(_) => write!(f, "failed to sync CVE List data"),
             Self::FailedToInitializeLogger(_) => write!(f, "failed to initialize logger"),
             Self::FailedToLoadConfig(err) => write!(f, "{err}"),
             Self::FailedToCreateOpenApiDescFile(path, _) => {
@@ -82,7 +80,6 @@ impl std::error::Error for FatalError {
             Self::FailedToStartDropshotServer(err) => Some(err),
             Self::FailedToBuildTokioRuntime(err) => Some(err),
             Self::FailedToConnectToDatabase(err) => Some(err),
-            Self::FailedToSyncCveList(err) => Some(err),
             Self::FailedToInitializeLogger(err) => Some(err),
             Self::FailedToLoadConfig(err) => Some(err),
             Self::FailedToCreateOpenApiDescFile(_, err) => Some(err),
@@ -102,12 +99,6 @@ impl From<ConfigLoadError> for FatalError {
 impl From<DatabaseConnectionError> for FatalError {
     fn from(error: DatabaseConnectionError) -> Self {
         Self::FailedToConnectToDatabase(error)
-    }
-}
-
-impl From<CveListSyncError> for FatalError {
-    fn from(error: CveListSyncError) -> Self {
-        Self::FailedToSyncCveList(error)
     }
 }
 

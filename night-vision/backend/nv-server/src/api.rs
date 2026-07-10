@@ -14,12 +14,18 @@ use chrono::{TimeZone as _, Utc};
 use dropshot::{
     HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, ServerBuilder, TypedBody,
 };
-use nv_common::config::Config;
+use nv_common::{
+    config::Config,
+    cve::storage::{
+        has_cve_list_records, last_successful_cve_list_sync_commit, latest_cve_list_sync_run,
+    },
+    db::entities::cve_list_sync_runs::Model as CveListSyncRun,
+};
 use nv_server_api::{
-    Health, NvServerApi, PackageSource, PackageSourceEcosystem, PackageSourcePathParams,
-    PackageSourceStatus, PackageSourceStatusCompleted, PackageSourceStatusProcessing,
-    PostPackageSourceBody, PostPackageSourceResponse, VersionedPackage,
-    nv_server_api_mod::api_description,
+    CveIngestHealth, CveListSyncRunHealth, Health, NvServerApi, PackageSource,
+    PackageSourceEcosystem, PackageSourcePathParams, PackageSourceStatus,
+    PackageSourceStatusCompleted, PackageSourceStatusProcessing, PostPackageSourceBody,
+    PostPackageSourceResponse, VersionedPackage, nv_server_api_mod::api_description,
 };
 use sea_orm::DatabaseConnection;
 use slog::Logger;
@@ -48,7 +54,6 @@ impl RestApi {
         let api = self.0;
         let ctx = ApiCtx::init(config).await?;
         let cve_list_worker_config = config.cve_list_worker_config();
-        cve_worker::sync_cve_list_on_startup(ctx.db(), &cve_list_worker_config, &log).await?;
         let _cve_list_worker = cve_worker::spawn_cve_list_worker(
             ctx.db().clone(),
             cve_list_worker_config,
@@ -121,10 +126,13 @@ impl NvServerApi for RestApi {
     type Context = ApiCtx;
 
     async fn health(
-        _ctx: RequestContext<Self::Context>,
+        ctx: RequestContext<Self::Context>,
     ) -> Result<HttpResponseOk<Health>, HttpError> {
+        let cve_ingest = cve_ingest_health(ctx.context().db()).await?;
+
         Ok(HttpResponseOk(Health {
             status: "ok".to_owned(),
+            cve_ingest,
         }))
     }
 
@@ -222,4 +230,39 @@ async fn lookup_package_source(
 
     let status = fake_statuses.get(&id).cloned();
     Ok(status)
+}
+
+async fn cve_ingest_health(db: &DatabaseConnection) -> Result<CveIngestHealth, HttpError> {
+    let records_available = has_cve_list_records(db)
+        .await
+        .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+    let latest_successful_commit = last_successful_cve_list_sync_commit(db)
+        .await
+        .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+        .map(|commit| commit.as_str().to_owned());
+    let latest_run = latest_cve_list_sync_run(db)
+        .await
+        .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+        .map(cve_list_sync_run_health);
+
+    Ok(CveIngestHealth {
+        records_available,
+        latest_successful_commit,
+        latest_run,
+    })
+}
+
+fn cve_list_sync_run_health(run: CveListSyncRun) -> CveListSyncRunHealth {
+    CveListSyncRunHealth {
+        generation: run.generation,
+        status: run.status,
+        checked_at: run.checked_at.with_timezone(&Utc),
+        completed_at: run
+            .completed_at
+            .map(|completed_at| completed_at.with_timezone(&Utc)),
+        records_seen: run.records_seen,
+        records_inserted: run.records_inserted,
+        records_updated: run.records_updated,
+        error: run.error,
+    }
 }

@@ -53,8 +53,8 @@ review workflows, see the [database workflow guide](migration/README.md).
 
 ## CVE List Ingest
 
-The backend syncs upstream CVE List records from Git into PostgreSQL on startup
-and on a recurring worker. See
+The backend syncs upstream CVE List records from Git into PostgreSQL with a
+recurring worker after `nv-server` starts. See
 [CVE List Ingest](../docs/backend/cve-ingest.md) for the pipeline, channel
 sizes, and tuning settings.
 

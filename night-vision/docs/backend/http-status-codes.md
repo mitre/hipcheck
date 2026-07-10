@@ -187,12 +187,18 @@ These examples describe the current Night Vision API. Update this section when
 the API surface changes.
 
 - `GET /health` returns `200 OK` with a health response body when the server is
-  able to answer the request.
+  able to answer the request. The body includes CVE ingest metadata; `200 OK`
+  does not guarantee that the initial CVE sync has completed.
 - `POST /package-sources` currently returns `202 ACCEPTED` with the submitted
   package source ID because package-source processing is asynchronous. The ID
   can be used with `GET /package-sources/{id}` to check status.
 - `GET /package-sources/{id}` returns `200 OK` with the package source status
   when the ID is known.
 - `GET /package-sources/{id}` returns `404 NOT FOUND` when the ID is not known.
+
+Endpoints that interact with CVE data must be prepared for an empty initial CVE
+store after startup. When CVE data is required but not yet available, return an
+explicit unavailable or empty-data response rather than treating the empty store
+as an unexpected server state.
 
 [omicron]: https://github.com/oxidecomputer/omicron/blob/main/docs/http-status-codes.adoc

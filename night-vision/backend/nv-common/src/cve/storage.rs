@@ -514,6 +514,21 @@ where
         .map_err(CveListSyncRunError::InvalidStoredCommitSha)
 }
 
+/// Return the most recent CVE List sync run.
+pub async fn latest_cve_list_sync_run<C>(
+    db: &C,
+) -> Result<Option<cve_list_sync_runs::Model>, CveListSyncRunError>
+where
+    C: ConnectionTrait,
+{
+    cve_list_sync_runs::Entity::find()
+        .order_by_desc(cve_list_sync_runs::Column::Generation)
+        .limit(1)
+        .one(db)
+        .await
+        .map_err(CveListSyncRunError::Db)
+}
+
 /// Return whether any active CVE List records are already stored.
 pub async fn has_cve_list_records<C>(db: &C) -> Result<bool, CveListRecordLookupError>
 where
@@ -1071,7 +1086,7 @@ impl std::fmt::Display for CveListSyncRunError {
             Self::CountTooLarge { field, count } => {
                 write!(f, "CVE List sync-run count {field} is too large: {count}")
             }
-            Self::Db(_) => write!(f, "failed to update CVE List sync-run metadata"),
+            Self::Db(_) => write!(f, "failed to access CVE List sync-run metadata"),
             Self::InvalidStoredCommitSha(_) => {
                 write!(f, "CVE List sync-run stored an invalid commit SHA")
             }
@@ -1803,6 +1818,24 @@ mod tests {
     }
 
     #[test]
+    fn latest_cve_list_sync_run_returns_latest_run() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_sync_run(42, "success")]])
+            .into_connection();
+
+        let run = run_async(latest_cve_list_sync_run(&db))
+            .expect("lookup should succeed")
+            .expect("run should exist");
+
+        assert_eq!(run.generation, 42);
+        assert_eq!(run.status, "success");
+        let transaction_log = db.into_transaction_log();
+        let select_sql = &transaction_log[0].statements()[0].sql;
+        assert!(select_sql.contains(r#"ORDER BY "cve_list_sync_runs"."generation" DESC"#));
+        assert!(select_sql.contains("LIMIT $"));
+    }
+
+    #[test]
     fn has_cve_list_records_returns_true_when_record_exists() {
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([vec![mock_cve_id_row("CVE-2026-1000")]])
@@ -1974,6 +2007,22 @@ mod tests {
 
     fn mock_cve_id_row(cve_id: &str) -> BTreeMap<String, Value> {
         BTreeMap::from([("cve_id".to_owned(), cve_id.to_owned().into())])
+    }
+
+    fn mock_sync_run(generation: i64, status: &str) -> cve_list_sync_runs::Model {
+        cve_list_sync_runs::Model {
+            generation,
+            checked_at: "2026-07-10T00:00:00Z".parse().expect("valid timestamp"),
+            completed_at: Some("2026-07-10T00:01:00Z".parse().expect("valid timestamp")),
+            status: status.to_owned(),
+            repository_url: Some("https://example.test/cvelistV5.git".to_owned()),
+            repository_ref: Some("main".to_owned()),
+            commit_sha: Some(TEST_COMMIT_SHA.to_owned()),
+            records_seen: 10,
+            records_inserted: 7,
+            records_updated: 3,
+            error: None,
+        }
     }
 
     fn parsed_file(cve_id: &str) -> ParsedCveListFile {
