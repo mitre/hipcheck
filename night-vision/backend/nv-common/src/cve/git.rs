@@ -533,65 +533,51 @@ where
     let mut stream_stdout = tokio::spawn(async move {
         stream_cat_file_batch_output(&stream_paths, child_stdout, sender).await
     });
-    let mut wait_child = tokio::spawn(async move { child.wait().await });
+    let mut wait_child = Box::pin(child.wait());
 
     let (status, stream_result) = tokio::select! {
         stream_join = &mut stream_stdout => {
             let stream_result = match stream_join {
                 Ok(stream_result) => stream_result,
                 Err(error) => {
-                    wait_child.abort();
-                    let _ = wait_child.await;
-                    let _ = write_stdin.await;
-                    let _ = read_stderr.await;
+                    drop(wait_child);
+                    let _ = child.start_kill();
+                    write_stdin.abort();
+                    read_stderr.abort();
 
                     return Err(CveListGitError::GitStdoutTask(error));
                 }
             };
             if stream_result.is_err() {
-                wait_child.abort();
-                let _ = wait_child.await;
-                let _ = write_stdin.await;
-                let _ = read_stderr.await;
+                drop(wait_child);
+                let _ = child.start_kill();
+                write_stdin.abort();
+                read_stderr.abort();
 
                 return stream_result;
             }
 
             let status = match wait_child.await {
-                Ok(Ok(status)) => status,
-                Ok(Err(error)) => {
-                    let _ = write_stdin.await;
-                    let _ = read_stderr.await;
-
-                    return Err(CveListGitError::RunGit(error));
-                }
+                Ok(status) => status,
                 Err(error) => {
                     let _ = write_stdin.await;
                     let _ = read_stderr.await;
 
-                    return Err(CveListGitError::GitWaitTask(error));
+                    return Err(CveListGitError::RunGit(error));
                 }
             };
             (status, stream_result)
         }
-        wait_join = &mut wait_child => {
-            let status = match wait_join {
-                Ok(Ok(status)) => status,
-                Ok(Err(error)) => {
-                    stream_stdout.abort();
-                    let _ = stream_stdout.await;
-                    let _ = write_stdin.await;
-                    let _ = read_stderr.await;
-
-                    return Err(CveListGitError::RunGit(error));
-                }
+        wait_result = &mut wait_child => {
+            let status = match wait_result {
+                Ok(status) => status,
                 Err(error) => {
                     stream_stdout.abort();
                     let _ = stream_stdout.await;
                     let _ = write_stdin.await;
                     let _ = read_stderr.await;
 
-                    return Err(CveListGitError::GitWaitTask(error));
+                    return Err(CveListGitError::RunGit(error));
                 }
             };
             let stream_result = stream_stdout
@@ -917,8 +903,6 @@ pub enum CveListGitError {
     GitStdin(std::io::Error),
     /// Failed to join the task writing requests to git stdin.
     GitStdinTask(tokio::task::JoinError),
-    /// Failed to join the task waiting for git to exit.
-    GitWaitTask(tokio::task::JoinError),
     /// The file receiver closed before all Git output was streamed.
     FileReceiverClosed,
     /// Git cat-file returned an invalid object header.
@@ -972,7 +956,6 @@ impl std::fmt::Display for CveListGitError {
             Self::GitStdoutTask(_) => write!(f, "failed to join git stdout reader task"),
             Self::GitStdin(_) => write!(f, "failed to write git command stdin"),
             Self::GitStdinTask(_) => write!(f, "failed to join git stdin writer task"),
-            Self::GitWaitTask(_) => write!(f, "failed to join git wait task"),
             Self::FileReceiverClosed => write!(f, "CVE List file receiver closed early"),
             Self::InvalidCatFileHeader(path, _) => {
                 write!(f, "git cat-file returned an invalid header for {path}")
@@ -1007,7 +990,6 @@ impl std::error::Error for CveListGitError {
             Self::GitStderrTask(err) => Some(err),
             Self::GitStdoutTask(err) => Some(err),
             Self::GitStdinTask(err) => Some(err),
-            Self::GitWaitTask(err) => Some(err),
             Self::GitStdoutUtf8(err) => Some(err),
             Self::CatFileMissing(_)
             | Self::CatFileTrailingData
@@ -1279,6 +1261,55 @@ mod tests {
         });
 
         assert!(matches!(err, CveListGitError::FileReceiverClosed));
+    }
+
+    #[test]
+    fn run_command_with_stdin_streaming_cat_file_kills_child_when_cancelled() {
+        let pid_path = std::env::temp_dir().join(format!(
+            "nv-common-streaming-cat-file-cancelled-{}.pid",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&pid_path);
+        let paths = vec![Utf8PathBuf::from("cves/2025/1xxx/CVE-2025-1000.json")];
+        let (sender, _receiver) = mpsc::channel(1);
+
+        let (pid, process_exited) = run_async(async {
+            tokio::time::timeout(
+                std::time::Duration::from_millis(100),
+                run_command_with_stdin_streaming_cat_file(
+                    Path::new("sh"),
+                    [
+                        OsString::from("-c"),
+                        OsString::from(
+                            "echo $$ > \"$1\"; \
+                             printf '0123456789abcdef0123456789abcdef01234567 blob 5\\nhello\\n'; \
+                             while :; do sleep 1; done",
+                        ),
+                        OsString::from("streaming-cat-file-test"),
+                        pid_path.as_os_str().to_owned(),
+                    ],
+                    Vec::new(),
+                    &paths,
+                    sender,
+                ),
+            )
+            .await
+            .expect_err("test command should time out");
+
+            let pid = read_test_pid(&pid_path).await;
+            (pid, wait_for_test_process_exit(pid).await)
+        });
+
+        if test_process_exists(pid) {
+            let _ = std::process::Command::new("kill")
+                .arg(pid.to_string())
+                .status();
+        }
+        let _ = std::fs::remove_file(pid_path);
+        assert!(
+            process_exited,
+            "cancelled streaming command process {pid} should exit"
+        );
     }
 
     #[test]
