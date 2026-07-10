@@ -27,15 +27,8 @@ pub async fn sync_cve_list_on_startup(
         Ok(summary) => {
             log_startup_cve_list_sync_summary(log, &summary);
         }
-        Err(error) if error.is_sync_already_running() => {
-            log_skipped_cve_list_sync(log, "startup", &error);
-        }
         Err(error) => {
-            if startup_can_use_stored_cve_list_records(db, log, &error).await {
-                log_startup_cve_list_sync_failure_permitted(log, &error);
-            } else {
-                return Err(error.into());
-            }
+            handle_startup_cve_list_sync_error(db, log, error).await?;
         }
     }
 
@@ -122,6 +115,24 @@ async fn startup_can_use_stored_cve_list_records(
     }
 }
 
+async fn handle_startup_cve_list_sync_error(
+    db: &DatabaseConnection,
+    log: &slog::Logger,
+    error: CveListSyncError,
+) -> Result<(), FatalError> {
+    if startup_can_use_stored_cve_list_records(db, log, &error).await {
+        if error.is_sync_already_running() {
+            log_skipped_cve_list_sync(log, "startup", &error);
+        } else {
+            log_startup_cve_list_sync_failure_permitted(log, &error);
+        }
+
+        Ok(())
+    } else {
+        Err(error.into())
+    }
+}
+
 fn log_startup_cve_list_sync_summary(log: &slog::Logger, summary: &CveListSyncSummary) {
     let commit_sha = summary_commit_sha(summary);
 
@@ -186,9 +197,12 @@ fn summary_commit_sha(summary: &CveListSyncSummary) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::{CveListSyncError, startup_can_use_stored_cve_list_records};
+    use super::{
+        CveListSyncError, handle_startup_cve_list_sync_error,
+        startup_can_use_stored_cve_list_records,
+    };
     use camino::Utf8PathBuf;
-    use nv_common::config::Config;
+    use nv_common::{config::Config, cve::storage::CveListSyncRunError};
     use sea_orm::{DbBackend, MockDatabase, Value};
     use std::{collections::BTreeMap, time::Duration};
 
@@ -259,6 +273,36 @@ mod tests {
         let can_start = run_async(startup_can_use_stored_cve_list_records(&db, &log, &error));
 
         assert!(!can_start);
+    }
+
+    #[test]
+    fn startup_can_skip_already_running_sync_when_records_exist() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_cve_id_row("CVE-2026-1000")]])
+            .into_connection();
+        let log = slog::Logger::root(slog::Discard, slog::o!());
+        let error = sync_already_running_error();
+
+        let result = run_async(handle_startup_cve_list_sync_error(&db, &log, error));
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn startup_fails_already_running_sync_when_storage_is_empty() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<BTreeMap<String, Value>>::new()])
+            .into_connection();
+        let log = slog::Logger::root(slog::Discard, slog::o!());
+        let error = sync_already_running_error();
+
+        let result = run_async(handle_startup_cve_list_sync_error(&db, &log, error));
+
+        assert!(result.is_err());
+    }
+
+    fn sync_already_running_error() -> CveListSyncError {
+        CveListSyncError::StartSyncRun(CveListSyncRunError::SyncAlreadyRunning)
     }
 
     fn mock_cve_id_row(cve_id: &str) -> BTreeMap<String, Value> {
