@@ -6,6 +6,7 @@ pub mod recover;
 pub mod reset;
 pub mod run;
 pub mod runs;
+pub mod stats;
 pub mod status;
 pub mod sync;
 
@@ -18,6 +19,7 @@ pub fn command() -> clap::Command {
         .subcommand(reset::command())
         .subcommand(run::command())
         .subcommand(runs::command())
+        .subcommand(stats::command())
         .subcommand(status::command())
         .subcommand(sync::command())
 }
@@ -41,6 +43,10 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
 
     if let Some(runs_matches) = matches.subcommand_matches("runs") {
         return runs::run(config, runs_matches);
+    }
+
+    if let Some(stats_matches) = matches.subcommand_matches("stats") {
+        return stats::run(config, stats_matches);
     }
 
     if let Some(status_matches) = matches.subcommand_matches("status") {
