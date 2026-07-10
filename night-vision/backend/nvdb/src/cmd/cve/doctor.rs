@@ -141,7 +141,7 @@ async fn doctor(config: &Config) -> Result<()> {
     println!("checkout_path: {}", worker_config.checkout_path());
     println!("checkout_path_exists: {}", checkout_status.exists);
     println!("checkout_path_writable: {}", checkout_status.writable);
-    ok &= checkout_status.exists && checkout_status.writable;
+    ok &= checkout_status.writable;
 
     if checkout_status.exists {
         let git = GitCliCveListGit::new(
@@ -321,11 +321,29 @@ fn checkout_path_status(path: &Utf8Path) -> CheckoutPathStatus {
             exists: metadata.is_dir(),
             writable: metadata.is_dir() && !metadata.permissions().readonly(),
         },
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => CheckoutPathStatus {
+            exists: false,
+            writable: checkout_parent_writable(path),
+        },
         Err(_) => CheckoutPathStatus {
             exists: false,
             writable: false,
         },
     }
+}
+
+fn checkout_parent_writable(path: &Utf8Path) -> bool {
+    path.parent()
+        .and_then(|parent| {
+            parent
+                .ancestors()
+                .find_map(|ancestor| match fs::metadata(ancestor) {
+                    Ok(metadata) => Some(metadata.is_dir() && !metadata.permissions().readonly()),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+                    Err(_) => Some(false),
+                })
+        })
+        .unwrap_or(false)
 }
 
 fn print_latest_run(latest_run: Option<&CveListSyncRun>) {
@@ -401,7 +419,12 @@ struct CheckoutPathStatus {
 
 #[cfg(test)]
 mod tests {
-    use super::{command, format_pending_migrations, table_key};
+    use super::{checkout_path_status, command, format_pending_migrations, table_key};
+    use camino::Utf8PathBuf;
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     #[test]
     fn cve_doctor_accepts_no_arguments() {
@@ -429,5 +452,70 @@ mod tests {
             table_key("public.cve_list_records"),
             "public_cve_list_records"
         );
+    }
+
+    #[test]
+    fn missing_checkout_path_is_writable_when_parent_can_be_created() {
+        let temp_dir = TestDir::new();
+        let checkout_path = temp_dir.path().join("cache").join("cvelist");
+
+        let status = checkout_path_status(&checkout_path);
+
+        assert!(!status.exists);
+        assert!(status.writable);
+    }
+
+    #[test]
+    fn existing_checkout_directory_is_writable() {
+        let temp_dir = TestDir::new();
+        let checkout_path = temp_dir.path().join("cvelist");
+        fs::create_dir(&checkout_path).expect("create checkout path");
+
+        let status = checkout_path_status(&checkout_path);
+
+        assert!(status.exists);
+        assert!(status.writable);
+    }
+
+    #[test]
+    fn existing_checkout_file_is_not_usable() {
+        let temp_dir = TestDir::new();
+        let checkout_path = temp_dir.path().join("cvelist");
+        fs::write(&checkout_path, "").expect("create checkout file");
+
+        let status = checkout_path_status(&checkout_path);
+
+        assert!(!status.exists);
+        assert!(!status.writable);
+    }
+
+    struct TestDir {
+        path: Utf8PathBuf,
+    }
+
+    impl TestDir {
+        fn new() -> Self {
+            let unique = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system clock before Unix epoch")
+                .as_nanos();
+            let path = Utf8PathBuf::from_path_buf(
+                std::env::temp_dir().join(format!("nvdb-doctor-test-{unique}")),
+            )
+            .expect("temp directory path should be UTF-8");
+            fs::create_dir(&path).expect("create temp dir");
+
+            Self { path }
+        }
+
+        fn path(&self) -> &Utf8PathBuf {
+            &self.path
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.path).expect("remove temp dir");
+        }
     }
 }
