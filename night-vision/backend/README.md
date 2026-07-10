@@ -51,6 +51,13 @@ steps, see the
 For migration, entity-generation, local test database, rollback, and schema
 review workflows, see the [database workflow guide](migration/README.md).
 
+## CVE List Ingest
+
+The backend syncs upstream CVE List records from Git into PostgreSQL on startup
+and on a recurring worker. See
+[CVE List Ingest](../docs/backend/cve-ingest.md) for the pipeline, channel
+sizes, and tuning settings.
+
 ## Integration Tests
 
 Most backend tests run without external services. Postgres-backed integration

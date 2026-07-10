@@ -30,6 +30,7 @@ This is the internal documentation index for the Night Vision project.
 ## Backend Info
 
 - [Database Workflow](../backend/migration/README.md)
+- [CVE List Ingest](./backend/cve-ingest.md)
 - [Dev Tools](./backend/dev-tools.md)
 - [Hipcheck Integration](./backend/hipcheck-integration.md)
 - [HTTP Status Codes](./backend/http-status-codes.md)
