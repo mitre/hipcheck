@@ -96,6 +96,13 @@ pub struct ResetCveListStorageSummary {
     pub sync_runs_deleted: u64,
 }
 
+/// Counts from marking stale running CVE List sync runs failed.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FailRunningCveListSyncRunsSummary {
+    /// Number of running sync runs marked failed.
+    pub sync_runs_failed: u64,
+}
+
 /// Upsert parsed CVE List records and return insert/update counts.
 ///
 /// Inserted rows use the database defaults for `first_seen_at`, `last_seen_at`,
@@ -475,6 +482,37 @@ where
         .map_err(ResetCveListStorageError::Db)
 }
 
+/// Mark running CVE List sync runs failed.
+///
+/// Callers should only use this after verifying no live sync holds the
+/// process-scoped advisory lock.
+pub async fn fail_running_cve_list_sync_runs<C>(
+    db: &C,
+    error: &str,
+) -> Result<FailRunningCveListSyncRunsSummary, CveListSyncRunError>
+where
+    C: ConnectionTrait,
+{
+    let result = cve_list_sync_runs::Entity::update_many()
+        .col_expr(
+            cve_list_sync_runs::Column::CompletedAt,
+            Expr::current_timestamp(),
+        )
+        .col_expr(
+            cve_list_sync_runs::Column::Status,
+            Expr::value(CveListSyncRunStatus::Failed.to_string()),
+        )
+        .col_expr(cve_list_sync_runs::Column::Error, Expr::value(error))
+        .filter(cve_list_sync_runs::Column::Status.eq(CveListSyncRunStatus::Running.to_string()))
+        .exec(db)
+        .await
+        .map_err(CveListSyncRunError::Db)?;
+
+    Ok(FailRunningCveListSyncRunsSummary {
+        sync_runs_failed: result.rows_affected,
+    })
+}
+
 async fn count_running_cve_list_sync_runs<C>(db: &C) -> Result<u64, ResetCveListStorageError>
 where
     C: ConnectionTrait,
@@ -768,8 +806,12 @@ pub enum CveListSyncRunError {
     Db(sea_orm::DbErr),
     /// A stored commit SHA was invalid.
     InvalidStoredCommitSha(CveListGitError),
+    /// The advisory-lock query returned no row.
+    MissingAdvisoryLockResult,
     /// A non-terminal status was passed when completing a sync run.
     NonTerminalStatus(CveListSyncRunStatus),
+    /// A CVE List sync run is already running.
+    SyncAlreadyRunning,
     /// The sync run to complete was not found.
     SyncRunNotFound(i64),
 }
@@ -784,8 +826,14 @@ impl std::fmt::Display for CveListSyncRunError {
             Self::InvalidStoredCommitSha(_) => {
                 write!(f, "CVE List sync-run stored an invalid commit SHA")
             }
+            Self::MissingAdvisoryLockResult => {
+                write!(f, "CVE List sync advisory-lock query returned no row")
+            }
             Self::NonTerminalStatus(status) => {
                 write!(f, "CVE List sync-run status {status} is not terminal")
+            }
+            Self::SyncAlreadyRunning => {
+                write!(f, "a CVE List sync run is already running")
             }
             Self::SyncRunNotFound(generation) => {
                 write!(f, "CVE List sync run {generation} was not found")
@@ -799,9 +847,11 @@ impl std::error::Error for CveListSyncRunError {
         match self {
             Self::Db(err) => Some(err),
             Self::InvalidStoredCommitSha(err) => Some(err),
-            Self::CountTooLarge { .. } | Self::NonTerminalStatus(_) | Self::SyncRunNotFound(_) => {
-                None
-            }
+            Self::CountTooLarge { .. }
+            | Self::MissingAdvisoryLockResult
+            | Self::NonTerminalStatus(_)
+            | Self::SyncAlreadyRunning
+            | Self::SyncRunNotFound(_) => None,
         }
     }
 }
@@ -1471,6 +1521,36 @@ mod tests {
                 sync_runs_deleted: 3,
             }
         );
+    }
+
+    #[test]
+    fn fail_running_cve_list_sync_runs_marks_running_runs_failed() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 2,
+            }])
+            .into_connection();
+
+        let summary = run_async(fail_running_cve_list_sync_runs(
+            &db,
+            "sync process was interrupted",
+        ))
+        .expect("running sync runs should be marked failed");
+
+        assert_eq!(
+            summary,
+            FailRunningCveListSyncRunsSummary {
+                sync_runs_failed: 2,
+            }
+        );
+        let transaction_log = db.into_transaction_log();
+        let update_sql = &transaction_log[0].statements()[0].sql;
+        assert!(update_sql.contains(r#"UPDATE "public"."cve_list_sync_runs""#));
+        assert!(update_sql.contains(r#""completed_at" = CURRENT_TIMESTAMP"#));
+        assert!(update_sql.contains(r#""status" = $"#));
+        assert!(update_sql.contains(r#""error" = $"#));
+        assert!(update_sql.contains(r#"WHERE "cve_list_sync_runs"."status" = $"#));
     }
 
     fn mock_num_items_row(num_items: i64) -> BTreeMap<String, Value> {

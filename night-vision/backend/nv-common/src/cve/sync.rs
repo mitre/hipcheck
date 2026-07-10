@@ -16,10 +16,13 @@ use crate::cve::{
     },
 };
 use camino::Utf8PathBuf;
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseBackend, Statement, TransactionTrait};
 use std::collections::HashSet;
 use tokio::sync::mpsc;
 use url::Url;
+
+/// PostgreSQL advisory-lock key used to serialize CVE List sync runs.
+pub const CVE_LIST_SYNC_ADVISORY_LOCK_ID: i64 = 0x4356_454c_5359_4e43;
 
 /// Outcome of a CVE List sync attempt.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -221,6 +224,73 @@ where
         run_cve_list_sync(db, git, pipeline_config, &mut resolved_commit, progress).await;
 
     finish_cve_list_sync(db, generation, resolved_commit, sync_result, progress).await
+}
+
+/// Sync CVE List records once while holding a process-scoped database lock.
+pub async fn sync_cve_list_once_exclusive_with_progress_and_pipeline_config<C, G, P>(
+    db: &C,
+    git: &G,
+    repository_url: &Url,
+    repository_ref: &GitRef,
+    progress: &P,
+    pipeline_config: CveListSyncPipelineConfig,
+) -> Result<CveListSyncSummary, CveListSyncError>
+where
+    C: ConnectionTrait + TransactionTrait,
+    G: CveListGit + Sync,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    let lock = acquire_cve_list_sync_lock(db).await?;
+    if !lock.acquired {
+        return Err(CveListSyncError::StartSyncRun(
+            CveListSyncRunError::SyncAlreadyRunning,
+        ));
+    }
+
+    sync_cve_list_once_with_progress_and_pipeline_config(
+        db,
+        git,
+        repository_url,
+        repository_ref,
+        progress,
+        pipeline_config,
+    )
+    .await
+}
+
+struct CveListSyncLock<T> {
+    _transaction: T,
+    acquired: bool,
+}
+
+async fn acquire_cve_list_sync_lock<C>(
+    db: &C,
+) -> Result<CveListSyncLock<C::Transaction>, CveListSyncError>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let transaction = db
+        .begin()
+        .await
+        .map_err(|err| CveListSyncError::StartSyncRun(CveListSyncRunError::Db(err)))?;
+    let statement = Statement::from_string(
+        DatabaseBackend::Postgres,
+        format!("SELECT pg_try_advisory_xact_lock({CVE_LIST_SYNC_ADVISORY_LOCK_ID})"),
+    );
+    let acquired = transaction
+        .query_one_raw(statement)
+        .await
+        .map_err(|err| CveListSyncError::StartSyncRun(CveListSyncRunError::Db(err)))?
+        .ok_or_else(|| {
+            CveListSyncError::StartSyncRun(CveListSyncRunError::MissingAdvisoryLockResult)
+        })?
+        .try_get_by_index(0)
+        .map_err(|err| CveListSyncError::StartSyncRun(CveListSyncRunError::Db(err)))?;
+
+    Ok(CveListSyncLock {
+        _transaction: transaction,
+        acquired,
+    })
 }
 
 async fn finish_cve_list_sync<C, P>(
@@ -436,6 +506,9 @@ pub enum CveListSyncError {
 impl std::fmt::Display for CveListSyncError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::StartSyncRun(CveListSyncRunError::SyncAlreadyRunning) => {
+                write!(f, "CVE List sync is already running")
+            }
             Self::StartSyncRun(_) => write!(f, "failed to start CVE List sync run"),
             Self::Git(_) => write!(f, "failed to access CVE List Git repository"),
             Self::Repository(_) => write!(f, "failed to read CVE List repository records"),
@@ -461,6 +534,16 @@ impl std::error::Error for CveListSyncError {
             Self::Storage(err) => Some(err),
             Self::FinishFailedSyncRun { finish_error, .. } => Some(finish_error),
         }
+    }
+}
+
+impl CveListSyncError {
+    /// Return true when a sync did not start because another run is active.
+    pub fn is_sync_already_running(&self) -> bool {
+        matches!(
+            self,
+            Self::StartSyncRun(CveListSyncRunError::SyncAlreadyRunning)
+        )
     }
 }
 
@@ -842,6 +925,32 @@ mod tests {
         assert!(finish_sql.contains(r#"UPDATE "public"."cve_list_sync_runs""#));
         assert!(finish_sql.contains(r#""status" = $"#));
         assert!(finish_sql.contains(r#""error" = $"#));
+    }
+
+    #[test]
+    fn sync_cve_list_once_exclusive_skips_when_advisory_lock_is_held() {
+        let git = MockCveListGit::default();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![BTreeMap::from([(
+                "pg_try_advisory_xact_lock".to_owned(),
+                false.into(),
+            )])]])
+            .into_connection();
+
+        let err = run_async(
+            sync_cve_list_once_exclusive_with_progress_and_pipeline_config(
+                &db,
+                &git,
+                &repository_url(),
+                &repository_ref(),
+                &NoopCveListSyncProgress,
+                CveListSyncPipelineConfig::with_write_batch_size(500),
+            ),
+        )
+        .expect_err("sync should be skipped");
+
+        assert!(err.is_sync_already_running());
+        assert!(git.calls.lock().expect("calls lock").is_empty());
     }
 
     fn repository_url() -> Url {

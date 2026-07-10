@@ -5,7 +5,9 @@ use nv_common::{
     cve::{
         git::{CommitSha, GitCliCveListGit},
         progress::{CveListSyncProgress, CveListSyncProgressReporter},
-        sync::{CveListSyncSummary, sync_cve_list_once_with_progress_and_pipeline_config},
+        sync::{
+            CveListSyncSummary, sync_cve_list_once_exclusive_with_progress_and_pipeline_config,
+        },
     },
     db, rt,
 };
@@ -42,7 +44,7 @@ async fn sync(config: &Config, _token: DestructiveOperationToken) -> Result<()> 
         worker_config.repository_ref().clone(),
     );
     let progress = CveSyncProgressBar::new();
-    let sync_result = sync_cve_list_once_with_progress_and_pipeline_config(
+    let sync_result = sync_cve_list_once_exclusive_with_progress_and_pipeline_config(
         &db,
         &git,
         worker_config.repository_url(),

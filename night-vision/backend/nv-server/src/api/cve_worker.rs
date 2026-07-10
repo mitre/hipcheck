@@ -8,7 +8,7 @@ use nv_common::{
         progress::NoopCveListSyncProgress,
         sync::{
             CveListSyncError, CveListSyncSummary,
-            sync_cve_list_once_with_progress_and_pipeline_config,
+            sync_cve_list_once_exclusive_with_progress_and_pipeline_config,
         },
     },
 };
@@ -22,8 +22,15 @@ pub async fn sync_cve_list_on_startup(
     config: &CveListWorkerConfig,
     log: &slog::Logger,
 ) -> Result<(), FatalError> {
-    let summary = sync_cve_list(db, config).await?;
-    log_startup_cve_list_sync_summary(log, &summary);
+    match sync_cve_list(db, config).await {
+        Ok(summary) => {
+            log_startup_cve_list_sync_summary(log, &summary);
+        }
+        Err(error) if error.is_sync_already_running() => {
+            log_skipped_cve_list_sync(log, "startup", &error);
+        }
+        Err(error) => return Err(error.into()),
+    }
 
     Ok(())
 }
@@ -55,6 +62,9 @@ async fn run_cve_list_worker(
             Ok(summary) => {
                 log_scheduled_cve_list_sync_summary(&log, &summary);
             }
+            Err(error) if error.is_sync_already_running() => {
+                log_skipped_cve_list_sync(&log, "scheduled", &error);
+            }
             Err(error) => {
                 log_cve_list_sync_error(&log, &error);
             }
@@ -72,7 +82,7 @@ async fn sync_cve_list(
         config.repository_ref().clone(),
     );
 
-    sync_cve_list_once_with_progress_and_pipeline_config(
+    sync_cve_list_once_exclusive_with_progress_and_pipeline_config(
         db,
         &git,
         config.repository_url(),
@@ -110,6 +120,15 @@ fn log_scheduled_cve_list_sync_summary(log: &slog::Logger, summary: &CveListSync
         "records_seen" => summary.records_seen,
         "records_inserted" => summary.records_inserted,
         "records_updated" => summary.records_updated,
+    );
+}
+
+fn log_skipped_cve_list_sync(log: &slog::Logger, sync_kind: &str, error: &CveListSyncError) {
+    info!(
+        log,
+        "skipped CVE List sync because another sync is still running";
+        "sync_kind" => sync_kind,
+        "error" => error.to_string(),
     );
 }
 
