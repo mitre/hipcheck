@@ -217,6 +217,7 @@ fn is_valid_git_ref(value: &str) -> bool {
 fn is_valid_git_ref_component(component: &str) -> bool {
     !component.is_empty()
         && !component.starts_with('.')
+        && !component.starts_with('-')
         && !component.ends_with(".lock")
         && component.chars().all(is_valid_git_ref_char)
 }
@@ -1094,6 +1095,8 @@ mod tests {
             "main/",
             "feature//branch",
             "feature..branch",
+            "-main",
+            "refs/heads/-main",
             "feature.lock",
             "refs/heads/.main",
             "refs/heads/main.",
