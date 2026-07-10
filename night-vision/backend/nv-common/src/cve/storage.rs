@@ -6,13 +6,13 @@ use crate::{
         progress::{CveListSyncProgress, CveListSyncProgressReporter, NoopCveListSyncProgress},
         repository::ParsedCveListFile,
     },
-    db::entities::{cve_list_records, cve_list_sync_runs},
+    db::entities::{cve_list_record_staging, cve_list_records, cve_list_sync_runs},
 };
 use sea_orm::{
     ActiveValue::{NotSet, Set},
     ColumnTrait as _, ConnectionTrait, DeriveIden, EntityTrait as _, PaginatorTrait as _,
     QueryFilter as _, QueryOrder as _, QuerySelect as _, Statement,
-    sea_query::{Expr, OnConflict, Query},
+    sea_query::{Expr, ExprTrait as _, OnConflict, Query},
 };
 use std::{collections::HashSet, fmt};
 use tokio::sync::mpsc;
@@ -266,6 +266,78 @@ where
     Ok(summary)
 }
 
+/// Stage parsed CVE List records from a channel in batches, reporting progress.
+///
+/// Staged records are not visible to readers until
+/// [`merge_staged_cve_list_records`] publishes them into the live records table.
+pub async fn stage_cve_list_records_from_receiver_with_batch_size_and_progress<C, P>(
+    db: &C,
+    generation: i64,
+    mut records: mpsc::Receiver<ParsedCveListFile>,
+    batch_size: usize,
+    total_records: usize,
+    progress: &P,
+) -> Result<WriteCveListRecordsSummary, WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    if batch_size == 0 {
+        return Err(WriteCveListRecordsError::InvalidBatchSize);
+    }
+
+    let mut seen = HashSet::new();
+    let mut batch = Vec::with_capacity(batch_size);
+    let mut summary = WriteCveListRecordsSummary {
+        records_seen: 0,
+        records_inserted: 0,
+        records_updated: 0,
+    };
+    let mut write_started = false;
+
+    while let Some(record) = records.recv().await {
+        if !write_started {
+            progress.report(CveListSyncProgress::RecordWriteStarted {
+                records: total_records,
+            });
+            write_started = true;
+        }
+
+        let cve_id = record.record.cve_id.as_str().to_owned();
+        if !seen.insert(cve_id.clone()) {
+            return Err(WriteCveListRecordsError::DuplicateCveId(cve_id));
+        }
+
+        batch.push(record);
+        if batch.len() == batch_size {
+            stage_cve_list_record_batch(
+                db,
+                generation,
+                &batch,
+                total_records,
+                &mut summary,
+                progress,
+            )
+            .await?;
+            batch.clear();
+        }
+    }
+
+    if !batch.is_empty() {
+        stage_cve_list_record_batch(
+            db,
+            generation,
+            &batch,
+            total_records,
+            &mut summary,
+            progress,
+        )
+        .await?;
+    }
+
+    Ok(summary)
+}
+
 /// Insert new parsed CVE List records from a channel in batches, reporting progress.
 ///
 /// This is intended for true first-run imports where CVE List storage is empty.
@@ -442,6 +514,71 @@ where
         .map_err(CveListSyncRunError::InvalidStoredCommitSha)
 }
 
+/// Publish staged CVE List records for a sync run into the live records table.
+pub async fn merge_staged_cve_list_records<C>(
+    db: &C,
+    generation: i64,
+) -> Result<(), WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+{
+    let mut select = Query::select();
+    select
+        .columns([
+            CveListRecordStaging::CveId,
+            CveListRecordStaging::RecordFormatVersion,
+            CveListRecordStaging::Record,
+        ])
+        .expr(Expr::value(false))
+        .from((CveListSchema::Public, CveListRecordStaging::Table))
+        .and_where(Expr::col(CveListRecordStaging::Generation).eq(generation));
+
+    let mut merge = Query::insert();
+    merge
+        .into_table((CveListSchema::Public, CveListRecords::Table))
+        .columns([
+            CveListRecords::CveId,
+            CveListRecords::RecordFormatVersion,
+            CveListRecords::Record,
+            CveListRecords::Deleted,
+        ])
+        .select_from(select)
+        .map_err(|err| WriteCveListRecordsError::QueryBuild(err.to_string()))?
+        .on_conflict(
+            OnConflict::column(CveListRecords::CveId)
+                .update_columns([CveListRecords::RecordFormatVersion, CveListRecords::Record])
+                .values([
+                    (CveListRecords::Deleted, Expr::value(false)),
+                    (CveListRecords::LastSeenAt, Expr::current_timestamp()),
+                    (CveListRecords::UpdatedAt, Expr::current_timestamp()),
+                ])
+                .to_owned(),
+        );
+
+    db.execute(&merge)
+        .await
+        .map(|_| ())
+        .map_err(WriteCveListRecordsError::Db)?;
+
+    clear_staged_cve_list_records(db, generation).await
+}
+
+/// Remove staged CVE List records for a sync run.
+pub async fn clear_staged_cve_list_records<C>(
+    db: &C,
+    generation: i64,
+) -> Result<(), WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+{
+    cve_list_record_staging::Entity::delete_many()
+        .filter(cve_list_record_staging::Column::Generation.eq(generation))
+        .exec(db)
+        .await
+        .map(|_| ())
+        .map_err(WriteCveListRecordsError::Db)
+}
+
 /// Clear CVE List records and sync-run metadata from database storage.
 ///
 /// Clearing sync-run metadata is part of the reset because the latest
@@ -469,7 +606,8 @@ where
         .map_err(ResetCveListStorageError::Db)?;
     let truncate = Statement::from_string(
         db.get_database_backend(),
-        "TRUNCATE TABLE public.cve_list_records, public.cve_list_sync_runs RESTART IDENTITY"
+        "TRUNCATE TABLE public.cve_list_records, public.cve_list_record_staging, \
+         public.cve_list_sync_runs RESTART IDENTITY"
             .to_owned(),
     );
 
@@ -602,6 +740,55 @@ where
     Ok(())
 }
 
+async fn stage_cve_list_record_batch<C, P>(
+    db: &C,
+    generation: i64,
+    records: &[ParsedCveListFile],
+    total_records: usize,
+    summary: &mut WriteCveListRecordsSummary,
+    progress: &P,
+) -> Result<(), WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+    P: CveListSyncProgressReporter + ?Sized,
+{
+    let cve_ids = collect_unique_cve_ids(records)?;
+    progress.report(CveListSyncProgress::ExistingRecordLookupStarted {
+        records: cve_ids.len(),
+    });
+    let records_updated = count_existing_cve_records(db, &cve_ids).await?;
+    progress.report(CveListSyncProgress::ExistingRecordLookupCompleted {
+        records: records_updated,
+    });
+
+    insert_cve_list_record_staging_batch(db, generation, records).await?;
+
+    let records_inserted = cve_ids
+        .len()
+        .checked_sub(records_updated)
+        .expect("existing CVE IDs were selected from supplied CVE IDs");
+
+    summary.records_seen = summary
+        .records_seen
+        .checked_add(records.len())
+        .expect("seen record count cannot exceed streamed record count");
+    summary.records_inserted = summary
+        .records_inserted
+        .checked_add(records_inserted)
+        .expect("inserted record count cannot exceed streamed record count");
+    summary.records_updated = summary
+        .records_updated
+        .checked_add(records_updated)
+        .expect("updated record count cannot exceed streamed record count");
+
+    progress.report(CveListSyncProgress::RecordWriteBatchCompleted {
+        written: summary.records_seen,
+        total: total_records,
+    });
+
+    Ok(())
+}
+
 async fn insert_new_cve_list_record_batch<C, P>(
     db: &C,
     records: &[ParsedCveListFile],
@@ -630,6 +817,41 @@ where
     });
 
     Ok(())
+}
+
+async fn insert_cve_list_record_staging_batch<C>(
+    db: &C,
+    generation: i64,
+    records: &[ParsedCveListFile],
+) -> Result<(), WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+{
+    let mut insert = Query::insert();
+    insert
+        .into_table((CveListSchema::Public, CveListRecordStaging::Table))
+        .columns([
+            CveListRecordStaging::Generation,
+            CveListRecordStaging::CveId,
+            CveListRecordStaging::RecordFormatVersion,
+            CveListRecordStaging::Record,
+        ]);
+
+    for record in records {
+        insert
+            .values([
+                Expr::val(generation),
+                Expr::val(record.record.cve_id.as_str().to_owned()),
+                Expr::val(record.record.record_format_version.as_str().to_owned()),
+                Expr::val(record.record.record.clone()),
+            ])
+            .map_err(|err| WriteCveListRecordsError::QueryBuild(err.to_string()))?;
+    }
+
+    db.execute(&insert)
+        .await
+        .map(|_| ())
+        .map_err(WriteCveListRecordsError::Db)
 }
 
 async fn insert_cve_list_record_batch<C>(
@@ -732,6 +954,15 @@ where
 #[derive(DeriveIden)]
 enum CveListSchema {
     Public,
+}
+
+#[derive(DeriveIden)]
+enum CveListRecordStaging {
+    Table,
+    Generation,
+    CveId,
+    RecordFormatVersion,
+    Record,
 }
 
 #[derive(DeriveIden)]
@@ -1053,6 +1284,90 @@ mod tests {
                 records_updated: 1,
             }
         );
+    }
+
+    #[test]
+    fn stage_cve_list_records_from_receiver_batches_streamed_writes() {
+        let batch_size = 2;
+        let records = vec![
+            parsed_file("CVE-2026-1000"),
+            parsed_file("CVE-2026-1001"),
+            parsed_file("CVE-2026-1002"),
+        ];
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_num_items_row(0)], vec![mock_num_items_row(1)]])
+            .append_exec_results(mock_exec_results(2))
+            .into_connection();
+
+        let summary = run_async(async {
+            let (sender, receiver) = mpsc::channel(records.len());
+            for record in records {
+                sender.send(record).await.expect("receiver should be open");
+            }
+            drop(sender);
+
+            stage_cve_list_records_from_receiver_with_batch_size_and_progress(
+                &db,
+                42,
+                receiver,
+                batch_size,
+                3,
+                &NoopCveListSyncProgress,
+            )
+            .await
+        })
+        .expect("stage should succeed");
+
+        assert_eq!(
+            summary,
+            WriteCveListRecordsSummary {
+                records_seen: 3,
+                records_inserted: 2,
+                records_updated: 1,
+            }
+        );
+
+        let transaction_log = db.into_transaction_log();
+        let staging_insert_count = transaction_log
+            .iter()
+            .filter(|entry| {
+                entry.statements()[0]
+                    .sql
+                    .contains(r#"INSERT INTO "public"."cve_list_record_staging""#)
+            })
+            .count();
+        assert_eq!(staging_insert_count, 2);
+        assert!(transaction_log.iter().all(|entry| {
+            !entry.statements()[0]
+                .sql
+                .contains(r#"INSERT INTO "public"."cve_list_records""#)
+        }));
+    }
+
+    #[test]
+    fn merge_staged_cve_list_records_upserts_live_records_and_clears_stage() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results(mock_exec_results(2))
+            .into_connection();
+
+        run_async(merge_staged_cve_list_records(&db, 42)).expect("merge should succeed");
+
+        let transaction_log = db.into_transaction_log();
+        assert!(transaction_log.iter().any(|entry| {
+            entry.statements()[0]
+                .sql
+                .contains(r#"INSERT INTO "public"."cve_list_records""#)
+        }));
+        assert!(transaction_log.iter().any(|entry| {
+            entry.statements()[0]
+                .sql
+                .contains(r#"ON CONFLICT ("cve_id") DO UPDATE"#)
+        }));
+        assert!(transaction_log.iter().any(|entry| {
+            entry.statements()[0]
+                .sql
+                .contains(r#"DELETE FROM "public"."cve_list_record_staging""#)
+        }));
     }
 
     #[test]
@@ -1475,7 +1790,8 @@ mod tests {
             transaction_log
                 .iter()
                 .any(|entry| entry.statements()[0].sql.contains(
-                    "TRUNCATE TABLE public.cve_list_records, public.cve_list_sync_runs \
+                    "TRUNCATE TABLE public.cve_list_records, public.cve_list_record_staging, \
+                     public.cve_list_sync_runs \
                      RESTART IDENTITY"
                 ))
         );

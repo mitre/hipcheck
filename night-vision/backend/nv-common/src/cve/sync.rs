@@ -10,13 +10,16 @@ use crate::cve::{
     },
     storage::{
         CveListSyncRunError, CveListSyncRunStatus, DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
-        FinishCveListSyncRun, WriteCveListRecordsError, finish_cve_list_sync_run,
-        last_successful_cve_list_sync_commit, mark_deleted_cve_list_records,
-        start_cve_list_sync_run, write_cve_list_records_from_receiver_with_batch_size_and_progress,
+        FinishCveListSyncRun, WriteCveListRecordsError, clear_staged_cve_list_records,
+        finish_cve_list_sync_run, last_successful_cve_list_sync_commit,
+        mark_deleted_cve_list_records, merge_staged_cve_list_records,
+        stage_cve_list_records_from_receiver_with_batch_size_and_progress, start_cve_list_sync_run,
     },
 };
 use camino::Utf8PathBuf;
-use sea_orm::{ConnectionTrait, DatabaseBackend, Statement, TransactionTrait};
+use sea_orm::{
+    ConnectionTrait, DatabaseBackend, Statement, TransactionSession as _, TransactionTrait,
+};
 use std::collections::HashSet;
 use tokio::sync::mpsc;
 use url::Url;
@@ -71,7 +74,7 @@ pub async fn sync_cve_list_once<C, G>(
     write_batch_size: usize,
 ) -> Result<CveListSyncSummary, CveListSyncError>
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
     G: CveListGit + Sync,
 {
     let pipeline_config = CveListSyncPipelineConfig::with_write_batch_size(write_batch_size);
@@ -97,7 +100,7 @@ pub async fn sync_cve_list_once_with_parse_concurrency<C, G>(
     parse_concurrency: usize,
 ) -> Result<CveListSyncSummary, CveListSyncError>
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
     G: CveListGit + Sync,
 {
     let pipeline_config = CveListSyncPipelineConfig {
@@ -128,7 +131,7 @@ pub async fn sync_cve_list_once_with_parse_and_write_channel_config<C, G>(
     write_channel_size: usize,
 ) -> Result<CveListSyncSummary, CveListSyncError>
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
     G: CveListGit + Sync,
 {
     let pipeline_config = CveListSyncPipelineConfig {
@@ -158,7 +161,7 @@ pub async fn sync_cve_list_once_with_progress<C, G, P>(
     progress: &P,
 ) -> Result<CveListSyncSummary, CveListSyncError>
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
     G: CveListGit + Sync,
     P: CveListSyncProgressReporter + ?Sized,
 {
@@ -185,7 +188,7 @@ pub async fn sync_cve_list_once_with_progress_and_parse_concurrency<C, G, P>(
     pipeline_config: CveListSyncPipelineConfig,
 ) -> Result<CveListSyncSummary, CveListSyncError>
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
     G: CveListGit + Sync,
     P: CveListSyncProgressReporter + ?Sized,
 {
@@ -210,7 +213,7 @@ pub async fn sync_cve_list_once_with_progress_and_pipeline_config<C, G, P>(
     pipeline_config: CveListSyncPipelineConfig,
 ) -> Result<CveListSyncSummary, CveListSyncError>
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
     G: CveListGit + Sync,
     P: CveListSyncProgressReporter + ?Sized,
 {
@@ -220,8 +223,15 @@ where
     progress.report(CveListSyncProgress::Started { generation });
     let mut resolved_commit = None;
 
-    let sync_result =
-        run_cve_list_sync(db, git, pipeline_config, &mut resolved_commit, progress).await;
+    let sync_result = run_cve_list_sync(
+        db,
+        generation,
+        git,
+        pipeline_config,
+        &mut resolved_commit,
+        progress,
+    )
+    .await;
 
     finish_cve_list_sync(db, generation, resolved_commit, sync_result, progress).await
 }
@@ -301,7 +311,7 @@ async fn finish_cve_list_sync<C, P>(
     progress: &P,
 ) -> Result<CveListSyncSummary, CveListSyncError>
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
     P: CveListSyncProgressReporter + ?Sized,
 {
     let completion = match sync_result {
@@ -323,6 +333,7 @@ where
                     sync_error: error_message,
                     finish_error,
                 })?;
+            let _ = clear_staged_cve_list_records(db, generation).await;
 
             return Err(error);
         }
@@ -346,13 +357,14 @@ where
 
 async fn run_cve_list_sync<C, G, P>(
     db: &C,
+    generation: i64,
     git: &G,
     pipeline_config: CveListSyncPipelineConfig,
     resolved_commit: &mut Option<CommitSha>,
     progress: &P,
 ) -> Result<FinishCveListSyncRun, CveListSyncError>
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
     G: CveListGit + Sync,
     P: CveListSyncProgressReporter + ?Sized,
 {
@@ -420,8 +432,9 @@ where
         pipeline_config.parse_concurrency,
         sender,
     );
-    let write_records = write_cve_list_records_from_receiver_with_batch_size_and_progress(
+    let write_records = stage_cve_list_records_from_receiver_with_batch_size_and_progress(
         db,
+        generation,
         receiver,
         pipeline_config.write_batch_size,
         total_records,
@@ -430,9 +443,20 @@ where
     let (parse_result, write_result) = tokio::join!(parse_records, write_records);
     let write_summary = write_result.map_err(CveListSyncError::Storage)?;
     parse_result.map_err(CveListSyncError::Repository)?;
-    let deleted_summary = mark_deleted_cve_list_records(db, &deleted_cve_ids)
+    let transaction = db
+        .begin()
+        .await
+        .map_err(|err| CveListSyncError::Storage(WriteCveListRecordsError::Db(err)))?;
+    merge_staged_cve_list_records(&transaction, generation)
         .await
         .map_err(CveListSyncError::Storage)?;
+    let deleted_summary = mark_deleted_cve_list_records(&transaction, &deleted_cve_ids)
+        .await
+        .map_err(CveListSyncError::Storage)?;
+    transaction
+        .commit()
+        .await
+        .map_err(|err| CveListSyncError::Storage(WriteCveListRecordsError::Db(err)))?;
 
     Ok(FinishCveListSyncRun {
         status: CveListSyncRunStatus::Success,
@@ -696,12 +720,7 @@ mod tests {
         assert!(transaction_log.iter().any(|entry| {
             entry.statements()[0]
                 .sql
-                .contains(r#"INSERT INTO "public"."cve_list_records""#)
-        }));
-        assert!(transaction_log.iter().any(|entry| {
-            entry.statements()[0]
-                .sql
-                .contains(r#"ON CONFLICT ("cve_id") DO UPDATE"#)
+                .contains(r#"INSERT INTO "public"."cve_list_record_staging""#)
         }));
         assert!(transaction_log.iter().all(|entry| {
             !entry.statements()[0]
@@ -827,14 +846,6 @@ mod tests {
             git.calls.lock().expect("calls lock").as_slice(),
             ["ensure_checkout", "fetch", "resolve_ref", "changed_files"]
         );
-
-        let transaction_log = db.into_transaction_log();
-        assert!(transaction_log.iter().any(|entry| {
-            entry.statements()[0]
-                .sql
-                .contains(r#"UPDATE "public"."cve_list_records""#)
-                && entry.statements()[0].sql.contains(r#""deleted" = $"#)
-        }));
     }
 
     #[test]
@@ -925,6 +936,52 @@ mod tests {
         assert!(finish_sql.contains(r#"UPDATE "public"."cve_list_sync_runs""#));
         assert!(finish_sql.contains(r#""status" = $"#));
         assert!(finish_sql.contains(r#""error" = $"#));
+    }
+
+    #[test]
+    fn sync_cve_list_once_does_not_merge_staged_records_after_later_parse_error() {
+        let valid_path = parsed_file_path("CVE-2026-1000");
+        let invalid_path = parsed_file_path("CVE-2026-1001");
+        let git = MockCveListGit {
+            all_paths: vec![valid_path.clone(), invalid_path.clone()],
+            files: HashMap::from([
+                (valid_path, cve_record("CVE-2026-1000")),
+                (invalid_path, "{".to_owned()),
+            ]),
+            ..Default::default()
+        };
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_generation_row(42)],
+                Vec::<BTreeMap<String, Value>>::new(),
+                vec![mock_existing_count_row(0)],
+            ])
+            .append_exec_results(mock_exec_results(3))
+            .into_connection();
+
+        let err = run_async(sync_cve_list_once_with_parse_and_write_channel_config(
+            &db,
+            &git,
+            &repository_url(),
+            &repository_ref(),
+            1,
+            1,
+            1,
+        ))
+        .expect_err("sync should fail");
+
+        assert!(matches!(err, CveListSyncError::Repository(_)));
+        let transaction_log = db.into_transaction_log();
+        assert!(transaction_log.iter().any(|entry| {
+            entry.statements()[0]
+                .sql
+                .contains(r#"INSERT INTO "public"."cve_list_record_staging""#)
+        }));
+        assert!(transaction_log.iter().all(|entry| {
+            !entry.statements()[0]
+                .sql
+                .contains("INSERT INTO public.cve_list_records")
+        }));
     }
 
     #[test]

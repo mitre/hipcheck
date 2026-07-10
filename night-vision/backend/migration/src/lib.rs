@@ -12,6 +12,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260707_000000_create_cve_list_tables::Migration),
             Box::new(m20260708_150958_create_package_version_table::Migration),
             Box::new(m20260710_000000_add_cve_list_record_deleted::Migration),
+            Box::new(m20260710_010000_create_cve_list_record_staging::Migration),
         ]
     }
 }
@@ -21,3 +22,4 @@ mod m20260706_000000_create_cisa_kev_tables;
 mod m20260707_000000_create_cve_list_tables;
 mod m20260708_150958_create_package_version_table;
 mod m20260710_000000_add_cve_list_record_deleted;
+mod m20260710_010000_create_cve_list_record_staging;
