@@ -2182,9 +2182,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "camino",
+ "chrono",
  "clap",
  "clap-verbosity-flag",
  "indicatif",
+ "migration",
  "nv-common",
  "sea-orm",
  "secrecy",

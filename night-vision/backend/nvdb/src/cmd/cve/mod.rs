@@ -2,6 +2,7 @@ use anyhow::Result;
 use nv_common::config::Config;
 
 pub mod config;
+pub mod doctor;
 pub mod list;
 pub mod record;
 pub mod recover;
@@ -17,6 +18,7 @@ pub fn command() -> clap::Command {
         .about("Manage CVE List data")
         .arg_required_else_help(true)
         .subcommand(config::command())
+        .subcommand(doctor::command())
         .subcommand(list::command())
         .subcommand(record::command())
         .subcommand(recover::command())
@@ -31,6 +33,10 @@ pub fn command() -> clap::Command {
 pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     if let Some(config_matches) = matches.subcommand_matches("config") {
         return self::config::run(config, config_matches);
+    }
+
+    if let Some(doctor_matches) = matches.subcommand_matches("doctor") {
+        return doctor::run(config, doctor_matches);
     }
 
     if let Some(list_matches) = matches.subcommand_matches("list") {
