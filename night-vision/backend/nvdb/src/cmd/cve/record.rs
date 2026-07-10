@@ -67,6 +67,7 @@ fn print_metadata(record: &CveListRecord) {
         "state: {}",
         cve_state(&record.record).unwrap_or("<unknown>")
     );
+    println!("deleted: {}", record.deleted);
     println!("first_seen_at: {}", record.first_seen_at);
     println!("last_seen_at: {}", record.last_seen_at);
     println!("updated_at: {}", record.updated_at);
