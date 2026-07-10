@@ -479,11 +479,10 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = Command::new(program)
-        .args(args)
-        .output()
-        .await
-        .map_err(CveListGitError::RunGit)?;
+    let mut command = Command::new(program);
+    command.args(args).kill_on_drop(true);
+
+    let output = command.output().await.map_err(CveListGitError::RunGit)?;
 
     if output.status.success() {
         String::from_utf8(output.stdout).map_err(CveListGitError::GitStdoutUtf8)
@@ -1283,6 +1282,46 @@ mod tests {
     }
 
     #[test]
+    fn run_command_kills_child_when_cancelled() {
+        let pid_path = std::env::temp_dir().join(format!(
+            "nv-common-run-command-cancelled-{}.pid",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&pid_path);
+
+        let (pid, process_exited) = run_async(async {
+            tokio::time::timeout(
+                std::time::Duration::from_millis(100),
+                run_command(
+                    Path::new("sh"),
+                    [
+                        OsString::from("-c"),
+                        OsString::from("echo $$ > \"$1\"; while :; do sleep 1; done"),
+                        OsString::from("run-command-test"),
+                        pid_path.as_os_str().to_owned(),
+                    ],
+                ),
+            )
+            .await
+            .expect_err("test command should time out");
+
+            let pid = read_test_pid(&pid_path).await;
+            (pid, wait_for_test_process_exit(pid).await)
+        });
+
+        if test_process_exists(pid) {
+            let _ = std::process::Command::new("kill")
+                .arg(pid.to_string())
+                .status();
+        }
+        let _ = std::fs::remove_file(pid_path);
+        assert!(
+            process_exited,
+            "cancelled command process {pid} should exit"
+        );
+    }
+
+    #[test]
     fn parse_cat_file_batch_output_rejects_missing_objects() {
         let path = Utf8PathBuf::from("cves/2025/1xxx/CVE-2025-1000.json");
         let output = b"0123456789abcdef0123456789abcdef01234567 missing\n";
@@ -1330,5 +1369,38 @@ mod tests {
             .build()
             .expect("test runtime should build")
             .block_on(future)
+    }
+
+    async fn read_test_pid(path: &Path) -> u32 {
+        for _ in 0..20 {
+            match tokio::fs::read_to_string(path).await {
+                Ok(pid) => {
+                    return pid.trim().parse().expect("test pid should parse");
+                }
+                Err(_) => tokio::time::sleep(std::time::Duration::from_millis(50)).await,
+            }
+        }
+
+        panic!("test pid file should be written");
+    }
+
+    async fn wait_for_test_process_exit(pid: u32) -> bool {
+        for _ in 0..20 {
+            if !test_process_exists(pid) {
+                return true;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+
+        false
+    }
+
+    fn test_process_exists(pid: u32) -> bool {
+        std::process::Command::new("kill")
+            .arg("-0")
+            .arg(pid.to_string())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success())
     }
 }
