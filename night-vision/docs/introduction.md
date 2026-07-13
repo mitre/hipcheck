@@ -1,11 +1,7 @@
 
 # Night Vision Documentation
 
-This is the internal documentation for the Night Vision project.
-
-> [!important]
-> This documentation is still a work-in-progress. Some links below are to
-> materials which are planned but have not yet been written.
+This is the internal documentation index for the Night Vision project.
 
 [[_TOC_]]
 
@@ -21,6 +17,10 @@ This is the internal documentation for the Night Vision project.
 ## System Info
 
 - [Requests For Discussion](./rfds/README.md)
+  - [RFD 0001](./rfds/0001-mvp-upgrade-safety-assessments.md): MVP
+    Upgrade Safety Assessments
+  - [RFD 0002](./rfds/0002-use-hipcheck-for-supply-chain-analysis.md): Use
+    Hipcheck for Supply Chain Analysis
 - [System Architecture](./system/architecture.md)
 
 ## Frontend Info
@@ -31,6 +31,7 @@ This is the internal documentation for the Night Vision project.
 
 - [Database Workflow](../backend/migration/README.md)
 - [Dev Tools](./backend/dev-tools.md)
+- [Hipcheck Integration](./backend/hipcheck-integration.md)
 - [HTTP Status Codes](./backend/http-status-codes.md)
 - [Operations Runbook](./backend/operations-runbook.md)
 - [`nvdb` Command Reference](./backend/nvdb-command-reference.md)
@@ -39,3 +40,4 @@ This is the internal documentation for the Night Vision project.
 - [Resolving Packages](./backend/resolving-packages.md)
 - [Rust Best Practices](./backend/rust-best-practices.md)
 - [Rust Error Handling](./backend/rust-error-handling.md)
+- [Spookey Format](./backend/spookey-format.md)
