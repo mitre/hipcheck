@@ -44,6 +44,10 @@ Night Vision's database of choice is PostgreSQL version 18. Make sure to
 install PostgreSQL locally for development. We also recommend installing
 pgAdmin if you want a GUI for inspecting the database.
 
+For local backend startup, health checks, logs, PostgreSQL checks, and recovery
+steps, see the
+[backend operations runbook](../docs/backend/operations-runbook.md).
+
 For migration, entity-generation, local test database, rollback, and schema
 review workflows, see the [database workflow guide](migration/README.md).
 

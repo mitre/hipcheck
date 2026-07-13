@@ -7,6 +7,9 @@ directory; use `-c` or `--config` to choose a different file.
 The parser is intentionally strict: unknown keys, missing required keys,
 invalid values, and conflicting database secret sources stop startup.
 
+For startup commands, health checks, logs, PostgreSQL checks, and local
+recovery steps, see the [backend operations runbook](./operations-runbook.md).
+
 ## Source Files
 
 - `backend/nv-common/src/config.rs` defines the accepted keys, parses values,

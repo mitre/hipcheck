@@ -8,6 +8,9 @@ migration, and entity-generation workflows. See the
 [`nvdb` command reference](./nvdb-command-reference.md) for current commands,
 flags, examples, expected output, and secret-safe usage guidance.
 
+For normal local startup, health checks, logs, PostgreSQL checks, and recovery
+steps, see the [backend operations runbook](./operations-runbook.md).
+
 For the end-to-end database development flow, including adding migrations,
 applying them locally, regenerating SeaORM entities, test database setup,
 rollback expectations, and schema review, see the

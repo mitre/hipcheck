@@ -20,6 +20,9 @@ The API currently has no documented authentication requirement. Do not assume
 production authentication, authorization, or deployment behavior from this
 local guide.
 
+For local startup, health checks, logs, and recovery steps, see the
+[backend operations runbook](./operations-runbook.md).
+
 ## JSON Conventions
 
 Request and response bodies use JSON. Field names are camelCase, matching the
@@ -58,6 +61,8 @@ Content-Type: application/json
   "status": "ok"
 }
 ```
+
+The current health response does not report database, CVE, or KEV ingest state.
 
 ### `POST /package-sources`
 
