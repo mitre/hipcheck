@@ -10,8 +10,8 @@ use crate::{
 };
 use sea_orm::{
     ActiveValue::{NotSet, Set},
-    ColumnTrait as _, ConnectionTrait, DeriveIden, EntityTrait as _, PaginatorTrait as _,
-    QueryFilter as _, QueryOrder as _, QuerySelect as _, Statement,
+    ColumnTrait as _, ConnectionTrait, DatabaseBackend, DeriveIden, EntityTrait as _,
+    PaginatorTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _, Statement,
     sea_query::{Expr, ExprTrait as _, OnConflict, Query},
 };
 use std::{collections::HashSet, fmt};
@@ -23,6 +23,9 @@ pub const DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE: usize = 500;
 
 /// Default number of parsed CVE List records to buffer between parsing and writing.
 pub const DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE: usize = 1024;
+
+/// PostgreSQL advisory-lock key used to serialize CVE List sync and reset work.
+pub const CVE_LIST_SYNC_ADVISORY_LOCK_ID: i64 = 0x4356_454c_5359_4e43;
 
 /// A CVE List sync-run status.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -617,6 +620,9 @@ where
 /// Clearing sync-run metadata is part of the reset because the latest
 /// successful sync commit determines whether future syncs can use the
 /// incremental path.
+///
+/// Callers must pass an active transaction so the transaction-scoped advisory
+/// lock is held until the reset is committed or rolled back.
 pub async fn reset_cve_list_storage<C>(
     db: &C,
     force: bool,
@@ -624,6 +630,13 @@ pub async fn reset_cve_list_storage<C>(
 where
     C: ConnectionTrait,
 {
+    let sync_lock_acquired = try_acquire_cve_list_sync_lock(db)
+        .await
+        .map_err(ResetCveListStorageError::SyncLock)?;
+    if !sync_lock_acquired {
+        return Err(ResetCveListStorageError::SyncAlreadyRunning);
+    }
+
     let running_sync_runs = count_running_cve_list_sync_runs(db).await?;
     if running_sync_runs > 0 && !force {
         return Err(ResetCveListStorageError::RunningSyncRuns(running_sync_runs));
@@ -651,6 +664,27 @@ where
             sync_runs_deleted,
         })
         .map_err(ResetCveListStorageError::Db)
+}
+
+/// Try to acquire the transaction-scoped CVE List sync advisory lock.
+///
+/// Callers that need the lock to guard multiple statements must pass an active
+/// transaction. Passing a plain connection only guards the current statement.
+pub async fn try_acquire_cve_list_sync_lock<C>(db: &C) -> Result<bool, CveListSyncRunError>
+where
+    C: ConnectionTrait,
+{
+    let statement = Statement::from_string(
+        DatabaseBackend::Postgres,
+        format!("SELECT pg_try_advisory_xact_lock({CVE_LIST_SYNC_ADVISORY_LOCK_ID})"),
+    );
+
+    db.query_one_raw(statement)
+        .await
+        .map_err(CveListSyncRunError::Db)?
+        .ok_or(CveListSyncRunError::MissingAdvisoryLockResult)?
+        .try_get_by_index(0)
+        .map_err(CveListSyncRunError::Db)
 }
 
 /// Mark running CVE List sync runs failed.
@@ -1150,6 +1184,10 @@ pub enum ResetCveListStorageError {
     Db(sea_orm::DbErr),
     /// One or more CVE List sync runs are still marked running.
     RunningSyncRuns(u64),
+    /// Another session holds the CVE List sync advisory lock.
+    SyncAlreadyRunning,
+    /// The sync advisory-lock check failed.
+    SyncLock(CveListSyncRunError),
 }
 
 impl std::fmt::Display for ResetCveListStorageError {
@@ -1162,6 +1200,10 @@ impl std::fmt::Display for ResetCveListStorageError {
                     "refusing to reset CVE List storage while {count} sync run(s) are running"
                 )
             }
+            Self::SyncAlreadyRunning => {
+                write!(f, "a CVE List sync run is already running")
+            }
+            Self::SyncLock(_) => write!(f, "failed to check CVE List sync advisory lock"),
         }
     }
 }
@@ -1170,7 +1212,8 @@ impl std::error::Error for ResetCveListStorageError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Db(err) => Some(err),
-            Self::RunningSyncRuns(_) => None,
+            Self::SyncLock(err) => Some(err),
+            Self::RunningSyncRuns(_) | Self::SyncAlreadyRunning => None,
         }
     }
 }
@@ -1880,6 +1923,7 @@ mod tests {
     fn reset_cve_list_storage_truncates_records_and_sync_runs() {
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([
+                vec![mock_advisory_lock_row(true)],
                 vec![mock_num_items_row(0)],
                 vec![mock_num_items_row(7)],
                 vec![mock_num_items_row(3)],
@@ -1913,9 +1957,34 @@ mod tests {
     }
 
     #[test]
+    fn reset_cve_list_storage_rejects_when_sync_lock_is_held() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_advisory_lock_row(false)]])
+            .into_connection();
+
+        let err = run_async(reset_cve_list_storage(&db, false)).expect_err("reset should fail");
+
+        assert!(matches!(err, ResetCveListStorageError::SyncAlreadyRunning));
+        let transaction_log = db.into_transaction_log();
+        assert!(
+            transaction_log[0].statements()[0]
+                .sql
+                .contains("pg_try_advisory_xact_lock")
+        );
+        assert!(
+            transaction_log
+                .iter()
+                .all(|entry| !entry.statements()[0].sql.contains("TRUNCATE TABLE"))
+        );
+    }
+
+    #[test]
     fn reset_cve_list_storage_rejects_running_sync_runs_without_force() {
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([vec![mock_num_items_row(2)]])
+            .append_query_results([
+                vec![mock_advisory_lock_row(true)],
+                vec![mock_num_items_row(2)],
+            ])
             .into_connection();
 
         let err = run_async(reset_cve_list_storage(&db, false)).expect_err("reset should fail");
@@ -1933,6 +2002,7 @@ mod tests {
     fn reset_cve_list_storage_accepts_running_sync_runs_with_force() {
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([
+                vec![mock_advisory_lock_row(true)],
                 vec![mock_num_items_row(2)],
                 vec![mock_num_items_row(7)],
                 vec![mock_num_items_row(3)],
@@ -1986,6 +2056,10 @@ mod tests {
 
     fn mock_num_items_row(num_items: i64) -> BTreeMap<String, Value> {
         BTreeMap::from([("num_items".to_owned(), num_items.into())])
+    }
+
+    fn mock_advisory_lock_row(acquired: bool) -> BTreeMap<String, Value> {
+        BTreeMap::from([("pg_try_advisory_xact_lock".to_owned(), acquired.into())])
     }
 
     fn mock_exec_results(count: usize) -> Vec<MockExecResult> {

@@ -14,16 +14,14 @@ use crate::cve::{
         finish_cve_list_sync_run, last_successful_cve_list_sync_commit,
         mark_deleted_cve_list_records, merge_staged_cve_list_records,
         stage_cve_list_records_from_receiver_with_batch_size_and_progress, start_cve_list_sync_run,
+        try_acquire_cve_list_sync_lock,
     },
 };
 use camino::Utf8PathBuf;
-use sea_orm::{ConnectionTrait, DatabaseBackend, Statement, TransactionSession, TransactionTrait};
+use sea_orm::{ConnectionTrait, TransactionSession, TransactionTrait};
 use std::{collections::HashSet, time::Duration};
 use tokio::sync::mpsc;
 use url::Url;
-
-/// PostgreSQL advisory-lock key used to serialize CVE List sync runs.
-pub const CVE_LIST_SYNC_ADVISORY_LOCK_ID: i64 = 0x4356_454c_5359_4e43;
 
 /// Outcome of a CVE List sync attempt.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -391,19 +389,9 @@ where
         .begin()
         .await
         .map_err(|err| CveListSyncError::StartSyncRun(CveListSyncRunError::Db(err)))?;
-    let statement = Statement::from_string(
-        DatabaseBackend::Postgres,
-        format!("SELECT pg_try_advisory_xact_lock({CVE_LIST_SYNC_ADVISORY_LOCK_ID})"),
-    );
-    let acquired = transaction
-        .query_one_raw(statement)
+    let acquired = try_acquire_cve_list_sync_lock(&transaction)
         .await
-        .map_err(|err| CveListSyncError::StartSyncRun(CveListSyncRunError::Db(err)))?
-        .ok_or_else(|| {
-            CveListSyncError::StartSyncRun(CveListSyncRunError::MissingAdvisoryLockResult)
-        })?
-        .try_get_by_index(0)
-        .map_err(|err| CveListSyncError::StartSyncRun(CveListSyncRunError::Db(err)))?;
+        .map_err(CveListSyncError::StartSyncRun)?;
 
     Ok(CveListSyncLock {
         transaction,

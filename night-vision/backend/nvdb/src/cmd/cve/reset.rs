@@ -75,6 +75,10 @@ fn reset_storage_error(error: ResetCveListStorageError) -> anyhow::Error {
              run `nvdb cve reset --destructive --force`; this is unsafe because forcing a reset \
              while a sync is running can leave CVE ingestion state inconsistent."
         ),
+        ResetCveListStorageError::SyncAlreadyRunning => anyhow!(
+            "refusing to reset CVE List storage while a live sync holds the advisory lock. \
+             Stop nv-server or wait for the sync to finish, then retry."
+        ),
         error => anyhow!(error).context("failed to reset CVE List storage"),
     }
 }
@@ -118,5 +122,14 @@ mod tests {
         assert!(error.contains("nvdb cve reset --destructive --force"));
         assert!(error.contains("unsafe"));
         assert!(error.contains("inconsistent"));
+    }
+
+    #[test]
+    fn live_sync_lock_error_does_not_point_to_force() {
+        let error = reset_storage_error(ResetCveListStorageError::SyncAlreadyRunning).to_string();
+
+        assert!(error.contains("live sync holds the advisory lock"));
+        assert!(error.contains("wait for the sync to finish"));
+        assert!(!error.contains("--force"));
     }
 }

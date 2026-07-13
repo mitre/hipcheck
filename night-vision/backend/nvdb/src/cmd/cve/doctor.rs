@@ -6,7 +6,7 @@ use nv_common::{
     config::Config,
     cve::{
         git::{CveListGit as _, GitCliCveListGit},
-        sync::CVE_LIST_SYNC_ADVISORY_LOCK_ID,
+        storage::CVE_LIST_SYNC_ADVISORY_LOCK_ID,
     },
     db::entities::{cve_list_sync_runs, cve_list_sync_runs::Model as CveListSyncRun},
     rt,

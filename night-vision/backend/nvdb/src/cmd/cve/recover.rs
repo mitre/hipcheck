@@ -1,13 +1,13 @@
-use anyhow::{Context as _, Result, anyhow, bail};
+use anyhow::{Context as _, Result, bail};
 use nv_common::{
     config::Config,
-    cve::{
-        storage::{FailRunningCveListSyncRunsSummary, fail_running_cve_list_sync_runs},
-        sync::CVE_LIST_SYNC_ADVISORY_LOCK_ID,
+    cve::storage::{
+        FailRunningCveListSyncRunsSummary, fail_running_cve_list_sync_runs,
+        try_acquire_cve_list_sync_lock,
     },
     db, rt,
 };
-use sea_orm::{ConnectionTrait, DatabaseBackend, QueryResult, Statement, TransactionTrait as _};
+use sea_orm::TransactionTrait as _;
 
 use crate::destructive::DestructiveOperationToken;
 
@@ -43,7 +43,7 @@ async fn recover(config: &Config, _token: DestructiveOperationToken) -> Result<(
         .await
         .context("failed to start CVE List recovery transaction")?;
 
-    if !try_acquire_sync_lock(&transaction).await? {
+    if !try_acquire_cve_list_sync_lock(&transaction).await? {
         transaction
             .rollback()
             .await
@@ -66,29 +66,6 @@ async fn recover(config: &Config, _token: DestructiveOperationToken) -> Result<(
     print_summary(&summary);
 
     Ok(())
-}
-
-async fn try_acquire_sync_lock<C>(db: &C) -> Result<bool>
-where
-    C: ConnectionTrait,
-{
-    let statement = Statement::from_string(
-        DatabaseBackend::Postgres,
-        format!("SELECT pg_try_advisory_xact_lock({CVE_LIST_SYNC_ADVISORY_LOCK_ID})"),
-    );
-    let result = db
-        .query_one_raw(statement)
-        .await
-        .context("failed to check CVE List sync advisory lock")?
-        .ok_or_else(|| anyhow!("CVE List sync advisory-lock query returned no row"))?;
-
-    sync_lock_acquired(&result)
-}
-
-fn sync_lock_acquired(result: &QueryResult) -> Result<bool> {
-    result
-        .try_get_by_index(0)
-        .context("failed to read CVE List sync advisory-lock result")
 }
 
 fn print_summary(summary: &FailRunningCveListSyncRunsSummary) {
