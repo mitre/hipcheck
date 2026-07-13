@@ -16,6 +16,7 @@ This is the internal documentation for the Night Vision project.
 - [Dev Practices](./project/dev-practices.md)
 - [Flox](./project/flox.md)
 
+- [Issue Tracker Standards](./project/issue-tracker.md)
 
 ## System Info
 
