@@ -11,6 +11,9 @@ a REST API to be used by the frontend.
 - `nvdb`: Night Vision Debugger, a tool for debugging the backend server.
   See the [`nvdb` command reference](../docs/backend/nvdb-command-reference.md)
   for commands, examples, and safety notes.
+- `migration`: SeaORM migrations for the PostgreSQL schema. See the
+  [database workflow guide](migration/README.md) for adding migrations,
+  applying them locally, regenerating entities, and reviewing schema changes.
 - `spookey`: Configuration language used by `nv-server`.
 - `workspace-hack`: Unifies dependency features, managed by `cargo-hakari`.
 - `xtask`: Task runner, used for project-internal tasks.
@@ -40,6 +43,9 @@ time, including by keeping compile times reasonable.
 Night Vision's database of choice is PostgreSQL version 18. Make sure to
 install PostgreSQL locally for development. We also recommend installing
 pgAdmin if you want a GUI for inspecting the database.
+
+For migration, entity-generation, local test database, rollback, and schema
+review workflows, see the [database workflow guide](migration/README.md).
 
 ## Secret Configuration
 

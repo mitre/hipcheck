@@ -25,6 +25,7 @@ This is the internal documentation for the Night Vision project.
 
 ## Backend Info
 
+- [Database Workflow](../backend/migration/README.md)
 - [Dev Tools](./backend/dev-tools.md)
 - [HTTP Error Codes](./backend/http-error-codes)
 - [`nvdb` Command Reference](./backend/nvdb-command-reference.md)
