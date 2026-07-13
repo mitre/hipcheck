@@ -54,9 +54,9 @@ following docs:
   using AI on the project.
 
 Additionally, if you're working on the backend (the REST API or PostgreSQL
-database) check out [`docs/backend/`](docs/backend/). We don't yet have
-documentation for the frontend, though it will be added soon as we get frontend
-development up and running.
+database) check out [`docs/backend/`](docs/backend/). If you're working on the
+SvelteKit frontend, start with the
+[frontend developer guide](docs/frontend/developer-guide.md).
 
 You can see the full set of documentation in
 [`docs/introduction.md`](docs/introduction.md).

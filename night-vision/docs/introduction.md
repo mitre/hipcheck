@@ -23,6 +23,10 @@ This is the internal documentation for the Night Vision project.
 - [Requests For Discussion](./rfds/README.md)
 - [System Architecture](./system/architecture.md)
 
+## Frontend Info
+
+- [Frontend Developer Guide](./frontend/developer-guide.md)
+
 ## Backend Info
 
 - [Database Workflow](../backend/migration/README.md)
