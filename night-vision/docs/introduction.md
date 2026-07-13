@@ -28,6 +28,7 @@ This is the internal documentation for the Night Vision project.
 - [Dev Tools](./backend/dev-tools.md)
 - [HTTP Error Codes](./backend/http-error-codes)
 - [`nv-server` Configuration](./backend/nv-server-configuration.md)
+- [REST API Usage](./backend/rest-api-usage.md)
 - [Resolving Packages](./backend/resolving-packages.md)
 - [Rust Best Practices](./backend/rust-best-practices.md)
 - [Rust Error Handling](./backend/rust-error-handling.md)
