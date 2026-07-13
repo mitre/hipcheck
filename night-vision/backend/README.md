@@ -42,8 +42,13 @@ pgAdmin if you want a GUI for inspecting the database.
 ## Secret Configuration
 
 `nv-server` supports database connection secrets through the server
-configuration file. For local development without credentials, it is acceptable
-to use `database-connection` directly:
+configuration file. See the
+[`nv-server` configuration reference](../docs/backend/nv-server-configuration.md)
+for the full list of configuration keys, defaults, units, and local/container
+behavior.
+
+For local development without credentials, it is acceptable to use
+`database-connection` directly:
 
 ```spookey
 database-connection = "postgres://localhost:5432/nv"
