@@ -1,6 +1,13 @@
 
 # Dev Tools
 
+## `nvdb`
+
+`nvdb` is the Night Vision backend debugger for local database inspection,
+migration, and entity-generation workflows. See the
+[`nvdb` command reference](./nvdb-command-reference.md) for current commands,
+flags, examples, expected output, and secret-safe usage guidance.
+
 ## `xtask unit-graph`
 
 The backend `xtask` crate includes a `unit-graph` command that turns Cargo's

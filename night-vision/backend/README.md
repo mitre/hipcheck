@@ -9,6 +9,8 @@ a REST API to be used by the frontend.
 - `nv-server`: The actual Night Vision backend server.
 - `nv-server-api`: Library crate that defines the `NvServerApi` trait.
 - `nvdb`: Night Vision Debugger, a tool for debugging the backend server.
+  See the [`nvdb` command reference](../docs/backend/nvdb-command-reference.md)
+  for commands, examples, and safety notes.
 - `spookey`: Configuration language used by `nv-server`.
 - `workspace-hack`: Unifies dependency features, managed by `cargo-hakari`.
 - `xtask`: Task runner, used for project-internal tasks.
