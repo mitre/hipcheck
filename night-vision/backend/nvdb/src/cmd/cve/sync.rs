@@ -46,10 +46,11 @@ async fn sync(config: &Config, _token: DestructiveOperationToken, no_timeout: bo
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
-    let git = GitCliCveListGit::new(
+    let git = GitCliCveListGit::new_with_record_max_bytes(
         worker_config.checkout_path().to_owned(),
         worker_config.repository_url().clone(),
         worker_config.repository_ref().clone(),
+        worker_config.record_max_bytes(),
     );
     let progress = CveSyncProgressBar::new();
     let sync_result = if no_timeout {

@@ -2,7 +2,7 @@
 
 use crate::{
     cve::{
-        git::GitRef,
+        git::{DEFAULT_CVE_RECORD_MAX_BYTES, GitRef},
         repository::DEFAULT_CVE_RECORD_PARSE_CONCURRENCY,
         storage::{
             DEFAULT_CVE_LIST_RECORD_WRITE_BATCH_SIZE, DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
@@ -211,6 +211,9 @@ pub struct Config {
     /// The maximum number of CVE List records to write in one database batch.
     pub cve_list_write_batch_size: usize,
 
+    /// The maximum size in bytes for one CVE List record blob.
+    pub cve_record_max_bytes: usize,
+
     /// The number of parsed CVE List records to buffer before database writes.
     pub cve_list_write_channel_size: usize,
 
@@ -260,6 +263,7 @@ pub struct CveListWorkerConfig {
     checkout_path: Utf8PathBuf,
     parse_concurrency: usize,
     write_batch_size: usize,
+    record_max_bytes: usize,
     write_channel_size: usize,
     parse_concurrency_source: ConfigValueSource,
     write_batch_size_source: ConfigValueSource,
@@ -305,6 +309,11 @@ impl CveListWorkerConfig {
     /// The maximum number of CVE List records to write in one database batch.
     pub fn write_batch_size(&self) -> usize {
         self.write_batch_size
+    }
+
+    /// The maximum size in bytes for one CVE List record blob.
+    pub fn record_max_bytes(&self) -> usize {
+        self.record_max_bytes
     }
 
     /// The number of parsed CVE List records to buffer before database writes.
@@ -387,6 +396,7 @@ impl Config {
                     "cve-list-first-sync-timeout",
                     "cve-list-parse-concurrency",
                     "cve-list-write-batch-size",
+                    "cve-record-max-bytes",
                     "cve-list-write-channel-size",
                 ],
             },
@@ -467,6 +477,12 @@ impl Config {
             parse_positive_usize_option(&parsed, "cve-list-parse-concurrency", &mut errors);
         let cve_list_write_batch_size =
             parse_positive_usize_option(&parsed, "cve-list-write-batch-size", &mut errors);
+        let cve_record_max_bytes = parse_positive_usize(
+            &parsed,
+            "cve-record-max-bytes",
+            DEFAULT_CVE_RECORD_MAX_BYTES,
+            &mut errors,
+        );
         let cve_list_write_channel_size =
             parse_positive_usize_option(&parsed, "cve-list-write-channel-size", &mut errors);
 
@@ -510,6 +526,7 @@ impl Config {
             cve_list_checkout_path,
             cve_list_parse_concurrency: cve_list_pipeline_config.parse_concurrency,
             cve_list_write_batch_size: cve_list_pipeline_config.write_batch_size,
+            cve_record_max_bytes,
             cve_list_write_channel_size: cve_list_pipeline_config.write_channel_size,
             cve_list_parse_concurrency_source: cve_list_pipeline_config.parse_concurrency_source,
             cve_list_write_batch_size_source: cve_list_pipeline_config.write_batch_size_source,
@@ -565,6 +582,7 @@ impl Config {
             checkout_path: self.cve_list_checkout_path.clone(),
             parse_concurrency: self.cve_list_parse_concurrency,
             write_batch_size: self.cve_list_write_batch_size,
+            record_max_bytes: self.cve_record_max_bytes,
             write_channel_size: self.cve_list_write_channel_size,
             parse_concurrency_source: self.cve_list_parse_concurrency_source,
             write_batch_size_source: self.cve_list_write_batch_size_source,
@@ -745,6 +763,7 @@ impl Display for Config {
             "cve-list-write-batch-size",
             &self.cve_list_write_batch_size
         )?;
+        write_report_line!(f, "cve-record-max-bytes", &self.cve_record_max_bytes)?;
         write_report_line!(
             f,
             "cve-list-write-channel-size",
@@ -859,6 +878,19 @@ fn parse_positive_usize_option(
     } else {
         Some(value)
     }
+}
+
+fn parse_positive_usize(
+    parsed: &spookey::ParseResult,
+    key: &'static str,
+    default: usize,
+    errors: &mut Vec<ConfigError>,
+) -> usize {
+    let Some(value) = parse_positive_usize_option(parsed, key, errors) else {
+        return default;
+    };
+
+    value
 }
 
 fn parse_positive_u64(
@@ -1437,6 +1469,13 @@ mod tests {
                 },
             ),
             ConfigFieldParseCase::new(
+                "cve_record_max_bytes",
+                "cve-record-max-bytes = 2097152",
+                |config, _| {
+                    assert_eq!(config.cve_record_max_bytes, 2_097_152);
+                },
+            ),
+            ConfigFieldParseCase::new(
                 "cve_list_write_channel_size",
                 "cve-list-write-channel-size = 1024",
                 |config, _| {
@@ -1510,6 +1549,7 @@ mod tests {
             config.cve_list_write_batch_size,
             DEFAULT_CVE_LIST_WRITE_BATCH_SIZE
         );
+        assert_eq!(config.cve_record_max_bytes, DEFAULT_CVE_RECORD_MAX_BYTES);
         assert_eq!(
             config.cve_list_parse_concurrency,
             default_cve_list_parse_concurrency(None, None)
@@ -1661,6 +1701,7 @@ mod tests {
             ("cve-list-first-sync-timeout", "never", "invalid digit"),
             ("cve-list-first-sync-timeout", "0", "must be greater than 0"),
             ("cve-list-write-batch-size", "0", "must be greater than 0"),
+            ("cve-record-max-bytes", "0", "must be greater than 0"),
             ("cve-list-write-channel-size", "0", "must be greater than 0"),
         ];
 

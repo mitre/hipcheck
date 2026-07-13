@@ -33,6 +33,7 @@ pub fn run(config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
         worker_config.write_batch_size(),
         source_suffix(worker_config.write_batch_size_source())
     );
+    println!("record_max_bytes: {}", worker_config.record_max_bytes());
     println!(
         "write_channel_size: {}{}",
         worker_config.write_channel_size(),

@@ -93,6 +93,11 @@ cve-list-parse-concurrency =
 # Default: 500
 cve-list-write-batch-size =
 
+# The maximum size in bytes for one CVE List record blob.
+#
+# Default: 5242880
+cve-record-max-bytes =
+
 # The number of parsed CVE List records to buffer before database writes.
 #
 # Default: auto, based on cve-list-parse-concurrency and

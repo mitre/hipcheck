@@ -55,6 +55,7 @@ SeaORM, or Tokio setting at its default unless noted below.
 | `async-blocking-thread-keep-alive` | Time to keep idle blocking threads alive. | Milliseconds | Tokio default. The sample config documents 10000 milliseconds. |
 | `async-global-queue-interval` | Scheduler ticks between global queue checks. | Ticks | Tokio default. The sample config documents 31 ticks. |
 | `async-event-interval` | Scheduler ticks between external event polls. | Ticks | Tokio default. The sample config documents 61 ticks. |
+| `cve-record-max-bytes` | Maximum accepted size for one CVE List Git blob. | Bytes | Defaults to 5242880 bytes. Oversized blobs are rejected before allocation. |
 
 ## Secret Files
 

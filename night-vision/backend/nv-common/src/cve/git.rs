@@ -9,6 +9,9 @@ use tokio::process::Command;
 use tokio::sync::mpsc;
 use url::Url;
 
+/// Default maximum size in bytes for one CVE List record blob.
+pub const DEFAULT_CVE_RECORD_MAX_BYTES: usize = 5 * 1024 * 1024;
+
 /// Abstraction over the Git operations needed by CVE List ingestion.
 #[async_trait]
 pub trait CveListGit {
@@ -247,16 +250,33 @@ pub struct GitCliCveListGit {
     checkout_dir: Utf8PathBuf,
     repository_url: Url,
     repository_ref: GitRef,
+    record_max_bytes: usize,
 }
 
 impl GitCliCveListGit {
     /// Create a CVE List Git client using the `git` command on `PATH`.
     pub fn new(checkout_dir: Utf8PathBuf, repository_url: Url, repository_ref: GitRef) -> Self {
+        Self::new_with_record_max_bytes(
+            checkout_dir,
+            repository_url,
+            repository_ref,
+            DEFAULT_CVE_RECORD_MAX_BYTES,
+        )
+    }
+
+    /// Create a CVE List Git client using the `git` command on `PATH`.
+    pub fn new_with_record_max_bytes(
+        checkout_dir: Utf8PathBuf,
+        repository_url: Url,
+        repository_ref: GitRef,
+        record_max_bytes: usize,
+    ) -> Self {
         Self {
             git_program: Utf8PathBuf::from("git"),
             checkout_dir,
             repository_url,
             repository_ref,
+            record_max_bytes,
         }
     }
 
@@ -267,11 +287,29 @@ impl GitCliCveListGit {
         repository_url: Url,
         repository_ref: GitRef,
     ) -> Self {
+        Self::with_git_program_and_record_max_bytes(
+            git_program,
+            checkout_dir,
+            repository_url,
+            repository_ref,
+            DEFAULT_CVE_RECORD_MAX_BYTES,
+        )
+    }
+
+    /// Create a CVE List Git client using a specific Git executable.
+    pub fn with_git_program_and_record_max_bytes(
+        git_program: Utf8PathBuf,
+        checkout_dir: Utf8PathBuf,
+        repository_url: Url,
+        repository_ref: GitRef,
+        record_max_bytes: usize,
+    ) -> Self {
         Self {
             git_program,
             checkout_dir,
             repository_url,
             repository_ref,
+            record_max_bytes,
         }
     }
 
@@ -325,6 +363,7 @@ impl GitCliCveListGit {
             stdin,
             paths,
             sender,
+            self.record_max_bytes,
         )
         .await
     }
@@ -500,6 +539,7 @@ async fn run_command_with_stdin_streaming_cat_file<I, S>(
     stdin: Vec<u8>,
     paths: &[Utf8PathBuf],
     sender: mpsc::Sender<(Utf8PathBuf, String)>,
+    record_max_bytes: usize,
 ) -> Result<(), CveListGitError>
 where
     I: IntoIterator<Item = S>,
@@ -531,7 +571,7 @@ where
     });
     let stream_paths = paths.to_vec();
     let mut stream_stdout = tokio::spawn(async move {
-        stream_cat_file_batch_output(&stream_paths, child_stdout, sender).await
+        stream_cat_file_batch_output(&stream_paths, child_stdout, sender, record_max_bytes).await
     });
     let mut wait_child = Box::pin(child.wait());
 
@@ -610,6 +650,7 @@ async fn stream_cat_file_batch_output<R>(
     paths: &[Utf8PathBuf],
     reader: R,
     sender: mpsc::Sender<(Utf8PathBuf, String)>,
+    record_max_bytes: usize,
 ) -> Result<(), CveListGitError>
 where
     R: tokio::io::AsyncRead + Unpin,
@@ -631,6 +672,7 @@ where
 
         let header = String::from_utf8(header).map_err(CveListGitError::GitStdoutUtf8)?;
         let size = parse_cat_file_header(path, &header)?;
+        validate_cat_file_size(path, size, record_max_bytes)?;
         let mut contents = vec![0; size];
         reader
             .read_exact(&mut contents)
@@ -661,6 +703,15 @@ fn parse_cat_file_batch_output(
     paths: &[Utf8PathBuf],
     output: &[u8],
 ) -> Result<Vec<(Utf8PathBuf, String)>, CveListGitError> {
+    parse_cat_file_batch_output_with_record_max_bytes(paths, output, DEFAULT_CVE_RECORD_MAX_BYTES)
+}
+
+#[cfg(test)]
+fn parse_cat_file_batch_output_with_record_max_bytes(
+    paths: &[Utf8PathBuf],
+    output: &[u8],
+    record_max_bytes: usize,
+) -> Result<Vec<(Utf8PathBuf, String)>, CveListGitError> {
     let mut files = Vec::with_capacity(paths.len());
     let mut offset = 0;
 
@@ -674,6 +725,7 @@ fn parse_cat_file_batch_output(
             .map_err(CveListGitError::GitStdoutUtf8)?;
 
         let size = parse_cat_file_header(path, &header)?;
+        validate_cat_file_size(path, size, record_max_bytes)?;
 
         let content_start = header_end + 1;
         let content_end = content_start
@@ -698,6 +750,22 @@ fn parse_cat_file_batch_output(
     }
 
     Ok(files)
+}
+
+fn validate_cat_file_size(
+    path: &Utf8PathBuf,
+    size: usize,
+    record_max_bytes: usize,
+) -> Result<(), CveListGitError> {
+    if size > record_max_bytes {
+        return Err(CveListGitError::CatFileTooLarge {
+            path: path.clone(),
+            size,
+            max_size: record_max_bytes,
+        });
+    }
+
+    Ok(())
 }
 
 fn parse_cat_file_header(path: &Utf8PathBuf, header: &str) -> Result<usize, CveListGitError> {
@@ -876,6 +944,15 @@ pub enum CveListGitError {
     CatFileMissing(Utf8PathBuf),
     /// Git cat-file output ended before a requested file was fully decoded.
     CatFileTruncated(Utf8PathBuf),
+    /// Git cat-file reported a blob larger than the configured CVE record limit.
+    CatFileTooLarge {
+        /// Requested path.
+        path: Utf8PathBuf,
+        /// Blob size from the cat-file header.
+        size: usize,
+        /// Configured maximum CVE record size.
+        max_size: usize,
+    },
     /// Git cat-file returned extra data after all requested files were decoded.
     CatFileTrailingData,
     /// Failed to create the checkout parent directory.
@@ -934,6 +1011,16 @@ impl std::fmt::Display for CveListGitError {
             }
             Self::CatFileTruncated(path) => {
                 write!(f, "git cat-file output ended while reading {path}")
+            }
+            Self::CatFileTooLarge {
+                path,
+                size,
+                max_size,
+            } => {
+                write!(
+                    f,
+                    "git cat-file reported CVE List file {path} is {size} bytes, exceeding limit {max_size}"
+                )
             }
             Self::CatFileTrailingData => {
                 write!(f, "git cat-file returned unexpected trailing data")
@@ -994,6 +1081,7 @@ impl std::error::Error for CveListGitError {
             Self::CatFileMissing(_)
             | Self::CatFileTrailingData
             | Self::CatFileTruncated(_)
+            | Self::CatFileTooLarge { .. }
             | Self::InvalidCatFileHeader(_, _)
             | Self::InvalidCatFileSeparator(_)
             | Self::UnexpectedCatFileObjectType { .. }
@@ -1195,6 +1283,25 @@ mod tests {
     }
 
     #[test]
+    fn parse_cat_file_batch_output_rejects_oversized_blob_before_content_read() {
+        let path = Utf8PathBuf::from("cves/2025/1xxx/CVE-2025-1000.json");
+        let output = b"0123456789abcdef0123456789abcdef01234567 blob 1025\n";
+
+        let err = parse_cat_file_batch_output_with_record_max_bytes(
+            std::slice::from_ref(&path),
+            output,
+            1024,
+        )
+        .expect_err("oversized cat-file header should fail before content read");
+
+        assert!(matches!(
+            err,
+            CveListGitError::CatFileTooLarge { path: error_path, size: 1025, max_size: 1024 }
+                if error_path == path
+        ));
+    }
+
+    #[test]
     fn stream_cat_file_batch_output_sends_requested_blobs() {
         let paths = vec![
             Utf8PathBuf::from("cves/2025/1xxx/CVE-2025-1000.json"),
@@ -1213,7 +1320,7 @@ mod tests {
                     .await
                     .expect("test output should write");
             });
-            stream_cat_file_batch_output(&paths, reader, sender)
+            stream_cat_file_batch_output(&paths, reader, sender, DEFAULT_CVE_RECORD_MAX_BYTES)
                 .await
                 .expect("cat-file output should stream");
             write_output.await.expect("writer task should complete");
@@ -1230,6 +1337,35 @@ mod tests {
         assert_eq!(files[0].1.as_bytes(), first);
         assert_eq!(files[1].0, paths[1]);
         assert_eq!(files[1].1.as_bytes(), second);
+    }
+
+    #[test]
+    fn stream_cat_file_batch_output_rejects_oversized_blob_before_allocation() {
+        let path = Utf8PathBuf::from("cves/2025/1xxx/CVE-2025-1000.json");
+        let paths = vec![path.clone()];
+        let output = b"0123456789abcdef0123456789abcdef01234567 blob 1025\n";
+        let (mut writer, reader) = tokio::io::duplex(output.len());
+        let (sender, _receiver) = mpsc::channel(paths.len());
+
+        let err = run_async(async {
+            let write_output = tokio::spawn(async move {
+                writer
+                    .write_all(output)
+                    .await
+                    .expect("test output should write");
+            });
+            let err = stream_cat_file_batch_output(&paths, reader, sender, 1024)
+                .await
+                .expect_err("oversized cat-file header should fail before content read");
+            write_output.await.expect("writer task should complete");
+            err
+        });
+
+        assert!(matches!(
+            err,
+            CveListGitError::CatFileTooLarge { path: error_path, size: 1025, max_size: 1024 }
+                if error_path == path
+        ));
     }
 
     #[test]
@@ -1253,6 +1389,7 @@ mod tests {
                     Vec::new(),
                     &paths,
                     sender,
+                    DEFAULT_CVE_RECORD_MAX_BYTES,
                 ),
             )
             .await
@@ -1291,6 +1428,7 @@ mod tests {
                     Vec::new(),
                     &paths,
                     sender,
+                    DEFAULT_CVE_RECORD_MAX_BYTES,
                 ),
             )
             .await

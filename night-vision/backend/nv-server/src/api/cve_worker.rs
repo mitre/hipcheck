@@ -60,10 +60,11 @@ async fn sync_cve_list(
     db: &DatabaseConnection,
     config: &CveListWorkerConfig,
 ) -> Result<CveListSyncSummary, CveListSyncError> {
-    let git = GitCliCveListGit::new(
+    let git = GitCliCveListGit::new_with_record_max_bytes(
         config.checkout_path().to_owned(),
         config.repository_url().clone(),
         config.repository_ref().clone(),
+        config.record_max_bytes(),
     );
 
     sync_cve_list_once_exclusive_with_progress_pipeline_config_and_timeout(
@@ -184,6 +185,10 @@ mod tests {
         assert_eq!(
             worker_config.write_batch_size(),
             config.cve_list_write_batch_size
+        );
+        assert_eq!(
+            worker_config.record_max_bytes(),
+            config.cve_record_max_bytes
         );
         assert_eq!(
             worker_config.write_channel_size(),
