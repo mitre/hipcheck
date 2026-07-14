@@ -40,8 +40,6 @@ async fn run_cve_list_worker(
     );
 
     loop {
-        tokio::time::sleep(config.sync_interval()).await;
-
         match sync_cve_list(&db, &config).await {
             Ok(summary) => {
                 log_scheduled_cve_list_sync_summary(&log, &summary);
@@ -53,6 +51,8 @@ async fn run_cve_list_worker(
                 log_cve_list_sync_error(&log, &error);
             }
         }
+
+        tokio::time::sleep(config.sync_interval()).await;
     }
 }
 
