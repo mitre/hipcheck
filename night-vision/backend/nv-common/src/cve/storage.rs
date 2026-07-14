@@ -159,6 +159,41 @@ where
     })
 }
 
+/// Mark active records missing from a staged full snapshot as deleted.
+pub async fn mark_cve_list_records_missing_from_staged_snapshot<C>(
+    db: &C,
+    generation: i64,
+) -> Result<WriteCveListRecordsSummary, WriteCveListRecordsError>
+where
+    C: ConnectionTrait,
+{
+    let mut staged_cve_ids = Query::select();
+    staged_cve_ids
+        .column(CveListRecordStaging::CveId)
+        .from((CveListSchema::Public, CveListRecordStaging::Table))
+        .and_where(Expr::col(CveListRecordStaging::Generation).eq(generation));
+
+    let result = cve_list_records::Entity::update_many()
+        .col_expr(cve_list_records::Column::Deleted, Expr::value(true))
+        .col_expr(
+            cve_list_records::Column::UpdatedAt,
+            Expr::current_timestamp(),
+        )
+        .filter(cve_list_records::Column::Deleted.eq(false))
+        .filter(cve_list_records::Column::CveId.not_in_subquery(staged_cve_ids))
+        .exec(db)
+        .await
+        .map_err(WriteCveListRecordsError::Db)?;
+    let records_updated = usize::try_from(result.rows_affected)
+        .map_err(|_| WriteCveListRecordsError::CountTooLarge(result.rows_affected))?;
+
+    Ok(WriteCveListRecordsSummary {
+        records_seen: records_updated,
+        records_inserted: 0,
+        records_updated,
+    })
+}
+
 /// Upsert parsed CVE List records in batches and return insert/update counts.
 pub async fn write_cve_list_records_with_batch_size<C>(
     db: &C,
@@ -1679,6 +1714,36 @@ mod tests {
         assert!(update_sql.contains(r#""deleted" = $"#));
         assert!(update_sql.contains(r#""updated_at" = CURRENT_TIMESTAMP"#));
         assert!(update_sql.contains(r#""cve_id" IN"#));
+    }
+
+    #[test]
+    fn mark_cve_list_records_missing_from_staged_snapshot_excludes_staged_ids() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 2,
+            }])
+            .into_connection();
+
+        let summary = run_async(mark_cve_list_records_missing_from_staged_snapshot(&db, 42))
+            .expect("mark missing records should succeed");
+
+        assert_eq!(
+            summary,
+            WriteCveListRecordsSummary {
+                records_seen: 2,
+                records_inserted: 0,
+                records_updated: 2,
+            }
+        );
+
+        let transaction_log = db.into_transaction_log();
+        let update_sql = &transaction_log[0].statements()[0].sql;
+        assert!(update_sql.contains(r#"UPDATE "public"."cve_list_records""#));
+        assert!(update_sql.contains(r#""deleted" = $"#));
+        assert!(update_sql.contains(r#""updated_at" = CURRENT_TIMESTAMP"#));
+        assert!(update_sql.contains(r#""cve_id" NOT IN (SELECT "cve_id""#));
+        assert!(update_sql.contains(r#""generation" = $"#));
     }
 
     #[test]

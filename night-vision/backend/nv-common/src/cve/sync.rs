@@ -10,9 +10,11 @@ use crate::cve::{
     },
     storage::{
         CveListSyncRunError, CveListSyncRunStatus, DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
-        FinishCveListSyncRun, WriteCveListRecordsError, clear_staged_cve_list_records,
-        finish_cve_list_sync_run, last_successful_cve_list_sync_commit_for_source,
-        mark_deleted_cve_list_records, merge_staged_cve_list_records,
+        FinishCveListSyncRun, WriteCveListRecordsError, WriteCveListRecordsSummary,
+        clear_staged_cve_list_records, finish_cve_list_sync_run,
+        last_successful_cve_list_sync_commit_for_source,
+        mark_cve_list_records_missing_from_staged_snapshot, mark_deleted_cve_list_records,
+        merge_staged_cve_list_records,
         stage_cve_list_records_from_receiver_with_batch_size_and_progress, start_cve_list_sync_run,
         try_acquire_cve_list_sync_lock,
     },
@@ -539,20 +541,21 @@ where
         ));
     }
 
-    let (paths, deleted_cve_ids) = match last_successful_commit {
+    let (paths, deleted_cve_ids, is_full_snapshot) = match last_successful_commit {
         Some(old_commit) => {
             let changes =
                 list_changed_cve_files_with_progress(git, &old_commit, &new_commit, progress)
                     .await
                     .map_err(CveListSyncError::Repository)?;
-            split_cve_file_changes(changes)
+            let (paths, deleted_cve_ids) = split_cve_file_changes(changes);
+            (paths, deleted_cve_ids, false)
         }
-        None => (
-            list_all_cve_files_with_progress(git, &new_commit, progress)
+        None => {
+            let paths = list_all_cve_files_with_progress(git, &new_commit, progress)
                 .await
-                .map_err(CveListSyncError::Repository)?,
-            Vec::new(),
-        ),
+                .map_err(CveListSyncError::Repository)?;
+            (paths, Vec::new(), true)
+        }
     };
 
     let total_records = paths
@@ -583,6 +586,17 @@ where
         .begin()
         .await
         .map_err(|err| CveListSyncError::Storage(WriteCveListRecordsError::Db(err)))?;
+    let replacement_summary = if is_full_snapshot {
+        mark_cve_list_records_missing_from_staged_snapshot(&transaction, generation)
+            .await
+            .map_err(CveListSyncError::Storage)?
+    } else {
+        WriteCveListRecordsSummary {
+            records_seen: 0,
+            records_inserted: 0,
+            records_updated: 0,
+        }
+    };
     merge_staged_cve_list_records(&transaction, generation)
         .await
         .map_err(CveListSyncError::Storage)?;
@@ -604,6 +618,8 @@ where
         records_inserted: write_summary.records_inserted,
         records_updated: write_summary
             .records_updated
+            .checked_add(replacement_summary.records_updated)
+            .expect("updated record count cannot exceed changed CVE file count")
             .checked_add(deleted_summary.records_updated)
             .expect("updated record count cannot exceed changed CVE file count"),
         error: None,
@@ -839,13 +855,15 @@ mod tests {
             ]),
             ..Default::default()
         };
+        let mut exec_results = mock_exec_results(5);
+        exec_results[1].rows_affected = 0;
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([
                 vec![mock_generation_row(42)],
                 Vec::<BTreeMap<String, Value>>::new(),
                 vec![mock_existing_count_row(0)],
             ])
-            .append_exec_results(mock_exec_results(5))
+            .append_exec_results(exec_results)
             .into_connection();
 
         let summary = run_async(sync_cve_list_once(
@@ -933,7 +951,7 @@ mod tests {
     }
 
     #[test]
-    fn sync_cve_list_once_upserts_all_records_without_prior_success() {
+    fn sync_cve_list_once_replaces_active_records_without_prior_success() {
         let records = [
             parsed_file_path("CVE-2026-1000"),
             parsed_file_path("CVE-2026-1001"),
@@ -972,9 +990,30 @@ mod tests {
                 commit_sha: Some(CommitSha::parse(NEW_COMMIT_SHA).expect("valid commit")),
                 records_seen: 2,
                 records_inserted: 1,
-                records_updated: 1,
+                records_updated: 2,
             }
         );
+
+        let statements = db
+            .into_transaction_log()
+            .into_iter()
+            .flat_map(|entry| {
+                entry
+                    .statements()
+                    .iter()
+                    .map(|statement| statement.sql.clone())
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let mark_missing_index = statements
+            .iter()
+            .position(|entry| entry.contains(r#""cve_id" NOT IN (SELECT "cve_id""#))
+            .expect("full sync should mark records missing from the staged snapshot deleted");
+        let merge_index = statements
+            .iter()
+            .position(|entry| entry.contains(r#"INSERT INTO "public"."cve_list_records""#))
+            .expect("full sync should merge staged records");
+        assert!(mark_missing_index < merge_index);
     }
 
     #[test]
