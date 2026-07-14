@@ -21,6 +21,8 @@ This is the internal documentation index for the Night Vision project.
     Upgrade Safety Assessments
   - [RFD 0002](./rfds/0002-use-hipcheck-for-supply-chain-analysis.md): Use
     Hipcheck for Supply Chain Analysis
+  - [RFD 0003](./rfds/0003-resource-limit-handling.md): Resource Limit
+    Handling for External Ingest
 - [System Architecture](./system/architecture.md)
 
 ## Frontend Info

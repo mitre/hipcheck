@@ -10,3 +10,5 @@ implementation guidance.
   Support](./0001-mvp-upgrade-safety-assessments.md)
 - [RFD 0002: Use Hipcheck for Supply Chain
   Analysis](./0002-use-hipcheck-for-supply-chain-analysis.md)
+- [RFD 0003: Resource Limit Handling for External
+  Ingest](./0003-resource-limit-handling.md)
