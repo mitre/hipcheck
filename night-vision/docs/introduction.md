@@ -37,6 +37,7 @@ This is the internal documentation index for the Night Vision project.
 - [Operations Runbook](./backend/operations-runbook.md)
 - [`nvdb` Command Reference](./backend/nvdb-command-reference.md)
 - [`nv-server` Configuration](./backend/nv-server-configuration.md)
+- [`nv-server` Threat Model](./backend/nv-server-threat-model.md)
 - [REST API Usage](./backend/rest-api-usage.md)
 - [Resolving Packages](./backend/resolving-packages.md)
 - [Rust Best Practices](./backend/rust-best-practices.md)
