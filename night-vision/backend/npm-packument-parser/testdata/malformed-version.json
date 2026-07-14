@@ -1,0 +1,16 @@
+{
+  "name": "broken-package",
+  "dist-tags": {
+    "latest": "not-a-version"
+  },
+  "versions": {
+    "not-a-version": {
+      "name": "broken-package",
+      "version": "not-a-version",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/broken-package/-/broken-package-not-a-version.tgz",
+        "shasum": "broken123"
+      }
+    }
+  }
+}
