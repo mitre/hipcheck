@@ -11,7 +11,7 @@ use crate::cve::{
     storage::{
         CveListSyncRunError, CveListSyncRunStatus, DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE,
         FinishCveListSyncRun, WriteCveListRecordsError, clear_staged_cve_list_records,
-        finish_cve_list_sync_run, last_successful_cve_list_sync_commit,
+        finish_cve_list_sync_run, last_successful_cve_list_sync_commit_for_source,
         mark_deleted_cve_list_records, merge_staged_cve_list_records,
         stage_cve_list_records_from_receiver_with_batch_size_and_progress, start_cve_list_sync_run,
         try_acquire_cve_list_sync_lock,
@@ -235,7 +235,8 @@ where
         .map_err(CveListSyncError::StartSyncRun)?;
     progress.report(CveListSyncProgress::Started { generation });
     let mut resolved_commit = None;
-    let last_successful_commit = previous_cve_list_sync_commit(db, progress).await;
+    let last_successful_commit =
+        previous_cve_list_sync_commit(db, repository_url, repository_ref, progress).await;
 
     let sync_result = match last_successful_commit {
         Ok(last_successful_commit) => {
@@ -275,7 +276,8 @@ where
         .map_err(CveListSyncError::StartSyncRun)?;
     progress.report(CveListSyncProgress::Started { generation });
     let mut resolved_commit = None;
-    let last_successful_commit = previous_cve_list_sync_commit(db, progress).await;
+    let last_successful_commit =
+        previous_cve_list_sync_commit(db, repository_url, repository_ref, progress).await;
 
     let sync_result = match last_successful_commit {
         Ok(last_successful_commit) => {
@@ -610,6 +612,8 @@ where
 
 async fn previous_cve_list_sync_commit<C, P>(
     db: &C,
+    repository_url: &Url,
+    repository_ref: &GitRef,
     progress: &P,
 ) -> Result<Option<CommitSha>, CveListSyncError>
 where
@@ -617,7 +621,7 @@ where
     P: CveListSyncProgressReporter + ?Sized,
 {
     progress.report(CveListSyncProgress::PreviousSyncLookupStarted);
-    last_successful_cve_list_sync_commit(db)
+    last_successful_cve_list_sync_commit_for_source(db, repository_url, repository_ref)
         .await
         .map_err(CveListSyncError::SyncRunMetadata)
 }
@@ -887,6 +891,45 @@ mod tests {
                 .sql
                 .contains("cve_list_records_staging")
         }));
+    }
+
+    #[test]
+    fn sync_cve_list_once_uses_full_sync_when_source_has_no_prior_success() {
+        let path = parsed_file_path("CVE-2026-1000");
+        let git = MockCveListGit {
+            all_paths: vec![path.clone()],
+            files: HashMap::from([(path, cve_record("CVE-2026-1000"))]),
+            ..Default::default()
+        };
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_generation_row(42)],
+                Vec::<BTreeMap<String, Value>>::new(),
+                vec![mock_existing_count_row(0)],
+            ])
+            .append_exec_results(mock_exec_results(5))
+            .into_connection();
+
+        let summary = run_async(sync_cve_list_once(
+            &db,
+            &git,
+            &repository_url(),
+            &repository_ref(),
+            500,
+        ))
+        .expect("sync should succeed");
+
+        assert_eq!(summary.status, CveListSyncRunStatus::Success);
+        assert_eq!(
+            git.calls.lock().expect("calls lock").as_slice(),
+            [
+                "ensure_checkout",
+                "fetch",
+                "resolve_ref",
+                "all_files",
+                "read_file"
+            ]
+        );
     }
 
     #[test]

@@ -517,6 +517,37 @@ where
         .map_err(CveListSyncRunError::InvalidStoredCommitSha)
 }
 
+/// Return the commit SHA from the most recent successful CVE List sync run for a source.
+pub async fn last_successful_cve_list_sync_commit_for_source<C>(
+    db: &C,
+    repository_url: &Url,
+    repository_ref: &GitRef,
+) -> Result<Option<CommitSha>, CveListSyncRunError>
+where
+    C: ConnectionTrait,
+{
+    let commit_sha = cve_list_sync_runs::Entity::find()
+        .select_only()
+        .column(cve_list_sync_runs::Column::CommitSha)
+        .filter(cve_list_sync_runs::Column::Status.eq(CveListSyncRunStatus::Success.to_string()))
+        .filter(cve_list_sync_runs::Column::RepositoryUrl.eq(repository_url.as_str()))
+        .filter(cve_list_sync_runs::Column::RepositoryRef.eq(repository_ref.as_str()))
+        .filter(cve_list_sync_runs::Column::CommitSha.is_not_null())
+        .order_by_desc(cve_list_sync_runs::Column::Generation)
+        .limit(1)
+        .into_tuple::<Option<String>>()
+        .one(db)
+        .await
+        .map_err(CveListSyncRunError::Db)?
+        .flatten();
+
+    commit_sha
+        .as_deref()
+        .map(CommitSha::parse)
+        .transpose()
+        .map_err(CveListSyncRunError::InvalidStoredCommitSha)
+}
+
 /// Return the most recent CVE List sync run.
 pub async fn latest_cve_list_sync_run<C>(
     db: &C,
@@ -1858,6 +1889,30 @@ mod tests {
             err,
             CveListSyncRunError::InvalidStoredCommitSha(CveListGitError::InvalidCommitSha(_))
         ));
+    }
+
+    #[test]
+    fn last_successful_cve_list_sync_commit_for_source_filters_by_source_identity() {
+        let repository_url =
+            Url::parse("https://github.com/CVEProject/cvelistV5.git").expect("valid URL");
+        let repository_ref = GitRef::parse("main").expect("valid Git ref");
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_commit_sha_row(TEST_COMMIT_SHA)]])
+            .into_connection();
+
+        let commit = run_async(last_successful_cve_list_sync_commit_for_source(
+            &db,
+            &repository_url,
+            &repository_ref,
+        ))
+        .expect("lookup should succeed")
+        .expect("commit should exist");
+
+        assert_eq!(commit.as_str(), TEST_COMMIT_SHA);
+        let transaction_log = db.into_transaction_log();
+        let select_sql = &transaction_log[0].statements()[0].sql;
+        assert!(select_sql.contains(r#""repository_url" = $"#));
+        assert!(select_sql.contains(r#""repository_ref" = $"#));
     }
 
     #[test]
