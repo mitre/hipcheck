@@ -743,7 +743,11 @@ impl Display for Config {
             write_report_line!(f, "async-event-interval", &async_event_interval)?;
         }
 
-        write_report_line!(f, "cve-list-repository-url", &self.cve_list_repository_url)?;
+        write_report_line!(
+            f,
+            "cve-list-repository-url",
+            &redact_url_password(&self.cve_list_repository_url)
+        )?;
         write_report_line!(f, "cve-list-repository-ref", &self.cve_list_repository_ref)?;
         write_report_line!(f, "cve-list-sync-interval", &self.cve_list_sync_interval)?;
         write_report_line!(f, "cve-list-sync-timeout", &self.cve_list_sync_timeout)?;
@@ -778,6 +782,19 @@ impl Display for Config {
 
 fn default_cve_list_repository_url() -> Url {
     Url::parse(DEFAULT_CVE_LIST_REPOSITORY_URL).expect("default CVE List repository URL is valid")
+}
+
+/// Return a copy of a URL with its password redacted, if present.
+pub fn redact_url_password(url: &Url) -> Url {
+    let mut redacted = url.clone();
+
+    if redacted.password().is_some() {
+        redacted
+            .set_password(Some("<redacted>"))
+            .expect("URLs with passwords support replacing their password");
+    }
+
+    redacted
 }
 
 fn default_cve_list_repository_ref() -> GitRef {
@@ -1664,6 +1681,22 @@ mod tests {
     }
 
     #[test]
+    fn config_display_redacts_cve_list_repository_password() {
+        let file = TempConfigFile::new(
+            "server-address = 127.0.0.1:0\n\
+            database-connection = sqlite::memory:\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
+            cve-list-repository-url = https://user:token@example.test/cvelistV5.git\n",
+        );
+
+        let config = Config::parse(file.path()).expect("config should parse");
+        let report = format!("{config}");
+
+        assert!(report.contains("https://user:%3Credacted%3E@example.test/cvelistV5.git"));
+        assert!(!report.contains("token"));
+    }
+
+    #[test]
     fn invalid_typed_field_values_are_returned_as_str_parse_config_errors() {
         let cases = [
             ("http-request-body-max-bytes", "many", "invalid digit"),
@@ -1999,5 +2032,22 @@ mod tests {
         let conn = "postgres://localhost/nv";
 
         assert_eq!(redact_database_conn_password(conn), conn);
+    }
+
+    #[test]
+    fn redact_url_password_redacts_password() {
+        let url = Url::parse("https://user:token@example.test/cvelistV5.git").expect("valid URL");
+
+        assert_eq!(
+            redact_url_password(&url).as_str(),
+            "https://user:%3Credacted%3E@example.test/cvelistV5.git"
+        );
+    }
+
+    #[test]
+    fn redact_url_password_preserves_url_without_password() {
+        let url = Url::parse("https://user@example.test/cvelistV5.git").expect("valid URL");
+
+        assert_eq!(redact_url_password(&url), url);
     }
 }
