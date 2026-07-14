@@ -221,6 +221,7 @@ where
                         .await
                         .map_err(|err| CveListRepositoryError::ParseTask(task_path, err))?
                         .map_err(|err| CveListRepositoryError::Record(record_path, err))?;
+                validate_record_id_matches_path(&path, &record)?;
 
                 Ok((index, ParsedCveListFile { path, record }))
             }
@@ -310,6 +311,7 @@ where
                         .await
                         .map_err(|err| CveListRepositoryError::ParseTask(task_path, err))?
                         .map_err(|err| CveListRepositoryError::Record(record_path, err))?;
+                validate_record_id_matches_path(&path, &record)?;
 
                 Ok(ParsedCveListFile { path, record })
             }
@@ -339,6 +341,25 @@ where
     Ok(parsed)
 }
 
+fn validate_record_id_matches_path(
+    path: &Utf8PathBuf,
+    record: &ParsedCveRecord,
+) -> Result<(), CveListRepositoryError> {
+    let expected_cve_id = path
+        .file_stem()
+        .expect("CVE List files are validated record paths");
+
+    if record.cve_id.as_str() == expected_cve_id {
+        return Ok(());
+    }
+
+    Err(CveListRepositoryError::RecordIdMismatch {
+        path: path.clone(),
+        expected_cve_id: expected_cve_id.to_owned(),
+        actual_cve_id: record.cve_id.as_str().to_owned(),
+    })
+}
+
 /// Failure while ingesting CVE List repository files.
 #[derive(Debug)]
 pub enum CveListRepositoryError {
@@ -352,6 +373,15 @@ pub enum CveListRepositoryError {
     ParsedRecordReceiverClosed,
     /// A CVE record file could not be parsed.
     Record(Utf8PathBuf, CveRecordParseError),
+    /// A parsed CVE record ID did not match the ID implied by its file path.
+    RecordIdMismatch {
+        /// Path to the CVE record file.
+        path: Utf8PathBuf,
+        /// CVE ID implied by the file path.
+        expected_cve_id: String,
+        /// CVE ID declared by the parsed record.
+        actual_cve_id: String,
+    },
 }
 
 impl std::fmt::Display for CveListRepositoryError {
@@ -371,6 +401,14 @@ impl std::fmt::Display for CveListRepositoryError {
                 )
             }
             Self::Record(path, _) => write!(f, "failed to parse CVE List record {path}"),
+            Self::RecordIdMismatch {
+                path,
+                expected_cve_id,
+                actual_cve_id,
+            } => write!(
+                f,
+                "CVE List record {path} declares {actual_cve_id}, expected {expected_cve_id}"
+            ),
         }
     }
 }
@@ -383,6 +421,7 @@ impl std::error::Error for CveListRepositoryError {
             Self::ParseTask(_, err) => Some(err),
             Self::ParsedRecordReceiverClosed => None,
             Self::Record(_, err) => Some(err),
+            Self::RecordIdMismatch { .. } => None,
         }
     }
 }
@@ -543,6 +582,39 @@ mod tests {
             err,
             CveListRepositoryError::Record(error_path, CveRecordParseError::Json(_))
                 if error_path == path
+        ));
+    }
+
+    #[test]
+    fn send_cve_files_rejects_record_id_that_does_not_match_path() {
+        let path = Utf8PathBuf::from("cves/2026/1xxx/CVE-2026-1000.json");
+        let git = MockCveListGit {
+            files: HashMap::from([(path.clone(), cve_record("CVE-2026-1001"))]),
+            ..Default::default()
+        };
+        let commit =
+            CommitSha::parse("0123456789abcdef0123456789abcdef01234567").expect("valid commit SHA");
+        let (sender, _receiver) = mpsc::channel(1);
+
+        let err = run_async(send_cve_files(
+            &git,
+            &commit,
+            vec![path.clone()],
+            &NoopCveListSyncProgress,
+            1,
+            sender,
+        ))
+        .expect_err("mismatched record ID should fail");
+
+        assert!(matches!(
+            err,
+            CveListRepositoryError::RecordIdMismatch {
+                path: error_path,
+                expected_cve_id,
+                actual_cve_id,
+            } if error_path == path
+                && expected_cve_id == "CVE-2026-1000"
+                && actual_cve_id == "CVE-2026-1001"
         ));
     }
 
