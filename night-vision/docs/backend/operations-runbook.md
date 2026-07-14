@@ -77,13 +77,20 @@ The current health response body is:
 
 ```json
 {
-  "status": "ok"
+  "status": "ok",
+  "cveIngest": {
+    "recordsAvailable": false,
+    "latestSuccessfulCommit": null,
+    "latestRun": null
+  }
 }
 ```
 
 `GET /health` returning `200 OK` means the server accepted the request and the
-handler completed. It does not currently report database, CVE, or KEV ingest
-state.
+handler completed. It does not report database or KEV state. The `cveIngest`
+object reports whether active CVE records are available and, when present, the
+latest successful commit and sync attempt. A new server can return `200 OK`
+with `recordsAvailable: false` while its first CVE List sync is still running.
 
 For Compose, inspect container health and recent logs:
 
@@ -160,8 +167,8 @@ For the database development workflow, see
 
 ## `nvdb` Usage
 
-`nvdb` is the local backend debugger for database inspection, migrations, and
-entity generation. Run it from `backend/`:
+`nvdb` is the local backend debugger for database inspection, migrations,
+entity generation, and CVE List ingest operations. Run it from `backend/`:
 
 ```sh
 cargo nvdb --help
@@ -173,6 +180,9 @@ Use `nvdb` for:
 - Applying local migrations with `cargo nvdb db migrate --destructive up`.
 - Printing the current schema with `cargo nvdb db schema`.
 - Regenerating SeaORM entities with `cargo nvdb db entity generate`.
+- Inspecting CVE ingest state with `cargo nvdb cve status` and
+  `cargo nvdb cve runs`.
+- Running one local CVE sync with `cargo nvdb cve sync --destructive`.
 
 Do not use `nvdb` commands against shared or production-like databases unless
 that access and change are explicitly approved. The `--destructive` flag is an
@@ -183,40 +193,34 @@ The current `nvdb` binary lists an `api` placeholder, but REST API helpers are
 not implemented there yet. Use [REST API Usage](./rest-api-usage.md) for API
 examples.
 
-The current `nvdb` binary does not expose `cve` or `kev` commands. If you need
-operational CVE or KEV ingest inspection, file or link a follow-up issue rather
-than documenting commands that do not exist. The command reference tracks this
-as [issue #57](https://gitlab.mitre.org/night-vision/night-vision/-/work_items/57).
-
 For full command syntax, expected output, and dependencies such as `pg_dump` and
 `sea-orm-cli`, see [`nvdb` Command Reference](./nvdb-command-reference.md).
 
-## CVE And KEV Data
+## CVE List Data
 
-The current schema includes tables for CISA KEV entries, CISA KEV sync runs,
-CVE List records, and CVE List sync runs. The current server does not start a
-CVE or KEV ingest worker, `/health` does not report ingest state, and `nvdb`
-does not expose ingest commands.
-
-Practical current states are therefore limited to database state:
-
-- Tables missing: migrations have not been applied to the target database.
-- Tables present but empty: migrations exist, but no ingest path has populated
-  local data.
-- Rows present: data was inserted by local development work, tests, or manual
-  database activity outside the current server runtime.
-
-Use these checks to inspect only the local migration state and database shape:
+`nv-server` starts a recurring CVE List worker without delaying API startup.
+Use health output or these commands to distinguish initial sync, successful
+data availability, and failures:
 
 ```sh
 cd backend
-cargo nvdb db migrate --destructive status
-cargo nvdb db schema
+cargo nvdb cve status
+cargo nvdb cve runs
+cargo nvdb cve stats
 ```
 
-If a feature or issue expects live CVE/KEV ingest state such as `running`,
-`success`, `failed`, or `not_modified`, treat that as future behavior until the
-server worker and debugger commands exist on the branch you are using.
+Run a one-time sync only when intentionally changing local database state:
+
+```sh
+cd backend
+cargo nvdb cve sync --destructive
+```
+
+If an interrupted process leaves a run marked `running`, confirm that no live
+sync holds the advisory lock before running `cargo nvdb cve recover
+--destructive`. `cve reset --destructive` deletes local CVE List storage and
+sync history; use it only for disposable local data. For the full lifecycle,
+timeouts, and recovery constraints, see [CVE List Ingest](./cve-ingest.md).
 
 ## Common Failures
 

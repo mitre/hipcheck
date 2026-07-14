@@ -58,11 +58,19 @@ Content-Type: application/json
 
 ```json
 {
-  "status": "ok"
+  "status": "ok",
+  "cveIngest": {
+    "recordsAvailable": false,
+    "latestSuccessfulCommit": null,
+    "latestRun": null
+  }
 }
 ```
 
-The current health response does not report database, CVE, or KEV ingest state.
+`200 OK` means the server answered the request; it does not mean the initial
+CVE List sync has completed. `cveIngest.recordsAvailable` is `true` when active
+CVE records are available. `latestSuccessfulCommit` and `latestRun` describe
+the most recent successful commit and attempted sync, when present.
 
 ### `POST /package-sources`
 

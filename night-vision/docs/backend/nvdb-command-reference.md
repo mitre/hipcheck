@@ -90,6 +90,7 @@ Current top-level commands:
 ```text
 Commands:
   api   Interact with the REST API
+  cve   Manage CVE List data
   db    Manage the database
   help  Print this message or the help of the given subcommand(s)
 ```
@@ -98,12 +99,33 @@ The `api` command is listed in help output, but it is not implemented yet.
 Running it currently reaches a placeholder in the binary. Use the
 [REST API Usage](./rest-api-usage.md) guide for current API examples.
 
-The issue tracker mentions `cve` command coverage, but current `nvdb` help does
-not expose a `cve` subcommand. `nvdb cve --help` exits with an unrecognized
-subcommand error. Do not document `cve` command behavior until the command is
-implemented. Follow-up issue
-[#57](https://gitlab.mitre.org/night-vision/night-vision/-/work_items/57)
-tracks that implementation decision.
+## `cve`
+
+Use `cve` commands to inspect and maintain the local CVE List ingest state.
+They use the configured database and CVE List settings, so confirm the selected
+configuration file before running them.
+
+| Command | Purpose |
+| --- | --- |
+| `cve config` | Print the effective CVE List ingest configuration. |
+| `cve doctor` | Check CVE List ingest operational health. |
+| `cve list` | List stored CVE List records. |
+| `cve record <CVE-ID>` | Print one stored source record. |
+| `cve runs [--limit <N>]` | List recent sync runs. |
+| `cve run <GENERATION>` | Show one sync run. |
+| `cve status` | Print the latest sync state. |
+| `cve stats` | Print stored-record statistics. |
+| `cve sync --destructive [--no-timeout]` | Run one sync with progress output. |
+| `cve recover --destructive` | Mark stale, non-live running syncs as failed. |
+| `cve reset --destructive [--force]` | Remove local CVE List storage and sync history. |
+
+`sync`, `recover`, and `reset` require `--destructive` because they change
+database state. It is an acknowledgement, not a dry-run. Run `recover` only
+after confirming that no live sync holds the advisory lock. `reset --force` can
+override protection for stale running rows; do not use it while a sync is live.
+
+For the ingest lifecycle, configuration defaults, and recovery guidance, see
+[CVE List Ingest](./cve-ingest.md).
 
 ## `db`
 

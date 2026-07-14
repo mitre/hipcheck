@@ -55,7 +55,16 @@ SeaORM, or Tokio setting at its default unless noted below.
 | `async-blocking-thread-keep-alive` | Time to keep idle blocking threads alive. | Milliseconds | Tokio default. The sample config documents 10000 milliseconds. |
 | `async-global-queue-interval` | Scheduler ticks between global queue checks. | Ticks | Tokio default. The sample config documents 31 ticks. |
 | `async-event-interval` | Scheduler ticks between external event polls. | Ticks | Tokio default. The sample config documents 61 ticks. |
+| `cve-list-repository-url` | CVE List Git repository URL. | URL | `https://github.com/CVEProject/cvelistV5.git`. Usernames and passwords are rejected. |
+| `cve-list-repository-ref` | CVE List Git ref to fetch. | Git ref | `main`. |
+| `cve-list-sync-interval` | Delay between recurring CVE List sync attempts. | Milliseconds | 420000 milliseconds. |
+| `cve-list-sync-timeout` | Timeout for a sync after a successful baseline exists. | Milliseconds | 3600000 milliseconds. |
+| `cve-list-first-sync-timeout` | Timeout for the initial clone and full sync. | Milliseconds | 14400000 milliseconds. |
+| `cve-list-checkout-path` | Persistent local CVE List checkout path. | Path | Required. The local sample uses `target/cve-list/cvelistV5`; containers use a writable cache mount. |
+| `cve-list-parse-concurrency` | Maximum concurrent CVE record parser tasks and file-content buffer size. | Tasks | Automatic value based on runtime capacity, capped at 32. |
+| `cve-list-write-batch-size` | Maximum staged CVE records per database write. | Records | 500. |
 | `cve-record-max-bytes` | Maximum accepted size for one CVE List Git blob. | Bytes | Defaults to 5242880 bytes. Oversized blobs are rejected before allocation. |
+| `cve-list-write-channel-size` | Parsed-record buffer before database staging. | Records | Automatic value based on parser concurrency and batch size, capped at 1024. |
 
 ## Secret Files
 
@@ -120,3 +129,6 @@ at `/run/secrets/nv-server/database-url`.
   starve blocking work; too high can create excess thread pressure.
 - Change `async-global-queue-interval` and `async-event-interval` only for
   measured scheduler behavior. They are low-level Tokio tuning knobs.
+- CVE List settings control a background ingest worker. See
+  [CVE List Ingest](./cve-ingest.md) for its lifecycle, tuning trade-offs, and
+  manual recovery commands.
