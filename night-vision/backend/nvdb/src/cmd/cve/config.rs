@@ -1,5 +1,5 @@
 use anyhow::Result;
-use nv_common::config::{Config, ConfigValueSource, redact_url_password};
+use nv_common::config::{Config, ConfigValueSource, redact_url_authentication};
 
 pub fn command() -> clap::Command {
     clap::Command::new("config").about("Print the effective CVE List ingest configuration")
@@ -10,7 +10,7 @@ pub fn run(config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
 
     println!(
         "repository_url: {}",
-        redact_url_password(worker_config.repository_url())
+        redact_url_authentication(worker_config.repository_url())
     );
     println!("repository_ref: {}", worker_config.repository_ref());
     println!("checkout_path: {}", worker_config.checkout_path());

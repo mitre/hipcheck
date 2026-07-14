@@ -448,7 +448,7 @@ impl Config {
         let async_global_queue_interval =
             parse_value(&parsed, "async-global-queue-interval", &mut errors);
         let async_event_interval = parse_value(&parsed, "async-event-interval", &mut errors);
-        let cve_list_repository_url = parse_value(&parsed, "cve-list-repository-url", &mut errors)
+        let cve_list_repository_url = parse_cve_list_repository_url(&parsed, &mut errors)
             .unwrap_or_else(default_cve_list_repository_url);
         let cve_list_repository_ref = parse_value(&parsed, "cve-list-repository-ref", &mut errors)
             .unwrap_or_else(default_cve_list_repository_ref);
@@ -743,11 +743,7 @@ impl Display for Config {
             write_report_line!(f, "async-event-interval", &async_event_interval)?;
         }
 
-        write_report_line!(
-            f,
-            "cve-list-repository-url",
-            &redact_url_password(&self.cve_list_repository_url)
-        )?;
+        write_report_line!(f, "cve-list-repository-url", &self.cve_list_repository_url)?;
         write_report_line!(f, "cve-list-repository-ref", &self.cve_list_repository_ref)?;
         write_report_line!(f, "cve-list-sync-interval", &self.cve_list_sync_interval)?;
         write_report_line!(f, "cve-list-sync-timeout", &self.cve_list_sync_timeout)?;
@@ -784,10 +780,34 @@ fn default_cve_list_repository_url() -> Url {
     Url::parse(DEFAULT_CVE_LIST_REPOSITORY_URL).expect("default CVE List repository URL is valid")
 }
 
-/// Return a copy of a URL with its password redacted, if present.
-pub fn redact_url_password(url: &Url) -> Url {
+/// Parse the CVE List repository URL, rejecting embedded authentication.
+fn parse_cve_list_repository_url(
+    parsed: &spookey::ParseResult,
+    errors: &mut Vec<ConfigError>,
+) -> Option<Url> {
+    let url = parse_value::<Url>(parsed, "cve-list-repository-url", errors)?;
+
+    if url.username().is_empty() && url.password().is_none() {
+        return Some(url);
+    }
+
+    errors.push(ConfigError::StrParse(StrParseError {
+        key: "cve-list-repository-url".into(),
+        value: redact_url_authentication(&url).as_str().into(),
+        err: "repository URLs must not include authentication information".into(),
+    }));
+    None
+}
+
+/// Return a copy of a URL with its authentication components redacted.
+pub fn redact_url_authentication(url: &Url) -> Url {
     let mut redacted = url.clone();
 
+    if !redacted.username().is_empty() {
+        redacted
+            .set_username("<redacted>")
+            .expect("URLs with usernames support replacing their username");
+    }
     if redacted.password().is_some() {
         redacted
             .set_password(Some("<redacted>"))
@@ -1681,7 +1701,7 @@ mod tests {
     }
 
     #[test]
-    fn config_display_redacts_cve_list_repository_password() {
+    fn config_rejects_cve_list_repository_url_with_authentication() {
         let file = TempConfigFile::new(
             "server-address = 127.0.0.1:0\n\
             database-connection = sqlite::memory:\n\
@@ -1689,11 +1709,22 @@ mod tests {
             cve-list-repository-url = https://user:token@example.test/cvelistV5.git\n",
         );
 
-        let config = Config::parse(file.path()).expect("config should parse");
-        let report = format!("{config}");
+        let error = Config::parse(file.path()).expect_err("config should reject authentication");
+        let ConfigLoadError::FailedToParseConfigFileFields(_, ConfigErrors(errors)) = error else {
+            panic!("expected a field parsing error");
+        };
+        let ConfigError::StrParse(parse_error) = &errors[0] else {
+            panic!("expected a URL parsing error");
+        };
 
-        assert!(report.contains("https://user:%3Credacted%3E@example.test/cvelistV5.git"));
-        assert!(!report.contains("token"));
+        assert_eq!(
+            &*parse_error.value,
+            "https://%3Credacted%3E:%3Credacted%3E@example.test/cvelistV5.git"
+        );
+        assert_eq!(
+            &*parse_error.err,
+            "repository URLs must not include authentication information"
+        );
     }
 
     #[test]
@@ -2032,22 +2063,5 @@ mod tests {
         let conn = "postgres://localhost/nv";
 
         assert_eq!(redact_database_conn_password(conn), conn);
-    }
-
-    #[test]
-    fn redact_url_password_redacts_password() {
-        let url = Url::parse("https://user:token@example.test/cvelistV5.git").expect("valid URL");
-
-        assert_eq!(
-            redact_url_password(&url).as_str(),
-            "https://user:%3Credacted%3E@example.test/cvelistV5.git"
-        );
-    }
-
-    #[test]
-    fn redact_url_password_preserves_url_without_password() {
-        let url = Url::parse("https://user@example.test/cvelistV5.git").expect("valid URL");
-
-        assert_eq!(redact_url_password(&url), url);
     }
 }
