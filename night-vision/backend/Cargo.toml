@@ -53,8 +53,8 @@ petgraph = "0.8.3"
 migration = { path = "migration" }
 nv-common = { path = "nv-common" }
 # NOTE that the version numbers of sea-orm components should match
-sea-orm = { version = "=2.0.0-rc.38", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
-sea-orm-migration = { version = "=2.0.0-rc.38", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
+sea-orm = { version = "2.0.0", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
+sea-orm-migration = { version = "2.0.0", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 # This an outdated version, required to match the one expected by dropshot.
 # See: https://github.com/oxidecomputer/dropshot/issues/1375
 # We'd prefer to use `jiff` over `chrono`, but this old version of

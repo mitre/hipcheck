@@ -24,13 +24,13 @@ chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive", "env", "string"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "env", "help", "std", "string", "suggestions", "usage"] }
 deranged = { version = "0.5", features = ["powerfmt", "serde"] }
-either = { version = "1", features = ["serde", "use_std"] }
+digest = { version = "0.11", features = ["alloc", "mac", "oid"] }
+either = { version = "1", features = ["use_std"] }
 form_urlencoded = { version = "1" }
 futures-channel = { version = "0.3", features = ["sink"] }
 futures-io = { version = "0.3" }
 futures-sink = { version = "0.3" }
 futures-util = { version = "0.3", features = ["channel", "io", "sink"] }
-hashbrown = { version = "0.15" }
 indexmap = { version = "2", features = ["serde"] }
 memchr = { version = "2" }
 num-traits = { version = "0.2", default-features = false, features = ["i128", "std"] }
@@ -40,26 +40,25 @@ rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", 
 rustls-webpki = { version = "0.103", default-features = false, features = ["aws-lc-rs", "ring", "std"] }
 schemars = { version = "0.8", features = ["chrono", "uuid1"] }
 scopeguard = { version = "1" }
-sea-orm = { version = "2.0.0-rc.38", features = ["mock", "runtime-tokio-rustls", "schema-sync", "sqlx-postgres"] }
-sea-query-sqlx = { version = "0.8.0-rc.15", default-features = false, features = ["postgres-array", "runtime-tokio-rustls", "sqlx-postgres", "with-chrono", "with-json", "with-rust_decimal", "with-time", "with-uuid"] }
-sea-schema = { version = "0.17.0-rc.17", default-features = false, features = ["discovery", "probe", "runtime-tokio-rustls", "sqlx-postgres", "writer"] }
+sea-orm = { version = "2", features = ["mock", "runtime-tokio-rustls", "schema-sync", "sqlx-postgres"] }
+sea-query-sqlx = { version = "0.9", default-features = false, features = ["postgres-array", "runtime-tokio-rustls", "sqlx-postgres", "with-chrono", "with-json", "with-rust_decimal", "with-time", "with-uuid"] }
+sea-schema = { version = "0.18", default-features = false, features = ["discovery", "probe", "runtime-tokio-rustls", "sqlx-postgres", "writer"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_core = { version = "1", features = ["alloc", "rc"] }
 serde_json = { version = "1", features = ["raw_value"] }
 slab = { version = "0.4" }
 slog = { version = "2", features = ["dynamic-keys", "release_max_level_debug"] }
-smallvec = { version = "1", default-features = false, features = ["const_new", "serde"] }
+smallvec = { version = "1", default-features = false, features = ["const_new"] }
 thiserror = { version = "2" }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing", "serde"] }
 tokio = { version = "1", features = ["full"] }
 toml = { version = "1", features = ["preserve_order"] }
 tracing = { version = "0.1", features = ["log"] }
-typenum = { version = "1", default-features = false, features = ["const-generics"] }
 uuid = { version = "1", features = ["serde", "v4", "v7"] }
 
 [build-dependencies]
 cc = { version = "1", default-features = false, features = ["parallel"] }
-either = { version = "1", features = ["serde", "use_std"] }
+either = { version = "1", features = ["use_std"] }
 memchr = { version = "2" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
 regex-syntax = { version = "0.8" }
