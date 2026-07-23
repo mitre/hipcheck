@@ -27,6 +27,7 @@ services:
     tmpfs:
       - /tmp
     environment:
+      API_BASE_URL: ${API_BASE_URL:-http://nv-server:8080}
       HOST: 0.0.0.0
       PORT: 3000
     healthcheck:

@@ -12,8 +12,15 @@
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
+    "generate:api": "openapi-ts",
+    "generate:api:watch": "openapi-ts --watch",
+    "check:generated": "pnpm generate:api && git diff --exit-code -- src/lib/api/generated",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+    
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.4"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.5.7",
@@ -25,6 +32,7 @@
     "svelte-check": "^4.7.4",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "vite": "^8.1.5"
+    "vite": "^8.1.5",
+    "@hey-api/openapi-ts": "0.99.0"
   }
 }
