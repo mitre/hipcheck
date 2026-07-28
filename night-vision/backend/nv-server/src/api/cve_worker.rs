@@ -145,16 +145,68 @@ fn summary_commit_sha(summary: &CveListSyncSummary) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use camino::Utf8PathBuf;
+    use camino::{Utf8Path, Utf8PathBuf};
     use nv_common::config::Config;
-    use std::time::Duration;
+    use std::{
+        fs,
+        sync::atomic::{AtomicUsize, Ordering},
+        time::Duration,
+    };
+
+    static TEST_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    struct TempConfigFile {
+        path: Utf8PathBuf,
+    }
+
+    impl TempConfigFile {
+        fn default_backend_config_with_inline_test_database() -> Self {
+            let mut default_config_path = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            default_config_path.pop();
+            default_config_path.push("nv-server.spookey");
+
+            let config = fs::read_to_string(&default_config_path)
+                .expect("default backend config should be readable");
+            let database_connection_file =
+                "database-connection-file = \"../.secrets/local-development-database-url\"";
+            assert!(
+                config.contains(database_connection_file),
+                "default backend config should use the local development database URL file"
+            );
+            let config = config.replace(
+                database_connection_file,
+                "database-connection = \"postgres://localhost:5432/nv\"",
+            );
+
+            let id = TEST_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "nv-server-cve-worker-config-test-{}-{id}.spookey",
+                std::process::id()
+            ));
+            fs::write(&path, config).expect("failed to write test config file");
+
+            Self {
+                path: Utf8PathBuf::from_path_buf(path)
+                    .expect("test temp path should be valid UTF-8"),
+            }
+        }
+
+        fn path(&self) -> &Utf8Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TempConfigFile {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
 
     #[test]
     fn worker_config_copies_cve_list_settings() {
-        let mut config_path = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        config_path.pop();
-        config_path.push("nv-server.spookey");
-        let config = Config::parse(&config_path).expect("default backend config should parse");
+        let config_file = TempConfigFile::default_backend_config_with_inline_test_database();
+        let config = Config::parse(config_file.path())
+            .expect("default backend config with a test database should parse");
         let worker_config = config.cve_list_worker_config();
 
         assert_eq!(
