@@ -62,9 +62,9 @@ usage() {
     printf '  %sPOSTGRES_PASSWORD='\''replace-me'\'' scripts/setup-compose-secrets.sh -x%s\n\n' "$color_yellow" "$color_reset"
 
     cat <<'EOF'
-Plans local Docker Compose secret files for Postgres and nv-server. Pass
--x/--execute to write the planned changes. By default, non-secret database
-settings are read from .env in the repository root.
+Plans local Docker Compose secret files and the host-development database URL
+secret. Pass -x/--execute to write the planned changes. By default, non-secret
+database settings are read from .env in the repository root.
 
 The .env parser supports KEY=value and export KEY=value lines, quoted values,
 and whitespace-prefixed inline comments on unquoted values.
@@ -96,6 +96,8 @@ EOF
       Path to the Postgres password secret file.
   NV_SERVER_DATABASE_URL_SECRET_FILE
       Path to the nv-server database URL secret file.
+  NV_LOCAL_DATABASE_URL_SECRET_FILE
+      Path to the host-development database URL secret file.
 
 POSTGRES_USER, POSTGRES_PASSWORD, and POSTGRES_DB are percent-encoded before the
 database URL is written.
@@ -389,6 +391,7 @@ postgres_host=$(env_value POSTGRES_HOST postgres)
 postgres_port=$(env_value POSTGRES_PORT 5432)
 postgres_password_secret_file=$(absolute_path "$(env_value POSTGRES_PASSWORD_SECRET_FILE .secrets/postgres-password)")
 nv_server_database_url_secret_file=$(absolute_path "$(env_value NV_SERVER_DATABASE_URL_SECRET_FILE .secrets/nv-server-database-url)")
+local_database_url_secret_file=$(absolute_path "$(env_value NV_LOCAL_DATABASE_URL_SECRET_FILE .secrets/local-development-database-url)")
 
 require_nonempty POSTGRES_DB "$postgres_db"
 require_nonempty POSTGRES_USER "$postgres_user"
@@ -396,6 +399,7 @@ require_nonempty POSTGRES_HOST "$postgres_host"
 require_nonempty POSTGRES_PORT "$postgres_port"
 require_nonempty POSTGRES_PASSWORD_SECRET_FILE "$postgres_password_secret_file"
 require_nonempty NV_SERVER_DATABASE_URL_SECRET_FILE "$nv_server_database_url_secret_file"
+require_nonempty NV_LOCAL_DATABASE_URL_SECRET_FILE "$local_database_url_secret_file"
 require_single_line POSTGRES_DB "$postgres_db"
 require_single_line POSTGRES_USER "$postgres_user"
 require_single_line POSTGRES_HOST "$postgres_host"
@@ -406,6 +410,7 @@ if [ "$print_paths" = true ]; then
     info "Env file: $env_file"
     info "Postgres password secret file: $postgres_password_secret_file"
     info "nv-server database URL secret file: $nv_server_database_url_secret_file"
+    info "Local development database URL secret file: $local_database_url_secret_file"
     exit 0
 fi
 
@@ -433,19 +438,26 @@ database_url=$(printf 'postgres://%s:%s@%s:%s/%s' \
     "$postgres_host" \
     "$postgres_port" \
     "$encoded_postgres_db")
+local_database_url=$(printf 'postgres://%s:%s@127.0.0.1:5432/%s' \
+    "$encoded_postgres_user" \
+    "$encoded_postgres_password" \
+    "$encoded_postgres_db")
 
 password_action=$(plan_file_action "$postgres_password_secret_file" "$postgres_password")
 database_url_action=$(plan_file_action "$nv_server_database_url_secret_file" "$database_url")
+local_database_url_action=$(plan_file_action "$local_database_url_secret_file" "$local_database_url")
 
 info "Using Postgres password source: $postgres_password_source"
 
 if [ "$execute" = false ]; then
     plan "Would $password_action Postgres password secret: $postgres_password_secret_file"
     plan "Would $database_url_action nv-server database URL secret: $nv_server_database_url_secret_file"
+    plan "Would $local_database_url_action local development database URL secret: $local_database_url_secret_file"
     info 'Pass -x or --execute to apply these changes.'
 else
     write_secret_file "Postgres password secret" "$postgres_password_secret_file" "$postgres_password" "$password_action"
     write_secret_file "nv-server database URL secret" "$nv_server_database_url_secret_file" "$database_url" "$database_url_action"
+    write_secret_file "local development database URL secret" "$local_database_url_secret_file" "$local_database_url" "$local_database_url_action"
 fi
 
 if [ "$validate_compose" = true ]; then

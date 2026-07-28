@@ -12,14 +12,13 @@ section says otherwise.
 
 ## Local Database Setup
 
-Night Vision targets PostgreSQL 18. For local development, run a PostgreSQL
-database that is safe to modify and point `nv-server.spookey` at it with either
-`database-connection` or `database-connection-file`.
+Night Vision targets PostgreSQL 18. For local development, use the disposable
+Compose database and generate the credentialed URL file used by
+`nv-server.spookey`:
 
-For credential-free local development, this is acceptable:
-
-```spookey
-database-connection = "postgres://localhost:5432/nv"
+```sh
+scripts/setup-compose-secrets.sh -x
+scripts/docker-compose-local.sh up -d postgres
 ```
 
 Do not paste real passwords, secret file contents, or production connection

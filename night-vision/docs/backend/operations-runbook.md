@@ -13,10 +13,13 @@ Use an activated Flox environment for normal development commands.
 
 ### Direct Local Server
 
-The direct local server uses `backend/nv-server.spookey`. That sample binds the
-server to `127.0.0.1:8080` and uses a credential-free local database URL:
+The direct local server uses `backend/nv-server.spookey`. It binds the server
+to `127.0.0.1:8080` and connects to the loopback-published local Compose
+database. Set up and start Compose before running it:
 
 ```sh
+scripts/setup-compose-secrets.sh -x
+scripts/docker-compose-local.sh up -d postgres
 cd backend
 cargo run -p nv-server
 ```
@@ -44,8 +47,8 @@ For config keys, defaults, and secret-file rules, see
 
 Local Compose uses `docker-compose.yml` plus `docker-compose.local.yml`. The
 local override binds the backend to `127.0.0.1:8080`, the frontend to
-`127.0.0.1:3000`, and the local Postgres volume to
-`night-vision-local-postgres-data`.
+`127.0.0.1:3000`, PostgreSQL to `127.0.0.1:5432`, and the local Postgres
+volume to `night-vision-local-postgres-data`.
 
 ```sh
 cp .env.local.example .env
@@ -245,8 +248,8 @@ scripts/docker-compose-local.sh ps postgres
 scripts/docker-compose-local.sh logs postgres
 ```
 
-For direct local runs, confirm PostgreSQL 18 is running and the database named
-in `backend/nv-server.spookey` exists.
+For direct local runs, start the Compose Postgres service and confirm it is
+healthy before starting the server.
 
 ### Secret File Problems
 

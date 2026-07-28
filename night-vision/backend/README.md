@@ -40,9 +40,9 @@ time, including by keeping compile times reasonable.
 
 ## Database
 
-Night Vision's database of choice is PostgreSQL version 18. Make sure to
-install PostgreSQL locally for development. We also recommend installing
-pgAdmin if you want a GUI for inspecting the database.
+Night Vision's database of choice is PostgreSQL version 18. Local development
+uses the Compose Postgres service, published only to `127.0.0.1:5432`. We also
+recommend installing pgAdmin if you want a GUI for inspecting the database.
 
 For local backend startup, health checks, logs, PostgreSQL checks, and recovery
 steps, see the
@@ -83,11 +83,11 @@ configuration file. See the
 for the full list of configuration keys, defaults, units, and local/container
 behavior.
 
-For local development without credentials, it is acceptable to use
-`database-connection` directly:
+For normal local development, `scripts/setup-compose-secrets.sh -x` generates
+the credentialed URL file used by `backend/nv-server.spookey`:
 
 ```spookey
-database-connection = "postgres://localhost:5432/nv"
+database-connection-file = "../.secrets/local-development-database-url"
 ```
 
 For deployed environments, prefer `database-connection-file`:

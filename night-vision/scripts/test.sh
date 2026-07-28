@@ -174,6 +174,10 @@ if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT
     error 'error: local Docker Compose config should use the staged CA file build secret'
     exit 1
 fi
+if ! printf '%s\n' "$local_compose_config" | grep -F 'postgres-host: null' >/dev/null; then
+    error 'error: local Compose should attach Postgres to its host-access network'
+    exit 1
+fi
 if ! cmp -s "$tmp_dir/source-postgres-password" "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/postgres-password"; then
     error 'error: staged Postgres secret should match the source secret file'
     exit 1
@@ -202,6 +206,7 @@ pass_test
 start_test 'execute creates secret files with strict modes'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
+NV_LOCAL_DATABASE_URL_SECRET_FILE="$tmp_dir/local-development-database-url" \
 ENV_FILE=/dev/null \
 POSTGRES_DB=nv \
 POSTGRES_USER=nv-server \
@@ -212,19 +217,24 @@ POSTGRES_PASSWORD=replace-me \
 
 assert_file_mode "$tmp_dir/postgres-password" 600
 assert_file_mode "$tmp_dir/nv-server-database-url" 600
+assert_file_mode "$tmp_dir/local-development-database-url" 600
 assert_line_count "$tmp_dir/postgres-password" 1
 assert_line_count "$tmp_dir/nv-server-database-url" 1
+assert_line_count "$tmp_dir/local-development-database-url" 1
+assert_contains "$tmp_dir/local-development-database-url" '@127.0.0.1:5432/nv'
 pass_test
 
 start_test 'plan mode leaves existing secrets unchanged'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
+NV_LOCAL_DATABASE_URL_SECRET_FILE="$tmp_dir/local-development-database-url" \
 ENV_FILE=/dev/null \
 POSTGRES_PASSWORD=replace-me \
     "$setup_script" >/dev/null
 
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
+NV_LOCAL_DATABASE_URL_SECRET_FILE="$tmp_dir/local-development-database-url" \
 ENV_FILE=/dev/null \
 POSTGRES_PASSWORD=different-password \
     "$setup_script" >/dev/null
@@ -235,6 +245,7 @@ pass_test
 start_test 'execute overwrites changed password'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
+NV_LOCAL_DATABASE_URL_SECRET_FILE="$tmp_dir/local-development-database-url" \
 ENV_FILE=/dev/null \
 POSTGRES_PASSWORD=different-password \
     "$setup_script" -x >/dev/null
@@ -285,6 +296,10 @@ if ! printf '%s\n' "$paths_output" | grep -F "nv-server database URL secret file
     error "error: default nv-server database URL secret path should resolve under $repo_root/.secrets"
     exit 1
 fi
+if ! printf '%s\n' "$paths_output" | grep -F "Local development database URL secret file: $repo_root/.secrets/local-development-database-url" >/dev/null; then
+    error "error: default local development database URL secret path should resolve under $repo_root/.secrets"
+    exit 1
+fi
 
 "$setup_script" \
     --print-paths \
@@ -294,6 +309,7 @@ pass_test
 start_test 'combined short flags execute and validate'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/combined-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/combined-url" \
+NV_LOCAL_DATABASE_URL_SECRET_FILE="$tmp_dir/combined-local-development-url" \
 ENV_FILE=/dev/null \
 POSTGRES_PASSWORD=replace-me \
     "$setup_script" -xc >/dev/null
@@ -307,16 +323,19 @@ POSTGRES_HOST=postgres # inline comment
 POSTGRES_PORT=5432
 POSTGRES_PASSWORD_SECRET_FILE=$tmp_dir/quoted-password
 NV_SERVER_DATABASE_URL_SECRET_FILE=$tmp_dir/quoted-url
+NV_LOCAL_DATABASE_URL_SECRET_FILE=$tmp_dir/quoted-local-development-url
 EOF
 ENV_FILE="$tmp_dir/quoted.env" \
 POSTGRES_PASSWORD=quoted-password \
     "$setup_script" -x >/dev/null
 assert_contains "$tmp_dir/quoted-url" 'quoted%20user:quoted-password@postgres:5432/quoted%20db'
+assert_contains "$tmp_dir/quoted-local-development-url" 'quoted%20user:quoted-password@127.0.0.1:5432/quoted%20db'
 pass_test
 
 start_test 'database URL components are percent encoded'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/symbol-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/symbol-url" \
+NV_LOCAL_DATABASE_URL_SECRET_FILE="$tmp_dir/symbol-local-development-url" \
 ENV_FILE=/dev/null \
 POSTGRES_PASSWORD='bad:value@with/slash%space value' \
     "$setup_script" -x >/dev/null
@@ -326,6 +345,7 @@ pass_test
 start_test 'long execute and validate flags work'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/long-validate-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/long-validate-url" \
+NV_LOCAL_DATABASE_URL_SECRET_FILE="$tmp_dir/long-validate-local-development-url" \
 ENV_FILE=/dev/null \
 POSTGRES_PASSWORD=replace-me \
     "$setup_script" --execute --validate-compose >/dev/null

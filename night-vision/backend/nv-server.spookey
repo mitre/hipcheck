@@ -11,14 +11,9 @@
 # The address to bind the Night Vision server to.
 server-address = "127.0.0.1:8080"
 
-# The connection string for the database.
-#
-# Use `database-connection-file` for deployed environments where the connection
-# string contains credentials. The file should contain a single line with the
-# connection string. On Unix systems, the file must have no group or world
-# permissions; use mode 0600 or stricter.
-database-connection = "postgres://localhost:5432/nv"
-database-connection-file =
+# The connection string for the local Docker Compose database. The setup script
+# generates this ignored file with the local database credentials.
+database-connection-file = "../.secrets/local-development-database-url"
 
 # The destination path to write the OpenAPI Definition file.
 # If this is a relative directory, it will be treated as relative to the rust
