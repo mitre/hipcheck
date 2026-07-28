@@ -30,7 +30,7 @@ First, quickly, let's lay out some definitions:
   <dt>Large Language Model (LLM)</dt>
   <dd>Type of machine learning model trained on large amounts of text.</dd>
   <dt>AI Model (or just "Model")</dt>
-  <dd>The particular LLM being employed. For example: Claude Opus 4.6 (by Anthropic), GPT-5.5 (by OpenAI), Llama 3.1 (by Meta, formerly Facebook).</dd>
+  <dd>The particular LLM being employed.</dd>
   <dt>Harness</dt>
   <dd>Specialized software built around an AI model that turns it into a usable tool for some set of tasks.</dd>
   <dt>AI Agent</dt>
@@ -42,6 +42,9 @@ First, quickly, let's lay out some definitions:
 </dl>
 
 ## The Rules
+
+
+
 
 1. You can use AI tools to write code for Night Vision, but you are responsible
    for anything you submit. That means you need to review the code, test it,
@@ -153,17 +156,13 @@ take them at face value as whole-cloth solutions.
 It's a reality of using AI tools that the quality of your prompts
 *really matters* for the quality of the output. Prompting AI systems effectively
 is a skill, and one that can be learned and developed over time. The specifics
-of how to effectively prompt will vary depending on the specific model in use.
-We highly recommend seeking out guides to effective prompting for whatever
-model you're using. Some examples:
+of how to effectively prompt vary by model. Use prompting guidance for the
+OpenAI Codex model:
 
 - [OpenAI's GPT-5 prompting guide](https://developers.openai.com/cookbook/examples/gpt-5/gpt-5_prompting_guide)
-- [Anthropic's Claude Prompt Engineering Best Practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
-- [Google's Gemini 3 Prompting Guide](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/start/gemini-3-prompting-guide)
 
-Pay attention to the model you're using to ensure that any guide you try is
-actually applicable to that model. There can be substantial differences from
-version to version, so a guide for GPT-5.4 might not apply well to GPT-5.5.
+Check that the guidance applies to the Codex model you are using, because
+prompting behavior can vary between model versions.
 
 ## Risk Mitigation
 
