@@ -134,6 +134,49 @@ Git flags during the process before resolving the interactive rebase.
 In Jujutsu, it means running `jj rebase -b <FEATURE_BOOKMARK> -d main`, and
 then resolving any conflicted commits.
 
+### Resolve `Cargo.lock` Conflicts While Rebasing on `main`
+
+When rebasing a branch onto `main`, resolve a `Cargo.lock` conflict as follows:
+
+1. Resolve the related `Cargo.toml` conflicts so they express the intended
+   dependency configuration.
+2. Restore `Cargo.lock` from `main` rather than hand-editing its conflict
+   markers or blindly choosing either side:
+
+   ```console
+   $ git restore --source=main -- Cargo.lock
+   ```
+
+   Or, with Jujutsu:
+
+   ```console
+   $ jj restore --from main Cargo.lock
+   ```
+
+3. Run `cargo check` to update only lockfile entries required by the resolved
+   manifest. Do not use `cargo generate-lockfile`, which selects the latest
+   available version of every package.
+4. Finish the rebase:
+
+   - With Git, stage the resolved files and continue:
+
+     ```console
+     $ git add Cargo.toml Cargo.lock
+     $ git rebase --continue
+     ```
+
+   - With Jujutsu, working-copy changes are tracked automatically. Confirm
+     that no conflicts remain:
+
+     ```console
+     $ jj status
+     ```
+
+5. Run the relevant Cargo checks before completing the rebase. If you cannot
+   determine the intended dependency configuration, stop with
+   `git rebase --abort` or abandon the Jujutsu rebase with `jj undo`, then
+   confirm it with the authors or maintainers.
+
 ### Don't Merge From `main` to a Dev Branch
 
 This is a common mistake when trying to resolve conflicts between a dev branch
