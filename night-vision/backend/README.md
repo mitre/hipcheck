@@ -18,6 +18,9 @@ a REST API to be used by the frontend.
 - `workspace-hack`: Unifies dependency features, managed by `cargo-hakari`.
 - `xtask`: Task runner, used for project-internal tasks.
 
+Do not add a new crate or workspace member without explicit approval from the
+backend maintainers.
+
 ## Rust Guidelines
 
 The following are guidelines to follow when contributing Rust code to this
