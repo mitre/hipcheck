@@ -20,5 +20,9 @@ sea-orm.workspace = true
 secrecy.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+reqwest = { workspace = true, features = ["blocking", "json"] }
 url.workspace = true
 workspace-hack.workspace = true
+
+[dev-dependencies]
+httpmock = "0.8.3"

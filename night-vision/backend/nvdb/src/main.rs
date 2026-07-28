@@ -60,19 +60,18 @@ fn run() -> Result<()> {
         .filter();
     let _log = logger(verbosity_filter);
 
-    if let Some(_matches) = matches.subcommand_matches("api") {
-        todo!("api subcommand not yet implemented")
-    }
-
     if let Some(npm_matches) = matches.subcommand_matches("npm") {
         return cmd::npm::run(npm_matches);
     }
-
     let config_file = matches
         .get_one::<Utf8PathBuf>("config")
         .expect("config has a default value");
     let config = Config::parse(config_file)?;
-
+    if let Some(sub_matches) = matches.subcommand_matches("api")
+        && let Some(_sub_matches) = sub_matches.subcommand_matches("health")
+    {
+        return cmd::api::health::run(&config);
+    }
     if let Some(db_matches) = matches.subcommand_matches("db") {
         if let Some(_matches) = db_matches.subcommand_matches("schema") {
             return cmd::db::schema::run(&config);
@@ -111,7 +110,8 @@ fn command() -> clap::Command {
         .subcommand(
             clap::Command::new("api")
                 .about("Interact with the REST API")
-                .arg_required_else_help(true),
+                .arg_required_else_help(true)
+                .subcommand(cmd::api::health::command()),
         )
         .subcommand(
             clap::Command::new("db")

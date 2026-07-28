@@ -1,3 +1,4 @@
+pub mod api;
 pub mod cve;
 pub mod db;
 pub mod npm;

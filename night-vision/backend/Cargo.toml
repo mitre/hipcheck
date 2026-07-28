@@ -82,6 +82,7 @@ workspace-hack = { path = "workspace-hack" }
 xshell = "0.2.7"
 secrecy = "0.10.3"
 url = "2.5.7"
+reqwest = "0.13.4"
 
 [workspace.dependencies.tokio]
 

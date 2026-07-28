@@ -19,12 +19,16 @@ workspace = true
 ### BEGIN HAKARI SECTION
 [dependencies]
 base64 = { version = "0.22" }
+bytes = { version = "1", features = ["serde"] }
 camino = { version = "1", default-features = false, features = ["serde1"] }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive", "env", "string"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "env", "help", "std", "string", "suggestions", "usage"] }
+crossbeam-utils = { version = "0.8" }
+crypto-common = { version = "0.1", default-features = false, features = ["std"] }
 deranged = { version = "0.5", features = ["powerfmt", "serde"] }
-digest = { version = "0.11", features = ["alloc", "mac", "oid"] }
+digest-93f6ce9d446188ac = { package = "digest", version = "0.10", features = ["std"] }
+digest-a6292c17cd707f01 = { package = "digest", version = "0.11", features = ["alloc", "mac", "oid"] }
 either = { version = "1", features = ["use_std"] }
 form_urlencoded = { version = "1" }
 futures-channel = { version = "0.3", features = ["sink"] }

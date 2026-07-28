@@ -161,6 +161,20 @@ The package name is required. The command writes the fixture under
 `--destructive` acknowledges those project-file changes. Review the resulting
 fixture and catalog diff before committing it.
 
+## `api`
+
+Use `api` commands to interact with the API endpoints. Responses will be printed to the command line:
+
+```text
+Usage: nvdb api [OPTIONS] [COMMAND]
+
+Commands:
+  health   Get the status from the health endpoint
+
+Options:
+  -c, --config <FILE>  Path to the configuration file [default: nv-server.spookey]
+  -h, --help           Print help
+```
 ## `db`
 
 Use `db` commands for database inspection and maintenance:
