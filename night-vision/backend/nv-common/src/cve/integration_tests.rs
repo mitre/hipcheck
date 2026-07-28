@@ -210,7 +210,7 @@ async fn connect_to_integration_database() -> DatabaseConnection {
     let config_path = integration_config_path();
     let config = Config::parse(&config_path).expect("integration-test config should parse");
     let database_url = config.database_connection().expose_secret();
-    assert_disposable_database_url(&database_url);
+    assert_disposable_database_url(database_url);
 
     connection(&config).await.unwrap_or_else(|error| {
         panic!(

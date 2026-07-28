@@ -11,7 +11,11 @@ pub fn ci(_args: &ArgMatches) -> Result<()> {
     cmd!(s, "cargo xtask lint").run()?;
     cmd!(s, "cargo hakari generate --diff").run()?;
     cmd!(s, "cargo fmt --all --check").run()?;
-    cmd!(s, "cargo clippy --locked --workspace -- -D warnings").run()?;
+    cmd!(
+        s,
+        "cargo clippy --locked --workspace --all-targets -- -D warnings"
+    )
+    .run()?;
     cmd!(s, "cargo doc --locked --workspace --no-deps")
         .env("RUSTDOCFLAGS", "-Dwarnings")
         .run()?;

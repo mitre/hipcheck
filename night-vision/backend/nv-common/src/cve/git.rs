@@ -719,7 +719,7 @@ fn parse_cat_file_batch_output_with_record_max_bytes(
         let header_end = output[offset..]
             .iter()
             .position(|byte| *byte == b'\n')
-            .map(|position| offset + position)
+            .and_then(|position| offset.checked_add(position))
             .ok_or_else(|| CveListGitError::CatFileTruncated(path.clone()))?;
         let header = String::from_utf8(output[offset..header_end].to_vec())
             .map_err(CveListGitError::GitStdoutUtf8)?;
@@ -727,7 +727,9 @@ fn parse_cat_file_batch_output_with_record_max_bytes(
         let size = parse_cat_file_header(path, &header)?;
         validate_cat_file_size(path, size, record_max_bytes)?;
 
-        let content_start = header_end + 1;
+        let content_start = header_end
+            .checked_add(1)
+            .ok_or_else(|| CveListGitError::CatFileTruncated(path.clone()))?;
         let content_end = content_start
             .checked_add(size)
             .ok_or_else(|| CveListGitError::CatFileTruncated(path.clone()))?;
@@ -742,7 +744,9 @@ fn parse_cat_file_batch_output_with_record_max_bytes(
         let contents = String::from_utf8(output[content_start..content_end].to_vec())
             .map_err(CveListGitError::GitStdoutUtf8)?;
         files.push((path.clone(), contents));
-        offset = separator + 1;
+        offset = separator
+            .checked_add(1)
+            .ok_or_else(|| CveListGitError::CatFileTruncated(path.clone()))?;
     }
 
     if offset != output.len() {
