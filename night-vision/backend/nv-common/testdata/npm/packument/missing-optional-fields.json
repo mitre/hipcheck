@@ -9,7 +9,7 @@
       "version": "1.0.0",
       "dist": {
         "tarball": "https://registry.npmjs.org/no-metadata/-/no-metadata-1.0.0.tgz",
-        "shasum": "optional123"
+        "shasum": "0123456789abcdef0123456789abcdef01234567"
       }
     }
   }

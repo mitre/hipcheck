@@ -9,7 +9,7 @@
       "version": "2.0.0",
       "dist": {
         "tarball": "https://registry.npmjs.org/minimal-package/-/minimal-package-2.0.0.tgz",
-        "shasum": "def456"
+        "shasum": "0123456789abcdef0123456789abcdef01234567"
       }
     }
   }

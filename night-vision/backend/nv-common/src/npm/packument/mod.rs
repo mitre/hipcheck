@@ -7,10 +7,6 @@ use std::error::Error;
 use std::io::Read;
 use url::Url;
 
-#[expect(
-    dead_code,
-    reason = "the raw representation retains registry fields that are not exposed"
-)]
 #[derive(Debug, Deserialize)]
 struct RawNpmPackument {
     #[serde(rename = "_id")]
@@ -407,9 +403,12 @@ pub struct PeerDependencyMeta {
 #[derive(Debug)]
 pub struct NpmDist {
     pub tarball: Url,
-    pub shasum: Option<String>,
+    pub shasum: Sha1Digest,
     pub integrity: Option<String>,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Sha1Digest(String);
 
 /*
     A human requires either a name or an email.
@@ -537,7 +536,9 @@ impl NpmPackument {
 
                 dist: NpmDist {
                     tarball,
-                    shasum: dist.shasum,
+                    shasum: parse_sha1_digest(
+                        dist.shasum.ok_or("Missing required field: dist.shasum")?,
+                    )?,
                     integrity: dist.integrity,
                 },
 
@@ -613,6 +614,14 @@ fn validate_url(url: String, field: &str) -> Result<String, String> {
 
 fn parse_url(url: String, field: &str) -> Result<Url, String> {
     Url::parse(&url).map_err(|_| format!("Invalid {field}: {url}"))
+}
+
+fn parse_sha1_digest(value: String) -> Result<Sha1Digest, String> {
+    if value.len() != 40 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(format!("Invalid SHA-1 digest: {value}"));
+    }
+
+    Ok(Sha1Digest(value))
 }
 
 fn convert_funding(raw: Option<RawFunding>) -> Result<Option<Funding>, String> {
@@ -922,7 +931,7 @@ mod tests {
         );
 
         assert!(
-            version.dist.shasum.is_some(),
+            !version.dist.shasum.0.is_empty(),
             "express should have a shasum"
         );
     }

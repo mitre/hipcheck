@@ -9,7 +9,7 @@
       "version": "not-a-version",
       "dist": {
         "tarball": "https://registry.npmjs.org/broken-package/-/broken-package-not-a-version.tgz",
-        "shasum": "broken123"
+        "shasum": "0123456789abcdef0123456789abcdef01234567"
       }
     }
   }

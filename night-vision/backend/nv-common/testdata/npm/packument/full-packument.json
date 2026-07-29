@@ -27,7 +27,7 @@
       },
       "dist": {
         "tarball": "https://registry.npmjs.org/example/-/example-1.0.0.tgz",
-        "shasum": "abc123",
+        "shasum": "0123456789abcdef0123456789abcdef01234567",
         "integrity": "sha512-example"
       }
     }

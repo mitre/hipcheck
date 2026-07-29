@@ -10,7 +10,7 @@
       "description": "Scoped package example",
       "dist": {
         "tarball": "https://registry.npmjs.org/@scope/package/-/package-1.0.0.tgz",
-        "shasum": "scope123"
+        "shasum": "0123456789abcdef0123456789abcdef01234567"
       }
     }
   }
