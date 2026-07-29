@@ -322,26 +322,27 @@ pub struct Repository {
 
 impl NpmPackument {
     fn from_raw(raw: RawNpmPackument) -> Result<Self, PackumentParseError> {
-        let name = NpmPackageName::parse(raw.name.ok_or(PackumentParseError::MissingField(Box::from("name")))?)?;
+        let name = NpmPackageName::parse(raw.name.ok_or(PackumentParseError::MissingField(Box::from("$.name")))?)?;
 
-        let raw_dist_tags = raw.dist_tags.ok_or(PackumentParseError::MissingField(Box::from("dist-tags")))?;
+        let raw_dist_tags = raw.dist_tags.ok_or(PackumentParseError::MissingField(Box::from("$.dist-tags")))?;
 
-        let raw_versions = raw.versions.ok_or(PackumentParseError::MissingField(Box::from("versions")))?;
+        let raw_versions = raw.versions.ok_or(PackumentParseError::MissingField(Box::from("$.versions")))?;
 
         if raw_versions.is_empty() {
             return Err(PackumentParseError::PackageHasNoVersions);
         }
 
         let homepage = match raw.homepage {
-            Some(url) => Some(validate_url(url, "homepage URL")?),
+            Some(url) => Some(validate_url(url, "$.homepage")?),
             None => None,
         };
 
         let mut versions = HashMap::new();
 
         for (key, raw_version) in raw_versions {
+            let version_path = json_path_map_key("$.versions", &key);
             let version_name =
-                NpmPackageName::parse(raw_version.name.ok_or(PackumentParseError::MissingField(Box::from("version.name")))?)?;
+                NpmPackageName::parse(raw_version.name.ok_or_else(|| PackumentParseError::MissingField(format!("{version_path}.name").into()))?)?;
 
             if version_name != name {
                 return Err(PackumentParseError::VersionPackageNameMismatch {
@@ -350,12 +351,12 @@ impl NpmPackument {
                 });
             }
 
-            let version_key = parse_version(key, "version key")?;
+            let version_key = parse_version(key, version_path.clone())?;
             let version = parse_version(
                 raw_version
                     .version
-                    .ok_or(PackumentParseError::MissingField(Box::from("version.version")))?,
-                "version.version",
+                    .ok_or_else(|| PackumentParseError::MissingField(format!("{version_path}.version").into()))?,
+                format!("{version_path}.version"),
             )?;
 
             if version_key != version {
@@ -365,11 +366,11 @@ impl NpmPackument {
                 });
             }
 
-            let dist = raw_version.dist.ok_or(PackumentParseError::MissingField(Box::from("dist")))?;
+            let dist = raw_version.dist.ok_or_else(|| PackumentParseError::MissingField(format!("{version_path}.dist").into()))?;
 
             let tarball = parse_url(
-                dist.tarball.ok_or(PackumentParseError::MissingField(Box::from("dist.tarball")))?,
-                "tarball URL",
+                dist.tarball.ok_or_else(|| PackumentParseError::MissingField(format!("{version_path}.dist.tarball").into()))?,
+                format!("{version_path}.dist.tarball"),
             )?;
 
             let npm_version = NpmVersion {
@@ -437,7 +438,7 @@ impl NpmPackument {
                 dist: NpmDist {
                     tarball,
                     shasum: parse_sha1_digest(
-                        dist.shasum.ok_or(PackumentParseError::MissingField(Box::from("dist.shasum")))?,
+                        dist.shasum.ok_or_else(|| PackumentParseError::MissingField(format!("{version_path}.dist.shasum").into()))?,
                     )?,
                     integrity: dist.integrity,
                 },
@@ -453,7 +454,7 @@ impl NpmPackument {
         let mut dist_tags = HashMap::new();
 
         for (tag, version) in raw_dist_tags {
-            let version = parse_version(version, "dist-tag version")?;
+            let version = parse_version(version, json_path_map_key("$.dist-tags", &tag))?;
 
             if !versions.contains_key(&version) {
                 return Err(PackumentParseError::MissingDistTagVersion { tag: tag.into_boxed_str(), version: version.to_string().into_boxed_str() });
@@ -470,7 +471,7 @@ impl NpmPackument {
 
             modified: raw
                 .modified
-                .map(|value| parse_timestamp(value, "modified"))
+                .map(|value| parse_timestamp(value, "$.modified"))
                 .transpose()?,
 
             dist_tags,
@@ -508,11 +509,11 @@ impl NpmPackument {
     }
 }
 
-fn validate_url(url: String, field: &str) -> Result<String, PackumentParseError> {
+fn validate_url(url: String, field: impl Into<Box<str>>) -> Result<String, PackumentParseError> {
     parse_url(url, field).map(|url| url.to_string())
 }
 
-fn parse_url(url: String, field: &str) -> Result<Url, PackumentParseError> {
+fn parse_url(url: String, field: impl Into<Box<str>>) -> Result<Url, PackumentParseError> {
     Url::parse(&url)
         .map_err(|_| PackumentParseError::InvalidUrl { field: field.into(), value: url.into_boxed_str() })
 }
@@ -528,12 +529,12 @@ fn parse_sha1_digest(value: String) -> Result<Sha1Digest, PackumentParseError> {
 fn convert_funding(raw: Option<RawFunding>) -> Result<Option<Funding>, PackumentParseError> {
     match raw {
         Some(RawFunding::Url(url)) => Ok(Some(Funding {
-            url: validate_url(url, "funding URL")?,
+            url: validate_url(url, "$.funding")?,
             type_field: None,
         })),
 
         Some(RawFunding::Object { url, type_field }) => Ok(Some(Funding {
-            url: validate_url(url, "funding URL")?,
+            url: validate_url(url, "$.funding.url")?,
             type_field,
         })),
 
@@ -585,7 +586,7 @@ fn convert_repository(raw: Option<RawRepository>) -> Result<Option<Repository>, 
     match raw {
         Some(repo) => {
             let repo_type = repo.type_field.ok_or(PackumentParseError::MissingRepositoryType)?;
-            let url = validate_url(repo.url.ok_or(PackumentParseError::MissingField(Box::from("repository.url")))?, "repository URL")?;
+            let url = validate_url(repo.url.ok_or(PackumentParseError::MissingField(Box::from("$.repository.url")))?, "$.repository.url")?;
 
             Ok(Some(Repository {
                 type_field: repo_type,
@@ -647,20 +648,21 @@ fn convert_packument_times(
 
     let created = parse_timestamp(
         raw.remove("created")
-            .ok_or(PackumentParseError::MissingField(Box::from("time.created")))?,
-        "time.created",
+            .ok_or(PackumentParseError::MissingField(Box::from("$.time.created")))?,
+        "$.time.created",
     )?;
     let modified = parse_timestamp(
         raw.remove("modified")
-            .ok_or(PackumentParseError::MissingField(Box::from("time.modified")))?,
-        "time.modified",
+            .ok_or(PackumentParseError::MissingField(Box::from("$.time.modified")))?,
+        "$.time.modified",
     )?;
     let versions = raw
         .into_iter()
         .map(|(version, timestamp)| {
+            let field = json_path_map_key("$.time", &version);
             Ok((
                 parse_published_version_key(version)?,
-                parse_timestamp(timestamp, "time version timestamp")?,
+                parse_timestamp(timestamp, field)?,
             ))
         })
         .collect::<Result<HashMap<_, _>, PackumentParseError>>()?;
@@ -672,7 +674,7 @@ fn convert_packument_times(
     }))
 }
 
-fn parse_timestamp(value: String, field: &str) -> Result<Timestamp, PackumentParseError> {
+fn parse_timestamp(value: String, field: impl Into<Box<str>>) -> Result<Timestamp, PackumentParseError> {
     value
         .parse()
         .map_err(|_| PackumentParseError::InvalidTimestamp { field: field.into(), value: value.into_boxed_str() })
@@ -686,9 +688,13 @@ fn parse_published_version_key(value: String) -> Result<PublishedVersionKey, Pac
     Ok(PublishedVersionKey(value))
 }
 
-fn parse_version(value: String, field: &str) -> Result<Version, PackumentParseError> {
+fn parse_version(value: String, field: impl Into<Box<str>>) -> Result<Version, PackumentParseError> {
     Version::parse(&value)
         .map_err(|_| PackumentParseError::InvalidVersion { field: field.into(), value: value.into_boxed_str() })
+}
+
+fn json_path_map_key(object_path: &str, key: &str) -> Box<str> {
+    format!("{object_path}[{}]", serde_json::to_string(key).expect("string serializes")).into_boxed_str()
 }
 
 pub fn parse_packument<R: Read>(reader: R) -> Result<NpmPackument, PackumentParseError> {
