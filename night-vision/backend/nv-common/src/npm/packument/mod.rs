@@ -185,105 +185,100 @@ struct RawNpmDist {
     npm_signature: Option<String>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
-struct NpmPackument {
-    id: Option<String>,
-    rev: Option<String>,
+pub struct NpmPackument {
+    pub id: Option<String>,
+    pub rev: Option<String>,
 
-    name: String,
+    pub name: String,
 
-    dist_tags: HashMap<String, String>,
-    time: HashMap<String, String>,
-    users: HashMap<String, bool>,
+    pub dist_tags: HashMap<String, String>,
+    pub time: HashMap<String, String>,
+    pub users: HashMap<String, bool>,
 
-    versions: HashMap<String, NpmVersion>,
+    pub versions: HashMap<String, NpmVersion>,
 
-    author: Option<Human>,
-    bugs: Option<Value>,
-    contributors: Vec<Human>,
+    pub author: Option<Human>,
+    pub bugs: Option<Value>,
+    pub contributors: Vec<Human>,
 
-    description: Option<String>,
-    homepage: Option<String>,
-    keywords: Vec<String>,
-    license: Option<String>,
+    pub description: Option<String>,
+    pub homepage: Option<String>,
+    pub keywords: Vec<String>,
+    pub license: Option<String>,
 
-    maintainers: Vec<Human>,
+    pub maintainers: Vec<Human>,
 
-    readme: Option<String>,
-    readme_filename: Option<String>,
+    pub readme: Option<String>,
+    pub readme_filename: Option<String>,
 
-    repository: Option<Repository>,
-    extra: HashMap<String, Value>,
+    pub repository: Option<Repository>,
+    pub extra: HashMap<String, Value>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
-struct NpmVersion {
-    id: Option<String>,
-    node_version: Option<String>,
-    npm_version: Option<String>,
-    npm_user: Option<Human>,
+pub struct NpmVersion {
+    pub id: Option<String>,
+    pub node_version: Option<String>,
+    pub npm_version: Option<String>,
+    pub npm_user: Option<Human>,
 
-    name: String,
-    version: String,
+    pub name: String,
+    pub version: String,
 
-    description: Option<String>,
-    main: Option<String>,
-    license: Option<String>,
+    pub description: Option<String>,
+    pub main: Option<String>,
+    pub license: Option<String>,
 
-    author: Option<Human>,
-    contributors: Vec<Human>,
-    maintainers: Vec<Human>,
-    repository: Option<Repository>,
+    pub author: Option<Human>,
+    pub contributors: Vec<Human>,
+    pub maintainers: Vec<Human>,
+    pub repository: Option<Repository>,
 
-    dependencies: HashMap<String, String>,
-    accept_dependencies: HashMap<String, String>,
-    dev_dependencies: HashMap<String, String>,
-    peer_dependencies: HashMap<String, String>,
-    peer_dependencies_meta: HashMap<String, PeerDependencyMeta>,
-    optional_dependencies: HashMap<String, String>,
-    bundle_dependencies: Vec<String>,
+    pub dependencies: HashMap<String, String>,
+    pub accept_dependencies: HashMap<String, String>,
+    pub dev_dependencies: HashMap<String, String>,
+    pub peer_dependencies: HashMap<String, String>,
+    pub peer_dependencies_meta: HashMap<String, PeerDependencyMeta>,
+    pub optional_dependencies: HashMap<String, String>,
+    pub bundle_dependencies: Vec<String>,
 
-    bin: HashMap<String, String>,
-    directories: HashMap<String, String>,
+    pub bin: HashMap<String, String>,
+    pub directories: HashMap<String, String>,
 
-    engines: HashMap<String, String>,
+    pub engines: HashMap<String, String>,
 
-    has_shrinkwrap: Option<bool>,
-    has_install_script: Option<bool>,
+    pub has_shrinkwrap: Option<bool>,
+    pub has_install_script: Option<bool>,
 
-    funding: Option<Funding>,
+    pub funding: Option<Funding>,
 
-    cpu: Vec<String>,
-    os: Vec<String>,
+    pub cpu: Vec<String>,
+    pub os: Vec<String>,
 
-    dist: NpmDist,
+    pub dist: NpmDist,
 
-    deprecated: Option<String>,
+    pub deprecated: Option<String>,
 
-    extra: HashMap<String, Value>,
+    pub extra: HashMap<String, Value>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
-struct Funding {
-    url: String,
-    type_field: Option<String>,
+pub struct Funding {
+    pub url: String,
+    pub type_field: Option<String>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
-struct PeerDependencyMeta {
-    optional: bool,
+pub struct PeerDependencyMeta {
+    pub optional: bool,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
-struct NpmDist {
-    tarball: String,
-    shasum: Option<String>,
-    integrity: Option<String>,
+pub struct NpmDist {
+    pub tarball: String,
+    pub shasum: Option<String>,
+    pub integrity: Option<String>,
 }
 
 /*
@@ -291,19 +286,17 @@ struct NpmDist {
     The parser will fail without having at
     least one field filled out.
 */
-#[allow(dead_code)]
 #[derive(Debug)]
-struct Human {
-    name: Option<String>,
-    email: Option<String>,
-    url: Option<String>,
+pub struct Human {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub url: Option<String>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
-struct Repository {
-    type_field: String,
-    url: String,
+pub struct Repository {
+    pub type_field: String,
+    pub url: String,
 }
 
 impl NpmPackument {
@@ -568,27 +561,12 @@ fn is_valid_semver(version: &str) -> bool {
     semver::Version::parse(version).is_ok()
 }
 
-fn parse_packument<R: Read>(reader: R) -> Result<NpmPackument, Box<dyn Error>> {
+pub fn parse_packument<R: Read>(reader: R) -> Result<NpmPackument, Box<dyn Error>> {
     let raw: RawNpmPackument = serde_json::from_reader(reader)?;
 
     let validated = NpmPackument::from_raw(raw)?;
 
     Ok(validated)
-}
-
-fn main() -> Result<(), Box<dyn Error>> {
-    //let api_path = "some variable"; // Replace with API request data for package.json path
-    //let path = Path::new(api_path); //comment out for testing
-    // FOR TESTING
-    let file = std::fs::File::open("testdata/express.json")?;
-
-    match parse_packument(file) {
-        Ok(pkg) => {
-            println!("Safe package.json: {:#?}", pkg);
-            Ok(())
-        }
-        Err(e) => Err(Box::<dyn Error>::from(e)),
-    }
 }
 
 #[cfg(test)]
@@ -597,7 +575,10 @@ mod tests {
     use std::fs::File;
 
     fn load_fixture(name: &str) -> Result<NpmPackument, Box<dyn Error>> {
-        let path = format!("testdata/{name}");
+        let path = format!(
+            "{}/testdata/npm/packument/{name}",
+            env!("CARGO_MANIFEST_DIR")
+        );
         let file = File::open(&path)?;
         parse_packument(file)
     }
@@ -651,7 +632,11 @@ mod tests {
 
     #[test]
     fn malformed_version_metadata_returns_error() {
-        let file = File::open("testdata/malformed-version.json").unwrap();
+        let file = File::open(format!(
+            "{}/testdata/npm/packument/malformed-version.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
 
         let result = parse_packument(file);
 

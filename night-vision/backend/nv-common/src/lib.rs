@@ -12,6 +12,7 @@ pub mod cve;
 pub mod db;
 pub mod error;
 pub mod log;
+pub mod npm;
 pub mod rt;
 pub mod secret;
 

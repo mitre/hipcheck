@@ -61,6 +61,7 @@ sea-orm-migration = { version = "2.0.0", features = ["sqlx-postgres", "runtime-t
 # `schemars` doesn't support `jiff`. When we can use a newer version
 # of `schemars`, we should switch to using `jiff`.
 schemars = { version = "0.8.22", features = ["chrono"] }
+semver = "1.0.28"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 # This needs to be compatible with the version used by dropshot.
