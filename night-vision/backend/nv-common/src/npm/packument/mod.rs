@@ -406,7 +406,7 @@ pub struct PeerDependencyMeta {
 
 #[derive(Debug)]
 pub struct NpmDist {
-    pub tarball: String,
+    pub tarball: Url,
     pub shasum: Option<String>,
     pub integrity: Option<String>,
 }
@@ -468,7 +468,7 @@ impl NpmPackument {
 
             let dist = raw_version.dist.ok_or("Missing required field: dist")?;
 
-            let tarball = validate_url(
+            let tarball = parse_url(
                 dist.tarball.ok_or("Missing required field: dist.tarball")?,
                 "tarball URL",
             )?;
@@ -608,8 +608,11 @@ impl NpmPackument {
 }
 
 fn validate_url(url: String, field: &str) -> Result<String, String> {
-    Url::parse(&url).map_err(|_| format!("Invalid {field}: {url}"))?;
-    Ok(url)
+    parse_url(url, field).map(|url| url.to_string())
+}
+
+fn parse_url(url: String, field: &str) -> Result<Url, String> {
+    Url::parse(&url).map_err(|_| format!("Invalid {field}: {url}"))
 }
 
 fn convert_funding(raw: Option<RawFunding>) -> Result<Option<Funding>, String> {
@@ -914,7 +917,7 @@ mod tests {
         assert_eq!(version.version, *latest_version);
 
         assert!(
-            !version.dist.tarball.is_empty(),
+            !version.dist.tarball.as_str().is_empty(),
             "express should have a tarball URL"
         );
 
