@@ -451,6 +451,14 @@ impl NpmPackument {
             let version_name =
                 NpmPackageName::parse(raw_version.name.ok_or("Missing required field: version.name")?)?;
 
+            if version_name != name {
+                return Err(format!(
+                    "Version package name {} does not match packument name {}",
+                    version_name.as_str(),
+                    name.as_str()
+                ));
+            }
+
             let version_key = parse_version(key, "version key")?;
             let version = parse_version(
                 raw_version
