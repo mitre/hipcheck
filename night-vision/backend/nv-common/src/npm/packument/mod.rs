@@ -12,7 +12,7 @@ use raw::*;
 #[derive(Debug)]
 pub enum PackumentParseError {
     Json(serde_json::Error),
-    MissingField(&'static str),
+    MissingField(Box<str>),
     EmptyPackageName,
     PackageNameTooLong,
     InvalidPackageName(Box<str>),
@@ -70,21 +70,6 @@ impl Error for PackumentParseError {
 impl From<serde_json::Error> for PackumentParseError {
     fn from(error: serde_json::Error) -> Self {
         Self::Json(error)
-    }
-}
-
-impl From<String> for PackumentParseError {
-    fn from(value: String) -> Self {
-        Self::InvalidVersion {
-            field: "packument value".into(),
-            value: value.into_boxed_str(),
-        }
-    }
-}
-
-impl From<&'static str> for PackumentParseError {
-    fn from(value: &'static str) -> Self {
-        Self::MissingField(value)
     }
 }
 
@@ -184,8 +169,12 @@ pub struct NpmPackageName(String);
 
 impl NpmPackageName {
     fn parse(value: String) -> Result<Self, PackumentParseError> {
-        if value.is_empty() || value.len() > 214 {
-            return Err("Package name must be between 1 and 214 characters".into());
+        if value.is_empty() {
+            return Err(PackumentParseError::EmptyPackageName);
+        }
+
+        if value.len() > 214 {
+            return Err(PackumentParseError::PackageNameTooLong);
         }
 
         let mut parts = value.split('/');
@@ -239,14 +228,14 @@ pub struct NpmVersionRange(String);
 impl DependencySpec {
     fn parse(value: String) -> Result<Self, PackumentParseError> {
         if value.is_empty() {
-            return Err("Dependency specification cannot be empty".into());
+            return Err(PackumentParseError::EmptyDependencySpecification);
         }
 
         if let Some(alias) = value.strip_prefix("npm:") {
             let (package, specification) = alias
                 .rsplit_once('@')
                 .filter(|(package, specification)| !package.is_empty() && !specification.is_empty())
-                .ok_or("Invalid npm alias dependency specification")?;
+                .ok_or(PackumentParseError::InvalidNpmAlias)?;
             return Ok(Self::NpmAlias {
                 package: NpmPackageName::parse(package.to_owned())?,
                 specification: Box::new(Self::parse(specification.to_owned())?),
@@ -333,14 +322,14 @@ pub struct Repository {
 
 impl NpmPackument {
     fn from_raw(raw: RawNpmPackument) -> Result<Self, PackumentParseError> {
-        let name = NpmPackageName::parse(raw.name.ok_or("Missing required field: name")?)?;
+        let name = NpmPackageName::parse(raw.name.ok_or(PackumentParseError::MissingField(Box::from("name")))?)?;
 
-        let raw_dist_tags = raw.dist_tags.ok_or("Missing required field: dist-tags")?;
+        let raw_dist_tags = raw.dist_tags.ok_or(PackumentParseError::MissingField(Box::from("dist-tags")))?;
 
-        let raw_versions = raw.versions.ok_or("Missing required field: versions")?;
+        let raw_versions = raw.versions.ok_or(PackumentParseError::MissingField(Box::from("versions")))?;
 
         if raw_versions.is_empty() {
-            return Err("Package has no versions".into());
+            return Err(PackumentParseError::PackageHasNoVersions);
         }
 
         let homepage = match raw.homepage {
@@ -352,7 +341,7 @@ impl NpmPackument {
 
         for (key, raw_version) in raw_versions {
             let version_name =
-                NpmPackageName::parse(raw_version.name.ok_or("Missing required field: version.name")?)?;
+                NpmPackageName::parse(raw_version.name.ok_or(PackumentParseError::MissingField(Box::from("version.name")))?)?;
 
             if version_name != name {
                 return Err(PackumentParseError::VersionPackageNameMismatch {
@@ -365,7 +354,7 @@ impl NpmPackument {
             let version = parse_version(
                 raw_version
                     .version
-                    .ok_or("Missing required field: version.version")?,
+                    .ok_or(PackumentParseError::MissingField(Box::from("version.version")))?,
                 "version.version",
             )?;
 
@@ -376,10 +365,10 @@ impl NpmPackument {
                 });
             }
 
-            let dist = raw_version.dist.ok_or("Missing required field: dist")?;
+            let dist = raw_version.dist.ok_or(PackumentParseError::MissingField(Box::from("dist")))?;
 
             let tarball = parse_url(
-                dist.tarball.ok_or("Missing required field: dist.tarball")?,
+                dist.tarball.ok_or(PackumentParseError::MissingField(Box::from("dist.tarball")))?,
                 "tarball URL",
             )?;
 
@@ -448,7 +437,7 @@ impl NpmPackument {
                 dist: NpmDist {
                     tarball,
                     shasum: parse_sha1_digest(
-                        dist.shasum.ok_or("Missing required field: dist.shasum")?,
+                        dist.shasum.ok_or(PackumentParseError::MissingField(Box::from("dist.shasum")))?,
                     )?,
                     integrity: dist.integrity,
                 },
@@ -562,7 +551,7 @@ fn convert_person(raw: Option<RawHuman>) -> Result<Option<Human>, PackumentParse
 
         Some(RawHuman::Object { name, email, url }) => {
             if name.is_none() && email.is_none() {
-                return Err("Human must have either a name or an email".into());
+                return Err(PackumentParseError::InvalidHuman);
             }
 
             Ok(Some(Human { name, email, url }))
@@ -583,7 +572,7 @@ fn convert_people(raw: Vec<RawHuman>) -> Result<Vec<Human>, PackumentParseError>
 
             RawHuman::Object { name, email, url } => {
                 if name.is_none() && email.is_none() {
-                    return Err("Human must have either a name or an email".into());
+                    return Err(PackumentParseError::InvalidHuman);
                 }
 
                 Ok(Human { name, email, url })
@@ -595,8 +584,8 @@ fn convert_people(raw: Vec<RawHuman>) -> Result<Vec<Human>, PackumentParseError>
 fn convert_repository(raw: Option<RawRepository>) -> Result<Option<Repository>, PackumentParseError> {
     match raw {
         Some(repo) => {
-            let repo_type = repo.type_field.ok_or("Repository missing type")?;
-            let url = validate_url(repo.url.ok_or("Repository missing url")?, "repository URL")?;
+            let repo_type = repo.type_field.ok_or(PackumentParseError::MissingRepositoryType)?;
+            let url = validate_url(repo.url.ok_or(PackumentParseError::MissingField(Box::from("repository.url")))?, "repository URL")?;
 
             Ok(Some(Repository {
                 type_field: repo_type,
@@ -658,12 +647,12 @@ fn convert_packument_times(
 
     let created = parse_timestamp(
         raw.remove("created")
-            .ok_or("Packument time is missing created")?,
+            .ok_or(PackumentParseError::MissingField(Box::from("time.created")))?,
         "time.created",
     )?;
     let modified = parse_timestamp(
         raw.remove("modified")
-            .ok_or("Packument time is missing modified")?,
+            .ok_or(PackumentParseError::MissingField(Box::from("time.modified")))?,
         "time.modified",
     )?;
     let versions = raw
