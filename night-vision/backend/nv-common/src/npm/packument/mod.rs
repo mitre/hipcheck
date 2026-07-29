@@ -5,7 +5,10 @@ use std::error::Error;
 use std::io::Read;
 use url::Url;
 
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "the raw representation retains registry fields that are not exposed"
+)]
 #[derive(Debug, Deserialize)]
 struct RawNpmPackument {
     #[serde(rename = "_id")]
@@ -50,7 +53,10 @@ struct RawNpmPackument {
     extra: HashMap<String, Value>,
 }
 
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "the raw representation retains registry fields that are not exposed"
+)]
 #[derive(Debug, Deserialize)]
 struct RawNpmVersion {
     #[serde(rename = "_id")]
@@ -148,7 +154,10 @@ struct RawPeerDependencyMeta {
     optional: Option<bool>,
 }
 
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "human values are converted before being exposed"
+)]
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum RawHuman {
@@ -161,7 +170,10 @@ enum RawHuman {
     },
 }
 
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "repository values are converted before being exposed"
+)]
 #[derive(Debug, Deserialize)]
 struct RawRepository {
     #[serde(rename = "type")]
@@ -169,7 +181,10 @@ struct RawRepository {
     url: Option<String>,
 }
 
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "the raw representation retains registry fields that are not exposed"
+)]
 #[derive(Debug, Deserialize)]
 struct RawNpmDist {
     tarball: Option<String>,
@@ -334,7 +349,7 @@ impl NpmPackument {
                 .ok_or("Missing required field: version.version")?;
 
             if !is_valid_semver(&version_string) {
-                return Err(format!("Invalid version: {}", version_string));
+                return Err(format!("Invalid version: {version_string}"));
             }
 
             let dist = version.dist.ok_or("Missing required field: dist")?;
@@ -532,7 +547,7 @@ fn convert_bin(raw: Option<RawBin>) -> HashMap<String, String> {
     match raw {
         Some(RawBin::String(path)) => {
             let mut map = HashMap::new();
-            map.insert("".into(), path);
+            map.insert(String::new(), path);
             map
         }
 
@@ -595,7 +610,7 @@ mod tests {
         assert_eq!(version.version, "1.0.0");
         assert_eq!(
             version.dependencies.get("serde"),
-            Some(&"^1.0.0".to_string())
+            Some(&"^1.0.0".to_owned())
         );
     }
 
