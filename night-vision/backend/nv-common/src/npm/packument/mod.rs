@@ -239,12 +239,12 @@ pub struct NpmVersion {
     pub maintainers: Vec<Human>,
     pub repository: Option<Repository>,
 
-    pub dependencies: HashMap<NpmPackageName, String>,
-    pub accept_dependencies: HashMap<NpmPackageName, String>,
-    pub dev_dependencies: HashMap<NpmPackageName, String>,
-    pub peer_dependencies: HashMap<NpmPackageName, String>,
+    pub dependencies: HashMap<NpmPackageName, DependencySpec>,
+    pub accept_dependencies: HashMap<NpmPackageName, DependencySpec>,
+    pub dev_dependencies: HashMap<NpmPackageName, DependencySpec>,
+    pub peer_dependencies: HashMap<NpmPackageName, DependencySpec>,
     pub peer_dependencies_meta: HashMap<NpmPackageName, PeerDependencyMeta>,
-    pub optional_dependencies: HashMap<NpmPackageName, String>,
+    pub optional_dependencies: HashMap<NpmPackageName, DependencySpec>,
     pub bundle_dependencies: Vec<NpmPackageName>,
 
     pub bin: HashMap<String, String>,
@@ -305,6 +305,68 @@ impl NpmPackageName {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DependencySpec {
+    Registry(NpmVersionRange),
+    Tag(String),
+    File(String),
+    Git(String),
+    Url(Url),
+    NpmAlias {
+        package: NpmPackageName,
+        specification: Box<DependencySpec>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NpmVersionRange(String);
+
+impl DependencySpec {
+    fn parse(value: String) -> Result<Self, String> {
+        if value.is_empty() {
+            return Err("Dependency specification cannot be empty".into());
+        }
+
+        if let Some(alias) = value.strip_prefix("npm:") {
+            let (package, specification) = alias
+                .rsplit_once('@')
+                .filter(|(package, specification)| !package.is_empty() && !specification.is_empty())
+                .ok_or("Invalid npm alias dependency specification")?;
+            return Ok(Self::NpmAlias {
+                package: NpmPackageName::parse(package.to_owned())?,
+                specification: Box::new(Self::parse(specification.to_owned())?),
+            });
+        }
+
+        if value.starts_with("file:") || value.starts_with("link:") || value.starts_with("workspace:") {
+            return Ok(Self::File(value));
+        }
+
+        if value.starts_with("git+") || value.starts_with("git://") || value.starts_with("github:") {
+            return Ok(Self::Git(value));
+        }
+
+        if let Ok(url) = Url::parse(&value) {
+            return Ok(Self::Url(url));
+        }
+
+        if value.starts_with(['=', '~', '^', '>', '<', '*', 'v'])
+            || value
+                .chars()
+                .next()
+                .is_some_and(|character| character.is_ascii_digit())
+        {
+            return Ok(Self::Registry(NpmVersionRange(value)));
+        }
+
+        if value.chars().any(char::is_whitespace) {
+            return Err(format!("Invalid dependency specification: {value}"));
+        }
+
+        Ok(Self::Tag(value))
     }
 }
 
@@ -634,9 +696,14 @@ fn convert_peer_dependencies_meta(
 
 fn convert_dependency_map(
     raw: HashMap<String, String>,
-) -> Result<HashMap<NpmPackageName, String>, String> {
+) -> Result<HashMap<NpmPackageName, DependencySpec>, String> {
     raw.into_iter()
-        .map(|(name, specification)| Ok((NpmPackageName::parse(name)?, specification)))
+        .map(|(name, specification)| {
+            Ok((
+                NpmPackageName::parse(name)?,
+                DependencySpec::parse(specification)?,
+            ))
+        })
         .collect()
 }
 
@@ -682,7 +749,7 @@ mod tests {
         assert_eq!(version.version, semantic_version("1.0.0"));
         assert_eq!(
             version.dependencies.get(&NpmPackageName::parse("serde".to_owned()).unwrap()),
-            Some(&"^1.0.0".to_owned())
+            Some(&DependencySpec::Registry(NpmVersionRange("^1.0.0".to_owned())))
         );
     }
 
