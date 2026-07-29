@@ -239,13 +239,13 @@ pub struct NpmVersion {
     pub maintainers: Vec<Human>,
     pub repository: Option<Repository>,
 
-    pub dependencies: HashMap<String, String>,
-    pub accept_dependencies: HashMap<String, String>,
-    pub dev_dependencies: HashMap<String, String>,
-    pub peer_dependencies: HashMap<String, String>,
-    pub peer_dependencies_meta: HashMap<String, PeerDependencyMeta>,
-    pub optional_dependencies: HashMap<String, String>,
-    pub bundle_dependencies: Vec<String>,
+    pub dependencies: HashMap<NpmPackageName, String>,
+    pub accept_dependencies: HashMap<NpmPackageName, String>,
+    pub dev_dependencies: HashMap<NpmPackageName, String>,
+    pub peer_dependencies: HashMap<NpmPackageName, String>,
+    pub peer_dependencies_meta: HashMap<NpmPackageName, PeerDependencyMeta>,
+    pub optional_dependencies: HashMap<NpmPackageName, String>,
+    pub bundle_dependencies: Vec<NpmPackageName>,
 
     pub bin: HashMap<String, String>,
     pub directories: HashMap<String, String>,
@@ -419,21 +419,30 @@ impl NpmPackument {
 
                 repository: convert_repository(raw_version.repository)?,
 
-                dependencies: raw_version.dependencies.unwrap_or_default(),
+                dependencies: convert_dependency_map(raw_version.dependencies.unwrap_or_default())?,
 
-                accept_dependencies: raw_version.accept_dependencies.unwrap_or_default(),
+                accept_dependencies: convert_dependency_map(
+                    raw_version.accept_dependencies.unwrap_or_default(),
+                )?,
 
-                dev_dependencies: raw_version.dev_dependencies.unwrap_or_default(),
+                dev_dependencies: convert_dependency_map(raw_version.dev_dependencies.unwrap_or_default())?,
 
-                peer_dependencies: raw_version.peer_dependencies.unwrap_or_default(),
+                peer_dependencies: convert_dependency_map(raw_version.peer_dependencies.unwrap_or_default())?,
 
                 peer_dependencies_meta: convert_peer_dependencies_meta(
                     raw_version.peer_dependencies_meta.unwrap_or_default(),
-                ),
+                )?,
 
-                optional_dependencies: raw_version.optional_dependencies.unwrap_or_default(),
+                optional_dependencies: convert_dependency_map(
+                    raw_version.optional_dependencies.unwrap_or_default(),
+                )?,
 
-                bundle_dependencies: raw_version.bundle_dependencies.unwrap_or_default(),
+                bundle_dependencies: raw_version
+                    .bundle_dependencies
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(NpmPackageName::parse)
+                    .collect::<Result<_, _>>()?,
 
                 bin: convert_bin(raw_version.bin),
 
@@ -610,16 +619,24 @@ fn convert_bin(raw: Option<RawBin>) -> HashMap<String, String> {
 
 fn convert_peer_dependencies_meta(
     raw: HashMap<String, RawPeerDependencyMeta>,
-) -> HashMap<String, PeerDependencyMeta> {
+) -> Result<HashMap<NpmPackageName, PeerDependencyMeta>, String> {
     raw.into_iter()
         .map(|(name, meta)| {
-            (
-                name,
+            Ok((
+                NpmPackageName::parse(name)?,
                 PeerDependencyMeta {
                     optional: meta.optional.unwrap_or(false),
                 },
-            )
+            ))
         })
+        .collect()
+}
+
+fn convert_dependency_map(
+    raw: HashMap<String, String>,
+) -> Result<HashMap<NpmPackageName, String>, String> {
+    raw.into_iter()
+        .map(|(name, specification)| Ok((NpmPackageName::parse(name)?, specification)))
         .collect()
 }
 
@@ -664,7 +681,7 @@ mod tests {
 
         assert_eq!(version.version, semantic_version("1.0.0"));
         assert_eq!(
-            version.dependencies.get("serde"),
+            version.dependencies.get(&NpmPackageName::parse("serde".to_owned()).unwrap()),
             Some(&"^1.0.0".to_owned())
         );
     }
