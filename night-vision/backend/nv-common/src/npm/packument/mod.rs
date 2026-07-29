@@ -2,11 +2,54 @@ use jiff::Timestamp;
 use serde_json::Value;
 use semver::Version;
 use std::collections::HashMap;
+use std::fmt;
 use std::error::Error;
 use std::io::Read;
 use url::Url;
 mod raw;
 use raw::*;
+
+#[derive(Debug)]
+pub enum PackumentParseError {
+    Json(serde_json::Error),
+    Validation(Box<str>),
+}
+
+impl fmt::Display for PackumentParseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Json(error) => write!(formatter, "invalid packument JSON: {error}"),
+            Self::Validation(message) => formatter.write_str(message),
+        }
+    }
+}
+
+impl Error for PackumentParseError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Json(error) => Some(error),
+            Self::Validation(_) => None,
+        }
+    }
+}
+
+impl From<serde_json::Error> for PackumentParseError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::Json(error)
+    }
+}
+
+impl From<String> for PackumentParseError {
+    fn from(message: String) -> Self {
+        Self::Validation(message.into_boxed_str())
+    }
+}
+
+impl From<&'static str> for PackumentParseError {
+    fn from(message: &'static str) -> Self {
+        Self::Validation(Box::from(message))
+    }
+}
 
 
 #[derive(Debug)]
@@ -103,7 +146,7 @@ pub struct PublishedVersionKey(String);
 pub struct NpmPackageName(String);
 
 impl NpmPackageName {
-    fn parse(value: String) -> Result<Self, String> {
+    fn parse(value: String) -> Result<Self, PackumentParseError> {
         if value.is_empty() || value.len() > 214 {
             return Err("Package name must be between 1 and 214 characters".into());
         }
@@ -116,7 +159,7 @@ impl NpmPackageName {
             || (value.starts_with('@') && second.is_none())
             || (!value.starts_with('@') && second.is_some())
         {
-            return Err(format!("Invalid package name: {value}"));
+            return Err(format!("Invalid package name: {value}").into());
         }
 
         let valid = if value.starts_with('@') {
@@ -129,7 +172,7 @@ impl NpmPackageName {
         };
 
         if !valid {
-            return Err(format!("Invalid package name: {value}"));
+            return Err(format!("Invalid package name: {value}").into());
         }
 
         Ok(Self(value))
@@ -157,7 +200,7 @@ pub enum DependencySpec {
 pub struct NpmVersionRange(String);
 
 impl DependencySpec {
-    fn parse(value: String) -> Result<Self, String> {
+    fn parse(value: String) -> Result<Self, PackumentParseError> {
         if value.is_empty() {
             return Err("Dependency specification cannot be empty".into());
         }
@@ -195,7 +238,7 @@ impl DependencySpec {
         }
 
         if value.chars().any(char::is_whitespace) {
-            return Err(format!("Invalid dependency specification: {value}"));
+            return Err(format!("Invalid dependency specification: {value}").into());
         }
 
         Ok(Self::Tag(value))
@@ -252,7 +295,7 @@ pub struct Repository {
 }
 
 impl NpmPackument {
-    fn from_raw(raw: RawNpmPackument) -> Result<Self, String> {
+    fn from_raw(raw: RawNpmPackument) -> Result<Self, PackumentParseError> {
         let name = NpmPackageName::parse(raw.name.ok_or("Missing required field: name")?)?;
 
         let raw_dist_tags = raw.dist_tags.ok_or("Missing required field: dist-tags")?;
@@ -279,7 +322,7 @@ impl NpmPackument {
                     "Version package name {} does not match packument name {}",
                     version_name.as_str(),
                     name.as_str()
-                ));
+                ).into());
             }
 
             let version_key = parse_version(key, "version key")?;
@@ -293,7 +336,7 @@ impl NpmPackument {
             if version_key != version {
                 return Err(format!(
                     "Version key {version_key} does not match version.version {version}"
-                ));
+                ).into());
             }
 
             let dist = raw_version.dist.ok_or("Missing required field: dist")?;
@@ -387,7 +430,7 @@ impl NpmPackument {
             let version = parse_version(version, "dist-tag version")?;
 
             if !versions.contains_key(&version) {
-                return Err(format!("Dist tag {tag} refers to missing version {version}"));
+                return Err(format!("Dist tag {tag} refers to missing version {version}").into());
             }
 
             dist_tags.insert(tag, version);
@@ -439,23 +482,24 @@ impl NpmPackument {
     }
 }
 
-fn validate_url(url: String, field: &str) -> Result<String, String> {
+fn validate_url(url: String, field: &str) -> Result<String, PackumentParseError> {
     parse_url(url, field).map(|url| url.to_string())
 }
 
-fn parse_url(url: String, field: &str) -> Result<Url, String> {
-    Url::parse(&url).map_err(|_| format!("Invalid {field}: {url}"))
+fn parse_url(url: String, field: &str) -> Result<Url, PackumentParseError> {
+    Url::parse(&url)
+        .map_err(|_| PackumentParseError::from(format!("Invalid {field}: {url}")))
 }
 
-fn parse_sha1_digest(value: String) -> Result<Sha1Digest, String> {
+fn parse_sha1_digest(value: String) -> Result<Sha1Digest, PackumentParseError> {
     if value.len() != 40 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err(format!("Invalid SHA-1 digest: {value}"));
+        return Err(format!("Invalid SHA-1 digest: {value}").into());
     }
 
     Ok(Sha1Digest(value))
 }
 
-fn convert_funding(raw: Option<RawFunding>) -> Result<Option<Funding>, String> {
+fn convert_funding(raw: Option<RawFunding>) -> Result<Option<Funding>, PackumentParseError> {
     match raw {
         Some(RawFunding::Url(url)) => Ok(Some(Funding {
             url: validate_url(url, "funding URL")?,
@@ -471,7 +515,7 @@ fn convert_funding(raw: Option<RawFunding>) -> Result<Option<Funding>, String> {
     }
 }
 
-fn convert_person(raw: Option<RawHuman>) -> Result<Option<Human>, String> {
+fn convert_person(raw: Option<RawHuman>) -> Result<Option<Human>, PackumentParseError> {
     match raw {
         Some(RawHuman::String(name)) => Ok(Some(Human {
             name: Some(name),
@@ -491,7 +535,7 @@ fn convert_person(raw: Option<RawHuman>) -> Result<Option<Human>, String> {
     }
 }
 
-fn convert_people(raw: Vec<RawHuman>) -> Result<Vec<Human>, String> {
+fn convert_people(raw: Vec<RawHuman>) -> Result<Vec<Human>, PackumentParseError> {
     raw.into_iter()
         .map(|person| match person {
             RawHuman::String(name) => Ok(Human {
@@ -511,7 +555,7 @@ fn convert_people(raw: Vec<RawHuman>) -> Result<Vec<Human>, String> {
         .collect()
 }
 
-fn convert_repository(raw: Option<RawRepository>) -> Result<Option<Repository>, String> {
+fn convert_repository(raw: Option<RawRepository>) -> Result<Option<Repository>, PackumentParseError> {
     match raw {
         Some(repo) => {
             let repo_type = repo.type_field.ok_or("Repository missing type")?;
@@ -542,7 +586,7 @@ fn convert_bin(raw: Option<RawBin>) -> HashMap<String, String> {
 
 fn convert_peer_dependencies_meta(
     raw: HashMap<String, RawPeerDependencyMeta>,
-) -> Result<HashMap<NpmPackageName, PeerDependencyMeta>, String> {
+) -> Result<HashMap<NpmPackageName, PeerDependencyMeta>, PackumentParseError> {
     raw.into_iter()
         .map(|(name, meta)| {
             Ok((
@@ -557,7 +601,7 @@ fn convert_peer_dependencies_meta(
 
 fn convert_dependency_map(
     raw: HashMap<String, String>,
-) -> Result<HashMap<NpmPackageName, DependencySpec>, String> {
+) -> Result<HashMap<NpmPackageName, DependencySpec>, PackumentParseError> {
     raw.into_iter()
         .map(|(name, specification)| {
             Ok((
@@ -570,7 +614,7 @@ fn convert_dependency_map(
 
 fn convert_packument_times(
     raw: Option<HashMap<String, String>>,
-) -> Result<Option<PackumentTimes>, String> {
+) -> Result<Option<PackumentTimes>, PackumentParseError> {
     let Some(mut raw) = raw else {
         return Ok(None);
     };
@@ -593,7 +637,7 @@ fn convert_packument_times(
                 parse_timestamp(timestamp, "time version timestamp")?,
             ))
         })
-        .collect::<Result<HashMap<_, _>, String>>()?;
+        .collect::<Result<HashMap<_, _>, PackumentParseError>>()?;
 
     Ok(Some(PackumentTimes {
         created,
@@ -602,13 +646,13 @@ fn convert_packument_times(
     }))
 }
 
-fn parse_timestamp(value: String, field: &str) -> Result<Timestamp, String> {
+fn parse_timestamp(value: String, field: &str) -> Result<Timestamp, PackumentParseError> {
     value
         .parse()
-        .map_err(|_| format!("Invalid {field}: {value}"))
+        .map_err(|_| PackumentParseError::from(format!("Invalid {field}: {value}")))
 }
 
-fn parse_published_version_key(value: String) -> Result<PublishedVersionKey, String> {
+fn parse_published_version_key(value: String) -> Result<PublishedVersionKey, PackumentParseError> {
     if value.is_empty() {
         return Err("Packument time contains an empty version key".into());
     }
@@ -616,11 +660,12 @@ fn parse_published_version_key(value: String) -> Result<PublishedVersionKey, Str
     Ok(PublishedVersionKey(value))
 }
 
-fn parse_version(value: String, field: &str) -> Result<Version, String> {
-    Version::parse(&value).map_err(|_| format!("Invalid {field}: {value}"))
+fn parse_version(value: String, field: &str) -> Result<Version, PackumentParseError> {
+    Version::parse(&value)
+        .map_err(|_| PackumentParseError::from(format!("Invalid {field}: {value}")))
 }
 
-pub fn parse_packument<R: Read>(reader: R) -> Result<NpmPackument, Box<dyn Error>> {
+pub fn parse_packument<R: Read>(reader: R) -> Result<NpmPackument, PackumentParseError> {
     let raw: RawNpmPackument = serde_json::from_reader(reader)?;
 
     let validated = NpmPackument::from_raw(raw)?;
@@ -639,7 +684,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR")
         );
         let file = File::open(&path)?;
-        parse_packument(file)
+        Ok(parse_packument(file)?)
     }
 
     fn semantic_version(value: &str) -> Version {
