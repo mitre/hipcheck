@@ -193,7 +193,7 @@ pub struct NpmPackument {
     pub id: Option<String>,
     pub rev: Option<String>,
 
-    pub name: String,
+    pub name: NpmPackageName,
 
     pub dist_tags: HashMap<String, String>,
     pub time: HashMap<String, String>,
@@ -226,7 +226,7 @@ pub struct NpmVersion {
     pub npm_version: Option<String>,
     pub npm_user: Option<Human>,
 
-    pub name: String,
+    pub name: NpmPackageName,
     pub version: String,
 
     pub description: Option<String>,
@@ -264,6 +264,57 @@ pub struct NpmVersion {
     pub deprecated: Option<String>,
 
     pub extra: HashMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct NpmPackageName(String);
+
+impl NpmPackageName {
+    fn parse(value: String) -> Result<Self, String> {
+        if value.is_empty() || value.len() > 214 {
+            return Err("Package name must be between 1 and 214 characters".into());
+        }
+
+        let mut parts = value.split('/');
+        let first = parts.next().expect("split always produces a first part");
+        let second = parts.next();
+
+        if parts.next().is_some()
+            || (value.starts_with('@') && second.is_none())
+            || (!value.starts_with('@') && second.is_some())
+        {
+            return Err(format!("Invalid package name: {value}"));
+        }
+
+        let valid = if value.starts_with('@') {
+            second.is_some_and(|second| {
+                is_valid_package_name_component(first.strip_prefix('@').unwrap_or(first))
+                    && is_valid_package_name_component(second)
+            })
+        } else {
+            second.is_none() && is_valid_package_name_component(first)
+        };
+
+        if !valid {
+            return Err(format!("Invalid package name: {value}"));
+        }
+
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+fn is_valid_package_name_component(component: &str) -> bool {
+    !component.is_empty()
+        && !component.starts_with(['.', '_'])
+        && component.bytes().all(|byte| {
+            byte.is_ascii_lowercase()
+                || byte.is_ascii_digit()
+                || matches!(byte, b'-' | b'_' | b'.')
+        })
 }
 
 #[derive(Debug)]
@@ -304,11 +355,7 @@ pub struct Repository {
 
 impl NpmPackument {
     fn from_raw(raw: RawNpmPackument) -> Result<Self, String> {
-        let name = raw.name.ok_or("Missing required field: name")?;
-
-        if name.trim().is_empty() {
-            return Err("Package name cannot be empty".into());
-        }
+        let name = NpmPackageName::parse(raw.name.ok_or("Missing required field: name")?)?;
 
         let dist_tags = raw.dist_tags.ok_or("Missing required field: dist-tags")?;
 
@@ -326,11 +373,8 @@ impl NpmPackument {
         let mut versions = HashMap::new();
 
         for (key, version) in raw_versions {
-            let version_name = version.name.ok_or("Missing required field: version.name")?;
-
-            if version_name.trim().is_empty() {
-                return Err("Version name cannot be empty".into());
-            }
+            let version_name =
+                NpmPackageName::parse(version.name.ok_or("Missing required field: version.name")?)?;
 
             let version_string = version
                 .version
@@ -590,7 +634,7 @@ mod tests {
     fn parses_full_packument_fixture() {
         let package = load_fixture("full-packument.json").unwrap();
 
-        assert_eq!(package.name, "example");
+        assert_eq!(package.name.as_str(), "example");
         assert!(package.versions.contains_key("1.0.0"));
 
         let version = package.versions.get("1.0.0").unwrap();
@@ -606,7 +650,7 @@ mod tests {
     fn parses_abbreviated_packument_fixture() {
         let package = load_fixture("abbreviated-packument.json").unwrap();
 
-        assert_eq!(package.name, "minimal-package");
+        assert_eq!(package.name.as_str(), "minimal-package");
         assert!(package.versions.contains_key("2.0.0"));
     }
 
@@ -657,16 +701,24 @@ mod tests {
     fn parses_scoped_package_names() -> Result<(), Box<dyn Error>> {
         let package = load_fixture("scoped-package.json")?;
 
-        assert_eq!(package.name, "@scope/package");
+        assert_eq!(package.name.as_str(), "@scope/package");
 
         Ok(())
+    }
+
+    #[test]
+    fn rejects_invalid_package_names() {
+        for package_name in ["", "UPPERCASE", "@scope", "@/package", "two/slashes/here"] {
+            let result = NpmPackageName::parse(package_name.to_owned());
+            assert!(result.is_err(), "{package_name} should be rejected");
+        }
     }
 
     #[test]
     fn parses_express_full_packument() {
         let package = load_fixture("express.json").unwrap();
 
-        assert_eq!(package.name, "express");
+        assert_eq!(package.name.as_str(), "express");
 
         assert!(
             !package.versions.is_empty(),
@@ -685,7 +737,7 @@ mod tests {
 
         let version = package.versions.get(latest_version).unwrap();
 
-        assert_eq!(version.name, "express");
+        assert_eq!(version.name.as_str(), "express");
         assert_eq!(version.version, *latest_version);
 
         assert!(
