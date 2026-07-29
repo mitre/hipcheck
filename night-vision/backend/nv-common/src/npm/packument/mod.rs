@@ -12,14 +12,48 @@ use raw::*;
 #[derive(Debug)]
 pub enum PackumentParseError {
     Json(serde_json::Error),
-    Validation(Box<str>),
+    MissingField(&'static str),
+    EmptyPackageName,
+    PackageNameTooLong,
+    InvalidPackageName(Box<str>),
+    EmptyDependencySpecification,
+    InvalidNpmAlias,
+    InvalidDependencySpecification(Box<str>),
+    PackageHasNoVersions,
+    VersionPackageNameMismatch { version_name: Box<str>, package_name: Box<str> },
+    VersionKeyMismatch { key: Box<str>, version: Box<str> },
+    MissingDistTagVersion { tag: Box<str>, version: Box<str> },
+    InvalidUrl { field: Box<str>, value: Box<str> },
+    InvalidSha1Digest(Box<str>),
+    InvalidTimestamp { field: Box<str>, value: Box<str> },
+    InvalidVersion { field: Box<str>, value: Box<str> },
+    EmptyPublishedVersionKey,
+    InvalidHuman,
+    MissingRepositoryType,
 }
 
 impl fmt::Display for PackumentParseError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Json(error) => write!(formatter, "invalid packument JSON: {error}"),
-            Self::Validation(message) => formatter.write_str(message),
+            Self::Json(_) => formatter.write_str("failed to parse packument JSON"),
+            Self::MissingField(field) => write!(formatter, "packument is missing required field {field}"),
+            Self::EmptyPackageName => formatter.write_str("package name cannot be empty"),
+            Self::PackageNameTooLong => formatter.write_str("package name is too long"),
+            Self::InvalidPackageName(_) => formatter.write_str("packument contains an invalid package name"),
+            Self::EmptyDependencySpecification => formatter.write_str("dependency specification cannot be empty"),
+            Self::InvalidNpmAlias => formatter.write_str("packument contains an invalid npm alias"),
+            Self::InvalidDependencySpecification(_) => formatter.write_str("packument contains an invalid dependency specification"),
+            Self::PackageHasNoVersions => formatter.write_str("packument has no versions"),
+            Self::VersionPackageNameMismatch { .. } => formatter.write_str("version package name does not match packument name"),
+            Self::VersionKeyMismatch { .. } => formatter.write_str("version key does not match version metadata"),
+            Self::MissingDistTagVersion { .. } => formatter.write_str("dist tag refers to a missing version"),
+            Self::InvalidUrl { field, .. } => write!(formatter, "packument contains an invalid {field}"),
+            Self::InvalidSha1Digest(_) => formatter.write_str("packument contains an invalid SHA-1 digest"),
+            Self::InvalidTimestamp { field, .. } => write!(formatter, "packument contains an invalid {field}"),
+            Self::InvalidVersion { field, .. } => write!(formatter, "packument contains an invalid {field}"),
+            Self::EmptyPublishedVersionKey => formatter.write_str("packument contains an empty published version key"),
+            Self::InvalidHuman => formatter.write_str("packument contains an invalid human"),
+            Self::MissingRepositoryType => formatter.write_str("repository is missing its type"),
         }
     }
 }
@@ -28,7 +62,7 @@ impl Error for PackumentParseError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Json(error) => Some(error),
-            Self::Validation(_) => None,
+            _ => None,
         }
     }
 }
@@ -40,14 +74,17 @@ impl From<serde_json::Error> for PackumentParseError {
 }
 
 impl From<String> for PackumentParseError {
-    fn from(message: String) -> Self {
-        Self::Validation(message.into_boxed_str())
+    fn from(value: String) -> Self {
+        Self::InvalidVersion {
+            field: "packument value".into(),
+            value: value.into_boxed_str(),
+        }
     }
 }
 
 impl From<&'static str> for PackumentParseError {
-    fn from(message: &'static str) -> Self {
-        Self::Validation(Box::from(message))
+    fn from(value: &'static str) -> Self {
+        Self::MissingField(value)
     }
 }
 
@@ -159,7 +196,7 @@ impl NpmPackageName {
             || (value.starts_with('@') && second.is_none())
             || (!value.starts_with('@') && second.is_some())
         {
-            return Err(format!("Invalid package name: {value}").into());
+            return Err(PackumentParseError::InvalidPackageName(value.into_boxed_str()));
         }
 
         let valid = if value.starts_with('@') {
@@ -172,7 +209,7 @@ impl NpmPackageName {
         };
 
         if !valid {
-            return Err(format!("Invalid package name: {value}").into());
+            return Err(PackumentParseError::InvalidPackageName(value.into_boxed_str()));
         }
 
         Ok(Self(value))
@@ -238,7 +275,7 @@ impl DependencySpec {
         }
 
         if value.chars().any(char::is_whitespace) {
-            return Err(format!("Invalid dependency specification: {value}").into());
+            return Err(PackumentParseError::InvalidDependencySpecification(value.into_boxed_str()));
         }
 
         Ok(Self::Tag(value))
@@ -318,11 +355,10 @@ impl NpmPackument {
                 NpmPackageName::parse(raw_version.name.ok_or("Missing required field: version.name")?)?;
 
             if version_name != name {
-                return Err(format!(
-                    "Version package name {} does not match packument name {}",
-                    version_name.as_str(),
-                    name.as_str()
-                ).into());
+                return Err(PackumentParseError::VersionPackageNameMismatch {
+                    version_name: version_name.as_str().into(),
+                    package_name: name.as_str().into(),
+                });
             }
 
             let version_key = parse_version(key, "version key")?;
@@ -334,9 +370,10 @@ impl NpmPackument {
             )?;
 
             if version_key != version {
-                return Err(format!(
-                    "Version key {version_key} does not match version.version {version}"
-                ).into());
+                return Err(PackumentParseError::VersionKeyMismatch {
+                    key: version_key.to_string().into_boxed_str(),
+                    version: version.to_string().into_boxed_str(),
+                });
             }
 
             let dist = raw_version.dist.ok_or("Missing required field: dist")?;
@@ -430,7 +467,7 @@ impl NpmPackument {
             let version = parse_version(version, "dist-tag version")?;
 
             if !versions.contains_key(&version) {
-                return Err(format!("Dist tag {tag} refers to missing version {version}").into());
+                return Err(PackumentParseError::MissingDistTagVersion { tag: tag.into_boxed_str(), version: version.to_string().into_boxed_str() });
             }
 
             dist_tags.insert(tag, version);
@@ -488,12 +525,12 @@ fn validate_url(url: String, field: &str) -> Result<String, PackumentParseError>
 
 fn parse_url(url: String, field: &str) -> Result<Url, PackumentParseError> {
     Url::parse(&url)
-        .map_err(|_| PackumentParseError::from(format!("Invalid {field}: {url}")))
+        .map_err(|_| PackumentParseError::InvalidUrl { field: field.into(), value: url.into_boxed_str() })
 }
 
 fn parse_sha1_digest(value: String) -> Result<Sha1Digest, PackumentParseError> {
     if value.len() != 40 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err(format!("Invalid SHA-1 digest: {value}").into());
+        return Err(PackumentParseError::InvalidSha1Digest(value.into_boxed_str()));
     }
 
     Ok(Sha1Digest(value))
@@ -649,12 +686,12 @@ fn convert_packument_times(
 fn parse_timestamp(value: String, field: &str) -> Result<Timestamp, PackumentParseError> {
     value
         .parse()
-        .map_err(|_| PackumentParseError::from(format!("Invalid {field}: {value}")))
+        .map_err(|_| PackumentParseError::InvalidTimestamp { field: field.into(), value: value.into_boxed_str() })
 }
 
 fn parse_published_version_key(value: String) -> Result<PublishedVersionKey, PackumentParseError> {
     if value.is_empty() {
-        return Err("Packument time contains an empty version key".into());
+        return Err(PackumentParseError::EmptyPublishedVersionKey);
     }
 
     Ok(PublishedVersionKey(value))
@@ -662,7 +699,7 @@ fn parse_published_version_key(value: String) -> Result<PublishedVersionKey, Pac
 
 fn parse_version(value: String, field: &str) -> Result<Version, PackumentParseError> {
     Version::parse(&value)
-        .map_err(|_| PackumentParseError::from(format!("Invalid {field}: {value}")))
+        .map_err(|_| PackumentParseError::InvalidVersion { field: field.into(), value: value.into_boxed_str() })
 }
 
 pub fn parse_packument<R: Read>(reader: R) -> Result<NpmPackument, PackumentParseError> {
@@ -750,12 +787,10 @@ mod tests {
 
         assert!(result.is_err());
 
-        let error = result.unwrap_err().to_string();
-
-        assert!(
-            error.contains("Invalid version"),
-            "unexpected error: {error}"
-        );
+        assert!(matches!(
+            result.unwrap_err(),
+            PackumentParseError::InvalidVersion { .. }
+        ));
     }
 
     #[test]
