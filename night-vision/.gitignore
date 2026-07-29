@@ -1,3 +1,4 @@
 .env
 .secrets/
 compose-smoke-secrets/
+/backend/nv-common/testdata/npm/packument/cache/

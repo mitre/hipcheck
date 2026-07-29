@@ -93,6 +93,7 @@ Commands:
   api   Interact with the REST API
   cve   Manage CVE List data
   db    Manage the database
+  npm   Inspect npm registry data
   help  Print this message or the help of the given subcommand(s)
 ```
 
@@ -127,6 +128,38 @@ override protection for stale running rows; do not use it while a sync is live.
 
 For the ingest lifecycle, configuration defaults, and recovery guidance, see
 [CVE List Ingest](./cve-ingest.md).
+
+## `npm packument corpus-refresh`
+
+Fetch the fixed public npm packument corpus and write a JSON acceptance
+summary to `backend/nv-common/testdata/npm/packument/corpus-refresh.json`. The
+command does not require database configuration and never overwrites reviewed
+fixtures, so it is suitable for scheduled diagnostics but must not be part of
+blocking CI.
+
+```sh
+cargo nvdb npm packument corpus-refresh --destructive
+```
+
+Use `--registry URL` only with a controlled registry endpoint, such as a local
+test server. Each request has connection, total-time, and 64 MiB response-size
+limits. Network or parser failures are recorded per package in the summary;
+the command still writes the complete report for review. `--destructive` is
+required because the command replaces the fixed compatibility-state file.
+
+### `npm packument corpus-add`
+
+Fetch, validate, and add one full registry response to the reviewed corpus:
+
+```sh
+cargo nvdb npm packument corpus-add @scope/package --destructive
+```
+
+The package name is required. The command writes the fixture under
+`backend/nv-common/testdata/npm/packument/real/` and updates
+`corpus.json`; it refuses to overwrite an existing fixture or catalog entry.
+`--destructive` acknowledges those project-file changes. Review the resulting
+fixture and catalog diff before committing it.
 
 ## `db`
 

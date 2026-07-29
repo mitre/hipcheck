@@ -64,6 +64,10 @@ fn run() -> Result<()> {
         todo!("api subcommand not yet implemented")
     }
 
+    if let Some(npm_matches) = matches.subcommand_matches("npm") {
+        return cmd::npm::run(npm_matches);
+    }
+
     let config_file = matches
         .get_one::<Utf8PathBuf>("config")
         .expect("config has a default value");
@@ -117,7 +121,8 @@ fn command() -> clap::Command {
                 .subcommand(cmd::db::schema::command())
                 .subcommand(cmd::db::migrate::command()),
         )
-        .subcommand(cmd::cve::command());
+        .subcommand(cmd::cve::command())
+        .subcommand(cmd::npm::command());
 
     Verbosity::<InfoLevel>::augment_args(command)
 }

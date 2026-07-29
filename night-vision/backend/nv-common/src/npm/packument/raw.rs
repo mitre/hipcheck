@@ -60,12 +60,12 @@ pub(super) struct RawNpmVersion {
     #[serde(rename = "optionalDependencies")]
     pub(super) optional_dependencies: Option<HashMap<String, String>>,
     #[serde(rename = "bundleDependencies")]
-    pub(super) bundle_dependencies: Option<Vec<String>>,
+    pub(super) bundle_dependencies: Option<RawBundleDependencies>,
     #[serde(rename = "peerDependenciesMeta")]
     pub(super) peer_dependencies_meta: Option<HashMap<String, RawPeerDependencyMeta>>,
     pub(super) dist: Option<RawNpmDist>,
-    pub(super) engines: Option<HashMap<String, String>>,
-    pub(super) deprecated: Option<String>,
+    pub(super) engines: Option<RawEngines>,
+    pub(super) deprecated: Option<RawDeprecated>,
     #[serde(rename = "acceptDependencies")]
     pub(super) accept_dependencies: Option<HashMap<String, String>>,
     pub(super) bin: Option<RawBin>,
@@ -88,6 +88,18 @@ pub(super) enum RawFunding { Url(String), Object { url: String, #[serde(rename =
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub(super) enum RawBin { String(String), Map(HashMap<String, String>) }
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub(super) enum RawEngines { Map(HashMap<String, String>), LegacyList(Vec<String>) }
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub(super) enum RawDeprecated { Message(String), LegacyBoolean(bool) }
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub(super) enum RawBundleDependencies { List(Vec<String>), LegacyBoolean(bool) }
 
 #[derive(Debug, Deserialize)]
 pub(super) struct RawPeerDependencyMeta { pub(super) optional: Option<bool> }
