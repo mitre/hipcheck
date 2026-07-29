@@ -197,6 +197,8 @@ pub struct NpmPackument {
 
     pub name: NpmPackageName,
 
+    pub modified: Option<DateTime<Utc>>,
+
     pub dist_tags: HashMap<String, Version>,
     pub time: Option<PackumentTimes>,
     pub users: HashMap<String, bool>,
@@ -564,6 +566,11 @@ impl NpmPackument {
             rev: raw.rev,
 
             name,
+
+            modified: raw
+                .modified
+                .map(|value| parse_timestamp(value, "modified"))
+                .transpose()?,
 
             dist_tags,
 
