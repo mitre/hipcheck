@@ -154,10 +154,7 @@ struct RawPeerDependencyMeta {
     optional: Option<bool>,
 }
 
-#[expect(
-    dead_code,
-    reason = "human values are converted before being exposed"
-)]
+#[expect(dead_code, reason = "human values are converted before being exposed")]
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum RawHuman {
