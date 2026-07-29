@@ -53,10 +53,6 @@ struct RawNpmPackument {
     extra: HashMap<String, Value>,
 }
 
-#[expect(
-    dead_code,
-    reason = "the raw representation retains registry fields that are not exposed"
-)]
 #[derive(Debug, Deserialize)]
 struct RawNpmVersion {
     #[serde(rename = "_id")]
@@ -154,7 +150,6 @@ struct RawPeerDependencyMeta {
     optional: Option<bool>,
 }
 
-#[expect(dead_code, reason = "human values are converted before being exposed")]
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum RawHuman {
@@ -167,10 +162,6 @@ enum RawHuman {
     },
 }
 
-#[expect(
-    dead_code,
-    reason = "repository values are converted before being exposed"
-)]
 #[derive(Debug, Deserialize)]
 struct RawRepository {
     #[serde(rename = "type")]
