@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use serde_json::Value;
+use semver::Version;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::Read;
@@ -195,11 +196,11 @@ pub struct NpmPackument {
 
     pub name: NpmPackageName,
 
-    pub dist_tags: HashMap<String, String>,
+    pub dist_tags: HashMap<String, Version>,
     pub time: HashMap<String, String>,
     pub users: HashMap<String, bool>,
 
-    pub versions: HashMap<String, NpmVersion>,
+    pub versions: HashMap<Version, NpmVersion>,
 
     pub author: Option<Human>,
     pub bugs: Option<Value>,
@@ -227,7 +228,7 @@ pub struct NpmVersion {
     pub npm_user: Option<Human>,
 
     pub name: NpmPackageName,
-    pub version: String,
+    pub version: Version,
 
     pub description: Option<String>,
     pub main: Option<String>,
@@ -357,7 +358,7 @@ impl NpmPackument {
     fn from_raw(raw: RawNpmPackument) -> Result<Self, String> {
         let name = NpmPackageName::parse(raw.name.ok_or("Missing required field: name")?)?;
 
-        let dist_tags = raw.dist_tags.ok_or("Missing required field: dist-tags")?;
+        let raw_dist_tags = raw.dist_tags.ok_or("Missing required field: dist-tags")?;
 
         let raw_versions = raw.versions.ok_or("Missing required field: versions")?;
 
@@ -372,19 +373,25 @@ impl NpmPackument {
 
         let mut versions = HashMap::new();
 
-        for (key, version) in raw_versions {
+        for (key, raw_version) in raw_versions {
             let version_name =
-                NpmPackageName::parse(version.name.ok_or("Missing required field: version.name")?)?;
+                NpmPackageName::parse(raw_version.name.ok_or("Missing required field: version.name")?)?;
 
-            let version_string = version
-                .version
-                .ok_or("Missing required field: version.version")?;
+            let version_key = parse_version(key, "version key")?;
+            let version = parse_version(
+                raw_version
+                    .version
+                    .ok_or("Missing required field: version.version")?,
+                "version.version",
+            )?;
 
-            if !is_valid_semver(&version_string) {
-                return Err(format!("Invalid version: {version_string}"));
+            if version_key != version {
+                return Err(format!(
+                    "Version key {version_key} does not match version.version {version}"
+                ));
             }
 
-            let dist = version.dist.ok_or("Missing required field: dist")?;
+            let dist = raw_version.dist.ok_or("Missing required field: dist")?;
 
             let tarball = validate_url(
                 dist.tarball.ok_or("Missing required field: dist.tarball")?,
@@ -392,57 +399,57 @@ impl NpmPackument {
             )?;
 
             let npm_version = NpmVersion {
-                id: version.id,
-                node_version: version.node_version,
-                npm_version: version.npm_version,
-                npm_user: convert_person(version.npm_user)?,
+                id: raw_version.id,
+                node_version: raw_version.node_version,
+                npm_version: raw_version.npm_version,
+                npm_user: convert_person(raw_version.npm_user)?,
 
                 name: version_name,
-                version: version_string,
+                version: version,
 
-                description: version.description,
-                main: version.main,
-                license: version.license,
+                description: raw_version.description,
+                main: raw_version.main,
+                license: raw_version.license,
 
-                author: convert_person(version.author)?,
+                author: convert_person(raw_version.author)?,
 
-                contributors: convert_people(version.contributors.unwrap_or_default())?,
+                contributors: convert_people(raw_version.contributors.unwrap_or_default())?,
 
-                maintainers: convert_people(version.maintainers.unwrap_or_default())?,
+                maintainers: convert_people(raw_version.maintainers.unwrap_or_default())?,
 
-                repository: convert_repository(version.repository)?,
+                repository: convert_repository(raw_version.repository)?,
 
-                dependencies: version.dependencies.unwrap_or_default(),
+                dependencies: raw_version.dependencies.unwrap_or_default(),
 
-                accept_dependencies: version.accept_dependencies.unwrap_or_default(),
+                accept_dependencies: raw_version.accept_dependencies.unwrap_or_default(),
 
-                dev_dependencies: version.dev_dependencies.unwrap_or_default(),
+                dev_dependencies: raw_version.dev_dependencies.unwrap_or_default(),
 
-                peer_dependencies: version.peer_dependencies.unwrap_or_default(),
+                peer_dependencies: raw_version.peer_dependencies.unwrap_or_default(),
 
                 peer_dependencies_meta: convert_peer_dependencies_meta(
-                    version.peer_dependencies_meta.unwrap_or_default(),
+                    raw_version.peer_dependencies_meta.unwrap_or_default(),
                 ),
 
-                optional_dependencies: version.optional_dependencies.unwrap_or_default(),
+                optional_dependencies: raw_version.optional_dependencies.unwrap_or_default(),
 
-                bundle_dependencies: version.bundle_dependencies.unwrap_or_default(),
+                bundle_dependencies: raw_version.bundle_dependencies.unwrap_or_default(),
 
-                bin: convert_bin(version.bin),
+                bin: convert_bin(raw_version.bin),
 
-                directories: version.directories.unwrap_or_default(),
+                directories: raw_version.directories.unwrap_or_default(),
 
-                engines: version.engines.unwrap_or_default(),
+                engines: raw_version.engines.unwrap_or_default(),
 
-                has_shrinkwrap: version.has_shrinkwrap,
+                has_shrinkwrap: raw_version.has_shrinkwrap,
 
-                has_install_script: version.has_install_script,
+                has_install_script: raw_version.has_install_script,
 
-                funding: convert_funding(version.funding)?,
+                funding: convert_funding(raw_version.funding)?,
 
-                cpu: version.cpu.unwrap_or_default(),
+                cpu: raw_version.cpu.unwrap_or_default(),
 
-                os: version.os.unwrap_or_default(),
+                os: raw_version.os.unwrap_or_default(),
 
                 dist: NpmDist {
                     tarball,
@@ -450,12 +457,24 @@ impl NpmPackument {
                     integrity: dist.integrity,
                 },
 
-                deprecated: version.deprecated,
+                deprecated: raw_version.deprecated,
 
-                extra: version.extra,
+                extra: raw_version.extra,
             };
 
-            versions.insert(key, npm_version);
+            versions.insert(version_key, npm_version);
+        }
+
+        let mut dist_tags = HashMap::new();
+
+        for (tag, version) in raw_dist_tags {
+            let version = parse_version(version, "dist-tag version")?;
+
+            if !versions.contains_key(&version) {
+                return Err(format!("Dist tag {tag} refers to missing version {version}"));
+            }
+
+            dist_tags.insert(tag, version);
         }
 
         Ok(Self {
@@ -604,8 +623,8 @@ fn convert_peer_dependencies_meta(
         .collect()
 }
 
-fn is_valid_semver(version: &str) -> bool {
-    semver::Version::parse(version).is_ok()
+fn parse_version(value: String, field: &str) -> Result<Version, String> {
+    Version::parse(&value).map_err(|_| format!("Invalid {field}: {value}"))
 }
 
 pub fn parse_packument<R: Read>(reader: R) -> Result<NpmPackument, Box<dyn Error>> {
@@ -630,16 +649,20 @@ mod tests {
         parse_packument(file)
     }
 
+    fn semantic_version(value: &str) -> Version {
+        Version::parse(value).expect("test version should parse")
+    }
+
     #[test]
     fn parses_full_packument_fixture() {
         let package = load_fixture("full-packument.json").unwrap();
 
         assert_eq!(package.name.as_str(), "example");
-        assert!(package.versions.contains_key("1.0.0"));
+        assert!(package.versions.contains_key(&semantic_version("1.0.0")));
 
-        let version = package.versions.get("1.0.0").unwrap();
+        let version = package.versions.get(&semantic_version("1.0.0")).unwrap();
 
-        assert_eq!(version.version, "1.0.0");
+        assert_eq!(version.version, semantic_version("1.0.0"));
         assert_eq!(
             version.dependencies.get("serde"),
             Some(&"^1.0.0".to_owned())
@@ -651,7 +674,7 @@ mod tests {
         let package = load_fixture("abbreviated-packument.json").unwrap();
 
         assert_eq!(package.name.as_str(), "minimal-package");
-        assert!(package.versions.contains_key("2.0.0"));
+        assert!(package.versions.contains_key(&semantic_version("2.0.0")));
     }
 
     #[test]
@@ -662,7 +685,7 @@ mod tests {
         assert!(package.author.is_none());
         assert!(package.repository.is_none());
 
-        let version = package.versions.get("2.0.0").unwrap();
+        let version = package.versions.get(&semantic_version("2.0.0")).unwrap();
 
         assert!(version.dependencies.is_empty());
         assert!(version.dev_dependencies.is_empty());
