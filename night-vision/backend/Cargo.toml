@@ -34,6 +34,7 @@ async-trait = "0.1.89"
 camino = "1.2.2"
 cargo-manifest = "0.21.0"
 chrono = "0.4.44"
+jiff = "0.2"
 clap = { version = "4.6.1", features = ["string"] }
 clap-verbosity-flag = { version = "3.0.4", default-features = false }
 # SECURITY: Note there are four known vulnerabilities in Dropshot 0.17.0 [1], but 0.18.0 (which

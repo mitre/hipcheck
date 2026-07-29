@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde_json::Value;
 use semver::Version;
 use std::collections::HashMap;
@@ -16,7 +16,7 @@ pub struct NpmPackument {
 
     pub name: NpmPackageName,
 
-    pub modified: Option<DateTime<Utc>>,
+    pub modified: Option<Timestamp>,
 
     pub dist_tags: HashMap<String, Version>,
     pub time: Option<PackumentTimes>,
@@ -91,9 +91,9 @@ pub struct NpmVersion {
 
 #[derive(Debug)]
 pub struct PackumentTimes {
-    pub created: DateTime<Utc>,
-    pub modified: DateTime<Utc>,
-    pub versions: HashMap<PublishedVersionKey, DateTime<Utc>>,
+    pub created: Timestamp,
+    pub modified: Timestamp,
+    pub versions: HashMap<PublishedVersionKey, Timestamp>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -602,9 +602,9 @@ fn convert_packument_times(
     }))
 }
 
-fn parse_timestamp(value: String, field: &str) -> Result<DateTime<Utc>, String> {
-    DateTime::parse_from_rfc3339(&value)
-        .map(|timestamp| timestamp.with_timezone(&Utc))
+fn parse_timestamp(value: String, field: &str) -> Result<Timestamp, String> {
+    value
+        .parse()
         .map_err(|_| format!("Invalid {field}: {value}"))
 }
 
