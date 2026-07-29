@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
 use semver::Version;
@@ -197,7 +198,7 @@ pub struct NpmPackument {
     pub name: NpmPackageName,
 
     pub dist_tags: HashMap<String, Version>,
-    pub time: HashMap<String, String>,
+    pub time: Option<PackumentTimes>,
     pub users: HashMap<String, bool>,
 
     pub versions: HashMap<Version, NpmVersion>,
@@ -266,6 +267,16 @@ pub struct NpmVersion {
 
     pub extra: HashMap<String, Value>,
 }
+
+#[derive(Debug)]
+pub struct PackumentTimes {
+    pub created: DateTime<Utc>,
+    pub modified: DateTime<Utc>,
+    pub versions: HashMap<PublishedVersionKey, DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct PublishedVersionKey(String);
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NpmPackageName(String);
@@ -556,7 +567,7 @@ impl NpmPackument {
 
             dist_tags,
 
-            time: raw.time.unwrap_or_default(),
+            time: convert_packument_times(raw.time)?,
 
             users: raw.users.unwrap_or_default(),
 
@@ -705,6 +716,54 @@ fn convert_dependency_map(
             ))
         })
         .collect()
+}
+
+fn convert_packument_times(
+    raw: Option<HashMap<String, String>>,
+) -> Result<Option<PackumentTimes>, String> {
+    let Some(mut raw) = raw else {
+        return Ok(None);
+    };
+
+    let created = parse_timestamp(
+        raw.remove("created")
+            .ok_or("Packument time is missing created")?,
+        "time.created",
+    )?;
+    let modified = parse_timestamp(
+        raw.remove("modified")
+            .ok_or("Packument time is missing modified")?,
+        "time.modified",
+    )?;
+    let versions = raw
+        .into_iter()
+        .map(|(version, timestamp)| {
+            Ok((
+                parse_published_version_key(version)?,
+                parse_timestamp(timestamp, "time version timestamp")?,
+            ))
+        })
+        .collect::<Result<HashMap<_, _>, String>>()?;
+
+    Ok(Some(PackumentTimes {
+        created,
+        modified,
+        versions,
+    }))
+}
+
+fn parse_timestamp(value: String, field: &str) -> Result<DateTime<Utc>, String> {
+    DateTime::parse_from_rfc3339(&value)
+        .map(|timestamp| timestamp.with_timezone(&Utc))
+        .map_err(|_| format!("Invalid {field}: {value}"))
+}
+
+fn parse_published_version_key(value: String) -> Result<PublishedVersionKey, String> {
+    if value.is_empty() {
+        return Err("Packument time contains an empty version key".into());
+    }
+
+    Ok(PublishedVersionKey(value))
 }
 
 fn parse_version(value: String, field: &str) -> Result<Version, String> {
