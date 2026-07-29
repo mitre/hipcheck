@@ -1,12 +1,14 @@
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
 use serde_json::Value;
 use semver::Version;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::Read;
 use url::Url;
+mod raw;
+use raw::*;
 
+/*
 #[derive(Debug, Deserialize)]
 struct RawNpmPackument {
     #[serde(rename = "_id")]
@@ -185,6 +187,7 @@ struct RawNpmDist {
     #[serde(rename = "npm-signature")]
     npm_signature: Option<String>,
 }
+*/
 
 #[derive(Debug)]
 pub struct NpmPackument {
