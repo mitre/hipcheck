@@ -47,6 +47,9 @@ futures-util = "0.3.32"
 indicatif = "0.17.9"
 itertools = "0.14.0"
 newtype-uuid = { version = "1.3.2", features = ["v7"] }
+# A Rust port of npm's own `node-semver` library: the version-matching engine behind
+# `nv_common::npm_semver`, used directly against raw NPM range strings.
+node-semver = "2.2.0"
 nv-server-api = { path = "nv-server-api" }
 patharg = "0.4.1"
 pathbuf = "1.0.0"

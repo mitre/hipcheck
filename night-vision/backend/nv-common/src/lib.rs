@@ -13,6 +13,7 @@ pub mod db;
 pub mod error;
 pub mod log;
 pub mod npm;
+pub mod npm_semver;
 pub mod rt;
 pub mod secret;
 
