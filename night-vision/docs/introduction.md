@@ -11,6 +11,7 @@ This is the internal documentation index for the Night Vision project.
 - [Continuous Integration](./project/ci.md)
 - [Dev Practices](./project/dev-practices.md)
 - [Flox](./project/flox.md)
+- [Flox CI Image](./project/flox-ci-image.md)
 
 - [Issue Tracker Standards](./project/issue-tracker.md)
 
