@@ -203,6 +203,42 @@ NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
     "$compose_script" --env-file .env.local.example config --quiet >/dev/null
 pass_test
 
+start_test 'local Compose uses DOCKER_HOST_REPO_ROOT for Linux default secret staging'
+host_repo_root="$tmp_dir/host-repo-root"
+host_secret_mount_dir="$host_repo_root/.secrets/docker/night-vision-local"
+
+DOCKER_SECRET_MOUNT_DIR="" \
+DOCKER_HOST_REPO_ROOT="$host_repo_root" \
+POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
+NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
+    "$compose_script" --env-file .env.local.example config --quiet >/dev/null
+host_override_compose_config=$(
+    DOCKER_SECRET_MOUNT_DIR="" \
+    DOCKER_HOST_REPO_ROOT="$host_repo_root" \
+    POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
+    NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
+        "$compose_script" --env-file .env.local.example config
+)
+if ! printf '%s\n' "$host_override_compose_config" | grep -F "file: $host_secret_mount_dir/postgres-password" >/dev/null; then
+    error 'error: local Docker Compose config should use the DOCKER_HOST_REPO_ROOT staged Postgres secret file'
+    exit 1
+fi
+if ! printf '%s\n' "$host_override_compose_config" | grep -F "file: $host_secret_mount_dir/nv-server-database-url" >/dev/null; then
+    error 'error: local Docker Compose config should use the DOCKER_HOST_REPO_ROOT staged nv-server database URL secret file'
+    exit 1
+fi
+if ! cmp -s "$tmp_dir/source-postgres-password" "$host_secret_mount_dir/postgres-password"; then
+    error 'error: DOCKER_HOST_REPO_ROOT staged Postgres secret should match the source secret file'
+    exit 1
+fi
+if ! cmp -s "$tmp_dir/source-nv-server-database-url" "$host_secret_mount_dir/nv-server-database-url"; then
+    error 'error: DOCKER_HOST_REPO_ROOT staged nv-server database URL secret should match the source secret file'
+    exit 1
+fi
+assert_file_mode "$host_secret_mount_dir/postgres-password" 444
+assert_file_mode "$host_secret_mount_dir/nv-server-database-url" 444
+pass_test
+
 start_test 'execute creates secret files with strict modes'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \

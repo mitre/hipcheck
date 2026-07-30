@@ -10,8 +10,11 @@
 # The wrapper applies `docker-compose.local.yml`, stages local secret files into
 # a Docker-approved host mount directory, sets a local Compose project name, and
 # defaults the local service image names. If `CA_FILE_SECRET_FILE` is set, it is
-# staged and passed to the backend Dockerfile as the `ca_file` build secret. Pass
-# any normal `docker compose` arguments after the script name.
+# staged and passed to the backend Dockerfile as the `ca_file` build secret. Set
+# `DOCKER_HOST_REPO_ROOT` when the Docker daemon needs a host-visible path for
+# the repository root that differs from the current shell's path (for example,
+# docker-out-of-docker from a devcontainer on a Windows host). Pass any normal
+# `docker compose` arguments after the script name.
 
 set -eu
 
@@ -49,9 +52,11 @@ usage() {
 Runs Docker Compose from the repository root with docker-compose.yml and
 docker-compose.local.yml. COMPOSE_PROJECT_NAME defaults to night-vision-local,
 NV_APP_IMAGE defaults to nv-app:local, NV_SERVER_IMAGE defaults to
-nv-server:local, and DOCKER_SECRET_MOUNT_DIR overrides the Docker-approved host
-directory used for staged local secrets. Set CA_FILE_SECRET_FILE to pass network
-CA certificates to the backend image build.
+nv-server:local, DOCKER_SECRET_MOUNT_DIR overrides the Docker-approved host
+directory used for staged local secrets, and DOCKER_HOST_REPO_ROOT overrides the
+repository root used to derive the default Linux staging directory when Docker
+needs a host-visible path. Set CA_FILE_SECRET_FILE to pass network CA
+certificates to the backend image build.
 EOF
 }
 
@@ -119,6 +124,14 @@ env_file_value() {
     printf '%s\n' "$default"
 }
 
+host_repo_root() {
+    if [ -n "${DOCKER_HOST_REPO_ROOT:-}" ]; then
+        printf '%s\n' "$DOCKER_HOST_REPO_ROOT"
+    else
+        printf '%s\n' "$repo_root"
+    fi
+}
+
 approved_mount_root() {
     if [ -n "${DOCKER_SECRET_MOUNT_DIR:-}" ]; then
         printf '%s\n' "$DOCKER_SECRET_MOUNT_DIR"
@@ -137,7 +150,7 @@ approved_mount_root() {
             if grep -qi microsoft /proc/version 2>/dev/null; then
                 printf '%s\n' /mnt/c/Users/Public/Docker/night-vision
             else
-                printf '%s\n' "$repo_root/.secrets/docker"
+                printf '%s\n' "$(host_repo_root)/.secrets/docker"
             fi
             ;;
         *)
