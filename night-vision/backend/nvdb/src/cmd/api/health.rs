@@ -95,12 +95,11 @@ mod tests {
         // Send an HTTP request to the mock server.
         let client = reqwest::blocking::Client::new();
         let request_url = server.url("/health");
-        match get_health_status(&client, &request_url) {
-            Ok(_res) => {}
-            Err(e) => {
-                let body = format!("{:?}", e.to_string());
-                assert!(body.contains("error"));
-            }
-        }
+        let error = get_health_status(&client, &request_url)
+            .expect_err("a 500 response must cause the health check to fail");
+        let message = error.to_string();
+
+        assert!(message.contains("500 Internal Server Error"));
+        assert!(message.contains(r#"{\"status\": \"error\"}"#));
     }
 }
