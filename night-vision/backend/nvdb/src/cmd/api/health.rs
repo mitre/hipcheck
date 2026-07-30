@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use nv_common::config::Config;
 use reqwest::header::USER_AGENT;
 use serde::Deserialize;
@@ -43,18 +43,14 @@ pub fn get_health_status(client: &reqwest::blocking::Client, request_url: &str) 
 }
 
 /// Get a response from the REST API health endpoint and print it to stdout.
-/// If the API is not reachable, print error message instead.
 pub fn run(config: &Config) -> Result<()> {
     let request_url = format!("http://{}/health", config.server_address.clone());
     let client = reqwest::blocking::Client::new();
-    match get_health_status(&client, &request_url) {
-        Ok(res) => {
-            println!("{}: {:?}", &request_url, res.status);
-        }
-        Err(e) => {
-            println!("Error fetching data: {e}");
-        }
-    }
+
+    let res = get_health_status(&client, &request_url)
+        .with_context(|| format!("failed to fetch health status from {request_url}"))?;
+    println!("{request_url}: {:?}", res.status);
+
     Ok(())
 }
 
