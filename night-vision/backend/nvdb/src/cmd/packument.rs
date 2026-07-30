@@ -3,7 +3,10 @@ use camino::Utf8PathBuf;
 use chrono::Utc;
 use nv_common::npm::packument::parse_packument;
 use serde::{Deserialize, Serialize};
-use std::{fs::{self, File}, process::Command};
+use std::{
+    fs::{self, File},
+    process::Command,
+};
 use url::Url;
 
 use crate::destructive::DestructiveOperationToken;
@@ -148,7 +151,8 @@ fn add_corpus_package(
     _token: DestructiveOperationToken,
 ) -> Result<()> {
     let registry_path = registry_path_for_package(package)?;
-    let endpoint = registry.join(&registry_path)
+    let endpoint = registry
+        .join(&registry_path)
         .with_context(|| format!("failed to build registry URL for {package}"))?;
     let body = fetch_packument(registry, package, &registry_path)?;
     let parsed = parse_packument(body.as_slice())
@@ -160,7 +164,11 @@ fn add_corpus_package(
 
     let catalog_path = corpus_catalog_path();
     let mut catalog = load_catalog()?;
-    if catalog.fixtures.iter().any(|fixture| fixture.package == package) {
+    if catalog
+        .fixtures
+        .iter()
+        .any(|fixture| fixture.package == package)
+    {
         bail!("corpus already contains package {package}");
     }
 
@@ -245,7 +253,9 @@ fn fixture_stem(package: &str) -> Result<String> {
     let scoped = package.starts_with('@');
     let package = package.strip_prefix('@').unwrap_or(package);
     let mut parts = package.split('/');
-    let first = parts.next().expect("nonempty package has a first component");
+    let first = parts
+        .next()
+        .expect("nonempty package has a first component");
     let second = parts.next();
     if parts.next().is_some() || (scoped && second.is_none()) || (!scoped && second.is_some()) {
         bail!("invalid npm package name {package:?}");
@@ -254,7 +264,11 @@ fn fixture_stem(package: &str) -> Result<String> {
     let valid_component = |component: &str| {
         !component.is_empty()
             && !component.starts_with(['.', '_'])
-            && component.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_' | b'.'))
+            && component.bytes().all(|byte| {
+                byte.is_ascii_lowercase()
+                    || byte.is_ascii_digit()
+                    || matches!(byte, b'-' | b'_' | b'.')
+            })
     };
     if !valid_component(first) || second.is_some_and(|component| !valid_component(component)) {
         bail!("invalid npm package name {package:?}");
@@ -266,12 +280,14 @@ fn fixture_stem(package: &str) -> Result<String> {
 fn refresh_package(registry: &Url, package: &str) -> CorpusRefreshPackage {
     let registry_path = match registry_path_for_package(package) {
         Ok(path) => path,
-        Err(error) => return CorpusRefreshPackage {
-            name: package.to_owned(),
-            status: CorpusStatus::Rejected,
-            versions: None,
-            error: Some(error.to_string()),
-        },
+        Err(error) => {
+            return CorpusRefreshPackage {
+                name: package.to_owned(),
+                status: CorpusStatus::Rejected,
+                versions: None,
+                error: Some(error.to_string()),
+            };
+        }
     };
 
     match fetch_packument(registry, package, &registry_path) {
@@ -408,7 +424,10 @@ mod tests {
             .try_get_matches_from(["packument", "corpus-add", "example"])
             .expect_err("missing corpus-add options should fail");
 
-        assert_eq!(error.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+        assert_eq!(
+            error.kind(),
+            clap::error::ErrorKind::MissingRequiredArgument
+        );
     }
 
     #[test]

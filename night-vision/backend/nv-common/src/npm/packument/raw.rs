@@ -83,35 +83,70 @@ pub(super) struct RawNpmVersion {
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub(super) enum RawFunding { Url(String), Object { url: String, #[serde(rename = "type")] type_field: Option<String> } }
+pub(super) enum RawFunding {
+    Url(String),
+    Object {
+        url: String,
+        #[serde(rename = "type")]
+        type_field: Option<String>,
+    },
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub(super) enum RawBin { String(String), Map(HashMap<String, String>) }
+pub(super) enum RawBin {
+    String(String),
+    Map(HashMap<String, String>),
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub(super) enum RawEngines { Map(HashMap<String, String>), LegacyList(Vec<String>) }
+pub(super) enum RawEngines {
+    Map(HashMap<String, String>),
+    LegacyList(Vec<String>),
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub(super) enum RawDeprecated { Message(String), LegacyBoolean(bool) }
+pub(super) enum RawDeprecated {
+    Message(String),
+    LegacyBoolean(bool),
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub(super) enum RawBundleDependencies { List(Vec<String>), LegacyBoolean(bool) }
+pub(super) enum RawBundleDependencies {
+    List(Vec<String>),
+    LegacyBoolean(bool),
+}
 
 #[derive(Debug, Deserialize)]
-pub(super) struct RawPeerDependencyMeta { pub(super) optional: Option<bool> }
+pub(super) struct RawPeerDependencyMeta {
+    pub(super) optional: Option<bool>,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub(super) enum RawHuman { String(String), Object { name: Option<String>, email: Option<String>, url: Option<String> } }
+pub(super) enum RawHuman {
+    String(String),
+    Object {
+        name: Option<String>,
+        email: Option<String>,
+        url: Option<String>,
+    },
+}
 
 #[derive(Debug, Deserialize)]
-pub(super) struct RawRepository { #[serde(rename = "type")] pub(super) type_field: Option<String>, pub(super) url: Option<String> }
+pub(super) struct RawRepository {
+    #[serde(rename = "type")]
+    pub(super) type_field: Option<String>,
+    pub(super) url: Option<String>,
+}
 
-#[expect(dead_code, reason = "the raw representation retains registry fields that are not exposed")]
+#[expect(
+    dead_code,
+    reason = "the raw representation retains registry fields that are not exposed"
+)]
 #[derive(Debug, Deserialize)]
 pub(super) struct RawNpmDist {
     pub(super) tarball: Option<String>,

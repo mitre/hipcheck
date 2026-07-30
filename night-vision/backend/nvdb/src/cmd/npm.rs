@@ -31,9 +31,7 @@ mod tests {
     #[test]
     fn npm_command_accepts_packument_corpus_add() {
         command()
-            .try_get_matches_from([
-                "npm", "packument", "corpus-add", "example", "--destructive",
-            ])
+            .try_get_matches_from(["npm", "packument", "corpus-add", "example", "--destructive"])
             .expect("packument corpus add should parse");
     }
 }

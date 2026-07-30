@@ -1,9 +1,9 @@
 use jiff::Timestamp;
-use serde_json::Value;
 use semver::Version;
+use serde_json::Value;
 use std::collections::HashMap;
-use std::fmt;
 use std::error::Error;
+use std::fmt;
 use std::io::Read;
 use url::Url;
 mod raw;
@@ -20,13 +20,31 @@ pub enum PackumentParseError {
     InvalidNpmAlias,
     InvalidDependencySpecification(Box<str>),
     PackageHasNoVersions,
-    VersionPackageNameMismatch { version_name: Box<str>, package_name: Box<str> },
-    VersionKeyMismatch { key: Box<str>, version: Box<str> },
-    MissingDistTagVersion { tag: Box<str>, version: Box<str> },
-    InvalidUrl { field: Box<str>, value: Box<str> },
+    VersionPackageNameMismatch {
+        version_name: Box<str>,
+        package_name: Box<str>,
+    },
+    VersionKeyMismatch {
+        key: Box<str>,
+        version: Box<str>,
+    },
+    MissingDistTagVersion {
+        tag: Box<str>,
+        version: Box<str>,
+    },
+    InvalidUrl {
+        field: Box<str>,
+        value: Box<str>,
+    },
     InvalidSha1Digest(Box<str>),
-    InvalidTimestamp { field: Box<str>, value: Box<str> },
-    InvalidVersion { field: Box<str>, value: Box<str> },
+    InvalidTimestamp {
+        field: Box<str>,
+        value: Box<str>,
+    },
+    InvalidVersion {
+        field: Box<str>,
+        value: Box<str>,
+    },
     EmptyPublishedVersionKey,
     InvalidHuman,
     MissingRepositoryType,
@@ -36,22 +54,46 @@ impl fmt::Display for PackumentParseError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Json(_) => formatter.write_str("failed to parse packument JSON"),
-            Self::MissingField(field) => write!(formatter, "packument is missing required field {field}"),
+            Self::MissingField(field) => {
+                write!(formatter, "packument is missing required field {field}")
+            }
             Self::EmptyPackageName => formatter.write_str("package name cannot be empty"),
             Self::PackageNameTooLong => formatter.write_str("package name is too long"),
-            Self::InvalidPackageName(_) => formatter.write_str("packument contains an invalid package name"),
-            Self::EmptyDependencySpecification => formatter.write_str("dependency specification cannot be empty"),
+            Self::InvalidPackageName(_) => {
+                formatter.write_str("packument contains an invalid package name")
+            }
+            Self::EmptyDependencySpecification => {
+                formatter.write_str("dependency specification cannot be empty")
+            }
             Self::InvalidNpmAlias => formatter.write_str("packument contains an invalid npm alias"),
-            Self::InvalidDependencySpecification(_) => formatter.write_str("packument contains an invalid dependency specification"),
+            Self::InvalidDependencySpecification(_) => {
+                formatter.write_str("packument contains an invalid dependency specification")
+            }
             Self::PackageHasNoVersions => formatter.write_str("packument has no versions"),
-            Self::VersionPackageNameMismatch { .. } => formatter.write_str("version package name does not match packument name"),
-            Self::VersionKeyMismatch { .. } => formatter.write_str("version key does not match version metadata"),
-            Self::MissingDistTagVersion { .. } => formatter.write_str("dist tag refers to a missing version"),
-            Self::InvalidUrl { field, .. } => write!(formatter, "packument contains an invalid {field}"),
-            Self::InvalidSha1Digest(_) => formatter.write_str("packument contains an invalid SHA-1 digest"),
-            Self::InvalidTimestamp { field, .. } => write!(formatter, "packument contains an invalid {field}"),
-            Self::InvalidVersion { field, .. } => write!(formatter, "packument contains an invalid {field}"),
-            Self::EmptyPublishedVersionKey => formatter.write_str("packument contains an empty published version key"),
+            Self::VersionPackageNameMismatch { .. } => {
+                formatter.write_str("version package name does not match packument name")
+            }
+            Self::VersionKeyMismatch { .. } => {
+                formatter.write_str("version key does not match version metadata")
+            }
+            Self::MissingDistTagVersion { .. } => {
+                formatter.write_str("dist tag refers to a missing version")
+            }
+            Self::InvalidUrl { field, .. } => {
+                write!(formatter, "packument contains an invalid {field}")
+            }
+            Self::InvalidSha1Digest(_) => {
+                formatter.write_str("packument contains an invalid SHA-1 digest")
+            }
+            Self::InvalidTimestamp { field, .. } => {
+                write!(formatter, "packument contains an invalid {field}")
+            }
+            Self::InvalidVersion { field, .. } => {
+                write!(formatter, "packument contains an invalid {field}")
+            }
+            Self::EmptyPublishedVersionKey => {
+                formatter.write_str("packument contains an empty published version key")
+            }
             Self::InvalidHuman => formatter.write_str("packument contains an invalid human"),
             Self::MissingRepositoryType => formatter.write_str("repository is missing its type"),
         }
@@ -72,7 +114,6 @@ impl From<serde_json::Error> for PackumentParseError {
         Self::Json(error)
     }
 }
-
 
 #[derive(Debug)]
 pub struct NpmPackument {
@@ -185,7 +226,9 @@ impl NpmPackageName {
             || (value.starts_with('@') && second.is_none())
             || (!value.starts_with('@') && second.is_some())
         {
-            return Err(PackumentParseError::InvalidPackageName(value.into_boxed_str()));
+            return Err(PackumentParseError::InvalidPackageName(
+                value.into_boxed_str(),
+            ));
         }
 
         let valid = if value.starts_with('@') {
@@ -198,7 +241,9 @@ impl NpmPackageName {
         };
 
         if !valid {
-            return Err(PackumentParseError::InvalidPackageName(value.into_boxed_str()));
+            return Err(PackumentParseError::InvalidPackageName(
+                value.into_boxed_str(),
+            ));
         }
 
         Ok(Self(value))
@@ -269,11 +314,15 @@ impl DependencySpec {
             });
         }
 
-        if value.starts_with("file:") || value.starts_with("link:") || value.starts_with("workspace:") {
+        if value.starts_with("file:")
+            || value.starts_with("link:")
+            || value.starts_with("workspace:")
+        {
             return Ok(Self::File(value));
         }
 
-        if value.starts_with("git+") || value.starts_with("git://") || value.starts_with("github:") {
+        if value.starts_with("git+") || value.starts_with("git://") || value.starts_with("github:")
+        {
             return Ok(Self::Git(value));
         }
 
@@ -291,7 +340,9 @@ impl DependencySpec {
         }
 
         if value.chars().any(char::is_whitespace) {
-            return Err(PackumentParseError::InvalidDependencySpecification(value.into_boxed_str()));
+            return Err(PackumentParseError::InvalidDependencySpecification(
+                value.into_boxed_str(),
+            ));
         }
 
         Ok(Self::Tag(value))
@@ -302,19 +353,20 @@ fn is_valid_package_name_component(component: &str) -> bool {
     !component.is_empty()
         && !component.starts_with(['.', '_'])
         && component.bytes().all(|byte| {
-            byte.is_ascii_lowercase()
-                || byte.is_ascii_digit()
-                || matches!(byte, b'-' | b'_' | b'.')
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_' | b'.')
         })
 }
 
 fn is_valid_historic_dependency_package_name(value: &str) -> bool {
-    if value.is_empty() || value.len() > 214 || !value.bytes().any(|byte| byte.is_ascii_uppercase()) {
+    if value.is_empty() || value.len() > 214 || !value.bytes().any(|byte| byte.is_ascii_uppercase())
+    {
         return false;
     }
 
     let mut parts = value.split('/');
-    let first = parts.next().expect("nonempty package has a first component");
+    let first = parts
+        .next()
+        .expect("nonempty package has a first component");
     let second = parts.next();
     if parts.next().is_some()
         || (value.starts_with('@') && second.is_none())
@@ -326,9 +378,9 @@ fn is_valid_historic_dependency_package_name(value: &str) -> bool {
     let valid_component = |component: &str| {
         !component.is_empty()
             && !component.starts_with(['.', '_'])
-            && component.bytes().all(|byte| {
-                byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')
-            })
+            && component
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
     };
 
     if value.starts_with('@') {
@@ -381,11 +433,18 @@ pub struct Repository {
 
 impl NpmPackument {
     fn from_raw(raw: RawNpmPackument) -> Result<Self, PackumentParseError> {
-        let name = NpmPackageName::parse(raw.name.ok_or(PackumentParseError::MissingField(Box::from("$.name")))?)?;
+        let name = NpmPackageName::parse(
+            raw.name
+                .ok_or(PackumentParseError::MissingField(Box::from("$.name")))?,
+        )?;
 
-        let raw_dist_tags = raw.dist_tags.ok_or(PackumentParseError::MissingField(Box::from("$.dist-tags")))?;
+        let raw_dist_tags = raw
+            .dist_tags
+            .ok_or(PackumentParseError::MissingField(Box::from("$.dist-tags")))?;
 
-        let raw_versions = raw.versions.ok_or(PackumentParseError::MissingField(Box::from("$.versions")))?;
+        let raw_versions = raw
+            .versions
+            .ok_or(PackumentParseError::MissingField(Box::from("$.versions")))?;
 
         if raw_versions.is_empty() {
             return Err(PackumentParseError::PackageHasNoVersions);
@@ -400,8 +459,9 @@ impl NpmPackument {
 
         for (key, raw_version) in raw_versions {
             let version_path = json_path_map_key("$.versions", &key);
-            let version_name =
-                NpmPackageName::parse(raw_version.name.ok_or_else(|| PackumentParseError::MissingField(format!("{version_path}.name").into()))?)?;
+            let version_name = NpmPackageName::parse(raw_version.name.ok_or_else(|| {
+                PackumentParseError::MissingField(format!("{version_path}.name").into())
+            })?)?;
 
             if version_name != name {
                 return Err(PackumentParseError::VersionPackageNameMismatch {
@@ -412,9 +472,9 @@ impl NpmPackument {
 
             let version_key = parse_version(key, version_path.clone())?;
             let version = parse_version(
-                raw_version
-                    .version
-                    .ok_or_else(|| PackumentParseError::MissingField(format!("{version_path}.version").into()))?,
+                raw_version.version.ok_or_else(|| {
+                    PackumentParseError::MissingField(format!("{version_path}.version").into())
+                })?,
                 format!("{version_path}.version"),
             )?;
 
@@ -425,10 +485,14 @@ impl NpmPackument {
                 });
             }
 
-            let dist = raw_version.dist.ok_or_else(|| PackumentParseError::MissingField(format!("{version_path}.dist").into()))?;
+            let dist = raw_version.dist.ok_or_else(|| {
+                PackumentParseError::MissingField(format!("{version_path}.dist").into())
+            })?;
 
             let tarball = parse_url(
-                dist.tarball.ok_or_else(|| PackumentParseError::MissingField(format!("{version_path}.dist.tarball").into()))?,
+                dist.tarball.ok_or_else(|| {
+                    PackumentParseError::MissingField(format!("{version_path}.dist.tarball").into())
+                })?,
                 format!("{version_path}.dist.tarball"),
             )?;
 
@@ -459,9 +523,13 @@ impl NpmPackument {
                     raw_version.accept_dependencies.unwrap_or_default(),
                 )?,
 
-                dev_dependencies: convert_dependency_map(raw_version.dev_dependencies.unwrap_or_default())?,
+                dev_dependencies: convert_dependency_map(
+                    raw_version.dev_dependencies.unwrap_or_default(),
+                )?,
 
-                peer_dependencies: convert_dependency_map(raw_version.peer_dependencies.unwrap_or_default())?,
+                peer_dependencies: convert_dependency_map(
+                    raw_version.peer_dependencies.unwrap_or_default(),
+                )?,
 
                 peer_dependencies_meta: convert_peer_dependencies_meta(
                     raw_version.peer_dependencies_meta.unwrap_or_default(),
@@ -494,9 +562,11 @@ impl NpmPackument {
 
                 dist: NpmDist {
                     tarball,
-                    shasum: parse_sha1_digest(
-                        dist.shasum.ok_or_else(|| PackumentParseError::MissingField(format!("{version_path}.dist.shasum").into()))?,
-                    )?,
+                    shasum: parse_sha1_digest(dist.shasum.ok_or_else(|| {
+                        PackumentParseError::MissingField(
+                            format!("{version_path}.dist.shasum").into(),
+                        )
+                    })?)?,
                     integrity: dist.integrity,
                 },
 
@@ -514,7 +584,10 @@ impl NpmPackument {
             let version = parse_version(version, json_path_map_key("$.dist-tags", &tag))?;
 
             if !versions.contains_key(&version) {
-                return Err(PackumentParseError::MissingDistTagVersion { tag: tag.into_boxed_str(), version: version.to_string().into_boxed_str() });
+                return Err(PackumentParseError::MissingDistTagVersion {
+                    tag: tag.into_boxed_str(),
+                    version: version.to_string().into_boxed_str(),
+                });
             }
 
             dist_tags.insert(tag, version);
@@ -571,13 +644,17 @@ fn validate_url(url: String, field: impl Into<Box<str>>) -> Result<String, Packu
 }
 
 fn parse_url(url: String, field: impl Into<Box<str>>) -> Result<Url, PackumentParseError> {
-    Url::parse(&url)
-        .map_err(|_| PackumentParseError::InvalidUrl { field: field.into(), value: url.into_boxed_str() })
+    Url::parse(&url).map_err(|_| PackumentParseError::InvalidUrl {
+        field: field.into(),
+        value: url.into_boxed_str(),
+    })
 }
 
 fn parse_sha1_digest(value: String) -> Result<Sha1Digest, PackumentParseError> {
     if value.len() != 40 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err(PackumentParseError::InvalidSha1Digest(value.into_boxed_str()));
+        return Err(PackumentParseError::InvalidSha1Digest(
+            value.into_boxed_str(),
+        ));
     }
 
     Ok(Sha1Digest(value))
@@ -639,11 +716,20 @@ fn convert_people(raw: Vec<RawHuman>) -> Result<Vec<Human>, PackumentParseError>
         .collect()
 }
 
-fn convert_repository(raw: Option<RawRepository>) -> Result<Option<Repository>, PackumentParseError> {
+fn convert_repository(
+    raw: Option<RawRepository>,
+) -> Result<Option<Repository>, PackumentParseError> {
     match raw {
         Some(repo) => {
-            let repo_type = repo.type_field.ok_or(PackumentParseError::MissingRepositoryType)?;
-            let url = validate_url(repo.url.ok_or(PackumentParseError::MissingField(Box::from("$.repository.url")))?, "$.repository.url")?;
+            let repo_type = repo
+                .type_field
+                .ok_or(PackumentParseError::MissingRepositoryType)?;
+            let url = validate_url(
+                repo.url.ok_or(PackumentParseError::MissingField(Box::from(
+                    "$.repository.url",
+                )))?,
+                "$.repository.url",
+            )?;
 
             Ok(Some(Repository {
                 type_field: repo_type,
@@ -743,12 +829,16 @@ fn convert_packument_times(
 
     let created = parse_timestamp(
         raw.remove("created")
-            .ok_or(PackumentParseError::MissingField(Box::from("$.time.created")))?,
+            .ok_or(PackumentParseError::MissingField(Box::from(
+                "$.time.created",
+            )))?,
         "$.time.created",
     )?;
     let modified = parse_timestamp(
         raw.remove("modified")
-            .ok_or(PackumentParseError::MissingField(Box::from("$.time.modified")))?,
+            .ok_or(PackumentParseError::MissingField(Box::from(
+                "$.time.modified",
+            )))?,
         "$.time.modified",
     )?;
     let versions = raw
@@ -769,10 +859,16 @@ fn convert_packument_times(
     }))
 }
 
-fn parse_timestamp(value: String, field: impl Into<Box<str>>) -> Result<Timestamp, PackumentParseError> {
+fn parse_timestamp(
+    value: String,
+    field: impl Into<Box<str>>,
+) -> Result<Timestamp, PackumentParseError> {
     value
         .parse()
-        .map_err(|_| PackumentParseError::InvalidTimestamp { field: field.into(), value: value.into_boxed_str() })
+        .map_err(|_| PackumentParseError::InvalidTimestamp {
+            field: field.into(),
+            value: value.into_boxed_str(),
+        })
 }
 
 fn parse_published_version_key(value: String) -> Result<PublishedVersionKey, PackumentParseError> {
@@ -783,13 +879,22 @@ fn parse_published_version_key(value: String) -> Result<PublishedVersionKey, Pac
     Ok(PublishedVersionKey(value))
 }
 
-fn parse_version(value: String, field: impl Into<Box<str>>) -> Result<Version, PackumentParseError> {
-    Version::parse(&value)
-        .map_err(|_| PackumentParseError::InvalidVersion { field: field.into(), value: value.into_boxed_str() })
+fn parse_version(
+    value: String,
+    field: impl Into<Box<str>>,
+) -> Result<Version, PackumentParseError> {
+    Version::parse(&value).map_err(|_| PackumentParseError::InvalidVersion {
+        field: field.into(),
+        value: value.into_boxed_str(),
+    })
 }
 
 fn json_path_map_key(object_path: &str, key: &str) -> Box<str> {
-    format!("{object_path}[{}]", serde_json::to_string(key).expect("string serializes")).into_boxed_str()
+    format!(
+        "{object_path}[{}]",
+        serde_json::to_string(key).expect("string serializes")
+    )
+    .into_boxed_str()
 }
 
 pub fn parse_packument<R: Read>(reader: R) -> Result<NpmPackument, PackumentParseError> {
@@ -822,14 +927,17 @@ mod tests {
 
     fn valid_packument(name: &str, version: &str, dist_tag_version: &str) -> Value {
         let mut versions = Map::new();
-        versions.insert(version.to_owned(), json!({
-            "name": name,
-            "version": version,
-            "dist": {
-                "tarball": "https://registry.npmjs.org/example/-/example.tgz",
-                "shasum": "0123456789abcdef0123456789abcdef01234567"
-            }
-        }));
+        versions.insert(
+            version.to_owned(),
+            json!({
+                "name": name,
+                "version": version,
+                "dist": {
+                    "tarball": "https://registry.npmjs.org/example/-/example.tgz",
+                    "shasum": "0123456789abcdef0123456789abcdef01234567"
+                }
+            }),
+        );
 
         json!({
             "name": name,
@@ -839,7 +947,11 @@ mod tests {
     }
 
     fn parse_value(value: &Value) -> Result<NpmPackument, PackumentParseError> {
-        parse_packument(serde_json::to_vec(value).expect("test values serialize").as_slice())
+        parse_packument(
+            serde_json::to_vec(value)
+                .expect("test values serialize")
+                .as_slice(),
+        )
     }
 
     #[test]
@@ -853,8 +965,12 @@ mod tests {
 
         assert_eq!(version.version, semantic_version("1.0.0"));
         assert_eq!(
-            version.dependencies.get(&DependencyPackageName::parse("serde".to_owned()).unwrap()),
-            Some(&DependencySpec::Registry(NpmVersionRange("^1.0.0".to_owned())))
+            version
+                .dependencies
+                .get(&DependencyPackageName::parse("serde".to_owned()).unwrap()),
+            Some(&DependencySpec::Registry(NpmVersionRange(
+                "^1.0.0".to_owned()
+            )))
         );
     }
 
@@ -967,11 +1083,17 @@ mod tests {
             "{}/testdata/npm/packument/corpus.json",
             env!("CARGO_MANIFEST_DIR")
         ))?)?;
-        let fixtures = corpus["fixtures"].as_array().expect("corpus fixtures should be an array");
+        let fixtures = corpus["fixtures"]
+            .as_array()
+            .expect("corpus fixtures should be an array");
 
         for fixture in fixtures {
-            let package = fixture["package"].as_str().expect("corpus fixture should name its package");
-            let path = fixture["fixture"].as_str().expect("corpus fixture should name its file");
+            let package = fixture["package"]
+                .as_str()
+                .expect("corpus fixture should name its package");
+            let path = fixture["fixture"]
+                .as_str()
+                .expect("corpus fixture should name its file");
             load_fixture(path).map_err(|error| format!("{package}: {error}"))?;
         }
 
@@ -984,7 +1106,10 @@ mod tests {
         packument["versions"]["1.0.0"]["engines"] = json!(["node 0.4"]);
 
         let packument = parse_value(&packument).expect("legacy engines list should parse");
-        let version = packument.versions.get(&semantic_version("1.0.0")).expect("version should be present");
+        let version = packument
+            .versions
+            .get(&semantic_version("1.0.0"))
+            .expect("version should be present");
 
         assert!(version.engines.is_empty());
     }
@@ -995,7 +1120,10 @@ mod tests {
         packument["versions"]["1.0.0"]["deprecated"] = Value::Bool(false);
 
         let packument = parse_value(&packument).expect("legacy deprecated boolean should parse");
-        let version = packument.versions.get(&semantic_version("1.0.0")).expect("version should be present");
+        let version = packument
+            .versions
+            .get(&semantic_version("1.0.0"))
+            .expect("version should be present");
 
         assert!(version.deprecated.is_none());
     }
@@ -1005,8 +1133,12 @@ mod tests {
         let mut packument = valid_packument("example", "1.0.0", "1.0.0");
         packument["versions"]["1.0.0"]["bundleDependencies"] = Value::Bool(false);
 
-        let packument = parse_value(&packument).expect("legacy bundle dependencies boolean should parse");
-        let version = packument.versions.get(&semantic_version("1.0.0")).expect("version should be present");
+        let packument =
+            parse_value(&packument).expect("legacy bundle dependencies boolean should parse");
+        let version = packument
+            .versions
+            .get(&semantic_version("1.0.0"))
+            .expect("version should be present");
 
         assert!(version.bundle_dependencies.is_empty());
     }
@@ -1017,7 +1149,10 @@ mod tests {
         packument["versions"]["1.0.0"]["dependencies"] = json!({ "Deferred": "0.1.0" });
 
         let packument = parse_value(&packument).expect("historic dependency name should parse");
-        let version = packument.versions.get(&semantic_version("1.0.0")).expect("version should be present");
+        let version = packument
+            .versions
+            .get(&semantic_version("1.0.0"))
+            .expect("version should be present");
         let name = DependencyPackageName::parse("Deferred".to_owned()).expect("name should parse");
 
         assert!(matches!(&name, DependencyPackageName::Historic(_)));
