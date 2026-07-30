@@ -7,7 +7,10 @@ use std::fmt;
 use std::io::Read;
 use url::Url;
 mod raw;
-use raw::*;
+use raw::{
+    RawBin, RawBundleDependencies, RawDeprecated, RawEngines, RawFunding, RawHuman,
+    RawNpmPackument, RawPeerDependencyMeta, RawRepository,
+};
 
 #[derive(Debug)]
 pub enum PackumentParseError {
@@ -290,7 +293,7 @@ pub enum DependencySpec {
     Url(Url),
     NpmAlias {
         package: DependencyPackageName,
-        specification: Box<DependencySpec>,
+        specification: Box<Self>,
     },
 }
 
@@ -503,7 +506,7 @@ impl NpmPackument {
                 npm_user: convert_person(raw_version.npm_user)?,
 
                 name: version_name,
-                version: version,
+                version,
 
                 description: raw_version.description,
                 main: raw_version.main,
@@ -1163,9 +1166,9 @@ mod tests {
         #[test]
         fn parses_generated_cross_field_invariants(
             name in "[a-z][a-z0-9-]{0,12}",
-            major in 0u16..100,
-            minor in 0u16..100,
-            patch in 0u16..100,
+            major in 0_u16..100,
+            minor in 0_u16..100,
+            patch in 0_u16..100,
         ) {
             let version = format!("{major}.{minor}.{patch}");
             let parsed = parse_value(&valid_packument(&name, &version, &version));
@@ -1178,7 +1181,7 @@ mod tests {
         }
 
         #[test]
-        fn generated_version_key_mismatches_report_the_exact_variant(major in 0u16..100) {
+        fn generated_version_key_mismatches_report_the_exact_variant(major in 0_u16..100) {
             let version = format!("{major}.0.0");
             let wrong_version = format!("{}.0.0", major.checked_add(1).expect("bounded generator"));
             let mut packument = valid_packument("example", &version, &version);

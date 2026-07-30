@@ -434,7 +434,7 @@ mod tests {
     fn fixture_stems_preserve_scopes_without_path_separators() {
         assert_eq!(fixture_stem("example").unwrap(), "example");
         assert_eq!(fixture_stem("@scope/package").unwrap(), "scope--package");
-        assert!(fixture_stem("../escape").is_err());
+        fixture_stem("../escape").expect_err("invalid package name should fail");
     }
 
     #[test]
