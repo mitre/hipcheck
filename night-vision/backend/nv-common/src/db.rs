@@ -8,8 +8,8 @@ use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use secrecy::ExposeSecret as _;
 use std::time::Duration;
 
-/// Connect to the database using the given configuration.
-pub async fn connection(config: &Config) -> Result<DatabaseConnection, DatabaseConnectionError> {
+/// Build database connection options using the given configuration.
+pub fn connect_options(config: &Config) -> ConnectOptions {
     let database_connection = config.database_connection();
     let mut opt = ConnectOptions::new(database_connection.expose_secret());
 
@@ -37,9 +37,21 @@ pub async fn connection(config: &Config) -> Result<DatabaseConnection, DatabaseC
         opt.max_lifetime(Duration::from_millis(database_max_lifetime));
     }
 
-    let db = Database::connect(opt)
+    opt
+}
+
+/// Connect to the database using the given configuration without running migrations.
+pub async fn connection_without_migrations(
+    config: &Config,
+) -> Result<DatabaseConnection, DatabaseConnectionError> {
+    Database::connect(connect_options(config))
         .await
-        .map_err(DatabaseConnectionError::Connect)?;
+        .map_err(DatabaseConnectionError::Connect)
+}
+
+/// Connect to the database using the given configuration.
+pub async fn connection(config: &Config) -> Result<DatabaseConnection, DatabaseConnectionError> {
+    let db = connection_without_migrations(config).await?;
 
     run_all_migrations(&db).await?;
 

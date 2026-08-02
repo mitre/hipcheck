@@ -73,6 +73,10 @@ fn run() -> Result<()> {
         return cmd::api::health::run(&config);
     }
     if let Some(db_matches) = matches.subcommand_matches("db") {
+        if let Some(_matches) = db_matches.subcommand_matches("ping") {
+            return cmd::db::ping::run(&config);
+        }
+
         if let Some(_matches) = db_matches.subcommand_matches("schema") {
             return cmd::db::schema::run(&config);
         }
@@ -118,6 +122,7 @@ fn command() -> clap::Command {
                 .about("Manage the database")
                 .arg_required_else_help(true)
                 .subcommand(cmd::db::entity::command())
+                .subcommand(cmd::db::ping::command())
                 .subcommand(cmd::db::schema::command())
                 .subcommand(cmd::db::migrate::command()),
         )
