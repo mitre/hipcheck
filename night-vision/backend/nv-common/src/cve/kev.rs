@@ -1,0 +1,788 @@
+//! KEV-linked vulnerability matching for reachable NPM package versions.
+
+use crate::db::entities::{cisa_kev_entries, cve_list_records, package_sources};
+use sea_orm::{ColumnTrait as _, DatabaseConnection, EntityTrait as _, QueryFilter as _};
+use semver::Version;
+use serde_json::Value;
+
+/// A reachable concrete NPM package version from a submitted package source.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReachableNpmPackageVersion {
+    pub package_name: String,
+    pub version: String,
+    pub source_evidence: String,
+}
+
+/// KEV metadata preserved with a match or explainable unknown result.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KevContext {
+    pub cve_id: String,
+    pub vendor_project: Option<String>,
+    pub product: Option<String>,
+    pub vulnerability_name: Option<String>,
+    pub date_added: Option<String>,
+}
+
+/// Confidence in a KEV-to-package-version association.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KevNpmMatchConfidence {
+    High,
+    Unknown,
+}
+
+/// Whether a KEV-linked CVE could be matched to a reachable NPM package version.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum KevNpmMatchStatus {
+    Affected,
+    Unknown,
+}
+
+/// A KEV-linked CVE assessment for one submitted source.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KevAffectedNpmPackageVersion {
+    pub cve_id: String,
+    pub kev_context: KevContext,
+    pub package_name: Option<String>,
+    pub affected_version: Option<String>,
+    pub source_evidence: Vec<String>,
+    pub confidence: KevNpmMatchConfidence,
+    pub caveats: Vec<String>,
+    pub status: KevNpmMatchStatus,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NpmAffectedPackage {
+    package_name: Option<String>,
+    ranges: Vec<AffectedVersionRange>,
+    evidence: Vec<String>,
+    caveats: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct AffectedVersionRange {
+    introduced: Option<String>,
+    fixed: Option<String>,
+    last_affected: Option<String>,
+    exact: Option<String>,
+    evidence: String,
+}
+
+/// Find reachable NPM package versions in a submitted source that are affected by KEV-linked CVEs.
+///
+/// This reads concrete versions from NPM lockfile-shaped JSON in `package_sources.file_contents`.
+/// `package.json` ranges are not treated as concrete reachable versions.
+pub async fn kev_affected_npm_package_versions_for_source(
+    db: &DatabaseConnection,
+    source_id: &str,
+) -> Result<Vec<KevAffectedNpmPackageVersion>, KevNpmMatchError> {
+    let Some(source) = package_sources::Entity::find()
+        .filter(package_sources::Column::SourceId.eq(source_id))
+        .one(db)
+        .await
+        .map_err(KevNpmMatchError::Db)?
+    else {
+        return Ok(Vec::new());
+    };
+
+    let reachable = reachable_npm_package_versions_from_source(&source.file_contents)
+        .map_err(KevNpmMatchError::PackageSourceJson)?;
+    kev_affected_npm_package_versions(db, &reachable).await
+}
+
+/// Match KEV-linked CVE records against caller-provided reachable NPM package versions.
+pub async fn kev_affected_npm_package_versions(
+    db: &DatabaseConnection,
+    reachable: &[ReachableNpmPackageVersion],
+) -> Result<Vec<KevAffectedNpmPackageVersion>, KevNpmMatchError> {
+    let kev_entries = cisa_kev_entries::Entity::find()
+        .all(db)
+        .await
+        .map_err(KevNpmMatchError::Db)?;
+    let mut matches = Vec::new();
+
+    for kev in kev_entries {
+        let kev_context = kev_context_from_entry(&kev.cve_id, &kev.entry);
+        let cve_record = cve_list_records::Entity::find_by_id(&kev.cve_id)
+            .one(db)
+            .await
+            .map_err(KevNpmMatchError::Db)?;
+        let Some(cve_record) = cve_record.filter(|record| !record.deleted) else {
+            matches.push(unknown_without_cve_enrichment(kev_context));
+            continue;
+        };
+
+        matches.extend(match_kev_cve_record_to_reachable_npm(
+            kev_context,
+            &cve_record.record,
+            reachable,
+        ));
+    }
+
+    Ok(matches)
+}
+
+fn match_kev_cve_record_to_reachable_npm(
+    kev_context: KevContext,
+    cve_record: &Value,
+    reachable: &[ReachableNpmPackageVersion],
+) -> Vec<KevAffectedNpmPackageVersion> {
+    let affected_packages = npm_affected_packages_from_cve(cve_record);
+    if affected_packages.is_empty() {
+        return vec![unknown(
+            kev_context,
+            None,
+            vec!["CVE record has no NPM affected package metadata".to_owned()],
+            Vec::new(),
+        )];
+    }
+
+    let mut results = Vec::new();
+    for affected in affected_packages {
+        let Some(package_name) = affected.package_name.clone() else {
+            results.push(unknown(
+                kev_context.clone(),
+                None,
+                affected.evidence,
+                caveats_with(
+                    &affected.caveats,
+                    "affected package name is missing or ambiguous",
+                ),
+            ));
+            continue;
+        };
+
+        if affected.ranges.is_empty() {
+            results.push(unknown(
+                kev_context.clone(),
+                Some(package_name),
+                affected.evidence,
+                caveats_with(&affected.caveats, "affected version range is missing"),
+            ));
+            continue;
+        }
+
+        for version in reachable
+            .iter()
+            .filter(|version| version.package_name == package_name)
+        {
+            match affected_ranges_include_version(&affected.ranges, &version.version) {
+                RangeMatch::Matched(evidence) => {
+                    let mut source_evidence = affected.evidence.clone();
+                    source_evidence.push(version.source_evidence.clone());
+                    source_evidence.push(evidence);
+                    results.push(KevAffectedNpmPackageVersion {
+                        cve_id: kev_context.cve_id.clone(),
+                        kev_context: kev_context.clone(),
+                        package_name: Some(package_name.clone()),
+                        affected_version: Some(version.version.clone()),
+                        source_evidence,
+                        confidence: KevNpmMatchConfidence::High,
+                        caveats: affected.caveats.clone(),
+                        status: KevNpmMatchStatus::Affected,
+                    });
+                }
+                RangeMatch::NoMatch => {}
+                RangeMatch::Unknown(caveat) => results.push(unknown(
+                    kev_context.clone(),
+                    Some(package_name.clone()),
+                    affected.evidence.clone(),
+                    caveats_with(&affected.caveats, caveat),
+                )),
+            }
+        }
+    }
+
+    results
+}
+
+fn npm_affected_packages_from_cve(cve_record: &Value) -> Vec<NpmAffectedPackage> {
+    cve_record
+        .pointer("/containers/cna")
+        .map(|container| affected_from_container(container, "containers.cna"))
+        .unwrap_or_default()
+}
+
+fn affected_from_container(container: &Value, base_path: &str) -> Vec<NpmAffectedPackage> {
+    container
+        .get("affected")
+        .and_then(Value::as_array)
+        .map(|affected| {
+            affected
+                .iter()
+                .enumerate()
+                .filter_map(|(index, entry)| {
+                    npm_affected_package(entry, &format!("{base_path}.affected[{index}]"))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn npm_affected_package(entry: &Value, path: &str) -> Option<NpmAffectedPackage> {
+    if !affected_entry_is_npm(entry) {
+        return None;
+    }
+
+    let package_name = package_name_from_affected_entry(entry);
+    let mut caveats = Vec::new();
+    if package_name.is_none() {
+        caveats.push(
+            "NPM ecosystem evidence was present but package identity could not be derived"
+                .to_owned(),
+        );
+    }
+
+    let ranges = affected_ranges_from_entry(entry, path, &mut caveats);
+    Some(NpmAffectedPackage {
+        package_name,
+        ranges,
+        evidence: vec![format!("{path} declares NPM affected metadata")],
+        caveats,
+    })
+}
+
+fn affected_entry_is_npm(entry: &Value) -> bool {
+    package_name_from_package_url(entry).is_some() || collection_url_is_npm(entry)
+}
+
+fn collection_url_is_npm(entry: &Value) -> bool {
+    entry
+        .get("collectionURL")
+        .and_then(Value::as_str)
+        .is_some_and(|value| {
+            matches!(
+                value.trim_end_matches('/'),
+                "https://www.npmjs.com" | "https://registry.npmjs.org"
+            )
+        })
+}
+
+fn package_name_from_affected_entry(entry: &Value) -> Option<String> {
+    if let Some(package_name) = package_name_from_package_url(entry) {
+        return Some(package_name);
+    }
+
+    let package_name = entry.get("packageName").and_then(Value::as_str)?;
+    npm_package_name_from_string(package_name)
+}
+
+fn package_name_from_package_url(entry: &Value) -> Option<String> {
+    let package_url = entry.get("packageURL").and_then(Value::as_str)?;
+    let package_name = package_url.strip_prefix("pkg:npm/")?;
+    npm_package_name_from_string(package_name)
+}
+
+fn npm_package_name_from_string(package_name: &str) -> Option<String> {
+    let package_name = package_name
+        .strip_prefix("npm:")
+        .or_else(|| package_name.strip_prefix("pkg:npm/"))
+        .unwrap_or(package_name);
+    strip_npm_package_version_suffix(package_name)
+        .filter(|name| !name.trim().is_empty())
+        .map(str::to_owned)
+}
+
+fn strip_npm_package_version_suffix(package_name: &str) -> Option<&str> {
+    let Some((name, _version)) = package_name.rsplit_once('@') else {
+        return Some(package_name);
+    };
+
+    if name.is_empty() {
+        Some(package_name)
+    } else {
+        Some(name)
+    }
+}
+
+fn affected_ranges_from_entry(
+    entry: &Value,
+    path: &str,
+    caveats: &mut Vec<String>,
+) -> Vec<AffectedVersionRange> {
+    let Some(versions) = entry.get("versions").and_then(Value::as_array) else {
+        caveats.push("CVE affected entry has no versions array".to_owned());
+        return Vec::new();
+    };
+
+    let mut ranges = Vec::new();
+    let mut introduced = None;
+    for (index, version) in versions.iter().enumerate() {
+        let status = version.get("status").and_then(Value::as_str);
+        let version_value = version
+            .get("version")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        match status {
+            Some("affected") => {
+                if version.get("lessThan").is_some() || version.get("lessThanOrEqual").is_some() {
+                    ranges.push(AffectedVersionRange {
+                        introduced: version_value,
+                        fixed: version
+                            .get("lessThan")
+                            .and_then(Value::as_str)
+                            .map(str::to_owned),
+                        last_affected: version
+                            .get("lessThanOrEqual")
+                            .and_then(Value::as_str)
+                            .map(str::to_owned),
+                        exact: None,
+                        evidence: format!("{path}.versions[{index}] affected range"),
+                    });
+                } else if let Some(exact) = version_value {
+                    ranges.push(AffectedVersionRange {
+                        introduced: None,
+                        fixed: None,
+                        last_affected: None,
+                        exact: Some(exact),
+                        evidence: format!("{path}.versions[{index}] exact affected version"),
+                    });
+                } else {
+                    caveats.push(format!(
+                        "{path}.versions[{index}] is affected but has no version bounds"
+                    ));
+                }
+            }
+            Some("unaffected") => {
+                if let Some(fixed) = version_value
+                    && let Some(start) = introduced.take()
+                {
+                    ranges.push(AffectedVersionRange {
+                        introduced: Some(start),
+                        fixed: Some(fixed),
+                        last_affected: None,
+                        exact: None,
+                        evidence: format!("{path}.versions[{index}] closes affected range"),
+                    });
+                }
+            }
+            _ => {
+                if let Some(version_value) = version_value {
+                    introduced = Some(version_value);
+                }
+            }
+        }
+    }
+
+    ranges
+}
+
+enum RangeMatch {
+    Matched(String),
+    NoMatch,
+    Unknown(&'static str),
+}
+
+fn affected_ranges_include_version(ranges: &[AffectedVersionRange], version: &str) -> RangeMatch {
+    let Ok(version) = Version::parse(version) else {
+        return RangeMatch::Unknown("reachable package version is not valid SemVer");
+    };
+
+    for range in ranges {
+        if let Some(exact) = &range.exact {
+            let Ok(exact) = Version::parse(exact) else {
+                return RangeMatch::Unknown("CVE affected exact version is not valid SemVer");
+            };
+            if version == exact {
+                return RangeMatch::Matched(range.evidence.clone());
+            }
+            continue;
+        }
+
+        if let Some(introduced) = &range.introduced {
+            let Ok(introduced) = Version::parse(introduced) else {
+                return RangeMatch::Unknown("CVE affected introduced version is not valid SemVer");
+            };
+            if version < introduced {
+                continue;
+            }
+        }
+
+        if let Some(fixed) = &range.fixed {
+            let Ok(fixed) = Version::parse(fixed) else {
+                return RangeMatch::Unknown("CVE affected upper bound is not valid SemVer");
+            };
+            if version >= fixed {
+                continue;
+            }
+        }
+
+        if let Some(last_affected) = &range.last_affected {
+            let Ok(last_affected) = Version::parse(last_affected) else {
+                return RangeMatch::Unknown("CVE affected upper bound is not valid SemVer");
+            };
+            if version > last_affected {
+                continue;
+            }
+        }
+
+        return RangeMatch::Matched(range.evidence.clone());
+    }
+
+    RangeMatch::NoMatch
+}
+
+fn reachable_npm_package_versions_from_source(
+    file_contents: &str,
+) -> Result<Vec<ReachableNpmPackageVersion>, serde_json::Error> {
+    let source: Value = serde_json::from_str(file_contents)?;
+    let mut versions = Vec::new();
+
+    if let Some(packages) = source.get("packages").and_then(Value::as_object) {
+        for (path, package) in packages {
+            if path.is_empty() {
+                continue;
+            }
+            let Some(name) = package.get("name").and_then(Value::as_str) else {
+                continue;
+            };
+            let Some(version) = package.get("version").and_then(Value::as_str) else {
+                continue;
+            };
+            versions.push(ReachableNpmPackageVersion {
+                package_name: name.to_owned(),
+                version: version.to_owned(),
+                source_evidence: format!("package-lock packages.{path} resolves {name}@{version}"),
+            });
+        }
+    }
+
+    if let Some(dependencies) = source.get("dependencies").and_then(Value::as_object) {
+        collect_lockfile_dependencies(dependencies, &mut versions);
+    }
+
+    versions.sort_by(|a, b| {
+        a.package_name
+            .cmp(&b.package_name)
+            .then(a.version.cmp(&b.version))
+    });
+    versions.dedup_by(|a, b| a.package_name == b.package_name && a.version == b.version);
+    Ok(versions)
+}
+
+fn collect_lockfile_dependencies(
+    dependencies: &serde_json::Map<String, Value>,
+    versions: &mut Vec<ReachableNpmPackageVersion>,
+) {
+    for (name, dependency) in dependencies {
+        if let Some(version) = dependency.get("version").and_then(Value::as_str) {
+            versions.push(ReachableNpmPackageVersion {
+                package_name: name.clone(),
+                version: version.to_owned(),
+                source_evidence: format!(
+                    "package-lock dependencies.{name}.version resolves {name}@{version}"
+                ),
+            });
+        }
+
+        if let Some(child_dependencies) = dependency.get("dependencies").and_then(Value::as_object)
+        {
+            collect_lockfile_dependencies(child_dependencies, versions);
+        }
+    }
+}
+
+fn kev_context_from_entry(cve_id: &str, entry: &Value) -> KevContext {
+    KevContext {
+        cve_id: cve_id.to_owned(),
+        vendor_project: kev_string(entry, "vendorProject"),
+        product: kev_string(entry, "product"),
+        vulnerability_name: kev_string(entry, "vulnerabilityName"),
+        date_added: kev_string(entry, "dateAdded"),
+    }
+}
+
+fn kev_string(entry: &Value, field: &str) -> Option<String> {
+    entry.get(field).and_then(Value::as_str).map(str::to_owned)
+}
+
+fn unknown_without_cve_enrichment(kev_context: KevContext) -> KevAffectedNpmPackageVersion {
+    unknown(
+        kev_context,
+        None,
+        vec!["KEV entry has no usable active CVE List enrichment record".to_owned()],
+        Vec::new(),
+    )
+}
+
+fn unknown(
+    kev_context: KevContext,
+    package_name: Option<String>,
+    source_evidence: Vec<String>,
+    caveats: Vec<String>,
+) -> KevAffectedNpmPackageVersion {
+    KevAffectedNpmPackageVersion {
+        cve_id: kev_context.cve_id.clone(),
+        kev_context,
+        package_name,
+        affected_version: None,
+        source_evidence,
+        confidence: KevNpmMatchConfidence::Unknown,
+        caveats,
+        status: KevNpmMatchStatus::Unknown,
+    }
+}
+
+fn caveats_with(caveats: &[String], caveat: impl Into<String>) -> Vec<String> {
+    let mut next = caveats.to_vec();
+    next.push(caveat.into());
+    next
+}
+
+/// Failure while matching KEV-linked CVEs to reachable NPM package versions.
+#[derive(Debug)]
+pub enum KevNpmMatchError {
+    Db(sea_orm::DbErr),
+    PackageSourceJson(serde_json::Error),
+}
+
+impl std::fmt::Display for KevNpmMatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Db(_) => write!(f, "failed to read KEV/CVE/package-source data"),
+            Self::PackageSourceJson(_) => {
+                write!(f, "failed to parse submitted package source JSON")
+            }
+        }
+    }
+}
+
+impl std::error::Error for KevNpmMatchError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Db(err) => Some(err),
+            Self::PackageSourceJson(err) => Some(err),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn kev_context(cve_id: &str) -> KevContext {
+        KevContext {
+            cve_id: cve_id.to_owned(),
+            vendor_project: Some("Example".to_owned()),
+            product: Some("Example Product".to_owned()),
+            vulnerability_name: Some("Example Vulnerability".to_owned()),
+            date_added: Some("2026-08-03".to_owned()),
+        }
+    }
+
+    fn reachable(package_name: &str, version: &str) -> Vec<ReachableNpmPackageVersion> {
+        vec![ReachableNpmPackageVersion {
+            package_name: package_name.to_owned(),
+            version: version.to_owned(),
+            source_evidence: format!("test source resolves {package_name}@{version}"),
+        }]
+    }
+
+    fn cve(package_name: Value, versions: Value) -> Value {
+        json!({
+            "containers": {
+                "cna": {
+                    "affected": [{
+                        "collectionURL": "https://www.npmjs.com/",
+                        "packageName": package_name,
+                        "versions": versions
+                    }]
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn direct_match_returns_kev_package_version_and_evidence() {
+        let record = cve(
+            json!("left-pad"),
+            json!([{ "status": "affected", "version": "1.0.0", "lessThan": "1.2.0" }]),
+        );
+
+        let matches = match_kev_cve_record_to_reachable_npm(
+            kev_context("CVE-2026-1000"),
+            &record,
+            &reachable("left-pad", "1.1.0"),
+        );
+
+        assert_eq!(matches.len(), 1);
+        let matched = &matches[0];
+        assert_eq!(matched.status, KevNpmMatchStatus::Affected);
+        assert_eq!(matched.cve_id, "CVE-2026-1000");
+        assert_eq!(matched.package_name.as_deref(), Some("left-pad"));
+        assert_eq!(matched.affected_version.as_deref(), Some("1.1.0"));
+        assert_eq!(matched.confidence, KevNpmMatchConfidence::High);
+        assert!(
+            matched
+                .source_evidence
+                .iter()
+                .any(|evidence| evidence.contains("affected range"))
+        );
+    }
+
+    #[test]
+    fn non_match_returns_no_finding() {
+        let record = cve(
+            json!("left-pad"),
+            json!([{ "status": "affected", "version": "1.0.0", "lessThan": "1.2.0" }]),
+        );
+
+        let matches = match_kev_cve_record_to_reachable_npm(
+            kev_context("CVE-2026-1001"),
+            &record,
+            &reachable("left-pad", "1.2.0"),
+        );
+
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn ambiguous_package_name_returns_unknown_with_caveat() {
+        let record = cve(
+            Value::Null,
+            json!([{ "status": "affected", "version": "1.0.0", "lessThan": "1.2.0" }]),
+        );
+
+        let matches = match_kev_cve_record_to_reachable_npm(
+            kev_context("CVE-2026-1002"),
+            &record,
+            &reachable("left-pad", "1.1.0"),
+        );
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].status, KevNpmMatchStatus::Unknown);
+        assert!(
+            matches[0]
+                .caveats
+                .iter()
+                .any(|caveat| caveat.contains("package name"))
+        );
+    }
+
+    #[test]
+    fn missing_version_ranges_returns_unknown_with_caveat() {
+        let record = cve(json!("left-pad"), json!([]));
+
+        let matches = match_kev_cve_record_to_reachable_npm(
+            kev_context("CVE-2026-1003"),
+            &record,
+            &reachable("left-pad", "1.1.0"),
+        );
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].status, KevNpmMatchStatus::Unknown);
+        assert!(
+            matches[0]
+                .caveats
+                .iter()
+                .any(|caveat| caveat.contains("version range"))
+        );
+    }
+
+    #[test]
+    fn kev_entry_without_usable_cve_enrichment_returns_unknown() {
+        let matched = unknown_without_cve_enrichment(kev_context("CVE-2026-1004"));
+
+        assert_eq!(matched.status, KevNpmMatchStatus::Unknown);
+        assert_eq!(matched.confidence, KevNpmMatchConfidence::Unknown);
+        assert!(
+            matched
+                .source_evidence
+                .iter()
+                .any(|evidence| evidence.contains("no usable active CVE List enrichment"))
+        );
+    }
+
+    #[test]
+    fn package_lock_versions_are_reachable_source_evidence() {
+        let source = r#"{
+            "lockfileVersion": 3,
+            "packages": {
+                "": { "name": "root", "version": "1.0.0" },
+                "node_modules/left-pad": { "name": "left-pad", "version": "1.1.0" }
+            }
+        }"#;
+
+        let versions = reachable_npm_package_versions_from_source(source).unwrap();
+
+        assert_eq!(
+            versions,
+            vec![ReachableNpmPackageVersion {
+                package_name: "left-pad".to_owned(),
+                version: "1.1.0".to_owned(),
+                source_evidence:
+                    "package-lock packages.node_modules/left-pad resolves left-pad@1.1.0".to_owned(),
+            }]
+        );
+    }
+
+    #[test]
+    fn package_name_from_affected_entry_preserves_scoped_npm_names() {
+        let entry = json!({
+            "packageURL": "pkg:npm/@scope/name@1.2.3"
+        });
+
+        assert_eq!(
+            package_name_from_affected_entry(&entry).as_deref(),
+            Some("@scope/name")
+        );
+    }
+
+    #[test]
+    fn package_url_takes_precedence_over_package_name() {
+        let entry = json!({
+            "collectionURL": "https://www.npmjs.com/",
+            "packageName": "wrong-name",
+            "packageURL": "pkg:npm/right-name@1.2.3"
+        });
+
+        assert_eq!(
+            package_name_from_affected_entry(&entry).as_deref(),
+            Some("right-name")
+        );
+    }
+
+    #[test]
+    fn collection_url_and_package_name_identify_npm_package() {
+        let entry = json!({
+            "collectionURL": "https://www.npmjs.com/",
+            "packageName": "left-pad"
+        });
+
+        assert!(affected_entry_is_npm(&entry));
+        assert_eq!(
+            package_name_from_affected_entry(&entry).as_deref(),
+            Some("left-pad")
+        );
+    }
+
+    #[test]
+    fn adp_affected_metadata_is_not_used_for_npm_matching() {
+        let record = json!({
+            "containers": {
+                "adp": [{
+                    "affected": [{
+                        "collectionURL": "https://www.npmjs.com/",
+                        "packageName": "left-pad",
+                        "versions": [{ "status": "affected", "version": "1.0.0", "lessThan": "1.2.0" }]
+                    }]
+                }]
+            }
+        });
+
+        let matches = match_kev_cve_record_to_reachable_npm(
+            kev_context("CVE-2026-1005"),
+            &record,
+            &reachable("left-pad", "1.1.0"),
+        );
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].status, KevNpmMatchStatus::Unknown);
+        assert!(
+            matches[0]
+                .source_evidence
+                .iter()
+                .any(|evidence| evidence.contains("no NPM affected package metadata"))
+        );
+    }
+}
