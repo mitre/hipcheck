@@ -23,8 +23,8 @@ pub fn get_health_status(client: &reqwest::blocking::Client, request_url: &str) 
                 Ok(status)
             } else {
                 Err(anyhow::anyhow!(
-                    "{} returned an error: {} - {}",
-                    &request_url,
+                    "{} returned an error: {} - {:?}",
+                    request_url,
                     response.status(),
                     response.text()?
                 ))
