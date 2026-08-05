@@ -7,8 +7,8 @@ use std::fmt;
 use std::io::Read;
 use url::Url;
 
-use super::types::NpmTypeParseError;
 pub use super::types::{DependencyPackageName, DependencySpec, NpmPackageName, NpmVersionRange};
+use super::types::{NpmPackageNameError, NpmTypeParseError};
 
 mod raw;
 use raw::{
@@ -125,9 +125,7 @@ impl From<serde_json::Error> for PackumentParseError {
 impl From<NpmTypeParseError> for PackumentParseError {
     fn from(error: NpmTypeParseError) -> Self {
         match error {
-            NpmTypeParseError::EmptyPackageName => Self::EmptyPackageName,
-            NpmTypeParseError::PackageNameTooLong => Self::PackageNameTooLong,
-            NpmTypeParseError::InvalidPackageName(name) => Self::InvalidPackageName(name),
+            NpmTypeParseError::InvalidPackageName { value, .. } => Self::InvalidPackageName(value),
             NpmTypeParseError::EmptyDependencySpecification => Self::EmptyDependencySpecification,
             NpmTypeParseError::InvalidNpmAlias => Self::InvalidNpmAlias,
             NpmTypeParseError::InvalidDependencySpecification(specification) => {
@@ -135,6 +133,18 @@ impl From<NpmTypeParseError> for PackumentParseError {
             }
         }
     }
+}
+
+fn parse_package_name(value: String) -> Result<NpmPackageName, PackumentParseError> {
+    NpmPackageName::parse(value.clone()).map_err(|error| match error {
+        NpmPackageNameError::Empty => PackumentParseError::EmptyPackageName,
+        NpmPackageNameError::TooLong => PackumentParseError::PackageNameTooLong,
+        NpmPackageNameError::InvalidStructure
+        | NpmPackageNameError::InvalidComponent
+        | NpmPackageNameError::Reserved => {
+            PackumentParseError::InvalidPackageName(value.into_boxed_str())
+        }
+    })
 }
 
 #[derive(Debug)]
@@ -268,7 +278,7 @@ pub struct Repository {
 
 impl NpmPackument {
     fn from_raw(raw: RawNpmPackument) -> Result<Self, PackumentParseError> {
-        let name = NpmPackageName::parse(
+        let name = parse_package_name(
             raw.name
                 .ok_or(PackumentParseError::MissingField(Box::from("$.name")))?,
         )?;
@@ -294,7 +304,7 @@ impl NpmPackument {
 
         for (key, raw_version) in raw_versions {
             let version_path = json_path_map_key("$.versions", &key);
-            let version_name = NpmPackageName::parse(raw_version.name.ok_or_else(|| {
+            let version_name = parse_package_name(raw_version.name.ok_or_else(|| {
                 PackumentParseError::MissingField(format!("{version_path}.name").into())
             })?)?;
 

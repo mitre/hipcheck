@@ -1,14 +1,39 @@
 //! Reusable types for npm package and dependency identifiers.
 
-use std::fmt;
+use std::{fmt, str::FromStr};
 use url::Url;
 
-/// An error returned while parsing an npm package or dependency type.
+/// A reason that a current npm package name is invalid.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum NpmPackageNameError {
+    Empty,
+    TooLong,
+    InvalidStructure,
+    InvalidComponent,
+    Reserved,
+}
+
+impl fmt::Display for NpmPackageNameError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Empty => formatter.write_str("package name cannot be empty"),
+            Self::TooLong => formatter.write_str("package name is too long"),
+            Self::InvalidStructure => formatter.write_str("package name has an invalid structure"),
+            Self::InvalidComponent => formatter.write_str("package name has an invalid component"),
+            Self::Reserved => formatter.write_str("package name is reserved"),
+        }
+    }
+}
+
+impl std::error::Error for NpmPackageNameError {}
+
+/// An error returned while parsing an npm dependency type.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NpmTypeParseError {
-    EmptyPackageName,
-    PackageNameTooLong,
-    InvalidPackageName(Box<str>),
+    InvalidPackageName {
+        value: Box<str>,
+        reason: NpmPackageNameError,
+    },
     EmptyDependencySpecification,
     InvalidNpmAlias,
     InvalidDependencySpecification(Box<str>),
@@ -17,9 +42,7 @@ pub enum NpmTypeParseError {
 impl fmt::Display for NpmTypeParseError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyPackageName => formatter.write_str("package name cannot be empty"),
-            Self::PackageNameTooLong => formatter.write_str("package name is too long"),
-            Self::InvalidPackageName(_) => formatter.write_str("invalid package name"),
+            Self::InvalidPackageName { reason, .. } => reason.fmt(formatter),
             Self::EmptyDependencySpecification => {
                 formatter.write_str("dependency specification cannot be empty")
             }
@@ -39,13 +62,13 @@ pub struct NpmPackageName(String);
 
 impl NpmPackageName {
     /// Parses a package name using npm's current naming contract.
-    pub fn parse(value: String) -> Result<Self, NpmTypeParseError> {
+    pub fn parse(value: String) -> Result<Self, NpmPackageNameError> {
         if value.is_empty() {
-            return Err(NpmTypeParseError::EmptyPackageName);
+            return Err(NpmPackageNameError::Empty);
         }
 
         if value.len() > 214 {
-            return Err(NpmTypeParseError::PackageNameTooLong);
+            return Err(NpmPackageNameError::TooLong);
         }
 
         let mut parts = value.split('/');
@@ -56,9 +79,7 @@ impl NpmPackageName {
             || (value.starts_with('@') && second.is_none())
             || (!value.starts_with('@') && second.is_some())
         {
-            return Err(NpmTypeParseError::InvalidPackageName(
-                value.into_boxed_str(),
-            ));
+            return Err(NpmPackageNameError::InvalidStructure);
         }
 
         let valid = if value.starts_with('@') {
@@ -71,9 +92,11 @@ impl NpmPackageName {
         };
 
         if !valid {
-            return Err(NpmTypeParseError::InvalidPackageName(
-                value.into_boxed_str(),
-            ));
+            return Err(NpmPackageNameError::InvalidComponent);
+        }
+
+        if matches!(value.as_str(), "node_modules" | "favicon.ico") {
+            return Err(NpmPackageNameError::Reserved);
         }
 
         Ok(Self(value))
@@ -81,6 +104,20 @@ impl NpmPackageName {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl fmt::Display for NpmPackageName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl FromStr for NpmPackageName {
+    type Err = NpmPackageNameError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::parse(value.to_owned())
     }
 }
 
@@ -100,7 +137,10 @@ impl DependencyPackageName {
             Err(_) if is_valid_historic_dependency_package_name(&value) => {
                 Ok(Self::Historic(value.into_boxed_str()))
             }
-            Err(error) => Err(error),
+            Err(reason) => Err(NpmTypeParseError::InvalidPackageName {
+                value: value.into_boxed_str(),
+                reason,
+            }),
         }
     }
 
@@ -231,7 +271,94 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_current_and_historic_dependency_names() {
+    fn accepts_valid_current_package_names() {
+        for name in [
+            "package",
+            "package-name",
+            "package_name",
+            "package.name",
+            "a1",
+            "0package",
+            "@scope/package",
+            "@scope/package-name",
+            "@scope_2/package.name",
+            "@a/b",
+            "@npm/cli",
+            "http",
+            "stream",
+            "fs",
+            "path",
+        ] {
+            let parsed = NpmPackageName::parse(name.to_owned()).expect("valid package name");
+            assert_eq!(parsed.as_str(), name);
+        }
+    }
+
+    #[test]
+    fn exposes_standard_string_conversion_for_current_package_names() {
+        let name: NpmPackageName = "package".parse().expect("valid package name");
+
+        assert_eq!(name.to_string(), "package");
+    }
+
+    #[test]
+    fn rejects_invalid_current_package_names() {
+        for name in [
+            "",
+            " package",
+            "package ",
+            "package\tname",
+            ".package",
+            "_package",
+            "UPPERCASE",
+            "package/child",
+            "package/child/grandchild",
+            "package/",
+            "/package",
+            "@scope",
+            "@",
+            "@scope/",
+            "@/package",
+            "@scope/package/child",
+            "@scope//package",
+            "@@scope/package",
+            "@scope/@package",
+            "@scope/._package",
+            "package~name",
+            "package!name",
+            "package*name",
+            "package(name)",
+            "package'name",
+            "package?name",
+            "package%name",
+            "package:name",
+            "package\\name",
+            "café",
+            "node_modules",
+            "favicon.ico",
+        ] {
+            assert!(
+                NpmPackageName::parse(name.to_owned()).is_err(),
+                "{name:?} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn enforces_the_npm_package_name_length_limit() {
+        assert!(NpmPackageName::parse("a".repeat(214)).is_ok());
+        assert_eq!(
+            NpmPackageName::parse("a".repeat(215)),
+            Err(NpmPackageNameError::TooLong)
+        );
+    }
+
+    #[test]
+    fn accepts_historic_names_only_for_dependencies() {
+        assert_eq!(
+            NpmPackageName::parse("Deferred".to_owned()),
+            Err(NpmPackageNameError::InvalidComponent)
+        );
         assert!(matches!(
             DependencyPackageName::parse("@scope/package".to_owned()),
             Ok(DependencyPackageName::Modern(_))

@@ -2,10 +2,10 @@ use node_semver::Version;
 use serde::Deserialize;
 use serde_json;
 use serde_json::Value;
-use std::{collections::HashMap, io::Read, str::FromStr};
+use std::{collections::HashMap, io::Read};
 use thiserror::Error;
 
-use super::package_name::NpmPackageName;
+use super::types::{NpmPackageName, NpmPackageNameError};
 
 #[derive(Debug, Error)]
 pub enum PackageParseError {
@@ -16,7 +16,10 @@ pub enum PackageParseError {
     InvalidJson(#[from] serde_json::Error),
 
     #[error("Invalid package name '{name}': {reason}")]
-    InvalidName { name: String, reason: &'static str },
+    InvalidName {
+        name: String,
+        reason: NpmPackageNameError,
+    },
 
     #[error("The 'type' field cannot be empty")]
     EmptyType,
@@ -115,7 +118,7 @@ impl NpmPackageJson {
         let name = raw
             .name
             .map(|name| {
-                NpmPackageName::from_str(&name)
+                NpmPackageName::parse(name.clone())
                     .map_err(|reason| PackageParseError::InvalidName { name, reason })
             })
             .transpose()?;
