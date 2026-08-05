@@ -20,55 +20,133 @@ impl FromStr for NpmPackageName {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let name = s.trim();
-
-        // 1. Length constraint
-        if name.is_empty() {
+        if s.is_empty() {
             return Err("Package name length must be greater than zero");
         }
-        if name.len() > 214 {
+        if s.len() > 214 {
             return Err("Package name length cannot exceed 214 characters");
         }
-
-        // 2. Whitespace check
-        if name.contains(' ') {
+        if s.chars().any(char::is_whitespace) {
             return Err("Package name should not contain any spaces");
         }
 
-        // 3. Leading characters
-        if name.starts_with('.') || name.starts_with('_') {
-            return Err("Package name should not start with . or _");
-        }
-
-        // 4. Lowercase constraint
-        if name.chars().any(|c| c.is_uppercase()) {
-            return Err("Package name must be all lowercase");
-        }
-
-        // 5. Illegal character set
-        if name
-            .chars()
-            .any(|c| matches!(c, '~' | ')' | '(' | '\'' | '!' | '*'))
-        {
-            return Err("Package name should not contain any of the following characters: ~)('!*");
-        }
-
-        // 6. Basic URL safety check (excluding the scope markers '@' and '/')
-        for c in name.chars() {
-            if c != '@' && c != '/' && c != '-' && c != '.' && c != '_' && !c.is_alphanumeric() {
-                return Err("Package name must contain only URL-safe characters");
+        let (scope, package) = if let Some(scoped_name) = s.strip_prefix('@') {
+            let Some((scope, package)) = scoped_name.split_once('/') else {
+                return Err("Scoped package names must use the form @scope/name");
+            };
+            if package.contains('/') {
+                return Err("Scoped package names must use the form @scope/name");
             }
+
+            (Some(scope), package)
+        } else {
+            if s.contains('/') {
+                return Err("Unscoped package names cannot contain a slash");
+            }
+
+            (None, s)
+        };
+
+        if !is_valid_package_name_component(package)
+            || scope.is_some_and(|scope| !is_valid_package_name_component(scope))
+        {
+            return Err("Package name components must be lowercase URL-safe names");
         }
 
-        // 7. Core node modules exclusions
-        let lower = name.to_lowercase();
         if matches!(
-            lower.as_str(),
+            s,
             "node_modules" | "favicon.ico" | "http" | "stream" | "fs" | "path"
         ) {
             return Err("Package name cannot conflict with Node core modules or reserved paths");
         }
 
-        Ok(NpmPackageName(name.to_string()))
+        Ok(NpmPackageName(s.to_string()))
+    }
+}
+
+fn is_valid_package_name_component(component: &str) -> bool {
+    !component.is_empty()
+        && !component.starts_with(['.', '_'])
+        && component.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_' | b'.')
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_valid_unscoped_and_scoped_package_names() {
+        for name in [
+            "package",
+            "package-name",
+            "package_name",
+            "package.name",
+            "a1",
+            "0package",
+            "@scope/package",
+            "@scope/package-name",
+            "@scope_2/package.name",
+            "@a/b",
+            "@npm/cli",
+        ] {
+            let parsed = NpmPackageName::from_str(name).expect("valid package name");
+            assert_eq!(parsed.as_str(), name);
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_package_names() {
+        for name in [
+            "",
+            " package",
+            "package ",
+            "package\tname",
+            ".package",
+            "_package",
+            "UPPERCASE",
+            "package/child",
+            "package/child/grandchild",
+            "package/",
+            "/package",
+            "@scope",
+            "@",
+            "@scope/",
+            "@/package",
+            "@scope/package/child",
+            "@scope//package",
+            "@@scope/package",
+            "@scope/@package",
+            "@scope/._package",
+            "package~name",
+            "package!name",
+            "package*name",
+            "package(name)",
+            "package'name",
+            "package?name",
+            "package%name",
+            "package:name",
+            "package\\name",
+            "café",
+            "node_modules",
+            "favicon.ico",
+            "http",
+            "stream",
+            "fs",
+            "path",
+        ] {
+            assert!(
+                NpmPackageName::from_str(name).is_err(),
+                "{name:?} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_package_names_over_the_npm_length_limit() {
+        let name = "a".repeat(215);
+
+        assert!(NpmPackageName::from_str(&name).is_err());
     }
 }
