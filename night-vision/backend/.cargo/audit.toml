@@ -19,5 +19,10 @@ ignore = [
     "RUSTSEC-2026-0173",
 
     # Ditto, also an unmaintained notice. This one for `rustls-pemfile`.
-    "RUSTSEC-2025-0134"
+    "RUSTSEC-2025-0134",
+
+    # `rust_decimal` includes optional `rkyv` in Cargo.lock, but no backend package enables
+    # the `rust_decimal` `rkyv` feature. We do not build or use this dependency, though
+    # `cargo audit` reports it because it scans every package recorded in the lockfile.
+    "RUSTSEC-2026-0235"
 ]
