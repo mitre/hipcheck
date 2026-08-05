@@ -1,5 +1,6 @@
 //! Reusable types for npm package and dependency identifiers.
 
+use std::collections::HashMap;
 use std::{fmt, str::FromStr};
 use url::Url;
 
@@ -55,6 +56,25 @@ impl fmt::Display for NpmTypeParseError {
 }
 
 impl std::error::Error for NpmTypeParseError {}
+
+/// An error returned while converting a dependency collection.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DependencyCollectionParseError {
+    pub name: String,
+    pub source: NpmTypeParseError,
+}
+
+impl fmt::Display for DependencyCollectionParseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "invalid dependency {}: {}",
+            self.name, self.source
+        )
+    }
+}
+
+impl std::error::Error for DependencyCollectionParseError {}
 
 /// A current npm package name.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -169,6 +189,75 @@ pub enum DependencySpec {
 /// An npm registry version range.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NpmVersionRange(String);
+
+/// A map of validated npm dependency names and specifications.
+pub type DependencyMap = HashMap<DependencyPackageName, DependencySpec>;
+
+/// Metadata associated with a peer dependency.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PeerDependencyMeta {
+    pub optional: bool,
+}
+
+/// A map of peer dependency metadata keyed by validated dependency names.
+pub type PeerDependencyMetaMap = HashMap<DependencyPackageName, PeerDependencyMeta>;
+
+/// The validated package names bundled with an npm package.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BundleDependencies(Vec<DependencyPackageName>);
+
+impl BundleDependencies {
+    /// Parses the package names in an npm `bundleDependencies` list.
+    pub fn parse(names: Vec<String>) -> Result<Self, DependencyCollectionParseError> {
+        names
+            .into_iter()
+            .map(parse_dependency_name)
+            .collect::<Result<Vec<_>, _>>()
+            .map(Self)
+    }
+
+    pub fn as_slice(&self) -> &[DependencyPackageName] {
+        &self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+/// Parses a raw dependency map into validated names and specifications.
+pub fn parse_dependency_map(
+    raw: HashMap<String, String>,
+) -> Result<DependencyMap, DependencyCollectionParseError> {
+    raw.into_iter()
+        .map(|(name, specification)| {
+            let parsed_name = parse_dependency_name(name)?;
+            let parsed_specification = DependencySpec::parse(specification).map_err(|source| {
+                DependencyCollectionParseError {
+                    name: parsed_name.as_str().to_owned(),
+                    source,
+                }
+            })?;
+            Ok((parsed_name, parsed_specification))
+        })
+        .collect()
+}
+
+/// Parses raw peer dependency metadata keyed by npm dependency names.
+pub fn parse_peer_dependency_meta_map(
+    raw: HashMap<String, PeerDependencyMeta>,
+) -> Result<PeerDependencyMetaMap, DependencyCollectionParseError> {
+    raw.into_iter()
+        .map(|(name, meta)| Ok((parse_dependency_name(name)?, meta)))
+        .collect()
+}
+
+fn parse_dependency_name(
+    name: String,
+) -> Result<DependencyPackageName, DependencyCollectionParseError> {
+    DependencyPackageName::parse(name.clone())
+        .map_err(|source| DependencyCollectionParseError { name, source })
+}
 
 impl DependencySpec {
     /// Parses a dependency specification using npm's supported source forms.
@@ -381,5 +470,40 @@ mod tests {
         ] {
             assert!(DependencySpec::parse(value.to_owned()).is_ok(), "{value}");
         }
+    }
+
+    #[test]
+    fn converts_dependency_collections_to_shared_types() {
+        let dependencies = parse_dependency_map(HashMap::from([
+            ("react".to_owned(), "^19.0.0".to_owned()),
+            ("legacy".to_owned(), "npm:Deferred@0.1.0".to_owned()),
+        ]))
+        .expect("valid dependency map");
+
+        assert_eq!(dependencies.len(), 2);
+        assert_eq!(
+            dependencies.get(&DependencyPackageName::parse("react".to_owned()).unwrap()),
+            Some(&DependencySpec::parse("^19.0.0".to_owned()).unwrap())
+        );
+
+        let peer_metadata = parse_peer_dependency_meta_map(HashMap::from([(
+            "react".to_owned(),
+            PeerDependencyMeta { optional: true },
+        )]))
+        .expect("valid peer dependency metadata");
+        assert_eq!(peer_metadata.len(), 1);
+
+        let bundled =
+            BundleDependencies::parse(vec!["react".to_owned()]).expect("valid bundled dependency");
+        assert_eq!(bundled.as_slice().len(), 1);
+    }
+
+    #[test]
+    fn reports_the_failing_dependency_key() {
+        let error =
+            parse_dependency_map(HashMap::from([("@scope".to_owned(), "^1.0.0".to_owned())]))
+                .expect_err("malformed dependency name should fail");
+
+        assert_eq!(error.name, "@scope");
     }
 }

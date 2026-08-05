@@ -7,8 +7,14 @@ use std::fmt;
 use std::io::Read;
 use url::Url;
 
-pub use super::types::{DependencyPackageName, DependencySpec, NpmPackageName, NpmVersionRange};
-use super::types::{NpmPackageNameError, NpmTypeParseError};
+pub use super::types::{
+    BundleDependencies, DependencyMap, DependencyPackageName, DependencySpec, NpmPackageName,
+    NpmVersionRange, PeerDependencyMeta, PeerDependencyMetaMap,
+};
+use super::types::{
+    DependencyCollectionParseError, NpmPackageNameError, NpmTypeParseError, parse_dependency_map,
+    parse_peer_dependency_meta_map,
+};
 
 mod raw;
 use raw::{
@@ -135,6 +141,12 @@ impl From<NpmTypeParseError> for PackumentParseError {
     }
 }
 
+impl From<DependencyCollectionParseError> for PackumentParseError {
+    fn from(error: DependencyCollectionParseError) -> Self {
+        error.source.into()
+    }
+}
+
 fn parse_package_name(value: String) -> Result<NpmPackageName, PackumentParseError> {
     NpmPackageName::parse(value.clone()).map_err(|error| match error {
         NpmPackageNameError::Empty => PackumentParseError::EmptyPackageName,
@@ -199,13 +211,13 @@ pub struct NpmVersion {
     pub maintainers: Vec<Human>,
     pub repository: Option<Repository>,
 
-    pub dependencies: HashMap<DependencyPackageName, DependencySpec>,
-    pub accept_dependencies: HashMap<DependencyPackageName, DependencySpec>,
-    pub dev_dependencies: HashMap<DependencyPackageName, DependencySpec>,
-    pub peer_dependencies: HashMap<DependencyPackageName, DependencySpec>,
-    pub peer_dependencies_meta: HashMap<DependencyPackageName, PeerDependencyMeta>,
-    pub optional_dependencies: HashMap<DependencyPackageName, DependencySpec>,
-    pub bundle_dependencies: Vec<DependencyPackageName>,
+    pub dependencies: DependencyMap,
+    pub accept_dependencies: DependencyMap,
+    pub dev_dependencies: DependencyMap,
+    pub peer_dependencies: DependencyMap,
+    pub peer_dependencies_meta: PeerDependencyMetaMap,
+    pub optional_dependencies: DependencyMap,
+    pub bundle_dependencies: BundleDependencies,
 
     pub bin: HashMap<String, String>,
     pub directories: HashMap<String, String>,
@@ -241,11 +253,6 @@ pub struct PublishedVersionKey(String);
 pub struct Funding {
     pub url: String,
     pub type_field: Option<String>,
-}
-
-#[derive(Debug)]
-pub struct PeerDependencyMeta {
-    pub optional: bool,
 }
 
 #[derive(Debug)]
@@ -362,32 +369,33 @@ impl NpmPackument {
 
                 repository: convert_repository(raw_version.repository)?,
 
-                dependencies: convert_dependency_map(raw_version.dependencies.unwrap_or_default())?,
+                dependencies: parse_dependency_map(raw_version.dependencies.unwrap_or_default())?,
 
-                accept_dependencies: convert_dependency_map(
+                accept_dependencies: parse_dependency_map(
                     raw_version.accept_dependencies.unwrap_or_default(),
                 )?,
 
-                dev_dependencies: convert_dependency_map(
+                dev_dependencies: parse_dependency_map(
                     raw_version.dev_dependencies.unwrap_or_default(),
                 )?,
 
-                peer_dependencies: convert_dependency_map(
+                peer_dependencies: parse_dependency_map(
                     raw_version.peer_dependencies.unwrap_or_default(),
                 )?,
 
-                peer_dependencies_meta: convert_peer_dependencies_meta(
-                    raw_version.peer_dependencies_meta.unwrap_or_default(),
+                peer_dependencies_meta: parse_peer_dependency_meta_map(
+                    convert_peer_dependencies_meta(
+                        raw_version.peer_dependencies_meta.unwrap_or_default(),
+                    ),
                 )?,
 
-                optional_dependencies: convert_dependency_map(
+                optional_dependencies: parse_dependency_map(
                     raw_version.optional_dependencies.unwrap_or_default(),
                 )?,
 
-                bundle_dependencies: convert_bundle_dependencies(raw_version.bundle_dependencies)
-                    .into_iter()
-                    .map(DependencyPackageName::parse)
-                    .collect::<Result<_, _>>()?,
+                bundle_dependencies: BundleDependencies::parse(convert_bundle_dependencies(
+                    raw_version.bundle_dependencies,
+                ))?,
 
                 bin: convert_bin(raw_version.bin),
 
@@ -639,28 +647,15 @@ fn convert_bundle_dependencies(raw: Option<RawBundleDependencies>) -> Vec<String
 
 fn convert_peer_dependencies_meta(
     raw: HashMap<String, RawPeerDependencyMeta>,
-) -> Result<HashMap<DependencyPackageName, PeerDependencyMeta>, PackumentParseError> {
+) -> HashMap<String, PeerDependencyMeta> {
     raw.into_iter()
         .map(|(name, meta)| {
-            Ok((
-                DependencyPackageName::parse(name)?,
+            (
+                name,
                 PeerDependencyMeta {
                     optional: meta.optional.unwrap_or(false),
                 },
-            ))
-        })
-        .collect()
-}
-
-fn convert_dependency_map(
-    raw: HashMap<String, String>,
-) -> Result<HashMap<DependencyPackageName, DependencySpec>, PackumentParseError> {
-    raw.into_iter()
-        .map(|(name, specification)| {
-            Ok((
-                DependencyPackageName::parse(name)?,
-                DependencySpec::parse(specification)?,
-            ))
+            )
         })
         .collect()
 }
