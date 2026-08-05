@@ -1,6 +1,7 @@
 use node_semver::Version;
 use serde::Deserialize;
 use serde_json;
+use serde_json::Value;
 use std::{collections::HashMap, io::Read, str::FromStr};
 use thiserror::Error;
 
@@ -56,6 +57,28 @@ struct RawNpmPackageJson {
     #[serde(rename = "devDependencies")]
     #[serde(default)]
     dev_dependencies: HashMap<String, String>,
+
+    #[serde(rename = "peerDependencies")]
+    #[serde(default)]
+    peer_dependencies: HashMap<String, String>,
+
+    #[serde(rename = "peerDependenciesMeta")]
+    #[serde(default)]
+    peer_dependencies_meta: Value,
+
+    #[serde(rename = "optionalDependencies")]
+    #[serde(default)]
+    optional_dependencies: HashMap<String, String>,
+
+    #[serde(rename = "bundleDependencies")]
+    #[serde(default)]
+    bundle_dependencies: Value,
+
+    #[serde(default)]
+    overrides: Value,
+
+    #[serde(default)]
+    workspaces: Value,
 }
 
 /// structure of safe, validated package.json file.
@@ -70,6 +93,12 @@ pub struct NpmPackageJson {
     pub scripts: HashMap<String, String>,
     pub dependencies: HashMap<String, String>,
     pub dev_dependencies: HashMap<String, String>,
+    pub peer_dependencies: HashMap<String, String>,
+    pub peer_dependencies_meta: Value,
+    pub optional_dependencies: HashMap<String, String>,
+    pub bundle_dependencies: Value,
+    pub overrides: Value,
+    pub workspaces: Value,
 }
 
 impl NpmPackageJson {
@@ -116,6 +145,8 @@ impl NpmPackageJson {
         let scripts = sanitize_map(raw.scripts);
         let dependencies = sanitize_map(raw.dependencies);
         let dev_dependencies = sanitize_map(raw.dev_dependencies);
+        let peer_dependencies = sanitize_map(raw.peer_dependencies);
+        let optional_dependencies = sanitize_map(raw.optional_dependencies);
 
         Ok(Self {
             name,
@@ -127,6 +158,12 @@ impl NpmPackageJson {
             scripts,
             dependencies,
             dev_dependencies,
+            peer_dependencies,
+            peer_dependencies_meta: raw.peer_dependencies_meta,
+            optional_dependencies,
+            bundle_dependencies: raw.bundle_dependencies,
+            overrides: raw.overrides,
+            workspaces: raw.workspaces,
         })
     }
 
@@ -168,6 +205,22 @@ mod tests {
             "type": "module",
             "devDependencies": {
                 "typescript": " 5.0.0 "
+            },
+            "peerDependencies": {
+                "react": " ^19.0.0 "
+            },
+            "peerDependenciesMeta": {
+                "react": { "optional": true }
+            },
+            "optionalDependencies": {
+                "fsevents": " ~2.3.3 "
+            },
+            "bundleDependencies": ["react"],
+            "overrides": {
+                "react": "19.0.0"
+            },
+            "workspaces": {
+                "packages": ["packages/*"]
             }
         }"#;
 
@@ -179,6 +232,18 @@ mod tests {
         assert_eq!(parsed.type_field, "module");
         // Verify whitespace sanitizer trimmed our map values
         assert_eq!(parsed.dev_dependencies.get("typescript").unwrap(), "5.0.0");
+        assert_eq!(parsed.peer_dependencies.get("react").unwrap(), "^19.0.0");
+        assert_eq!(
+            parsed.optional_dependencies.get("fsevents").unwrap(),
+            "~2.3.3"
+        );
+        assert_eq!(parsed.peer_dependencies_meta["react"]["optional"], true);
+        assert_eq!(parsed.bundle_dependencies, serde_json::json!(["react"]));
+        assert_eq!(parsed.overrides["react"], "19.0.0");
+        assert_eq!(
+            parsed.workspaces["packages"],
+            serde_json::json!(["packages/*"])
+        );
 
         Ok(())
     }
