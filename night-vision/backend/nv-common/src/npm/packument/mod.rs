@@ -6,6 +6,10 @@ use std::error::Error;
 use std::fmt;
 use std::io::Read;
 use url::Url;
+
+use super::types::NpmTypeParseError;
+pub use super::types::{DependencyPackageName, DependencySpec, NpmPackageName, NpmVersionRange};
+
 mod raw;
 use raw::{
     RawBin, RawBundleDependencies, RawDeprecated, RawEngines, RawFunding, RawHuman,
@@ -118,6 +122,21 @@ impl From<serde_json::Error> for PackumentParseError {
     }
 }
 
+impl From<NpmTypeParseError> for PackumentParseError {
+    fn from(error: NpmTypeParseError) -> Self {
+        match error {
+            NpmTypeParseError::EmptyPackageName => Self::EmptyPackageName,
+            NpmTypeParseError::PackageNameTooLong => Self::PackageNameTooLong,
+            NpmTypeParseError::InvalidPackageName(name) => Self::InvalidPackageName(name),
+            NpmTypeParseError::EmptyDependencySpecification => Self::EmptyDependencySpecification,
+            NpmTypeParseError::InvalidNpmAlias => Self::InvalidNpmAlias,
+            NpmTypeParseError::InvalidDependencySpecification(specification) => {
+                Self::InvalidDependencySpecification(specification)
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct NpmPackument {
     pub id: Option<String>,
@@ -207,193 +226,6 @@ pub struct PackumentTimes {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct PublishedVersionKey(String);
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct NpmPackageName(String);
-
-impl NpmPackageName {
-    fn parse(value: String) -> Result<Self, PackumentParseError> {
-        if value.is_empty() {
-            return Err(PackumentParseError::EmptyPackageName);
-        }
-
-        if value.len() > 214 {
-            return Err(PackumentParseError::PackageNameTooLong);
-        }
-
-        let mut parts = value.split('/');
-        let first = parts.next().expect("split always produces a first part");
-        let second = parts.next();
-
-        if parts.next().is_some()
-            || (value.starts_with('@') && second.is_none())
-            || (!value.starts_with('@') && second.is_some())
-        {
-            return Err(PackumentParseError::InvalidPackageName(
-                value.into_boxed_str(),
-            ));
-        }
-
-        let valid = if value.starts_with('@') {
-            second.is_some_and(|second| {
-                is_valid_package_name_component(first.strip_prefix('@').unwrap_or(first))
-                    && is_valid_package_name_component(second)
-            })
-        } else {
-            second.is_none() && is_valid_package_name_component(first)
-        };
-
-        if !valid {
-            return Err(PackumentParseError::InvalidPackageName(
-                value.into_boxed_str(),
-            ));
-        }
-
-        Ok(Self(value))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-/// A dependency name using either the current npm contract or its historic
-/// case-sensitive predecessor.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum DependencyPackageName {
-    Modern(NpmPackageName),
-    Historic(Box<str>),
-}
-
-impl DependencyPackageName {
-    fn parse(value: String) -> Result<Self, PackumentParseError> {
-        match NpmPackageName::parse(value.clone()) {
-            Ok(name) => Ok(Self::Modern(name)),
-            Err(_) if is_valid_historic_dependency_package_name(&value) => {
-                Ok(Self::Historic(value.into_boxed_str()))
-            }
-            Err(error) => Err(error),
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Modern(name) => name.as_str(),
-            Self::Historic(name) => name,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DependencySpec {
-    Registry(NpmVersionRange),
-    Tag(String),
-    File(String),
-    Git(String),
-    Url(Url),
-    NpmAlias {
-        package: DependencyPackageName,
-        specification: Box<Self>,
-    },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NpmVersionRange(String);
-
-impl DependencySpec {
-    fn parse(value: String) -> Result<Self, PackumentParseError> {
-        if value.is_empty() {
-            return Err(PackumentParseError::EmptyDependencySpecification);
-        }
-
-        if let Some(alias) = value.strip_prefix("npm:") {
-            let (package, specification) = alias
-                .rsplit_once('@')
-                .filter(|(package, specification)| !package.is_empty() && !specification.is_empty())
-                .ok_or(PackumentParseError::InvalidNpmAlias)?;
-            return Ok(Self::NpmAlias {
-                package: DependencyPackageName::parse(package.to_owned())?,
-                specification: Box::new(Self::parse(specification.to_owned())?),
-            });
-        }
-
-        if value.starts_with("file:")
-            || value.starts_with("link:")
-            || value.starts_with("workspace:")
-        {
-            return Ok(Self::File(value));
-        }
-
-        if value.starts_with("git+") || value.starts_with("git://") || value.starts_with("github:")
-        {
-            return Ok(Self::Git(value));
-        }
-
-        if let Ok(url) = Url::parse(&value) {
-            return Ok(Self::Url(url));
-        }
-
-        if value.starts_with(['=', '~', '^', '>', '<', '*', 'v'])
-            || value
-                .chars()
-                .next()
-                .is_some_and(|character| character.is_ascii_digit())
-        {
-            return Ok(Self::Registry(NpmVersionRange(value)));
-        }
-
-        if value.chars().any(char::is_whitespace) {
-            return Err(PackumentParseError::InvalidDependencySpecification(
-                value.into_boxed_str(),
-            ));
-        }
-
-        Ok(Self::Tag(value))
-    }
-}
-
-fn is_valid_package_name_component(component: &str) -> bool {
-    !component.is_empty()
-        && !component.starts_with(['.', '_'])
-        && component.bytes().all(|byte| {
-            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_' | b'.')
-        })
-}
-
-fn is_valid_historic_dependency_package_name(value: &str) -> bool {
-    if value.is_empty() || value.len() > 214 || !value.bytes().any(|byte| byte.is_ascii_uppercase())
-    {
-        return false;
-    }
-
-    let mut parts = value.split('/');
-    let first = parts
-        .next()
-        .expect("nonempty package has a first component");
-    let second = parts.next();
-    if parts.next().is_some()
-        || (value.starts_with('@') && second.is_none())
-        || (!value.starts_with('@') && second.is_some())
-    {
-        return false;
-    }
-
-    let valid_component = |component: &str| {
-        !component.is_empty()
-            && !component.starts_with(['.', '_'])
-            && component
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
-    };
-
-    if value.starts_with('@') {
-        second.is_some_and(|second| {
-            valid_component(first.strip_prefix('@').unwrap_or(first)) && valid_component(second)
-        })
-    } else {
-        valid_component(first)
-    }
-}
 
 #[derive(Debug)]
 pub struct Funding {
@@ -971,9 +803,7 @@ mod tests {
             version
                 .dependencies
                 .get(&DependencyPackageName::parse("serde".to_owned()).unwrap()),
-            Some(&DependencySpec::Registry(NpmVersionRange(
-                "^1.0.0".to_owned()
-            )))
+            Some(&DependencySpec::parse("^1.0.0".to_owned()).unwrap())
         );
     }
 
