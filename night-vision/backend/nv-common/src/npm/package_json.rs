@@ -21,6 +21,9 @@ pub enum PackageParseError {
     #[error("The 'type' field cannot be empty")]
     EmptyType,
 
+    #[error("Invalid package type '{type_field}'; expected 'commonjs' or 'module'")]
+    InvalidModuleKind { type_field: String },
+
     #[error("Invalid package version '{version}': {details}")]
     InvalidPackageVersion { version: String, details: String },
 }
@@ -78,13 +81,20 @@ struct RawNpmPackageJson {
     workspaces: Value,
 }
 
-/// structure of safe, validated package.json file.
+/// The module system selected by a package's `type` field.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModuleKind {
+    CommonJs,
+    Module,
+}
+
+/// Structure of a safe, validated `package.json` file.
 #[derive(Debug)]
 pub struct NpmPackageJson {
     pub name: Option<NpmPackageName>,
     pub private: bool,
     pub version: Option<Version>,
-    pub type_field: String,
+    pub module_kind: ModuleKind,
     pub engines: HashMap<String, String>,
     pub description: String,
     pub scripts: HashMap<String, String>,
@@ -110,15 +120,23 @@ impl NpmPackageJson {
             })
             .transpose()?;
 
-        let type_field = match raw.type_field {
+        let module_kind = match raw.type_field {
             Some(type_field) => {
-                let type_field = type_field.trim().to_string();
+                let type_field = type_field.trim();
                 if type_field.is_empty() {
                     return Err(PackageParseError::EmptyType);
                 }
-                type_field
+                match type_field {
+                    "commonjs" => ModuleKind::CommonJs,
+                    "module" => ModuleKind::Module,
+                    _ => {
+                        return Err(PackageParseError::InvalidModuleKind {
+                            type_field: type_field.to_owned(),
+                        });
+                    }
+                }
             }
-            None => "commonjs".to_owned(),
+            None => ModuleKind::CommonJs,
         };
 
         let version = match raw.version {
@@ -146,7 +164,7 @@ impl NpmPackageJson {
             name,
             private: raw.private,
             version,
-            type_field,
+            module_kind,
             description: raw.description,
             engines,
             scripts,
@@ -223,7 +241,7 @@ mod tests {
         let parsed = NpmPackageJson::parse_package_json(stream)?;
 
         assert_eq!(parsed.name.as_ref().unwrap().as_str(), "my-safe-package");
-        assert_eq!(parsed.type_field, "module");
+        assert_eq!(parsed.module_kind, ModuleKind::Module);
         // Verify whitespace sanitizer trimmed our map values
         assert_eq!(parsed.dev_dependencies.get("typescript").unwrap(), "5.0.0");
         assert_eq!(parsed.peer_dependencies.get("react").unwrap(), "^19.0.0");
@@ -254,8 +272,21 @@ mod tests {
 
         assert!(parsed.name.is_none());
         assert!(parsed.version.is_none());
-        assert_eq!(parsed.type_field, "commonjs");
+        assert_eq!(parsed.module_kind, ModuleKind::CommonJs);
         assert_eq!(parsed.dependencies.get("react").unwrap(), "^19.0.0");
+
+        Ok(())
+    }
+
+    #[test]
+    fn parses_an_explicit_commonjs_type_field() -> Result<(), PackageParseError> {
+        let json_payload = r#"{
+            "type": " commonjs "
+        }"#;
+
+        let parsed = NpmPackageJson::parse_package_json(Cursor::new(json_payload))?;
+
+        assert_eq!(parsed.module_kind, ModuleKind::CommonJs);
 
         Ok(())
     }
@@ -269,5 +300,20 @@ mod tests {
         let error = NpmPackageJson::parse_package_json(Cursor::new(json_payload)).unwrap_err();
 
         assert!(matches!(error, PackageParseError::EmptyType));
+    }
+
+    #[test]
+    fn rejects_an_unknown_type_field() {
+        let json_payload = r#"{
+            "type": "definitely-not-a-node-type"
+        }"#;
+
+        let error = NpmPackageJson::parse_package_json(Cursor::new(json_payload)).unwrap_err();
+
+        assert!(matches!(
+            error,
+            PackageParseError::InvalidModuleKind { type_field }
+                if type_field == "definitely-not-a-node-type"
+        ));
     }
 }
