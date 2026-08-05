@@ -21,9 +21,6 @@ pub enum PackageParseError {
     #[error("The 'type' field cannot be empty")]
     EmptyType,
 
-    #[error("Missing required field: 'version'")]
-    MissingVersion,
-
     #[error("Invalid package version '{version}': {details}")]
     InvalidPackageVersion { version: String, details: String },
 }
@@ -31,7 +28,7 @@ pub enum PackageParseError {
 /// structure of raw, unvalidated package.json file.
 #[derive(Debug, Deserialize)]
 struct RawNpmPackageJson {
-    name: String,
+    name: Option<String>,
 
     #[serde(default)]
     private: bool,
@@ -39,8 +36,8 @@ struct RawNpmPackageJson {
     #[serde(default)]
     version: Option<String>,
 
-    #[serde(default, rename = "type")]
-    type_field: String,
+    #[serde(rename = "type")]
+    type_field: Option<String>,
 
     #[serde(default)]
     engines: HashMap<String, String>,
@@ -84,7 +81,7 @@ struct RawNpmPackageJson {
 /// structure of safe, validated package.json file.
 #[derive(Debug)]
 pub struct NpmPackageJson {
-    pub name: NpmPackageName,
+    pub name: Option<NpmPackageName>,
     pub private: bool,
     pub version: Option<Version>,
     pub type_field: String,
@@ -105,21 +102,25 @@ impl NpmPackageJson {
     /// Validate and convert from RawNpmPackageJson.
     /// Returns an error if validation fails.
     fn from_raw(raw: RawNpmPackageJson) -> Result<Self, PackageParseError> {
-        // 1. Validate package name
-        let name = NpmPackageName::from_str(&raw.name).map_err(|reason| {
-            PackageParseError::InvalidName {
-                name: raw.name.clone(),
-                reason,
+        let name = raw
+            .name
+            .map(|name| {
+                NpmPackageName::from_str(&name)
+                    .map_err(|reason| PackageParseError::InvalidName { name, reason })
+            })
+            .transpose()?;
+
+        let type_field = match raw.type_field {
+            Some(type_field) => {
+                let type_field = type_field.trim().to_string();
+                if type_field.is_empty() {
+                    return Err(PackageParseError::EmptyType);
+                }
+                type_field
             }
-        })?;
+            None => "commonjs".to_owned(),
+        };
 
-        // 2. Validate type field string (Since serde defaults it to "", we check if empty)
-        let trimmed_type = raw.type_field.trim().to_string();
-        if trimmed_type.is_empty() {
-            return Err(PackageParseError::EmptyType);
-        }
-
-        // 3. Conditional version evaluation
         let version = match raw.version {
             Some(v) => {
                 let trimmed = v.trim();
@@ -131,16 +132,9 @@ impl NpmPackageJson {
                 })?;
                 Some(parsed)
             }
-            None => {
-                if raw.private {
-                    None
-                } else {
-                    return Err(PackageParseError::MissingVersion);
-                }
-            }
+            None => None,
         };
 
-        // 4. Sanitize map inputs
         let engines = sanitize_map(raw.engines);
         let scripts = sanitize_map(raw.scripts);
         let dependencies = sanitize_map(raw.dependencies);
@@ -152,7 +146,7 @@ impl NpmPackageJson {
             name,
             private: raw.private,
             version,
-            type_field: trimmed_type,
+            type_field,
             description: raw.description,
             engines,
             scripts,
@@ -228,7 +222,7 @@ mod tests {
         let stream = Cursor::new(json_payload);
         let parsed = NpmPackageJson::parse_package_json(stream)?;
 
-        assert_eq!(parsed.name.as_str(), "my-safe-package");
+        assert_eq!(parsed.name.as_ref().unwrap().as_str(), "my-safe-package");
         assert_eq!(parsed.type_field, "module");
         // Verify whitespace sanitizer trimmed our map values
         assert_eq!(parsed.dev_dependencies.get("typescript").unwrap(), "5.0.0");
@@ -246,5 +240,34 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn parses_dependency_only_package_json() -> Result<(), PackageParseError> {
+        let json_payload = r#"{
+            "dependencies": {
+                "react": " ^19.0.0 "
+            }
+        }"#;
+
+        let parsed = NpmPackageJson::parse_package_json(Cursor::new(json_payload))?;
+
+        assert!(parsed.name.is_none());
+        assert!(parsed.version.is_none());
+        assert_eq!(parsed.type_field, "commonjs");
+        assert_eq!(parsed.dependencies.get("react").unwrap(), "^19.0.0");
+
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_an_explicitly_empty_type_field() {
+        let json_payload = r#"{
+            "type": "   "
+        }"#;
+
+        let error = NpmPackageJson::parse_package_json(Cursor::new(json_payload)).unwrap_err();
+
+        assert!(matches!(error, PackageParseError::EmptyType));
     }
 }
