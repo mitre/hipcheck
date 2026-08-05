@@ -26,6 +26,7 @@ slog-async.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 spookey.workspace = true
+thiserror.workspace = true
 tokio.workspace = true
 url.workspace = true
 windows-acls.workspace = true

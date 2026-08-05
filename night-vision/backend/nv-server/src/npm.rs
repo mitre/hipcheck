@@ -1,7 +1,4 @@
-mod package_json;
-mod package_name;
-
-use package_json::{NpmPackageJson, PackageParseError};
+use nv_common::npm::package_json::{NpmPackageJson, PackageParseError};
 use std::fs::File;
 
 pub fn run_npm_parser(api_path: &str) -> Result<(), PackageParseError> {

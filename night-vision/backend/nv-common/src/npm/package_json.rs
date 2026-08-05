@@ -25,7 +25,7 @@ pub enum PackageParseError {
     InvalidPackageVersion { version: String, details: String },
 }
 
-/// structure of raw, unvalidated package.json file.
+/// Structure of a raw, unvalidated `package.json` file.
 #[derive(Debug, Deserialize)]
 struct RawNpmPackageJson {
     name: Option<String>,

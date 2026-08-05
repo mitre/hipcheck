@@ -1,6 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
+/// A validated npm package name.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NpmPackageName(String);
 
