@@ -81,7 +81,7 @@ windows-acls = { path = "windows-acls" }
 workspace-hack = { path = "workspace-hack" }
 xshell = "0.2.7"
 secrecy = "0.10.3"
-node-semver = "2.1"
+thiserror = "2.0.19"
 url = "2.5.7"
 reqwest = "0.13.4"
 

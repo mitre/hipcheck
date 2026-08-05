@@ -1,8 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
 
-
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NpmPackageName(String);
 
@@ -48,7 +46,10 @@ impl FromStr for NpmPackageName {
         }
 
         // 5. Illegal character set
-        if name.chars().any(|c| matches!(c, '~' | ')' | '(' | '\'' | '!' | '*')) {
+        if name
+            .chars()
+            .any(|c| matches!(c, '~' | ')' | '(' | '\'' | '!' | '*'))
+        {
             return Err("Package name should not contain any of the following characters: ~)('!*");
         }
 
@@ -61,7 +62,10 @@ impl FromStr for NpmPackageName {
 
         // 7. Core node modules exclusions
         let lower = name.to_lowercase();
-        if matches!(lower.as_str(), "node_modules" | "favicon.ico" | "http" | "stream" | "fs" | "path") {
+        if matches!(
+            lower.as_str(),
+            "node_modules" | "favicon.ico" | "http" | "stream" | "fs" | "path"
+        ) {
             return Err("Package name cannot conflict with Node core modules or reserved paths");
         }
 

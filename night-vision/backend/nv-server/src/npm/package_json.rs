@@ -1,8 +1,7 @@
+use node_semver::Version;
 use serde::Deserialize;
 use serde_json;
-use std::{collections::HashMap, fs::File, path::Path, io::{self,Read}, str::FromStr};
-use std::error::Error;
-use node_semver::Version;
+use std::{collections::HashMap, io::Read, str::FromStr};
 use thiserror::Error;
 
 use super::package_name::NpmPackageName;
@@ -16,10 +15,7 @@ pub enum PackageParseError {
     InvalidJson(#[from] serde_json::Error),
 
     #[error("Invalid package name '{name}': {reason}")]
-    InvalidName {
-        name: String,
-        reason: &'static str,
-    },
+    InvalidName { name: String, reason: &'static str },
 
     #[error("The 'type' field cannot be empty")]
     EmptyType,
@@ -28,10 +24,7 @@ pub enum PackageParseError {
     MissingVersion,
 
     #[error("Invalid package version '{version}': {details}")]
-    InvalidPackageVersion {
-        version: String,
-        details: String,
-    },
+    InvalidPackageVersion { version: String, details: String },
 }
 
 /// structure of raw, unvalidated package.json file.
@@ -62,7 +55,7 @@ struct RawNpmPackageJson {
 
     #[serde(rename = "devDependencies")]
     #[serde(default)]
-    devDependencies: HashMap<String, String>,
+    dev_dependencies: HashMap<String, String>,
 }
 
 /// structure of safe, validated package.json file.
@@ -70,19 +63,19 @@ struct RawNpmPackageJson {
 pub struct NpmPackageJson {
     pub name: NpmPackageName,
     pub private: bool,
-    pub version: Option<Version>, 
+    pub version: Option<Version>,
     pub type_field: String,
     pub engines: HashMap<String, String>,
     pub description: String,
     pub scripts: HashMap<String, String>,
     pub dependencies: HashMap<String, String>,
-    pub devDependencies: HashMap<String, String>, 
+    pub dev_dependencies: HashMap<String, String>,
 }
 
 impl NpmPackageJson {
     /// Validate and convert from RawNpmPackageJson.
     /// Returns an error if validation fails.
-    pub fn from_raw(raw: RawNpmPackageJson) -> Result<Self, PackageParseError> {
+    fn from_raw(raw: RawNpmPackageJson) -> Result<Self, PackageParseError> {
         // 1. Validate package name
         let name = NpmPackageName::from_str(&raw.name).map_err(|reason| {
             PackageParseError::InvalidName {
@@ -90,7 +83,7 @@ impl NpmPackageJson {
                 reason,
             }
         })?;
-       
+
         // 2. Validate type field string (Since serde defaults it to "", we check if empty)
         let trimmed_type = raw.type_field.trim().to_string();
         if trimmed_type.is_empty() {
@@ -101,9 +94,11 @@ impl NpmPackageJson {
         let version = match raw.version {
             Some(v) => {
                 let trimmed = v.trim();
-                let parsed = Version::parse(trimmed).map_err(|e| PackageParseError::InvalidPackageVersion {
-                    version: trimmed.to_string(),
-                    details: e.to_string(),
+                let parsed = Version::parse(trimmed).map_err(|e| {
+                    PackageParseError::InvalidPackageVersion {
+                        version: trimmed.to_string(),
+                        details: e.to_string(),
+                    }
                 })?;
                 Some(parsed)
             }
@@ -120,7 +115,7 @@ impl NpmPackageJson {
         let engines = sanitize_map(raw.engines);
         let scripts = sanitize_map(raw.scripts);
         let dependencies = sanitize_map(raw.dependencies);
-        let devDependencies = sanitize_map(raw.devDependencies);
+        let dev_dependencies = sanitize_map(raw.dev_dependencies);
 
         Ok(Self {
             name,
@@ -131,15 +126,15 @@ impl NpmPackageJson {
             engines,
             scripts,
             dependencies,
-            devDependencies
+            dev_dependencies,
         })
     }
 
     /// Reads, parses, and validates a package.json file into a NpmPackageJson struct.
-   pub fn parse_package_json<R: Read>(reader: R) -> Result<Self, PackageParseError> {
+    pub fn parse_package_json<R: Read>(reader: R) -> Result<Self, PackageParseError> {
         let raw: RawNpmPackageJson = serde_json::from_reader(reader)?;
         let validated = Self::from_raw(raw)?; // Executes through your preferred from_raw constructor
-        
+
         Ok(validated)
     }
 }
@@ -151,7 +146,6 @@ impl TryFrom<RawNpmPackageJson> for NpmPackageJson {
         Self::from_raw(raw)
     }
 }
-
 
 /// Helper function to trim internal values in raw maps cleanly
 fn sanitize_map(map: HashMap<String, String>) -> HashMap<String, String> {
@@ -184,7 +178,7 @@ mod tests {
         assert_eq!(parsed.name.as_str(), "my-safe-package");
         assert_eq!(parsed.type_field, "module");
         // Verify whitespace sanitizer trimmed our map values
-        assert_eq!(parsed.devDependencies.get("typescript").unwrap(), "5.0.0");
+        assert_eq!(parsed.dev_dependencies.get("typescript").unwrap(), "5.0.0");
 
         Ok(())
     }
