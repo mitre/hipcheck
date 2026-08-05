@@ -216,6 +216,11 @@ impl BundleDependencies {
             .map(Self)
     }
 
+    /// Creates a bundle list containing every declared dependency.
+    pub fn all_dependencies(dependencies: &DependencyMap) -> Self {
+        Self(dependencies.keys().cloned().collect())
+    }
+
     pub fn as_slice(&self) -> &[DependencyPackageName] {
         &self.0
     }

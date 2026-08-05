@@ -238,7 +238,8 @@ impl NpmPackageJson {
             parse_manifest_peer_dependency_meta(raw.peer_dependencies_meta)?;
         let optional_dependencies =
             parse_manifest_dependency_map("optionalDependencies", raw.optional_dependencies)?;
-        let bundle_dependencies = parse_manifest_bundle_dependencies(raw.bundle_dependencies)?;
+        let bundle_dependencies =
+            parse_manifest_bundle_dependencies(raw.bundle_dependencies, &dependencies)?;
         let overrides = parse_overrides(raw.overrides, "$.overrides")?;
         let workspaces = raw.workspaces.map(Workspaces::from).unwrap_or_default();
 
@@ -313,18 +314,18 @@ fn parse_manifest_peer_dependency_meta(
 
 fn parse_manifest_bundle_dependencies(
     raw: Option<RawBundleDependencies>,
+    dependencies: &DependencyMap,
 ) -> Result<BundleDependencies, PackageParseError> {
-    let names = match raw {
-        Some(RawBundleDependencies::List(names)) => names,
-        Some(RawBundleDependencies::LegacyBoolean(value)) => {
-            let _ = value;
-            Vec::new()
+    match raw {
+        Some(RawBundleDependencies::List(names)) => BundleDependencies::parse(names)
+            .map_err(|error| invalid_dependency("bundleDependencies", error)),
+        Some(RawBundleDependencies::LegacyBoolean(true)) => {
+            Ok(BundleDependencies::all_dependencies(dependencies))
         }
-        None => Vec::new(),
-    };
-
-    BundleDependencies::parse(names)
-        .map_err(|error| invalid_dependency("bundleDependencies", error))
+        Some(RawBundleDependencies::LegacyBoolean(false)) | None => {
+            Ok(BundleDependencies::default())
+        }
+    }
 }
 
 fn invalid_dependency(
@@ -483,6 +484,7 @@ mod tests {
             parsed.dependencies.get(&dependency_name("react")),
             Some(&dependency_spec("^19.0.0"))
         );
+        assert!(parsed.bundle_dependencies.is_empty());
 
         Ok(())
     }
@@ -540,6 +542,36 @@ mod tests {
             Workspaces::Packages(vec!["packages/*".to_owned()])
         );
         assert!(parsed.bundle_dependencies.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn expands_true_bundle_dependencies_to_declared_dependencies() -> Result<(), PackageParseError>
+    {
+        let json_payload = r#"{
+            "dependencies": {
+                "react": "^19.0.0",
+                "scheduler": "^0.25.0"
+            },
+            "bundleDependencies": true
+        }"#;
+
+        let parsed = NpmPackageJson::parse_package_json(Cursor::new(json_payload))?;
+
+        assert_eq!(parsed.bundle_dependencies.as_slice().len(), 2);
+        assert!(
+            parsed
+                .bundle_dependencies
+                .as_slice()
+                .contains(&dependency_name("react"))
+        );
+        assert!(
+            parsed
+                .bundle_dependencies
+                .as_slice()
+                .contains(&dependency_name("scheduler"))
+        );
 
         Ok(())
     }

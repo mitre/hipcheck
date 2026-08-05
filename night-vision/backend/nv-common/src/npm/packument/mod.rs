@@ -348,6 +348,10 @@ impl NpmPackument {
                 format!("{version_path}.dist.tarball"),
             )?;
 
+            let dependencies = parse_dependency_map(raw_version.dependencies.unwrap_or_default())?;
+            let bundle_dependencies =
+                parse_bundle_dependencies(raw_version.bundle_dependencies, &dependencies)?;
+
             let npm_version = NpmVersion {
                 id: raw_version.id,
                 node_version: raw_version.node_version,
@@ -369,7 +373,7 @@ impl NpmPackument {
 
                 repository: convert_repository(raw_version.repository)?,
 
-                dependencies: parse_dependency_map(raw_version.dependencies.unwrap_or_default())?,
+                dependencies,
 
                 accept_dependencies: parse_dependency_map(
                     raw_version.accept_dependencies.unwrap_or_default(),
@@ -393,9 +397,7 @@ impl NpmPackument {
                     raw_version.optional_dependencies.unwrap_or_default(),
                 )?,
 
-                bundle_dependencies: BundleDependencies::parse(convert_bundle_dependencies(
-                    raw_version.bundle_dependencies,
-                ))?,
+                bundle_dependencies,
 
                 bin: convert_bin(raw_version.bin),
 
@@ -633,15 +635,18 @@ fn convert_deprecated(raw: Option<RawDeprecated>) -> Option<String> {
     }
 }
 
-fn convert_bundle_dependencies(raw: Option<RawBundleDependencies>) -> Vec<String> {
+fn parse_bundle_dependencies(
+    raw: Option<RawBundleDependencies>,
+    dependencies: &DependencyMap,
+) -> Result<BundleDependencies, DependencyCollectionParseError> {
     match raw {
-        Some(RawBundleDependencies::List(packages)) => packages,
-        // npm accepted this historical boolean form to mean no bundled dependencies.
-        Some(RawBundleDependencies::LegacyBoolean(value)) => {
-            let _ = value;
-            Vec::new()
+        Some(RawBundleDependencies::List(packages)) => BundleDependencies::parse(packages),
+        Some(RawBundleDependencies::LegacyBoolean(true)) => {
+            Ok(BundleDependencies::all_dependencies(dependencies))
         }
-        None => Vec::new(),
+        Some(RawBundleDependencies::LegacyBoolean(false)) | None => {
+            Ok(BundleDependencies::default())
+        }
     }
 }
 
@@ -979,6 +984,28 @@ mod tests {
             .expect("version should be present");
 
         assert!(version.bundle_dependencies.is_empty());
+    }
+
+    #[test]
+    fn expands_true_bundle_dependencies_to_declared_dependencies() {
+        let mut packument = valid_packument("example", "1.0.0", "1.0.0");
+        packument["versions"]["1.0.0"]["dependencies"] =
+            json!({ "react": "^19.0.0", "scheduler": "^0.25.0" });
+        packument["versions"]["1.0.0"]["bundleDependencies"] = Value::Bool(true);
+
+        let packument = parse_value(&packument).expect("bundle dependencies should parse");
+        let version = packument
+            .versions
+            .get(&semantic_version("1.0.0"))
+            .expect("version should be present");
+
+        assert_eq!(version.bundle_dependencies.as_slice().len(), 2);
+        assert!(version.bundle_dependencies.as_slice().contains(
+            &DependencyPackageName::parse("react".to_owned()).expect("valid dependency name")
+        ));
+        assert!(version.bundle_dependencies.as_slice().contains(
+            &DependencyPackageName::parse("scheduler".to_owned()).expect("valid dependency name")
+        ));
     }
 
     #[test]
