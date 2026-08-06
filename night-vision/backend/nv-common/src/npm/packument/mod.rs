@@ -249,6 +249,12 @@ pub struct PackumentTimes {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct PublishedVersionKey(String);
 
+impl PublishedVersionKey {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 #[derive(Debug)]
 pub struct Funding {
     pub url: String,
