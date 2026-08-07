@@ -294,6 +294,10 @@ impl DependencySpec {
             return Ok(Self::Git(value));
         }
 
+        if is_github_shorthand(&value) {
+            return Ok(Self::Git(value));
+        }
+
         if let Ok(url) = Url::parse(&value) {
             return Ok(Self::Url(url));
         }
@@ -323,6 +327,27 @@ fn is_valid_package_name_component(component: &str) -> bool {
         && component.bytes().all(|byte| {
             byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_' | b'.')
         })
+}
+
+fn is_github_shorthand(value: &str) -> bool {
+    let repository = value
+        .split_once('#')
+        .map_or(value, |(repository, _)| repository);
+    let mut components = repository.split('/');
+    let Some(owner) = components.next() else {
+        return false;
+    };
+    let Some(name) = components.next() else {
+        return false;
+    };
+
+    components.next().is_none()
+        && !owner.is_empty()
+        && !name.is_empty()
+        && owner
+            .bytes()
+            .chain(name.bytes())
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
 fn is_valid_historic_dependency_package_name(value: &str) -> bool {
@@ -465,15 +490,28 @@ mod tests {
 
     #[test]
     fn parses_dependency_specification_forms() {
-        for value in [
-            "^1.0.0",
-            "latest",
-            "file:../package",
-            "git+https://example.com/package.git",
-            "https://example.com/package.tgz",
-            "npm:package@^1.0.0",
-        ] {
-            assert!(DependencySpec::parse(value.to_owned()).is_ok(), "{value}");
+        let cases = [
+            ("^1.0.0", "registry range"),
+            ("latest", "registry tag"),
+            ("file:../package", "file path"),
+            ("link:../package", "linked path"),
+            ("workspace:^", "workspace range"),
+            ("git+https://example.com/package.git", "git URL"),
+            ("github:owner/package", "GitHub protocol shorthand"),
+            ("owner/package#v1.0.0", "GitHub user/repository shorthand"),
+            (
+                "owner/package.name",
+                "GitHub shorthand with a dotted repository name",
+            ),
+            ("https://example.com/package.tgz", "tarball URL"),
+            ("npm:@scope/package@^1.0.0", "scoped npm alias"),
+        ];
+
+        for (value, description) in cases {
+            assert!(
+                DependencySpec::parse(value.to_owned()).is_ok(),
+                "{description}: {value}"
+            );
         }
     }
 

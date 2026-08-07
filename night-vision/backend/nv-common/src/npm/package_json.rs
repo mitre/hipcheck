@@ -9,18 +9,24 @@ use std::{
 use thiserror::Error;
 
 use super::types::{
-    BundleDependencies, DependencyCollectionParseError, DependencyMap, DependencySpec,
-    NpmPackageName, NpmPackageNameError, NpmTypeParseError, PeerDependencyMeta,
+    BundleDependencies, DependencyCollectionParseError, DependencyMap, DependencyPackageName,
+    DependencySpec, NpmPackageName, NpmPackageNameError, NpmTypeParseError, PeerDependencyMeta,
     PeerDependencyMetaMap, parse_dependency_map, parse_peer_dependency_meta_map,
 };
 
+/// Largest accepted `package.json` document, in bytes.
+pub const MAX_PACKAGE_JSON_BYTES: u64 = 1024 * 1024;
+
 #[derive(Debug, Error)]
 pub enum PackageParseError {
-    #[error("File system I/O error")]
+    #[error("I/O error while reading package.json")]
     Io(#[from] std::io::Error),
 
     #[error("Invalid JSON")]
     InvalidJson(#[from] serde_json::Error),
+
+    #[error("package.json exceeds the {MAX_PACKAGE_JSON_BYTES}-byte limit")]
+    PackageTooLarge,
 
     #[error("Invalid package name '{name}': {reason}")]
     InvalidName {
@@ -137,7 +143,25 @@ pub struct Overrides(BTreeMap<String, Override>);
 #[derive(Debug, Eq, PartialEq)]
 pub enum Override {
     Specification(DependencySpec),
+    DependencyReference(DependencyPackageName),
     Nested(Overrides),
+}
+
+/// The manifest section that declared a root dependency candidate.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum DependencyKind {
+    Dependencies,
+    DevDependencies,
+    PeerDependencies,
+    OptionalDependencies,
+}
+
+/// A dependency that can seed package-source resolution.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RootDependency {
+    pub name: DependencyPackageName,
+    pub specification: DependencySpec,
+    pub kind: DependencyKind,
 }
 
 impl Overrides {
@@ -183,6 +207,34 @@ pub struct NpmPackageJson {
 }
 
 impl NpmPackageJson {
+    /// Returns every dependency specification that can seed package-source resolution.
+    pub fn root_dependencies(&self) -> Vec<RootDependency> {
+        let mut roots = Vec::new();
+        append_root_dependencies(&mut roots, DependencyKind::Dependencies, &self.dependencies);
+        append_root_dependencies(
+            &mut roots,
+            DependencyKind::DevDependencies,
+            &self.dev_dependencies,
+        );
+        append_root_dependencies(
+            &mut roots,
+            DependencyKind::PeerDependencies,
+            &self.peer_dependencies,
+        );
+        append_root_dependencies(
+            &mut roots,
+            DependencyKind::OptionalDependencies,
+            &self.optional_dependencies,
+        );
+        roots.sort_by(|left, right| {
+            left.name
+                .as_str()
+                .cmp(right.name.as_str())
+                .then(left.kind.cmp(&right.kind))
+        });
+        roots
+    }
+
     /// Validate and convert from RawNpmPackageJson.
     /// Returns an error if validation fails.
     fn from_raw(raw: RawNpmPackageJson) -> Result<Self, PackageParseError> {
@@ -264,10 +316,16 @@ impl NpmPackageJson {
 
     /// Reads, parses, and validates a package.json file into a NpmPackageJson struct.
     pub fn parse_package_json<R: Read>(reader: R) -> Result<Self, PackageParseError> {
-        let raw: RawNpmPackageJson = serde_json::from_reader(reader)?;
-        let validated = Self::from_raw(raw)?; // Executes through your preferred from_raw constructor
+        let mut bytes = Vec::new();
+        reader
+            .take(MAX_PACKAGE_JSON_BYTES + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_PACKAGE_JSON_BYTES {
+            return Err(PackageParseError::PackageTooLarge);
+        }
 
-        Ok(validated)
+        let raw = serde_json::from_slice(&bytes)?;
+        Self::from_raw(raw)
     }
 }
 
@@ -339,6 +397,22 @@ fn invalid_dependency(
     }
 }
 
+fn append_root_dependencies(
+    roots: &mut Vec<RootDependency>,
+    kind: DependencyKind,
+    dependencies: &DependencyMap,
+) {
+    roots.extend(
+        dependencies
+            .iter()
+            .map(|(name, specification)| RootDependency {
+                name: name.clone(),
+                specification: specification.clone(),
+                kind,
+            }),
+    );
+}
+
 fn parse_overrides(value: Value, path: &str) -> Result<Overrides, PackageParseError> {
     let Value::Object(overrides) = value else {
         if value.is_null() {
@@ -357,12 +431,23 @@ fn parse_overrides(value: Value, path: &str) -> Result<Overrides, PackageParseEr
             serde_json::to_string(&key).expect("string serializes")
         );
         let override_value = match value {
-            Value::String(specification) => DependencySpec::parse(specification)
-                .map_err(|error| PackageParseError::InvalidOverride {
-                    path: entry_path.clone(),
-                    details: error.to_string(),
-                })
-                .map(Override::Specification)?,
+            Value::String(specification) => {
+                if let Some(reference) = specification.strip_prefix('$') {
+                    DependencyPackageName::parse(reference.to_owned())
+                        .map_err(|error| PackageParseError::InvalidOverride {
+                            path: entry_path.clone(),
+                            details: error.to_string(),
+                        })
+                        .map(Override::DependencyReference)?
+                } else {
+                    DependencySpec::parse(specification)
+                        .map_err(|error| PackageParseError::InvalidOverride {
+                            path: entry_path.clone(),
+                            details: error.to_string(),
+                        })
+                        .map(Override::Specification)?
+                }
+            }
             Value::Object(_) => Override::Nested(parse_overrides(value, &entry_path)?),
             _ => {
                 return Err(PackageParseError::InvalidOverride {
@@ -394,7 +479,10 @@ mod tests {
     use crate::npm::packument::parse_packument;
     use proptest::prelude::*;
     use serde_json::json;
-    use std::{collections::HashSet, fs::File, io::Cursor};
+    use std::{
+        fs::File,
+        io::{Cursor, ErrorKind, Read},
+    };
 
     #[test]
     fn test_package_json_parser() -> Result<(), PackageParseError> {
@@ -675,6 +763,72 @@ mod tests {
     }
 
     #[test]
+    fn parses_override_dependency_references() -> Result<(), PackageParseError> {
+        let parsed = NpmPackageJson::parse_package_json(Cursor::new(
+            json!({
+                "overrides": {
+                    "runtime": "$development",
+                    "scoped": "$@scope/runtime"
+                }
+            })
+            .to_string(),
+        ))?;
+
+        assert_eq!(
+            parsed.overrides.entries().get("runtime"),
+            Some(&Override::DependencyReference(dependency_name(
+                "development"
+            )))
+        );
+        assert_eq!(
+            parsed.overrides.entries().get("scoped"),
+            Some(&Override::DependencyReference(dependency_name(
+                "@scope/runtime"
+            )))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn parses_dependency_specification_matrix() -> Result<(), PackageParseError> {
+        let specifications = [
+            ("registry", "^1.0.0"),
+            ("tag", "latest"),
+            ("file", "file:../package"),
+            ("link", "link:../package"),
+            ("workspace", "workspace:^"),
+            ("git", "git+https://example.com/package.git"),
+            ("github-protocol", "github:owner/package"),
+            ("github-shorthand", "owner/package#v1.0.0"),
+            ("url", "https://example.com/package.tgz"),
+            ("alias", "npm:@scope/package@^1.0.0"),
+        ];
+        let dependencies = specifications
+            .iter()
+            .map(|(name, specification)| {
+                (
+                    (*name).to_owned(),
+                    serde_json::Value::String((*specification).to_owned()),
+                )
+            })
+            .collect::<serde_json::Map<_, _>>();
+        let parsed = NpmPackageJson::parse_package_json(Cursor::new(
+            json!({ "dependencies": dependencies }).to_string(),
+        ))?;
+
+        for (name, specification) in specifications {
+            assert_eq!(
+                parsed.dependencies.get(&dependency_name(name)),
+                Some(&dependency_spec(specification)),
+                "{name}"
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn reports_the_dependency_section_and_key_for_invalid_entries() {
         let json_payload = r#"{
             "dependencies": {
@@ -839,7 +993,7 @@ mod tests {
     fn preserves_every_dependency_class_for_later_resolution() -> Result<(), PackageParseError> {
         let parsed = NpmPackageJson::parse_package_json(Cursor::new(
             json!({
-                "dependencies": { "runtime": "1.0.0" },
+                "dependencies": { "runtime": "1.0.0", "bundled": "5.0.0" },
                 "devDependencies": { "development": "2.0.0" },
                 "peerDependencies": { "peer": "3.0.0" },
                 "peerDependenciesMeta": { "peer": { "optional": true } },
@@ -849,19 +1003,39 @@ mod tests {
             .to_string(),
         ))?;
 
-        let names = parsed
-            .dependencies
-            .keys()
-            .chain(parsed.dev_dependencies.keys())
-            .chain(parsed.peer_dependencies.keys())
-            .chain(parsed.optional_dependencies.keys())
-            .chain(parsed.bundle_dependencies.as_slice())
-            .map(|name| name.as_str())
-            .collect::<HashSet<_>>();
-
         assert_eq!(
-            names,
-            HashSet::from(["runtime", "development", "peer", "optional", "bundled"])
+            parsed.root_dependencies(),
+            vec![
+                RootDependency {
+                    name: dependency_name("bundled"),
+                    specification: dependency_spec("5.0.0"),
+                    kind: DependencyKind::Dependencies,
+                },
+                RootDependency {
+                    name: dependency_name("development"),
+                    specification: dependency_spec("2.0.0"),
+                    kind: DependencyKind::DevDependencies,
+                },
+                RootDependency {
+                    name: dependency_name("optional"),
+                    specification: dependency_spec("4.0.0"),
+                    kind: DependencyKind::OptionalDependencies,
+                },
+                RootDependency {
+                    name: dependency_name("peer"),
+                    specification: dependency_spec("3.0.0"),
+                    kind: DependencyKind::PeerDependencies,
+                },
+                RootDependency {
+                    name: dependency_name("runtime"),
+                    specification: dependency_spec("1.0.0"),
+                    kind: DependencyKind::Dependencies,
+                },
+            ]
+        );
+        assert_eq!(
+            parsed.bundle_dependencies.as_slice(),
+            &[dependency_name("bundled")]
         );
         assert_eq!(
             parsed.peer_dependencies_meta.get(&dependency_name("peer")),
@@ -976,6 +1150,42 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn parser_accepts_short_reads_and_reports_reader_errors() -> Result<(), PackageParseError> {
+        let parsed = NpmPackageJson::parse_package_json(ShortReader {
+            bytes: br#"{ "dependencies": { "runtime": "1.0.0" } }"#,
+            position: 0,
+            maximum_chunk_size: 1,
+        })?;
+        assert_eq!(parsed.root_dependencies().len(), 1);
+
+        let error = NpmPackageJson::parse_package_json(FailingReader).unwrap_err();
+        assert!(matches!(error, PackageParseError::Io(error) if error.kind() == ErrorKind::Other));
+
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_manifests_larger_than_the_document_limit() {
+        let oversized = vec![b' '; MAX_PACKAGE_JSON_BYTES as usize + 1];
+        let error = NpmPackageJson::parse_package_json(Cursor::new(oversized)).unwrap_err();
+
+        assert!(matches!(error, PackageParseError::PackageTooLarge));
+    }
+
+    #[test]
+    fn accepts_a_manifest_at_the_document_limit() -> Result<(), PackageParseError> {
+        let wrapper = r#"{"description":""}"#;
+        let description_length = MAX_PACKAGE_JSON_BYTES as usize - wrapper.len();
+        let manifest = format!(r#"{{"description":"{}"}}"#, "a".repeat(description_length));
+
+        let parsed = NpmPackageJson::parse_package_json(Cursor::new(manifest))?;
+
+        assert_eq!(parsed.description.len(), description_length);
+
+        Ok(())
+    }
+
     proptest! {
         #[test]
         fn parser_never_panics_for_arbitrary_bytes(input in proptest::collection::vec(any::<u8>(), 0..4096)) {
@@ -1000,6 +1210,50 @@ mod tests {
 
             prop_assert!(parsed.dependencies.contains_key(&dependency));
             prop_assert_eq!(parsed.bundle_dependencies.as_slice(), &[dependency]);
+        }
+
+        #[test]
+        fn unknown_fields_do_not_change_resolvable_dependencies(
+            unknown_key in "x[a-z][a-z0-9-]{0,12}",
+            unknown_value in ".{0,80}",
+        ) {
+            let base = json!({ "dependencies": { "runtime": "^1.0.0" } });
+            let mut with_unknown_field = base.as_object().expect("object literal").clone();
+            with_unknown_field.insert(unknown_key, serde_json::Value::String(unknown_value));
+
+            let base = NpmPackageJson::parse_package_json(Cursor::new(base.to_string()))?;
+            let with_unknown_field = NpmPackageJson::parse_package_json(Cursor::new(
+                serde_json::Value::Object(with_unknown_field).to_string(),
+            ))?;
+
+            prop_assert_eq!(base.root_dependencies(), with_unknown_field.root_dependencies());
+        }
+    }
+
+    struct ShortReader {
+        bytes: &'static [u8],
+        position: usize,
+        maximum_chunk_size: usize,
+    }
+
+    impl Read for ShortReader {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            let remaining = &self.bytes[self.position..];
+            let length = remaining
+                .len()
+                .min(self.maximum_chunk_size)
+                .min(buffer.len());
+            buffer[..length].copy_from_slice(&remaining[..length]);
+            self.position += length;
+            Ok(length)
+        }
+    }
+
+    struct FailingReader;
+
+    impl Read for FailingReader {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::new(ErrorKind::Other, "reader failed"))
         }
     }
 
