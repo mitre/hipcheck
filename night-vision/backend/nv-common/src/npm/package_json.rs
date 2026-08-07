@@ -1174,6 +1174,11 @@ mod tests {
     }
 
     #[test]
+    fn document_limit_is_one_mebibyte() {
+        assert_eq!(MAX_PACKAGE_JSON_BYTES, 1_048_576);
+    }
+
+    #[test]
     fn accepts_a_manifest_at_the_document_limit() -> Result<(), PackageParseError> {
         let wrapper = r#"{"description":""}"#;
         let description_length = MAX_PACKAGE_JSON_BYTES as usize - wrapper.len();

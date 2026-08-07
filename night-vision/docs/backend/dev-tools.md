@@ -39,3 +39,28 @@ RUSTC_BOOTSTRAP=1 cargo -Z unstable-options <BUILD_CMD> --unit-graph | cargo xta
 
 Replace `<BUILD_CMD>` with the Cargo build command you want to inspect, such as
 `check`, `test --no-run`, or `build`.
+
+## `cargo mutants`
+
+[`cargo mutants`](https://mutants.rs/) checks whether the backend test suite
+catches small behavior changes. It is a deeper, slower quality check, so it is
+not part of `cargo xtask ci` or normal Merge Request pipelines.
+
+The shared configuration in `backend/.cargo/mutants.toml` limits default runs
+to `nv-common` and uses its test suite. To assess the `package.json` parser,
+run this from the repository root:
+
+```sh
+flox activate --dir . --command \
+  'cd backend && mkdir -p target/cargo-mutants && \
+  cargo mutants --package nv-common --file nv-common/src/npm/package_json.rs \
+  --output target/cargo-mutants/package-json'
+```
+
+Review surviving mutants before adding tests: a survivor may reveal a missing
+assertion, but it can also represent behavior that is intentionally not covered
+by the current contract. Local runs that use the default output directory write
+to `backend/mutants.out/`, which is ignored by version control.
+
+
+

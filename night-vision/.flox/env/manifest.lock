@@ -21,6 +21,9 @@
       "cargo-hakari": {
         "pkg-path": "cargo-hakari"
       },
+      "cargo-mutants": {
+        "pkg-path": "cargo-mutants"
+      },
       "cargo-nextest": {
         "pkg-path": "cargo-nextest"
       },
@@ -1196,6 +1199,126 @@
       "priority": 5
     },
     {
+      "attr_path": "cargo-mutants",
+      "broken": false,
+      "derivation": "/nix/store/dbbllsnkgpfd42sph16zm8iqc0vncm6f-cargo-mutants-27.0.0.drv",
+      "description": "Mutation testing tool for Rust",
+      "install_id": "cargo-mutants",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-mutants-27.0.0",
+      "pname": "cargo-mutants",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:40.023635Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "27.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/rz54z549wy4p5v6qj03c51308dk2c8kl-cargo-mutants-27.0.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-mutants",
+      "broken": false,
+      "derivation": "/nix/store/73hgkhx3n29f912x06w0gbi1bkmlzwkw-cargo-mutants-27.0.0.drv",
+      "description": "Mutation testing tool for Rust",
+      "install_id": "cargo-mutants",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-mutants-27.0.0",
+      "pname": "cargo-mutants",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:18.738967Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "27.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/zml4cwiz0bvwdi6w47hfjxqzzz54b59c-cargo-mutants-27.0.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-mutants",
+      "broken": false,
+      "derivation": "/nix/store/7sk3wx9lzah4iy5mdy10df9cwdpc3228-cargo-mutants-27.0.0.drv",
+      "description": "Mutation testing tool for Rust",
+      "install_id": "cargo-mutants",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-mutants-27.0.0",
+      "pname": "cargo-mutants",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:47.233117Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "27.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5vw61vj50w68csg17w7xcx6l2f8a1gld-cargo-mutants-27.0.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-mutants",
+      "broken": false,
+      "derivation": "/nix/store/886hkblln5m5d0pyp87kspcdb4n5yckm-cargo-mutants-27.0.0.drv",
+      "description": "Mutation testing tool for Rust",
+      "install_id": "cargo-mutants",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-mutants-27.0.0",
+      "pname": "cargo-mutants",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:42.731754Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "27.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/6vpplj9jwwssilrs3i83rai9zaiqkk6n-cargo-mutants-27.0.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "cargo-nextest",
       "broken": false,
       "derivation": "/nix/store/33bahabplchmcrwdrjmpxr7dhcavjv3v-cargo-nextest-0.9.137.drv",
@@ -1612,6 +1735,8 @@
       "outputs_to_install": [
         "man",
         "man",
+        "man",
+        "out",
         "out",
         "out",
         "out"
@@ -2147,6 +2272,10 @@
         "out",
         "out",
         "out",
+        "out",
+        "out",
+        "out",
+        "out",
         "out"
       ],
       "outputs": {
@@ -2178,6 +2307,7 @@
       "unfree": false,
       "version": "113",
       "outputs_to_install": [
+        "out",
         "out",
         "out",
         "out"
@@ -2213,6 +2343,7 @@
       "outputs_to_install": [
         "out",
         "out",
+        "out",
         "out"
       ],
       "outputs": {
@@ -2243,6 +2374,7 @@
       "unfree": false,
       "version": "24.15.0",
       "outputs_to_install": [
+        "out",
         "out",
         "out"
       ],
@@ -2275,6 +2407,7 @@
       "version": "24.15.0",
       "outputs_to_install": [
         "out",
+        "out",
         "out"
       ],
       "outputs": {
@@ -2305,6 +2438,7 @@
       "unfree": false,
       "version": "24.15.0",
       "outputs_to_install": [
+        "out",
         "out",
         "out"
       ],
