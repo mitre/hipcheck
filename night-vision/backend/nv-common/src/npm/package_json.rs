@@ -270,7 +270,7 @@ impl NpmPackageJson {
                 let trimmed = v.trim();
                 let parsed = Version::parse(trimmed).map_err(|e| {
                     PackageParseError::InvalidPackageVersion {
-                        version: trimmed.to_string(),
+                        version: trimmed.to_owned(),
                         details: e.to_string(),
                     }
                 })?;
@@ -340,7 +340,7 @@ impl TryFrom<RawNpmPackageJson> for NpmPackageJson {
 /// Helper function to trim internal values in raw maps cleanly
 fn sanitize_map(map: HashMap<String, String>) -> HashMap<String, String> {
     map.into_iter()
-        .map(|(k, v)| (k, v.trim().to_string()))
+        .map(|(k, v)| (k, v.trim().to_owned()))
         .collect()
 }
 
@@ -925,7 +925,7 @@ mod tests {
                         matches!(error, PackageParseError::InvalidJson(_)),
                         "{}",
                         case.name
-                    )
+                    );
                 }
                 ExpectedError::InvalidName(reason) => {
                     assert!(
@@ -935,14 +935,14 @@ mod tests {
                         ),
                         "{}",
                         case.name
-                    )
+                    );
                 }
                 ExpectedError::EmptyType => {
                     assert!(
                         matches!(error, PackageParseError::EmptyType),
                         "{}",
                         case.name
-                    )
+                    );
                 }
                 ExpectedError::InvalidModuleKind(type_field) => {
                     assert!(
@@ -952,7 +952,7 @@ mod tests {
                         ),
                         "{}",
                         case.name
-                    )
+                    );
                 }
                 ExpectedError::InvalidVersion(version) => {
                     assert!(
@@ -962,7 +962,7 @@ mod tests {
                         ),
                         "{}",
                         case.name
-                    )
+                    );
                 }
                 ExpectedError::InvalidDependency { section, name } => {
                     assert!(
@@ -973,7 +973,7 @@ mod tests {
                         ),
                         "{}",
                         case.name
-                    )
+                    );
                 }
                 ExpectedError::InvalidOverride(path) => {
                     assert!(
@@ -983,7 +983,7 @@ mod tests {
                         ),
                         "{}",
                         case.name
-                    )
+                    );
                 }
             }
         }
@@ -1167,7 +1167,12 @@ mod tests {
 
     #[test]
     fn rejects_manifests_larger_than_the_document_limit() {
-        let oversized = vec![b' '; MAX_PACKAGE_JSON_BYTES as usize + 1];
+        let maximum_size =
+            usize::try_from(MAX_PACKAGE_JSON_BYTES).expect("document limit fits in usize");
+        let oversized_size = maximum_size
+            .checked_add(1)
+            .expect("one byte over document limit fits in usize");
+        let oversized = vec![b' '; oversized_size];
         let error = NpmPackageJson::parse_package_json(Cursor::new(oversized)).unwrap_err();
 
         assert!(matches!(error, PackageParseError::PackageTooLarge));
@@ -1181,7 +1186,11 @@ mod tests {
     #[test]
     fn accepts_a_manifest_at_the_document_limit() -> Result<(), PackageParseError> {
         let wrapper = r#"{"description":""}"#;
-        let description_length = MAX_PACKAGE_JSON_BYTES as usize - wrapper.len();
+        let maximum_size =
+            usize::try_from(MAX_PACKAGE_JSON_BYTES).expect("document limit fits in usize");
+        let description_length = maximum_size
+            .checked_sub(wrapper.len())
+            .expect("wrapper fits within document limit");
         let manifest = format!(r#"{{"description":"{}"}}"#, "a".repeat(description_length));
 
         let parsed = NpmPackageJson::parse_package_json(Cursor::new(manifest))?;
@@ -1249,7 +1258,10 @@ mod tests {
                 .min(self.maximum_chunk_size)
                 .min(buffer.len());
             buffer[..length].copy_from_slice(&remaining[..length]);
-            self.position += length;
+            self.position = self
+                .position
+                .checked_add(length)
+                .expect("read position cannot overflow");
             Ok(length)
         }
     }
@@ -1258,7 +1270,7 @@ mod tests {
 
     impl Read for FailingReader {
         fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
-            Err(std::io::Error::new(ErrorKind::Other, "reader failed"))
+            Err(std::io::Error::other("reader failed"))
         }
     }
 

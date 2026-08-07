@@ -465,7 +465,7 @@ mod tests {
 
     #[test]
     fn enforces_the_npm_package_name_length_limit() {
-        assert!(NpmPackageName::parse("a".repeat(214)).is_ok());
+        NpmPackageName::parse("a".repeat(214)).expect("214-character package name should be valid");
         assert_eq!(
             NpmPackageName::parse("a".repeat(215)),
             Err(NpmPackageNameError::TooLong)

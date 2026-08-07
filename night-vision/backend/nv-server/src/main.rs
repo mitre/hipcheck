@@ -6,7 +6,6 @@ mod api;
 mod cli;
 mod env;
 mod error;
-mod npm;
 
 /// Run the Night Vision server.
 fn main() -> Result<(), error::FatalError> {
