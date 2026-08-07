@@ -392,8 +392,9 @@ impl From<RawWorkspaces> for Workspaces {
 mod tests {
     use super::*;
     use crate::npm::packument::parse_packument;
+    use proptest::prelude::*;
     use serde_json::json;
-    use std::io::Cursor;
+    use std::{collections::HashSet, fs::File, io::Cursor};
 
     #[test]
     fn test_package_json_parser() -> Result<(), PackageParseError> {
@@ -485,6 +486,80 @@ mod tests {
             Some(&dependency_spec("^19.0.0"))
         );
         assert!(parsed.bundle_dependencies.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn parses_manifest_compatibility_matrix() -> Result<(), PackageParseError> {
+        struct Case {
+            name: &'static str,
+            manifest: serde_json::Value,
+            expected_name: Option<&'static str>,
+            expected_private: bool,
+            expected_version: Option<&'static str>,
+            expected_module_kind: ModuleKind,
+        }
+
+        let cases = [
+            Case {
+                name: "minimal manifest",
+                manifest: json!({}),
+                expected_name: None,
+                expected_private: false,
+                expected_version: None,
+                expected_module_kind: ModuleKind::CommonJs,
+            },
+            Case {
+                name: "private CommonJS package",
+                manifest: json!({
+                    "name": "example-package",
+                    "private": true,
+                    "version": " 1.2.3 ",
+                    "type": " commonjs "
+                }),
+                expected_name: Some("example-package"),
+                expected_private: true,
+                expected_version: Some("1.2.3"),
+                expected_module_kind: ModuleKind::CommonJs,
+            },
+            Case {
+                name: "scoped module package",
+                manifest: json!({
+                    "name": "@scope/example-package",
+                    "version": "2.0.0",
+                    "type": "module"
+                }),
+                expected_name: Some("@scope/example-package"),
+                expected_private: false,
+                expected_version: Some("2.0.0"),
+                expected_module_kind: ModuleKind::Module,
+            },
+        ];
+
+        for case in cases {
+            let parsed =
+                NpmPackageJson::parse_package_json(Cursor::new(case.manifest.to_string()))?;
+
+            assert_eq!(
+                parsed.name.as_ref().map(NpmPackageName::as_str),
+                case.expected_name,
+                "{}",
+                case.name
+            );
+            assert_eq!(parsed.private, case.expected_private, "{}", case.name);
+            assert_eq!(
+                parsed.version.as_ref().map(ToString::to_string).as_deref(),
+                case.expected_version,
+                "{}",
+                case.name
+            );
+            assert_eq!(
+                parsed.module_kind, case.expected_module_kind,
+                "{}",
+                case.name
+            );
+        }
 
         Ok(())
     }
@@ -617,6 +692,224 @@ mod tests {
     }
 
     #[test]
+    fn rejects_invalid_manifest_matrix() {
+        enum ExpectedError {
+            InvalidJson,
+            InvalidName(NpmPackageNameError),
+            EmptyType,
+            InvalidModuleKind(&'static str),
+            InvalidVersion(&'static str),
+            InvalidDependency {
+                section: &'static str,
+                name: &'static str,
+            },
+            InvalidOverride(&'static str),
+        }
+
+        struct Case {
+            name: &'static str,
+            manifest: serde_json::Value,
+            expected: ExpectedError,
+        }
+
+        let cases = [
+            Case {
+                name: "non-object root",
+                manifest: json!([]),
+                expected: ExpectedError::InvalidJson,
+            },
+            Case {
+                name: "reserved package name",
+                manifest: json!({ "name": "node_modules" }),
+                expected: ExpectedError::InvalidName(NpmPackageNameError::Reserved),
+            },
+            Case {
+                name: "empty module kind",
+                manifest: json!({ "type": "  " }),
+                expected: ExpectedError::EmptyType,
+            },
+            Case {
+                name: "unknown module kind",
+                manifest: json!({ "type": "amd" }),
+                expected: ExpectedError::InvalidModuleKind("amd"),
+            },
+            Case {
+                name: "invalid version",
+                manifest: json!({ "version": "not-a-version" }),
+                expected: ExpectedError::InvalidVersion("not-a-version"),
+            },
+            Case {
+                name: "invalid dev dependency",
+                manifest: json!({ "devDependencies": { "@scope": "1.0.0" } }),
+                expected: ExpectedError::InvalidDependency {
+                    section: "devDependencies",
+                    name: "@scope",
+                },
+            },
+            Case {
+                name: "invalid bundle dependency",
+                manifest: json!({ "bundleDependencies": ["not valid"] }),
+                expected: ExpectedError::InvalidDependency {
+                    section: "bundleDependencies",
+                    name: "not valid",
+                },
+            },
+            Case {
+                name: "invalid override shape",
+                manifest: json!({ "overrides": { "react": true } }),
+                expected: ExpectedError::InvalidOverride("$.overrides[\"react\"]"),
+            },
+        ];
+
+        for case in cases {
+            let error = NpmPackageJson::parse_package_json(Cursor::new(case.manifest.to_string()))
+                .expect_err(case.name);
+
+            match case.expected {
+                ExpectedError::InvalidJson => {
+                    assert!(
+                        matches!(error, PackageParseError::InvalidJson(_)),
+                        "{}",
+                        case.name
+                    )
+                }
+                ExpectedError::InvalidName(reason) => {
+                    assert!(
+                        matches!(
+                            error,
+                            PackageParseError::InvalidName { reason: actual, .. } if actual == reason
+                        ),
+                        "{}",
+                        case.name
+                    )
+                }
+                ExpectedError::EmptyType => {
+                    assert!(
+                        matches!(error, PackageParseError::EmptyType),
+                        "{}",
+                        case.name
+                    )
+                }
+                ExpectedError::InvalidModuleKind(type_field) => {
+                    assert!(
+                        matches!(
+                            error,
+                            PackageParseError::InvalidModuleKind { type_field: actual } if actual == type_field
+                        ),
+                        "{}",
+                        case.name
+                    )
+                }
+                ExpectedError::InvalidVersion(version) => {
+                    assert!(
+                        matches!(
+                            error,
+                            PackageParseError::InvalidPackageVersion { version: actual, .. } if actual == version
+                        ),
+                        "{}",
+                        case.name
+                    )
+                }
+                ExpectedError::InvalidDependency { section, name } => {
+                    assert!(
+                        matches!(
+                            error,
+                            PackageParseError::InvalidDependency { section: actual_section, name: actual_name, .. }
+                                if actual_section == section && actual_name == name
+                        ),
+                        "{}",
+                        case.name
+                    )
+                }
+                ExpectedError::InvalidOverride(path) => {
+                    assert!(
+                        matches!(
+                            error,
+                            PackageParseError::InvalidOverride { path: actual, .. } if actual == path
+                        ),
+                        "{}",
+                        case.name
+                    )
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn preserves_every_dependency_class_for_later_resolution() -> Result<(), PackageParseError> {
+        let parsed = NpmPackageJson::parse_package_json(Cursor::new(
+            json!({
+                "dependencies": { "runtime": "1.0.0" },
+                "devDependencies": { "development": "2.0.0" },
+                "peerDependencies": { "peer": "3.0.0" },
+                "peerDependenciesMeta": { "peer": { "optional": true } },
+                "optionalDependencies": { "optional": "4.0.0" },
+                "bundleDependencies": ["bundled"],
+            })
+            .to_string(),
+        ))?;
+
+        let names = parsed
+            .dependencies
+            .keys()
+            .chain(parsed.dev_dependencies.keys())
+            .chain(parsed.peer_dependencies.keys())
+            .chain(parsed.optional_dependencies.keys())
+            .chain(parsed.bundle_dependencies.as_slice())
+            .map(|name| name.as_str())
+            .collect::<HashSet<_>>();
+
+        assert_eq!(
+            names,
+            HashSet::from(["runtime", "development", "peer", "optional", "bundled"])
+        );
+        assert_eq!(
+            parsed.peer_dependencies_meta.get(&dependency_name("peer")),
+            Some(&PeerDependencyMeta { optional: true })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn parses_the_complex_manifest_fixture() -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = File::open(format!(
+            "{}/testdata/npm/package-json/complex-manifest.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))?;
+        let parsed = NpmPackageJson::parse_package_json(fixture)?;
+
+        assert_eq!(
+            parsed.name.as_ref().map(NpmPackageName::as_str),
+            Some("@night-vision/example")
+        );
+        assert_eq!(parsed.module_kind, ModuleKind::Module);
+        assert_eq!(parsed.dependencies.len(), 3);
+        assert_eq!(parsed.dev_dependencies.len(), 1);
+        assert_eq!(parsed.peer_dependencies.len(), 1);
+        assert_eq!(parsed.optional_dependencies.len(), 1);
+        assert_eq!(
+            parsed.bundle_dependencies.as_slice(),
+            &[dependency_name("runtime")]
+        );
+        assert_eq!(parsed.engines.get("node"), Some(&">=20".to_owned()));
+        assert_eq!(parsed.scripts.get("test"), Some(&"cargo test".to_owned()));
+        assert_eq!(
+            parsed.workspaces,
+            Workspaces::Configuration {
+                packages: vec!["packages/*".to_owned()],
+                nohoist: vec!["**/legacy".to_owned()],
+            }
+        );
+        assert!(matches!(
+            parsed.overrides.entries().get("runtime"),
+            Some(Override::Nested(_))
+        ));
+
+        Ok(())
+    }
+
+    #[test]
     fn shares_typed_dependency_results_with_packuments() -> Result<(), Box<dyn std::error::Error>> {
         let dependencies = json!({
             "react": "^19.0.0",
@@ -626,11 +919,13 @@ mod tests {
         let peer_dependencies = json!({ "react": "^19.0.0" });
         let peer_dependencies_meta = json!({ "react": { "optional": true } });
         let optional_dependencies = json!({ "fsevents": "~2.3.3" });
+        let dev_dependencies = json!({ "typescript": "^5.0.0" });
         let bundle_dependencies = json!(["react"]);
 
         let manifest = NpmPackageJson::parse_package_json(Cursor::new(
             json!({
                 "dependencies": dependencies,
+                "devDependencies": dev_dependencies,
                 "peerDependencies": peer_dependencies,
                 "peerDependenciesMeta": peer_dependencies_meta,
                 "optionalDependencies": optional_dependencies,
@@ -648,6 +943,7 @@ mod tests {
                         "name": "example",
                         "version": "1.0.0",
                         "dependencies": dependencies,
+                        "devDependencies": dev_dependencies,
                         "peerDependencies": peer_dependencies,
                         "peerDependenciesMeta": peer_dependencies_meta,
                         "optionalDependencies": optional_dependencies,
@@ -665,6 +961,7 @@ mod tests {
         let version = packument.versions.values().next().unwrap();
 
         assert_eq!(manifest.dependencies, version.dependencies);
+        assert_eq!(manifest.dev_dependencies, version.dev_dependencies);
         assert_eq!(manifest.peer_dependencies, version.peer_dependencies);
         assert_eq!(
             manifest.peer_dependencies_meta,
@@ -677,6 +974,33 @@ mod tests {
         assert_eq!(manifest.bundle_dependencies, version.bundle_dependencies);
 
         Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn parser_never_panics_for_arbitrary_bytes(input in proptest::collection::vec(any::<u8>(), 0..4096)) {
+            let _ = NpmPackageJson::parse_package_json(Cursor::new(input));
+        }
+
+        #[test]
+        fn parses_generated_valid_dependency_collections(
+            package in "[a-z][a-z0-9-]{0,12}",
+            dependency in "[a-z][a-z0-9-]{0,12}",
+            major in 0_u16..100,
+        ) {
+            let manifest = json!({
+                "name": package,
+                "version": format!("{major}.0.0"),
+                "dependencies": { dependency.clone(): format!("^{major}.0.0") },
+                "bundleDependencies": true,
+            });
+
+            let parsed = NpmPackageJson::parse_package_json(Cursor::new(manifest.to_string()))?;
+            let dependency = dependency_name(&dependency);
+
+            prop_assert!(parsed.dependencies.contains_key(&dependency));
+            prop_assert_eq!(parsed.bundle_dependencies.as_slice(), &[dependency]);
+        }
     }
 
     fn dependency_name(value: &str) -> super::super::types::DependencyPackageName {
