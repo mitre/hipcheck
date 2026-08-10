@@ -49,24 +49,18 @@ pub fn build_report(
 					.default_query_explanation(analysis.publisher.clone(), analysis.plugin.clone())?
 					.unwrap_or("output".to_owned());
 
-				builder.add_analysis(
-					Analysis::plugin(
-						name,
-						stored.passed,
-						stored.policy.clone(),
-						stored.value.clone(),
-						full_value,
-						message,
-					),
+				builder.add_analysis(Analysis::plugin(
+					name,
+					stored.passed,
+					stored.policy.clone(),
+					stored.value.clone(),
+					full_value,
+					message,
 					res.concerns.clone(),
-				)?;
+				))?;
 			}
 			Err(error) => {
-				builder.add_errored_analysis(
-					AnalysisIdent(name.clone()),
-					AnalysisIdent(name),
-					error,
-				);
+				builder.add_errored_analysis(AnalysisIdent(name), error);
 			}
 		}
 	}
@@ -94,10 +88,10 @@ pub struct ReportBuilder<'target> {
 	investigate_if_failed: HashSet<PolicyPluginName>,
 
 	/// What analyses passed.
-	passing: Vec<PassingAnalysis>,
+	passing: Vec<Analysis>,
 
 	/// What analyses failed.
-	failing: Vec<FailingAnalysis>,
+	failing: Vec<Analysis>,
 
 	/// What analyses encountered errors.
 	errored: Vec<ErroredAnalysis>,
@@ -138,39 +132,29 @@ impl<'target> ReportBuilder<'target> {
 	}
 
 	/// Add an analysis.
-	pub fn add_analysis(&mut self, analysis: Analysis, concerns: Vec<String>) -> Result<&mut Self> {
+	pub fn add_analysis(&mut self, analysis: Analysis) -> Result<&mut Self> {
 		if analysis.is_passing() {
 			Ok(self.add_passing_analysis(analysis))
 		} else {
-			self.add_failing_analysis(analysis, concerns)
+			self.add_failing_analysis(analysis)
 		}
 	}
 
 	/// Add an errored analysis to the report.
-	pub fn add_errored_analysis(
-		&mut self,
-		analysis: AnalysisIdent,
-		name: AnalysisIdent,
-		error: &Error,
-	) -> &mut Self {
-		self.errored
-			.push(ErroredAnalysis::new(analysis, name, error));
+	pub fn add_errored_analysis(&mut self, name: AnalysisIdent, error: &Error) -> &mut Self {
+		self.errored.push(ErroredAnalysis::new(name, error));
 		self
 	}
 
 	/// Add an analysis that passed.
 	fn add_passing_analysis(&mut self, analysis: Analysis) -> &mut Self {
-		self.passing.push(PassingAnalysis::new(analysis));
+		self.passing.push(analysis);
 		self
 	}
 
 	/// Add a failing analysis and any concerns associated with it.
-	fn add_failing_analysis(
-		&mut self,
-		analysis: Analysis,
-		concerns: Vec<String>,
-	) -> Result<&mut Self> {
-		self.failing.push(FailingAnalysis::new(analysis, concerns)?);
+	fn add_failing_analysis(&mut self, analysis: Analysis) -> Result<&mut Self> {
+		self.failing.push(analysis);
 		Ok(self)
 	}
 
@@ -196,8 +180,8 @@ impl<'target> ReportBuilder<'target> {
 		let repo_head = Arc::new(self.target.head());
 		let hipcheck_version = hc_version();
 		let analyzed_at = self.analyzed_at;
-		let passing = self.passing;
-		let failing = self.failing;
+		let mut passing = self.passing;
+		let mut failing = self.failing;
 		let errored = self.errored;
 		let recommendation = {
 			let score = self
@@ -215,7 +199,7 @@ impl<'target> ReportBuilder<'target> {
 
 			// Override base recommendation if any `investigate-if-fail` analyses failed
 			for failed in failing.iter() {
-				let (publisher, name) = failed.analysis.name.as_str().split_once('/').unwrap();
+				let (publisher, name) = failed.name.as_str().split_once('/').unwrap();
 				let policy_plugin_name = PolicyPluginName {
 					publisher: PluginPublisher(publisher.to_owned()),
 					name: PluginName(name.to_owned()),
@@ -239,6 +223,12 @@ impl<'target> ReportBuilder<'target> {
 
 			rec
 		};
+
+		// Sort the passing and failing analyses by the percent difference of their value compared to the threshold
+		passing.sort_by_key(|a| a.threshold_diff());
+		failing.sort_by_key(|a| a.threshold_diff());
+		// Reverse the order so the failing analyses start with the largest deviations from the threshold
+		failing.reverse();
 
 		let report = Report {
 			repo_name,

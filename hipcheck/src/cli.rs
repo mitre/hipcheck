@@ -1450,18 +1450,10 @@ mod tests {
 	}
 
 	#[test]
-	fn hc_check_schema_no_args_gives_help() {
+	fn hc_check_no_args_gives_help() {
 		let check_args = vec!["hc", "check"];
-		let schema_args = vec!["hc", "schema"];
 
 		let parsed = Cli::try_parse_from(check_args);
-		assert!(parsed.is_err());
-		assert_eq!(
-			parsed.unwrap_err().kind(),
-			clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
-		);
-
-		let parsed = Cli::try_parse_from(schema_args);
 		assert!(parsed.is_err());
 		assert_eq!(
 			parsed.unwrap_err().kind(),
