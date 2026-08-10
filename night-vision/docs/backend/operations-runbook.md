@@ -115,7 +115,23 @@ for Postgres before starting the backend.
 ## Logs
 
 Direct local `nv-server` logs go to the terminal that started the process. The
-current logger uses Dropshot terminal logging at `Info` level.
+current logger starts with debug logging disabled and by default uses Dropshot
+terminal logging at `Info` level.
+
+On Unix platforms, an operator can toggle debug logging for a running
+`nv-server` process without restarting it by sending `SIGUSR1` to the server
+process:
+
+```sh
+kill -USR1 <pid>
+```
+
+The first `SIGUSR1` enables debug log output. A second `SIGUSR1` disables debug
+log output again. The toggle state is process-local and resets to disabled when
+`nv-server` restarts.
+
+This signal-based toggle is available only on Unix platforms because it depends
+on `SIGUSR1`. It is not available for non-Unix builds.
 
 Compose services use Docker's `json-file` logging driver. The base Compose file
 limits each service to three 10 MB log files. Read service logs through the
