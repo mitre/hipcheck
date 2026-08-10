@@ -48,51 +48,16 @@ pub struct Report {
 	pub analyzed_at: Timestamp,
 
 	/// What analyses passed.
-	pub passing: Vec<PassingAnalysis>,
+	pub passing: Vec<Analysis>,
 
 	/// What analyses did _not_ pass, and why.
-	pub failing: Vec<FailingAnalysis>,
+	pub failing: Vec<Analysis>,
 
 	/// What analyses errored out, and why.
 	pub errored: Vec<ErroredAnalysis>,
 
 	/// The final recommendation to the user.
 	pub recommendation: Recommendation,
-}
-
-/// An analysis which passed.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(transparent)]
-#[schemars(crate = "schemars")]
-pub struct PassingAnalysis(
-	/// The analysis which passed.
-	Analysis,
-);
-
-impl PassingAnalysis {
-	pub fn new(analysis: Analysis) -> PassingAnalysis {
-		PassingAnalysis(analysis)
-	}
-}
-
-/// An analysis which failed, including potential specific concerns.
-#[derive(Debug, Serialize, JsonSchema)]
-#[schemars(crate = "schemars")]
-pub struct FailingAnalysis {
-	/// The analysis.
-	#[serde(flatten)]
-	analysis: Analysis,
-
-	/// Any concerns the analysis identified.
-	#[serde(skip_serializing_if = "no_concerns")]
-	concerns: Vec<String>,
-}
-
-impl FailingAnalysis {
-	/// Construct a new failing analysis, verifying that concerns are appropriate.
-	pub fn new(analysis: Analysis, concerns: Vec<String>) -> Result<FailingAnalysis> {
-		Ok(FailingAnalysis { analysis, concerns })
-	}
 }
 
 /// Is the concern list empty?
@@ -106,16 +71,14 @@ fn no_concerns(concerns: &[String]) -> bool {
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(crate = "schemars")]
 pub struct ErroredAnalysis {
-	analysis: AnalysisIdent,
 	name: AnalysisIdent,
 	error: ErrorReport,
 }
 
 impl ErroredAnalysis {
 	/// Construct a new `ErroredAnalysis`.
-	pub fn new(analysis: AnalysisIdent, name: AnalysisIdent, error: &Error) -> Self {
+	pub fn new(name: AnalysisIdent, error: &Error) -> Self {
 		ErroredAnalysis {
-			analysis,
 			name,
 			error: ErrorReport::from(error),
 		}
@@ -189,7 +152,7 @@ impl From<&(dyn std::error::Error + 'static)> for ErrorReport {
 
 /// An analysis, with score and threshold.
 #[derive(Debug, Serialize, JsonSchema, Clone)]
-#[serde(tag = "analysis")]
+// #[serde(tag = "analysis")]
 #[schemars(crate = "schemars")]
 pub struct Analysis {
 	/// The name of the plugin.
@@ -223,9 +186,19 @@ pub struct Analysis {
 	/// *why* an analysis failed.
 	final_value: Option<String>,
 
+	/// The value to which the final value is being compared, as set by the config file
+	/// 
+	/// We also use the percent difference between this and the final value (if it can be calcualted)
+	/// to determine the order in which passing and failing analyses are listed
+	threshold: Option<String>,
+
 	/// Either an English language explanation of why the plugin succeded or failed or the default query explanation (if an English explanation could not be constructed)
 	/// The default explanation is pulled from RPC with the plugin.
 	message: String,
+
+	/// Any concerns the analysis identified.
+	#[serde(skip_serializing_if = "no_concerns")]
+	concerns: Vec<String>,
 }
 
 // fn custom_schema(generator: &mut SchemaGenerator) -> Schema {
@@ -241,11 +214,12 @@ impl Analysis {
 		init_value: Option<Value>,
 		full_value: bool,
 		default_message: String,
+		concerns: Vec<String>,
 	) -> Self {
 		// Try to parse the policy expression to an English language explanation of why the plugin's analysis succeded or failed
 		// If it cannot be parsed, return the default explanation text
 		// At the same time, compute the raw value returned by the plugin in the policy expression and get that value, if it exists
-		let (message, final_value) = match policy_exprs::parse_expr_to_english(
+		let (message, final_value, threshold) = match policy_exprs::parse_expr_to_english(
 			&policy_expr,
 			&default_message,
 			&init_value,
@@ -261,6 +235,7 @@ impl Analysis {
 				(
 					default_message.clone(),
 					init_value.as_ref().map(|v| v.to_string()),
+					None,
 				)
 			}
 		};
@@ -277,12 +252,38 @@ impl Analysis {
 			policy_expr,
 			value,
 			final_value,
+			threshold,
 			message,
+			concerns,
 		}
 	}
 
 	pub fn is_passing(&self) -> bool {
 		self.passed
+	}
+
+	/// Return the percent difference between the measured value and the passing threshold, if the threshold is a nonzero number
+	pub fn threshold_diff(&self) -> i64 {
+		if let (Some(threshold), Some(value)) = (&self.threshold, &self.final_value)
+			&& let Ok(t) = threshold
+				.chars()
+				.filter(|c| c.is_ascii_digit() || *c == '.')
+				.collect::<String>()
+				.parse::<f64>()
+		{
+			if t == 0.0 {
+				return 0;
+			} else if let Ok(v) = value
+				.chars()
+				.filter(|c| c.is_ascii_digit() || *c == '.')
+				.collect::<String>()
+				.parse::<f64>()
+			{
+				return (((v - t) / t).abs() * 100.0).round() as i64;
+			}
+		}
+
+		0
 	}
 }
 

@@ -175,7 +175,7 @@ pub fn parse_expr_to_english(
 	message: &str,
 	value: &Option<Value>,
 	passed: bool,
-) -> Result<(String, Option<String>)> {
+) -> Result<(String, Option<String>, Option<String>)> {
 	// Create a standard environment, with its list of functions and their English descriptions
 	let env = Env::std();
 	// Store that environment and the plugin explanation message in a struct for English parsing
@@ -234,11 +234,16 @@ pub fn parse_expr_to_english(
 						.unwrap_or("no value was returned by the query".to_string())
 				),
 				inner_value,
+				Some(threshold),
 			));
 		}
 
 		// Recursively parse the top level function to English
 		let english_expr = english.visit_function(func)?;
+
+		// Parse the top level primitive to English
+		let threshold = english.visit_expr(&func.args[1])?;
+
 		return Ok((
 			format!(
 				"Expected {english_expr} but it was {}",
@@ -247,6 +252,7 @@ pub fn parse_expr_to_english(
 					.unwrap_or("no value was returned by the query".to_string())
 			),
 			inner_value,
+			Some(threshold),
 		));
 	}
 
