@@ -44,9 +44,9 @@ pub fn logger_with_dynamic_debug(
     // loggers will result in panics. In particular, it seems possible
     // for `slog_term` to produce `io::Error`s when writing logs.
     let drain = FullFormat::new(decorator).build().fuse();
-    let level_drain = DynamicDebugDrain::new(drain, level, debug_enabled).fuse();
-    let async_drain = Async::new(level_drain).chan_size(1024).build().fuse();
-    Logger::root(async_drain, slog::o!())
+    let async_drain = Async::new(drain).chan_size(1024).build().fuse();
+    let level_drain = DynamicDebugDrain::new(async_drain, level, debug_enabled).fuse();
+    Logger::root(level_drain, slog::o!())
 }
 
 struct DynamicDebugDrain<D> {
@@ -78,6 +78,10 @@ where
         }
 
         Ok(())
+    }
+
+    fn is_enabled(&self, level: Level) -> bool {
+        should_log(level, self.baseline_level, self.debug_enabled)
     }
 }
 
@@ -126,8 +130,8 @@ fn verbosity_filter_to_slog_level(filter: VerbosityFilter) -> slog::Level {
 
 #[cfg(test)]
 mod tests {
-    use super::{baseline_allows_level, should_log};
-    use slog::Level;
+    use super::{DynamicDebugDrain, baseline_allows_level, should_log};
+    use slog::{Discard, Drain as _, Level};
     use std::sync::atomic::AtomicBool;
 
     #[test]
@@ -141,6 +145,19 @@ mod tests {
 
         assert!(should_log(Level::Debug, Level::Info, Some(&debug_enabled)));
         assert!(should_log(Level::Error, Level::Info, Some(&debug_enabled)));
+    }
+
+    #[test]
+    fn dynamic_debug_drain_rejects_disabled_debug_records_before_enqueueing() {
+        let debug_enabled = Box::leak(Box::new(AtomicBool::new(false)));
+        let drain = DynamicDebugDrain::new(Discard, Level::Info, Some(debug_enabled));
+
+        assert!(!drain.is_enabled(Level::Debug));
+        assert!(drain.is_enabled(Level::Info));
+
+        debug_enabled.store(true, std::sync::atomic::Ordering::Relaxed);
+
+        assert!(drain.is_enabled(Level::Debug));
     }
 
     #[test]
