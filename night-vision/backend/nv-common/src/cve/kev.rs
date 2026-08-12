@@ -5,6 +5,7 @@ use percent_encoding::percent_decode_str;
 use sea_orm::{ColumnTrait as _, DatabaseConnection, EntityTrait as _, QueryFilter as _};
 use semver::Version;
 use serde_json::Value;
+use std::collections::HashMap;
 
 /// A reachable concrete NPM package version from a submitted package source.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -99,15 +100,23 @@ pub async fn kev_affected_npm_package_versions(
         .all(db)
         .await
         .map_err(KevNpmMatchError::Db)?;
+    let cve_records = cve_list_records::Entity::find()
+        .filter(
+            cve_list_records::Column::CveId
+                .is_in(kev_entries.iter().map(|entry| entry.cve_id.clone())),
+        )
+        .filter(cve_list_records::Column::Deleted.eq(false))
+        .all(db)
+        .await
+        .map_err(KevNpmMatchError::Db)?
+        .into_iter()
+        .map(|record| (record.cve_id.clone(), record))
+        .collect::<HashMap<_, _>>();
     let mut matches = Vec::new();
 
     for kev in kev_entries {
         let kev_context = kev_context_from_entry(&kev.cve_id, &kev.entry);
-        let cve_record = cve_list_records::Entity::find_by_id(&kev.cve_id)
-            .one(db)
-            .await
-            .map_err(KevNpmMatchError::Db)?;
-        let Some(cve_record) = cve_record.filter(|record| !record.deleted) else {
+        let Some(cve_record) = cve_records.get(&kev.cve_id) else {
             matches.push(unknown_without_cve_enrichment(kev_context));
             continue;
         };
@@ -569,6 +578,7 @@ impl std::error::Error for KevNpmMatchError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sea_orm::{DbBackend, MockDatabase};
     use serde_json::json;
 
     fn kev_context(cve_id: &str) -> KevContext {
@@ -821,5 +831,45 @@ mod tests {
                 .iter()
                 .any(|evidence| evidence.contains("no NPM affected package metadata"))
         );
+    }
+
+    #[test]
+    fn bulk_cve_lookup_uses_one_query_for_all_kev_entries() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_kev_entry("CVE-2026-1006")], vec![]])
+            .into_connection();
+
+        let matches = run_async(kev_affected_npm_package_versions(&db, &[]))
+            .expect("matching should succeed");
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].status, KevNpmMatchStatus::Unknown);
+        let transaction_log = db.into_transaction_log();
+        assert_eq!(transaction_log.len(), 2);
+        assert!(
+            transaction_log[1].statements()[0]
+                .sql
+                .contains(r#""cve_list_records"."cve_id" IN"#)
+        );
+    }
+
+    fn mock_kev_entry(cve_id: &str) -> cisa_kev_entries::Model {
+        let timestamp: sea_orm::prelude::DateTimeWithTimeZone =
+            "2026-08-03T00:00:00Z".parse().expect("valid timestamp");
+        cisa_kev_entries::Model {
+            cve_id: cve_id.to_owned(),
+            entry: json!({}),
+            first_seen_at: timestamp,
+            last_seen_at: timestamp,
+            updated_at: timestamp,
+        }
+    }
+
+    fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("test runtime should build")
+            .block_on(future)
     }
 }
