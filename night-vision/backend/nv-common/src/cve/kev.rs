@@ -429,17 +429,14 @@ fn reachable_npm_package_versions_from_source(
 
     if let Some(packages) = source.get("packages").and_then(Value::as_object) {
         for (path, package) in packages {
-            if path.is_empty() {
-                continue;
-            }
-            let Some(name) = package.get("name").and_then(Value::as_str) else {
+            let Some(name) = npm_package_name_from_lockfile_path(path) else {
                 continue;
             };
             let Some(version) = package.get("version").and_then(Value::as_str) else {
                 continue;
             };
             versions.push(ReachableNpmPackageVersion {
-                package_name: name.to_owned(),
+                package_name: name.clone(),
                 version: version.to_owned(),
                 source_evidence: format!("package-lock packages.{path} resolves {name}@{version}"),
             });
@@ -457,6 +454,18 @@ fn reachable_npm_package_versions_from_source(
     });
     versions.dedup_by(|a, b| a.package_name == b.package_name && a.version == b.version);
     Ok(versions)
+}
+
+fn npm_package_name_from_lockfile_path(path: &str) -> Option<String> {
+    let package_name = path.rsplit_once("node_modules/")?.1;
+    let valid_unscoped_name = !package_name.is_empty() && !package_name.contains('/');
+    let valid_scoped_name = package_name.strip_prefix('@').is_some_and(|name| {
+        name.split_once('/').is_some_and(|(scope, name)| {
+            !scope.is_empty() && !name.is_empty() && !name.contains('/')
+        })
+    });
+
+    (valid_unscoped_name || valid_scoped_name).then(|| package_name.to_owned())
 }
 
 fn collect_lockfile_dependencies(
@@ -694,16 +703,11 @@ mod tests {
     }
 
     #[test]
-    fn package_lock_versions_are_reachable_source_evidence() {
-        let source = r#"{
-            "lockfileVersion": 3,
-            "packages": {
-                "": { "name": "root", "version": "1.0.0" },
-                "node_modules/left-pad": { "name": "left-pad", "version": "1.1.0" }
-            }
-        }"#;
-
-        let versions = reachable_npm_package_versions_from_source(source).unwrap();
+    fn npm_v2_package_lock_versions_are_reachable_source_evidence() {
+        let versions = reachable_npm_package_versions_from_source(include_str!(
+            "../../testdata/npm/package-lock-v2.json"
+        ))
+        .unwrap();
 
         assert_eq!(
             versions,
@@ -712,6 +716,25 @@ mod tests {
                 version: "1.1.0".to_owned(),
                 source_evidence:
                     "package-lock packages.node_modules/left-pad resolves left-pad@1.1.0".to_owned(),
+            }]
+        );
+    }
+
+    #[test]
+    fn npm_v3_package_lock_derives_scoped_package_name_from_path() {
+        let versions = reachable_npm_package_versions_from_source(include_str!(
+            "../../testdata/npm/package-lock-v3.json"
+        ))
+        .unwrap();
+
+        assert_eq!(
+            versions,
+            vec![ReachableNpmPackageVersion {
+                package_name: "@scope/name".to_owned(),
+                version: "2.3.4".to_owned(),
+                source_evidence:
+                    "package-lock packages.node_modules/@scope/name resolves @scope/name@2.3.4"
+                        .to_owned(),
             }]
         );
     }
