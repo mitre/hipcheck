@@ -69,6 +69,9 @@ cargo-mutants = { pkg-path = "cargo-mutants" }
 # Used by `scripts/test.sh` to lint POSIX shell scripts.
 shellcheck = { pkg-path = "shellcheck" }
 
+# Used by shell scripts and frontend package-command wrappers.
+sed = { pkg-path = "gnused" }
+
 # Used to visualize unit-graphs by 'xtask' (provided the `dot` CLI)
 graphviz = { pkg-path = "graphviz" }
 
