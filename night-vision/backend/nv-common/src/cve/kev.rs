@@ -1,6 +1,7 @@
 //! KEV-linked vulnerability matching for reachable NPM package versions.
 
 use crate::db::entities::{cisa_kev_entries, cve_list_records, package_sources};
+use percent_encoding::percent_decode_str;
 use sea_orm::{ColumnTrait as _, DatabaseConnection, EntityTrait as _, QueryFilter as _};
 use semver::Version;
 use serde_json::Value;
@@ -269,7 +270,8 @@ fn package_name_from_affected_entry(entry: &Value) -> Option<String> {
 fn package_name_from_package_url(entry: &Value) -> Option<String> {
     let package_url = entry.get("packageURL").and_then(Value::as_str)?;
     let package_name = package_url.strip_prefix("pkg:npm/")?;
-    npm_package_name_from_string(package_name)
+    let package_name = percent_decode_str(package_name).decode_utf8().ok()?;
+    npm_package_name_from_string(&package_name)
 }
 
 fn npm_package_name_from_string(package_name: &str) -> Option<String> {
@@ -743,6 +745,18 @@ mod tests {
     fn package_name_from_affected_entry_preserves_scoped_npm_names() {
         let entry = json!({
             "packageURL": "pkg:npm/@scope/name@1.2.3"
+        });
+
+        assert_eq!(
+            package_name_from_affected_entry(&entry).as_deref(),
+            Some("@scope/name")
+        );
+    }
+
+    #[test]
+    fn package_name_from_affected_entry_decodes_encoded_scoped_npm_purl() {
+        let entry = json!({
+            "packageURL": "pkg:npm/%40scope/name@1.2.3"
         });
 
         assert_eq!(

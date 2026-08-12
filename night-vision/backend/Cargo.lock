@@ -2438,6 +2438,7 @@ dependencies = [
  "jiff",
  "migration",
  "node-semver",
+ "percent-encoding",
  "proptest",
  "sea-orm",
  "secrecy",

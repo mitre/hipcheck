@@ -17,6 +17,7 @@ futures-util.workspace = true
 itertools.workspace = true
 migration.workspace = true
 node-semver.workspace = true
+percent-encoding.workspace = true
 sea-orm.workspace = true
 secrecy.workspace = true
 semver.workspace = true
