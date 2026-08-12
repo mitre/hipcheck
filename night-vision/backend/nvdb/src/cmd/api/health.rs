@@ -100,6 +100,6 @@ mod tests {
         let message = error.to_string();
 
         assert!(message.contains("500 Internal Server Error"));
-        assert!(message.contains(r#"{\"status\": \"error\"}"#));
+        assert!(message.contains(r#"{"status": "error"}"#));
     }
 }
