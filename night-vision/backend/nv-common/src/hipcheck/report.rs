@@ -13,6 +13,7 @@
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::{error::Error, fmt};
+use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct HipcheckReport {
@@ -174,6 +175,12 @@ pub fn parse_hipcheck_report(input: &str) -> Result<HipcheckReport, HipcheckRepo
 }
 
 fn validate_report(report: &HipcheckReport) -> Result<(), HipcheckReportError> {
+    if !has_source_repository_url(&report.target.source_repository_url) {
+        return Err(HipcheckReportError::contract(
+            "target.source_repository_url must be an absolute HTTP(S) URL",
+        ));
+    }
+
     if report.target.kind == "npm"
         && !report
             .target
@@ -194,6 +201,11 @@ fn validate_report(report: &HipcheckReport) -> Result<(), HipcheckReportError> {
     Ok(())
 }
 
+fn has_source_repository_url(source_repository_url: &str) -> bool {
+    Url::parse(source_repository_url)
+        .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.has_host())
+}
+
 fn has_npm_package_version(purl: &str) -> bool {
     let Some(package_and_version) = purl.strip_prefix("pkg:npm/") else {
         return false;
@@ -202,9 +214,46 @@ fn has_npm_package_version(purl: &str) -> bool {
         .split_once(['?', '#'])
         .map_or(package_and_version, |(path, _)| path);
 
-    package_and_version
-        .rsplit_once('@')
-        .is_some_and(|(package, version)| !package.is_empty() && !version.is_empty())
+    let Some((package, version)) = package_and_version.split_once('@') else {
+        return false;
+    };
+
+    !version.is_empty()
+        && !version.contains('@')
+        && has_valid_percent_encoding(package)
+        && has_valid_percent_encoding(version)
+        && is_npm_package_name(package)
+}
+
+fn is_npm_package_name(package: &str) -> bool {
+    if let Some(scoped_package) = package.strip_prefix("%40") {
+        let Some((scope, name)) = scoped_package.split_once('/') else {
+            return false;
+        };
+
+        !scope.is_empty() && !name.is_empty() && !name.contains('/')
+    } else {
+        !package.is_empty() && !package.contains('/')
+    }
+}
+
+fn has_valid_percent_encoding(value: &str) -> bool {
+    let mut bytes = value.bytes();
+
+    while let Some(byte) = bytes.next() {
+        if byte != b'%' {
+            continue;
+        }
+
+        let (Some(first), Some(second)) = (bytes.next(), bytes.next()) else {
+            return false;
+        };
+        if !first.is_ascii_hexdigit() || !second.is_ascii_hexdigit() {
+            return false;
+        }
+    }
+
+    true
 }
 
 fn validate_timestamp(

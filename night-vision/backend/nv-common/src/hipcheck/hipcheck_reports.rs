@@ -73,6 +73,21 @@ fn missing_required_target_identity_is_rejected() {
 }
 
 #[test]
+fn empty_or_malformed_source_repository_url_is_rejected() {
+    for invalid_url in ["", "not a URL", "file:///tmp/repository"] {
+        let input = VALID_MVP_REPORT.replace("https://github.com/example/name", invalid_url);
+
+        let error = parse_hipcheck_report(&input)
+            .expect_err("source repository URL must be an absolute HTTP(S) URL");
+
+        assert_eq!(
+            error.detail(),
+            Some("target.source_repository_url must be an absolute HTTP(S) URL")
+        );
+    }
+}
+
+#[test]
 fn missing_required_check_state_is_rejected() {
     let input = VALID_MVP_REPORT.replacen("\n      \"state\": \"passed\",", "", 1);
 
@@ -115,4 +130,24 @@ fn npm_target_without_a_versioned_purl_is_rejected() {
         error.detail(),
         Some("target.purl must be a versioned npm package URL for npm targets")
     );
+}
+
+#[test]
+fn npm_target_with_malformed_purl_is_rejected() {
+    for malformed_purl in [
+        "pkg:npm/name@1.2.7@bogus",
+        "pkg:npm/%40scope/name@",
+        "pkg:npm/%40scope/@1.2.7",
+        "pkg:npm/name%2@1.2.7",
+    ] {
+        let input = VALID_MVP_REPORT.replace("pkg:npm/%40scope/name@1.2.7", malformed_purl);
+
+        let error = parse_hipcheck_report(&input)
+            .expect_err("npm target PURLs must contain one package name and version");
+
+        assert_eq!(
+            error.detail(),
+            Some("target.purl must be a versioned npm package URL for npm targets")
+        );
+    }
 }
