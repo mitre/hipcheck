@@ -1,25 +1,46 @@
 use anyhow::{Context as _, Result, bail};
+use migration::Migrator;
+use migration::MigratorTrait as _;
 use nv_common::config::Config;
+use nv_common::rt::AsyncRuntime;
+use sea_orm::Database;
 use secrecy::ExposeSecret as _;
+use slog::{Logger, warn};
 use std::{path::Path, process::Command};
 
 pub fn command() -> clap::Command {
     clap::Command::new("entity")
         .about("Manage SeaORM entities")
         .arg_required_else_help(true)
-        .subcommand(clap::Command::new("generate").about("Generate SeaORM entities"))
+        .subcommand(
+            clap::Command::new("generate")
+                .about("Generate SeaORM entities")
+                .arg(
+                    clap::Arg::new("allow-stale-schema")
+                        .long("allow-stale-schema")
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Continue entity generation when migrations are pending"),
+                ),
+        )
 }
 
-pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
-    if let Some(_matches) = matches.subcommand_matches("generate") {
-        return generate_entities(config);
+pub fn run(config: &Config, logger: &Logger, matches: &clap::ArgMatches) -> Result<()> {
+    if let Some(matches) = matches.subcommand_matches("generate") {
+        let allow_stale_schema = matches.get_flag("allow-stale-schema");
+
+        let runtime = AsyncRuntime::new(config)?;
+        return runtime.block_on(generate_entity_with_schema_check(
+            config,
+            logger,
+            allow_stale_schema,
+        ));
     }
 
     Ok(())
 }
 
 fn generate_entities(config: &Config) -> Result<()> {
-    let status = sea_orm_generate_entity_command(config.database_connection().expose_secret())
+    let status = sea_orm_generate_entity_command(config)
         .status()
         .context("failed to run sea-orm-cli generate entity")?;
 
@@ -30,12 +51,59 @@ fn generate_entities(config: &Config) -> Result<()> {
     Ok(())
 }
 
-fn sea_orm_generate_entity_command(database_url: &str) -> Command {
+fn sea_orm_generate_entity_command(config: &Config) -> Command {
+    let database_url = config.database_connection().expose_secret();
     sea_orm_generate_entity_command_with_output_dir(database_url, entity_output_dir())
 }
 
 fn entity_output_dir() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../nv-common/src/db/entities")
+}
+
+// accept db, borrowed db connection
+// returns ok on success and anyhow error on failure
+async fn stale_schema_check(
+    config: &Config,
+    logger: &Logger,
+    allow_stale_schema: bool,
+) -> Result<()> {
+    let db = config.database_connection().expose_secret();
+    let conn = Database::connect(db).await?;
+
+    let pending = Migrator::get_pending_migrations(&conn).await?;
+
+    if !pending.is_empty() {
+        let names = pending
+            .iter()
+            .map(sea_orm_migration::migrator::Migration::name)
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        if allow_stale_schema {
+            warn!(
+                logger,
+                "Database schema is stale; continuing due to --allow-stale-schema";
+                "pending_migrations" => names
+            );
+        } else {
+            bail!(
+                "Database schema is stale; apply pending migrations before generating \
+                 entities: {names}. To continue for a draft migration, pass \
+                 --allow-stale-schema."
+            );
+        }
+    }
+
+    Ok(())
+}
+
+async fn generate_entity_with_schema_check(
+    config: &Config,
+    logger: &Logger,
+    allow_stale_schema: bool,
+) -> Result<()> {
+    stale_schema_check(config, logger, allow_stale_schema).await?;
+    generate_entities(config)
 }
 
 fn sea_orm_generate_entity_command_with_output_dir(
@@ -80,6 +148,13 @@ mod tests {
         command()
             .try_get_matches_from(["entity", "generate"])
             .expect("generate subcommand should parse");
+    }
+
+    #[test]
+    fn entity_command_accepts_stale_schema_override() {
+        command()
+            .try_get_matches_from(["entity", "generate", "--allow-stale-schema"])
+            .expect("generate should accept the stale-schema override");
     }
 
     #[test]

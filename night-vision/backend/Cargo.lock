@@ -2508,6 +2508,7 @@ dependencies = [
  "nv-common",
  "reqwest",
  "sea-orm",
+ "sea-orm-migration",
  "secrecy",
  "serde",
  "serde_json",

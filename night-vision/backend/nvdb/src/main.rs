@@ -82,7 +82,7 @@ fn run() -> Result<()> {
         }
 
         if let Some(entity_matches) = db_matches.subcommand_matches("entity") {
-            return cmd::db::entity::run(&config, entity_matches);
+            return cmd::db::entity::run(&config, &log, entity_matches);
         }
 
         if let Some(migrate_matches) = db_matches.subcommand_matches("migrate") {
