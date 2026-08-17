@@ -3,7 +3,7 @@
 //! The fixtures implement the report shape documented in RFD 0002 and
 //! `docs/backend/hipcheck-integration.md`.
 
-use super::{HipcheckCheckState, HipcheckRecommendation, parse_hipcheck_report};
+use super::{HipcheckCheckState, HipcheckEffect, HipcheckRecommendation, parse_hipcheck_report};
 
 const VALID_MVP_REPORT: &str =
     include_str!("../../testdata/define-hipcheck/fixtures/valid_mvp.json");
@@ -11,6 +11,14 @@ const MISSING_OPTIONAL_FIELDS_REPORT: &str =
     include_str!("../../testdata/define-hipcheck/fixtures/missing_optional_fields.json");
 const MISSING_REQUIRED_FIELDS_REPORT: &str =
     include_str!("../../testdata/define-hipcheck/fixtures/missing_required_fields.json");
+const INVESTIGATE_REPORT: &str =
+    include_str!("../../testdata/define-hipcheck/fixtures/investigate.json");
+const UNSUPPORTED_CHECK_REPORT: &str =
+    include_str!("../../testdata/define-hipcheck/fixtures/unsupported_check.json");
+const PLUGIN_ERROR_REPORT: &str =
+    include_str!("../../testdata/define-hipcheck/fixtures/plugin_error.json");
+const MALFORMED_REPORT: &str =
+    include_str!("../../testdata/define-hipcheck/fixtures/malformed.json");
 
 #[test]
 fn valid_mvp_report_deserializes() {
@@ -26,6 +34,49 @@ fn valid_mvp_report_deserializes() {
     assert_eq!(report.policy.recommendation, HipcheckRecommendation::Pass);
     assert_eq!(report.checks.len(), 1);
     assert_eq!(report.checks[0].state, HipcheckCheckState::Passed);
+    assert_eq!(report.checks[0].value["packageSizeDelta"], 0);
+}
+
+#[test]
+fn investigate_report_uses_structured_fields_not_display_text() {
+    let report = parse_hipcheck_report(INVESTIGATE_REPORT).expect("valid INVESTIGATE report");
+
+    assert_eq!(
+        report.policy.recommendation,
+        HipcheckRecommendation::Investigate
+    );
+    assert_eq!(report.checks[0].state, HipcheckCheckState::Failed);
+    assert_eq!(report.checks[0].effect, HipcheckEffect::Review);
+    assert_eq!(report.checks[0].value["installScriptsChanged"], true);
+}
+
+#[test]
+fn unsupported_check_is_usable_as_missing_check_evidence() {
+    let report = parse_hipcheck_report(UNSUPPORTED_CHECK_REPORT)
+        .expect("valid report with an unsupported check");
+
+    let check = &report.checks[0];
+    assert_eq!(check.state, HipcheckCheckState::Unsupported);
+    assert_eq!(check.effect, HipcheckEffect::MissingCheck);
+    let error = check
+        .error
+        .as_ref()
+        .expect("unsupported check error details");
+    assert_eq!(error.kind, "target-resolution");
+    assert!(!error.retryable);
+}
+
+#[test]
+fn plugin_error_preserves_completed_checks_and_typed_error_details() {
+    let report =
+        parse_hipcheck_report(PLUGIN_ERROR_REPORT).expect("valid report with a plugin error");
+
+    assert_eq!(report.checks[0].state, HipcheckCheckState::Passed);
+    let failed_check = &report.checks[1];
+    assert_eq!(failed_check.state, HipcheckCheckState::Errored);
+    let error = failed_check.error.as_ref().expect("plugin error details");
+    assert_eq!(error.kind, "plugin");
+    assert!(error.retryable);
 }
 
 #[test]
@@ -44,14 +95,14 @@ fn missing_optional_fields_still_parse() {
 }
 
 #[test]
-fn missing_required_fields_fixture_is_rejected() {
+fn missing_required_fields_fixture_is_rejected_with_a_stable_error() {
     let error = parse_hipcheck_report(MISSING_REQUIRED_FIELDS_REPORT)
-        .expect_err("report is missing required target identity");
+        .expect_err("report is missing the required check state");
 
     assert!(
         error
             .to_string()
-            .contains("missing field `source_repository_url`")
+            .starts_with("invalid Hipcheck report JSON: missing field `state`")
     );
 }
 
@@ -111,7 +162,7 @@ fn missing_required_structured_value_is_rejected() {
 
 #[test]
 fn malformed_json_is_rejected_with_a_parse_error() {
-    let error = parse_hipcheck_report("{").expect_err("JSON must be complete");
+    let error = parse_hipcheck_report(MALFORMED_REPORT).expect_err("JSON must be complete");
 
     assert!(
         error

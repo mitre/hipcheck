@@ -6,13 +6,15 @@
   },
   "target": {
     "kind": "npm",
-    "purl": "pkg:npm/%40scope/name@1.2.7",
+    "purl": "pkg:npm/name@1.2.7",
     "source_repository_url": "https://github.com/example/name"
   },
   "policy": {
     "id": "night-vision-upgrade-assessment",
+    "version": "2026-07-02",
     "source": "policies/night-vision-upgrade-assessment.hcpolicy",
-    "recommendation": "PASS"
+    "recommendation": "INVESTIGATE",
+    "display": "PASS: display text is not part of the consumer contract"
   },
   "checks": [
     {
@@ -25,10 +27,12 @@
       "policy": {
         "expression": "plugin.release_delta == PASS"
       },
-      "effect": "context",
-      "summary": "missing required fields",
+      "state": "failed",
+      "effect": "review",
+      "summary": "release delta needs review",
+      "display": "passed",
       "value": {
-        "installScriptsChanged": false
+        "installScriptsChanged": true
       }
     }
   ]

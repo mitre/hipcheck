@@ -6,29 +6,33 @@
   },
   "target": {
     "kind": "npm",
-    "purl": "pkg:npm/%40scope/name@1.2.7",
+    "purl": "pkg:npm/name@1.2.7",
     "source_repository_url": "https://github.com/example/name"
   },
   "policy": {
     "id": "night-vision-upgrade-assessment",
     "source": "policies/night-vision-upgrade-assessment.hcpolicy",
-    "recommendation": "PASS"
+    "recommendation": "INVESTIGATE"
   },
   "checks": [
     {
       "plugin": {
-        "name": "npm-release-delta",
+        "name": "source-tag-mismatch",
         "publisher": "mitre",
         "version": "0.1.0",
-        "query": "release_delta"
+        "query": "source_tag_mismatch"
       },
       "policy": {
-        "expression": "plugin.release_delta == PASS"
+        "expression": "plugin.source_tag_mismatch == PASS"
       },
-      "effect": "context",
-      "summary": "missing required fields",
-      "value": {
-        "installScriptsChanged": false
+      "state": "unsupported",
+      "effect": "missing-check",
+      "summary": "source target is unsupported",
+      "value": null,
+      "error": {
+        "kind": "target-resolution",
+        "message": "source tag is unavailable",
+        "retryable": false
       }
     }
   ]

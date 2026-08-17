@@ -1,5 +1,5 @@
 {
-  "schema_version": "1",
+  "schema_version": "1"
   "hipcheck": {
     "version": "4.0.0-pre",
     "commit": "abc123def456"
@@ -25,8 +25,9 @@
       "policy": {
         "expression": "plugin.release_delta == PASS"
       },
+      "state": "passed",
       "effect": "context",
-      "summary": "missing required fields",
+      "summary": "no suspicious release delta detected",
       "value": {
         "installScriptsChanged": false
       }

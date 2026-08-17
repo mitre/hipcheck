@@ -6,13 +6,13 @@
   },
   "target": {
     "kind": "npm",
-    "purl": "pkg:npm/%40scope/name@1.2.7",
+    "purl": "pkg:npm/name@1.2.7",
     "source_repository_url": "https://github.com/example/name"
   },
   "policy": {
     "id": "night-vision-upgrade-assessment",
     "source": "policies/night-vision-upgrade-assessment.hcpolicy",
-    "recommendation": "PASS"
+    "recommendation": "INVESTIGATE"
   },
   "checks": [
     {
@@ -25,10 +25,31 @@
       "policy": {
         "expression": "plugin.release_delta == PASS"
       },
+      "state": "passed",
       "effect": "context",
-      "summary": "missing required fields",
+      "summary": "release delta completed",
       "value": {
         "installScriptsChanged": false
+      }
+    },
+    {
+      "plugin": {
+        "name": "source-tag-mismatch",
+        "publisher": "mitre",
+        "version": "0.1.0",
+        "query": "source_tag_mismatch"
+      },
+      "policy": {
+        "expression": "plugin.source_tag_mismatch == PASS"
+      },
+      "state": "errored",
+      "effect": "review",
+      "summary": "plugin did not complete",
+      "value": null,
+      "error": {
+        "kind": "plugin",
+        "message": "plugin process exited unexpectedly",
+        "retryable": true
       }
     }
   ]
