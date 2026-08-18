@@ -1,8 +1,9 @@
-use slog::{Logger, info};
-use std::sync::{
-    Arc, OnceLock,
-    atomic::{AtomicBool, Ordering},
-};
+use slog::Logger;
+#[cfg(unix)]
+use slog::info;
+#[cfg(unix)]
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, OnceLock, atomic::AtomicBool};
 use tokio::task::JoinHandle;
 
 static DEBUG_MODE: OnceLock<Arc<AtomicBool>> = OnceLock::new();
@@ -16,16 +17,19 @@ pub fn debug_mode_flag() -> &'static AtomicBool {
 
 /// Return whether process-wide debug mode is currently enabled.
 #[cfg_attr(not(test), expect(dead_code, reason = "Only used in tests, for now"))]
+#[cfg(unix)]
 pub fn debug_mode_enabled() -> bool {
     debug_mode_flag().load(Ordering::Relaxed)
 }
 
+#[cfg(unix)]
 fn toggle_debug_mode() -> bool {
     let was_enabled = debug_mode_flag().fetch_xor(true, Ordering::Relaxed);
     !was_enabled
 }
 
 /// Toggle debug logging in response to a received `SIGUSR1`.
+#[cfg(unix)]
 pub fn handle_sigusr1(log: &Logger) -> bool {
     let enabled = toggle_debug_mode();
     info!(log, "toggled debug logging via SIGUSR1"; "debug_enabled" => enabled);
@@ -65,13 +69,17 @@ pub fn spawn_sigusr1_listener(_log: Logger) -> JoinHandle<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{debug_mode_enabled, debug_mode_flag, handle_sigusr1};
+    use super::debug_mode_flag;
+    #[cfg(unix)]
+    use super::{debug_mode_enabled, handle_sigusr1};
+    #[cfg(unix)]
     use slog::Logger;
     use std::sync::atomic::Ordering;
     use std::sync::{Mutex, MutexGuard};
 
     static DEBUG_MODE_TEST_MUTEX: Mutex<()> = Mutex::new(());
 
+    #[cfg(unix)]
     fn discard_logger() -> Logger {
         Logger::root(slog::Discard, slog::o!())
     }
@@ -98,6 +106,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn handle_sigusr1_toggles_debug_mode_on_and_off() {
         let _guard = debug_mode_test_lock();
         let log = discard_logger();
