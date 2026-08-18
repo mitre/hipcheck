@@ -77,6 +77,7 @@ slog-term = "2.9.2"
 spookey = { path = "spookey" }
 # Should match the version used by `newtype-uuid`.
 uuid = "1.18.1"
+walkdir = "2.5.0"
 which = "8.0.2"
 windows-acls = { path = "windows-acls" }
 workspace-hack = { path = "workspace-hack" }
@@ -85,6 +86,9 @@ secrecy = "0.10.3"
 thiserror = "2.0.19"
 url = "2.5.7"
 reqwest = "0.13.4"
+httpmock = "0.8.3"
+proptest = "1.11.0"
+regex = "1.13.1"
 
 [workspace.dependencies.tokio]
 

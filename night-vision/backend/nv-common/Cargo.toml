@@ -34,5 +34,5 @@ windows-acls.workspace = true
 workspace-hack.workspace = true
 
 [dev-dependencies]
-proptest = "1.11.0"
+proptest = { workspace = true }
 sea-orm = { workspace = true, features = ["mock"] }

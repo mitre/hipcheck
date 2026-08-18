@@ -16,9 +16,11 @@ newtype-uuid.workspace = true
 patharg = { workspace = true }
 pathbuf.workspace = true
 petgraph = { workspace = true }
+regex = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true
 uuid = { workspace = true }
+walkdir = { workspace = true }
 which.workspace = true
 workspace-hack.workspace = true
 xshell.workspace = true
