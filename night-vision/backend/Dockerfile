@@ -14,6 +14,8 @@
 # Keep these versions synced with the versions set in `.flox/env/manifest.toml`.
 ARG RUST_VERSION=1.95.0-bookworm
 ARG CARGO_CHEF_VERSION=0.1.77
+ARG HIPCHECK_RUST_VERSION=1.95.0-bookworm
+ARG HIPCHECK_COMMIT=06a3db9394742a58a7fb3412b677db25feb6f678
 
 # OCI Image Metadata.
 ARG IMAGE_CREATED
@@ -81,6 +83,37 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --locked --release --bin nv-server
 
 # ================================================================================================
+# Hipcheck Artifact Layer
+# ------------------------------------------------------------------------------------------------
+
+# Hipcheck is intentionally built from this immutable upstream revision, rather
+# than discovered from the developer PATH or a floating plugin manifest.
+FROM rust:${HIPCHECK_RUST_VERSION} AS hipcheck-builder
+
+ARG HIPCHECK_COMMIT
+
+RUN --mount=type=secret,id=ca_file,target=/tmp/build-ca.crt,required=false \
+    apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates git mold pkg-config protobuf-compiler \
+    && if [ -s /tmp/build-ca.crt ]; then \
+        cat /tmp/build-ca.crt >> /etc/ssl/certs/ca-certificates.crt; \
+    fi \
+    && rm -rf /var/lib/apt/lists/* \
+    && git init /usr/src/hipcheck \
+    && git -C /usr/src/hipcheck remote add origin https://github.com/mitre/hipcheck.git \
+    && git -C /usr/src/hipcheck fetch --depth 1 origin "${HIPCHECK_COMMIT}" \
+    && git -C /usr/src/hipcheck checkout --detach FETCH_HEAD \
+    && test "$(git -C /usr/src/hipcheck rev-parse HEAD)" = "${HIPCHECK_COMMIT}"
+
+WORKDIR /usr/src/hipcheck
+
+# The MVP policy uses only the MITRE binary-analysis plugin. Both executables
+# are compiled from the same immutable Hipcheck source revision.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo build --locked --release --package hipcheck --package binary
+
+# ================================================================================================
 # Runtime Layer
 # ------------------------------------------------------------------------------------------------
 
@@ -108,18 +141,23 @@ ENV DEBIAN_FRONTEND=noninteractive
 # workflows, not for this container runtime.
 RUN --mount=type=secret,id=ca_file,target=/tmp/build-ca.crt,required=false \
     apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates curl git \
+    && apt-get install --yes --no-install-recommends ca-certificates curl git nodejs npm \
     && if [ -s /tmp/build-ca.crt ]; then \
         cat /tmp/build-ca.crt >> /etc/ssl/certs/ca-certificates.crt; \
     fi \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --home-dir /nonexistent --shell /usr/sbin/nologin nv-server \
-    && mkdir -p /etc/night-vision /var/cache/night-vision
+    && mkdir -p /etc/night-vision /opt/night-vision/hipcheck /var/cache/night-vision/hipcheck /var/lib/night-vision/hipcheck
 
 COPY --from=builder /usr/src/night-vision/target/release/nv-server /usr/local/bin/nv-server
+COPY --from=hipcheck-builder /usr/src/hipcheck/target/release/hc /usr/local/bin/hc
+COPY --from=hipcheck-builder /usr/src/hipcheck/target/release/binary /opt/night-vision/hipcheck/target/release/binary
 COPY deploy/nv-server.spookey /etc/night-vision/nv-server.spookey
+COPY hipcheck/config /opt/night-vision/hipcheck/config
+COPY hipcheck/plugins /opt/night-vision/hipcheck/plugins
 
-RUN chown -R nv-server:nv-server /etc/night-vision /var/cache/night-vision
+RUN chown -R nv-server:nv-server /etc/night-vision /opt/night-vision /var/cache/night-vision /var/lib/night-vision
+WORKDIR /opt/night-vision/hipcheck
 USER nv-server
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/nv-server"]

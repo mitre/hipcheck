@@ -61,6 +61,9 @@ services:
       # The root filesystem stays read-only, but CVE List Git sync needs a
       # persistent writable parent directory for its checkout path.
       - nv-server-cache:/var/cache/night-vision
+      # Hipcheck artifacts are part of the immutable backend image. Only its
+      # bounded cache and Night Vision-managed work/data directory are writable.
+      - nv-server-hipcheck-data:/var/lib/night-vision/hipcheck
     secrets:
       - source: nv-server-database-url
         target: nv-server/database-url
@@ -110,6 +113,7 @@ services:
 
 volumes:
   nv-server-cache:
+  nv-server-hipcheck-data:
   postgres-data:
 
 networks:

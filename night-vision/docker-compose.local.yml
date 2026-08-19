@@ -31,6 +31,8 @@ services:
 volumes:
   nv-server-cache:
     name: night-vision-local-nv-server-cache
+  nv-server-hipcheck-data:
+    name: night-vision-local-nv-server-hipcheck-data
   postgres-data:
     name: night-vision-local-postgres-data
 

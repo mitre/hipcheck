@@ -124,10 +124,13 @@ prerequisite.
 
 ## Hipcheck Version and Reporting Strategy
 
-Night Vision should track a pinned commit from Hipcheck's `main` branch for the
-MVP integration. That branch is the pre-release line for Hipcheck 4.0.0, and is
-the right target for integration work that may need coordinated changes on both
-sides. Night Vision should not rely on a floating local Hipcheck installation.
+Night Vision pins Hipcheck `main` commit
+[`06a3db9394742a58a7fb3412b677db25feb6f678`](https://github.com/mitre/hipcheck/commit/06a3db9394742a58a7fb3412b677db25feb6f678)
+for the MVP integration. The pinned source reports version `3.15.0` and is
+built with its locked dependency set. The artifact layout and policy are
+defined in [`backend/hipcheck/README.md`](../../backend/hipcheck/README.md).
+Night Vision must not rely on a floating local Hipcheck installation or a
+floating plugin manifest.
 
 Because Hipcheck and Night Vision are both MITRE-maintained projects, the teams
 have room to add upstream Hipcheck report fields when Night Vision needs better

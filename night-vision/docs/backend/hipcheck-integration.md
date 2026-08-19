@@ -144,10 +144,12 @@ results.
 
 ### Deployment
 
-Night Vision deployments will need a known Hipcheck binary, policy file, and
-plugin artifacts. For local development this can be handled through Flox or
-developer setup. For containerized deployment, the backend image should include
-or mount:
+Night Vision deployments use the immutable artifact layout documented in
+[`backend/hipcheck/README.md`](../../backend/hipcheck/README.md). It names the
+pinned Hipcheck commit, exact runtime paths, and the command shape used by the
+backend boundary. For local development, build the backend image and invoke its
+bundled `hc`; do not install or discover a system `hc`. For containerized
+deployment, the backend image includes:
 
 - the `hc` binary;
 - Night Vision's predetermined Hipcheck policy file;
@@ -156,7 +158,10 @@ or mount:
   plugins;
 - writable cache and data directories with bounded retention.
 
-The MVP should prefer reproducible artifacts over floating plugin resolution.
+Compose mounts only `/var/cache/night-vision/hipcheck` and
+`/var/lib/night-vision/hipcheck` as writable storage. The policy, exec
+configuration, manifests, and executable artifacts remain in the read-only
+image. The MVP must prefer reproducible artifacts over floating plugin resolution.
 Night Vision-owned plugins should be built and packaged from the same Night
 Vision change set as the policy and backend integration. Later deployments can
 add a stronger plugin update process, artifact mirroring, and cache management
