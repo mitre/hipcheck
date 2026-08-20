@@ -119,8 +119,8 @@ pub struct Config {
     /// should be fetched.
     pub kev_url: Option<reqwest::Url>,
 
-    /// The time interval between refreshes of the KEV data from its source URL.
-    pub kev_refresh_interval: Option<jiff::Span>,
+    /// The interval in milliseconds between refreshes of KEV data from its source URL.
+    pub kev_refresh_interval: Option<u64>,
 
     /// The maximum size in bytes for the request body.
     ///
@@ -434,8 +434,8 @@ impl Config {
         let openapi_dest_path: Option<Utf8PathBuf> =
             parse_value(&parsed, "openapi-dest-path", &mut errors);
         let kev_url: Option<reqwest::Url> = parse_value(&parsed, "kev-url", &mut errors);
-        let kev_refresh_interval: Option<jiff::Span> =
-            parse_value(&parsed, "kev-refresh-interval", &mut errors);
+        let kev_refresh_interval =
+            parse_kev_refresh_interval(&parsed, "kev-refresh-interval", &mut errors);
         let http_request_body_max_bytes =
             parse_value(&parsed, "http-request-body-max-bytes", &mut errors);
         let http_early_disconnect_behavior =
@@ -952,15 +952,12 @@ fn parse_positive_usize(
     value
 }
 
-fn parse_positive_u64(
+fn parse_positive_u64_option(
     parsed: &spookey::ParseResult,
     key: &'static str,
-    default: u64,
     errors: &mut Vec<ConfigError>,
-) -> u64 {
-    let Some(value) = parse_value::<u64>(parsed, key, errors) else {
-        return default;
-    };
+) -> Option<u64> {
+    let value = parse_value::<u64>(parsed, key, errors)?;
 
     if value == 0 {
         errors.push(ConfigError::StrParse(StrParseError {
@@ -969,9 +966,39 @@ fn parse_positive_u64(
             err: "must be greater than 0".into(),
         }));
 
-        default
+        None
     } else {
-        value
+        Some(value)
+    }
+}
+
+fn parse_positive_u64(
+    parsed: &spookey::ParseResult,
+    key: &'static str,
+    default: u64,
+    errors: &mut Vec<ConfigError>,
+) -> u64 {
+    parse_positive_u64_option(parsed, key, errors).unwrap_or(default)
+}
+
+fn parse_kev_refresh_interval(
+    parsed: &spookey::ParseResult,
+    key: &'static str,
+    errors: &mut Vec<ConfigError>,
+) -> Option<u64> {
+    // Jiff accepts at most 631,107,417,600,000 milliseconds in a Span.
+    const MAX_JIFF_SPAN_MILLISECONDS: u64 = 631_107_417_600_000;
+
+    let value = parse_positive_u64_option(parsed, key, errors)?;
+    if value > MAX_JIFF_SPAN_MILLISECONDS {
+        errors.push(ConfigError::StrParse(StrParseError {
+            key: key.to_owned().into_boxed_str(),
+            value: value.to_string().into_boxed_str(),
+            err: format!("must not exceed {MAX_JIFF_SPAN_MILLISECONDS}").into_boxed_str(),
+        }));
+        None
+    } else {
+        Some(value)
     }
 }
 
@@ -1345,6 +1372,13 @@ mod tests {
                 assert_eq!(config.server_address, "0.0.0.0:9000");
             })
             .with_server_address("0.0.0.0:9000"),
+            ConfigFieldParseCase::new(
+                "kev_refresh_interval",
+                "kev-refresh-interval = 900000",
+                |config, _| {
+                    assert_eq!(config.kev_refresh_interval, Some(900_000));
+                },
+            ),
             ConfigFieldParseCase::new(
                 "http_request_body_max_bytes",
                 "http-request-body-max-bytes = 2048",
@@ -1774,6 +1808,14 @@ mod tests {
             ),
             ("async-global-queue-interval", "sometimes", "invalid digit"),
             ("async-event-interval", "often", "invalid digit"),
+            ("kev-refresh-interval", "PT1H", "invalid digit"),
+            ("kev-refresh-interval", "-1", "invalid digit"),
+            ("kev-refresh-interval", "0", "must be greater than 0"),
+            (
+                "kev-refresh-interval",
+                "631107417600001",
+                "must not exceed 631107417600000",
+            ),
             (
                 "cve-list-repository-url",
                 "not-a-url",

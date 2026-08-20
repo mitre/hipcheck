@@ -26,14 +26,10 @@ openapi-dest-path = "openapi/nv-server-openapi.json"
 # Default: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 kev-url =
 
-# The time interval between KEV Catalog sync runs. The format is an
-# ISO 8601 time span string, or more specifically, what `jiff::Span`
-# parses.
+# The interval in milliseconds between KEV Catalog sync runs.
+# Must be greater than 0.
 #
-# Must not contain time units larger than hours.
-# Must be a positive time span.
-#
-# Default: "PT1h" (1 hour)
+# Default: 3600000 (1 hour)
 kev-refresh-interval =
 
 # Maximum size in bytes for the request body.

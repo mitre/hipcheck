@@ -14,7 +14,7 @@ use sea_orm::{
 };
 use sea_orm::{DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, Set, Statement};
 use serde::Deserialize;
-use slog::{Logger, debug, error, info, warn};
+use slog::{Logger, debug, error, info};
 use std::{
     borrow::ToOwned,
     error::Error as _,
@@ -25,6 +25,7 @@ use tokio::time::sleep;
 
 pub const DEFAULT_KEV_URL: &str =
     "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
+const DEFAULT_KEV_REFRESH_INTERVAL_MILLISECONDS: u64 = 3_600_000;
 
 /// PostgreSQL advisory lock key used to serialize KEV sync work.
 /// ASCII text: "KEV_SYNC"
@@ -163,17 +164,28 @@ pub enum RequestMode {
 
 #[derive(Debug, Clone)]
 struct KevConfig {
-    kev_refresh_interval: Option<jiff::Span>,
+    kev_refresh_interval: jiff::Span,
     kev_url: Option<reqwest::Url>,
 }
 
 impl KevConfig {
     fn from_config(config: &Config) -> Self {
+        let refresh_interval_milliseconds = config
+            .kev_refresh_interval
+            .unwrap_or(DEFAULT_KEV_REFRESH_INTERVAL_MILLISECONDS);
         Self {
-            kev_refresh_interval: config.kev_refresh_interval,
+            kev_refresh_interval: kev_refresh_interval_span(refresh_interval_milliseconds),
             kev_url: config.kev_url.clone(),
         }
     }
+}
+
+fn kev_refresh_interval_span(milliseconds: u64) -> jiff::Span {
+    let milliseconds = i64::try_from(milliseconds)
+        .expect("KEV refresh interval was validated while parsing configuration");
+    jiff::Span::new()
+        .try_milliseconds(milliseconds)
+        .expect("KEV refresh interval was validated while parsing configuration")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -199,15 +211,8 @@ pub fn spawn_kev_sync_worker(
 async fn loop_fetch_kev(config: KevConfig, db: DatabaseConnection, log: Logger) {
     info!(log, "started KEV sync worker");
 
-    let default_interval = jiff::Span::new().hours(1);
-    let default_interval_duration = Duration::from_hours(1);
-    let refresh_interval = config.kev_refresh_interval.unwrap_or(default_interval);
-    // NOTE: can fail if the Span has units larger than hours
-    let interval = Duration::try_from(refresh_interval)
-        .unwrap_or_else(|e| {
-            warn!(log, "failed to convert KEV refresh interval {refresh_interval} to `std::time::Duration`; defaulting to 1 hour. Caused by:\n\t{e}");
-            default_interval_duration
-    });
+    let interval = Duration::try_from(config.kev_refresh_interval)
+        .expect("KEV refresh interval was constructed from validated milliseconds");
 
     loop {
         let res = sync_kev(
@@ -677,6 +682,18 @@ mod tests {
         assert!(upsert_sql.contains("IS DISTINCT FROM EXCLUDED.entry"));
         assert!(upsert_sql.contains("ELSE cisa_kev_entries.updated_at END"));
         assert!(!upsert_sql.contains(r#""first_seen_at" = "#));
+    }
+
+    #[test]
+    fn kev_refresh_interval_span_uses_milliseconds() {
+        assert_eq!(
+            kev_refresh_interval_span(DEFAULT_KEV_REFRESH_INTERVAL_MILLISECONDS).get_milliseconds(),
+            3_600_000
+        );
+        assert_eq!(
+            kev_refresh_interval_span(900_000).get_milliseconds(),
+            900_000
+        );
     }
 
     #[test]
