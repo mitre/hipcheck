@@ -51,6 +51,7 @@ sea-schema = { version = "0.18", default-features = false, features = ["discover
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_core = { version = "1", features = ["alloc", "rc"] }
 serde_json = { version = "1", features = ["raw_value"] }
+sha2 = { version = "0.10" }
 slab = { version = "0.4" }
 slog = { version = "2", features = ["dynamic-keys", "release_max_level_debug"] }
 smallvec = { version = "1", default-features = false, features = ["const_new"] }

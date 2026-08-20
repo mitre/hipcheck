@@ -95,6 +95,7 @@ pub enum KevError {
     InvalidCatalog(serde_json::Error),
     InvalidCatalogEntry(serde_json::Error),
     InvalidCatalogReleaseDate(chrono::ParseError),
+    EntryCountOutOfRange(usize),
     ReqwestError(reqwest::Error),
     SeaOrmError(sea_orm::DbErr),
     SyncRunNotFound(i64),
@@ -152,6 +153,9 @@ impl Display for KevError {
             Self::CatalogCountOutOfRange(count) => {
                 write!(f, "KEV catalog count {count} exceeds the database range")
             }
+            Self::EntryCountOutOfRange(count) => {
+                write!(f, "KEV entry count {count} exceeds the database range")
+            }
             Self::CatalogResponseBodyTooLarge { max_bytes } => {
                 write!(
                     f,
@@ -203,6 +207,7 @@ impl std::error::Error for KevError {
         match self {
             Self::CatalogCountMismatch { .. } => None,
             Self::CatalogCountOutOfRange(_) => None,
+            Self::EntryCountOutOfRange(_) => None,
             Self::CatalogResponseBodyTooLarge { .. } => None,
             Self::ConflictingDuplicateCveId(_) => None,
             Self::DatabaseConnectionError(err) => Some(err),
@@ -679,7 +684,7 @@ fn kev_entry_upsert_statement(entries: &[KevEntry]) -> Statement {
 
     let mut sql =
         String::from("INSERT INTO \"public\".\"cisa_kev_entries\" (\"cve_id\", \"entry\") VALUES ");
-    let mut values = Vec::with_capacity(entries.len() * 2);
+    let mut values = Vec::new();
 
     for (index, entry) in entries.iter().enumerate() {
         if index > 0 {
@@ -739,7 +744,7 @@ fn deduplicate_entries(entries: Vec<KevEntry>, log: &Logger) -> Result<Vec<KevEn
 }
 
 fn count_to_i32(value: usize) -> Result<i32, KevError> {
-    i32::try_from(value).map_err(|_| KevError::CatalogCountOutOfRange(value as i64))
+    i32::try_from(value).map_err(|_| KevError::EntryCountOutOfRange(value))
 }
 
 /// Cancellation: TODO

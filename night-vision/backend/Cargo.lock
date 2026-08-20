@@ -5042,6 +5042,7 @@ dependencies = [
  "serde",
  "serde_core",
  "serde_json",
+ "sha2 0.10.9",
  "slab",
  "slog",
  "smallvec",
