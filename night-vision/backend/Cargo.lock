@@ -2435,6 +2435,7 @@ dependencies = [
  "clap-verbosity-flag",
  "dropshot",
  "futures-util",
+ "httpmock",
  "itertools",
  "jiff",
  "migration",

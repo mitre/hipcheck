@@ -98,6 +98,7 @@ pub enum KevError {
     SeaOrmError(sea_orm::DbErr),
     SyncRunNotFound(i64),
     TransactionLockError,
+    UnexpectedResponseStatus(StatusCode),
 }
 
 impl From<DatabaseConnectionError> for KevError {
@@ -180,6 +181,12 @@ impl Display for KevError {
             Self::TransactionLockError => {
                 write!(f, "failed to acquire exclusive database lock to sync data")
             }
+            Self::UnexpectedResponseStatus(status) => {
+                write!(
+                    f,
+                    "KEV catalog request returned unexpected HTTP status {status}"
+                )
+            }
         }
     }
 }
@@ -198,6 +205,7 @@ impl std::error::Error for KevError {
             Self::SeaOrmError(err) => Some(err),
             Self::SyncRunNotFound(_) => None,
             Self::TransactionLockError => None,
+            Self::UnexpectedResponseStatus(_) => None,
         }
     }
 }
@@ -406,17 +414,12 @@ async fn fetch_kev(
         .kev_url
         .clone()
         .unwrap_or(Url::parse(DEFAULT_KEV_URL).expect("default URL should be valid"));
-    let request = client.get(url.clone()).headers(headers);
-    debug!(log, "KEV Sync: Sending request for KEV Catalog";
-        "url" => ?url,
-        "request" => ?request);
 
     // TODO
     // save expires and cache-control from response
     // cache-control max-age directive provides number of seconds until server
     // considers it stale; use that as time to refresh
-    let response = request.send().await?;
-    debug!(log, "KEV Sync: Got KEV Catalog response"; "response" => ?response);
+    let response = request_kev_catalog(&client, url, headers, &log).await?;
 
     let status = response.status();
     let cache_metadata = cache_metadata_for_response(
@@ -473,6 +476,28 @@ async fn fetch_kev(
         records_updated: summary.records_updated,
         error: None,
     })
+}
+
+async fn request_kev_catalog(
+    client: &Client,
+    url: Url,
+    headers: HeaderMap,
+    log: &Logger,
+) -> Result<Response, KevError> {
+    let request = client.get(url.clone()).headers(headers);
+    debug!(log, "KEV Sync: Sending request for KEV Catalog";
+        "url" => ?url,
+        "request" => ?request);
+
+    let response = request.send().await?;
+    debug!(log, "KEV Sync: Got KEV Catalog response"; "response" => ?response);
+
+    let status = response.status();
+    if status != StatusCode::OK && status != StatusCode::NOT_MODIFIED {
+        return Err(KevError::UnexpectedResponseStatus(status));
+    }
+
+    Ok(response)
 }
 
 fn validate_catalog_count(declared: i64, actual: usize) -> Result<(), KevError> {
@@ -858,6 +883,7 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use camino::Utf8PathBuf;
+    use httpmock::prelude::*;
     use sea_orm::{DbBackend, MockDatabase, MockExecResult, Value};
     use secrecy::ExposeSecret as _;
     use serde_json::json;
@@ -867,6 +893,44 @@ mod tests {
 
     const CONFIG_PATH_ENV: &str = "NV_POSTGRES_INTEGRATION_CONFIG_PATH";
     const DEFAULT_CONFIG_PATH: &str = "src/cve/testdata/nv-server.integration.spookey";
+    const VALID_KEV_CATALOG: &str = r#"{
+        "catalogVersion": "2026.08.20",
+        "count": 0,
+        "dateReleased": "2026-08-20T00:00:00Z",
+        "vulnerabilities": []
+    }"#;
+
+    #[test]
+    fn kev_catalog_request_accepts_ok_response() {
+        let server = MockServer::start();
+        let _mock = server.mock(|when, then| {
+            when.method(GET).path("/kev");
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(VALID_KEV_CATALOG);
+        });
+        let log = slog::Logger::root(slog::Discard, slog::o!());
+
+        let response = run_async(request_kev_catalog(
+            &Client::new(),
+            Url::parse(&server.url("/kev")).expect("mock URL should be valid"),
+            HeaderMap::new(),
+            &log,
+        ))
+        .expect("200 response should be accepted");
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn kev_catalog_request_rejects_partial_content_response() {
+        assert_kev_catalog_request_rejects_status(206, StatusCode::PARTIAL_CONTENT);
+    }
+
+    #[test]
+    fn kev_catalog_request_rejects_server_error_response() {
+        assert_kev_catalog_request_rejects_status(500, StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     #[test]
     #[ignore = "requires a disposable Postgres test database"]
@@ -1361,6 +1425,30 @@ mod tests {
             .map(|url| url.path().trim_start_matches('/').to_owned())
             .filter(|database| !database.is_empty())
             .unwrap_or_else(|| "<unknown>".to_owned())
+    }
+
+    fn assert_kev_catalog_request_rejects_status(status: u16, expected: StatusCode) {
+        let server = MockServer::start();
+        let _mock = server.mock(|when, then| {
+            when.method(GET).path("/kev");
+            then.status(status)
+                .header("content-type", "application/json")
+                .body(VALID_KEV_CATALOG);
+        });
+        let log = slog::Logger::root(slog::Discard, slog::o!());
+
+        let error = run_async(request_kev_catalog(
+            &Client::new(),
+            Url::parse(&server.url("/kev")).expect("mock URL should be valid"),
+            HeaderMap::new(),
+            &log,
+        ))
+        .expect_err("non-OK response should be rejected");
+
+        assert!(matches!(
+            error,
+            KevError::UnexpectedResponseStatus(status) if status == expected
+        ));
     }
 
     fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
