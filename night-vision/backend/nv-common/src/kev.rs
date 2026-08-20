@@ -18,9 +18,10 @@ use sea_orm::{
 };
 use serde::Deserialize;
 use sha2::{Digest as _, Sha256};
-use slog::{Logger, debug, error, info};
+use slog::{Logger, debug, error, info, warn};
 use std::{
     borrow::ToOwned,
+    collections::HashMap,
     error::Error as _,
     fmt::{Debug, Display, Write as _},
     time::Duration,
@@ -88,6 +89,7 @@ pub struct Vulnerability {
 pub enum KevError {
     CatalogCountMismatch { declared: i64, actual: usize },
     CatalogCountOutOfRange(i64),
+    ConflictingDuplicateCveId(String),
     DatabaseConnectionError(DatabaseConnectionError),
     InvalidCatalog(serde_json::Error),
     InvalidCatalogEntry(serde_json::Error),
@@ -148,6 +150,12 @@ impl Display for KevError {
             Self::CatalogCountOutOfRange(count) => {
                 write!(f, "KEV catalog count {count} exceeds the database range")
             }
+            Self::ConflictingDuplicateCveId(cve_id) => {
+                write!(
+                    f,
+                    "KEV catalog contains conflicting entries for CVE ID {cve_id}"
+                )
+            }
             Self::DatabaseConnectionError(_) => {
                 write!(f, "failed to connect to database")
             }
@@ -181,6 +189,7 @@ impl std::error::Error for KevError {
         match self {
             Self::CatalogCountMismatch { .. } => None,
             Self::CatalogCountOutOfRange(_) => None,
+            Self::ConflictingDuplicateCveId(_) => None,
             Self::DatabaseConnectionError(err) => Some(err),
             Self::InvalidCatalog(err) => Some(err),
             Self::InvalidCatalogEntry(err) => Some(err),
@@ -533,6 +542,7 @@ where
             );
             KevError::InvalidCatalogEntry(error)
         })?;
+    let entries = deduplicate_entries(entries, &log)?;
     let cve_ids = entries
         .iter()
         .map(|entry| entry.cve_id.clone())
@@ -592,6 +602,29 @@ where
 struct KevEntry {
     cve_id: String,
     entry: serde_json::Value,
+}
+
+fn deduplicate_entries(entries: Vec<KevEntry>, log: &Logger) -> Result<Vec<KevEntry>, KevError> {
+    let mut entry_indexes: HashMap<String, usize> = HashMap::new();
+    let mut unique_entries: Vec<KevEntry> = Vec::with_capacity(entries.len());
+
+    for entry in entries {
+        if let Some(&index) = entry_indexes.get(&entry.cve_id) {
+            let retained = &unique_entries[index];
+            if retained.entry != entry.entry {
+                return Err(KevError::ConflictingDuplicateCveId(entry.cve_id));
+            }
+
+            warn!(log, "KEV Sync: skipping duplicate KEV catalog entry";
+                "cve_id" => entry.cve_id);
+            continue;
+        }
+
+        entry_indexes.insert(entry.cve_id.clone(), unique_entries.len());
+        unique_entries.push(entry);
+    }
+
+    Ok(unique_entries)
 }
 
 fn count_to_i32(value: usize) -> Result<i32, KevError> {
@@ -939,6 +972,57 @@ mod tests {
         assert!(
             db.into_transaction_log().is_empty(),
             "an invalid entry must prevent every catalog upsert"
+        );
+    }
+
+    #[test]
+    fn store_all_entries_deduplicates_identical_cve_ids() {
+        let entry = kev_entry("duplicate entry");
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_num_items_row(0)],
+                Vec::<BTreeMap<String, Value>>::new(),
+            ])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        let summary = run_async(store_all_entries(
+            &[entry.clone(), entry],
+            &db,
+            slog::Logger::root(slog::Discard, slog::o!()),
+        ))
+        .expect("identical duplicate entries should be deduplicated");
+
+        assert_eq!(summary.records_seen, 1);
+        assert_eq!(summary.records_inserted, 1);
+        assert_eq!(summary.records_updated, 0);
+        assert_eq!(db.into_transaction_log().len(), 2);
+    }
+
+    #[test]
+    fn store_all_entries_rejects_conflicting_duplicate_cve_ids_atomically() {
+        let db = MockDatabase::new(DbBackend::Postgres).into_connection();
+
+        let error = run_async(store_all_entries(
+            &[
+                kev_entry("first description"),
+                kev_entry("conflicting description"),
+            ],
+            &db,
+            slog::Logger::root(slog::Discard, slog::o!()),
+        ))
+        .expect_err("conflicting duplicate entries should fail the write");
+
+        assert!(matches!(
+            error,
+            KevError::ConflictingDuplicateCveId(cve_id) if cve_id == "CVE-2026-1000"
+        ));
+        assert!(
+            db.into_transaction_log().is_empty(),
+            "a conflicting duplicate must prevent every database operation"
         );
     }
 
