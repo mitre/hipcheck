@@ -4,7 +4,6 @@ use cargo_manifest::{Manifest, MaybeInherited, Publish};
 use clap::ArgMatches;
 use itertools::Itertools as _;
 use pathbuf::pathbuf;
-use regex::Regex;
 use std::ops::Not as _;
 use std::path::PathBuf;
 use walkdir::WalkDir;
@@ -57,13 +56,16 @@ fn apply_checks(manifest: &Manifest, problems: &mut Vec<anyhow::Error>) -> Resul
 pub fn find_all_cargo_tomls() -> Result<Vec<PathBuf>> {
     let root = crate::workspace::get_workspace_path()?;
     let mut tomls = Vec::new();
-    let re = Regex::new(r"\/backend\/([\w-]+\/)+Cargo.toml").unwrap();
+    let root_manifest = root.join("Cargo.toml");
 
     for entry in WalkDir::new(root)
         .into_iter()
         .filter_map(std::result::Result::ok)
     {
-        if re.is_match(entry.path().to_str().unwrap()) {
+        if entry.file_type().is_file()
+            && entry.file_name() == "Cargo.toml"
+            && entry.path() != root_manifest
+        {
             tomls.push(entry.path().to_path_buf());
         }
     }
@@ -252,6 +254,19 @@ dbg_macro = "deny"
         assert_eq!(
             problems[0].to_string(),
             "'example' does not inherit workspace lint configuration with `[lints] workspace = true`"
+        );
+    }
+
+    #[test]
+    fn find_all_cargo_tomls_excludes_the_workspace_manifest() {
+        let workspace_root = get_workspace_path().expect("workspace root should be found");
+        let toml_files = find_all_cargo_tomls().expect("should find package manifests");
+
+        assert!(!toml_files.contains(&workspace_root.join("Cargo.toml")));
+        assert!(
+            toml_files
+                .iter()
+                .all(|path| path.file_name().is_some_and(|name| name == "Cargo.toml"))
         );
     }
 

@@ -88,7 +88,6 @@ url = "2.5.7"
 reqwest = "0.13.4"
 httpmock = "0.8.3"
 proptest = "1.11.0"
-regex = "1.13.1"
 
 [workspace.dependencies.tokio]
 
