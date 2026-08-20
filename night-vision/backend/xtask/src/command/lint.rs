@@ -18,8 +18,7 @@ pub fn lint(_args: &ArgMatches) -> Result<()> {
     }
 
     check_unregistered(
-        &manifests,
-        &get_excluded_workspace_manifests()?,
+        &get_workspace_manifest_paths()?,
         &find_all_cargo_tomls()?,
         &mut problems,
     )?;
@@ -74,32 +73,14 @@ pub fn find_all_cargo_tomls() -> Result<Vec<PathBuf>> {
 
 /// Run any checks we want to apply to package manifests.
 fn check_unregistered(
-    manifests: &Vec<Manifest>,
-    excluded_manifests: &Vec<Manifest>,
-    toml_files: &Vec<PathBuf>,
+    registered_manifest_paths: &[PathBuf],
+    toml_files: &[PathBuf],
     problems: &mut Vec<anyhow::Error>,
 ) -> Result<()> {
-    let mut registered = vec![];
     let mut missing = vec![];
 
-    for manifest in manifests {
-        //println!("Checking manifest: {:?}", manifest);
-        if let Some(pkg) = &manifest.package {
-            let teststr = pkg.name.clone() + "/Cargo.toml";
-            registered.push(teststr);
-        }
-    }
-    for excluded in excluded_manifests {
-        if let Some(pkg) = &excluded.package {
-            let teststr = pkg.name.clone() + "/Cargo.toml";
-            registered.push(teststr);
-        }
-    }
     for toml in toml_files {
-        if !registered
-            .iter()
-            .any(|r| toml.display().to_string().ends_with(r))
-        {
+        if !registered_manifest_paths.contains(toml) {
             missing.push(toml.display().to_string());
         }
     }
@@ -112,6 +93,23 @@ fn check_unregistered(
     }
 
     Ok(())
+}
+
+/// Get manifest paths for every package listed in the workspace, including excluded packages.
+fn get_workspace_manifest_paths() -> Result<Vec<PathBuf>> {
+    let workspace_root = get_workspace_path()?;
+    let root_manifest = Manifest::from_path(&pathbuf![&workspace_root, "Cargo.toml"])
+        .context("failed to load root manifest")?;
+    let Some(workspace) = root_manifest.workspace else {
+        bail!("root manifest missing `[workspace]` section")
+    };
+
+    Ok(workspace
+        .members
+        .iter()
+        .chain(workspace.exclude.as_ref().into_iter().flatten())
+        .map(|member| pathbuf![&workspace_root, member, "Cargo.toml"])
+        .collect())
 }
 
 // Get package manifests for every package in the workspace.
@@ -130,36 +128,6 @@ fn get_workspace_manifests() -> Result<Vec<Manifest>> {
     let mut manifests = Vec::with_capacity(workspace.members.len());
 
     for member in &workspace.members {
-        let manifest_path = pathbuf![&workspace_root, member, "Cargo.toml"];
-        let manifest = Manifest::from_path(&manifest_path).with_context(|| {
-            anyhow!(
-                "failed to load member manifest for '{}'",
-                manifest_path.display()
-            )
-        })?;
-        manifests.push(manifest);
-    }
-
-    Ok(manifests)
-}
-
-// Get package manifests listed in the excluded section in the workspace.
-fn get_excluded_workspace_manifests() -> Result<Vec<Manifest>> {
-    // Get the workspace root manifest.
-    let workspace_root = get_workspace_path()?;
-    let root_manifest = Manifest::from_path(&pathbuf![&workspace_root, "Cargo.toml"])
-        .context("failed to load root manifest")?;
-
-    // Get the names of crates in the workspace.
-    let Some(workspace) = root_manifest.workspace else {
-        bail!("root manifest missing `[workspace]` section")
-    };
-
-    // Resolve the excluded manifests.
-    let mut manifests =
-        Vec::with_capacity(workspace.exclude.as_ref().map_or(0, std::vec::Vec::len));
-
-    for member in workspace.exclude.as_ref().into_iter().flatten() {
         let manifest_path = pathbuf![&workspace_root, member, "Cargo.toml"];
         let manifest = Manifest::from_path(&manifest_path).with_context(|| {
             anyhow!(
@@ -289,41 +257,10 @@ dbg_macro = "deny"
 
     #[test]
     fn unregistered_package_pass_manifest_checks() {
-        let mut manifests = vec![];
-        let excluded_manifests = vec![];
-        let workspace_root = get_workspace_path().expect("workspace root should be found");
-        let toml_files = find_all_cargo_tomls().expect("should find all cargo tomls");
-        let re = Regex::new(r"\/backend\/([\w-]+)+/Cargo.toml").unwrap();
-        let mut package_names: Vec<String> = vec![];
-        for toml in &toml_files {
-            if let Some(caps) = re.captures(toml.display().to_string().as_str()) {
-                let (_full, [name]) = caps.extract();
-                package_names.push(String::from(name));
-            }
-        }
-        let members: Vec<String> = package_names.iter().map(|w| format!("\"{w}\"")).collect();
-        let joined = members.join(", ");
-        let members_str = format!("[workspace]\n\nresolver = \"3\"\nmembers = [{joined}]");
-        let root_manifest = manifest(members_str.as_str());
-
+        let registered_manifest_paths = vec![PathBuf::from("backend/nvdb/Cargo.toml")];
+        let toml_files = registered_manifest_paths.clone();
         let mut problems = vec![];
-        let workspace = root_manifest
-            .workspace
-            .as_ref()
-            .expect("workspace should exist");
-        for member in &workspace.members {
-            let manifest_path = pathbuf![&workspace_root, member, "Cargo.toml"];
-            let manifest = Manifest::from_path(&manifest_path)
-                .with_context(|| {
-                    anyhow!(
-                        "failed to load member manifest for '{}'",
-                        manifest_path.display()
-                    )
-                })
-                .expect("got manifest");
-            manifests.push(manifest);
-        }
-        check_unregistered(&manifests, &excluded_manifests, &toml_files, &mut problems)
+        check_unregistered(&registered_manifest_paths, &toml_files, &mut problems)
             .expect("manifest checks should run");
 
         assert!(problems.is_empty());
@@ -331,86 +268,33 @@ dbg_macro = "deny"
 
     #[test]
     fn unregistered_package_fail_manifest_checks() {
-        let mut manifests = vec![];
-        let excluded_manifests = vec![];
-        let workspace_root = get_workspace_path().expect("workspace root should be found");
-        let toml_files = find_all_cargo_tomls().expect("should find all cargo tomls");
-        let re = Regex::new(r"\/backend\/([\w-]+)+/Cargo.toml").unwrap();
-        let mut package_names: Vec<String> = vec![];
-        for toml in &toml_files {
-            if let Some(caps) = re.captures(toml.display().to_string().as_str()) {
-                let (_full, [name]) = caps.extract();
-                package_names.push(String::from(name));
-            }
-        }
-        let mut members: Vec<String> = package_names.iter().map(|w| format!("\"{w}\"")).collect();
-        members.pop(); // Remove the last member to simulate an unregistered package
-        let joined = members.join(", ");
-        let members_str = format!("[workspace]\n\nresolver = \"3\"\nmembers = [{joined}]");
-        let root_manifest = manifest(members_str.as_str());
+        let registered_manifest_paths = vec![PathBuf::from("backend/nvdb/Cargo.toml")];
+        let toml_files = vec![
+            PathBuf::from("backend/nvdb/Cargo.toml"),
+            PathBuf::from("backend/unregistered/Cargo.toml"),
+        ];
         let mut problems = vec![];
-        let workspace = root_manifest
-            .workspace
-            .as_ref()
-            .expect("workspace should exist");
-        for member in &workspace.members {
-            let manifest_path = pathbuf![&workspace_root, member, "Cargo.toml"];
-            let manifest = Manifest::from_path(&manifest_path)
-                .with_context(|| {
-                    anyhow!(
-                        "failed to load member manifest for '{}'",
-                        manifest_path.display()
-                    )
-                })
-                .expect("got manifest");
-            manifests.push(manifest);
-        }
-        check_unregistered(&manifests, &excluded_manifests, &toml_files, &mut problems)
+        check_unregistered(&registered_manifest_paths, &toml_files, &mut problems)
             .expect("manifest checks should run");
 
         assert_eq!(problems.len(), 1);
     }
 
     #[test]
-    fn unregistered_package_pass_excluded_checks() {
-        let manifests = vec![];
-        let mut excluded_manifests = vec![];
-        let workspace_root = get_workspace_path().expect("workspace root should be found");
-        let toml_files = find_all_cargo_tomls().expect("should find all cargo tomls");
-        let re = Regex::new(r"\/backend\/([\w-]+)+/Cargo.toml").unwrap();
-        let mut package_names: Vec<String> = vec![];
-        for toml in &toml_files {
-            if let Some(caps) = re.captures(toml.display().to_string().as_str()) {
-                let (_full, [name]) = caps.extract();
-                package_names.push(String::from(name));
-            }
-        }
-        let members: Vec<String> = package_names.iter().map(|w| format!("\"{w}\"")).collect();
-        let joined = members.join(", ");
-        let members_str = format!("[workspace]\n\nresolver = \"3\"\nexclude = [{joined}]");
-        let root_manifest = manifest(members_str.as_str());
-
+    fn unregistered_package_with_registered_suffix_fails_manifest_checks() {
+        let registered_manifest_paths = vec![PathBuf::from("backend/nvdb/Cargo.toml")];
+        let toml_files = vec![
+            PathBuf::from("backend/nvdb/Cargo.toml"),
+            PathBuf::from("backend/not-nvdb/Cargo.toml"),
+        ];
         let mut problems = vec![];
-        let workspace = root_manifest
-            .workspace
-            .as_ref()
-            .expect("workspace should exist");
-        // Resolve the excluded manifests.
-        for member in workspace.exclude.as_ref().into_iter().flatten() {
-            let manifest_path = pathbuf![&workspace_root, member, "Cargo.toml"];
-            let manifest = Manifest::from_path(&manifest_path)
-                .with_context(|| {
-                    anyhow!(
-                        "failed to load member manifest for '{}'",
-                        manifest_path.display()
-                    )
-                })
-                .expect("manifest checks should run");
-            excluded_manifests.push(manifest);
-        }
-        check_unregistered(&manifests, &excluded_manifests, &toml_files, &mut problems)
+        check_unregistered(&registered_manifest_paths, &toml_files, &mut problems)
             .expect("manifest checks should run");
 
-        assert!(problems.is_empty());
+        assert_eq!(problems.len(), 1);
+        assert_eq!(
+            problems[0].to_string(),
+            "The following packages are not registered in the workspace: backend/not-nvdb/Cargo.toml"
+        );
     }
 }
