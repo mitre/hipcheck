@@ -9,8 +9,8 @@ use reqwest::header::{
 };
 use reqwest::{Client, Response, StatusCode, Url};
 use sea_orm::{
-    ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait as _, EntityTrait as _,
-    QueryFilter as _, QueryOrder as _, TransactionTrait as _,
+    ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait, EntityTrait as _, QueryFilter as _,
+    QueryOrder as _, TransactionTrait as _,
 };
 use sea_orm::{DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, Set, Statement};
 use serde::Deserialize;
@@ -385,11 +385,14 @@ fn convert_one_entry(
 }
 
 /// Cancellation: TODO
-async fn store_all_entries(
+async fn store_all_entries<C>(
     values: &[serde_json::Value],
-    xact: &DatabaseTransaction,
+    db: &C,
     log: Logger,
-) -> Result<RunSummary, KevError> {
+) -> Result<RunSummary, KevError>
+where
+    C: ConnectionTrait,
+{
     let models = values.iter().map(convert_one_entry).filter_map(|res| {
         if let Err(e) = &res {
             error!(
@@ -401,13 +404,25 @@ async fn store_all_entries(
     });
 
     let res = cisa_kev_entries::Entity::insert_many(models)
-        // TODO update fields instead of doing nothing
         .on_conflict(
             sea_query::OnConflict::column(cisa_kev_entries::Column::CveId)
-                .do_nothing()
+                .update_columns([cisa_kev_entries::Column::Entry])
+                .values([
+                    (
+                        cisa_kev_entries::Column::LastSeenAt,
+                        sea_query::Expr::current_timestamp(),
+                    ),
+                    (
+                        cisa_kev_entries::Column::UpdatedAt,
+                        sea_query::Expr::cust(
+                            "CASE WHEN cisa_kev_entries.entry IS DISTINCT FROM EXCLUDED.entry \
+                             THEN CURRENT_TIMESTAMP ELSE cisa_kev_entries.updated_at END",
+                        ),
+                    ),
+                ])
                 .to_owned(),
         )
-        .exec(xact)
+        .exec(db)
         .await;
     match res {
         // Ignore SeaORM errors that say no records were updated or inserted.
@@ -581,7 +596,11 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use camino::Utf8PathBuf;
+    use sea_orm::{DbBackend, MockDatabase, MockExecResult, Value};
     use secrecy::ExposeSecret as _;
+    use serde_json::json;
+    use std::collections::BTreeMap;
+    use std::time::Duration;
     use url::Url;
 
     const CONFIG_PATH_ENV: &str = "NV_POSTGRES_INTEGRATION_CONFIG_PATH";
@@ -627,6 +646,112 @@ mod tests {
                 .await
                 .expect("KEV sync runs should clear");
         });
+    }
+
+    #[test]
+    fn store_all_entries_upserts_payload_with_change_aware_timestamps() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<BTreeMap<String, Value>>::new()])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        run_async(store_all_entries(
+            &[kev_entry("initial description")],
+            &db,
+            slog::Logger::root(slog::Discard, slog::o!()),
+        ))
+        .expect("entry write should succeed");
+
+        let transaction_log = db.into_transaction_log();
+        let upsert_sql = transaction_log
+            .iter()
+            .map(|entry| &entry.statements()[0].sql)
+            .find(|sql| sql.contains(r#"INSERT INTO "public"."cisa_kev_entries""#))
+            .expect("entry write should issue an insert");
+        assert!(upsert_sql.contains("ON CONFLICT"));
+        assert!(upsert_sql.contains(r#""entry" = "excluded"."entry""#));
+        assert!(upsert_sql.contains(r#""last_seen_at" = CURRENT_TIMESTAMP"#));
+        assert!(upsert_sql.contains("IS DISTINCT FROM EXCLUDED.entry"));
+        assert!(upsert_sql.contains("ELSE cisa_kev_entries.updated_at END"));
+        assert!(!upsert_sql.contains(r#""first_seen_at" = "#));
+    }
+
+    #[test]
+    #[ignore = "requires a disposable Postgres test database"]
+    fn repeated_entries_refresh_payload_and_timestamps() {
+        run_async(async {
+            let db = connect_to_integration_database().await;
+            cisa_kev_entries::Entity::delete_many()
+                .exec(&db)
+                .await
+                .expect("KEV entries should clear");
+
+            let initial_entry = kev_entry("initial description");
+            write_entries(&db, std::slice::from_ref(&initial_entry)).await;
+            let initial = read_entry(&db).await;
+
+            tokio::time::sleep(Duration::from_millis(5)).await;
+            write_entries(&db, &[initial_entry]).await;
+            let unchanged = read_entry(&db).await;
+            assert_eq!(unchanged.entry, initial.entry);
+            assert_eq!(unchanged.first_seen_at, initial.first_seen_at);
+            assert!(unchanged.last_seen_at > initial.last_seen_at);
+            assert_eq!(unchanged.updated_at, initial.updated_at);
+
+            tokio::time::sleep(Duration::from_millis(5)).await;
+            let changed_entry = kev_entry("changed description");
+            write_entries(&db, std::slice::from_ref(&changed_entry)).await;
+            let changed = read_entry(&db).await;
+            assert_eq!(changed.entry, changed_entry);
+            assert_eq!(changed.first_seen_at, initial.first_seen_at);
+            assert!(changed.last_seen_at > unchanged.last_seen_at);
+            assert!(changed.updated_at > unchanged.updated_at);
+
+            cisa_kev_entries::Entity::delete_many()
+                .exec(&db)
+                .await
+                .expect("KEV entries should clear");
+        });
+    }
+
+    async fn write_entries(db: &DatabaseConnection, entries: &[serde_json::Value]) {
+        let transaction = db.begin().await.expect("transaction should begin");
+        store_all_entries(
+            entries,
+            &transaction,
+            slog::Logger::root(slog::Discard, slog::o!()),
+        )
+        .await
+        .expect("entry write should succeed");
+        transaction
+            .commit()
+            .await
+            .expect("transaction should commit");
+    }
+
+    async fn read_entry(db: &DatabaseConnection) -> cisa_kev_entries::Model {
+        cisa_kev_entries::Entity::find_by_id("CVE-2026-1000".to_owned())
+            .one(db)
+            .await
+            .expect("entry lookup should succeed")
+            .expect("entry should be stored")
+    }
+
+    fn kev_entry(short_description: &str) -> serde_json::Value {
+        json!({
+            "cveID": "CVE-2026-1000",
+            "cwes": [],
+            "dateAdded": "2026-01-01",
+            "dueDate": "2026-02-01",
+            "product": "example product",
+            "requiredAction": "apply the update",
+            "shortDescription": short_description,
+            "vendorProject": "example vendor",
+            "vulnerabilityName": "Example vulnerability"
+        })
     }
 
     async fn connect_to_integration_database() -> DatabaseConnection {
