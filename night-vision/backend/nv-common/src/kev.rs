@@ -86,6 +86,7 @@ pub struct Vulnerability {
 }
 
 pub enum KevError {
+    CatalogCountMismatch { declared: i64, actual: usize },
     CatalogCountOutOfRange(i64),
     DatabaseConnectionError(DatabaseConnectionError),
     InvalidCatalog(serde_json::Error),
@@ -138,6 +139,12 @@ impl Debug for KevError {
 impl Display for KevError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::CatalogCountMismatch { declared, actual } => {
+                write!(
+                    f,
+                    "KEV catalog count {declared} does not match {actual} vulnerability entries"
+                )
+            }
             Self::CatalogCountOutOfRange(count) => {
                 write!(f, "KEV catalog count {count} exceeds the database range")
             }
@@ -172,6 +179,7 @@ impl Display for KevError {
 impl std::error::Error for KevError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::CatalogCountMismatch { .. } => None,
             Self::CatalogCountOutOfRange(_) => None,
             Self::DatabaseConnectionError(err) => Some(err),
             Self::InvalidCatalog(err) => Some(err),
@@ -426,6 +434,7 @@ async fn fetch_kev(
         .date_released
         .parse()
         .map_err(KevError::InvalidCatalogReleaseDate)?;
+    validate_catalog_count(catalog.count, catalog.vulnerabilities.len())?;
     let catalog_count = i32::try_from(catalog.count)
         .map_err(|_| KevError::CatalogCountOutOfRange(catalog.count))?;
 
@@ -455,6 +464,14 @@ async fn fetch_kev(
         records_updated: summary.records_updated,
         error: None,
     })
+}
+
+fn validate_catalog_count(declared: i64, actual: usize) -> Result<(), KevError> {
+    if declared < 0 || usize::try_from(declared).ok() != Some(actual) {
+        return Err(KevError::CatalogCountMismatch { declared, actual });
+    }
+
+    Ok(())
 }
 
 /// This function provides a way for `nvdb` to check KEV status.
@@ -923,6 +940,33 @@ mod tests {
             db.into_transaction_log().is_empty(),
             "an invalid entry must prevent every catalog upsert"
         );
+    }
+
+    #[test]
+    fn catalog_count_mismatch_is_rejected_before_entry_storage() {
+        let error = validate_catalog_count(2, 1)
+            .expect_err("catalog count must match the number of vulnerability entries");
+
+        assert!(matches!(
+            error,
+            KevError::CatalogCountMismatch {
+                declared: 2,
+                actual: 1
+            }
+        ));
+    }
+
+    #[test]
+    fn negative_catalog_count_is_rejected_before_entry_storage() {
+        let error = validate_catalog_count(-1, 0).expect_err("a catalog count cannot be negative");
+
+        assert!(matches!(
+            error,
+            KevError::CatalogCountMismatch {
+                declared: -1,
+                actual: 0
+            }
+        ));
     }
 
     #[test]
