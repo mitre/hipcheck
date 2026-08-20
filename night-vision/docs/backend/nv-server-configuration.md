@@ -43,6 +43,7 @@ SeaORM, or Tokio setting at its default unless noted below.
 | `openapi-dest-path` | Path for writing the OpenAPI description on startup. | Path | No OpenAPI file is written. The local sample writes `openapi/nv-server-openapi.json`; the container sample leaves it unset. |
 | `kev-url` | Source URL for the CISA Known Exploited Vulnerabilities catalog. | URL | CISA's published KEV catalog URL. |
 | `kev-refresh-interval` | Delay between recurring KEV catalog sync attempts. | Milliseconds | 3600000 milliseconds. Values must be greater than 0. |
+| `kev-response-body-max-bytes` | Maximum size of a KEV catalog response body. | Bytes | 16777216 bytes (16 MiB). Values must be greater than 0. The limit applies while streaming, even when the response has no `Content-Length`. |
 | `http-request-body-max-bytes` | Maximum request body size. | Bytes | Dropshot default, currently 1024 bytes in project comments and sample config. |
 | `http-early-disconnect-behavior` | `continue` or `cancel`. | Enum | Dropshot default, which matches `continue`: handlers are detached and run to completion after early disconnect. |
 | `database-max-connections` | Maximum database pool connections. | Connections | SeaORM default. The sample config documents 100. |

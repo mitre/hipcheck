@@ -122,6 +122,9 @@ pub struct Config {
     /// The interval in milliseconds between refreshes of KEV data from its source URL.
     pub kev_refresh_interval: Option<u64>,
 
+    /// The maximum size in bytes of a KEV catalog response body.
+    pub kev_response_body_max_bytes: Option<usize>,
+
     /// The maximum size in bytes for the request body.
     ///
     /// The default is 1024 bytes.
@@ -382,6 +385,7 @@ impl Config {
                     "openapi-dest-path",
                     "kev-url",
                     "kev-refresh-interval",
+                    "kev-response-body-max-bytes",
                     "http-request-body-max-bytes",
                     "http-early-disconnect-behavior",
                     "database-connection",
@@ -436,6 +440,8 @@ impl Config {
         let kev_url: Option<reqwest::Url> = parse_value(&parsed, "kev-url", &mut errors);
         let kev_refresh_interval =
             parse_kev_refresh_interval(&parsed, "kev-refresh-interval", &mut errors);
+        let kev_response_body_max_bytes =
+            parse_positive_usize_option(&parsed, "kev-response-body-max-bytes", &mut errors);
         let http_request_body_max_bytes =
             parse_value(&parsed, "http-request-body-max-bytes", &mut errors);
         let http_early_disconnect_behavior =
@@ -516,6 +522,7 @@ impl Config {
             openapi_dest_path,
             kev_url,
             kev_refresh_interval,
+            kev_response_body_max_bytes,
             http_request_body_max_bytes,
             http_early_disconnect_behavior,
             database_connection_source,
@@ -695,6 +702,10 @@ impl Display for Config {
 
         if let Some(kev_refresh_interval) = &self.kev_refresh_interval {
             write_report_line!(f, "kev-refresh-interval", kev_refresh_interval)?;
+        }
+
+        if let Some(max_bytes) = self.kev_response_body_max_bytes {
+            write_report_line!(f, "kev-response-body-max-bytes", &max_bytes)?;
         }
 
         if let Some(max_bytes) = self.http_request_body_max_bytes {
@@ -1380,6 +1391,13 @@ mod tests {
                 },
             ),
             ConfigFieldParseCase::new(
+                "kev_response_body_max_bytes",
+                "kev-response-body-max-bytes = 2048",
+                |config, _| {
+                    assert_eq!(config.kev_response_body_max_bytes, Some(2048));
+                },
+            ),
+            ConfigFieldParseCase::new(
                 "http_request_body_max_bytes",
                 "http-request-body-max-bytes = 2048",
                 |config, _| {
@@ -1787,6 +1805,8 @@ mod tests {
     fn invalid_typed_field_values_are_returned_as_str_parse_config_errors() {
         let cases = [
             ("http-request-body-max-bytes", "many", "invalid digit"),
+            ("kev-response-body-max-bytes", "many", "invalid digit"),
+            ("kev-response-body-max-bytes", "0", "must be greater than 0"),
             (
                 "http-early-disconnect-behavior",
                 "detach",

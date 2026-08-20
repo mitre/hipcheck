@@ -32,6 +32,12 @@ kev-url =
 # Default: 3600000 (1 hour)
 kev-refresh-interval =
 
+# The maximum size in bytes of a KEV Catalog response body.
+# Must be greater than 0.
+#
+# Default: 16777216 (16 MiB)
+kev-response-body-max-bytes =
+
 # Maximum size in bytes for the request body.
 #
 # Default: 1024

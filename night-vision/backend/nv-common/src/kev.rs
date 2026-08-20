@@ -31,6 +31,7 @@ use tokio::time::sleep;
 pub const DEFAULT_KEV_URL: &str =
     "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
 const DEFAULT_KEV_REFRESH_INTERVAL_MILLISECONDS: u64 = 3_600_000;
+const DEFAULT_KEV_RESPONSE_BODY_MAX_BYTES: usize = 16 * 1024 * 1024;
 
 /// PostgreSQL advisory lock key used to serialize KEV sync work.
 /// ASCII text: "KEV_SYNC"
@@ -89,6 +90,7 @@ pub struct Vulnerability {
 pub enum KevError {
     CatalogCountMismatch { declared: i64, actual: usize },
     CatalogCountOutOfRange(i64),
+    CatalogResponseBodyTooLarge { max_bytes: usize },
     ConflictingDuplicateCveId(String),
     DatabaseConnectionError(DatabaseConnectionError),
     InvalidCatalog(serde_json::Error),
@@ -151,6 +153,12 @@ impl Display for KevError {
             Self::CatalogCountOutOfRange(count) => {
                 write!(f, "KEV catalog count {count} exceeds the database range")
             }
+            Self::CatalogResponseBodyTooLarge { max_bytes } => {
+                write!(
+                    f,
+                    "KEV catalog response body exceeds configured limit of {max_bytes} bytes"
+                )
+            }
             Self::ConflictingDuplicateCveId(cve_id) => {
                 write!(
                     f,
@@ -196,6 +204,7 @@ impl std::error::Error for KevError {
         match self {
             Self::CatalogCountMismatch { .. } => None,
             Self::CatalogCountOutOfRange(_) => None,
+            Self::CatalogResponseBodyTooLarge { .. } => None,
             Self::ConflictingDuplicateCveId(_) => None,
             Self::DatabaseConnectionError(err) => Some(err),
             Self::InvalidCatalog(err) => Some(err),
@@ -219,6 +228,7 @@ pub enum RequestMode {
 #[derive(Debug, Clone)]
 struct KevConfig {
     kev_refresh_interval: jiff::Span,
+    kev_response_body_max_bytes: usize,
     kev_url: Option<reqwest::Url>,
 }
 
@@ -229,6 +239,9 @@ impl KevConfig {
             .unwrap_or(DEFAULT_KEV_REFRESH_INTERVAL_MILLISECONDS);
         Self {
             kev_refresh_interval: kev_refresh_interval_span(refresh_interval_milliseconds),
+            kev_response_body_max_bytes: config
+                .kev_response_body_max_bytes
+                .unwrap_or(DEFAULT_KEV_RESPONSE_BODY_MAX_BYTES),
             kev_url: config.kev_url.clone(),
         }
     }
@@ -439,7 +452,7 @@ async fn fetch_kev(
         return Ok(FinishKevSyncRun::not_modified());
     }
 
-    let body = response.bytes().await?;
+    let body = read_kev_catalog_body(response, config.kev_response_body_max_bytes).await?;
     let content_sha256 = sha256_hex(&body);
     let catalog = serde_json::from_slice::<KevCatalog>(&body).map_err(KevError::InvalidCatalog)?;
     let catalog_date_released = catalog
@@ -476,6 +489,50 @@ async fn fetch_kev(
         records_updated: summary.records_updated,
         error: None,
     })
+}
+
+async fn read_kev_catalog_body(response: Response, max_bytes: usize) -> Result<Vec<u8>, KevError> {
+    let content_length = response.content_length();
+    validate_kev_catalog_content_length(content_length, max_bytes)?;
+
+    let mut body = Vec::with_capacity(kev_catalog_body_capacity(content_length, max_bytes));
+    let mut response = response;
+    while let Some(chunk) = response.chunk().await? {
+        append_kev_catalog_chunk(&mut body, &chunk, max_bytes)?;
+    }
+
+    Ok(body)
+}
+
+fn validate_kev_catalog_content_length(
+    content_length: Option<u64>,
+    max_bytes: usize,
+) -> Result<(), KevError> {
+    if content_length.is_some_and(|length| length > max_bytes as u64) {
+        return Err(KevError::CatalogResponseBodyTooLarge { max_bytes });
+    }
+
+    Ok(())
+}
+
+fn kev_catalog_body_capacity(content_length: Option<u64>, max_bytes: usize) -> usize {
+    content_length
+        .and_then(|length| usize::try_from(length).ok())
+        .unwrap_or_default()
+        .min(max_bytes)
+}
+
+fn append_kev_catalog_chunk(
+    body: &mut Vec<u8>,
+    chunk: &[u8],
+    max_bytes: usize,
+) -> Result<(), KevError> {
+    if chunk.len() > max_bytes.saturating_sub(body.len()) {
+        return Err(KevError::CatalogResponseBodyTooLarge { max_bytes });
+    }
+
+    body.extend_from_slice(chunk);
+    Ok(())
 }
 
 async fn request_kev_catalog(
@@ -930,6 +987,40 @@ mod tests {
     #[test]
     fn kev_catalog_request_rejects_server_error_response() {
         assert_kev_catalog_request_rejects_status(500, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn kev_catalog_body_at_limit_is_accepted() {
+        let mut body = Vec::new();
+        append_kev_catalog_chunk(&mut body, &[1, 2, 3], 3)
+            .expect("body at the configured limit should be accepted");
+
+        assert_eq!(body, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn kev_catalog_body_rejects_oversized_declared_length() {
+        let error = validate_kev_catalog_content_length(Some(4), 3)
+            .expect_err("an oversized declared response length should be rejected");
+
+        assert!(matches!(
+            error,
+            KevError::CatalogResponseBodyTooLarge { max_bytes: 3 }
+        ));
+    }
+
+    #[test]
+    fn kev_catalog_body_rejects_oversized_chunked_response() {
+        let mut body = Vec::new();
+        append_kev_catalog_chunk(&mut body, &[1, 2], 3)
+            .expect("first chunk should fit within the limit");
+        let error = append_kev_catalog_chunk(&mut body, &[3, 4], 3)
+            .expect_err("an oversized response without a declared length should be rejected");
+
+        assert!(matches!(
+            error,
+            KevError::CatalogResponseBodyTooLarge { max_bytes: 3 }
+        ));
     }
 
     #[test]
