@@ -96,8 +96,7 @@ fn run() -> Result<()> {
 
     if let Some(kev_matches) = matches.subcommand_matches("kev") {
         if let Some(pull_matches) = kev_matches.subcommand_matches("pull") {
-            let force = pull_matches.get_flag("force");
-            return cmd::kev::pull::run(force, &config, log);
+            return cmd::kev::pull::run(&config, pull_matches, log);
         } else if let Some(_matches) = kev_matches.subcommand_matches("status") {
             return cmd::kev::status::run(&config, log);
         }
