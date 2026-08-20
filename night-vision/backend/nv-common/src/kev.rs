@@ -290,11 +290,13 @@ async fn fetch_kev(
 
     // If a previous sync run was found, generate appropriate HTTP request headers
     // for a conditional request.
-    let headers = maybe_run.map_or(HeaderMap::new(), |run| {
-        debug!(log, "KEV Sync: Found previous sync run: {run:?}");
-        let cache_metadata = extract_cache_metadata_from_model(&run);
-        generate_cache_headers(&cache_metadata)
-    });
+    let previous_cache_metadata = maybe_run.as_ref().map(extract_cache_metadata_from_model);
+    let headers = previous_cache_metadata
+        .as_ref()
+        .map_or_else(HeaderMap::new, |metadata| {
+            debug!(log, "KEV Sync: Found previous cache metadata: {metadata:?}");
+            generate_cache_headers(metadata)
+        });
 
     let client = Client::new();
     let url = config
@@ -313,14 +315,18 @@ async fn fetch_kev(
     let response = request.send().await?;
     debug!(log, "KEV Sync: Got KEV Catalog response"; "response" => ?response);
 
-    let cache_metadata = extract_cache_metadata_from_headers(&response);
+    let status = response.status();
+    let cache_metadata = cache_metadata_for_response(
+        status,
+        previous_cache_metadata.as_ref(),
+        extract_cache_metadata_from_headers(&response),
+    );
     debug!(log, "KEV Sync: cache metadata: {cache_metadata:?}");
 
     let _sync_run =
         update_sync_run_cache_metadata(cache_metadata, sync_run, xact, log.clone()).await?;
 
     // Detect 304 Not Modified and exit early
-    let status = response.status();
     if status == StatusCode::NOT_MODIFIED {
         info!(
             log,
@@ -574,6 +580,27 @@ fn extract_cache_metadata_from_headers(resp: &Response) -> CacheMetadata {
     }
 }
 
+fn cache_metadata_for_response(
+    status: StatusCode,
+    previous: Option<&CacheMetadata>,
+    response: CacheMetadata,
+) -> CacheMetadata {
+    if status != StatusCode::NOT_MODIFIED {
+        return response;
+    }
+
+    CacheMetadata {
+        etag: response.etag.or_else(|| {
+            let metadata = previous?;
+            metadata.etag.clone()
+        }),
+        last_modified: response.last_modified.or_else(|| {
+            let metadata = previous?;
+            metadata.last_modified.clone()
+        }),
+    }
+}
+
 fn generate_cache_headers(cache_metadata: &CacheMetadata) -> HeaderMap {
     let mut headers = HeaderMap::new();
 
@@ -694,6 +721,60 @@ mod tests {
             kev_refresh_interval_span(900_000).get_milliseconds(),
             900_000
         );
+    }
+
+    #[test]
+    fn not_modified_response_preserves_absent_cache_validators() {
+        let metadata = cache_metadata_for_response(
+            StatusCode::NOT_MODIFIED,
+            Some(&cache_metadata(Some("old-etag"), Some("old-modified"))),
+            cache_metadata(None, None),
+        );
+
+        assert_eq!(
+            metadata,
+            cache_metadata(Some("old-etag"), Some("old-modified"))
+        );
+    }
+
+    #[test]
+    fn not_modified_response_replaces_supplied_cache_validators() {
+        let metadata = cache_metadata_for_response(
+            StatusCode::NOT_MODIFIED,
+            Some(&cache_metadata(Some("old-etag"), Some("old-modified"))),
+            cache_metadata(Some("new-etag"), None),
+        );
+
+        assert_eq!(
+            metadata,
+            cache_metadata(Some("new-etag"), Some("old-modified"))
+        );
+    }
+
+    #[test]
+    fn not_modified_response_without_prior_metadata_stays_empty() {
+        let metadata =
+            cache_metadata_for_response(StatusCode::NOT_MODIFIED, None, cache_metadata(None, None));
+
+        assert_eq!(metadata, cache_metadata(None, None));
+    }
+
+    #[test]
+    fn full_response_does_not_preserve_stale_cache_validators() {
+        let metadata = cache_metadata_for_response(
+            StatusCode::OK,
+            Some(&cache_metadata(Some("old-etag"), Some("old-modified"))),
+            cache_metadata(None, None),
+        );
+
+        assert_eq!(metadata, cache_metadata(None, None));
+    }
+
+    fn cache_metadata(etag: Option<&str>, last_modified: Option<&str>) -> CacheMetadata {
+        CacheMetadata {
+            etag: etag.map(str::to_owned),
+            last_modified: last_modified.map(str::to_owned),
+        }
     }
 
     #[test]
