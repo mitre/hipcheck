@@ -83,6 +83,7 @@ pub struct Vulnerability {
 
 pub enum KevError {
     DatabaseConnectionError(DatabaseConnectionError),
+    InvalidCatalogEntry(serde_json::Error),
     ReqwestError(reqwest::Error),
     SeaOrmError(sea_orm::DbErr),
     TransactionLockError,
@@ -132,6 +133,9 @@ impl Display for KevError {
             Self::DatabaseConnectionError(_) => {
                 write!(f, "failed to connect to database")
             }
+            Self::InvalidCatalogEntry(_) => {
+                write!(f, "failed to parse KEV catalog entry")
+            }
             Self::ReqwestError(_) => {
                 write!(f, "failed to fetch KEV data")
             }
@@ -149,6 +153,7 @@ impl std::error::Error for KevError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::DatabaseConnectionError(err) => Some(err),
+            Self::InvalidCatalogEntry(err) => Some(err),
             Self::ReqwestError(err) => Some(err),
             Self::SeaOrmError(err) => Some(err),
             Self::TransactionLockError => None,
@@ -323,11 +328,10 @@ async fn fetch_kev(
     );
     debug!(log, "KEV Sync: cache metadata: {cache_metadata:?}");
 
-    let _sync_run =
-        update_sync_run_cache_metadata(cache_metadata, sync_run, xact, log.clone()).await?;
-
     // Detect 304 Not Modified and exit early
     if status == StatusCode::NOT_MODIFIED {
+        let _sync_run =
+            update_sync_run_cache_metadata(cache_metadata, sync_run, xact, log.clone()).await?;
         info!(
             log,
             "KEV Catalog Response was 304 Not Modified; nothing to process"
@@ -348,6 +352,10 @@ async fn fetch_kev(
 
     let _summary = store_all_entries(&catalog.vulnerabilities, xact, log.clone()).await?;
     //let sync_run = update_sync_run_summary(summary, sync_run, xact, log.clone()).await?;
+
+    // Only save response validators after every catalog entry has been stored.
+    // Otherwise a later conditional request could hide an entry that failed validation.
+    let _sync_run = update_sync_run_cache_metadata(cache_metadata, sync_run, xact, log).await?;
 
     Ok(())
 }
@@ -404,15 +412,17 @@ async fn store_all_entries<C>(
 where
     C: ConnectionTrait,
 {
-    let models = values.iter().map(convert_one_entry).filter_map(|res| {
-        if let Err(e) = &res {
+    let models = values
+        .iter()
+        .map(convert_one_entry)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| {
             error!(
                 log,
-                "KEV Sync: failed to parse JSON as Vulnerability struct, caused by:\n\t{e}"
+                "KEV Sync: failed to parse JSON as Vulnerability struct, caused by:\n\t{error}"
             );
-        }
-        res.ok()
-    });
+            KevError::InvalidCatalogEntry(error)
+        })?;
 
     let res = cisa_kev_entries::Entity::insert_many(models)
         .on_conflict(
@@ -709,6 +719,27 @@ mod tests {
         assert!(upsert_sql.contains("IS DISTINCT FROM EXCLUDED.entry"));
         assert!(upsert_sql.contains("ELSE cisa_kev_entries.updated_at END"));
         assert!(!upsert_sql.contains(r#""first_seen_at" = "#));
+    }
+
+    #[test]
+    fn store_all_entries_rejects_invalid_catalog_atomically() {
+        let db = MockDatabase::new(DbBackend::Postgres).into_connection();
+        let invalid_entry = json!({
+            "cveID": "CVE-2026-1001"
+        });
+
+        let error = run_async(store_all_entries(
+            &[kev_entry("valid entry"), invalid_entry],
+            &db,
+            slog::Logger::root(slog::Discard, slog::o!()),
+        ))
+        .expect_err("invalid catalog entry should fail the entire write");
+
+        assert!(matches!(error, KevError::InvalidCatalogEntry(_)));
+        assert!(
+            db.into_transaction_log().is_empty(),
+            "an invalid entry must prevent every catalog upsert"
+        );
     }
 
     #[test]
