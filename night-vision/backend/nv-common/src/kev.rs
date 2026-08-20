@@ -489,7 +489,7 @@ async fn update_sync_run_result_failure(
     xact: &DatabaseTransaction,
     _log: Logger,
 ) -> Result<(), KevError> {
-    sync_run.status = Set("failure".to_owned());
+    sync_run.status = Set("failed".to_owned());
     sync_run.error = Set(Some(error));
     let _run = sync_run.save(xact).await?;
     Ok(())
@@ -574,4 +574,112 @@ fn generate_cache_headers(cache_metadata: &CacheMetadata) -> HeaderMap {
     }
 
     headers
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use camino::Utf8PathBuf;
+    use secrecy::ExposeSecret as _;
+    use url::Url;
+
+    const CONFIG_PATH_ENV: &str = "NV_POSTGRES_INTEGRATION_CONFIG_PATH";
+    const DEFAULT_CONFIG_PATH: &str = "src/cve/testdata/nv-server.integration.spookey";
+
+    #[test]
+    #[ignore = "requires a disposable Postgres test database"]
+    fn failed_sync_run_commits_failure_details() {
+        run_async(async {
+            let db = connect_to_integration_database().await;
+            cisa_kev_sync_runs::Entity::delete_many()
+                .exec(&db)
+                .await
+                .expect("KEV sync runs should clear");
+
+            let transaction = db.begin().await.expect("transaction should begin");
+            let sync_run = create_sync_run(&transaction)
+                .await
+                .expect("sync run should be created");
+            update_sync_run_result_failure(
+                sync_run,
+                "upstream request timed out".to_owned(),
+                &transaction,
+                slog::Logger::root(slog::Discard, slog::o!()),
+            )
+            .await
+            .expect("failure details should be stored");
+            transaction
+                .commit()
+                .await
+                .expect("transaction should commit");
+
+            let run = cisa_kev_sync_runs::Entity::find()
+                .one(&db)
+                .await
+                .expect("sync-run lookup should succeed")
+                .expect("sync run should be stored");
+            assert_eq!(run.status, "failed");
+            assert_eq!(run.error.as_deref(), Some("upstream request timed out"));
+
+            cisa_kev_sync_runs::Entity::delete_many()
+                .exec(&db)
+                .await
+                .expect("KEV sync runs should clear");
+        });
+    }
+
+    async fn connect_to_integration_database() -> DatabaseConnection {
+        let config_path = integration_config_path();
+        let config = Config::parse(&config_path).expect("integration-test config should parse");
+        let database_url = config.database_connection().expose_secret();
+        assert_disposable_database_url(database_url);
+
+        crate::db::connection(&config).await.unwrap_or_else(|error| {
+            panic!(
+                "Postgres integration database should connect and migrate. Config path: {config_path}. Database: {}. Original error: {error:#}",
+                database_name(database_url),
+            )
+        })
+    }
+
+    fn integration_config_path() -> Utf8PathBuf {
+        std::env::var(CONFIG_PATH_ENV).map_or_else(
+            |_| {
+                let mut path = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                path.push(DEFAULT_CONFIG_PATH);
+                path
+            },
+            Utf8PathBuf::from,
+        )
+    }
+
+    fn assert_disposable_database_url(database_url: &str) {
+        let url = Url::parse(database_url).expect("database URL should parse");
+        assert!(
+            matches!(url.scheme(), "postgres" | "postgresql"),
+            "integration test database connection must use a Postgres URL"
+        );
+        let database = database_name(database_url);
+        assert!(
+            database.contains("test") || database.contains("integration"),
+            "integration test database name must contain 'test' or 'integration'; got {database:?}"
+        );
+    }
+
+    fn database_name(database_url: &str) -> String {
+        Url::parse(database_url)
+            .ok()
+            .map(|url| url.path().trim_start_matches('/').to_owned())
+            .filter(|database| !database.is_empty())
+            .unwrap_or_else(|| "<unknown>".to_owned())
+    }
+
+    fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("test runtime should build")
+            .block_on(future)
+    }
 }
