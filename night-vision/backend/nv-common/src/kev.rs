@@ -9,12 +9,11 @@ use reqwest::header::{
 };
 use reqwest::{Client, Response, StatusCode, Url};
 use sea_orm::{
-    ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait, EntityTrait as _,
-    PaginatorTrait as _, QueryFilter as _, QueryOrder as _, TransactionTrait as _,
+    ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait, EntityTrait as _, QueryFilter as _,
+    QueryOrder as _, TransactionTrait as _, Value,
 };
 use sea_orm::{
-    DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, Set, Statement,
-    sea_query::Expr,
+    DatabaseBackend, DatabaseConnection, DatabaseTransaction, Set, Statement, sea_query::Expr,
 };
 use serde::Deserialize;
 use sha2::{Digest as _, Sha256};
@@ -625,53 +624,35 @@ where
             KevError::InvalidCatalogEntry(error)
         })?;
     let entries = deduplicate_entries(entries, &log)?;
-    let cve_ids = entries
-        .iter()
-        .map(|entry| entry.cve_id.clone())
-        .collect::<Vec<_>>();
     let records_seen = count_to_i32(entries.len())?;
-    let records_updated = count_existing_entries(db, &cve_ids).await?;
-    let records_inserted = records_seen
-        .checked_sub(records_updated)
-        .expect("existing KEV entries were selected from supplied KEV entries");
-    let models = entries
-        .into_iter()
-        .map(|entry| cisa_kev_entries::ActiveModel {
-            cve_id: Set(entry.cve_id),
-            entry: Set(entry.entry),
-            ..Default::default()
-        });
-
-    let res = cisa_kev_entries::Entity::insert_many(models)
-        .on_conflict(
-            sea_query::OnConflict::column(cisa_kev_entries::Column::CveId)
-                .update_columns([cisa_kev_entries::Column::Entry])
-                .values([
-                    (
-                        cisa_kev_entries::Column::LastSeenAt,
-                        sea_query::Expr::current_timestamp(),
-                    ),
-                    (
-                        cisa_kev_entries::Column::UpdatedAt,
-                        sea_query::Expr::cust(
-                            "CASE WHEN cisa_kev_entries.entry IS DISTINCT FROM EXCLUDED.entry \
-                             THEN CURRENT_TIMESTAMP ELSE cisa_kev_entries.updated_at END",
-                        ),
-                    ),
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await;
-    match res {
-        // Ignore SeaORM errors that say no records were updated or inserted.
-        // That is not an error in this case.
-        Err(DbErr::RecordNotInserted) => {}
-        Err(DbErr::RecordNotUpdated) => {}
-        Err(e) => return Err(KevError::SeaOrmError(e)),
-        Ok(_) => {}
-    }
-    debug!(log, "KEV Sync: insert_many result: {res:?}");
+    let outcomes = if entries.is_empty() {
+        Vec::new()
+    } else {
+        db.query_all_raw(kev_entry_upsert_statement(&entries))
+            .await?
+    };
+    let records_inserted = count_to_i32(
+        outcomes
+            .iter()
+            .map(|outcome| outcome.try_get_by_index::<bool>(0))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|inserted| *inserted)
+            .count(),
+    )?;
+    let records_updated = count_to_i32(
+        outcomes
+            .iter()
+            .map(|outcome| outcome.try_get_by_index::<bool>(1))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|updated| *updated)
+            .count(),
+    )?;
+    debug!(log, "KEV Sync: stored catalog entries";
+        "records_seen" => records_seen,
+        "records_inserted" => records_inserted,
+        "records_updated" => records_updated);
 
     let summary = RunSummary {
         records_seen,
@@ -684,6 +665,54 @@ where
 struct KevEntry {
     cve_id: String,
     entry: serde_json::Value,
+}
+
+/// Build the PostgreSQL 18 upsert used for KEV entries.
+///
+/// The old/new aliases in `RETURNING` report each row's actual write outcome
+/// without a separate pre-write lookup.
+fn kev_entry_upsert_statement(entries: &[KevEntry]) -> Statement {
+    assert!(
+        !entries.is_empty(),
+        "KEV entry upsert requires at least one entry"
+    );
+
+    let mut sql =
+        String::from("INSERT INTO \"public\".\"cisa_kev_entries\" (\"cve_id\", \"entry\") VALUES ");
+    let mut values = Vec::with_capacity(entries.len() * 2);
+
+    for (index, entry) in entries.iter().enumerate() {
+        if index > 0 {
+            sql.push_str(", ");
+        }
+        let cve_id_parameter = next_kev_upsert_parameter(&values);
+        values.push(Value::String(Some(entry.cve_id.clone())));
+        let entry_parameter = next_kev_upsert_parameter(&values);
+        values.push(Value::Json(Some(Box::new(entry.entry.clone()))));
+        write!(sql, "(${cve_id_parameter}, ${entry_parameter})")
+            .expect("writing KEV upsert SQL should not fail");
+    }
+
+    sql.push_str(
+        " ON CONFLICT (\"cve_id\") DO UPDATE SET \
+         \"entry\" = EXCLUDED.\"entry\", \
+         \"last_seen_at\" = CURRENT_TIMESTAMP, \
+         \"updated_at\" = CASE WHEN \"cisa_kev_entries\".\"entry\" \
+         IS DISTINCT FROM EXCLUDED.\"entry\" THEN CURRENT_TIMESTAMP \
+         ELSE \"cisa_kev_entries\".\"updated_at\" END \
+         RETURNING WITH (OLD AS old, NEW AS new) \
+         old.\"cve_id\" IS NULL AS inserted, \
+         old.\"entry\" IS DISTINCT FROM new.\"entry\" AS updated",
+    );
+
+    Statement::from_sql_and_values(DatabaseBackend::Postgres, sql, values)
+}
+
+fn next_kev_upsert_parameter(values: &[Value]) -> usize {
+    values
+        .len()
+        .checked_add(1)
+        .expect("KEV upsert parameter count should fit in usize")
 }
 
 fn deduplicate_entries(entries: Vec<KevEntry>, log: &Logger) -> Result<Vec<KevEntry>, KevError> {
@@ -711,17 +740,6 @@ fn deduplicate_entries(entries: Vec<KevEntry>, log: &Logger) -> Result<Vec<KevEn
 
 fn count_to_i32(value: usize) -> Result<i32, KevError> {
     i32::try_from(value).map_err(|_| KevError::CatalogCountOutOfRange(value as i64))
-}
-
-async fn count_existing_entries<C>(db: &C, cve_ids: &[String]) -> Result<i32, KevError>
-where
-    C: ConnectionTrait,
-{
-    let count = cisa_kev_entries::Entity::find()
-        .filter(cisa_kev_entries::Column::CveId.is_in(cve_ids.iter().cloned()))
-        .count(db)
-        .await?;
-    i32::try_from(count).map_err(|_| KevError::CatalogCountOutOfRange(count as i64))
 }
 
 /// Cancellation: TODO
@@ -1075,14 +1093,7 @@ mod tests {
     #[test]
     fn store_all_entries_upserts_payload_with_change_aware_timestamps() {
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([
-                vec![mock_num_items_row(0)],
-                Vec::<BTreeMap<String, Value>>::new(),
-            ])
-            .append_exec_results([MockExecResult {
-                last_insert_id: 0,
-                rows_affected: 1,
-            }])
+            .append_query_results([vec![mock_kev_entry_outcome(true, false)]])
             .into_connection();
 
         let summary = run_async(store_all_entries(
@@ -1102,10 +1113,13 @@ mod tests {
             .find(|sql| sql.contains(r#"INSERT INTO "public"."cisa_kev_entries""#))
             .expect("entry write should issue an insert");
         assert!(upsert_sql.contains("ON CONFLICT"));
-        assert!(upsert_sql.contains(r#""entry" = "excluded"."entry""#));
+        assert!(upsert_sql.contains(r#""entry" = EXCLUDED."entry""#));
         assert!(upsert_sql.contains(r#""last_seen_at" = CURRENT_TIMESTAMP"#));
-        assert!(upsert_sql.contains("IS DISTINCT FROM EXCLUDED.entry"));
-        assert!(upsert_sql.contains("ELSE cisa_kev_entries.updated_at END"));
+        assert!(upsert_sql.contains(r#"IS DISTINCT FROM EXCLUDED."entry""#));
+        assert!(upsert_sql.contains(r#"ELSE "cisa_kev_entries"."updated_at" END"#));
+        assert!(upsert_sql.contains("RETURNING WITH (OLD AS old, NEW AS new)"));
+        assert!(upsert_sql.contains("old.\"cve_id\" IS NULL AS inserted"));
+        assert!(upsert_sql.contains("old.\"entry\" IS DISTINCT FROM new.\"entry\" AS updated"));
         assert!(!upsert_sql.contains(r#""first_seen_at" = "#));
     }
 
@@ -1134,14 +1148,7 @@ mod tests {
     fn store_all_entries_deduplicates_identical_cve_ids() {
         let entry = kev_entry("duplicate entry");
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([
-                vec![mock_num_items_row(0)],
-                Vec::<BTreeMap<String, Value>>::new(),
-            ])
-            .append_exec_results([MockExecResult {
-                last_insert_id: 0,
-                rows_affected: 1,
-            }])
+            .append_query_results([vec![mock_kev_entry_outcome(true, false)]])
             .into_connection();
 
         let summary = run_async(store_all_entries(
@@ -1154,7 +1161,7 @@ mod tests {
         assert_eq!(summary.records_seen, 1);
         assert_eq!(summary.records_inserted, 1);
         assert_eq!(summary.records_updated, 0);
-        assert_eq!(db.into_transaction_log().len(), 2);
+        assert_eq!(db.into_transaction_log().len(), 1);
     }
 
     #[test]
@@ -1209,16 +1216,12 @@ mod tests {
     }
 
     #[test]
-    fn store_all_entries_counts_existing_entries_as_updates() {
+    fn store_all_entries_counts_only_changed_existing_entries_as_updates() {
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([
-                vec![mock_num_items_row(1)],
-                Vec::<BTreeMap<String, Value>>::new(),
-            ])
-            .append_exec_results([MockExecResult {
-                last_insert_id: 0,
-                rows_affected: 2,
-            }])
+            .append_query_results([vec![
+                mock_kev_entry_outcome(false, true),
+                mock_kev_entry_outcome(true, false),
+            ]])
             .into_connection();
 
         let summary = run_async(store_all_entries(
@@ -1234,6 +1237,24 @@ mod tests {
         assert_eq!(summary.records_seen, 2);
         assert_eq!(summary.records_inserted, 1);
         assert_eq!(summary.records_updated, 1);
+    }
+
+    #[test]
+    fn store_all_entries_does_not_count_unchanged_existing_entries_as_updates() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_kev_entry_outcome(false, false)]])
+            .into_connection();
+
+        let summary = run_async(store_all_entries(
+            &[kev_entry("unchanged")],
+            &db,
+            slog::Logger::root(slog::Discard, slog::o!()),
+        ))
+        .expect("entry write should succeed");
+
+        assert_eq!(summary.records_seen, 1);
+        assert_eq!(summary.records_inserted, 0);
+        assert_eq!(summary.records_updated, 0);
     }
 
     #[test]
@@ -1400,11 +1421,17 @@ mod tests {
                 .expect("KEV entries should clear");
 
             let initial_entry = kev_entry("initial description");
-            write_entries(&db, std::slice::from_ref(&initial_entry)).await;
+            let initial_summary = write_entries(&db, std::slice::from_ref(&initial_entry)).await;
+            assert_eq!(initial_summary.records_seen, 1);
+            assert_eq!(initial_summary.records_inserted, 1);
+            assert_eq!(initial_summary.records_updated, 0);
             let initial = read_entry(&db).await;
 
             tokio::time::sleep(Duration::from_millis(5)).await;
-            write_entries(&db, &[initial_entry]).await;
+            let unchanged_summary = write_entries(&db, &[initial_entry]).await;
+            assert_eq!(unchanged_summary.records_seen, 1);
+            assert_eq!(unchanged_summary.records_inserted, 0);
+            assert_eq!(unchanged_summary.records_updated, 0);
             let unchanged = read_entry(&db).await;
             assert_eq!(unchanged.entry, initial.entry);
             assert_eq!(unchanged.first_seen_at, initial.first_seen_at);
@@ -1413,7 +1440,10 @@ mod tests {
 
             tokio::time::sleep(Duration::from_millis(5)).await;
             let changed_entry = kev_entry("changed description");
-            write_entries(&db, std::slice::from_ref(&changed_entry)).await;
+            let changed_summary = write_entries(&db, std::slice::from_ref(&changed_entry)).await;
+            assert_eq!(changed_summary.records_seen, 1);
+            assert_eq!(changed_summary.records_inserted, 0);
+            assert_eq!(changed_summary.records_updated, 1);
             let changed = read_entry(&db).await;
             assert_eq!(changed.entry, changed_entry);
             assert_eq!(changed.first_seen_at, initial.first_seen_at);
@@ -1427,9 +1457,9 @@ mod tests {
         });
     }
 
-    async fn write_entries(db: &DatabaseConnection, entries: &[serde_json::Value]) {
+    async fn write_entries(db: &DatabaseConnection, entries: &[serde_json::Value]) -> RunSummary {
         let transaction = db.begin().await.expect("transaction should begin");
-        store_all_entries(
+        let summary = store_all_entries(
             entries,
             &transaction,
             slog::Logger::root(slog::Discard, slog::o!()),
@@ -1440,6 +1470,7 @@ mod tests {
             .commit()
             .await
             .expect("transaction should commit");
+        summary
     }
 
     async fn read_entry(db: &DatabaseConnection) -> cisa_kev_entries::Model {
@@ -1468,8 +1499,11 @@ mod tests {
         })
     }
 
-    fn mock_num_items_row(num_items: i64) -> BTreeMap<String, Value> {
-        BTreeMap::from([("num_items".to_owned(), num_items.into())])
+    fn mock_kev_entry_outcome(inserted: bool, updated: bool) -> BTreeMap<String, Value> {
+        BTreeMap::from([
+            ("inserted".to_owned(), inserted.into()),
+            ("updated".to_owned(), updated.into()),
+        ])
     }
 
     async fn connect_to_integration_database() -> DatabaseConnection {
