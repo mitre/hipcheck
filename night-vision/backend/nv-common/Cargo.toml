@@ -10,6 +10,7 @@ workspace = true
 [dependencies]
 async-trait.workspace = true
 camino.workspace = true
+chrono.workspace = true
 clap-verbosity-flag.workspace = true
 dropshot.workspace = true
 futures-util.workspace = true
@@ -22,6 +23,7 @@ reqwest.workspace = true
 sea-orm.workspace = true
 sea-query.workspace = true
 secrecy.workspace = true
+sha2.workspace = true
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true

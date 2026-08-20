@@ -9,11 +9,15 @@ use reqwest::header::{
 };
 use reqwest::{Client, Response, StatusCode, Url};
 use sea_orm::{
-    ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait, EntityTrait as _, QueryFilter as _,
-    QueryOrder as _, TransactionTrait as _,
+    ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait, EntityTrait as _,
+    PaginatorTrait as _, QueryFilter as _, QueryOrder as _, TransactionTrait as _,
 };
-use sea_orm::{DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, Set, Statement};
+use sea_orm::{
+    DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, Set, Statement,
+    sea_query::Expr,
+};
 use serde::Deserialize;
+use sha2::{Digest as _, Sha256};
 use slog::{Logger, debug, error, info};
 use std::{
     borrow::ToOwned,
@@ -82,10 +86,14 @@ pub struct Vulnerability {
 }
 
 pub enum KevError {
+    CatalogCountOutOfRange(i64),
     DatabaseConnectionError(DatabaseConnectionError),
+    InvalidCatalog(serde_json::Error),
     InvalidCatalogEntry(serde_json::Error),
+    InvalidCatalogReleaseDate(chrono::ParseError),
     ReqwestError(reqwest::Error),
     SeaOrmError(sea_orm::DbErr),
+    SyncRunNotFound(i64),
     TransactionLockError,
 }
 
@@ -130,17 +138,29 @@ impl Debug for KevError {
 impl Display for KevError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::CatalogCountOutOfRange(count) => {
+                write!(f, "KEV catalog count {count} exceeds the database range")
+            }
             Self::DatabaseConnectionError(_) => {
                 write!(f, "failed to connect to database")
             }
+            Self::InvalidCatalog(_) => {
+                write!(f, "failed to parse KEV catalog")
+            }
             Self::InvalidCatalogEntry(_) => {
                 write!(f, "failed to parse KEV catalog entry")
+            }
+            Self::InvalidCatalogReleaseDate(_) => {
+                write!(f, "failed to parse KEV catalog release date")
             }
             Self::ReqwestError(_) => {
                 write!(f, "failed to fetch KEV data")
             }
             Self::SeaOrmError(_) => {
                 write!(f, "failed to access database")
+            }
+            Self::SyncRunNotFound(generation) => {
+                write!(f, "KEV sync run {generation} was not found")
             }
             Self::TransactionLockError => {
                 write!(f, "failed to acquire exclusive database lock to sync data")
@@ -152,10 +172,14 @@ impl Display for KevError {
 impl std::error::Error for KevError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::CatalogCountOutOfRange(_) => None,
             Self::DatabaseConnectionError(err) => Some(err),
+            Self::InvalidCatalog(err) => Some(err),
             Self::InvalidCatalogEntry(err) => Some(err),
+            Self::InvalidCatalogReleaseDate(err) => Some(err),
             Self::ReqwestError(err) => Some(err),
             Self::SeaOrmError(err) => Some(err),
+            Self::SyncRunNotFound(_) => None,
             Self::TransactionLockError => None,
         }
     }
@@ -199,8 +223,72 @@ struct CacheMetadata {
     last_modified: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum KevSyncRunStatus {
+    Success,
+    Failed,
+    NotModified,
+}
+
+impl Display for KevSyncRunStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let status = match self {
+            Self::Success => "success",
+            Self::Failed => "failed",
+            Self::NotModified => "not_modified",
+        };
+        f.write_str(status)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct FinishKevSyncRun {
+    status: KevSyncRunStatus,
+    catalog_version: Option<String>,
+    catalog_date_released: Option<sea_orm::prelude::DateTimeWithTimeZone>,
+    catalog_count: Option<i32>,
+    content_sha256: Option<String>,
+    records_seen: i32,
+    records_inserted: i32,
+    records_updated: i32,
+    error: Option<String>,
+}
+
+impl FinishKevSyncRun {
+    fn failed(error: String) -> Self {
+        Self {
+            status: KevSyncRunStatus::Failed,
+            catalog_version: None,
+            catalog_date_released: None,
+            catalog_count: None,
+            content_sha256: None,
+            records_seen: 0,
+            records_inserted: 0,
+            records_updated: 0,
+            error: Some(error),
+        }
+    }
+
+    fn not_modified() -> Self {
+        Self {
+            status: KevSyncRunStatus::NotModified,
+            catalog_version: None,
+            catalog_date_released: None,
+            catalog_count: None,
+            content_sha256: None,
+            records_seen: 0,
+            records_inserted: 0,
+            records_updated: 0,
+            error: None,
+        }
+    }
+}
+
+#[derive(Debug)]
 struct RunSummary {
-    // TODO
+    records_seen: i32,
+    records_inserted: i32,
+    records_updated: i32,
 }
 
 pub fn spawn_kev_sync_worker(
@@ -255,23 +343,16 @@ async fn sync_kev(
 ) -> Result<(), KevError> {
     let xact = acquire_kev_sync_lock(db).await?;
     let sync_run = create_sync_run(&xact).await?;
-    // NOTE the clone of sync_run. We want to avoid the possibility of saving
-    // an old version of the sync run. We also want to be able to pass it into `fetch_kev`.
-    // Assumption: the result of `create_sync_run` is an ActiveModel with all fields set to
-    // NotChanged.
-    // If that's true, then reusing the ActiveModel should be safe.
-    let res = fetch_kev(request_mode, config, sync_run.clone(), &xact, log.clone()).await;
-    match &res {
-        Ok(()) => update_sync_run_result_success(sync_run, &xact, log).await?,
-        Err(e) => {
-            let error = format!("{e:?}");
-            update_sync_run_result_failure(sync_run, error, &xact, log).await?;
-        }
-    }
+    let res = fetch_kev(request_mode, config, &sync_run, &xact, log.clone()).await;
+    let completion = match &res {
+        Ok(completion) => completion.clone(),
+        Err(error) => FinishKevSyncRun::failed(format!("{error:?}")),
+    };
+    finish_kev_sync_run(&xact, sync_run.generation, completion).await?;
     // Must finish the transaction first, regardless of whether there was an error
     // during processing.
     finish_locked_kev_sync(xact).await?;
-    res
+    res.map(|_| ())
 }
 
 /// TODO: name this function better
@@ -279,10 +360,10 @@ async fn sync_kev(
 async fn fetch_kev(
     request_mode: RequestMode,
     config: &KevConfig,
-    sync_run: cisa_kev_sync_runs::ActiveModel,
+    sync_run: &cisa_kev_sync_runs::Model,
     xact: &DatabaseTransaction,
     log: Logger,
-) -> Result<(), KevError> {
+) -> Result<FinishKevSyncRun, KevError> {
     // If using a conditional request, check database for previous sync run,
     // to retrieve cache metadata.
     let maybe_run = match request_mode {
@@ -330,16 +411,23 @@ async fn fetch_kev(
 
     // Detect 304 Not Modified and exit early
     if status == StatusCode::NOT_MODIFIED {
-        let _sync_run =
-            update_sync_run_cache_metadata(cache_metadata, sync_run, xact, log.clone()).await?;
+        update_sync_run_cache_metadata(cache_metadata, sync_run.generation, xact).await?;
         info!(
             log,
             "KEV Catalog Response was 304 Not Modified; nothing to process"
         );
-        return Ok(());
+        return Ok(FinishKevSyncRun::not_modified());
     }
 
-    let catalog = response.json::<KevCatalog>().await?;
+    let body = response.bytes().await?;
+    let content_sha256 = sha256_hex(&body);
+    let catalog = serde_json::from_slice::<KevCatalog>(&body).map_err(KevError::InvalidCatalog)?;
+    let catalog_date_released = catalog
+        .date_released
+        .parse()
+        .map_err(KevError::InvalidCatalogReleaseDate)?;
+    let catalog_count = i32::try_from(catalog.count)
+        .map_err(|_| KevError::CatalogCountOutOfRange(catalog.count))?;
 
     let catalog_version = &catalog.catalog_version;
     let count = catalog.count;
@@ -350,14 +438,23 @@ async fn fetch_kev(
     "date_released" => date_released
     );
 
-    let _summary = store_all_entries(&catalog.vulnerabilities, xact, log.clone()).await?;
-    //let sync_run = update_sync_run_summary(summary, sync_run, xact, log.clone()).await?;
+    let summary = store_all_entries(&catalog.vulnerabilities, xact, log.clone()).await?;
 
     // Only save response validators after every catalog entry has been stored.
     // Otherwise a later conditional request could hide an entry that failed validation.
-    let _sync_run = update_sync_run_cache_metadata(cache_metadata, sync_run, xact, log).await?;
+    update_sync_run_cache_metadata(cache_metadata, sync_run.generation, xact).await?;
 
-    Ok(())
+    Ok(FinishKevSyncRun {
+        status: KevSyncRunStatus::Success,
+        catalog_version: Some(catalog.catalog_version),
+        catalog_date_released: Some(catalog_date_released),
+        catalog_count: Some(catalog_count),
+        content_sha256: Some(content_sha256),
+        records_seen: summary.records_seen,
+        records_inserted: summary.records_inserted,
+        records_updated: summary.records_updated,
+        error: None,
+    })
 }
 
 /// This function provides a way for `nvdb` to check KEV status.
@@ -390,16 +487,12 @@ pub async fn read_status(config: &Config, log: Logger) -> Result<(), KevError> {
     Ok(())
 }
 
-fn convert_one_entry(
-    value: &serde_json::Value,
-) -> Result<cisa_kev_entries::ActiveModel, serde_json::Error> {
+fn convert_one_entry(value: &serde_json::Value) -> Result<KevEntry, serde_json::Error> {
     let vulnerability: Vulnerability = serde_json::from_value(value.clone())?;
-    let cve_id = vulnerability.cve_id;
 
-    Ok(cisa_kev_entries::ActiveModel {
-        cve_id: Set(cve_id),
-        entry: Set(value.clone()),
-        ..Default::default()
+    Ok(KevEntry {
+        cve_id: vulnerability.cve_id,
+        entry: value.clone(),
     })
 }
 
@@ -412,7 +505,7 @@ async fn store_all_entries<C>(
 where
     C: ConnectionTrait,
 {
-    let models = values
+    let entries = values
         .iter()
         .map(convert_one_entry)
         .collect::<Result<Vec<_>, _>>()
@@ -423,6 +516,22 @@ where
             );
             KevError::InvalidCatalogEntry(error)
         })?;
+    let cve_ids = entries
+        .iter()
+        .map(|entry| entry.cve_id.clone())
+        .collect::<Vec<_>>();
+    let records_seen = count_to_i32(entries.len())?;
+    let records_updated = count_existing_entries(db, &cve_ids).await?;
+    let records_inserted = records_seen
+        .checked_sub(records_updated)
+        .expect("existing KEV entries were selected from supplied KEV entries");
+    let models = entries
+        .into_iter()
+        .map(|entry| cisa_kev_entries::ActiveModel {
+            cve_id: Set(entry.cve_id),
+            entry: Set(entry.entry),
+            ..Default::default()
+        });
 
     let res = cisa_kev_entries::Entity::insert_many(models)
         .on_conflict(
@@ -455,9 +564,32 @@ where
     }
     debug!(log, "KEV Sync: insert_many result: {res:?}");
 
-    // TODO how to get information on how many entries were inserted/updated?
-    let summary = RunSummary {};
+    let summary = RunSummary {
+        records_seen,
+        records_inserted,
+        records_updated,
+    };
     Ok(summary)
+}
+
+struct KevEntry {
+    cve_id: String,
+    entry: serde_json::Value,
+}
+
+fn count_to_i32(value: usize) -> Result<i32, KevError> {
+    i32::try_from(value).map_err(|_| KevError::CatalogCountOutOfRange(value as i64))
+}
+
+async fn count_existing_entries<C>(db: &C, cve_ids: &[String]) -> Result<i32, KevError>
+where
+    C: ConnectionTrait,
+{
+    let count = cisa_kev_entries::Entity::find()
+        .filter(cisa_kev_entries::Column::CveId.is_in(cve_ids.iter().cloned()))
+        .count(db)
+        .await?;
+    i32::try_from(count).map_err(|_| KevError::CatalogCountOutOfRange(count as i64))
 }
 
 /// Cancellation: TODO
@@ -465,7 +597,7 @@ async fn get_latest_run(
     xact: &DatabaseTransaction,
 ) -> Result<Option<cisa_kev_sync_runs::Model>, KevError> {
     let run: Option<cisa_kev_sync_runs::Model> = cisa_kev_sync_runs::Entity::find()
-        .filter(cisa_kev_sync_runs::Column::Status.eq("success"))
+        .filter(cisa_kev_sync_runs::Column::Status.is_in(["success", "not_modified"]))
         .order_by_desc(cisa_kev_sync_runs::Column::Generation)
         .one(xact)
         .await?;
@@ -475,59 +607,93 @@ async fn get_latest_run(
 /// Cancellation: TODO
 async fn create_sync_run(
     xact: &DatabaseTransaction,
-) -> Result<cisa_kev_sync_runs::ActiveModel, KevError> {
+) -> Result<cisa_kev_sync_runs::Model, KevError> {
     let run = cisa_kev_sync_runs::ActiveModel {
         status: Set("running".to_owned()),
         ..Default::default()
     };
-    let stored_run = run.insert(xact).await?;
-    Ok(stored_run.into())
+    run.insert(xact).await.map_err(KevError::SeaOrmError)
 }
 
 /// Cancellation: TODO
 async fn update_sync_run_cache_metadata(
     cache_metadata: CacheMetadata,
-    mut sync_run: cisa_kev_sync_runs::ActiveModel,
+    generation: i64,
     xact: &DatabaseTransaction,
-    _log: Logger,
-) -> Result<cisa_kev_sync_runs::ActiveModel, KevError> {
-    sync_run.etag = Set(cache_metadata.etag);
-    sync_run.last_modified = Set(cache_metadata.last_modified);
-    let run = sync_run.save(xact).await?;
-    Ok(run)
-}
-
-/*
-/// Cancellation: TODO
-async fn update_sync_run_summary(summary: RunSummary, mut sync_run: cisa_kev_sync_runs::ActiveModel, xact: &DatabaseTransaction, log: Logger)
--> Result<cisa_kev_sync_runs::ActiveModel, KevError> {
-    // TODO update stats on number of entries processed, updated, etc
-    let _run = sync_run.save(xact).await?;
-    Ok(run)
-}
-*/
-
-/// Cancellation: TODO
-async fn update_sync_run_result_success(
-    mut sync_run: cisa_kev_sync_runs::ActiveModel,
-    xact: &DatabaseTransaction,
-    _log: Logger,
 ) -> Result<(), KevError> {
-    sync_run.status = Set("success".to_owned());
-    let _run = sync_run.save(xact).await?;
+    let result = cisa_kev_sync_runs::Entity::update_many()
+        .col_expr(
+            cisa_kev_sync_runs::Column::Etag,
+            Expr::value(cache_metadata.etag),
+        )
+        .col_expr(
+            cisa_kev_sync_runs::Column::LastModified,
+            Expr::value(cache_metadata.last_modified),
+        )
+        .filter(cisa_kev_sync_runs::Column::Generation.eq(generation))
+        .exec(xact)
+        .await?;
+    if result.rows_affected == 0 {
+        return Err(KevError::SyncRunNotFound(generation));
+    }
     Ok(())
 }
 
-/// Cancellation: TODO
-async fn update_sync_run_result_failure(
-    mut sync_run: cisa_kev_sync_runs::ActiveModel,
-    error: String,
-    xact: &DatabaseTransaction,
-    _log: Logger,
-) -> Result<(), KevError> {
-    sync_run.status = Set("failed".to_owned());
-    sync_run.error = Set(Some(error));
-    let _run = sync_run.save(xact).await?;
+async fn finish_kev_sync_run<C>(
+    db: &C,
+    generation: i64,
+    completion: FinishKevSyncRun,
+) -> Result<(), KevError>
+where
+    C: ConnectionTrait,
+{
+    let result = cisa_kev_sync_runs::Entity::update_many()
+        .col_expr(
+            cisa_kev_sync_runs::Column::CompletedAt,
+            Expr::current_timestamp(),
+        )
+        .col_expr(
+            cisa_kev_sync_runs::Column::Status,
+            Expr::value(completion.status.to_string()),
+        )
+        .col_expr(
+            cisa_kev_sync_runs::Column::CatalogVersion,
+            Expr::value(completion.catalog_version),
+        )
+        .col_expr(
+            cisa_kev_sync_runs::Column::CatalogDateReleased,
+            Expr::value(completion.catalog_date_released),
+        )
+        .col_expr(
+            cisa_kev_sync_runs::Column::CatalogCount,
+            Expr::value(completion.catalog_count),
+        )
+        .col_expr(
+            cisa_kev_sync_runs::Column::ContentSha256,
+            Expr::value(completion.content_sha256),
+        )
+        .col_expr(
+            cisa_kev_sync_runs::Column::RecordsSeen,
+            Expr::value(completion.records_seen),
+        )
+        .col_expr(
+            cisa_kev_sync_runs::Column::RecordsInserted,
+            Expr::value(completion.records_inserted),
+        )
+        .col_expr(
+            cisa_kev_sync_runs::Column::RecordsUpdated,
+            Expr::value(completion.records_updated),
+        )
+        .col_expr(
+            cisa_kev_sync_runs::Column::Error,
+            Expr::value(completion.error),
+        )
+        .filter(cisa_kev_sync_runs::Column::Generation.eq(generation))
+        .exec(db)
+        .await?;
+    if result.rows_affected == 0 {
+        return Err(KevError::SyncRunNotFound(generation));
+    }
     Ok(())
 }
 
@@ -588,6 +754,10 @@ fn extract_cache_metadata_from_headers(resp: &Response) -> CacheMetadata {
         etag: header_to_string(headers.get(ETAG)),
         last_modified: header_to_string(headers.get(LAST_MODIFIED)),
     }
+}
+
+fn sha256_hex(body: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(body))
 }
 
 fn cache_metadata_for_response(
@@ -662,11 +832,10 @@ mod tests {
             let sync_run = create_sync_run(&transaction)
                 .await
                 .expect("sync run should be created");
-            update_sync_run_result_failure(
-                sync_run,
-                "upstream request timed out".to_owned(),
+            finish_kev_sync_run(
                 &transaction,
-                slog::Logger::root(slog::Discard, slog::o!()),
+                sync_run.generation,
+                FinishKevSyncRun::failed("upstream request timed out".to_owned()),
             )
             .await
             .expect("failure details should be stored");
@@ -682,6 +851,14 @@ mod tests {
                 .expect("sync run should be stored");
             assert_eq!(run.status, "failed");
             assert_eq!(run.error.as_deref(), Some("upstream request timed out"));
+            assert!(run.completed_at.is_some());
+            assert_eq!(run.catalog_version, None);
+            assert_eq!(run.catalog_date_released, None);
+            assert_eq!(run.catalog_count, None);
+            assert_eq!(run.content_sha256, None);
+            assert_eq!(run.records_seen, 0);
+            assert_eq!(run.records_inserted, 0);
+            assert_eq!(run.records_updated, 0);
 
             cisa_kev_sync_runs::Entity::delete_many()
                 .exec(&db)
@@ -693,19 +870,25 @@ mod tests {
     #[test]
     fn store_all_entries_upserts_payload_with_change_aware_timestamps() {
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([Vec::<BTreeMap<String, Value>>::new()])
+            .append_query_results([
+                vec![mock_num_items_row(0)],
+                Vec::<BTreeMap<String, Value>>::new(),
+            ])
             .append_exec_results([MockExecResult {
                 last_insert_id: 0,
                 rows_affected: 1,
             }])
             .into_connection();
 
-        run_async(store_all_entries(
+        let summary = run_async(store_all_entries(
             &[kev_entry("initial description")],
             &db,
             slog::Logger::root(slog::Discard, slog::o!()),
         ))
         .expect("entry write should succeed");
+        assert_eq!(summary.records_seen, 1);
+        assert_eq!(summary.records_inserted, 1);
+        assert_eq!(summary.records_updated, 0);
 
         let transaction_log = db.into_transaction_log();
         let upsert_sql = transaction_log
@@ -740,6 +923,121 @@ mod tests {
             db.into_transaction_log().is_empty(),
             "an invalid entry must prevent every catalog upsert"
         );
+    }
+
+    #[test]
+    fn store_all_entries_counts_existing_entries_as_updates() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_num_items_row(1)],
+                Vec::<BTreeMap<String, Value>>::new(),
+            ])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 2,
+            }])
+            .into_connection();
+
+        let summary = run_async(store_all_entries(
+            &[
+                kev_entry("existing"),
+                kev_entry_with_id("CVE-2026-1001", "new"),
+            ],
+            &db,
+            slog::Logger::root(slog::Discard, slog::o!()),
+        ))
+        .expect("entry write should succeed");
+
+        assert_eq!(summary.records_seen, 2);
+        assert_eq!(summary.records_inserted, 1);
+        assert_eq!(summary.records_updated, 1);
+    }
+
+    #[test]
+    fn sha256_hex_uses_lowercase_hex() {
+        assert_eq!(
+            sha256_hex(b"Night Vision"),
+            "4cbe4ae9154d2b8ce3ad05bc9fd107420e66d7a62d465ccd5096ccd87cd7284d"
+        );
+    }
+
+    #[test]
+    fn finish_kev_sync_run_persists_terminal_metadata() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+        let completion = FinishKevSyncRun {
+            status: KevSyncRunStatus::Success,
+            catalog_version: Some("2026.08.20".to_owned()),
+            catalog_date_released: Some("2026-08-20T00:00:00Z".parse().expect("valid date")),
+            catalog_count: Some(2),
+            content_sha256: Some("abc123".to_owned()),
+            records_seen: 2,
+            records_inserted: 1,
+            records_updated: 1,
+            error: None,
+        };
+
+        run_async(finish_kev_sync_run(&db, 42, completion))
+            .expect("terminal metadata should be stored");
+
+        let transaction_log = db.into_transaction_log();
+        let sql = &transaction_log[0].statements()[0].sql;
+        assert!(sql.contains(r#"UPDATE "public"."cisa_kev_sync_runs""#));
+        assert!(sql.contains(r#""completed_at" = CURRENT_TIMESTAMP"#));
+        assert!(sql.contains(r#""catalog_version" = $"#));
+        assert!(sql.contains(r#""catalog_date_released" = $"#));
+        assert!(sql.contains(r#""catalog_count" = $"#));
+        assert!(sql.contains(r#""content_sha256" = $"#));
+        assert!(sql.contains(r#""records_seen" = $"#));
+        assert!(sql.contains(r#""records_inserted" = $"#));
+        assert!(sql.contains(r#""records_updated" = $"#));
+        assert!(sql.contains(r#""error" = $"#));
+    }
+
+    #[test]
+    fn not_modified_completion_has_no_catalog_metadata() {
+        let completion = FinishKevSyncRun::not_modified();
+
+        assert_eq!(completion.status, KevSyncRunStatus::NotModified);
+        assert_eq!(completion.records_seen, 0);
+        assert_eq!(completion.records_inserted, 0);
+        assert_eq!(completion.records_updated, 0);
+        assert_eq!(completion.catalog_version, None);
+        assert_eq!(completion.catalog_date_released, None);
+        assert_eq!(completion.catalog_count, None);
+        assert_eq!(completion.content_sha256, None);
+    }
+
+    #[test]
+    fn failed_completion_has_no_catalog_metadata() {
+        let completion = FinishKevSyncRun::failed("upstream request timed out".to_owned());
+
+        assert_eq!(completion.status, KevSyncRunStatus::Failed);
+        assert_eq!(
+            completion.error.as_deref(),
+            Some("upstream request timed out")
+        );
+        assert_eq!(completion.records_seen, 0);
+        assert_eq!(completion.records_inserted, 0);
+        assert_eq!(completion.records_updated, 0);
+        assert_eq!(completion.catalog_version, None);
+        assert_eq!(completion.catalog_date_released, None);
+        assert_eq!(completion.catalog_count, None);
+        assert_eq!(completion.content_sha256, None);
+    }
+
+    #[test]
+    fn invalid_catalog_release_date_is_reported() {
+        let error = "not-a-date"
+            .parse::<sea_orm::prelude::DateTimeWithTimeZone>()
+            .map_err(KevError::InvalidCatalogReleaseDate)
+            .expect_err("invalid release date should fail");
+
+        assert!(matches!(error, KevError::InvalidCatalogReleaseDate(_)));
     }
 
     #[test]
@@ -870,8 +1168,12 @@ mod tests {
     }
 
     fn kev_entry(short_description: &str) -> serde_json::Value {
+        kev_entry_with_id("CVE-2026-1000", short_description)
+    }
+
+    fn kev_entry_with_id(cve_id: &str, short_description: &str) -> serde_json::Value {
         json!({
-            "cveID": "CVE-2026-1000",
+            "cveID": cve_id,
             "cwes": [],
             "dateAdded": "2026-01-01",
             "dueDate": "2026-02-01",
@@ -881,6 +1183,10 @@ mod tests {
             "vendorProject": "example vendor",
             "vulnerabilityName": "Example vulnerability"
         })
+    }
+
+    fn mock_num_items_row(num_items: i64) -> BTreeMap<String, Value> {
+        BTreeMap::from([("num_items".to_owned(), num_items.into())])
     }
 
     async fn connect_to_integration_database() -> DatabaseConnection {

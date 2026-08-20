@@ -2431,6 +2431,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "camino",
+ "chrono",
  "clap-verbosity-flag",
  "dropshot",
  "futures-util",
@@ -2447,6 +2448,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "slog",
  "slog-async",
  "slog-term",

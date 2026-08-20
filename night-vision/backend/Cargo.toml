@@ -85,6 +85,7 @@ windows-acls = { path = "windows-acls" }
 workspace-hack = { path = "workspace-hack" }
 xshell = "0.2.7"
 secrecy = "0.10.3"
+sha2 = "0.10.9"
 thiserror = "2.0.19"
 url = "2.5.7"
 httpmock = "0.8.3"
