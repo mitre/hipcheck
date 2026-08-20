@@ -93,6 +93,7 @@ Commands:
   api   Interact with the REST API
   cve   Manage CVE List data
   db    Manage the database
+  kev   Manage KEV data
   npm   Inspect npm registry data
   help  Print this message or the help of the given subcommand(s)
 ```
@@ -128,6 +129,25 @@ override protection for stale running rows; do not use it while a sync is live.
 
 For the ingest lifecycle, configuration defaults, and recovery guidance, see
 [CVE List Ingest](./cve-ingest.md).
+
+## `kev`
+
+Use `kev` commands to inspect and maintain the local CISA Known Exploited
+Vulnerabilities (KEV) catalog cache. They use the selected `nv-server`
+configuration file and its database connection. See
+[`nv-server` Configuration](./nv-server-configuration.md) for `kev-url`,
+`kev-refresh-interval`, and `kev-response-body-max-bytes`.
+
+| Command | Purpose |
+| --- | --- |
+| `kev pull --destructive [--force]` | Download and record one KEV catalog sync. |
+| `kev status` | Report cached KEV entry and sync-run counts. |
+
+`kev pull` requires `--destructive` because it writes KEV entries and sync-run
+history. It is an acknowledgement, not a dry-run. By default, it uses stored
+HTTP validators to make a conditional request; pass `--force` to send an
+unconditional request instead. `kev status` is read-only. Run it with verbose
+logging for the most recent sync-run and cache-validator details.
 
 ## `npm packument corpus-refresh`
 
