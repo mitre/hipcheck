@@ -64,3 +64,15 @@ to `backend/mutants.out/`, which is ignored by version control.
 
 
 
+
+## `cargo audit` and `cargo update`
+
+Run the command `cargo audit --file Cargo.lock` to check for package vulnerabilities reported in [RustSec](https://rustsec.org/) - the Rust Security Advisory Database. This command is run as a CI step, but you can run in locally before putting in a merge request to avoid any warnings showing up in the pipeline.
+
+The command returns a listing of package vulnerabilities, and each vulnerability will include a link to the RustSec page describing the vulnerability. That page should show if there are any patches available.
+
+If there is a patch available, you can use the `cargo update` command to update the packages in the `Cargo.lock` file.
+
+You can run `cargo update --dry-run` to preview the package updates, and check if the patch version you need is available.
+
+`cargo update` should only update the packages to the latest available versions allowed by your current Cargo.toml constraints - typically patch updates. It will not do major version breaking changes that may not be safe to install.
