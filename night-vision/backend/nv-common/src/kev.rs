@@ -522,12 +522,7 @@ async fn fetch_kev(
     );
 
     let summary = store_all_entries(&catalog.vulnerabilities, xact, log.clone()).await?;
-    retire_missing_kev_entries(
-        xact,
-        &catalog.vulnerabilities,
-        catalog_date_released.clone(),
-    )
-    .await?;
+    retire_missing_kev_entries(xact, &catalog.vulnerabilities, catalog_date_released).await?;
 
     // Only save response validators after every catalog entry has been stored.
     // Otherwise a later conditional request could hide an entry that failed validation.
@@ -948,11 +943,10 @@ async fn finish_locked_kev_sync(xact: DatabaseTransaction) -> Result<(), KevErro
     Ok(())
 }
 
-/// Attempt to acquire a PostgreSQL advisory lock using raw SQL.
-/// The bool result indicates whether the lock was actually acquired.
-/// By using the SQL function `pg_try_advisory_xact_lock`, this will return
-/// immediately with a result instead of waiting indefinitely for the lock.
 /// Try to acquire the transaction-scoped KEV sync advisory lock.
+///
+/// This uses `pg_try_advisory_xact_lock`, so it returns immediately when the
+/// lock is unavailable.
 ///
 /// Callers that need the lock to guard multiple statements must pass an active
 /// transaction. Passing a plain connection only guards the current statement.
