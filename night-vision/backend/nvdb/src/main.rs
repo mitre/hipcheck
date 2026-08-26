@@ -109,6 +109,8 @@ fn run() -> Result<()> {
             return cmd::kev::run::run(&config, run_matches);
         } else if let Some(runs_matches) = kev_matches.subcommand_matches("runs") {
             return cmd::kev::runs::run(&config, runs_matches);
+        } else if let Some(stats_matches) = kev_matches.subcommand_matches("stats") {
+            return cmd::kev::stats::run(&config, stats_matches);
         } else if let Some(status_matches) = kev_matches.subcommand_matches("status") {
             return cmd::kev::status::run(&config, status_matches);
         }
@@ -159,6 +161,7 @@ fn command() -> clap::Command {
                 .subcommand(cmd::kev::record::command())
                 .subcommand(cmd::kev::run::command())
                 .subcommand(cmd::kev::runs::command())
+                .subcommand(cmd::kev::stats::command())
                 .subcommand(cmd::kev::status::command()),
         );
     Verbosity::<InfoLevel>::augment_args(command)

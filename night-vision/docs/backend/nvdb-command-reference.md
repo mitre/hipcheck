@@ -147,6 +147,7 @@ configuration file and its database connection. See
 | `kev record <CVE-ID>` | Print one cached KEV entry and local timestamps. |
 | `kev run <GENERATION>` | Show one KEV catalog sync run. |
 | `kev runs [--limit <N>]` | List recent KEV catalog sync runs. |
+| `kev stats` | Summarize cached entries and sync-run outcomes. |
 | `kev status` | Print the latest KEV catalog sync state. |
 
 `kev pull` requires `--destructive` because it writes KEV entries and sync-run
