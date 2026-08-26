@@ -398,6 +398,26 @@ mod tests {
     }
 
     #[test]
+    fn discovery_excludes_legacy_boolean_deprecation() {
+        let packument = packument(
+            "example",
+            vec![
+                version_entry("1.2.3", json!({})),
+                version_entry("1.2.4", json!({ "deprecated": true })),
+            ],
+        );
+
+        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+
+        assert_eq!(
+            candidates[0].status,
+            CandidateStatus::Excluded(vec![CandidateExclusionReason::Deprecated(
+                "package is deprecated".into()
+            )])
+        );
+    }
+
+    #[test]
     fn discovery_excludes_a_version_that_is_both_prerelease_and_deprecated() {
         let packument = packument(
             "example",

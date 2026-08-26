@@ -631,12 +631,10 @@ fn convert_engines(raw: Option<RawEngines>) -> HashMap<String, String> {
 fn convert_deprecated(raw: Option<RawDeprecated>) -> Option<String> {
     match raw {
         Some(RawDeprecated::Message(message)) => Some(message),
-        // npm accepts this older boolean form, but the public representation
-        // only preserves a deprecation message.
-        Some(RawDeprecated::LegacyBoolean(value)) => {
-            let _ = value;
-            None
-        }
+        // npm accepts this older boolean form. It has no message, but retain
+        // a useful explanation so consumers do not overlook `true`.
+        Some(RawDeprecated::LegacyBoolean(true)) => Some("package is deprecated".to_owned()),
+        Some(RawDeprecated::LegacyBoolean(false)) => None,
         None => None,
     }
 }
@@ -975,6 +973,20 @@ mod tests {
             .expect("version should be present");
 
         assert!(version.deprecated.is_none());
+    }
+
+    #[test]
+    fn preserves_legacy_true_deprecated_metadata() {
+        let mut packument = valid_packument("example", "1.0.0", "1.0.0");
+        packument["versions"]["1.0.0"]["deprecated"] = Value::Bool(true);
+
+        let packument = parse_value(&packument).expect("legacy deprecated boolean should parse");
+        let version = packument
+            .versions
+            .get(&semantic_version("1.0.0"))
+            .expect("version should be present");
+
+        assert_eq!(version.deprecated.as_deref(), Some("package is deprecated"));
     }
 
     #[test]
