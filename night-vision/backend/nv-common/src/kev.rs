@@ -504,7 +504,7 @@ async fn fetch_kev(
     let body = read_kev_catalog_body(response, config.kev_response_body_max_bytes).await?;
     let content_sha256 = sha256_hex(&body);
     let catalog = serde_json::from_slice::<KevCatalog>(&body).map_err(KevError::InvalidCatalog)?;
-    let catalog_date_released = catalog
+    let catalog_date_released: sea_orm::prelude::DateTimeWithTimeZone = catalog
         .date_released
         .parse()
         .map_err(KevError::InvalidCatalogReleaseDate)?;
@@ -522,6 +522,12 @@ async fn fetch_kev(
     );
 
     let summary = store_all_entries(&catalog.vulnerabilities, xact, log.clone()).await?;
+    retire_missing_kev_entries(
+        xact,
+        &catalog.vulnerabilities,
+        catalog_date_released.clone(),
+    )
+    .await?;
 
     // Only save response validators after every catalog entry has been stored.
     // Otherwise a later conditional request could hide an entry that failed validation.
@@ -747,6 +753,7 @@ fn kev_entry_upsert_statement(entries: &[KevEntry]) -> Statement {
         " ON CONFLICT (\"cve_id\") DO UPDATE SET \
          \"entry\" = EXCLUDED.\"entry\", \
          \"last_seen_at\" = CURRENT_TIMESTAMP, \
+         \"removed_at\" = NULL, \
          \"updated_at\" = CASE WHEN \"cisa_kev_entries\".\"entry\" \
          IS DISTINCT FROM EXCLUDED.\"entry\" THEN CURRENT_TIMESTAMP \
          ELSE \"cisa_kev_entries\".\"updated_at\" END \
@@ -763,6 +770,32 @@ fn next_kev_upsert_parameter(values: &[Value]) -> usize {
         .len()
         .checked_add(1)
         .expect("KEV upsert parameter count should fit in usize")
+}
+
+async fn retire_missing_kev_entries<C>(
+    db: &C,
+    values: &[serde_json::Value],
+    removed_at: sea_orm::prelude::DateTimeWithTimeZone,
+) -> Result<(), KevError>
+where
+    C: ConnectionTrait,
+{
+    let cve_ids = values
+        .iter()
+        .map(convert_one_entry)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(KevError::InvalidCatalogEntry)?
+        .into_iter()
+        .map(|entry| entry.cve_id)
+        .collect::<Vec<_>>();
+    let mut update = cisa_kev_entries::Entity::update_many()
+        .col_expr(cisa_kev_entries::Column::RemovedAt, Expr::value(removed_at))
+        .filter(cisa_kev_entries::Column::RemovedAt.is_null());
+    if !cve_ids.is_empty() {
+        update = update.filter(cisa_kev_entries::Column::CveId.is_not_in(cve_ids));
+    }
+    update.exec(db).await?;
+    Ok(())
 }
 
 fn deduplicate_entries(entries: Vec<KevEntry>, log: &Logger) -> Result<Vec<KevEntry>, KevError> {

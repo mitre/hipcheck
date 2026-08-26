@@ -26,6 +26,7 @@ async fn status(config: &Config) -> Result<()> {
         .await
         .context("failed to connect to database")?;
     let entry_count = cisa_kev_entries::Entity::find()
+        .filter(cisa_kev_entries::Column::RemovedAt.is_null())
         .count(&db)
         .await
         .context("failed to count cached KEV entries")?;

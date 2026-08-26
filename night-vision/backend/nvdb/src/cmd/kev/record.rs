@@ -51,6 +51,13 @@ fn print_entry(entry: &KevEntry) -> Result<()> {
     println!("first_seen_at: {}", entry.first_seen_at);
     println!("last_seen_at: {}", entry.last_seen_at);
     println!("updated_at: {}", entry.updated_at);
+    println!(
+        "removed_at: {}",
+        entry
+            .removed_at
+            .as_ref()
+            .map_or("<none>".to_owned(), ToString::to_string)
+    );
     println!("entry:");
     let output = serde_json::to_string_pretty(&entry.entry)
         .context("failed to serialize cached KEV entry JSON")?;

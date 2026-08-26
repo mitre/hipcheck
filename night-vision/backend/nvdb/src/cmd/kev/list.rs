@@ -4,7 +4,9 @@ use nv_common::{
     db::{self, entities::cisa_kev_entries},
     rt,
 };
-use sea_orm::{EntityTrait as _, QueryOrder as _, QuerySelect as _};
+use sea_orm::{
+    ColumnTrait as _, EntityTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _,
+};
 use serde_json::json;
 
 const DEFAULT_LIMIT: u64 = 50;
@@ -12,6 +14,12 @@ const DEFAULT_LIMIT: u64 = 50;
 pub fn command() -> clap::Command {
     clap::Command::new("list")
         .about("List cached KEV entries")
+        .arg(
+            clap::Arg::new("removed")
+                .long("removed")
+                .action(clap::ArgAction::SetTrue)
+                .help("List retained entries removed from the current catalog"),
+        )
         .arg(
             clap::Arg::new("limit")
                 .long("limit")
@@ -53,6 +61,11 @@ async fn list(config: &Config, filter: &KevListFilter) -> Result<()> {
         .await
         .context("failed to connect to database")?;
     let mut query = cisa_kev_entries::Entity::find();
+    query = if filter.removed {
+        query.filter(cisa_kev_entries::Column::RemovedAt.is_not_null())
+    } else {
+        query.filter(cisa_kev_entries::Column::RemovedAt.is_null())
+    };
     query = if filter.descending {
         query.order_by_desc(cisa_kev_entries::Column::CveId)
     } else {
@@ -93,6 +106,7 @@ async fn list(config: &Config, filter: &KevListFilter) -> Result<()> {
 
 #[derive(Debug, PartialEq, Eq)]
 struct KevListFilter {
+    removed: bool,
     limit: Option<u64>,
     descending: bool,
     output_json: bool,
@@ -101,6 +115,7 @@ struct KevListFilter {
 impl KevListFilter {
     fn from_matches(matches: &clap::ArgMatches) -> Self {
         Self {
+            removed: matches.get_flag("removed"),
             limit: (!matches.get_flag("no-limit")).then(|| {
                 *matches
                     .get_one::<u64>("limit")
@@ -133,6 +148,7 @@ fn print_json(entries: &[cisa_kev_entries::Model]) -> Result<()> {
                 "first_seen_at": entry.first_seen_at.to_string(),
                 "last_seen_at": entry.last_seen_at.to_string(),
                 "updated_at": entry.updated_at.to_string(),
+                "removed_at": entry.removed_at.as_ref().map(ToString::to_string),
             })
         })
         .collect();
@@ -164,6 +180,7 @@ mod tests {
         assert_eq!(
             KevListFilter::from_matches(&matches),
             KevListFilter {
+                removed: false,
                 limit: Some(50),
                 descending: false,
                 output_json: false,
@@ -180,6 +197,7 @@ mod tests {
         assert_eq!(
             KevListFilter::from_matches(&matches),
             KevListFilter {
+                removed: false,
                 limit: Some(25),
                 descending: true,
                 output_json: true,

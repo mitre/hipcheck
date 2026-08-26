@@ -239,7 +239,7 @@ fn classified_cte() -> String {
          ), candidates AS ( \
              SELECT cve_id FROM active_cves \
              UNION \
-             SELECT cve_id FROM public.cisa_kev_entries \
+             SELECT cve_id FROM public.cisa_kev_entries WHERE removed_at IS NULL \
          ), classified AS ( \
              SELECT candidates.cve_id, \
                  kev.cve_id IS NOT NULL AS kev_entry_exists, \
@@ -253,7 +253,7 @@ fn classified_cte() -> String {
                  END AS audit_state \
              FROM candidates \
              LEFT JOIN active_cves cve ON cve.cve_id = candidates.cve_id \
-             LEFT JOIN public.cisa_kev_entries kev ON kev.cve_id = candidates.cve_id \
+             LEFT JOIN public.cisa_kev_entries kev ON kev.cve_id = candidates.cve_id AND kev.removed_at IS NULL \
          )"
     )
 }

@@ -97,6 +97,7 @@ pub async fn kev_affected_npm_package_versions(
     reachable: &[ReachableNpmPackageVersion],
 ) -> Result<Vec<KevAffectedNpmPackageVersion>, KevNpmMatchError> {
     let kev_entries = cisa_kev_entries::Entity::find()
+        .filter(cisa_kev_entries::Column::RemovedAt.is_null())
         .all(db)
         .await
         .map_err(KevNpmMatchError::Db)?;
@@ -862,6 +863,7 @@ mod tests {
             first_seen_at: timestamp,
             last_seen_at: timestamp,
             updated_at: timestamp,
+            removed_at: None,
         }
     }
 

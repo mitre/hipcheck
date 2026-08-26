@@ -12,6 +12,7 @@ pub struct Model {
     pub first_seen_at: DateTimeWithTimeZone,
     pub last_seen_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
+    pub removed_at: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
