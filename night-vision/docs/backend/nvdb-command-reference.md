@@ -140,6 +140,7 @@ configuration file and its database connection. See
 
 | Command | Purpose |
 | --- | --- |
+| `kev list [--limit <N> \| --no-limit] [--desc] [--json]` | List cached KEV entries. |
 | `kev pull --destructive [--force]` | Download and record one KEV catalog sync. |
 | `kev status` | Report cached KEV entry and sync-run counts. |
 

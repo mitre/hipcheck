@@ -97,6 +97,8 @@ fn run() -> Result<()> {
     if let Some(kev_matches) = matches.subcommand_matches("kev") {
         if let Some(pull_matches) = kev_matches.subcommand_matches("pull") {
             return cmd::kev::pull::run(&config, pull_matches, log);
+        } else if let Some(list_matches) = kev_matches.subcommand_matches("list") {
+            return cmd::kev::list::run(&config, list_matches);
         } else if let Some(_matches) = kev_matches.subcommand_matches("status") {
             return cmd::kev::status::run(&config, log);
         }
@@ -140,6 +142,7 @@ fn command() -> clap::Command {
             clap::Command::new("kev")
                 .about("Manage KEV data")
                 .arg_required_else_help(true)
+                .subcommand(cmd::kev::list::command())
                 .subcommand(cmd::kev::pull::command())
                 .subcommand(cmd::kev::status::command()),
         );
