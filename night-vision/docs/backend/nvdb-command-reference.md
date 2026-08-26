@@ -169,7 +169,11 @@ summary groups IDs into `both` (reciprocal references), `kev-only` (a KEV entry
 without a CVE-side citation), `cve-only` (a CVE-side citation without a cached
 KEV entry), and `neither`. Pass one or more `--state` values to list matching
 IDs; `--json` includes both the summary and any listed entries. `--check` exits
-unsuccessfully when either one-sided state is nonzero.
+unsuccessfully when either one-sided state is nonzero. The command warns when
+either dataset has never successfully synced, because its results may be
+incomplete. A CVE-side citation matches the CISA KEV catalog URL with an
+optional trailing slash and query string. Before its audit results, the command
+prints each dataset's last successful sync completion time.
 
 ### Inspecting KEV data
 
