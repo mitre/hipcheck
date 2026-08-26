@@ -10,8 +10,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        HIPCHECK_FETCH_EPOCH: ${CI_PIPELINE_ID:-0}
       secrets:
         - ca_file
+
     image: ${NV_SERVER_IMAGE:?NV_SERVER_IMAGE is required}
     pull_policy: never
 
@@ -27,3 +30,5 @@ volumes:
 secrets:
   ca_file:
     file: ${BUILD_CA_FILE:-/dev/null}
+
+

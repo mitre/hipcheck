@@ -4,6 +4,9 @@
 #
 #   docker build \
 #     --secret id=ca_file,src="$HOME/.config/certs/system_certs.pem" \
+#   
+#     --build-arg HIPCHECK_REF=HEAD \
+#     --build-arg HIPCHECK_FETCH_EPOCH="$(date -u +%s)" \
 #     --build-arg IMAGE_CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 #     --build-arg IMAGE_REVISION="$(git rev-parse HEAD)" \
 #     --build-arg IMAGE_VERSION="0.1.0" \
@@ -15,7 +18,10 @@
 ARG RUST_VERSION=1.95.0-bookworm
 ARG CARGO_CHEF_VERSION=0.1.77
 ARG HIPCHECK_RUST_VERSION=1.95.0-bookworm
-ARG HIPCHECK_COMMIT=06a3db9394742a58a7fb3412b677db25feb6f678
+ARG HIPCHECK_REF=HEAD
+# Docker cannot detect updates behind a floating Git ref. Change this value, or
+# build with --no-cache, when a fresh checkout is required.
+ARG HIPCHECK_FETCH_EPOCH=0
 
 # OCI Image Metadata.
 ARG IMAGE_CREATED
@@ -86,24 +92,30 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # Hipcheck Artifact Layer
 # ------------------------------------------------------------------------------------------------
 
-# Hipcheck is intentionally built from this immutable upstream revision, rather
-# than discovered from the developer PATH or a floating plugin manifest.
+# Hipcheck is built from Night Vision's internal fork. The selected ref is a
+# build input; the resolved commit is written into the final image for
+# provenance.
 FROM rust:${HIPCHECK_RUST_VERSION} AS hipcheck-builder
 
-ARG HIPCHECK_COMMIT
+ARG HIPCHECK_REF
+ARG HIPCHECK_FETCH_EPOCH
 
 RUN --mount=type=secret,id=ca_file,target=/tmp/build-ca.crt,required=false \
+    --mount=type=secret,id=hipcheck_gitlab_token,required=true \
     apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates git mold pkg-config protobuf-compiler \
     && if [ -s /tmp/build-ca.crt ]; then \
         cat /tmp/build-ca.crt >> /etc/ssl/certs/ca-certificates.crt; \
     fi \
     && rm -rf /var/lib/apt/lists/* \
+    && test -n "${HIPCHECK_FETCH_EPOCH}" \
     && git init /usr/src/hipcheck \
     && git -C /usr/src/hipcheck remote add origin https://github.com/mitre/hipcheck.git \
-    && git -C /usr/src/hipcheck fetch --depth 1 origin "${HIPCHECK_COMMIT}" \
+    && git -C /usr/src/hipcheck \
+        -c "http.extraHeader=Authorization: Bearer $(cat /run/secrets/hipcheck_gitlab_token)" \
+        fetch --depth 1 origin "${HIPCHECK_REF}" \
     && git -C /usr/src/hipcheck checkout --detach FETCH_HEAD \
-    && test "$(git -C /usr/src/hipcheck rev-parse HEAD)" = "${HIPCHECK_COMMIT}"
+    && git -C /usr/src/hipcheck rev-parse HEAD > /usr/src/hipcheck/REVISION
 
 WORKDIR /usr/src/hipcheck
 
@@ -123,6 +135,7 @@ ARG IMAGE_CREATED
 ARG IMAGE_REVISION
 ARG IMAGE_SOURCE
 ARG IMAGE_VERSION
+ARG HIPCHECK_REF
 
 LABEL org.opencontainers.image.title="nv-server" \
     org.opencontainers.image.description="Night Vision backend server" \
@@ -130,6 +143,7 @@ LABEL org.opencontainers.image.title="nv-server" \
     org.opencontainers.image.version="${IMAGE_VERSION}" \
     org.opencontainers.image.revision="${IMAGE_REVISION}" \
     org.opencontainers.image.created="${IMAGE_CREATED}" \
+    org.mitre.night-vision.hipcheck.ref="${HIPCHECK_REF}" \
     org.opencontainers.image.vendor="The MITRE Corporation" \
     org.opencontainers.image.licenses="Apache-2.0"
 
@@ -152,6 +166,7 @@ RUN --mount=type=secret,id=ca_file,target=/tmp/build-ca.crt,required=false \
 COPY --from=builder /usr/src/night-vision/target/release/nv-server /usr/local/bin/nv-server
 COPY --from=hipcheck-builder /usr/src/hipcheck/target/release/hc /usr/local/bin/hc
 COPY --from=hipcheck-builder /usr/src/hipcheck/target/release/binary /opt/night-vision/hipcheck/target/release/binary
+COPY --from=hipcheck-builder /usr/src/hipcheck/REVISION /opt/night-vision/hipcheck/REVISION
 COPY deploy/nv-server.spookey /etc/night-vision/nv-server.spookey
 COPY hipcheck/config /opt/night-vision/hipcheck/config
 COPY hipcheck/plugins /opt/night-vision/hipcheck/plugins

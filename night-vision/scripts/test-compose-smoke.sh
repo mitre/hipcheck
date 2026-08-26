@@ -70,6 +70,8 @@ finish() {
 }
 trap finish EXIT HUP INT TERM
 
+
+
 printf '%s\n' replace-me > "$tmp_dir/postgres-password"
 printf '%s\n' postgres://nv-server:replace-me@postgres:5432/nv > "$tmp_dir/nv-server-database-url"
 # Compose file-backed secrets are bind-mounted into containers by Docker
@@ -99,6 +101,15 @@ docker run \
     "${NV_SERVER_IMAGE:-nv-server:ci-smoke}" \
     --version
 
+hipcheck_revision=$(docker run \
+    --rm \
+    --entrypoint cat \
+    "${NV_SERVER_IMAGE:-nv-server:ci-smoke}" \
+    /opt/night-vision/hipcheck/REVISION
+)
+printf 'Bundled Hipcheck revision: %s\n' "$hipcheck_revision"
+printf '%s' "$hipcheck_revision" | grep -Eq '^[0-9a-f]{40}$'
+
 COMPOSE_PROJECT_NAME="$compose_project_name" \
 BUILD_CA_FILE="${BUILD_CA_FILE:-/dev/null}" \
 NV_APP_IMAGE="${NV_APP_IMAGE:-nv-app:ci-smoke}" \
@@ -111,3 +122,21 @@ NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
         -f docker-compose.yml \
         -f docker-compose.ci.yml \
         up --build --detach --wait --wait-timeout 180
+
+COMPOSE_PROJECT_NAME="$compose_project_name" \
+BUILD_CA_FILE="${BUILD_CA_FILE:-/dev/null}" \
+NV_APP_IMAGE="${NV_APP_IMAGE:-nv-app:ci-smoke}" \
+NV_SERVER_IMAGE="${NV_SERVER_IMAGE:-nv-server:ci-smoke}" \
+POSTGRES_DB=nv \
+POSTGRES_USER=nv-server \
+POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/postgres-password" \
+NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
+    docker compose \
+        -f docker-compose.yml \
+        -f docker-compose.ci.yml \
+        exec -T nv-server \
+        /usr/local/bin/hc \
+        --policy /opt/night-vision/hipcheck/config/Hipcheck.kdl \
+        --exec /opt/night-vision/hipcheck/config/Exec.kdl \
+        --cache /var/cache/night-vision/hipcheck \
+        ready

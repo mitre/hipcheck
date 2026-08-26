@@ -167,6 +167,7 @@ mod tests {
 
     struct TempConfigFile {
         path: Utf8PathBuf,
+        hipcheck_root: Utf8PathBuf,
     }
 
     impl TempConfigFile {
@@ -189,6 +190,52 @@ mod tests {
             );
 
             let id = TEST_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let hipcheck_root = std::env::temp_dir().join(format!(
+                "nv-server-cve-worker-hipcheck-test-{}-{id}",
+                std::process::id()
+            ));
+            let binary_path = hipcheck_root.join("hc");
+            let policy_path = hipcheck_root.join("Hipcheck.kdl");
+            let exec_config_path = hipcheck_root.join("Exec.kdl");
+            let working_dir = hipcheck_root.join("work");
+            let cache_dir = hipcheck_root.join("cache");
+            let data_dir = hipcheck_root.join("data");
+            for directory in [&working_dir, &cache_dir, &data_dir] {
+                fs::create_dir_all(directory).expect("failed to create Hipcheck test directory");
+            }
+            fs::write(&binary_path, "test binary").expect("failed to create Hipcheck test binary");
+            #[cfg(unix)]
+            fs::set_permissions(
+                &binary_path,
+                std::os::unix::fs::PermissionsExt::from_mode(0o755),
+            )
+            .expect("failed to mark Hipcheck test binary executable");
+            fs::write(&policy_path, "test policy").expect("failed to create Hipcheck test policy");
+            fs::write(&exec_config_path, "test exec config")
+                .expect("failed to create Hipcheck test exec config");
+            let config = config
+                .replace("/usr/local/bin/hc", &binary_path.display().to_string())
+                .replace(
+                    "/opt/night-vision/hipcheck/config/Hipcheck.kdl",
+                    &policy_path.display().to_string(),
+                )
+                .replace(
+                    "/opt/night-vision/hipcheck/config/Exec.kdl",
+                    &exec_config_path.display().to_string(),
+                )
+                .replace(
+                    "/opt/night-vision/hipcheck",
+                    &working_dir.display().to_string(),
+                )
+                .replace(
+                    "/var/cache/night-vision/hipcheck",
+                    &cache_dir.display().to_string(),
+                )
+                .replace(
+                    "/var/lib/night-vision/hipcheck",
+                    &data_dir.display().to_string(),
+                );
+
             let path = std::env::temp_dir().join(format!(
                 "nv-server-cve-worker-config-test-{}-{id}.spookey",
                 std::process::id()
@@ -197,6 +244,8 @@ mod tests {
 
             Self {
                 path: Utf8PathBuf::from_path_buf(path)
+                    .expect("test temp path should be valid UTF-8"),
+                hipcheck_root: Utf8PathBuf::from_path_buf(hipcheck_root)
                     .expect("test temp path should be valid UTF-8"),
             }
         }
@@ -209,6 +258,7 @@ mod tests {
     impl Drop for TempConfigFile {
         fn drop(&mut self) {
             let _ = fs::remove_file(&self.path);
+            let _ = fs::remove_dir_all(&self.hipcheck_root);
         }
     }
 

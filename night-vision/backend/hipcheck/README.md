@@ -1,24 +1,28 @@
 # Night Vision Hipcheck artifacts
 
-This directory defines the immutable Hipcheck artifact bundle used by the Night
-Vision MVP. It is deliberately separate from a developer's Hipcheck install.
+This directory defines the Hipcheck artifact bundle used by the Night Vision
+MVP. It is deliberately separate from a developer's Hipcheck install.
 
-## Pin
+## Build source and provenance
 
 | Artifact | Pinned value |
 | --- | --- |
-| Upstream repository | `https://github.com/mitre/hipcheck` |
-| Upstream commit | `06a3db9394742a58a7fb3412b677db25feb6f678` |
-| Upstream version at that commit | `3.15.0` |
+| Source repository | `https://github.com/mitre/hipcheck` |
+| Build ref | `HIPCHECK_REF`, defaulting to `HEAD` |
+| Resolved commit | `/opt/night-vision/hipcheck/REVISION` in the built image |
 | MVP policy | `config/Hipcheck.kdl` |
 | MVP plugin | `mitre/binary`, built locally from the same commit |
 
-The commit is resolved before the image is built and verified by the
-`hipcheck-builder` stage in `../Dockerfile`. The source's `Cargo.lock` is used
-with `cargo build --locked`. The policy references a local plugin manifest with
-an exact local version (`0.0.0`), so a run cannot download an upgraded plugin.
-Update the commit, policy, and compatibility fixtures together in a reviewed
-change.
+The Docker build fetches the selected ref with a read-only BuildKit secret,
+checks out the resulting commit detached, and records its full SHA in
+`REVISION`. The source's `Cargo.lock` is used with `cargo build --locked`.
+The policy references a local plugin manifest with an exact local version
+(`0.0.0`), so a run cannot download an upgraded plugin.
+
+`HEAD` is suitable for development and CI verification. Docker does not detect
+updates behind a floating ref, so change `HIPCHECK_FETCH_EPOCH` or use
+`--no-cache` to refresh it. Release builds must set `HIPCHECK_REF` to a full
+commit SHA and retain the image's `REVISION` file as provenance.
 
 ## Artifact layout
 
@@ -58,7 +62,11 @@ Build the backend image and run the same immutable artifact bundle rather than
 installing Hipcheck locally:
 
 ```sh
-docker build -f backend/Dockerfile -t nv-server:hipcheck-mvp backend
+docker build \
+
+  --build-arg HIPCHECK_REF=HEAD \
+  --build-arg HIPCHECK_FETCH_EPOCH="$(date -u +%s)" \
+  -f backend/Dockerfile -t nv-server:hipcheck-mvp backend
 docker run --rm --entrypoint /usr/local/bin/hc nv-server:hipcheck-mvp \
   --policy /opt/night-vision/hipcheck/config/Hipcheck.kdl \
   --exec /opt/night-vision/hipcheck/config/Exec.kdl \
@@ -80,9 +88,10 @@ docker run --rm nv-hipcheck:mvp
 
 ## Container deployment
 
-`backend/Dockerfile` includes the immutable executable, policy, exec
-configuration, manifest, and plugin executable. `docker-compose.yml` mounts
-separate writable cache and data volumes while keeping the policy and plugin
-paths in the read-only image. Deployments that use a different container system
-must provide equivalent writable mounts at the two paths above and must not
-mount over `/opt/night-vision/hipcheck`.
+`backend/Dockerfile` includes the executable, policy, exec configuration,
+manifest, plugin executable, and resolved source revision. The GitLab token is
+available only to the builder stage and is never copied into the image.
+`docker-compose.yml` mounts separate writable cache and data volumes while
+keeping the policy and plugin paths in the read-only image. Deployments that
+use a different container system must provide equivalent writable mounts at the
+two paths above and must not mount over `/opt/night-vision/hipcheck`.
