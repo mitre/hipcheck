@@ -14,6 +14,7 @@ This is the internal documentation index for the Night Vision project.
 - [Flox CI Image](./project/flox-ci-image.md)
 
 - [Issue Tracker Standards](./project/issue-tracker.md)
+- [MVP Roadmap](./project/mvp-roadmap.md)
 
 ## System Info
 
