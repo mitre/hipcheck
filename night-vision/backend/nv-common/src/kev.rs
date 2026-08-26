@@ -9,8 +9,8 @@ use reqwest::header::{
 };
 use reqwest::{Client, Response, StatusCode, Url};
 use sea_orm::{
-    ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait, EntityTrait as _, QueryFilter as _,
-    QueryOrder as _, TransactionTrait as _, Value,
+    ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait, EntityTrait as _,
+    PaginatorTrait as _, QueryFilter as _, QueryOrder as _, TransactionTrait as _, Value,
 };
 use sea_orm::{
     DatabaseBackend, DatabaseConnection, DatabaseTransaction, Set, Statement, sea_query::Expr,
@@ -106,6 +106,46 @@ pub enum KevError {
 #[derive(Debug, PartialEq, Eq)]
 pub struct FailRunningKevSyncRunsSummary {
     pub sync_runs_failed: u64,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ResetKevStorageSummary {
+    pub entries_deleted: u64,
+    pub sync_runs_deleted: u64,
+}
+
+#[derive(Debug)]
+pub enum ResetKevStorageError {
+    Db(sea_orm::DbErr),
+    RunningSyncRuns(u64),
+    SyncAlreadyRunning,
+    SyncLock(KevError),
+}
+
+impl Display for ResetKevStorageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Db(_) => write!(f, "failed to reset KEV storage"),
+            Self::RunningSyncRuns(count) => {
+                write!(
+                    f,
+                    "refusing to reset KEV storage while {count} sync run(s) are running"
+                )
+            }
+            Self::SyncAlreadyRunning => write!(f, "a KEV sync run is already running"),
+            Self::SyncLock(_) => write!(f, "failed to check KEV sync advisory lock"),
+        }
+    }
+}
+
+impl std::error::Error for ResetKevStorageError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Db(error) => Some(error),
+            Self::SyncLock(error) => Some(error),
+            Self::RunningSyncRuns(_) | Self::SyncAlreadyRunning => None,
+        }
+    }
 }
 
 impl From<DatabaseConnectionError> for KevError {
@@ -928,6 +968,56 @@ where
     })
 }
 
+/// Clear KEV entries and sync-run metadata from database storage.
+///
+/// Callers must pass an active transaction so the transaction-scoped advisory
+/// lock is held until the reset is committed or rolled back.
+pub async fn reset_kev_storage<C>(
+    db: &C,
+    force: bool,
+) -> Result<ResetKevStorageSummary, ResetKevStorageError>
+where
+    C: ConnectionTrait,
+{
+    let sync_lock_acquired = try_acquire_kev_sync_lock(db)
+        .await
+        .map_err(ResetKevStorageError::SyncLock)?;
+    if !sync_lock_acquired {
+        return Err(ResetKevStorageError::SyncAlreadyRunning);
+    }
+
+    let running_sync_runs = cisa_kev_sync_runs::Entity::find()
+        .filter(cisa_kev_sync_runs::Column::Status.eq("running"))
+        .count(db)
+        .await
+        .map_err(ResetKevStorageError::Db)?;
+    if running_sync_runs > 0 && !force {
+        return Err(ResetKevStorageError::RunningSyncRuns(running_sync_runs));
+    }
+
+    let entries_deleted = cisa_kev_entries::Entity::find()
+        .count(db)
+        .await
+        .map_err(ResetKevStorageError::Db)?;
+    let sync_runs_deleted = cisa_kev_sync_runs::Entity::find()
+        .count(db)
+        .await
+        .map_err(ResetKevStorageError::Db)?;
+    let truncate = Statement::from_string(
+        db.get_database_backend(),
+        "TRUNCATE TABLE public.cisa_kev_entries, public.cisa_kev_sync_runs RESTART IDENTITY"
+            .to_owned(),
+    );
+
+    db.execute_raw(truncate)
+        .await
+        .map(|_| ResetKevStorageSummary {
+            entries_deleted,
+            sync_runs_deleted,
+        })
+        .map_err(ResetKevStorageError::Db)
+}
+
 fn extract_cache_metadata_from_model(run: &cisa_kev_sync_runs::Model) -> CacheMetadata {
     CacheMetadata {
         etag: run.etag.clone(),
@@ -1018,6 +1108,14 @@ mod tests {
         "dateReleased": "2026-08-20T00:00:00Z",
         "vulnerabilities": []
     }"#;
+
+    fn mock_advisory_lock_row(acquired: bool) -> BTreeMap<String, Value> {
+        BTreeMap::from([("pg_try_advisory_xact_lock".to_owned(), acquired.into())])
+    }
+
+    fn mock_num_items_row(num_items: i64) -> BTreeMap<String, Value> {
+        BTreeMap::from([("num_items".to_owned(), num_items.into())])
+    }
 
     #[test]
     fn kev_catalog_request_accepts_ok_response() {
@@ -1113,6 +1211,104 @@ mod tests {
         assert!(update_sql.contains(r#""status" = $"#));
         assert!(update_sql.contains(r#""error" = $"#));
         assert!(update_sql.contains(r#"WHERE "cisa_kev_sync_runs"."status" = $"#));
+    }
+
+    #[test]
+    fn reset_kev_storage_truncates_entries_and_sync_runs() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_advisory_lock_row(true)],
+                vec![mock_num_items_row(0)],
+                vec![mock_num_items_row(7)],
+                vec![mock_num_items_row(3)],
+            ])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 0,
+            }])
+            .into_connection();
+
+        let summary = run_async(reset_kev_storage(&db, false)).expect("reset should succeed");
+
+        assert_eq!(
+            summary,
+            ResetKevStorageSummary {
+                entries_deleted: 7,
+                sync_runs_deleted: 3,
+            }
+        );
+        let transaction_log = db.into_transaction_log();
+        assert!(transaction_log.iter().any(|entry| entry.statements()[0]
+            .sql
+            .contains("TRUNCATE TABLE public.cisa_kev_entries, public.cisa_kev_sync_runs RESTART IDENTITY")));
+    }
+
+    #[test]
+    fn reset_kev_storage_rejects_when_sync_lock_is_held() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_advisory_lock_row(false)]])
+            .into_connection();
+
+        let error = run_async(reset_kev_storage(&db, false)).expect_err("reset should fail");
+
+        assert!(matches!(error, ResetKevStorageError::SyncAlreadyRunning));
+        let transaction_log = db.into_transaction_log();
+        assert!(
+            transaction_log[0].statements()[0]
+                .sql
+                .contains("pg_try_advisory_xact_lock")
+        );
+        assert!(
+            transaction_log
+                .iter()
+                .all(|entry| !entry.statements()[0].sql.contains("TRUNCATE TABLE"))
+        );
+    }
+
+    #[test]
+    fn reset_kev_storage_rejects_running_sync_runs_without_force() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_advisory_lock_row(true)],
+                vec![mock_num_items_row(2)],
+            ])
+            .into_connection();
+
+        let error = run_async(reset_kev_storage(&db, false)).expect_err("reset should fail");
+
+        assert!(matches!(error, ResetKevStorageError::RunningSyncRuns(2)));
+        let transaction_log = db.into_transaction_log();
+        assert!(
+            transaction_log
+                .iter()
+                .all(|entry| !entry.statements()[0].sql.contains("TRUNCATE TABLE"))
+        );
+    }
+
+    #[test]
+    fn reset_kev_storage_accepts_running_sync_runs_with_force() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![mock_advisory_lock_row(true)],
+                vec![mock_num_items_row(2)],
+                vec![mock_num_items_row(7)],
+                vec![mock_num_items_row(3)],
+            ])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 0,
+            }])
+            .into_connection();
+
+        let summary = run_async(reset_kev_storage(&db, true)).expect("reset should succeed");
+
+        assert_eq!(
+            summary,
+            ResetKevStorageSummary {
+                entries_deleted: 7,
+                sync_runs_deleted: 3,
+            }
+        );
     }
 
     #[test]

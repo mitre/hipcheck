@@ -4,6 +4,7 @@ pub mod list;
 pub mod pull;
 pub mod record;
 pub mod recover;
+pub mod reset;
 pub mod run;
 pub mod runs;
 pub mod stats;

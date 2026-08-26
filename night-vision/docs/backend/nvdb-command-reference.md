@@ -146,6 +146,7 @@ configuration file and its database connection. See
 | `kev sync --destructive [--force]` | Download and record one KEV catalog sync. |
 | `kev record <CVE-ID>` | Print one cached KEV entry and local timestamps. |
 | `kev recover --destructive` | Mark abandoned KEV sync runs failed. |
+| `kev reset --destructive [--force]` | Remove cached KEV entries and sync history. |
 | `kev run <GENERATION>` | Show one KEV catalog sync run. |
 | `kev runs [--limit <N>]` | List recent KEV catalog sync runs. |
 | `kev stats` | Summarize cached entries and sync-run outcomes. |
@@ -158,7 +159,9 @@ and Last-Modified validators. `kev pull` remains available as a deprecated,
 hidden alias and prints a warning when used. `kev status` is read-only and
 reports the latest run, latest successful catalog, stored validators, and entry
 count. `kev recover` first confirms that no active sync holds the KEV advisory
-lock, then marks all `running` runs failed.
+lock, then marks all `running` runs failed. `kev reset` first confirms the
+same lock is free. It refuses to clear stale `running` metadata unless
+`--force` is provided.
 
 ## `npm packument corpus-refresh`
 
