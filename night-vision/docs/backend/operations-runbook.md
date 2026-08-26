@@ -187,7 +187,8 @@ For the database development workflow, see
 ## `nvdb` Usage
 
 `nvdb` is the local backend debugger for database inspection, migrations,
-entity generation, and CVE List ingest operations. Run it from `backend/`:
+entity generation, and CVE List and KEV catalog operations. Run it from
+`backend/`:
 
 ```sh
 cargo nvdb --help
@@ -202,6 +203,9 @@ Use `nvdb` for:
 - Inspecting CVE ingest state with `cargo nvdb cve status` and
   `cargo nvdb cve runs`.
 - Running one local CVE sync with `cargo nvdb cve sync --destructive`.
+- Inspecting KEV cache state with `cargo nvdb kev status` and
+  `cargo nvdb kev runs`.
+- Running one local KEV sync with `cargo nvdb kev sync --destructive`.
 
 Do not use `nvdb` commands against shared or production-like databases unless
 that access and change are explicitly approved. The `--destructive` flag is an
@@ -240,6 +244,45 @@ sync holds the advisory lock before running `cargo nvdb cve recover
 --destructive`. `cve reset --destructive` deletes local CVE List storage and
 sync history; use it only for disposable local data. For the full lifecycle,
 timeouts, and recovery constraints, see [CVE List Ingest](./cve-ingest.md).
+
+## KEV Catalog Data
+
+`nv-server` refreshes the CISA Known Exploited Vulnerabilities (KEV) catalog
+on its configured interval. Inspect the local cache and recent sync history
+with:
+
+```sh
+cd backend
+cargo nvdb kev status
+cargo nvdb kev runs
+cargo nvdb kev stats
+cargo nvdb kev doctor
+```
+
+Use `cargo nvdb kev list` to inspect cached entries, or
+`cargo nvdb kev record <CVE-ID>` to print one stored entry and its local
+timestamps. `cargo nvdb kev config` prints the effective source URL, refresh
+interval, and response-size limit.
+
+Run a one-time conditional sync only when intentionally changing local
+database state:
+
+```sh
+cd backend
+cargo nvdb kev sync --destructive
+```
+
+The sync reuses stored ETag and Last-Modified validators. Pass `--force` only
+when an unconditional request is required. `kev pull` remains a deprecated,
+hidden alias that prints a warning; use `kev sync` in scripts and runbooks.
+
+If a process exits while a KEV sync run is marked `running`, use
+`cargo nvdb kev recover --destructive` only after the command confirms no live
+sync holds the advisory lock. Recovery marks abandoned runs failed without
+altering cached entries. `cargo nvdb kev reset --destructive` deletes the local
+KEV cache and sync history. It refuses a live sync lock and stale `running`
+metadata; `--force` overrides only the stale-metadata guard and must not be
+used while a sync is live.
 
 ## Common Failures
 

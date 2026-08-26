@@ -140,6 +140,7 @@ configuration file and its database connection. See
 
 | Command | Purpose |
 | --- | --- |
+| `kev audit [--state <STATE>]... [--limit <N> \| --no-limit] [--desc] [--json] [--check]` | Audit reciprocal CVE List and KEV catalog references. |
 | `kev config` | Print effective KEV fetch configuration. |
 | `kev doctor` | Check KEV cache freshness and sync health. |
 | `kev list [--limit <N> \| --no-limit] [--desc] [--json]` | List cached KEV entries. |
@@ -162,6 +163,62 @@ count. `kev recover` first confirms that no active sync holds the KEV advisory
 lock, then marks all `running` runs failed. `kev reset` first confirms the
 same lock is free. It refuses to clear stale `running` metadata unless
 `--force` is provided.
+
+`kev audit` compares every cached KEV entry with active CVE List records. Its
+summary groups IDs into `both` (reciprocal references), `kev-only` (a KEV entry
+without a CVE-side citation), `cve-only` (a CVE-side citation without a cached
+KEV entry), and `neither`. Pass one or more `--state` values to list matching
+IDs; `--json` includes both the summary and any listed entries. `--check` exits
+unsuccessfully when either one-sided state is nonzero.
+
+### Inspecting KEV data
+
+Use `kev config` to confirm the selected source URL, refresh interval, and
+response-size limit before troubleshooting a sync. `kev status` reports the
+latest run, latest successful catalog, validator metadata, and cached-entry
+count. `kev doctor` adds freshness, latest-failure, stale-`running`-run, and
+validator-health checks; it exits unsuccessfully when those checks fail.
+
+`kev list` prints cached entries, with `--json` for the stored JSON form.
+Use `kev record <CVE-ID>` for one entry, including its local timestamps.
+`kev runs` provides concise recent history, while `kev run <GENERATION>` shows
+the complete metadata for a single run. `kev stats` summarizes entry counts,
+sync outcomes, and aggregate import counts.
+
+### Syncing and repairing KEV data
+
+Run one conditional catalog fetch with:
+
+```sh
+cargo nvdb kev sync --destructive
+```
+
+The default request uses the latest stored ETag and Last-Modified validators.
+Use `--force` only to bypass those validators:
+
+```sh
+cargo nvdb kev sync --destructive --force
+```
+
+If an interrupted sync leaves metadata marked `running`, run:
+
+```sh
+cargo nvdb kev recover --destructive
+```
+
+Recovery acquires the transaction-scoped KEV advisory lock first and stops if
+another session holds it. On success, it marks abandoned `running` runs failed
+without changing cached entries.
+
+To remove local KEV data and sync history, run:
+
+```sh
+cargo nvdb kev reset --destructive
+```
+
+Reset also acquires the advisory lock. It refuses stale `running` metadata by
+default; `--force` bypasses that stale-row guard only and must never be used
+while a sync is live.
 
 ## `npm packument corpus-refresh`
 
