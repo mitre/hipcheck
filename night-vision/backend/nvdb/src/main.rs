@@ -99,6 +99,8 @@ fn run() -> Result<()> {
             return cmd::kev::config::run(&config, config_matches);
         } else if let Some(doctor_matches) = kev_matches.subcommand_matches("doctor") {
             return cmd::kev::doctor::run(&config, doctor_matches);
+        } else if let Some(sync_matches) = kev_matches.subcommand_matches("sync") {
+            return cmd::kev::sync::run(&config, sync_matches, log);
         } else if let Some(pull_matches) = kev_matches.subcommand_matches("pull") {
             return cmd::kev::pull::run(&config, pull_matches, log);
         } else if let Some(list_matches) = kev_matches.subcommand_matches("list") {
@@ -157,6 +159,7 @@ fn command() -> clap::Command {
                 .subcommand(cmd::kev::config::command())
                 .subcommand(cmd::kev::doctor::command())
                 .subcommand(cmd::kev::list::command())
+                .subcommand(cmd::kev::sync::command())
                 .subcommand(cmd::kev::pull::command())
                 .subcommand(cmd::kev::record::command())
                 .subcommand(cmd::kev::run::command())

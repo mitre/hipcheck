@@ -7,3 +7,4 @@ pub mod run;
 pub mod runs;
 pub mod stats;
 pub mod status;
+pub mod sync;

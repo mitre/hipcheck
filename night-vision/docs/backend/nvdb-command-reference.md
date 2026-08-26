@@ -143,18 +143,20 @@ configuration file and its database connection. See
 | `kev config` | Print effective KEV fetch configuration. |
 | `kev doctor` | Check KEV cache freshness and sync health. |
 | `kev list [--limit <N> \| --no-limit] [--desc] [--json]` | List cached KEV entries. |
-| `kev pull --destructive [--force]` | Download and record one KEV catalog sync. |
+| `kev sync --destructive [--force]` | Download and record one KEV catalog sync. |
 | `kev record <CVE-ID>` | Print one cached KEV entry and local timestamps. |
 | `kev run <GENERATION>` | Show one KEV catalog sync run. |
 | `kev runs [--limit <N>]` | List recent KEV catalog sync runs. |
 | `kev stats` | Summarize cached entries and sync-run outcomes. |
 | `kev status` | Print the latest KEV catalog sync state. |
 
-`kev pull` requires `--destructive` because it writes KEV entries and sync-run
+`kev sync` requires `--destructive` because it writes KEV entries and sync-run
 history. It is an acknowledgement, not a dry-run. By default, it uses stored
-HTTP validators to make a conditional request; pass `--force` to send an
-unconditional request instead. `kev status` is read-only and reports the
-latest run, latest successful catalog, stored validators, and entry count.
+HTTP validators to make a conditional request; pass `--force` to bypass ETag
+and Last-Modified validators. `kev pull` remains available as a deprecated,
+hidden alias and prints a warning when used. `kev status` is read-only and
+reports the latest run, latest successful catalog, stored validators, and entry
+count.
 
 ## `npm packument corpus-refresh`
 

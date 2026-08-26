@@ -1,60 +1,29 @@
 use nv_common::config::Config;
-use slog::{Logger, info};
+use slog::Logger;
 
-use crate::destructive::DestructiveOperationToken;
+pub const DEPRECATION_WARNING: &str =
+    "warning: `kev pull` is deprecated; use `kev sync --destructive` instead";
 
 pub fn command() -> clap::Command {
     clap::Command::new("pull")
-        .about("Pull KEV Catalog")
-        .arg(
-            clap::Arg::new("destructive")
-                .short('w')
-                .long("destructive")
-                .required(true)
-                .action(clap::ArgAction::SetTrue)
-                .help("Acknowledge this command may modify database state"),
-        )
-        .arg(
-            clap::Arg::new("force")
-                .short('f')
-                .long("force")
-                .action(clap::ArgAction::SetTrue)
-                .help("Send unconditional HTTP request"),
-        )
+        .hide(true)
+        .args(crate::cmd::kev::sync::command().get_arguments())
 }
 
 pub fn run(config: &Config, matches: &clap::ArgMatches, log: Logger) -> anyhow::Result<()> {
-    let token = DestructiveOperationToken::new(matches);
-    let force = matches.get_flag("force");
-    pull(force, config, token, log)
-}
-
-fn pull(
-    force: bool,
-    config: &Config,
-    _token: DestructiveOperationToken,
-    log: Logger,
-) -> anyhow::Result<()> {
-    info!(log, "Pulling KEV Catalog");
-    let rt = nv_common::rt::AsyncRuntime::new(config)?;
-
-    let request_mode = if force {
-        nv_common::kev::RequestMode::NoConditionalRequest
-    } else {
-        nv_common::kev::RequestMode::UseConditionalRequest
-    };
-    rt.block_on(nv_common::kev::run_fetch_kev(
-        request_mode,
-        config,
-        log.clone(),
-    ))?;
-    Ok(())
+    eprintln!("{DEPRECATION_WARNING}");
+    crate::cmd::kev::sync::run(config, matches, log)
 }
 
 #[cfg(test)]
 mod tests {
     use super::command;
     use clap::error::ErrorKind;
+
+    #[test]
+    fn kev_pull_is_hidden_from_help() {
+        assert!(command().is_hide_set());
+    }
 
     #[test]
     fn kev_pull_requires_destructive_flag() {
@@ -79,5 +48,13 @@ mod tests {
             .expect("destructive and force flags should parse");
 
         assert!(matches.get_flag("force"));
+    }
+
+    #[test]
+    fn kev_pull_warning_recommends_sync() {
+        assert_eq!(
+            super::DEPRECATION_WARNING,
+            "warning: `kev pull` is deprecated; use `kev sync --destructive` instead"
+        );
     }
 }
