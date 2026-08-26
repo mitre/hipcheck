@@ -147,13 +147,13 @@ configuration file and its database connection. See
 | `kev record <CVE-ID>` | Print one cached KEV entry and local timestamps. |
 | `kev run <GENERATION>` | Show one KEV catalog sync run. |
 | `kev runs [--limit <N>]` | List recent KEV catalog sync runs. |
-| `kev status` | Report cached KEV entry and sync-run counts. |
+| `kev status` | Print the latest KEV catalog sync state. |
 
 `kev pull` requires `--destructive` because it writes KEV entries and sync-run
 history. It is an acknowledgement, not a dry-run. By default, it uses stored
 HTTP validators to make a conditional request; pass `--force` to send an
-unconditional request instead. `kev status` is read-only. Run it with verbose
-logging for the most recent sync-run and cache-validator details.
+unconditional request instead. `kev status` is read-only and reports the
+latest run, latest successful catalog, stored validators, and entry count.
 
 ## `npm packument corpus-refresh`
 

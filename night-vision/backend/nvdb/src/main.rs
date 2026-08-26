@@ -109,8 +109,8 @@ fn run() -> Result<()> {
             return cmd::kev::run::run(&config, run_matches);
         } else if let Some(runs_matches) = kev_matches.subcommand_matches("runs") {
             return cmd::kev::runs::run(&config, runs_matches);
-        } else if let Some(_matches) = kev_matches.subcommand_matches("status") {
-            return cmd::kev::status::run(&config, log);
+        } else if let Some(status_matches) = kev_matches.subcommand_matches("status") {
+            return cmd::kev::status::run(&config, status_matches);
         }
     }
 
