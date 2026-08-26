@@ -145,6 +145,7 @@ configuration file and its database connection. See
 | `kev list [--limit <N> \| --no-limit] [--desc] [--json]` | List cached KEV entries. |
 | `kev sync --destructive [--force]` | Download and record one KEV catalog sync. |
 | `kev record <CVE-ID>` | Print one cached KEV entry and local timestamps. |
+| `kev recover --destructive` | Mark abandoned KEV sync runs failed. |
 | `kev run <GENERATION>` | Show one KEV catalog sync run. |
 | `kev runs [--limit <N>]` | List recent KEV catalog sync runs. |
 | `kev stats` | Summarize cached entries and sync-run outcomes. |
@@ -156,7 +157,8 @@ HTTP validators to make a conditional request; pass `--force` to bypass ETag
 and Last-Modified validators. `kev pull` remains available as a deprecated,
 hidden alias and prints a warning when used. `kev status` is read-only and
 reports the latest run, latest successful catalog, stored validators, and entry
-count.
+count. `kev recover` first confirms that no active sync holds the KEV advisory
+lock, then marks all `running` runs failed.
 
 ## `npm packument corpus-refresh`
 

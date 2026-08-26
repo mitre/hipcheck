@@ -103,6 +103,11 @@ pub enum KevError {
     UnexpectedResponseStatus(StatusCode),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct FailRunningKevSyncRunsSummary {
+    pub sync_runs_failed: u64,
+}
+
 impl From<DatabaseConnectionError> for KevError {
     fn from(error: DatabaseConnectionError) -> Self {
         Self::DatabaseConnectionError(error)
@@ -874,7 +879,14 @@ async fn finish_locked_kev_sync(xact: DatabaseTransaction) -> Result<(), KevErro
 /// The bool result indicates whether the lock was actually acquired.
 /// By using the SQL function `pg_try_advisory_xact_lock`, this will return
 /// immediately with a result instead of waiting indefinitely for the lock.
-async fn try_acquire_kev_sync_lock(db: &DatabaseTransaction) -> Result<bool, KevError> {
+/// Try to acquire the transaction-scoped KEV sync advisory lock.
+///
+/// Callers that need the lock to guard multiple statements must pass an active
+/// transaction. Passing a plain connection only guards the current statement.
+pub async fn try_acquire_kev_sync_lock<C>(db: &C) -> Result<bool, KevError>
+where
+    C: ConnectionTrait,
+{
     let statement = Statement::from_string(
         DatabaseBackend::Postgres,
         format!("SELECT pg_try_advisory_xact_lock({KEV_SYNC_ADVISORY_LOCK_ID})"),
@@ -887,6 +899,33 @@ async fn try_acquire_kev_sync_lock(db: &DatabaseTransaction) -> Result<bool, Kev
         .try_get_by_index(0)?;
 
     Ok(res)
+}
+
+/// Mark running KEV sync runs failed.
+///
+/// Callers should only use this after verifying no live sync holds the
+/// transaction-scoped advisory lock.
+pub async fn fail_running_kev_sync_runs<C>(
+    db: &C,
+    error: &str,
+) -> Result<FailRunningKevSyncRunsSummary, KevError>
+where
+    C: ConnectionTrait,
+{
+    let result = cisa_kev_sync_runs::Entity::update_many()
+        .col_expr(
+            cisa_kev_sync_runs::Column::CompletedAt,
+            Expr::current_timestamp(),
+        )
+        .col_expr(cisa_kev_sync_runs::Column::Status, Expr::value("failed"))
+        .col_expr(cisa_kev_sync_runs::Column::Error, Expr::value(error))
+        .filter(cisa_kev_sync_runs::Column::Status.eq("running"))
+        .exec(db)
+        .await?;
+
+    Ok(FailRunningKevSyncRunsSummary {
+        sync_runs_failed: result.rows_affected,
+    })
 }
 
 fn extract_cache_metadata_from_model(run: &cisa_kev_sync_runs::Model) -> CacheMetadata {
@@ -1044,6 +1083,36 @@ mod tests {
             error,
             KevError::CatalogResponseBodyTooLarge { max_bytes: 3 }
         ));
+    }
+
+    #[test]
+    fn fail_running_kev_sync_runs_marks_running_runs_failed() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 2,
+            }])
+            .into_connection();
+
+        let summary = run_async(fail_running_kev_sync_runs(
+            &db,
+            "sync process was interrupted",
+        ))
+        .expect("running sync runs should be marked failed");
+
+        assert_eq!(
+            summary,
+            FailRunningKevSyncRunsSummary {
+                sync_runs_failed: 2,
+            }
+        );
+        let transaction_log = db.into_transaction_log();
+        let update_sql = &transaction_log[0].statements()[0].sql;
+        assert!(update_sql.contains(r#"UPDATE "public"."cisa_kev_sync_runs""#));
+        assert!(update_sql.contains(r#""completed_at" = CURRENT_TIMESTAMP"#));
+        assert!(update_sql.contains(r#""status" = $"#));
+        assert!(update_sql.contains(r#""error" = $"#));
+        assert!(update_sql.contains(r#"WHERE "cisa_kev_sync_runs"."status" = $"#));
     }
 
     #[test]
