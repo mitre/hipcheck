@@ -145,6 +145,7 @@ configuration file and its database connection. See
 | `kev list [--limit <N> \| --no-limit] [--desc] [--json]` | List cached KEV entries. |
 | `kev pull --destructive [--force]` | Download and record one KEV catalog sync. |
 | `kev record <CVE-ID>` | Print one cached KEV entry and local timestamps. |
+| `kev run <GENERATION>` | Show one KEV catalog sync run. |
 | `kev runs [--limit <N>]` | List recent KEV catalog sync runs. |
 | `kev status` | Report cached KEV entry and sync-run counts. |
 
