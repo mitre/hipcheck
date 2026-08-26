@@ -270,7 +270,8 @@ The initial MVP should be constrained to:
 - NPM packages;
 - NPM `package.json` files as package-source input;
 - optional candidate version input;
-- patch-version candidate discovery;
+- candidate discovery across patch, minor, and major upgrades, with SemVer
+  compatibility classification;
 - KEV-linked vulnerability context;
 - direct package vulnerability assessment;
 - supply chain risk assessment where defensible package metadata is available;
@@ -279,6 +280,7 @@ The initial MVP should be constrained to:
 ## Consequences
 
 This gives the MVP a clearer promise: help users move off KEV-affected OSS
-package versions by choosing lower-risk patch upgrades.
+package versions by choosing lower-risk upgrades, prioritizing SemVer-compatible
+versions.
 
 [bod-26-04]: https://www.cisa.gov/news-events/directives/bod-26-04-prioritizing-security-updates-based-risk

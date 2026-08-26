@@ -1,17 +1,18 @@
-//! Discovers and validates NPM patch-version upgrade candidates.
+//! Discovers and validates NPM upgrade candidates.
 //!
 //! Given a packument (see [`crate::npm::packument`]) and a known-vulnerable
-//! package version, [`discover_patch_candidates`] finds newer published
-//! versions in the same major/minor line, annotating each with whether it's
-//! usable as an upgrade target. [`validate_explicit_candidate`] covers the
+//! package version, [`discover_upgrade_candidates`] finds newer published
+//! versions and annotates each with whether it's usable as an upgrade target
+//! and what SemVer API compatibility guarantee applies.
+//! [`validate_explicit_candidate`] covers the
 //! case where a caller already knows which version they want to assess,
 //! bypassing discovery while still checking that the version is real.
 //!
 //! Both functions operate purely on already-parsed packument data — no
-//! registry fetch, no database, no ranges. "Same major.minor, strictly
-//! newer patch" is a plain [`Version`] comparison; it deliberately does not
-//! use [`crate::npm_semver`], which answers a different question (does a
-//! version satisfy a range like `^1.2.3`) using a different version type.
+//! registry fetch, no database, no ranges. "Strictly newer" is a plain
+//! [`Version`] comparison; it deliberately does not use [`crate::npm_semver`],
+//! which answers a different question (does a version satisfy a range like
+//! `^1.2.3`) using a different version type.
 
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
@@ -21,16 +22,32 @@ use semver::Version;
 use super::packument::{NpmPackageName, NpmPackument};
 use super::types::NpmPackageNameError;
 
-/// A patch-version candidate discovered or validated against packument data.
+/// An upgrade candidate discovered or validated against packument data.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PatchCandidate {
+pub struct UpgradeCandidate {
     pub name: NpmPackageName,
     pub version: Version,
     /// `pkg:npm/name@version`, or `pkg:npm/%40scope/name@version` for scoped packages.
     pub purl: String,
     /// The version's publish time, when the packument carries that data.
     pub published_at: Option<Timestamp>,
+    /// The API compatibility guarantee SemVer provides for this upgrade.
+    pub api_compatibility: ApiCompatibility,
     pub status: CandidateStatus,
+}
+
+/// The compatibility guarantee SemVer provides between two package versions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiCompatibility {
+    /// A stable package's major version is unchanged, so SemVer promises
+    /// compatibility with its previous public API.
+    Compatible,
+    /// A stable package's major version changed. Its API may be incompatible;
+    /// SemVer requires that version bump when it makes incompatible changes.
+    Incompatible,
+    /// One of the versions is `0.y.z` or a prerelease, for which SemVer makes
+    /// no public API stability guarantee.
+    NoGuarantee,
 }
 
 /// Whether a candidate is usable, or the reasons it isn't.
@@ -50,34 +67,29 @@ pub enum CandidateExclusionReason {
     Deprecated(Box<str>),
 }
 
-/// Finds newer patch versions of `packument`'s package in the same
-/// major/minor line as `vulnerable_version`.
+/// Finds newer published versions of `packument`'s package.
 ///
-/// Every version strictly newer than `vulnerable_version` with a matching
-/// major and minor is returned, in ascending version order, annotated as
-/// [`CandidateStatus::Included`] or [`CandidateStatus::Excluded`]. An empty
-/// result (no newer patch versions) is `Ok(vec![])`, not an error.
+/// Every version strictly newer than `vulnerable_version` is returned in
+/// ascending version order, annotated with its [`ApiCompatibility`] and
+/// [`CandidateStatus`]. An empty result (no newer version) is `Ok(vec![])`,
+/// not an error.
 ///
 /// `vulnerable_version` does not need to be present in `packument.versions`:
 /// npm allows unpublishing an individual version within its unpublish
 /// window, so a vulnerability record can legitimately name a version the
 /// registry no longer serves. It's used only as a comparison baseline.
-pub fn discover_patch_candidates(
+pub fn discover_upgrade_candidates(
     packument: &NpmPackument,
     vulnerable_version: &str,
-) -> Result<Vec<PatchCandidate>, CandidateDiscoveryError> {
+) -> Result<Vec<UpgradeCandidate>, CandidateDiscoveryError> {
     let vulnerable_version = parse_version(vulnerable_version)
         .map_err(|(value, source)| CandidateDiscoveryError::MalformedVersion { value, source })?;
 
-    let mut candidates: Vec<PatchCandidate> = packument
+    let mut candidates: Vec<UpgradeCandidate> = packument
         .versions
         .values()
-        .filter(|version| {
-            version.version.major == vulnerable_version.major
-                && version.version.minor == vulnerable_version.minor
-                && version.version > vulnerable_version
-        })
-        .map(|version| build_candidate(packument, version))
+        .filter(|version| version.version > vulnerable_version)
+        .map(|version| build_candidate(packument, &vulnerable_version, version))
         .collect();
 
     candidates.sort_by(|a, b| a.version.cmp(&b.version));
@@ -93,13 +105,14 @@ pub fn discover_patch_candidates(
 /// availability), returning an error otherwise. Unlike discovery, a
 /// deprecated or prerelease candidate does not fail validation here — the
 /// caller deliberately chose this version, so it comes back as
-/// `Ok(PatchCandidate { status: CandidateStatus::Excluded(..), .. })` for the
+/// `Ok(UpgradeCandidate { status: CandidateStatus::Excluded(..), .. })` for the
 /// assessment layer to decide whether to proceed with a caveat.
 pub fn validate_explicit_candidate(
     packument: &NpmPackument,
     package_name: &str,
+    vulnerable_version: &str,
     candidate_version: &str,
-) -> Result<PatchCandidate, CandidateValidationError> {
+) -> Result<UpgradeCandidate, CandidateValidationError> {
     let requested_name = NpmPackageName::parse(package_name.to_owned())
         .map_err(CandidateValidationError::MalformedPackageName)?;
 
@@ -112,18 +125,21 @@ pub fn validate_explicit_candidate(
 
     let candidate_version = parse_version(candidate_version)
         .map_err(|(value, source)| CandidateValidationError::MalformedVersion { value, source })?;
+    let vulnerable_version = parse_version(vulnerable_version)
+        .map_err(|(value, source)| CandidateValidationError::MalformedVersion { value, source })?;
 
     let version = packument.versions.get(&candidate_version).ok_or(
         CandidateValidationError::VersionNotAvailable(candidate_version),
     )?;
 
-    Ok(build_candidate(packument, version))
+    Ok(build_candidate(packument, &vulnerable_version, version))
 }
 
 fn build_candidate(
     packument: &NpmPackument,
+    vulnerable_version: &Version,
     version: &super::packument::NpmVersion,
-) -> PatchCandidate {
+) -> UpgradeCandidate {
     let mut reasons = Vec::new();
 
     if !version.version.pre.is_empty() {
@@ -142,12 +158,30 @@ fn build_candidate(
         CandidateStatus::Excluded(reasons)
     };
 
-    PatchCandidate {
+    UpgradeCandidate {
         name: packument.name.clone(),
         version: version.version.clone(),
         purl: build_purl(&packument.name, &version.version),
         published_at: published_at(packument, &version.version),
+        api_compatibility: api_compatibility(vulnerable_version, &version.version),
         status,
+    }
+}
+
+fn api_compatibility(
+    vulnerable_version: &Version,
+    candidate_version: &Version,
+) -> ApiCompatibility {
+    if vulnerable_version.major == 0
+        || candidate_version.major == 0
+        || !vulnerable_version.pre.is_empty()
+        || !candidate_version.pre.is_empty()
+    {
+        ApiCompatibility::NoGuarantee
+    } else if vulnerable_version.major == candidate_version.major {
+        ApiCompatibility::Compatible
+    } else {
+        ApiCompatibility::Incompatible
     }
 }
 
@@ -318,7 +352,7 @@ mod tests {
     fn discovery_returns_empty_when_no_newer_patch_exists() {
         let packument = packument("example", vec![version_entry("1.2.3", json!({}))]);
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
         assert!(candidates.is_empty());
     }
@@ -333,16 +367,20 @@ mod tests {
             ],
         );
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].version, Version::parse("1.2.4").unwrap());
         assert_eq!(candidates[0].purl, "pkg:npm/example@1.2.4");
+        assert_eq!(
+            candidates[0].api_compatibility,
+            ApiCompatibility::Compatible
+        );
         assert_eq!(candidates[0].status, CandidateStatus::Included);
     }
 
     #[test]
-    fn discovery_ignores_different_major_minor_lines() {
+    fn discovery_includes_and_classifies_minor_and_major_upgrades() {
         let packument = packument(
             "example",
             vec![
@@ -352,9 +390,40 @@ mod tests {
             ],
         );
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
-        assert!(candidates.is_empty());
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].version, Version::parse("1.3.0").unwrap());
+        assert_eq!(
+            candidates[0].api_compatibility,
+            ApiCompatibility::Compatible
+        );
+        assert_eq!(candidates[1].version, Version::parse("2.0.0").unwrap());
+        assert_eq!(
+            candidates[1].api_compatibility,
+            ApiCompatibility::Incompatible
+        );
+    }
+
+    #[test]
+    fn discovery_reports_no_compatibility_guarantee_for_zero_major_versions() {
+        let packument = packument(
+            "example",
+            vec![
+                version_entry("0.2.3", json!({})),
+                version_entry("0.2.4", json!({})),
+                version_entry("0.3.0", json!({})),
+                version_entry("1.0.0", json!({})),
+            ],
+        );
+
+        let candidates = discover_upgrade_candidates(&packument, "0.2.3").unwrap();
+
+        assert!(
+            candidates
+                .iter()
+                .all(|candidate| candidate.api_compatibility == ApiCompatibility::NoGuarantee)
+        );
     }
 
     #[test]
@@ -367,12 +436,16 @@ mod tests {
             ],
         );
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(
             candidates[0].status,
             CandidateStatus::Excluded(vec![CandidateExclusionReason::Prerelease])
+        );
+        assert_eq!(
+            candidates[0].api_compatibility,
+            ApiCompatibility::NoGuarantee
         );
     }
 
@@ -386,7 +459,7 @@ mod tests {
             ],
         );
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(
@@ -407,7 +480,7 @@ mod tests {
             ],
         );
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
         assert_eq!(
             candidates[0].status,
@@ -427,7 +500,7 @@ mod tests {
             ],
         );
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(
@@ -451,7 +524,7 @@ mod tests {
             ],
         );
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
         let versions: Vec<String> = candidates
             .iter()
@@ -464,7 +537,7 @@ mod tests {
     fn discovery_rejects_malformed_vulnerable_version() {
         let packument = packument("example", vec![version_entry("1.2.3", json!({}))]);
 
-        let error = discover_patch_candidates(&packument, "not-a-version").unwrap_err();
+        let error = discover_upgrade_candidates(&packument, "not-a-version").unwrap_err();
 
         assert!(matches!(
             error,
@@ -482,7 +555,7 @@ mod tests {
             ],
         );
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
         assert_eq!(candidates[0].published_at, None);
     }
@@ -501,7 +574,7 @@ mod tests {
             ],
         );
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
         assert_eq!(
             candidates[0].published_at,
@@ -513,7 +586,7 @@ mod tests {
     fn discovery_does_not_require_the_vulnerable_version_to_be_published() {
         let packument = packument("example", vec![version_entry("1.2.4", json!({}))]);
 
-        let candidates = discover_patch_candidates(&packument, "1.2.3").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.2.3").unwrap();
 
         assert_eq!(candidates.len(), 1);
     }
@@ -528,9 +601,11 @@ mod tests {
             ],
         );
 
-        let candidate = validate_explicit_candidate(&packument, "example", "1.2.4").unwrap();
+        let candidate =
+            validate_explicit_candidate(&packument, "example", "1.2.3", "1.2.4").unwrap();
 
         assert_eq!(candidate.version, Version::parse("1.2.4").unwrap());
+        assert_eq!(candidate.api_compatibility, ApiCompatibility::Compatible);
         assert_eq!(candidate.status, CandidateStatus::Included);
     }
 
@@ -538,7 +613,8 @@ mod tests {
     fn explicit_validation_rejects_an_unpublished_version() {
         let packument = packument("example", vec![version_entry("1.2.3", json!({}))]);
 
-        let error = validate_explicit_candidate(&packument, "example", "9.9.9").unwrap_err();
+        let error =
+            validate_explicit_candidate(&packument, "example", "1.2.3", "9.9.9").unwrap_err();
 
         assert!(matches!(
             error,
@@ -550,8 +626,8 @@ mod tests {
     fn explicit_validation_rejects_a_package_identity_mismatch() {
         let packument = packument("example", vec![version_entry("1.2.3", json!({}))]);
 
-        let error =
-            validate_explicit_candidate(&packument, "some-other-package", "1.2.3").unwrap_err();
+        let error = validate_explicit_candidate(&packument, "some-other-package", "1.2.3", "1.2.3")
+            .unwrap_err();
 
         assert!(matches!(
             error,
@@ -563,7 +639,7 @@ mod tests {
     fn explicit_validation_rejects_a_malformed_package_name() {
         let packument = packument("example", vec![version_entry("1.2.3", json!({}))]);
 
-        let error = validate_explicit_candidate(&packument, "", "1.2.3").unwrap_err();
+        let error = validate_explicit_candidate(&packument, "", "1.2.3", "1.2.3").unwrap_err();
 
         assert!(matches!(
             error,
@@ -575,8 +651,8 @@ mod tests {
     fn explicit_validation_rejects_a_malformed_version() {
         let packument = packument("example", vec![version_entry("1.2.3", json!({}))]);
 
-        let error =
-            validate_explicit_candidate(&packument, "example", "not-a-version").unwrap_err();
+        let error = validate_explicit_candidate(&packument, "example", "1.2.3", "not-a-version")
+            .unwrap_err();
 
         assert!(matches!(
             error,
@@ -594,7 +670,8 @@ mod tests {
             )],
         );
 
-        let candidate = validate_explicit_candidate(&packument, "example", "1.2.3").unwrap();
+        let candidate =
+            validate_explicit_candidate(&packument, "example", "1.2.2", "1.2.3").unwrap();
 
         assert_eq!(
             candidate.status,
@@ -630,7 +707,7 @@ mod tests {
         });
         let packument = parse_packument(serde_json::to_vec(&value).unwrap().as_slice()).unwrap();
 
-        let candidates = discover_patch_candidates(&packument, "1.0.0").unwrap();
+        let candidates = discover_upgrade_candidates(&packument, "1.0.0").unwrap();
 
         assert_eq!(candidates[0].purl, "pkg:npm/%40scope/example@1.0.1");
     }
@@ -651,7 +728,7 @@ mod tests {
             .expect("express fixture has versions")
             .to_string();
 
-        discover_patch_candidates(&packument, &oldest_version)
+        discover_upgrade_candidates(&packument, &oldest_version)
             .expect("discovery should not error against real-world data");
     }
 }
