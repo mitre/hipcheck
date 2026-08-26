@@ -10,6 +10,7 @@ use nv_common::{
             sync_cve_list_once_exclusive_with_progress_pipeline_config_and_timeout,
         },
     },
+    error::ErrorSourceIterator as _,
 };
 use sea_orm::DatabaseConnection;
 use slog::{error, info};
@@ -107,8 +108,16 @@ fn log_cve_list_sync_error(log: &slog::Logger, error: &CveListSyncError) {
     error!(
         log,
         "failed scheduled CVE List sync";
-        "error" => error.to_string(),
+        "error" => format_cve_list_sync_error(error),
     );
+}
+
+fn format_cve_list_sync_error(error: &CveListSyncError) -> String {
+    error
+        .sources_iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(": ")
 }
 
 fn log_cve_list_pipeline_config(
@@ -145,6 +154,7 @@ fn summary_commit_sha(summary: &CveListSyncSummary) -> &str {
 
 #[cfg(test)]
 mod tests {
+    use super::{CveListSyncError, format_cve_list_sync_error};
     use camino::{Utf8Path, Utf8PathBuf};
     use nv_common::config::Config;
     use std::{
@@ -257,6 +267,21 @@ mod tests {
         assert_eq!(
             worker_config.write_channel_size_source(),
             config.cve_list_write_channel_size_source
+        );
+    }
+
+    #[test]
+    fn cve_list_sync_error_format_includes_error_context() {
+        let error =
+            CveListSyncError::Git(nv_common::cve::git::CveListGitError::InvalidCheckoutDir(
+                Utf8PathBuf::from("target/cve-list/cvelistV5"),
+            ));
+
+        assert_eq!(
+            format_cve_list_sync_error(&error),
+            "failed to access CVE List Git repository: \
+             CVE List checkout path exists but is not a Git repository: \
+             target/cve-list/cvelistV5"
         );
     }
 }
