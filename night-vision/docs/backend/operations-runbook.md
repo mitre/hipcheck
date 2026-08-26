@@ -259,10 +259,15 @@ cargo nvdb kev stats
 cargo nvdb kev doctor
 ```
 
-Use `cargo nvdb kev list` to inspect cached entries, or
+Use `cargo nvdb kev list` to inspect active catalog entries, or
 `cargo nvdb kev record <CVE-ID>` to print one stored entry and its local
 timestamps. `cargo nvdb kev config` prints the effective source URL, refresh
 interval, and response-size limit.
+
+Entries missing from a later successful catalog are retained as history, but do
+not affect matching or KEV audits. Run `cargo nvdb kev list --removed` to see
+them. Their `removed_at` value is the release time of the catalog snapshot
+that first omitted them.
 
 Run a one-time conditional sync only when intentionally changing local
 database state:

@@ -30,7 +30,8 @@ where
     let statement = Statement::from_string(
         DatabaseBackend::Postgres,
         "SELECT \
-             (SELECT COUNT(*) FROM public.cisa_kev_entries) AS entries_total, \
+             (SELECT COUNT(*) FROM public.cisa_kev_entries WHERE removed_at IS NULL) AS entries_total, \
+             (SELECT COUNT(*) FROM public.cisa_kev_entries WHERE removed_at IS NOT NULL) AS entries_removed, \
              (SELECT MIN(first_seen_at)::text FROM public.cisa_kev_entries) \
                  AS first_seen_at_oldest, \
              (SELECT MAX(first_seen_at)::text FROM public.cisa_kev_entries) \
@@ -68,6 +69,7 @@ where
 
 struct Summary {
     entries_total: i64,
+    entries_removed: i64,
     first_seen_at_oldest: Option<String>,
     first_seen_at_newest: Option<String>,
     last_seen_at_oldest: Option<String>,
@@ -93,63 +95,67 @@ impl Summary {
             entries_total: result
                 .try_get_by_index(0)
                 .context("failed to read entry count")?,
-            first_seen_at_oldest: result
+            entries_removed: result
                 .try_get_by_index(1)
+                .context("failed to read removed entry count")?,
+            first_seen_at_oldest: result
+                .try_get_by_index(2)
                 .context("failed to read oldest entry first_seen_at")?,
             first_seen_at_newest: result
-                .try_get_by_index(2)
+                .try_get_by_index(3)
                 .context("failed to read newest entry first_seen_at")?,
             last_seen_at_oldest: result
-                .try_get_by_index(3)
+                .try_get_by_index(4)
                 .context("failed to read oldest entry last_seen_at")?,
             last_seen_at_newest: result
-                .try_get_by_index(4)
+                .try_get_by_index(5)
                 .context("failed to read newest entry last_seen_at")?,
             updated_at_oldest: result
-                .try_get_by_index(5)
+                .try_get_by_index(6)
                 .context("failed to read oldest entry updated_at")?,
             updated_at_newest: result
-                .try_get_by_index(6)
+                .try_get_by_index(7)
                 .context("failed to read newest entry updated_at")?,
             sync_runs_total: result
-                .try_get_by_index(7)
+                .try_get_by_index(8)
                 .context("failed to read sync-run count")?,
             sync_runs_success: result
-                .try_get_by_index(8)
+                .try_get_by_index(9)
                 .context("failed to read successful sync-run count")?,
             sync_runs_not_modified: result
-                .try_get_by_index(9)
+                .try_get_by_index(10)
                 .context("failed to read not-modified sync-run count")?,
             sync_runs_failed: result
-                .try_get_by_index(10)
+                .try_get_by_index(11)
                 .context("failed to read failed sync-run count")?,
             sync_runs_running: result
-                .try_get_by_index(11)
+                .try_get_by_index(12)
                 .context("failed to read running sync-run count")?,
             records_seen_total: result
-                .try_get_by_index(12)
+                .try_get_by_index(13)
                 .context("failed to read records-seen total")?,
             records_inserted_total: result
-                .try_get_by_index(13)
+                .try_get_by_index(14)
                 .context("failed to read records-inserted total")?,
             records_updated_total: result
-                .try_get_by_index(14)
+                .try_get_by_index(15)
                 .context("failed to read records-updated total")?,
             sync_checked_at_oldest: result
-                .try_get_by_index(15)
+                .try_get_by_index(16)
                 .context("failed to read oldest sync checked_at")?,
             sync_checked_at_newest: result
-                .try_get_by_index(16)
+                .try_get_by_index(17)
                 .context("failed to read newest sync checked_at")?,
             sync_completed_at_newest: result
-                .try_get_by_index(17)
+                .try_get_by_index(18)
                 .context("failed to read newest sync completed_at")?,
         })
     }
 }
 
 fn print_stats(summary: &Summary) {
-    println!("entries_total: {}", summary.entries_total);
+    println!("entries_active: {}", summary.entries_total);
+    println!("entries_removed: {}", summary.entries_removed);
     print_timestamp(
         "entry_first_seen_at_oldest",
         summary.first_seen_at_oldest.as_deref(),

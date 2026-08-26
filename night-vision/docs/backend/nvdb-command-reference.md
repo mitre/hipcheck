@@ -143,7 +143,7 @@ configuration file and its database connection. See
 | `kev audit [--state <STATE>]... [--limit <N> \| --no-limit] [--desc] [--json] [--check]` | Audit reciprocal CVE List and KEV catalog references. |
 | `kev config` | Print effective KEV fetch configuration. |
 | `kev doctor` | Check KEV cache freshness and sync health. |
-| `kev list [--limit <N> \| --no-limit] [--desc] [--json]` | List cached KEV entries. |
+| `kev list [--removed] [--limit <N> \| --no-limit] [--desc] [--json]` | List active KEV entries or retained removed history. |
 | `kev sync --destructive [--force]` | Download and record one KEV catalog sync. |
 | `kev record <CVE-ID>` | Print one cached KEV entry and local timestamps. |
 | `kev recover --destructive` | Mark abandoned KEV sync runs failed. |
@@ -164,7 +164,7 @@ lock, then marks all `running` runs failed. `kev reset` first confirms the
 same lock is free. It refuses to clear stale `running` metadata unless
 `--force` is provided.
 
-`kev audit` compares every cached KEV entry with active CVE List records. Its
+`kev audit` compares active KEV entries with active CVE List records. Its
 summary groups IDs into `both` (reciprocal references), `kev-only` (a KEV entry
 without a CVE-side citation), `cve-only` (a CVE-side citation without a cached
 KEV entry), and `neither`. Pass one or more `--state` values to list matching
@@ -183,8 +183,12 @@ latest run, latest successful catalog, validator metadata, and cached-entry
 count. `kev doctor` adds freshness, latest-failure, stale-`running`-run, and
 validator-health checks; it exits unsuccessfully when those checks fail.
 
-`kev list` prints cached entries, with `--json` for the stored JSON form.
-Use `kev record <CVE-ID>` for one entry, including its local timestamps.
+`kev list` prints active catalog entries by default; use `--removed` to inspect
+retained history. A retained entry has `removed_at` set to the catalog release
+time that first omitted it. `kev record <CVE-ID>` can show either active or
+retained history, including `removed_at`. `kev status` and `kev stats`
+report active entries separately from retained history. KEV matching and
+`kev audit` ignore removed entries.
 `kev runs` provides concise recent history, while `kev run <GENERATION>` shows
 the complete metadata for a single run. `kev stats` summarizes entry counts,
 sync outcomes, and aggregate import counts.

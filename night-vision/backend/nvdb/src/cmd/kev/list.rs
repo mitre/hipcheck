@@ -215,6 +215,15 @@ mod tests {
     }
 
     #[test]
+    fn kev_list_accepts_removed_entries_filter() {
+        let matches = command()
+            .try_get_matches_from(["list", "--removed"])
+            .expect("removed filter should parse");
+
+        assert!(KevListFilter::from_matches(&matches).removed);
+    }
+
+    #[test]
     fn kev_list_rejects_limit_and_no_limit_together() {
         command()
             .try_get_matches_from(["list", "--limit", "10", "--no-limit"])
