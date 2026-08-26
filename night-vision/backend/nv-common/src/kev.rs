@@ -29,8 +29,8 @@ use tokio::time::sleep;
 
 pub const DEFAULT_KEV_URL: &str =
     "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
-const DEFAULT_KEV_REFRESH_INTERVAL_MILLISECONDS: u64 = 3_600_000;
-const DEFAULT_KEV_RESPONSE_BODY_MAX_BYTES: usize = 16 * 1024 * 1024;
+pub const DEFAULT_KEV_REFRESH_INTERVAL_MILLISECONDS: u64 = 3_600_000;
+pub const DEFAULT_KEV_RESPONSE_BODY_MAX_BYTES: usize = 16 * 1024 * 1024;
 
 /// PostgreSQL advisory lock key used to serialize KEV sync work.
 /// ASCII text: "KEV_SYNC"

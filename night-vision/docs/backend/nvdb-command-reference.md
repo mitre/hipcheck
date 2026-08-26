@@ -140,6 +140,7 @@ configuration file and its database connection. See
 
 | Command | Purpose |
 | --- | --- |
+| `kev config` | Print effective KEV fetch configuration. |
 | `kev list [--limit <N> \| --no-limit] [--desc] [--json]` | List cached KEV entries. |
 | `kev pull --destructive [--force]` | Download and record one KEV catalog sync. |
 | `kev record <CVE-ID>` | Print one cached KEV entry and local timestamps. |
