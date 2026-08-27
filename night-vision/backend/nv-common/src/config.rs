@@ -997,32 +997,69 @@ impl Display for Config {
             write_report_line!(f, "async-event-interval", &async_event_interval)?;
         }
 
-        write_report_line!(f, "cve-list-repository-url", &self.cve_list_repository_url)?;
-        write_report_line!(f, "cve-list-repository-ref", &self.cve_list_repository_ref)?;
-        write_report_line!(f, "cve-list-sync-interval", &self.cve_list_sync_interval)?;
-        write_report_line!(f, "cve-list-sync-timeout", &self.cve_list_sync_timeout)?;
-        write_report_line!(
-            f,
-            "cve-list-first-sync-timeout",
-            &self.cve_list_first_sync_timeout
-        )?;
+        if self.cve_list_repository_url.as_str() != DEFAULT_CVE_LIST_REPOSITORY_URL {
+            write_report_line!(f, "cve-list-repository-url", &self.cve_list_repository_url)?;
+        }
+
+        if self.cve_list_repository_ref.as_str() != DEFAULT_CVE_LIST_REPOSITORY_REF {
+            write_report_line!(f, "cve-list-repository-ref", &self.cve_list_repository_ref)?;
+        }
+
+        if self.cve_list_sync_interval != DEFAULT_CVE_LIST_SYNC_INTERVAL {
+            write_report_line!(f, "cve-list-sync-interval", &self.cve_list_sync_interval)?;
+        }
+
+        if self.cve_list_sync_timeout != DEFAULT_CVE_LIST_SYNC_TIMEOUT {
+            write_report_line!(f, "cve-list-sync-timeout", &self.cve_list_sync_timeout)?;
+        }
+
+        if self.cve_list_first_sync_timeout != DEFAULT_CVE_LIST_FIRST_SYNC_TIMEOUT {
+            write_report_line!(
+                f,
+                "cve-list-first-sync-timeout",
+                &self.cve_list_first_sync_timeout
+            )?;
+        }
+
         write_report_line!(f, "cve-list-checkout-path", &self.cve_list_checkout_path)?;
-        write_report_line!(
-            f,
-            "cve-list-parse-concurrency",
-            &self.cve_list_parse_concurrency
-        )?;
-        write_report_line!(
-            f,
-            "cve-list-write-batch-size",
-            &self.cve_list_write_batch_size
-        )?;
-        write_report_line!(f, "cve-record-max-bytes", &self.cve_record_max_bytes)?;
-        write_report_line!(
-            f,
-            "cve-list-write-channel-size",
-            &self.cve_list_write_channel_size
-        )?;
+        if self.cve_list_parse_concurrency
+            != default_cve_list_parse_concurrency(
+                self.async_worker_threads,
+                self.async_max_blocking_threads,
+            )
+        {
+            write_report_line!(
+                f,
+                "cve-list-parse-concurrency",
+                &self.cve_list_parse_concurrency
+            )?;
+        }
+
+        if self.cve_list_write_batch_size != DEFAULT_CVE_LIST_WRITE_BATCH_SIZE {
+            write_report_line!(
+                f,
+                "cve-list-write-batch-size",
+                &self.cve_list_write_batch_size
+            )?;
+        }
+
+        if self.cve_record_max_bytes != DEFAULT_CVE_RECORD_MAX_BYTES {
+            write_report_line!(f, "cve-record-max-bytes", &self.cve_record_max_bytes)?;
+        }
+
+        if self.cve_list_write_channel_size
+            != default_cve_list_write_channel_size(
+                self.cve_list_parse_concurrency,
+                self.cve_list_write_batch_size,
+            )
+        {
+            write_report_line!(
+                f,
+                "cve-list-write-channel-size",
+                &self.cve_list_write_channel_size
+            )?;
+        }
+
         write_report_line!(f, "npm-registry-url", &self.npm_registry_url)?;
         write_report_line!(
             f,
@@ -2114,6 +2151,81 @@ mod tests {
         assert!(!report.contains(secret_file.path().as_str()));
         assert!(!report.contains("password"));
         assert!(!report.contains("postgres://user:password@localhost:5432/nv"));
+    }
+
+    #[test]
+    fn config_display_omits_default_cve_list_settings() {
+        let default_parse_concurrency = default_cve_list_parse_concurrency(None, None);
+        let default_write_channel_size = default_cve_list_write_channel_size(
+            default_parse_concurrency,
+            DEFAULT_CVE_LIST_WRITE_BATCH_SIZE,
+        );
+        let file = TempConfigFile::new(
+            &[
+                valid_required_config(),
+                format!("cve-list-repository-url = {DEFAULT_CVE_LIST_REPOSITORY_URL}"),
+                format!("cve-list-repository-ref = {DEFAULT_CVE_LIST_REPOSITORY_REF}"),
+                format!("cve-list-sync-interval = {DEFAULT_CVE_LIST_SYNC_INTERVAL}"),
+                format!("cve-list-sync-timeout = {DEFAULT_CVE_LIST_SYNC_TIMEOUT}"),
+                format!("cve-list-first-sync-timeout = {DEFAULT_CVE_LIST_FIRST_SYNC_TIMEOUT}"),
+                format!("cve-list-parse-concurrency = {default_parse_concurrency}"),
+                format!("cve-list-write-batch-size = {DEFAULT_CVE_LIST_WRITE_BATCH_SIZE}"),
+                format!("cve-record-max-bytes = {DEFAULT_CVE_RECORD_MAX_BYTES}"),
+                format!("cve-list-write-channel-size = {default_write_channel_size}"),
+            ]
+            .join("\n"),
+        );
+
+        let config = Config::parse(file.path()).expect("config should parse");
+        let report = format!("{config}");
+
+        assert!(report.contains("cve-list-checkout-path"));
+        for key in [
+            "cve-list-repository-url",
+            "cve-list-repository-ref",
+            "cve-list-sync-interval",
+            "cve-list-sync-timeout",
+            "cve-list-first-sync-timeout",
+            "cve-list-parse-concurrency",
+            "cve-list-write-batch-size",
+            "cve-record-max-bytes",
+            "cve-list-write-channel-size",
+        ] {
+            assert!(!report.contains(key), "report unexpectedly contains {key}");
+        }
+    }
+
+    #[test]
+    fn config_display_includes_configured_cve_list_settings() {
+        let file = TempConfigFile::new(&format!(
+            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
+            valid_required_config(),
+            "cve-list-repository-url = https://example.test/cvelistV5.git",
+            "cve-list-repository-ref = stable",
+            "cve-list-sync-interval = 900000",
+            "cve-list-sync-timeout = 1800000",
+            "cve-list-first-sync-timeout = 7200000",
+            "cve-list-parse-concurrency = 16",
+            "cve-list-write-batch-size = 250",
+            "cve-record-max-bytes = 2097152\ncve-list-write-channel-size = 1024",
+        ));
+
+        let config = Config::parse(file.path()).expect("config should parse");
+        let report = format!("{config}");
+
+        for key in [
+            "cve-list-repository-url",
+            "cve-list-repository-ref",
+            "cve-list-sync-interval",
+            "cve-list-sync-timeout",
+            "cve-list-first-sync-timeout",
+            "cve-list-parse-concurrency",
+            "cve-list-write-batch-size",
+            "cve-record-max-bytes",
+            "cve-list-write-channel-size",
+        ] {
+            assert!(report.contains(key), "report is missing {key}");
+        }
     }
 
     #[test]
