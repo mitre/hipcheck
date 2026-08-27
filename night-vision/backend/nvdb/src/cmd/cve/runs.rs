@@ -9,6 +9,8 @@ use nv_common::{
 };
 use sea_orm::{EntityTrait as _, QueryOrder as _, QuerySelect as _};
 
+use crate::time_display::TimeDisplay;
+
 const DEFAULT_LIMIT: u64 = 10;
 const ERROR_SUMMARY_MAX_CHARS: usize = 120;
 
@@ -25,16 +27,16 @@ pub fn command() -> clap::Command {
         )
 }
 
-pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
+pub fn run(config: &Config, matches: &clap::ArgMatches, time_display: TimeDisplay) -> Result<()> {
     let limit = *matches
         .get_one::<u64>("limit")
         .expect("limit has a default value");
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
 
-    runtime.block_on(runs(config, limit))
+    runtime.block_on(runs(config, limit, time_display))
 }
 
-async fn runs(config: &Config, limit: u64) -> Result<()> {
+async fn runs(config: &Config, limit: u64, time_display: TimeDisplay) -> Result<()> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
@@ -45,12 +47,12 @@ async fn runs(config: &Config, limit: u64) -> Result<()> {
         .await
         .context("failed to read CVE List sync runs")?;
 
-    print_runs(&runs);
+    print_runs(&runs, time_display);
 
     Ok(())
 }
 
-fn print_runs(runs: &[CveListSyncRun]) {
+fn print_runs(runs: &[CveListSyncRun], time_display: TimeDisplay) {
     if runs.is_empty() {
         println!("runs: <none>");
         return;
@@ -70,12 +72,10 @@ fn print_runs(runs: &[CveListSyncRun]) {
         println!("records_seen: {}", run.records_seen);
         println!("records_inserted: {}", run.records_inserted);
         println!("records_updated: {}", run.records_updated);
-        println!("checked_at: {}", run.checked_at);
+        println!("checked_at: {}", time_display.format(&run.checked_at));
         println!(
             "completed_at: {}",
-            run.completed_at
-                .as_ref()
-                .map_or("<none>".to_owned(), ToString::to_string)
+            time_display.format_optional(run.completed_at.as_ref())
         );
         println!("error_summary: {}", error_summary(run.error.as_deref()));
     }

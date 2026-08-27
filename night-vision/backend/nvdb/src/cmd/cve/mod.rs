@@ -1,6 +1,8 @@
 use anyhow::Result;
 use nv_common::config::Config;
 
+use crate::time_display::TimeDisplay;
+
 pub mod config;
 pub mod doctor;
 pub mod list;
@@ -30,13 +32,13 @@ pub fn command() -> clap::Command {
         .subcommand(sync::command())
 }
 
-pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
+pub fn run(config: &Config, matches: &clap::ArgMatches, time_display: TimeDisplay) -> Result<()> {
     if let Some(config_matches) = matches.subcommand_matches("config") {
         return self::config::run(config, config_matches);
     }
 
     if let Some(doctor_matches) = matches.subcommand_matches("doctor") {
-        return doctor::run(config, doctor_matches);
+        return doctor::run(config, doctor_matches, time_display);
     }
 
     if let Some(list_matches) = matches.subcommand_matches("list") {
@@ -44,7 +46,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     }
 
     if let Some(record_matches) = matches.subcommand_matches("record") {
-        return record::run(config, record_matches);
+        return record::run(config, record_matches, time_display);
     }
 
     if let Some(recover_matches) = matches.subcommand_matches("recover") {
@@ -56,19 +58,19 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     }
 
     if let Some(run_matches) = matches.subcommand_matches("run") {
-        return run::run(config, run_matches);
+        return run::run(config, run_matches, time_display);
     }
 
     if let Some(runs_matches) = matches.subcommand_matches("runs") {
-        return runs::run(config, runs_matches);
+        return runs::run(config, runs_matches, time_display);
     }
 
     if let Some(stats_matches) = matches.subcommand_matches("stats") {
-        return stats::run(config, stats_matches);
+        return stats::run(config, stats_matches, time_display);
     }
 
     if let Some(status_matches) = matches.subcommand_matches("status") {
-        return status::run(config, status_matches);
+        return status::run(config, status_matches, time_display);
     }
 
     if let Some(sync_matches) = matches.subcommand_matches("sync") {

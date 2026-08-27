@@ -19,6 +19,8 @@ use sea_orm::{
 use secrecy::ExposeSecret as _;
 use std::{collections::HashSet, fs, time::Duration};
 
+use crate::time_display::TimeDisplay;
+
 const REQUIRED_CVE_TABLES: &[&str] = &[
     "public.cve_list_records",
     "public.cve_list_record_staging",
@@ -29,12 +31,12 @@ pub fn command() -> clap::Command {
     clap::Command::new("doctor").about("Check CVE List ingest operational health")
 }
 
-pub fn run(config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
+pub fn run(config: &Config, _matches: &clap::ArgMatches, time_display: TimeDisplay) -> Result<()> {
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
-    runtime.block_on(doctor(config))
+    runtime.block_on(doctor(config, time_display))
 }
 
-async fn doctor(config: &Config) -> Result<()> {
+async fn doctor(config: &Config, time_display: TimeDisplay) -> Result<()> {
     let worker_config = config.cve_list_worker_config();
     let mut ok = true;
 
@@ -103,7 +105,7 @@ async fn doctor(config: &Config) -> Result<()> {
             let latest_run = latest_sync_run(db)
                 .await
                 .context("failed to read latest CVE List sync run")?;
-            print_latest_run(latest_run.as_ref());
+            print_latest_run(latest_run.as_ref(), time_display);
 
             let running_run_age = latest_running_sync_run_age_seconds(db)
                 .await
@@ -346,11 +348,14 @@ fn checkout_parent_writable(path: &Utf8Path) -> bool {
         .unwrap_or(false)
 }
 
-fn print_latest_run(latest_run: Option<&CveListSyncRun>) {
+fn print_latest_run(latest_run: Option<&CveListSyncRun>, time_display: TimeDisplay) {
     if let Some(latest_run) = latest_run {
         println!("latest_run_generation: {}", latest_run.generation);
         println!("latest_run_status: {}", latest_run.status);
-        println!("latest_run_checked_at: {}", latest_run.checked_at);
+        println!(
+            "latest_run_checked_at: {}",
+            time_display.format(&latest_run.checked_at)
+        );
     } else {
         println!("latest_run_generation: <none>");
         println!("latest_run_status: <none>");

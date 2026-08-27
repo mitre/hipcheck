@@ -19,6 +19,7 @@ use crate::cve::{
         try_acquire_cve_list_sync_lock,
     },
 };
+use crate::error::format_error_chain;
 use camino::Utf8PathBuf;
 use sea_orm::{ConnectionTrait, TransactionSession, TransactionTrait};
 use std::{collections::HashSet, time::Duration};
@@ -459,7 +460,7 @@ where
     let completion = match sync_result {
         Ok(completion) => completion,
         Err(error) => {
-            let error_message = error.to_string();
+            let error_message = format_error_chain(&error);
             let failed_completion = FinishCveListSyncRun {
                 status: CveListSyncRunStatus::Failed,
                 commit_sha: resolved_commit,

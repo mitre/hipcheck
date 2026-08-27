@@ -9,6 +9,8 @@ use nv_common::{
 };
 use sea_orm::EntityTrait as _;
 
+use crate::time_display::TimeDisplay;
+
 pub fn command() -> clap::Command {
     clap::Command::new("run")
         .about("Show one KEV catalog sync run")
@@ -21,16 +23,16 @@ pub fn command() -> clap::Command {
         )
 }
 
-pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
+pub fn run(config: &Config, matches: &clap::ArgMatches, time_display: TimeDisplay) -> Result<()> {
     let generation = *matches
         .get_one::<i64>("generation")
         .expect("required generation argument");
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
 
-    runtime.block_on(show_run(config, generation))
+    runtime.block_on(show_run(config, generation, time_display))
 }
 
-async fn show_run(config: &Config, generation: i64) -> Result<()> {
+async fn show_run(config: &Config, generation: i64, time_display: TimeDisplay) -> Result<()> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
@@ -42,12 +44,12 @@ async fn show_run(config: &Config, generation: i64) -> Result<()> {
         bail!("KEV catalog sync run not found: {generation}");
     };
 
-    print_run(&run);
+    print_run(&run, time_display);
 
     Ok(())
 }
 
-fn print_run(run: &KevSyncRun) {
+fn print_run(run: &KevSyncRun, time_display: TimeDisplay) {
     println!("generation: {}", run.generation);
     println!("status: {}", run.status);
     println!(
@@ -77,12 +79,10 @@ fn print_run(run: &KevSyncRun) {
     println!("records_seen: {}", run.records_seen);
     println!("records_inserted: {}", run.records_inserted);
     println!("records_updated: {}", run.records_updated);
-    println!("checked_at: {}", run.checked_at);
+    println!("checked_at: {}", time_display.format(&run.checked_at));
     println!(
         "completed_at: {}",
-        run.completed_at
-            .as_ref()
-            .map_or("<none>".to_owned(), ToString::to_string)
+        time_display.format_optional(run.completed_at.as_ref())
     );
     println!("error: {}", run.error.as_deref().unwrap_or("<none>"));
 }

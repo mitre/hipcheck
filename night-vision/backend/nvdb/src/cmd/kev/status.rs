@@ -12,16 +12,18 @@ use sea_orm::{
     QuerySelect as _,
 };
 
+use crate::time_display::TimeDisplay;
+
 pub fn command() -> clap::Command {
     clap::Command::new("status").about("Print the latest KEV catalog sync state")
 }
 
-pub fn run(config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
+pub fn run(config: &Config, _matches: &clap::ArgMatches, time_display: TimeDisplay) -> Result<()> {
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
-    runtime.block_on(status(config))
+    runtime.block_on(status(config, time_display))
 }
 
-async fn status(config: &Config) -> Result<()> {
+async fn status(config: &Config, time_display: TimeDisplay) -> Result<()> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
@@ -48,6 +50,7 @@ async fn status(config: &Config) -> Result<()> {
         entry_count,
         latest_run.as_ref(),
         latest_successful_run.as_ref(),
+        time_display,
     );
 
     Ok(())
@@ -57,22 +60,24 @@ fn print_status(
     entry_count: u64,
     latest_run: Option<&KevSyncRun>,
     latest_successful_run: Option<&KevSyncRun>,
+    time_display: TimeDisplay,
 ) {
     println!("entry_count: {entry_count}");
-    print_latest_run(latest_run);
-    print_latest_successful_catalog(latest_successful_run);
+    print_latest_run(latest_run, time_display);
+    print_latest_successful_catalog(latest_successful_run, time_display);
 }
 
-fn print_latest_run(run: Option<&KevSyncRun>) {
+fn print_latest_run(run: Option<&KevSyncRun>, time_display: TimeDisplay) {
     if let Some(run) = run {
         println!("latest_run_generation: {}", run.generation);
         println!("latest_run_status: {}", run.status);
-        println!("latest_run_checked_at: {}", run.checked_at);
+        println!(
+            "latest_run_checked_at: {}",
+            time_display.format(&run.checked_at)
+        );
         println!(
             "latest_run_completed_at: {}",
-            run.completed_at
-                .as_ref()
-                .map_or("<none>".to_owned(), ToString::to_string)
+            time_display.format_optional(run.completed_at.as_ref())
         );
         println!("latest_run_records_seen: {}", run.records_seen);
         println!("latest_run_records_inserted: {}", run.records_inserted);
@@ -93,16 +98,17 @@ fn print_latest_run(run: Option<&KevSyncRun>) {
     }
 }
 
-fn print_latest_successful_catalog(run: Option<&KevSyncRun>) {
+fn print_latest_successful_catalog(run: Option<&KevSyncRun>, time_display: TimeDisplay) {
     if let Some(run) = run {
         println!("latest_successful_generation: {}", run.generation);
         println!("latest_successful_status: {}", run.status);
-        println!("latest_successful_checked_at: {}", run.checked_at);
+        println!(
+            "latest_successful_checked_at: {}",
+            time_display.format(&run.checked_at)
+        );
         println!(
             "latest_successful_completed_at: {}",
-            run.completed_at
-                .as_ref()
-                .map_or("<none>".to_owned(), ToString::to_string)
+            time_display.format_optional(run.completed_at.as_ref())
         );
         println!(
             "latest_successful_catalog_version: {}",

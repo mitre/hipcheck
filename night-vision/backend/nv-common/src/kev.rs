@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::db::DatabaseConnectionError;
 use crate::db::entities::cisa_kev_entries;
 use crate::db::entities::cisa_kev_sync_runs;
-use crate::error::ErrorSourceIterator as _;
+use crate::error::{ErrorSourceIterator as _, format_error_chain};
 use jiff::civil::Date;
 use reqwest::header::{
     ETAG, HeaderMap, HeaderValue, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED,
@@ -23,7 +23,7 @@ use std::{
     collections::HashMap,
     error::Error as _,
     fmt::{Debug, Display, Write as _},
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::time::sleep;
 
@@ -433,7 +433,7 @@ async fn sync_kev(
     let res = fetch_kev(request_mode, config, &sync_run, &xact, log.clone()).await;
     let completion = match &res {
         Ok(completion) => completion.clone(),
-        Err(error) => FinishKevSyncRun::failed(format!("{error:?}")),
+        Err(error) => FinishKevSyncRun::failed(format_error_chain(error)),
     };
     finish_kev_sync_run(&xact, sync_run.generation, completion).await?;
     // Must finish the transaction first, regardless of whether there was an error
@@ -481,7 +481,12 @@ async fn fetch_kev(
     // save expires and cache-control from response
     // cache-control max-age directive provides number of seconds until server
     // considers it stale; use that as time to refresh
-    let response = request_kev_catalog(&client, url, headers, &log).await?;
+    let request_diagnostics = KevRequestDiagnostics::new(
+        sync_run.generation,
+        matches!(request_mode, RequestMode::UseConditionalRequest),
+        &url,
+    );
+    let response = request_kev_catalog(&client, url, headers, &request_diagnostics, &log).await?;
 
     let status = response.status();
     let cache_metadata = cache_metadata_for_response(
@@ -589,15 +594,55 @@ async fn request_kev_catalog(
     client: &Client,
     url: Url,
     headers: HeaderMap,
+    diagnostics: &KevRequestDiagnostics,
     log: &Logger,
 ) -> Result<Response, KevError> {
     let request = client.get(url.clone()).headers(headers);
-    debug!(log, "KEV Sync: Sending request for KEV Catalog";
-        "url" => ?url,
-        "request" => ?request);
+    debug!(log, "KEV Sync: sending KEV catalog request";
+        "generation" => diagnostics.generation,
+        "conditional_request" => diagnostics.conditional_request,
+        "endpoint_scheme" => diagnostics.endpoint.scheme.as_str(),
+        "endpoint_host" => diagnostics.endpoint.host.as_str(),
+        "endpoint_port" => diagnostics.endpoint.port,
+        "http_proxy_configured" => diagnostics.proxy_environment.http_proxy_configured,
+        "https_proxy_configured" => diagnostics.proxy_environment.https_proxy_configured,
+        "no_proxy_configured" => diagnostics.proxy_environment.no_proxy_configured);
 
-    let response = request.send().await?;
-    debug!(log, "KEV Sync: Got KEV Catalog response"; "response" => ?response);
+    let started = Instant::now();
+    let response = match request.send().await {
+        Ok(response) => response,
+        Err(error) => {
+            let failure_class = KevRequestFailureClass::from_reqwest_error(&error);
+            warn!(log, "KEV Sync: KEV catalog request failed";
+                "generation" => diagnostics.generation,
+                "conditional_request" => diagnostics.conditional_request,
+                "endpoint_scheme" => diagnostics.endpoint.scheme.as_str(),
+                "endpoint_host" => diagnostics.endpoint.host.as_str(),
+                "endpoint_port" => diagnostics.endpoint.port,
+                "elapsed_milliseconds" => elapsed_milliseconds(started.elapsed()),
+                "failure_class" => failure_class.as_str(),
+                "is_timeout" => error.is_timeout(),
+                "is_connect" => error.is_connect(),
+                "is_request" => error.is_request(),
+                "is_body" => error.is_body(),
+                "is_decode" => error.is_decode(),
+                "http_proxy_configured" => diagnostics.proxy_environment.http_proxy_configured,
+                "https_proxy_configured" => diagnostics.proxy_environment.https_proxy_configured,
+                "no_proxy_configured" => diagnostics.proxy_environment.no_proxy_configured,
+                "error_sources" => ?reqwest_error_source_messages(&error));
+            return Err(KevError::ReqwestError(error));
+        }
+    };
+    let final_endpoint = KevEndpoint::from_url(response.url());
+    debug!(log, "KEV Sync: received KEV catalog response";
+        "generation" => diagnostics.generation,
+        "conditional_request" => diagnostics.conditional_request,
+        "final_endpoint_scheme" => final_endpoint.scheme.as_str(),
+        "final_endpoint_host" => final_endpoint.host.as_str(),
+        "final_endpoint_port" => final_endpoint.port,
+        "http_version" => format!("{:?}", response.version()),
+        "status" => response.status().as_u16(),
+        "elapsed_milliseconds" => elapsed_milliseconds(started.elapsed()));
 
     let status = response.status();
     if status != StatusCode::OK && status != StatusCode::NOT_MODIFIED {
@@ -605,6 +650,138 @@ async fn request_kev_catalog(
     }
 
     Ok(response)
+}
+
+/// Redacted connection details for one KEV catalog request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct KevRequestDiagnostics {
+    generation: i64,
+    conditional_request: bool,
+    endpoint: KevEndpoint,
+    proxy_environment: ProxyEnvironment,
+}
+
+impl KevRequestDiagnostics {
+    fn new(generation: i64, conditional_request: bool, url: &Url) -> Self {
+        Self {
+            generation,
+            conditional_request,
+            endpoint: KevEndpoint::from_url(url),
+            proxy_environment: ProxyEnvironment::from_environment(),
+        }
+    }
+}
+
+/// The URL components that are safe to include in KEV request logs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct KevEndpoint {
+    scheme: String,
+    host: String,
+    port: Option<u16>,
+}
+
+impl KevEndpoint {
+    fn from_url(url: &Url) -> Self {
+        Self {
+            scheme: url.scheme().to_owned(),
+            host: url.host_str().unwrap_or("<none>").to_owned(),
+            port: url.port_or_known_default(),
+        }
+    }
+}
+
+/// Whether conventional proxy environment variables are set, without exposing their values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ProxyEnvironment {
+    http_proxy_configured: bool,
+    https_proxy_configured: bool,
+    no_proxy_configured: bool,
+}
+
+impl ProxyEnvironment {
+    fn from_environment() -> Self {
+        Self::from_lookup(|name| std::env::var_os(name).is_some_and(|value| !value.is_empty()))
+    }
+
+    fn from_lookup(lookup: impl Fn(&str) -> bool) -> Self {
+        Self {
+            http_proxy_configured: lookup("HTTP_PROXY") || lookup("http_proxy"),
+            https_proxy_configured: lookup("HTTPS_PROXY") || lookup("https_proxy"),
+            no_proxy_configured: lookup("NO_PROXY") || lookup("no_proxy"),
+        }
+    }
+}
+
+/// A stable, high-level classification for a failed KEV HTTP request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KevRequestFailureClass {
+    Timeout,
+    Connect,
+    Request,
+    Body,
+    Decode,
+    Other,
+}
+
+impl KevRequestFailureClass {
+    fn from_reqwest_error(error: &reqwest::Error) -> Self {
+        Self::from_flags(ReqwestErrorFlags {
+            timeout: error.is_timeout(),
+            connect: error.is_connect(),
+            request: error.is_request(),
+            body: error.is_body(),
+            decode: error.is_decode(),
+        })
+    }
+
+    fn from_flags(flags: ReqwestErrorFlags) -> Self {
+        if flags.timeout {
+            Self::Timeout
+        } else if flags.connect {
+            Self::Connect
+        } else if flags.request {
+            Self::Request
+        } else if flags.body {
+            Self::Body
+        } else if flags.decode {
+            Self::Decode
+        } else {
+            Self::Other
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Timeout => "timeout",
+            Self::Connect => "connect",
+            Self::Request => "request",
+            Self::Body => "body",
+            Self::Decode => "decode",
+            Self::Other => "other",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct ReqwestErrorFlags {
+    timeout: bool,
+    connect: bool,
+    request: bool,
+    body: bool,
+    decode: bool,
+}
+
+fn elapsed_milliseconds(elapsed: Duration) -> u64 {
+    u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
+}
+
+/// Return nested error messages without the top-level Reqwest error, which can include a URL.
+fn reqwest_error_source_messages(error: &reqwest::Error) -> Vec<String> {
+    error
+        .sources_iter()
+        .skip(1)
+        .map(std::string::ToString::to_string)
+        .collect()
 }
 
 fn validate_catalog_count(declared: i64, actual: usize) -> Result<(), KevError> {
@@ -1154,16 +1331,138 @@ mod tests {
                 .body(VALID_KEV_CATALOG);
         });
         let log = slog::Logger::root(slog::Discard, slog::o!());
+        let url = Url::parse(&server.url("/kev")).expect("mock URL should be valid");
+        let diagnostics = test_request_diagnostics(&url);
 
         let response = run_async(request_kev_catalog(
             &Client::new(),
-            Url::parse(&server.url("/kev")).expect("mock URL should be valid"),
+            url,
             HeaderMap::new(),
+            &diagnostics,
             &log,
         ))
         .expect("200 response should be accepted");
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn kev_catalog_request_follows_redirect_and_reports_final_endpoint() {
+        let server = MockServer::start();
+        let destination = server.url("/kev");
+        let _redirect = server.mock(|when, then| {
+            when.method(GET).path("/redirect");
+            then.status(302).header("location", destination.as_str());
+        });
+        let _destination = server.mock(|when, then| {
+            when.method(GET).path("/kev");
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(VALID_KEV_CATALOG);
+        });
+        let log = slog::Logger::root(slog::Discard, slog::o!());
+        let url = Url::parse(&server.url("/redirect")).expect("mock URL should be valid");
+        let diagnostics = test_request_diagnostics(&url);
+
+        let response = run_async(request_kev_catalog(
+            &Client::new(),
+            url,
+            HeaderMap::new(),
+            &diagnostics,
+            &log,
+        ))
+        .expect("redirected response should be accepted");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(KevEndpoint::from_url(response.url()).host, "127.0.0.1");
+        assert_eq!(
+            KevEndpoint::from_url(response.url()).port,
+            Some(server.port())
+        );
+    }
+
+    #[test]
+    fn kev_endpoint_excludes_sensitive_url_components() {
+        let endpoint = KevEndpoint::from_url(
+            &Url::parse("https://user:password@example.test:8443/a/path?token=secret")
+                .expect("test URL should parse"),
+        );
+
+        assert_eq!(endpoint.scheme, "https");
+        assert_eq!(endpoint.host, "example.test");
+        assert_eq!(endpoint.port, Some(8443));
+        let logged_values = format!("{endpoint:?}");
+        assert!(!logged_values.contains("user"));
+        assert!(!logged_values.contains("password"));
+        assert!(!logged_values.contains("/a/path"));
+        assert!(!logged_values.contains("token=secret"));
+    }
+
+    #[test]
+    fn proxy_environment_detects_uppercase_and_lowercase_variables_without_values() {
+        let configured = ["http_proxy", "HTTPS_PROXY", "NO_PROXY"];
+        let proxy_environment = ProxyEnvironment::from_lookup(|name| configured.contains(&name));
+
+        assert_eq!(
+            proxy_environment,
+            ProxyEnvironment {
+                http_proxy_configured: true,
+                https_proxy_configured: true,
+                no_proxy_configured: true,
+            }
+        );
+    }
+
+    #[test]
+    fn kev_request_failure_class_uses_documented_precedence() {
+        assert_eq!(
+            KevRequestFailureClass::from_flags(ReqwestErrorFlags {
+                timeout: true,
+                connect: true,
+                request: true,
+                body: true,
+                decode: true,
+            }),
+            KevRequestFailureClass::Timeout
+        );
+        assert_eq!(
+            KevRequestFailureClass::from_flags(ReqwestErrorFlags {
+                connect: true,
+                request: true,
+                body: true,
+                decode: true,
+                ..ReqwestErrorFlags::default()
+            }),
+            KevRequestFailureClass::Connect
+        );
+        assert_eq!(
+            KevRequestFailureClass::from_flags(ReqwestErrorFlags {
+                request: true,
+                body: true,
+                decode: true,
+                ..ReqwestErrorFlags::default()
+            }),
+            KevRequestFailureClass::Request
+        );
+        assert_eq!(
+            KevRequestFailureClass::from_flags(ReqwestErrorFlags {
+                body: true,
+                decode: true,
+                ..ReqwestErrorFlags::default()
+            }),
+            KevRequestFailureClass::Body
+        );
+        assert_eq!(
+            KevRequestFailureClass::from_flags(ReqwestErrorFlags {
+                decode: true,
+                ..ReqwestErrorFlags::default()
+            }),
+            KevRequestFailureClass::Decode
+        );
+        assert_eq!(
+            KevRequestFailureClass::from_flags(ReqwestErrorFlags::default()),
+            KevRequestFailureClass::Other
+        );
     }
 
     #[test]
@@ -1858,11 +2157,14 @@ mod tests {
                 .body(VALID_KEV_CATALOG);
         });
         let log = slog::Logger::root(slog::Discard, slog::o!());
+        let url = Url::parse(&server.url("/kev")).expect("mock URL should be valid");
+        let diagnostics = test_request_diagnostics(&url);
 
         let error = run_async(request_kev_catalog(
             &Client::new(),
-            Url::parse(&server.url("/kev")).expect("mock URL should be valid"),
+            url,
             HeaderMap::new(),
+            &diagnostics,
             &log,
         ))
         .expect_err("non-OK response should be rejected");
@@ -1871,6 +2173,19 @@ mod tests {
             error,
             KevError::UnexpectedResponseStatus(status) if status == expected
         ));
+    }
+
+    fn test_request_diagnostics(url: &Url) -> KevRequestDiagnostics {
+        KevRequestDiagnostics {
+            generation: 42,
+            conditional_request: false,
+            endpoint: KevEndpoint::from_url(url),
+            proxy_environment: ProxyEnvironment {
+                http_proxy_configured: false,
+                https_proxy_configured: false,
+                no_proxy_configured: false,
+            },
+        }
     }
 
     fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {

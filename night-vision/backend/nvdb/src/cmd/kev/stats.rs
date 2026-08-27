@@ -1,24 +1,27 @@
 use anyhow::{Context as _, Result, anyhow};
+use chrono::{DateTime, FixedOffset};
 use nv_common::{config::Config, db, rt};
 use sea_orm::{ConnectionTrait, DatabaseBackend, QueryResult, Statement};
+
+use crate::time_display::TimeDisplay;
 
 pub fn command() -> clap::Command {
     clap::Command::new("stats").about("Summarize cached KEV entries and sync runs")
 }
 
-pub fn run(config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
+pub fn run(config: &Config, _matches: &clap::ArgMatches, time_display: TimeDisplay) -> Result<()> {
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
 
-    runtime.block_on(stats(config))
+    runtime.block_on(stats(config, time_display))
 }
 
-async fn stats(config: &Config) -> Result<()> {
+async fn stats(config: &Config, time_display: TimeDisplay) -> Result<()> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
     let summary = read_summary(&db).await?;
 
-    print_stats(&summary);
+    print_stats(&summary, time_display);
 
     Ok(())
 }
@@ -32,17 +35,17 @@ where
         "SELECT \
              (SELECT COUNT(*) FROM public.cisa_kev_entries WHERE removed_at IS NULL) AS entries_total, \
              (SELECT COUNT(*) FROM public.cisa_kev_entries WHERE removed_at IS NOT NULL) AS entries_removed, \
-             (SELECT MIN(first_seen_at)::text FROM public.cisa_kev_entries) \
+             (SELECT MIN(first_seen_at) FROM public.cisa_kev_entries) \
                  AS first_seen_at_oldest, \
-             (SELECT MAX(first_seen_at)::text FROM public.cisa_kev_entries) \
+             (SELECT MAX(first_seen_at) FROM public.cisa_kev_entries) \
                  AS first_seen_at_newest, \
-             (SELECT MIN(last_seen_at)::text FROM public.cisa_kev_entries) \
+             (SELECT MIN(last_seen_at) FROM public.cisa_kev_entries) \
                  AS last_seen_at_oldest, \
-             (SELECT MAX(last_seen_at)::text FROM public.cisa_kev_entries) \
+             (SELECT MAX(last_seen_at) FROM public.cisa_kev_entries) \
                  AS last_seen_at_newest, \
-             (SELECT MIN(updated_at)::text FROM public.cisa_kev_entries) \
+             (SELECT MIN(updated_at) FROM public.cisa_kev_entries) \
                  AS updated_at_oldest, \
-             (SELECT MAX(updated_at)::text FROM public.cisa_kev_entries) \
+             (SELECT MAX(updated_at) FROM public.cisa_kev_entries) \
                  AS updated_at_newest, \
              COUNT(*) AS sync_runs_total, \
              COUNT(*) FILTER (WHERE status = 'success') AS sync_runs_success, \
@@ -52,9 +55,9 @@ where
              COALESCE(SUM(records_seen), 0) AS records_seen_total, \
              COALESCE(SUM(records_inserted), 0) AS records_inserted_total, \
              COALESCE(SUM(records_updated), 0) AS records_updated_total, \
-             MIN(checked_at)::text AS sync_checked_at_oldest, \
-             MAX(checked_at)::text AS sync_checked_at_newest, \
-             MAX(completed_at)::text AS sync_completed_at_newest \
+             MIN(checked_at) AS sync_checked_at_oldest, \
+             MAX(checked_at) AS sync_checked_at_newest, \
+             MAX(completed_at) AS sync_completed_at_newest \
          FROM public.cisa_kev_sync_runs"
             .to_owned(),
     );
@@ -70,12 +73,12 @@ where
 struct Summary {
     entries_total: i64,
     entries_removed: i64,
-    first_seen_at_oldest: Option<String>,
-    first_seen_at_newest: Option<String>,
-    last_seen_at_oldest: Option<String>,
-    last_seen_at_newest: Option<String>,
-    updated_at_oldest: Option<String>,
-    updated_at_newest: Option<String>,
+    first_seen_at_oldest: Option<DateTime<FixedOffset>>,
+    first_seen_at_newest: Option<DateTime<FixedOffset>>,
+    last_seen_at_oldest: Option<DateTime<FixedOffset>>,
+    last_seen_at_newest: Option<DateTime<FixedOffset>>,
+    updated_at_oldest: Option<DateTime<FixedOffset>>,
+    updated_at_newest: Option<DateTime<FixedOffset>>,
     sync_runs_total: i64,
     sync_runs_success: i64,
     sync_runs_not_modified: i64,
@@ -84,9 +87,9 @@ struct Summary {
     records_seen_total: i64,
     records_inserted_total: i64,
     records_updated_total: i64,
-    sync_checked_at_oldest: Option<String>,
-    sync_checked_at_newest: Option<String>,
-    sync_completed_at_newest: Option<String>,
+    sync_checked_at_oldest: Option<DateTime<FixedOffset>>,
+    sync_checked_at_newest: Option<DateTime<FixedOffset>>,
+    sync_completed_at_newest: Option<DateTime<FixedOffset>>,
 }
 
 impl Summary {
@@ -153,32 +156,38 @@ impl Summary {
     }
 }
 
-fn print_stats(summary: &Summary) {
+fn print_stats(summary: &Summary, time_display: TimeDisplay) {
     println!("entries_active: {}", summary.entries_total);
     println!("entries_removed: {}", summary.entries_removed);
     print_timestamp(
         "entry_first_seen_at_oldest",
-        summary.first_seen_at_oldest.as_deref(),
+        summary.first_seen_at_oldest.as_ref(),
+        time_display,
     );
     print_timestamp(
         "entry_first_seen_at_newest",
-        summary.first_seen_at_newest.as_deref(),
+        summary.first_seen_at_newest.as_ref(),
+        time_display,
     );
     print_timestamp(
         "entry_last_seen_at_oldest",
-        summary.last_seen_at_oldest.as_deref(),
+        summary.last_seen_at_oldest.as_ref(),
+        time_display,
     );
     print_timestamp(
         "entry_last_seen_at_newest",
-        summary.last_seen_at_newest.as_deref(),
+        summary.last_seen_at_newest.as_ref(),
+        time_display,
     );
     print_timestamp(
         "entry_updated_at_oldest",
-        summary.updated_at_oldest.as_deref(),
+        summary.updated_at_oldest.as_ref(),
+        time_display,
     );
     print_timestamp(
         "entry_updated_at_newest",
-        summary.updated_at_newest.as_deref(),
+        summary.updated_at_newest.as_ref(),
+        time_display,
     );
     println!("sync_runs_total: {}", summary.sync_runs_total);
     println!("sync_runs_success: {}", summary.sync_runs_success);
@@ -190,29 +199,33 @@ fn print_stats(summary: &Summary) {
     println!("records_updated_total: {}", summary.records_updated_total);
     print_timestamp(
         "sync_checked_at_oldest",
-        summary.sync_checked_at_oldest.as_deref(),
+        summary.sync_checked_at_oldest.as_ref(),
+        time_display,
     );
     print_timestamp(
         "sync_checked_at_newest",
-        summary.sync_checked_at_newest.as_deref(),
+        summary.sync_checked_at_newest.as_ref(),
+        time_display,
     );
     print_timestamp(
         "sync_completed_at_newest",
-        summary.sync_completed_at_newest.as_deref(),
+        summary.sync_completed_at_newest.as_ref(),
+        time_display,
     );
 }
 
-fn print_timestamp(label: &str, timestamp: Option<&str>) {
-    println!("{label}: {}", optional_timestamp(timestamp));
-}
-
-fn optional_timestamp(timestamp: Option<&str>) -> &str {
-    timestamp.unwrap_or("<none>")
+fn print_timestamp(
+    label: &str,
+    timestamp: Option<&DateTime<FixedOffset>>,
+    time_display: TimeDisplay,
+) {
+    println!("{label}: {}", time_display.format_optional(timestamp));
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{command, optional_timestamp};
+    use super::command;
+    use crate::time_display::TimeDisplay;
 
     #[test]
     fn kev_stats_accepts_no_arguments() {
@@ -223,6 +236,6 @@ mod tests {
 
     #[test]
     fn optional_timestamp_uses_none_marker() {
-        assert_eq!(optional_timestamp(None), "<none>");
+        assert_eq!(TimeDisplay::Stored.format_optional(None), "<none>");
     }
 }

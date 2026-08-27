@@ -11,20 +11,26 @@ use sea_orm::{
     QuerySelect as _,
 };
 
+use crate::time_display::TimeDisplay;
+
 pub fn command() -> clap::Command {
     clap::Command::new("doctor").about("Check KEV cache freshness and sync health")
 }
 
-pub fn run(config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
+pub fn run(config: &Config, _matches: &clap::ArgMatches, time_display: TimeDisplay) -> Result<()> {
     let refresh_interval_ms = config
         .kev_refresh_interval
         .unwrap_or(DEFAULT_KEV_REFRESH_INTERVAL_MILLISECONDS);
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
 
-    runtime.block_on(doctor(config, refresh_interval_ms))
+    runtime.block_on(doctor(config, refresh_interval_ms, time_display))
 }
 
-async fn doctor(config: &Config, refresh_interval_ms: u64) -> Result<()> {
+async fn doctor(
+    config: &Config,
+    refresh_interval_ms: u64,
+    time_display: TimeDisplay,
+) -> Result<()> {
     let db = match db::connection(config).await {
         Ok(db) => {
             println!("database_reachable: true");
@@ -38,7 +44,7 @@ async fn doctor(config: &Config, refresh_interval_ms: u64) -> Result<()> {
     };
     let state = read_state(&db, refresh_interval_ms).await?;
 
-    print_state(&state);
+    print_state(&state, time_display);
     if !state.ok {
         bail!("KEV doctor found failing checks");
     }
@@ -126,11 +132,12 @@ fn run_is_stale(
         > chrono::Duration::milliseconds(refresh_interval_ms)
 }
 
-fn print_state(state: &DoctorState) {
-    print_run("latest_run", state.latest_run.as_ref());
+fn print_state(state: &DoctorState, time_display: TimeDisplay) {
+    print_run("latest_run", state.latest_run.as_ref(), time_display);
     print_run(
         "latest_successful_run",
         state.latest_successful_run.as_ref(),
+        time_display,
     );
     println!(
         "latest_successful_run_age_seconds: {}",
@@ -139,7 +146,7 @@ fn print_state(state: &DoctorState) {
             .map_or("<none>".to_owned(), |age| age.to_string())
     );
     println!("cache_fresh: {}", state.cache_fresh);
-    print_failure(state.latest_failure.as_ref());
+    print_failure(state.latest_failure.as_ref(), time_display);
     println!(
         "cache_validators_present: {}",
         state.cache_validators_present
@@ -149,11 +156,14 @@ fn print_state(state: &DoctorState) {
     println!("doctor_ok: {}", state.ok);
 }
 
-fn print_run(prefix: &str, run: Option<&cisa_kev_sync_runs::Model>) {
+fn print_run(prefix: &str, run: Option<&cisa_kev_sync_runs::Model>, time_display: TimeDisplay) {
     if let Some(run) = run {
         println!("{prefix}_generation: {}", run.generation);
         println!("{prefix}_status: {}", run.status);
-        println!("{prefix}_checked_at: {}", run.checked_at);
+        println!(
+            "{prefix}_checked_at: {}",
+            time_display.format(&run.checked_at)
+        );
     } else {
         println!("{prefix}_generation: <none>");
         println!("{prefix}_status: <none>");
@@ -161,10 +171,13 @@ fn print_run(prefix: &str, run: Option<&cisa_kev_sync_runs::Model>) {
     }
 }
 
-fn print_failure(run: Option<&cisa_kev_sync_runs::Model>) {
+fn print_failure(run: Option<&cisa_kev_sync_runs::Model>, time_display: TimeDisplay) {
     if let Some(run) = run {
         println!("latest_failure_generation: {}", run.generation);
-        println!("latest_failure_checked_at: {}", run.checked_at);
+        println!(
+            "latest_failure_checked_at: {}",
+            time_display.format(&run.checked_at)
+        );
         println!("latest_failure_error_present: {}", run.error.is_some());
     } else {
         println!("latest_failure_generation: <none>");

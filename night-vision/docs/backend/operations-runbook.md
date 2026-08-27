@@ -133,6 +133,16 @@ log output again. The toggle state is process-local and resets to disabled when
 This signal-based toggle is available only on Unix platforms because it depends
 on `SIGUSR1`. It is not available for non-Unix builds.
 
+KEV catalog requests emit redacted connection diagnostics. Debug logs record
+the sync generation, whether the request is conditional, endpoint scheme, host,
+effective port, proxy-variable presence, elapsed time, final endpoint after a
+redirect, HTTP version, and response status. Failed requests additionally emit
+a warning with a stable failure class (`timeout`, `connect`, `request`, `body`,
+`decode`, or `other`), Reqwest category flags, and nested error messages. The
+logs intentionally omit request paths, query parameters, headers, proxy values,
+and CA material; proxy fields state only whether the conventional environment
+variables are configured.
+
 Compose services use Docker's `json-file` logging driver. The base Compose file
 limits each service to three 10 MB log files. Read service logs through the
 local wrapper:
@@ -193,6 +203,11 @@ entity generation, and CVE List and KEV catalog operations. Run it from
 ```sh
 cargo nvdb --help
 ```
+
+Operational timestamps in `nvdb` text output are UTC by default. Add the
+global `--local-time` option to display them in the invoking user's local time
+zone with a numeric offset, for example `cargo nvdb kev runs --local-time`.
+The option does not change stored values or JSON output, which remains UTC.
 
 Use `nvdb` for:
 

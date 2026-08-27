@@ -10,6 +10,8 @@ use nv_common::{
 };
 use sea_orm::EntityTrait as _;
 
+use crate::time_display::TimeDisplay;
+
 pub fn command() -> clap::Command {
     clap::Command::new("record")
         .about("Print one cached KEV entry")
@@ -21,17 +23,17 @@ pub fn command() -> clap::Command {
         )
 }
 
-pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
+pub fn run(config: &Config, matches: &clap::ArgMatches, time_display: TimeDisplay) -> Result<()> {
     let cve_id = matches
         .get_one::<String>("cve-id")
         .expect("required CVE ID argument");
     let cve_id = CveId::parse(cve_id).context("invalid CVE ID")?;
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
 
-    runtime.block_on(record(config, &cve_id))
+    runtime.block_on(record(config, &cve_id, time_display))
 }
 
-async fn record(config: &Config, cve_id: &CveId) -> Result<()> {
+async fn record(config: &Config, cve_id: &CveId, time_display: TimeDisplay) -> Result<()> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
@@ -43,20 +45,20 @@ async fn record(config: &Config, cve_id: &CveId) -> Result<()> {
         bail!("KEV entry not found: {}", cve_id.as_str());
     };
 
-    print_entry(&entry)
+    print_entry(&entry, time_display)
 }
 
-fn print_entry(entry: &KevEntry) -> Result<()> {
+fn print_entry(entry: &KevEntry, time_display: TimeDisplay) -> Result<()> {
     println!("cve_id: {}", entry.cve_id);
-    println!("first_seen_at: {}", entry.first_seen_at);
-    println!("last_seen_at: {}", entry.last_seen_at);
-    println!("updated_at: {}", entry.updated_at);
+    println!(
+        "first_seen_at: {}",
+        time_display.format(&entry.first_seen_at)
+    );
+    println!("last_seen_at: {}", time_display.format(&entry.last_seen_at));
+    println!("updated_at: {}", time_display.format(&entry.updated_at));
     println!(
         "removed_at: {}",
-        entry
-            .removed_at
-            .as_ref()
-            .map_or("<none>".to_owned(), ToString::to_string)
+        time_display.format_optional(entry.removed_at.as_ref())
     );
     println!("entry:");
     let output = serde_json::to_string_pretty(&entry.entry)

@@ -1,5 +1,7 @@
 //! Shared errors and error-handling helpers.
 
+use std::fmt::Write as _;
+
 /// A generic iterator over causes of an error.
 pub struct ErrorSourceIter<'a> {
     /// The "current" error the iterator is handling; if empty, the source chain is done.
@@ -32,5 +34,65 @@ impl<E: std::error::Error> ErrorSourceIterator for E {
         ErrorSourceIter {
             current: Some(self),
         }
+    }
+}
+
+/// Format an error and every available source in its cause chain.
+///
+/// This preserves the top-level context while retaining the lower-level cause
+/// that often identifies an external dependency or transport failure.
+pub fn format_error_chain<E: std::error::Error>(error: &E) -> String {
+    let mut formatted = String::new();
+
+    for (index, source) in error.sources_iter().enumerate() {
+        if index == 0 {
+            formatted.push_str(&source.to_string());
+        } else if index == 1 {
+            let _ = write!(formatted, "\n\nCaused by:\n    {source}");
+        } else {
+            let _ = write!(formatted, "\n    {source}");
+        }
+    }
+
+    formatted
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_error_chain;
+    use std::{error::Error, fmt};
+
+    #[derive(Debug)]
+    struct OuterError(InnerError);
+
+    impl fmt::Display for OuterError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("outer failure")
+        }
+    }
+
+    impl Error for OuterError {
+        fn source(&self) -> Option<&(dyn Error + 'static)> {
+            Some(&self.0)
+        }
+    }
+
+    #[derive(Debug)]
+    struct InnerError;
+
+    impl fmt::Display for InnerError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("inner failure")
+        }
+    }
+
+    impl Error for InnerError {}
+
+    #[test]
+    fn format_error_chain_includes_top_level_error_and_all_sources() {
+        assert_eq!(
+            format_error_chain(&OuterError(InnerError)),
+            "outer failure\n\nCaused by:\n    inner failure"
+        );
     }
 }

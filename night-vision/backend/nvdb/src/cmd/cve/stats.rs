@@ -1,18 +1,21 @@
 use anyhow::{Context as _, Result, anyhow};
+use chrono::{DateTime, FixedOffset};
 use nv_common::{config::Config, db, rt};
 use sea_orm::{ConnectionTrait, DatabaseBackend, QueryResult, Statement};
+
+use crate::time_display::TimeDisplay;
 
 pub fn command() -> clap::Command {
     clap::Command::new("stats").about("Print stored CVE List record statistics")
 }
 
-pub fn run(config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
+pub fn run(config: &Config, _matches: &clap::ArgMatches, time_display: TimeDisplay) -> Result<()> {
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
 
-    runtime.block_on(stats(config))
+    runtime.block_on(stats(config, time_display))
 }
 
-async fn stats(config: &Config) -> Result<()> {
+async fn stats(config: &Config, time_display: TimeDisplay) -> Result<()> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
@@ -38,7 +41,7 @@ async fn stats(config: &Config) -> Result<()> {
     )
     .await?;
 
-    print_stats(&summary, &states, &record_format_versions);
+    print_stats(&summary, &states, &record_format_versions, time_display);
 
     Ok(())
 }
@@ -52,12 +55,12 @@ where
         "SELECT \
              COUNT(*) FILTER (WHERE NOT deleted) AS active_records, \
              COUNT(*) FILTER (WHERE deleted) AS deleted_records, \
-             MIN(first_seen_at)::text AS oldest_first_seen_at, \
-             MAX(first_seen_at)::text AS newest_first_seen_at, \
-             MIN(last_seen_at)::text AS oldest_last_seen_at, \
-             MAX(last_seen_at)::text AS newest_last_seen_at, \
-             MIN(updated_at)::text AS oldest_updated_at, \
-             MAX(updated_at)::text AS newest_updated_at \
+             MIN(first_seen_at) AS oldest_first_seen_at, \
+             MAX(first_seen_at) AS newest_first_seen_at, \
+             MIN(last_seen_at) AS oldest_last_seen_at, \
+             MAX(last_seen_at) AS newest_last_seen_at, \
+             MIN(updated_at) AS oldest_updated_at, \
+             MAX(updated_at) AS newest_updated_at \
          FROM public.cve_list_records"
             .to_owned(),
     );
@@ -91,12 +94,12 @@ where
 struct Summary {
     active_records: i64,
     deleted_records: i64,
-    oldest_first_seen_at: Option<String>,
-    newest_first_seen_at: Option<String>,
-    oldest_last_seen_at: Option<String>,
-    newest_last_seen_at: Option<String>,
-    oldest_updated_at: Option<String>,
-    newest_updated_at: Option<String>,
+    oldest_first_seen_at: Option<DateTime<FixedOffset>>,
+    newest_first_seen_at: Option<DateTime<FixedOffset>>,
+    oldest_last_seen_at: Option<DateTime<FixedOffset>>,
+    newest_last_seen_at: Option<DateTime<FixedOffset>>,
+    oldest_updated_at: Option<DateTime<FixedOffset>>,
+    newest_updated_at: Option<DateTime<FixedOffset>>,
 }
 
 impl Summary {
@@ -159,40 +162,37 @@ fn print_stats(
     summary: &Summary,
     states: &[GroupedCount],
     record_format_versions: &[GroupedCount],
+    time_display: TimeDisplay,
 ) {
     println!("records_total: {}", summary.total_records());
     println!("records_active: {}", summary.active_records);
     println!("records_deleted: {}", summary.deleted_records);
     println!(
         "first_seen_at_oldest: {}",
-        optional_timestamp(summary.oldest_first_seen_at.as_deref())
+        time_display.format_optional(summary.oldest_first_seen_at.as_ref())
     );
     println!(
         "first_seen_at_newest: {}",
-        optional_timestamp(summary.newest_first_seen_at.as_deref())
+        time_display.format_optional(summary.newest_first_seen_at.as_ref())
     );
     println!(
         "last_seen_at_oldest: {}",
-        optional_timestamp(summary.oldest_last_seen_at.as_deref())
+        time_display.format_optional(summary.oldest_last_seen_at.as_ref())
     );
     println!(
         "last_seen_at_newest: {}",
-        optional_timestamp(summary.newest_last_seen_at.as_deref())
+        time_display.format_optional(summary.newest_last_seen_at.as_ref())
     );
     println!(
         "updated_at_oldest: {}",
-        optional_timestamp(summary.oldest_updated_at.as_deref())
+        time_display.format_optional(summary.oldest_updated_at.as_ref())
     );
     println!(
         "updated_at_newest: {}",
-        optional_timestamp(summary.newest_updated_at.as_deref())
+        time_display.format_optional(summary.newest_updated_at.as_ref())
     );
     print_grouped_counts("cve_states", states);
     print_grouped_counts("record_format_versions", record_format_versions);
-}
-
-fn optional_timestamp(value: Option<&str>) -> &str {
-    value.unwrap_or("<none>")
 }
 
 fn print_grouped_counts(label: &str, counts: &[GroupedCount]) {
@@ -210,7 +210,8 @@ fn print_grouped_counts(label: &str, counts: &[GroupedCount]) {
 
 #[cfg(test)]
 mod tests {
-    use super::{GroupedCount, Summary, command, optional_timestamp};
+    use super::{GroupedCount, Summary, command};
+    use crate::time_display::TimeDisplay;
 
     #[test]
     fn cve_stats_accepts_no_arguments() {
@@ -237,11 +238,7 @@ mod tests {
 
     #[test]
     fn optional_timestamp_prints_none_marker() {
-        assert_eq!(optional_timestamp(None), "<none>");
-        assert_eq!(
-            optional_timestamp(Some("2026-07-10 12:00:00+00")),
-            "2026-07-10 12:00:00+00"
-        );
+        assert_eq!(TimeDisplay::Stored.format_optional(None), "<none>");
     }
 
     #[test]

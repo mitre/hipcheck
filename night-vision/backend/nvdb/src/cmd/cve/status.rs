@@ -10,16 +10,18 @@ use nv_common::{
 };
 use sea_orm::{EntityTrait as _, QueryOrder as _, QuerySelect as _};
 
+use crate::time_display::TimeDisplay;
+
 pub fn command() -> clap::Command {
     clap::Command::new("status").about("Print the latest CVE List sync state")
 }
 
-pub fn run(config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
+pub fn run(config: &Config, _matches: &clap::ArgMatches, time_display: TimeDisplay) -> Result<()> {
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
-    runtime.block_on(status(config))
+    runtime.block_on(status(config, time_display))
 }
 
-async fn status(config: &Config) -> Result<()> {
+async fn status(config: &Config, time_display: TimeDisplay) -> Result<()> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
@@ -33,12 +35,20 @@ async fn status(config: &Config) -> Result<()> {
         .await
         .context("failed to read latest CVE List sync run")?;
 
-    print_status(latest_successful_commit.as_ref(), latest_run.as_ref());
+    print_status(
+        latest_successful_commit.as_ref(),
+        latest_run.as_ref(),
+        time_display,
+    );
 
     Ok(())
 }
 
-fn print_status(latest_successful_commit: Option<&CommitSha>, latest_run: Option<&CveListSyncRun>) {
+fn print_status(
+    latest_successful_commit: Option<&CommitSha>,
+    latest_run: Option<&CveListSyncRun>,
+    time_display: TimeDisplay,
+) {
     println!(
         "latest_successful_commit: {}",
         latest_successful_commit.map_or("<none>", CommitSha::as_str)
@@ -47,13 +57,13 @@ fn print_status(latest_successful_commit: Option<&CommitSha>, latest_run: Option
     if let Some(latest_run) = latest_run {
         println!("latest_run_generation: {}", latest_run.generation);
         println!("latest_run_status: {}", latest_run.status);
-        println!("latest_run_checked_at: {}", latest_run.checked_at);
+        println!(
+            "latest_run_checked_at: {}",
+            time_display.format(&latest_run.checked_at)
+        );
         println!(
             "latest_run_completed_at: {}",
-            latest_run
-                .completed_at
-                .as_ref()
-                .map_or("<none>".to_owned(), ToString::to_string)
+            time_display.format_optional(latest_run.completed_at.as_ref())
         );
         println!("latest_run_records_seen: {}", latest_run.records_seen);
         println!(

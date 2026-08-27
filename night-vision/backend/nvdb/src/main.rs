@@ -8,6 +8,7 @@ use std::{fmt::Write as _, process::ExitCode};
 
 mod cmd;
 mod destructive;
+mod time_display;
 
 fn main() -> ExitCode {
     if let Err(e) = run() {
@@ -59,6 +60,7 @@ fn run() -> Result<()> {
         .expect("verbose and quiet args are always present and default to 0")
         .filter();
     let log = logger(verbosity_filter);
+    let time_display = time_display::TimeDisplay::from_matches(&matches);
 
     if let Some(npm_matches) = matches.subcommand_matches("npm") {
         return cmd::npm::run(npm_matches);
@@ -91,7 +93,7 @@ fn run() -> Result<()> {
     }
 
     if let Some(cve_matches) = matches.subcommand_matches("cve") {
-        return cmd::cve::run(&config, cve_matches);
+        return cmd::cve::run(&config, cve_matches, time_display);
     }
 
     if let Some(package_source_matches) = matches.subcommand_matches("package-source") {
@@ -112,7 +114,7 @@ fn run() -> Result<()> {
         } else if let Some(config_matches) = kev_matches.subcommand_matches("config") {
             return cmd::kev::config::run(&config, config_matches);
         } else if let Some(doctor_matches) = kev_matches.subcommand_matches("doctor") {
-            return cmd::kev::doctor::run(&config, doctor_matches);
+            return cmd::kev::doctor::run(&config, doctor_matches, time_display);
         } else if let Some(sync_matches) = kev_matches.subcommand_matches("sync") {
             return cmd::kev::sync::run(&config, sync_matches, log);
         } else if let Some(pull_matches) = kev_matches.subcommand_matches("pull") {
@@ -120,19 +122,19 @@ fn run() -> Result<()> {
         } else if let Some(list_matches) = kev_matches.subcommand_matches("list") {
             return cmd::kev::list::run(&config, list_matches);
         } else if let Some(record_matches) = kev_matches.subcommand_matches("record") {
-            return cmd::kev::record::run(&config, record_matches);
+            return cmd::kev::record::run(&config, record_matches, time_display);
         } else if let Some(recover_matches) = kev_matches.subcommand_matches("recover") {
             return cmd::kev::recover::run(&config, recover_matches);
         } else if let Some(reset_matches) = kev_matches.subcommand_matches("reset") {
             return cmd::kev::reset::run(&config, reset_matches);
         } else if let Some(run_matches) = kev_matches.subcommand_matches("run") {
-            return cmd::kev::run::run(&config, run_matches);
+            return cmd::kev::run::run(&config, run_matches, time_display);
         } else if let Some(runs_matches) = kev_matches.subcommand_matches("runs") {
-            return cmd::kev::runs::run(&config, runs_matches);
+            return cmd::kev::runs::run(&config, runs_matches, time_display);
         } else if let Some(stats_matches) = kev_matches.subcommand_matches("stats") {
-            return cmd::kev::stats::run(&config, stats_matches);
+            return cmd::kev::stats::run(&config, stats_matches, time_display);
         } else if let Some(status_matches) = kev_matches.subcommand_matches("status") {
-            return cmd::kev::status::run(&config, status_matches);
+            return cmd::kev::status::run(&config, status_matches, time_display);
         }
     }
 
@@ -152,6 +154,13 @@ fn command() -> clap::Command {
                 .global(true)
                 .value_parser(clap::value_parser!(Utf8PathBuf))
                 .help("Path to the configuration file"),
+        )
+        .arg(
+            clap::Arg::new("local-time")
+                .long("local-time")
+                .action(clap::ArgAction::SetTrue)
+                .global(true)
+                .help("Display operational timestamps in the local time zone"),
         )
         .subcommand(
             clap::Command::new("api")
@@ -196,7 +205,7 @@ fn command() -> clap::Command {
 
 #[cfg(test)]
 mod tests {
-    use super::format_error_report;
+    use super::{command, format_error_report};
     use anyhow::anyhow;
 
     #[test]
@@ -221,6 +230,24 @@ mod tests {
             report,
             "failed to sync CVE List data\n\nCaused by:\n    0: Execution Error\n    1: error returned from database\n"
         );
+    }
+
+    #[test]
+    fn local_time_flag_parses_before_nested_subcommands() {
+        let matches = command()
+            .try_get_matches_from(["nvdb", "--local-time", "kev", "runs"])
+            .expect("command should parse");
+
+        assert!(matches.get_flag("local-time"));
+    }
+
+    #[test]
+    fn local_time_flag_parses_after_nested_subcommands() {
+        let matches = command()
+            .try_get_matches_from(["nvdb", "cve", "runs", "--local-time"])
+            .expect("command should parse");
+
+        assert!(matches.get_flag("local-time"));
     }
 
     #[derive(Debug)]

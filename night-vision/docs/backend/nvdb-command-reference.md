@@ -47,6 +47,7 @@ Usage: nvdb [OPTIONS] [COMMAND]
 
 Options:
   -c, --config <FILE>  Path to the configuration file [default: nv-server.spookey]
+      --local-time     Display operational timestamps in the local time zone
   -h, --help           Print help
 ```
 
@@ -60,6 +61,16 @@ The configuration must provide exactly one database connection source:
 `database-connection` or `database-connection-file`. See
 [`nv-server` Configuration](./nv-server-configuration.md) for the full
 configuration reference.
+
+`--local-time` is a display-only global option and may appear before or after
+the selected subcommand. It converts human-readable operational database
+timestamps to the invoking user's local time zone and includes a numeric
+offset. Text output is UTC by default, and JSON output always remains UTC.
+
+```sh
+cargo nvdb --local-time kev runs
+cargo nvdb cve status --local-time
+```
 
 ## Secret Safety
 
@@ -188,7 +199,7 @@ configuration file and its database connection. See
 | `kev recover --destructive` | Mark abandoned KEV sync runs failed. |
 | `kev reset --destructive [--force]` | Remove cached KEV entries and sync history. |
 | `kev run <GENERATION>` | Show one KEV catalog sync run. |
-| `kev runs [--limit <N>]` | List recent KEV catalog sync runs. |
+| `kev runs [--limit <N> \| --no-limit]` | List recent KEV catalog sync runs. |
 | `kev stats` | Summarize cached entries and sync-run outcomes. |
 | `kev status` | Print the latest KEV catalog sync state. |
 
