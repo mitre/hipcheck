@@ -390,6 +390,8 @@ impl CveListGit for GitCliCveListGit {
 
         self.run_git([
             OsStr::new("clone"),
+            OsStr::new("--depth"),
+            OsStr::new("1"),
             OsStr::new(self.repository_url.as_str()),
             OsStr::new(self.checkout_dir.as_str()),
         ])
