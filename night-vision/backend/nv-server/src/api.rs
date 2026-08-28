@@ -376,35 +376,36 @@ mod tests {
 
     #[test]
     fn package_source_body_rejects_unknown_fields() {
-        assert!(
-            parse_package_source_body(
-                br#"{\"fileName\":\"package.json\",\"contents\":\"{}\",\"extra\":true}"#
-            )
-            .is_err()
-        );
+        let _error = parse_package_source_body(
+            br#"{\"fileName\":\"package.json\",\"contents\":\"{}\",\"extra\":true}"#,
+        )
+        .expect_err("unknown request fields should be rejected");
     }
 
     #[test]
     fn package_source_media_type_requires_json() {
-        assert!(validate_package_source_media_type(Some("text/plain")).is_err());
-        assert!(
-            validate_package_source_media_type(Some("application/json; charset=utf-8")).is_ok()
-        );
+        let _error = validate_package_source_media_type(Some("text/plain"))
+            .expect_err("non-JSON media types should be rejected");
+        validate_package_source_media_type(Some("application/json; charset=utf-8"))
+            .expect("JSON media types should be accepted");
     }
 
     #[test]
     fn package_source_validation_rejects_noncanonical_file_names() {
-        assert!(validate_package_source("../package.json", "{}", CONTENTS_MAX_BYTES).is_err());
+        let _error = validate_package_source("../package.json", "{}", CONTENTS_MAX_BYTES)
+            .expect_err("noncanonical file names should be rejected");
     }
 
     #[test]
     fn package_source_validation_rejects_malformed_manifest_contents() {
-        assert!(validate_package_source("package.json", "{", CONTENTS_MAX_BYTES).is_err());
+        let _error = validate_package_source("package.json", "{", CONTENTS_MAX_BYTES)
+            .expect_err("malformed manifest contents should be rejected");
     }
 
     #[test]
     fn package_source_validation_rejects_oversized_contents() {
         let contents = "x".repeat(CONTENTS_MAX_BYTES + 1);
-        assert!(validate_package_source("package.json", &contents, CONTENTS_MAX_BYTES).is_err());
+        let _error = validate_package_source("package.json", &contents, CONTENTS_MAX_BYTES)
+            .expect_err("oversized manifest contents should be rejected");
     }
 }

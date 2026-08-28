@@ -10,7 +10,6 @@ use crate::{
         sync::{CveListSyncPipelineConfig, CveListSyncTimeoutConfig},
     },
     error::ErrorSourceIterator as _,
-    npm::package_json::MAX_PACKAGE_JSON_BYTES,
     secret::{SecretFileError, SecretSource, SecretSourceKind},
 };
 use camino::{Utf8Path, Utf8PathBuf};
@@ -46,7 +45,7 @@ const DEFAULT_HIPCHECK_TIMEOUT: u64 = 300_000;
 const DEFAULT_HIPCHECK_STDOUT_MAX_BYTES: usize = 1_048_576;
 const DEFAULT_HIPCHECK_STDERR_MAX_BYTES: usize = 1_048_576;
 const DEFAULT_HIPCHECK_JSON_MAX_BYTES: usize = 4_194_304;
-const DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES: usize = MAX_PACKAGE_JSON_BYTES as usize;
+const DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES: usize = 1024 * 1024;
 const DEFAULT_PACKAGE_SOURCE_REQUEST_TIMEOUT: u64 = 5_000;
 const DEFAULT_PACKAGE_SOURCE_MAX_CONCURRENCY: usize = 4;
 

@@ -74,6 +74,7 @@ mod tests {
         let _permit = try_acquire_package_source_submission_slot(slots.clone())
             .expect("the first submission should acquire capacity");
 
-        assert!(try_acquire_package_source_submission_slot(slots).is_err());
+        let _error = try_acquire_package_source_submission_slot(slots)
+            .expect_err("the second submission should be rejected");
     }
 }
