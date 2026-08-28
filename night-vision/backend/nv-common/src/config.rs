@@ -10,6 +10,7 @@ use crate::{
         sync::{CveListSyncPipelineConfig, CveListSyncTimeoutConfig},
     },
     error::ErrorSourceIterator as _,
+    npm::package_json::MAX_PACKAGE_JSON_BYTES,
     secret::{SecretFileError, SecretSource, SecretSourceKind},
 };
 use camino::{Utf8Path, Utf8PathBuf};
@@ -45,6 +46,9 @@ const DEFAULT_HIPCHECK_TIMEOUT: u64 = 300_000;
 const DEFAULT_HIPCHECK_STDOUT_MAX_BYTES: usize = 1_048_576;
 const DEFAULT_HIPCHECK_STDERR_MAX_BYTES: usize = 1_048_576;
 const DEFAULT_HIPCHECK_JSON_MAX_BYTES: usize = 4_194_304;
+const DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES: usize = MAX_PACKAGE_JSON_BYTES as usize;
+const DEFAULT_PACKAGE_SOURCE_REQUEST_TIMEOUT: u64 = 5_000;
+const DEFAULT_PACKAGE_SOURCE_MAX_CONCURRENCY: usize = 4;
 
 /// Errors that can occur while loading configuration.
 pub enum ConfigLoadError {
@@ -136,6 +140,15 @@ pub struct Config {
 
     /// The default behavior for HTTP handler functions when clients disconnect early.
     pub http_early_disconnect_behavior: Option<EarlyDisconnectBehavior>,
+
+    /// The maximum size in bytes of submitted package-source contents.
+    pub package_source_contents_max_bytes: usize,
+
+    /// The timeout in milliseconds for accepting one package-source submission.
+    pub package_source_request_timeout: u64,
+
+    /// The maximum number of package-source submissions accepted concurrently.
+    pub package_source_max_concurrency: usize,
 
     /// Source for the string used to connect to the database.
     database_connection_source: SecretSourceKind,
@@ -444,6 +457,9 @@ impl Config {
                     "kev-response-body-max-bytes",
                     "http-request-body-max-bytes",
                     "http-early-disconnect-behavior",
+                    "package-source-contents-max-bytes",
+                    "package-source-request-timeout",
+                    "package-source-max-concurrency",
                     "database-connection",
                     "database-connection-file",
                     "database-max-connections",
@@ -512,6 +528,24 @@ impl Config {
             parse_value(&parsed, "http-request-body-max-bytes", &mut errors);
         let http_early_disconnect_behavior =
             parse_value(&parsed, "http-early-disconnect-behavior", &mut errors);
+        let package_source_contents_max_bytes = parse_positive_usize(
+            &parsed,
+            "package-source-contents-max-bytes",
+            DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES,
+            &mut errors,
+        );
+        let package_source_request_timeout = parse_positive_u64(
+            &parsed,
+            "package-source-request-timeout",
+            DEFAULT_PACKAGE_SOURCE_REQUEST_TIMEOUT,
+            &mut errors,
+        );
+        let package_source_max_concurrency = parse_positive_usize(
+            &parsed,
+            "package-source-max-concurrency",
+            DEFAULT_PACKAGE_SOURCE_MAX_CONCURRENCY,
+            &mut errors,
+        );
         let database_max_connections =
             parse_value(&parsed, "database-max-connections", &mut errors);
         let database_min_connections =
@@ -636,6 +670,9 @@ impl Config {
             kev_response_body_max_bytes,
             http_request_body_max_bytes,
             http_early_disconnect_behavior,
+            package_source_contents_max_bytes,
+            package_source_request_timeout,
+            package_source_max_concurrency,
             database_connection_source,
             database_connection,
             database_max_connections,
@@ -697,6 +734,11 @@ impl Config {
         }
 
         Ok(config)
+    }
+
+    /// Returns the timeout for accepting one package-source submission.
+    pub fn package_source_request_timeout(&self) -> Duration {
+        Duration::from_millis(self.package_source_request_timeout)
     }
 
     /// Get the configured database connection string.
@@ -827,6 +869,22 @@ impl Display for Config {
         if let Some(behavior) = self.http_early_disconnect_behavior {
             write_report_line!(f, "http-early-disconnect-behavior", &behavior)?;
         }
+
+        write_report_line!(
+            f,
+            "package-source-contents-max-bytes",
+            &self.package_source_contents_max_bytes
+        )?;
+        write_report_line!(
+            f,
+            "package-source-request-timeout",
+            &self.package_source_request_timeout
+        )?;
+        write_report_line!(
+            f,
+            "package-source-max-concurrency",
+            &self.package_source_max_concurrency
+        )?;
 
         if let Some(max_connections) = self.database_max_connections {
             write_report_line!(f, "database-max-connections", &max_connections)?;
@@ -1766,6 +1824,31 @@ mod tests {
                     ));
                 },
             ),
+            ConfigFieldParseCase::new(
+                "package_source_contents_max_bytes",
+                "package-source-contents-max-bytes = 4096",
+                |config, _| {
+                    assert_eq!(config.package_source_contents_max_bytes, 4096);
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "package_source_request_timeout",
+                "package-source-request-timeout = 7500",
+                |config, _| {
+                    assert_eq!(config.package_source_request_timeout, 7500);
+                    assert_eq!(
+                        config.package_source_request_timeout(),
+                        Duration::from_millis(7500)
+                    );
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "package_source_max_concurrency",
+                "package-source-max-concurrency = 8",
+                |config, _| {
+                    assert_eq!(config.package_source_max_concurrency, 8);
+                },
+            ),
             ConfigFieldParseCase::new("database_connection", "", |config, _| {
                 assert!(matches!(
                     config.database_connection_source,
@@ -1982,6 +2065,18 @@ mod tests {
             "sqlite::memory:"
         );
         assert_eq!(config.http_request_body_max_bytes, Some(2048));
+        assert_eq!(
+            config.package_source_contents_max_bytes,
+            DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES
+        );
+        assert_eq!(
+            config.package_source_request_timeout,
+            DEFAULT_PACKAGE_SOURCE_REQUEST_TIMEOUT
+        );
+        assert_eq!(
+            config.package_source_max_concurrency,
+            DEFAULT_PACKAGE_SOURCE_MAX_CONCURRENCY
+        );
         assert!(matches!(
             config.http_early_disconnect_behavior,
             Some(EarlyDisconnectBehavior::Continue)
@@ -2294,6 +2389,21 @@ mod tests {
             ("database-idle-timeout", "later", "invalid digit"),
             ("database-acquire-timeout", "eventually", "invalid digit"),
             ("database-max-lifetime", "forever", "invalid digit"),
+            (
+                "package-source-contents-max-bytes",
+                "0",
+                "must be greater than 0",
+            ),
+            (
+                "package-source-request-timeout",
+                "0",
+                "must be greater than 0",
+            ),
+            (
+                "package-source-max-concurrency",
+                "0",
+                "must be greater than 0",
+            ),
             ("async-worker-threads", "several", "invalid digit"),
             ("async-worker-thread-stack-size", "large", "invalid digit"),
             ("async-max-blocking-threads", "lots", "invalid digit"),

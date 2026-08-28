@@ -12,7 +12,8 @@ use camino::{Utf8Path, Utf8PathBuf};
 // `jiff`.
 use chrono::{TimeZone as _, Utc};
 use dropshot::{
-    HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, ServerBuilder, TypedBody,
+    ClientErrorStatusCode, HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext,
+    ServerBuilder, UntypedBody,
 };
 use nv_common::{
     config::Config,
@@ -140,14 +141,39 @@ impl NvServerApi for RestApi {
 
     async fn post_package_source(
         ctx: RequestContext<Self::Context>,
-        body_param: TypedBody<PostPackageSourceBody>,
+        body_param: UntypedBody,
     ) -> Result<HttpResponseAccepted<PostPackageSourceResponse>, HttpError> {
+        validate_package_source_media_type(
+            ctx.request
+                .headers()
+                .get("content-type")
+                .and_then(|value| value.to_str().ok()),
+        )?;
+        let body = parse_package_source_body(body_param.as_bytes())?;
+
+        // Retain this permit until the request is accepted. This bounds both
+        // manifest parsing and future persistence work per server process.
+        let _submission_slot = ctx.context().try_acquire_package_source_submission_slot()?;
         let db = ctx.context().db();
-        let body = body_param.into_inner();
         let file_name = body.file_name;
         let contents = body.contents;
 
-        let uuid = store_package_source(db, file_name, contents).await?;
+        validate_package_source(
+            &file_name,
+            &contents,
+            ctx.context().package_source_contents_max_bytes(),
+        )?;
+        let uuid = tokio::time::timeout(
+            ctx.context().package_source_request_timeout(),
+            store_package_source(db, file_name, contents),
+        )
+        .await
+        .map_err(|_| {
+            HttpError::for_unavail(
+                Some("PackageSourceRequestTimedOut".to_owned()),
+                "package-source submission timed out".to_owned(),
+            )
+        })??;
         let resp = HttpResponseAccepted(PostPackageSourceResponse { id: uuid });
 
         Ok(resp)
@@ -168,6 +194,79 @@ impl NvServerApi for RestApi {
             )),
         }
     }
+}
+
+fn validate_package_source_media_type(content_type: Option<&str>) -> Result<(), HttpError> {
+    let Some(content_type) = content_type else {
+        return Err(unsupported_package_source_media_type());
+    };
+    let media_type = content_type
+        .split_once(';')
+        .map_or(content_type, |(media_type, _)| media_type)
+        .trim();
+
+    if media_type.eq_ignore_ascii_case("application/json") {
+        Ok(())
+    } else {
+        Err(unsupported_package_source_media_type())
+    }
+}
+
+fn unsupported_package_source_media_type() -> HttpError {
+    HttpError::for_client_error(
+        Some("UnsupportedPackageSourceMediaType".to_owned()),
+        ClientErrorStatusCode::UNSUPPORTED_MEDIA_TYPE,
+        "package-source requests must use application/json".to_owned(),
+    )
+}
+
+fn parse_package_source_body(contents: &[u8]) -> Result<PostPackageSourceBody, HttpError> {
+    serde_json::from_slice(contents).map_err(|_| {
+        HttpError::for_bad_request(
+            Some("InvalidPackageSourceRequest".to_owned()),
+            "package-source request body must be valid JSON".to_owned(),
+        )
+    })
+}
+
+fn validate_package_source(
+    file_name: &str,
+    contents: &str,
+    max_contents_bytes: usize,
+) -> Result<(), HttpError> {
+    if file_name != "package.json" {
+        return Err(HttpError::for_bad_request(
+            Some("InvalidPackageSourceFileName".to_owned()),
+            "fileName must be exactly \"package.json\"".to_owned(),
+        ));
+    }
+
+    if contents.len() > max_contents_bytes {
+        return Err(HttpError::for_client_error(
+            Some("PackageSourceContentsTooLarge".to_owned()),
+            ClientErrorStatusCode::PAYLOAD_TOO_LARGE,
+            format!("contents must not exceed {max_contents_bytes} bytes"),
+        ));
+    }
+
+    match nv_common::npm::package_json::NpmPackageJson::parse_package_json(contents.as_bytes()) {
+        Ok(_) => {}
+        Err(nv_common::npm::package_json::PackageParseError::PackageTooLarge) => {
+            return Err(HttpError::for_client_error(
+                Some("PackageSourceContentsTooLarge".to_owned()),
+                ClientErrorStatusCode::PAYLOAD_TOO_LARGE,
+                "contents exceeds the supported package.json size limit".to_owned(),
+            ));
+        }
+        Err(_) => {
+            return Err(HttpError::for_bad_request(
+                Some("InvalidPackageSourceContents".to_owned()),
+                "contents must be a valid npm package.json document".to_owned(),
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 /// Placeholder implementation of storing a submitted Package Source
@@ -266,5 +365,46 @@ fn cve_list_sync_run_health(run: CveListSyncRun) -> CveListSyncRunHealth {
         records_inserted: run.records_inserted,
         records_updated: run.records_updated,
         error: run.error,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const CONTENTS_MAX_BYTES: usize = 1024;
+
+    #[test]
+    fn package_source_body_rejects_unknown_fields() {
+        assert!(
+            parse_package_source_body(
+                br#"{\"fileName\":\"package.json\",\"contents\":\"{}\",\"extra\":true}"#
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn package_source_media_type_requires_json() {
+        assert!(validate_package_source_media_type(Some("text/plain")).is_err());
+        assert!(
+            validate_package_source_media_type(Some("application/json; charset=utf-8")).is_ok()
+        );
+    }
+
+    #[test]
+    fn package_source_validation_rejects_noncanonical_file_names() {
+        assert!(validate_package_source("../package.json", "{}", CONTENTS_MAX_BYTES).is_err());
+    }
+
+    #[test]
+    fn package_source_validation_rejects_malformed_manifest_contents() {
+        assert!(validate_package_source("package.json", "{", CONTENTS_MAX_BYTES).is_err());
+    }
+
+    #[test]
+    fn package_source_validation_rejects_oversized_contents() {
+        let contents = "x".repeat(CONTENTS_MAX_BYTES + 1);
+        assert!(validate_package_source("package.json", &contents, CONTENTS_MAX_BYTES).is_err());
     }
 }

@@ -191,7 +191,12 @@ the API surface changes.
   does not guarantee that the initial CVE sync has completed.
 - `POST /package-sources` currently returns `202 ACCEPTED` with the submitted
   package source ID because package-source processing is asynchronous. The ID
-  can be used with `GET /package-sources/{id}` to check status.
+  can be used with `GET /package-sources/{id}` to check status. It accepts only
+  JSON `package.json` submissions within its documented size limits. Invalid
+  requests return `400 BAD REQUEST`, unsupported media types return `415
+  UNSUPPORTED MEDIA TYPE`, oversized manifest contents return `413 PAYLOAD TOO
+  LARGE`, and exhausted submission capacity or submission timeout returns `503
+  SERVICE UNAVAILABLE`.
 - `GET /package-sources/{id}` returns `200 OK` with the package source status
   when the ID is known.
 - `GET /package-sources/{id}` returns `404 NOT FOUND` when the ID is not known.

@@ -3,10 +3,15 @@
 // can use a newer version of `schemars`, we should switch to using
 // `jiff`.
 use chrono::{DateTime, Utc};
-use dropshot::{HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, TypedBody};
+use dropshot::{
+    HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, UntypedBody,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+/// Maximum encoded JSON request size for a package-source submission.
+pub const MAX_PACKAGE_SOURCE_REQUEST_BODY_BYTES: usize = 2 * 1024 * 1024;
 
 #[dropshot::api_description]
 pub trait NvServerApi {
@@ -23,10 +28,12 @@ pub trait NvServerApi {
     #[endpoint {
         method = POST,
         path = "/package-sources",
+        content_type = "application/json",
+        request_body_max_bytes = MAX_PACKAGE_SOURCE_REQUEST_BODY_BYTES,
     }]
     async fn post_package_source(
         ctx: RequestContext<Self::Context>,
-        body_param: TypedBody<PostPackageSourceBody>,
+        body_param: UntypedBody,
     ) -> Result<HttpResponseAccepted<PostPackageSourceResponse>, HttpError>;
 
     #[endpoint {
@@ -69,6 +76,7 @@ pub struct CveListSyncRunHealth {
 
 #[derive(Deserialize, JsonSchema, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct PostPackageSourceBody {
     pub file_name: String,
     pub contents: String,

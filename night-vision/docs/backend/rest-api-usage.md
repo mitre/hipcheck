@@ -74,8 +74,12 @@ the most recent successful commit and attempted sync, when present.
 
 ### `POST /package-sources`
 
-Submit a package source for processing. The current API accepts the source file
-name and the complete source file contents.
+Submit a package source for processing. The endpoint accepts only
+`application/json` requests with exactly the `fileName` and `contents` fields.
+`fileName` must be exactly `package.json`; paths, alternative file names, and
+additional fields are rejected. `contents` must be a valid npm `package.json`
+document and must not exceed `package-source-contents-max-bytes` (1 MiB by
+default).
 
 Request:
 
@@ -209,6 +213,19 @@ JSON objects with these fields:
 
 See [HTTP Status Codes](./http-status-codes.md) for status-code selection
 guidance and framework-generated response behavior.
+
+For `POST /package-sources`, invalid or malformed JSON, missing or unknown
+fields, an invalid file name, and invalid manifest contents return `400 Bad
+Request`. A non-JSON `Content-Type` returns `415 Unsupported Media Type`.
+Oversized manifest contents return `413 Payload Too Large`. If the configured
+submission concurrency limit is exhausted, or the configured submission timeout
+expires, the endpoint returns `503 Service Unavailable`.
+
+The endpoint has a fixed 2 MiB request-body limit, including JSON encoding.
+Dropshot rejects a body exceeding that limit before the handler runs with a
+`400 Bad Request`. The process-local concurrency limit protects server capacity;
+production ingress must still provide caller-aware rate limiting before the API
+is exposed outside a trusted environment.
 
 ## OpenAPI
 

@@ -130,6 +130,10 @@ The following controls exist today and are security-relevant:
   refs are validated before use as Git arguments.
 - CVE record blobs have a configured maximum size. Pipeline channels and parser
   concurrency are bounded, and syncs have timeouts.
+- Package-source submissions accept only JSON `package.json` manifests, with
+  explicit request and contents size limits, validation before acceptance, a
+  configurable timeout, and bounded per-process concurrency. Caller-aware rate
+  limiting remains an ingress requirement before external exposure.
 - CVE record publication uses database staging and a transaction. A PostgreSQL
   advisory lock prevents competing syncs.
 - The container runs as an unprivileged user with a read-only root filesystem,
@@ -153,7 +157,7 @@ trusted local network.
 | API access | An unauthenticated caller submits work or reads package-source status. | Spoofing, information disclosure | P0 | Define the API audience. Require an authenticated principal and authorize every resource operation before persistent package-source behavior ships. |
 | Package-source lookup | An identifier is guessed, leaked, or reused to read another caller's data. | Information disclosure | P0 | Bind resources to an owner or tenant; authorize lookup before revealing existence. Use `404` when existence must remain hidden. |
 | API transport | Credentials or package-source data travel over an unencrypted or incorrectly trusted connection. | Spoofing, information disclosure, tampering | P0 | Specify TLS termination, accepted proxy headers, certificate ownership, and the allowed network path. Do not infer these from local Compose. |
-| API input | Large, malformed, or adversarial package-source bodies consume memory, CPU, database capacity, or parser capacity. | Denial of service | P1 | Set endpoint-specific body limits, validation, request timeouts, concurrency limits, and rate limits. Return documented `400`, `413`, `415`, `429`, or `503` responses as applicable. |
+| API input | Large, malformed, or adversarial package-source bodies consume memory, CPU, database capacity, or parser capacity. | Denial of service | P1 | Package-source requests use endpoint-specific body limits, validation, timeout, and concurrency controls. Configure caller-aware ingress rate limits before external exposure. Return documented `400`, `413`, `415`, or `503` responses as applicable. |
 | Future package processing | Submitted file names or contents escape their intended interpretation, cause path traversal, or lead to process execution. | Tampering, elevation of privilege | P0 before implementation | Treat every submission as untrusted data. Avoid shell evaluation and filesystem paths derived from client strings; use an allowlisted parser and isolated work directory if files are required. |
 | Health endpoint | CVE sync error text, commit IDs, or run timing reveals operational details to untrusted callers. | Information disclosure | P1 | Decide whether health is public, authenticated, or split into liveness and operator diagnostics. Return only audience-appropriate state and redact error detail. |
 | Database credentials | A connection string appears in logs, process arguments, images, configuration output, or permissive files. | Information disclosure | P0 | Continue file-permission and redaction checks; document rotation; use a least-privilege database role; test failure paths for secret leakage. |
@@ -196,8 +200,8 @@ storage or processing:
 
 - Add authentication and per-resource authorization design and implementation.
 - Add schema ownership/tenant constraints and access-control tests.
-- Validate package-source media type, size, file-name semantics, and contents
-  before creating work.
+- Maintain package-source media-type, size, file-name, contents, timeout, and
+  concurrency tests as processing behavior expands.
 - Define and test the resource lifecycle for retries, cancellation, deletion,
   retention, and error visibility.
 

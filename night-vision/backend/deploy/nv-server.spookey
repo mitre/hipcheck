@@ -24,6 +24,24 @@ http-request-body-max-bytes =
 # Default: "continue"
 http-early-disconnect-behavior =
 
+# Maximum size in bytes of the package.json contents submitted to the
+# package-source endpoint. Must be greater than 0.
+#
+# Default: 1048576 (1 MiB)
+package-source-contents-max-bytes =
+
+# Timeout in milliseconds for accepting one package-source submission. Must be
+# greater than 0.
+#
+# Default: 5000
+package-source-request-timeout =
+
+# Maximum number of package-source submissions accepted concurrently per
+# server process. Must be greater than 0.
+#
+# Default: 4
+package-source-max-concurrency =
+
 # The maximum number of connections to the database.
 #
 # Default: 100
