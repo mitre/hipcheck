@@ -187,7 +187,7 @@ pub struct Analysis {
 	final_value: Option<String>,
 
 	/// The value to which the final value is being compared, as set by the config file
-	/// 
+	///
 	/// We also use the percent difference between this and the final value (if it can be calcualted)
 	/// to determine the order in which passing and failing analyses are listed
 	threshold: Option<String>,
@@ -229,7 +229,7 @@ impl Analysis {
 			Err(e) => {
 				log::error!(
 					"Could not parse policy expression for {} plugin: {}",
-					&name,
+					name,
 					e
 				);
 				(

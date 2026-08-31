@@ -9,10 +9,7 @@ pub fn parse_purl(purl: &PackageUrl) -> Option<(TargetType, String)> {
 			// For now we ignore the "version" field, which has GitHub tag information, until Hipcheck can cleanly handle things other than the main/master branch of a repo
 			let mut url = "https://github.com/".to_string();
 			// A repo must have an owner
-			match purl.namespace() {
-				Some(owner) => url.push_str(owner),
-				None => return None,
-			}
+			url.push_str(purl.namespace()?);
 			url.push('/');
 			let name = purl.name();
 			url.push_str(name);
@@ -24,25 +21,24 @@ pub fn parse_purl(purl: &PackageUrl) -> Option<(TargetType, String)> {
 
 			// We currently only support parsing Maven packages hosted at repo1.maven.org
 			let mut url = "https://repo1.maven.org/maven2/".to_string();
+
 			// A package must belong to a group
-			match purl.namespace() {
-				Some(group) => url.push_str(&group.replace('.', "/")),
-				None => return None,
-			}
+			let group = purl.namespace()?;
+			url.push_str(&group.replace('.', "/"));
 			url.push('/');
+
 			let name = purl.name();
 			url.push_str(name);
+
 			// A package version is needed to construct a URL
-			match purl.version() {
-				Some(version) => {
-					url.push('/');
-					url.push_str(version);
-					url.push('/');
-					let pom_file = format!("{}-{}.pom", name, version);
-					url.push_str(&pom_file);
-				}
-				None => return None,
-			}
+			let version = purl.version()?;
+			url.push('/');
+			url.push_str(version);
+			url.push('/');
+
+			let pom_file = format!("{}-{}.pom", name, version);
+			url.push_str(&pom_file);
+
 			Some((TargetType::Maven, url))
 		}
 		"npm" => {

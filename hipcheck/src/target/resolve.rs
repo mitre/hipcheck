@@ -199,7 +199,7 @@ impl ResolveRepo for LocalGitRepo {
 
 		// Ref we try to checkout is either from self or t
 		let init_ref = if self.git_ref.is_empty().not() {
-			log::debug!("Targeting existing `git_ref` field '{}'", &self.git_ref);
+			log::debug!("Targeting existing `git_ref` field '{}'", self.git_ref);
 			Some(self.git_ref.clone())
 		} else {
 			let refspec = t.get_checkout_target(&self.path)?;
@@ -213,7 +213,7 @@ impl ResolveRepo for LocalGitRepo {
 		// Checkout specified ref
 		self.git_ref = git::checkout(&self.path, init_ref)?;
 
-		log::debug!("Resolved git ref was '{}'", &self.git_ref);
+		log::debug!("Resolved git ref was '{}'", self.git_ref);
 
 		// If not descendant of remote, try to resolve a remote
 		if t.remote.is_none() {
@@ -261,7 +261,7 @@ impl ResolveRepo for RemoteGitRepo {
 
 		let refspec = t.get_checkout_target(&path)?;
 		let git_ref = git::checkout(&path, refspec)?;
-		log::debug!("Resolved git ref was '{}'", &git_ref);
+		log::debug!("Resolved git ref was '{}'", git_ref);
 
 		let local = LocalGitRepo { path, git_ref };
 

@@ -663,12 +663,11 @@ fn cmd_ready(args: &ReadyArgs, config: &Cli) -> ExitCode {
 /// Run the Hipcheck self-updater to update to the latest release version.
 /// If the updater is not found, returns an error
 fn cmd_update(args: &UpdateArgs) {
-	let command_name;
 	// Because of a bug in cargo-dist's updater, it is possible for the updater to be installed as "hipcheck-update" instead of "hc-update"
-	if which("hc-update").is_ok() {
-		command_name = "hc-update";
+	let command_name = if which("hc-update").is_ok() {
+		"hc-update"
 	} else if which("hipcheck-update").is_ok() {
-		command_name = "hipcheck-update";
+		"hipcheck-update"
 	} else {
 		// If neither possible updater command us found, print this error
 		Shell::print_error(
@@ -678,7 +677,7 @@ fn cmd_update(args: &UpdateArgs) {
 			Format::Human,
 		);
 		return;
-	}
+	};
 
 	// Create the updater command, with optional arguments
 	let mut hc_command = updater_command(command_name, args);

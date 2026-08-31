@@ -15,7 +15,7 @@ use hipcheck_common::{
 };
 use serde::Serialize;
 use serde_json::Value as JsonValue;
-use std::{collections::VecDeque, result::Result as StdResult, sync::Arc};
+use std::{collections::VecDeque, mem::take, result::Result as StdResult, sync::Arc};
 use tokio::sync::mpsc::{self, error::TrySendError};
 use tonic::Status;
 
@@ -338,7 +338,7 @@ impl PluginEngine {
 			query: name.to_owned(),
 			key: vec![],
 			output: vec![value],
-			concerns: self.concerns.drain(..).collect(),
+			concerns: take(&mut self.concerns),
 		};
 
 		self.send(query).await
@@ -356,7 +356,7 @@ impl PluginEngine {
 			query_name: "".to_owned(),
 			key: vec![],
 			output: vec![],
-			concern: self.concerns.drain(..).collect(),
+			concern: take(&mut self.concerns),
 			split: false,
 		};
 

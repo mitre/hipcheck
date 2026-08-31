@@ -341,11 +341,8 @@ impl HcPluginCache {
 	) -> Result<()> {
 		// using borrowed data in list_inner in order to avoid transferring ownership
 		let filtered_entries =
-			HcPluginCache::list_inner(&self.entries, scope, name, publisher, version);
-		match filtered_entries {
-			Ok(v) => self.display(v),
-			Err(e) => return Err(e),
-		}
+			HcPluginCache::list_inner(&self.entries, scope, name, publisher, version)?;
+		self.display(filtered_entries);
 		Ok(())
 	}
 	fn list_inner(

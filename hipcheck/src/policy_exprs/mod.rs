@@ -157,7 +157,7 @@ impl ExprMutator for Env<'_> {
 					"JsonPointer's `value` field was not set. \
 				All `value` fields must be set by `LookupJsonPointers` before evaluation. \
 				JsonPointer: {:?}",
-					&jp
+					jp
 				)
 				.into_boxed_str(),
 			)),
