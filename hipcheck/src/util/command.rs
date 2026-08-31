@@ -148,7 +148,7 @@ where
 	I: IntoIterator<Item = S> + Copy,
 	S: AsRef<OsStr>,
 {
-	log::debug!("logging {} CLI args", &program);
+	log::debug!("logging {} CLI args", program);
 
 	// https://doc.rust-lang.org/std/env/fn.args.html
 	for arg in env::args() {
@@ -163,7 +163,7 @@ where
 
 	log_each_arg(args, program);
 
-	log::debug!("done logging {} CLI args", &program);
+	log::debug!("done logging {} CLI args", program);
 }
 
 pub fn log_each_arg<I, S>(args: I, program: DependentProgram)

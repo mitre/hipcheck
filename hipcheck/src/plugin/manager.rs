@@ -280,7 +280,7 @@ impl PluginExecutor {
 		log::debug!(
 			"Starting plugin '{}' at '{:?}'",
 			plugin.name,
-			&canon_bin_path
+			canon_bin_path
 		);
 
 		let mut spawn_attempts: usize = 0;
@@ -306,7 +306,7 @@ impl PluginExecutor {
 			spawn_args.push(&plugin_log_level_str);
 
 			// Spawn plugin process
-			log::debug!("Spawning '{}' on port {}", &plugin.entrypoint, port_str);
+			log::debug!("Spawning '{}' on port {}", plugin.entrypoint, port_str);
 			let Ok(mut proc) = Command::new(&canon_bin_path)
 				.env("PATH", &cmd_path)
 				.args(spawn_args)

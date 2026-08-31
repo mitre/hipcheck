@@ -124,7 +124,7 @@ fn retrieve_plugin_from_network(
 		);
 		let target_manifest = plugin_cache.plugin_kdl(&plugin_id_for_cache);
 		if target_manifest.is_file() && !force {
-			log::debug!("Using existing entry in cache for {}", &plugin_id_for_cache);
+			log::debug!("Using existing entry in cache for {}", plugin_id_for_cache);
 			return PluginManifest::from_file(target_manifest);
 		}
 	}
