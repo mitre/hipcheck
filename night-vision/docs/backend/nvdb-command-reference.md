@@ -90,17 +90,43 @@ Current top-level commands:
 
 ```text
 Commands:
-  api   Interact with the REST API
-  cve   Manage CVE List data
-  db    Manage the database
-  kev   Manage KEV data
-  npm   Inspect npm registry data
-  help  Print this message or the help of the given subcommand(s)
+  api              Interact with the REST API
+  db               Manage the database
+  cve              Manage CVE List data
+  npm              Inspect npm registry data
+  package-source   Manage package sources and their resolved versions
+  package-version  Inspect resolved package versions
+  assessment       Run and inspect package-version assessments
+  kev              Manage KEV data
+  help             Print this message or the help of the given subcommand(s)
 ```
 
 The `api` command is listed in help output, but it is not implemented yet.
 Running it currently reaches a placeholder in the binary. Use the
 [REST API Usage](./rest-api-usage.md) guide for current API examples.
+
+## Demo workflow command stubs
+
+The following commands define the planned package-assessment demonstration
+workflow. They currently stop with an explicit not-implemented placeholder when
+run; they are available now so the command interface, help output, and parser
+tests can stabilize before their services are implemented.
+
+| Command | Planned purpose |
+| --- | --- |
+| `package-source import <FILE> [--json]` | Store a validated npm `package.json` source. |
+| `package-source resolve <SOURCE-ID> [--json]` | Resolve and persist reachable package versions. |
+| `package-source show <SOURCE-ID> [--json]` | Show package-source metadata and state. |
+| `package-source versions <SOURCE-ID> [--json]` | List versions resolved from the source. |
+| `package-source kevs <SOURCE-ID> [--json]` | List KEV-linked matches for source versions. |
+| `package-version kev <PURL> [--json]` | List KEV-linked CVE matches for one version. |
+| `assessment analyze <PURL> [--json]` | Run and persist the configured assessment. |
+| `assessment show <ASSESSMENT-ID> [--json]` | Show normalized assessment findings. |
+| `assessment runs --package <PURL> [--limit <N>] [--json]` | List persisted assessments for a package. |
+| `assessment evidence <ASSESSMENT-ID> [--raw-hipcheck] [--json]` | Inspect retained assessment evidence. |
+
+See [RFD 0004](../rfds/0004-nvdb-demo-workflow.md) for the intended workflow
+and output conventions.
 
 ## `cve`
 

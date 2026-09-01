@@ -94,6 +94,18 @@ fn run() -> Result<()> {
         return cmd::cve::run(&config, cve_matches);
     }
 
+    if let Some(package_source_matches) = matches.subcommand_matches("package-source") {
+        return cmd::package_source::run(&config, package_source_matches);
+    }
+
+    if let Some(package_version_matches) = matches.subcommand_matches("package-version") {
+        return cmd::package_version::run(&config, package_version_matches);
+    }
+
+    if let Some(assessment_matches) = matches.subcommand_matches("assessment") {
+        return cmd::assessment::run(&config, assessment_matches);
+    }
+
     if let Some(kev_matches) = matches.subcommand_matches("kev") {
         if let Some(audit_matches) = kev_matches.subcommand_matches("audit") {
             return cmd::kev::audit::run(&config, audit_matches);
@@ -158,6 +170,9 @@ fn command() -> clap::Command {
         )
         .subcommand(cmd::cve::command())
         .subcommand(cmd::npm::command())
+        .subcommand(cmd::package_source::command())
+        .subcommand(cmd::package_version::command())
+        .subcommand(cmd::assessment::command())
         .subcommand(
             clap::Command::new("kev")
                 .about("Manage KEV data")
