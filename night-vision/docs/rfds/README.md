@@ -12,3 +12,5 @@ implementation guidance.
   Analysis](./0002-use-hipcheck-for-supply-chain-analysis.md)
 - [RFD 0003: Resource Limit Handling for External
   Ingest](./0003-resource-limit-handling.md)
+- [RFD 0004: `nvdb` Demo Workflow for Package
+  Assessments](./0004-nvdb-demo-workflow.md)
