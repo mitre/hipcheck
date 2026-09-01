@@ -14,3 +14,5 @@ implementation guidance.
   Ingest](./0003-resource-limit-handling.md)
 - [RFD 0004: `nvdb` Demo Workflow for Package
   Assessments](./0004-nvdb-demo-workflow.md)
+- [RFD 0005: Package Source
+  Elaboration](./0005-package-source-elaboration.md)
