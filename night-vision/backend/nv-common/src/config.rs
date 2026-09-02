@@ -10,7 +10,7 @@ use crate::{
         sync::{CveListSyncPipelineConfig, CveListSyncTimeoutConfig},
     },
     error::ErrorSourceIterator as _,
-    npm::package_json::MAX_PACKAGE_JSON_BYTES,
+    npm::elaboration::ElaborationLimits,
     secret::{SecretFileError, SecretSource, SecretSourceKind},
 };
 use camino::{Utf8Path, Utf8PathBuf};
@@ -20,11 +20,11 @@ use secrecy::SecretString;
 use std::{
     error::Error as _,
     fmt::{Debug, Display},
-    fs::{self, File, OpenOptions},
+    fs::File,
     io::BufReader,
     net::AddrParseError,
     str::FromStr,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 use url::Url;
 
@@ -42,14 +42,10 @@ const DEFAULT_CVE_LIST_WRITE_BATCH_SIZE: usize = DEFAULT_CVE_LIST_RECORD_WRITE_B
 const DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE_CAP: usize = DEFAULT_CVE_LIST_RECORD_WRITE_CHANNEL_SIZE;
 const DEFAULT_ASYNC_MAX_BLOCKING_THREADS: usize = 512;
 const MIN_COMPUTED_CVE_LIST_PARSE_CONCURRENCY: usize = 2;
-const DEFAULT_HIPCHECK_TIMEOUT: u64 = 300_000;
-const DEFAULT_HIPCHECK_STDOUT_MAX_BYTES: usize = 1_048_576;
-const DEFAULT_HIPCHECK_STDERR_MAX_BYTES: usize = 1_048_576;
-const DEFAULT_HIPCHECK_JSON_MAX_BYTES: usize = 4_194_304;
-const MAX_PACKAGE_SOURCE_CONTENTS_MAX_BYTES: usize = MAX_PACKAGE_JSON_BYTES as usize;
-const DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES: usize = MAX_PACKAGE_SOURCE_CONTENTS_MAX_BYTES;
-const DEFAULT_PACKAGE_SOURCE_REQUEST_TIMEOUT: u64 = 5_000;
-const DEFAULT_PACKAGE_SOURCE_MAX_CONCURRENCY: usize = 4;
+const DEFAULT_NPM_REGISTRY_URL: &str = "https://registry.npmjs.org/";
+const DEFAULT_PACKAGE_ELABORATION_MAX_PACKUMENT_BYTES: usize = 5 * 1024 * 1024;
+const DEFAULT_PACKAGE_ELABORATION_MAX_PACKAGES: usize = 10_000;
+const DEFAULT_PACKAGE_ELABORATION_MAX_DERIVATIONS: usize = 100_000;
 
 /// Errors that can occur while loading configuration.
 pub enum ConfigLoadError {
@@ -141,15 +137,6 @@ pub struct Config {
 
     /// The default behavior for HTTP handler functions when clients disconnect early.
     pub http_early_disconnect_behavior: Option<EarlyDisconnectBehavior>,
-
-    /// The maximum size in bytes of submitted package-source contents.
-    pub package_source_contents_max_bytes: usize,
-
-    /// The timeout in milliseconds for accepting one package-source submission.
-    pub package_source_request_timeout: u64,
-
-    /// The maximum number of package-source submissions accepted concurrently.
-    pub package_source_max_concurrency: usize,
 
     /// Source for the string used to connect to the database.
     database_connection_source: SecretSourceKind,
@@ -254,57 +241,14 @@ pub struct Config {
     /// Whether CVE List write channel size was explicit or computed.
     pub cve_list_write_channel_size_source: ConfigValueSource,
 
-    /// Paths and resource limits for the bundled Hipcheck execution boundary,
-    /// when this process executes the container-bundled artifact.
-    pub hipcheck: Option<HipcheckExecutionConfig>,
-}
+    /// The NPM registry used for package-source elaboration.
+    pub npm_registry_url: Url,
 
-/// Configuration for invoking the bundled Hipcheck artifact.
-#[derive(Clone, Debug)]
-pub struct HipcheckExecutionConfig {
-    binary_path: Utf8PathBuf,
-    policy_path: Utf8PathBuf,
-    exec_config_path: Utf8PathBuf,
-    working_dir: Utf8PathBuf,
-    cache_dir: Utf8PathBuf,
-    data_dir: Utf8PathBuf,
-    timeout: Duration,
-    stdout_max_bytes: usize,
-    stderr_max_bytes: usize,
-    json_max_bytes: usize,
-}
+    /// Bounded concurrency and result limits for package-source elaboration.
+    pub package_elaboration_limits: ElaborationLimits,
 
-impl HipcheckExecutionConfig {
-    pub fn binary_path(&self) -> &Utf8Path {
-        &self.binary_path
-    }
-    pub fn policy_path(&self) -> &Utf8Path {
-        &self.policy_path
-    }
-    pub fn exec_config_path(&self) -> &Utf8Path {
-        &self.exec_config_path
-    }
-    pub fn working_dir(&self) -> &Utf8Path {
-        &self.working_dir
-    }
-    pub fn cache_dir(&self) -> &Utf8Path {
-        &self.cache_dir
-    }
-    pub fn data_dir(&self) -> &Utf8Path {
-        &self.data_dir
-    }
-    pub fn timeout(&self) -> Duration {
-        self.timeout
-    }
-    pub fn stdout_max_bytes(&self) -> usize {
-        self.stdout_max_bytes
-    }
-    pub fn stderr_max_bytes(&self) -> usize {
-        self.stderr_max_bytes
-    }
-    pub fn json_max_bytes(&self) -> usize {
-        self.json_max_bytes
-    }
+    /// The maximum accepted NPM packument response size in bytes.
+    pub package_elaboration_max_packument_bytes: usize,
 }
 
 /// Where a resolved configuration value came from.
@@ -458,9 +402,6 @@ impl Config {
                     "kev-response-body-max-bytes",
                     "http-request-body-max-bytes",
                     "http-early-disconnect-behavior",
-                    "package-source-contents-max-bytes",
-                    "package-source-request-timeout",
-                    "package-source-max-concurrency",
                     "database-connection",
                     "database-connection-file",
                     "database-max-connections",
@@ -484,16 +425,12 @@ impl Config {
                     "cve-list-write-batch-size",
                     "cve-record-max-bytes",
                     "cve-list-write-channel-size",
-                    "hipcheck-bin-path",
-                    "hipcheck-policy-path",
-                    "hipcheck-exec-config-path",
-                    "hipcheck-working-dir",
-                    "hipcheck-cache-dir",
-                    "hipcheck-data-dir",
-                    "hipcheck-timeout",
-                    "hipcheck-stdout-max-bytes",
-                    "hipcheck-stderr-max-bytes",
-                    "hipcheck-json-max-bytes",
+                    "npm-registry-url",
+                    "package-elaboration-worker-concurrency",
+                    "package-elaboration-work-queue-capacity",
+                    "package-elaboration-max-packument-bytes",
+                    "package-elaboration-max-packages",
+                    "package-elaboration-max-derivations",
                 ],
             },
             BufReader::new(
@@ -529,23 +466,6 @@ impl Config {
             parse_value(&parsed, "http-request-body-max-bytes", &mut errors);
         let http_early_disconnect_behavior =
             parse_value(&parsed, "http-early-disconnect-behavior", &mut errors);
-        let package_source_contents_max_bytes = parse_package_source_contents_max_bytes(
-            &parsed,
-            "package-source-contents-max-bytes",
-            &mut errors,
-        );
-        let package_source_request_timeout = parse_positive_u64(
-            &parsed,
-            "package-source-request-timeout",
-            DEFAULT_PACKAGE_SOURCE_REQUEST_TIMEOUT,
-            &mut errors,
-        );
-        let package_source_max_concurrency = parse_positive_usize(
-            &parsed,
-            "package-source-max-concurrency",
-            DEFAULT_PACKAGE_SOURCE_MAX_CONCURRENCY,
-            &mut errors,
-        );
         let database_max_connections =
             parse_value(&parsed, "database-max-connections", &mut errors);
         let database_min_connections =
@@ -603,49 +523,34 @@ impl Config {
         );
         let cve_list_write_channel_size =
             parse_positive_usize_option(&parsed, "cve-list-write-channel-size", &mut errors);
-        let hipcheck_binary_path = parse_value(&parsed, "hipcheck-bin-path", &mut errors);
-        let hipcheck_policy_path = parse_value(&parsed, "hipcheck-policy-path", &mut errors);
-        let hipcheck_exec_config_path =
-            parse_value(&parsed, "hipcheck-exec-config-path", &mut errors);
-        let hipcheck_working_dir = parse_value(&parsed, "hipcheck-working-dir", &mut errors);
-        let hipcheck_cache_dir = parse_value(&parsed, "hipcheck-cache-dir", &mut errors);
-        let hipcheck_data_dir = parse_value(&parsed, "hipcheck-data-dir", &mut errors);
-        let hipcheck_timeout = parse_positive_u64(
+        let npm_registry_url = parse_value(&parsed, "npm-registry-url", &mut errors)
+            .unwrap_or_else(default_npm_registry_url);
+        let package_elaboration_worker_concurrency = parse_positive_usize_option(
             &parsed,
-            "hipcheck-timeout",
-            DEFAULT_HIPCHECK_TIMEOUT,
+            "package-elaboration-worker-concurrency",
             &mut errors,
         );
-        let hipcheck_stdout_max_bytes = parse_positive_usize(
+        let package_elaboration_work_queue_capacity = parse_positive_usize_option(
             &parsed,
-            "hipcheck-stdout-max-bytes",
-            DEFAULT_HIPCHECK_STDOUT_MAX_BYTES,
+            "package-elaboration-work-queue-capacity",
             &mut errors,
         );
-        let hipcheck_stderr_max_bytes = parse_positive_usize(
+        let package_elaboration_max_packument_bytes = parse_positive_usize(
             &parsed,
-            "hipcheck-stderr-max-bytes",
-            DEFAULT_HIPCHECK_STDERR_MAX_BYTES,
+            "package-elaboration-max-packument-bytes",
+            DEFAULT_PACKAGE_ELABORATION_MAX_PACKUMENT_BYTES,
             &mut errors,
         );
-        let hipcheck_json_max_bytes = parse_positive_usize(
+        let package_elaboration_max_packages = parse_positive_usize(
             &parsed,
-            "hipcheck-json-max-bytes",
-            DEFAULT_HIPCHECK_JSON_MAX_BYTES,
+            "package-elaboration-max-packages",
+            DEFAULT_PACKAGE_ELABORATION_MAX_PACKAGES,
             &mut errors,
         );
-
-        let hipcheck = resolve_hipcheck_execution_config(
-            hipcheck_binary_path,
-            hipcheck_policy_path,
-            hipcheck_exec_config_path,
-            hipcheck_working_dir,
-            hipcheck_cache_dir,
-            hipcheck_data_dir,
-            hipcheck_timeout,
-            hipcheck_stdout_max_bytes,
-            hipcheck_stderr_max_bytes,
-            hipcheck_json_max_bytes,
+        let package_elaboration_max_derivations = parse_positive_usize(
+            &parsed,
+            "package-elaboration-max-derivations",
+            DEFAULT_PACKAGE_ELABORATION_MAX_DERIVATIONS,
             &mut errors,
         );
 
@@ -660,6 +565,13 @@ impl Config {
             cve_list_write_batch_size,
             cve_list_write_channel_size,
         );
+        let package_elaboration_limits = resolve_package_elaboration_limits(
+            async_worker_threads,
+            package_elaboration_worker_concurrency,
+            package_elaboration_work_queue_capacity,
+            package_elaboration_max_packages,
+            package_elaboration_max_derivations,
+        );
 
         let config = Self {
             config_file_path: path.into(),
@@ -670,9 +582,6 @@ impl Config {
             kev_response_body_max_bytes,
             http_request_body_max_bytes,
             http_early_disconnect_behavior,
-            package_source_contents_max_bytes,
-            package_source_request_timeout,
-            package_source_max_concurrency,
             database_connection_source,
             database_connection,
             database_max_connections,
@@ -700,7 +609,9 @@ impl Config {
             cve_list_parse_concurrency_source: cve_list_pipeline_config.parse_concurrency_source,
             cve_list_write_batch_size_source: cve_list_pipeline_config.write_batch_size_source,
             cve_list_write_channel_size_source: cve_list_pipeline_config.write_channel_size_source,
-            hipcheck,
+            npm_registry_url,
+            package_elaboration_limits,
+            package_elaboration_max_packument_bytes,
         };
 
         Ok(config)
@@ -736,11 +647,6 @@ impl Config {
         Ok(config)
     }
 
-    /// Returns the timeout for accepting one package-source submission.
-    pub fn package_source_request_timeout(&self) -> Duration {
-        Duration::from_millis(self.package_source_request_timeout)
-    }
-
     /// Get the configured database connection string.
     pub fn database_connection(&self) -> &SecretString {
         &self.database_connection
@@ -763,6 +669,11 @@ impl Config {
             write_batch_size_source: self.cve_list_write_batch_size_source,
             write_channel_size_source: self.cve_list_write_channel_size_source,
         }
+    }
+
+    /// Build the NPM elaboration limits resolved from this configuration.
+    pub fn package_elaboration_limits(&self) -> ElaborationLimits {
+        self.package_elaboration_limits.clone()
     }
 }
 
@@ -823,11 +734,11 @@ macro_rules! write_report_separator {
 
 /// Write a single line of the config report.
 macro_rules! write_report_line {
-    // Note that the "32" value is set by-hand based on the length in characters of the longest
+    // Note that the "48" value is set by-hand based on the length in characters of the longest
     // configuration key we accept. If we introduce longer configuration keys in the future, this will
     // likely need to be bumped.
     ($f:ident, $key:literal, $value:expr) => {
-        write!($f, "{:>32}: {}\n", $key, $value)
+        write!($f, "{:>48}: {}\n", $key, $value)
     };
 }
 
@@ -869,22 +780,6 @@ impl Display for Config {
         if let Some(behavior) = self.http_early_disconnect_behavior {
             write_report_line!(f, "http-early-disconnect-behavior", &behavior)?;
         }
-
-        write_report_line!(
-            f,
-            "package-source-contents-max-bytes",
-            &self.package_source_contents_max_bytes
-        )?;
-        write_report_line!(
-            f,
-            "package-source-request-timeout",
-            &self.package_source_request_timeout
-        )?;
-        write_report_line!(
-            f,
-            "package-source-max-concurrency",
-            &self.package_source_max_concurrency
-        )?;
 
         if let Some(max_connections) = self.database_max_connections {
             write_report_line!(f, "database-max-connections", &max_connections)?;
@@ -972,18 +867,32 @@ impl Display for Config {
             "cve-list-write-channel-size",
             &self.cve_list_write_channel_size
         )?;
-        if let Some(hipcheck) = &self.hipcheck {
-            write_report_line!(f, "hipcheck-bin-path", "<configured>")?;
-            write_report_line!(f, "hipcheck-policy-path", "<configured>")?;
-            write_report_line!(f, "hipcheck-exec-config-path", "<configured>")?;
-            write_report_line!(f, "hipcheck-working-dir", "<configured>")?;
-            write_report_line!(f, "hipcheck-cache-dir", "<configured>")?;
-            write_report_line!(f, "hipcheck-data-dir", "<configured>")?;
-            write_report_line!(f, "hipcheck-timeout", hipcheck.timeout().as_millis())?;
-            write_report_line!(f, "hipcheck-stdout-max-bytes", hipcheck.stdout_max_bytes())?;
-            write_report_line!(f, "hipcheck-stderr-max-bytes", hipcheck.stderr_max_bytes())?;
-            write_report_line!(f, "hipcheck-json-max-bytes", hipcheck.json_max_bytes())?;
-        }
+        write_report_line!(f, "npm-registry-url", &self.npm_registry_url)?;
+        write_report_line!(
+            f,
+            "package-elaboration-worker-concurrency",
+            &self.package_elaboration_limits.worker_concurrency
+        )?;
+        write_report_line!(
+            f,
+            "package-elaboration-work-queue-capacity",
+            &self.package_elaboration_limits.work_queue_capacity
+        )?;
+        write_report_line!(
+            f,
+            "package-elaboration-max-packument-bytes",
+            &self.package_elaboration_max_packument_bytes
+        )?;
+        write_report_line!(
+            f,
+            "package-elaboration-max-packages",
+            &self.package_elaboration_limits.max_packages
+        )?;
+        write_report_line!(
+            f,
+            "package-elaboration-max-derivations",
+            &self.package_elaboration_limits.max_derivations
+        )?;
 
         write_report_separator!(f)?;
 
@@ -993,6 +902,32 @@ impl Display for Config {
 
 fn default_cve_list_repository_url() -> Url {
     Url::parse(DEFAULT_CVE_LIST_REPOSITORY_URL).expect("default CVE List repository URL is valid")
+}
+
+fn default_npm_registry_url() -> Url {
+    Url::parse(DEFAULT_NPM_REGISTRY_URL).expect("default NPM registry URL is valid")
+}
+
+fn resolve_package_elaboration_limits(
+    async_worker_threads: Option<usize>,
+    worker_concurrency: Option<usize>,
+    work_queue_capacity: Option<usize>,
+    max_packages: usize,
+    max_derivations: usize,
+) -> ElaborationLimits {
+    let worker_concurrency = worker_concurrency.unwrap_or_else(|| {
+        async_worker_threads
+            .unwrap_or_else(available_parallelism)
+            .saturating_mul(4)
+            .clamp(4, 32)
+    });
+    ElaborationLimits {
+        worker_concurrency,
+        work_queue_capacity: work_queue_capacity
+            .unwrap_or_else(|| worker_concurrency.saturating_mul(4)),
+        max_packages,
+        max_derivations,
+    }
 }
 
 /// Parse the CVE List repository URL, rejecting embedded authentication.
@@ -1145,28 +1080,6 @@ fn parse_positive_usize(
     value
 }
 
-fn parse_package_source_contents_max_bytes(
-    parsed: &spookey::ParseResult,
-    key: &'static str,
-    errors: &mut Vec<ConfigError>,
-) -> usize {
-    let Some(value) = parse_positive_usize_option(parsed, key, errors) else {
-        return DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES;
-    };
-
-    if value > MAX_PACKAGE_SOURCE_CONTENTS_MAX_BYTES {
-        errors.push(ConfigError::StrParse(StrParseError {
-            key: key.to_owned().into_boxed_str(),
-            value: value.to_string().into_boxed_str(),
-            err: format!("must not exceed {MAX_PACKAGE_SOURCE_CONTENTS_MAX_BYTES}")
-                .into_boxed_str(),
-        }));
-        DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES
-    } else {
-        value
-    }
-}
-
 fn parse_positive_u64_option(
     parsed: &spookey::ParseResult,
     key: &'static str,
@@ -1214,188 +1127,6 @@ fn parse_kev_refresh_interval(
         None
     } else {
         Some(value)
-    }
-}
-
-fn resolve_hipcheck_execution_config(
-    binary_path: Option<Utf8PathBuf>,
-    policy_path: Option<Utf8PathBuf>,
-    exec_config_path: Option<Utf8PathBuf>,
-    working_dir: Option<Utf8PathBuf>,
-    cache_dir: Option<Utf8PathBuf>,
-    data_dir: Option<Utf8PathBuf>,
-    timeout: u64,
-    stdout_max_bytes: usize,
-    stderr_max_bytes: usize,
-    json_max_bytes: usize,
-    errors: &mut Vec<ConfigError>,
-) -> Option<HipcheckExecutionConfig> {
-    match (
-        binary_path,
-        policy_path,
-        exec_config_path,
-        working_dir,
-        cache_dir,
-        data_dir,
-    ) {
-        (
-            Some(binary_path),
-            Some(policy_path),
-            Some(exec_config_path),
-            Some(working_dir),
-            Some(cache_dir),
-            Some(data_dir),
-        ) => {
-            validate_hipcheck_paths(
-                &binary_path,
-                &policy_path,
-                &exec_config_path,
-                &working_dir,
-                &cache_dir,
-                &data_dir,
-                errors,
-            );
-            Some(HipcheckExecutionConfig {
-                binary_path,
-                policy_path,
-                exec_config_path,
-                working_dir,
-                cache_dir,
-                data_dir,
-                timeout: Duration::from_millis(timeout),
-                stdout_max_bytes,
-                stderr_max_bytes,
-                json_max_bytes,
-            })
-        }
-        (None, None, None, None, None, None) => None,
-        (binary_path, policy_path, exec_config_path, working_dir, cache_dir, data_dir) => {
-            for (key, value) in [
-                ("hipcheck-bin-path", binary_path),
-                ("hipcheck-policy-path", policy_path),
-                ("hipcheck-exec-config-path", exec_config_path),
-                ("hipcheck-working-dir", working_dir),
-                ("hipcheck-cache-dir", cache_dir),
-                ("hipcheck-data-dir", data_dir),
-            ] {
-                if value.is_none() {
-                    errors.push(ConfigError::StrParse(StrParseError {
-                        key: key.to_owned().into_boxed_str(),
-                        value: "".into(),
-                        err: "must be configured with every Hipcheck artifact path".into(),
-                    }));
-                }
-            }
-            None
-        }
-    }
-}
-
-/// Validate the bundled Hipcheck artifact boundary at startup, rather than
-/// deferring an image or volume error until an assessment invokes it.
-fn validate_hipcheck_paths(
-    binary_path: &Utf8Path,
-    policy_path: &Utf8Path,
-    exec_config_path: &Utf8Path,
-    working_dir: &Utf8Path,
-    cache_dir: &Utf8Path,
-    data_dir: &Utf8Path,
-    errors: &mut Vec<ConfigError>,
-) {
-    validate_hipcheck_file(binary_path, "hipcheck-bin-path", true, errors);
-    validate_hipcheck_file(policy_path, "hipcheck-policy-path", false, errors);
-    validate_hipcheck_file(exec_config_path, "hipcheck-exec-config-path", false, errors);
-    validate_hipcheck_directory(working_dir, "hipcheck-working-dir", false, errors);
-    validate_hipcheck_directory(cache_dir, "hipcheck-cache-dir", true, errors);
-    validate_hipcheck_directory(data_dir, "hipcheck-data-dir", true, errors);
-}
-
-fn validate_hipcheck_file(
-    path: &Utf8Path,
-    key: &'static str,
-    executable: bool,
-    errors: &mut Vec<ConfigError>,
-) {
-    let message = match fs::metadata(path.as_std_path()) {
-        Ok(metadata) if !metadata.is_file() => Some("must be an existing file"),
-        Ok(metadata) if executable && !is_executable(&metadata) => Some("must be executable"),
-        Ok(_) if File::open(path.as_std_path()).is_err() => Some("must be readable"),
-        Ok(_) => None,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Some("path does not exist"),
-        Err(_) => Some("path cannot be inspected"),
-    };
-
-    push_hipcheck_path_error(path, key, message, errors);
-}
-
-#[cfg(unix)]
-fn is_executable(metadata: &fs::Metadata) -> bool {
-    use std::os::unix::fs::PermissionsExt as _;
-
-    metadata.permissions().mode() & 0o111 != 0
-}
-
-#[cfg(not(unix))]
-fn is_executable(_metadata: &fs::Metadata) -> bool {
-    true
-}
-
-fn validate_hipcheck_directory(
-    path: &Utf8Path,
-    key: &'static str,
-    writable: bool,
-    errors: &mut Vec<ConfigError>,
-) {
-    let message = match fs::metadata(path.as_std_path()) {
-        Ok(metadata) if !metadata.is_dir() => Some("must be an existing directory"),
-        Ok(_) if fs::read_dir(path.as_std_path()).is_err() => Some("must be readable"),
-        Ok(_) if writable => writable_directory_error(path),
-        Ok(_) => None,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Some("path does not exist"),
-        Err(_) => Some("path cannot be inspected"),
-    };
-
-    push_hipcheck_path_error(path, key, message, errors);
-}
-
-fn writable_directory_error(path: &Utf8Path) -> Option<&'static str> {
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_nanos());
-    let probe = path.join(format!(
-        ".night-vision-write-check-{}-{timestamp}",
-        std::process::id()
-    ));
-
-    let file = match OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(probe.as_std_path())
-    {
-        Ok(file) => file,
-        Err(_) => return Some("must be writable"),
-    };
-    drop(file);
-
-    if fs::remove_file(probe.as_std_path()).is_err() {
-        return Some("must permit temporary files to be removed");
-    }
-
-    None
-}
-
-fn push_hipcheck_path_error(
-    path: &Utf8Path,
-    key: &'static str,
-    message: Option<&str>,
-    errors: &mut Vec<ConfigError>,
-) {
-    if let Some(err) = message {
-        errors.push(ConfigError::StrParse(StrParseError {
-            key: key.to_owned().into_boxed_str(),
-            value: path.as_str().into(),
-            err: err.into(),
-        }));
     }
 }
 
@@ -1700,60 +1431,15 @@ mod tests {
     }
 
     fn valid_required_config() -> String {
-        // The port and SQLite connection are irrelevant; these tests only parse config.
-        format!(
-            "server-address = 127.0.0.1:0\n\
-            database-connection = sqlite::memory:\n\
-            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n{}",
-            hipcheck_test_config()
-        )
-    }
-
-    fn hipcheck_test_config() -> String {
-        let id = TEST_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let root = std::env::temp_dir().join(format!(
-            "night-vision-hipcheck-config-test-{}-{id}",
-            std::process::id()
-        ));
-        let binary_path = root.join("hc");
-        let policy_path = root.join("Hipcheck.kdl");
-        let exec_config_path = root.join("Exec.kdl");
-        let working_dir = root.join("work");
-        let cache_dir = root.join("cache");
-        let data_dir = root.join("data");
-
-        for directory in [&working_dir, &cache_dir, &data_dir] {
-            fs::create_dir_all(directory).expect("failed to create Hipcheck test directory");
-        }
-        fs::write(&binary_path, "test binary").expect("failed to create Hipcheck test binary");
-        #[cfg(unix)]
-        fs::set_permissions(
-            &binary_path,
-            std::os::unix::fs::PermissionsExt::from_mode(0o755),
-        )
-        .expect("failed to mark Hipcheck test binary executable");
-        fs::write(&policy_path, "test policy").expect("failed to create Hipcheck test policy");
-        fs::write(&exec_config_path, "test exec config")
-            .expect("failed to create Hipcheck test exec config");
-
-        format!(
-            "hipcheck-bin-path = {}\n\
-            hipcheck-policy-path = {}\n\
-            hipcheck-exec-config-path = {}\n\
-            hipcheck-working-dir = {}\n\
-            hipcheck-cache-dir = {}\n\
-            hipcheck-data-dir = {}",
-            binary_path.display(),
-            policy_path.display(),
-            exec_config_path.display(),
-            working_dir.display(),
-            cache_dir.display(),
-            data_dir.display(),
-        )
-    }
-
-    fn config_with_hipcheck(contents: &str) -> String {
-        format!("{contents}\n{}", hipcheck_test_config())
+        [
+            // The port here is irrelevant; we're not making real connections in these tests.
+            "server-address = 127.0.0.1:0",
+            // We don't actually use sqlite; but we're not making real DB connections in these
+            // tests, only validating that we can parse the config field correctly.
+            "database-connection = sqlite::memory:",
+            "cve-list-checkout-path = /tmp/night-vision-test-cvelistV5",
+        ]
+        .join("\n")
     }
 
     struct ConfigFieldParseCase {
@@ -1799,7 +1485,6 @@ mod tests {
                 lines.push("cve-list-checkout-path = /tmp/night-vision-test-cvelistV5".to_owned());
             }
 
-            lines.push(hipcheck_test_config());
             lines.push(self.extra_config.to_owned());
             lines.join("\n")
         }
@@ -1844,31 +1529,6 @@ mod tests {
                         config.http_early_disconnect_behavior,
                         Some(EarlyDisconnectBehavior::Cancel)
                     ));
-                },
-            ),
-            ConfigFieldParseCase::new(
-                "package_source_contents_max_bytes",
-                "package-source-contents-max-bytes = 4096",
-                |config, _| {
-                    assert_eq!(config.package_source_contents_max_bytes, 4096);
-                },
-            ),
-            ConfigFieldParseCase::new(
-                "package_source_request_timeout",
-                "package-source-request-timeout = 7500",
-                |config, _| {
-                    assert_eq!(config.package_source_request_timeout, 7500);
-                    assert_eq!(
-                        config.package_source_request_timeout(),
-                        Duration::from_millis(7500)
-                    );
-                },
-            ),
-            ConfigFieldParseCase::new(
-                "package_source_max_concurrency",
-                "package-source-max-concurrency = 8",
-                |config, _| {
-                    assert_eq!(config.package_source_max_concurrency, 8);
                 },
             ),
             ConfigFieldParseCase::new("database_connection", "", |config, _| {
@@ -2087,18 +1747,6 @@ mod tests {
             "sqlite::memory:"
         );
         assert_eq!(config.http_request_body_max_bytes, Some(2048));
-        assert_eq!(
-            config.package_source_contents_max_bytes,
-            DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES
-        );
-        assert_eq!(
-            config.package_source_request_timeout,
-            DEFAULT_PACKAGE_SOURCE_REQUEST_TIMEOUT
-        );
-        assert_eq!(
-            config.package_source_max_concurrency,
-            DEFAULT_PACKAGE_SOURCE_MAX_CONCURRENCY
-        );
         assert!(matches!(
             config.http_early_disconnect_behavior,
             Some(EarlyDisconnectBehavior::Continue)
@@ -2130,6 +1778,13 @@ mod tests {
             DEFAULT_CVE_LIST_WRITE_BATCH_SIZE
         );
         assert_eq!(config.cve_record_max_bytes, DEFAULT_CVE_RECORD_MAX_BYTES);
+        assert_eq!(config.npm_registry_url.as_str(), DEFAULT_NPM_REGISTRY_URL);
+        assert_eq!(
+            config.package_elaboration_max_packument_bytes,
+            5 * 1024 * 1024
+        );
+        assert_eq!(config.package_elaboration_limits.max_packages, 10_000);
+        assert_eq!(config.package_elaboration_limits.max_derivations, 100_000);
         assert_eq!(
             config.cve_list_parse_concurrency,
             default_cve_list_parse_concurrency(None, None)
@@ -2152,130 +1807,6 @@ mod tests {
         assert_eq!(
             config.cve_list_write_channel_size_source,
             ConfigValueSource::ComputedDefault
-        );
-        let hipcheck = config
-            .hipcheck
-            .as_ref()
-            .expect("Hipcheck should be configured");
-        assert_eq!(
-            hipcheck.timeout(),
-            Duration::from_millis(DEFAULT_HIPCHECK_TIMEOUT)
-        );
-        assert_eq!(
-            hipcheck.stdout_max_bytes(),
-            DEFAULT_HIPCHECK_STDOUT_MAX_BYTES
-        );
-        assert_eq!(
-            hipcheck.stderr_max_bytes(),
-            DEFAULT_HIPCHECK_STDERR_MAX_BYTES
-        );
-        assert_eq!(hipcheck.json_max_bytes(), DEFAULT_HIPCHECK_JSON_MAX_BYTES);
-    }
-
-    #[test]
-    fn rejects_missing_hipcheck_artifact() {
-        let mut contents = valid_required_config();
-        let key = "hipcheck-bin-path = ";
-        let value_start = contents
-            .find(key)
-            .expect("test config has Hipcheck binary path")
-            + key.len();
-        let value_end = contents[value_start..]
-            .find('\n')
-            .map_or(contents.len(), |offset| value_start + offset);
-        contents.replace_range(value_start..value_end, "/missing/hc");
-        let file = TempConfigFile::new(&contents);
-
-        let error = Config::parse(file.path()).expect_err("missing Hipcheck binary should fail");
-        let ConfigLoadError::FailedToParseConfigFileFields(_, ConfigErrors(errors)) = error else {
-            panic!("expected field parsing error");
-        };
-        let ConfigError::StrParse(error) = &errors[0] else {
-            panic!("expected Hipcheck path error");
-        };
-        assert_eq!(&*error.key, "hipcheck-bin-path");
-        assert_eq!(&*error.err, "path does not exist");
-    }
-
-    #[test]
-    fn parses_explicit_hipcheck_execution_limits() {
-        let file = TempConfigFile::new(&format!(
-            "{}\nhipcheck-timeout = 1000\nhipcheck-stdout-max-bytes = 200\n\
-            hipcheck-stderr-max-bytes = 300\nhipcheck-json-max-bytes = 400",
-            valid_required_config()
-        ));
-
-        let config = Config::parse(file.path()).expect("config should parse");
-        let hipcheck = config
-            .hipcheck
-            .as_ref()
-            .expect("Hipcheck should be configured");
-        assert_eq!(hipcheck.timeout(), Duration::from_secs(1));
-        assert_eq!(hipcheck.stdout_max_bytes(), 200);
-        assert_eq!(hipcheck.stderr_max_bytes(), 300);
-        assert_eq!(hipcheck.json_max_bytes(), 400);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn rejects_nonexecutable_hipcheck_binary() {
-        let file = TempConfigFile::new(&valid_required_config());
-        let config = Config::parse(file.path()).expect("config should parse");
-        fs::set_permissions(
-            config
-                .hipcheck
-                .as_ref()
-                .expect("Hipcheck should be configured")
-                .binary_path()
-                .as_std_path(),
-            std::os::unix::fs::PermissionsExt::from_mode(0o644),
-        )
-        .expect("failed to remove test binary execute permission");
-
-        let error =
-            Config::parse(file.path()).expect_err("nonexecutable Hipcheck binary should fail");
-        let ConfigLoadError::FailedToParseConfigFileFields(_, ConfigErrors(errors)) = error else {
-            panic!("expected field parsing error");
-        };
-        let ConfigError::StrParse(error) = &errors[0] else {
-            panic!("expected Hipcheck path error");
-        };
-        assert_eq!(&*error.key, "hipcheck-bin-path");
-        assert_eq!(&*error.err, "must be executable");
-    }
-
-    #[test]
-    fn host_config_does_not_require_hipcheck_artifacts() {
-        let file = TempConfigFile::new(
-            "server-address = 127.0.0.1:0\n\
-            database-connection = sqlite::memory:\n\
-            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n",
-        );
-
-        let config = Config::parse(file.path()).expect("host config should parse");
-        assert!(config.hipcheck.is_none());
-    }
-
-    #[test]
-    fn rejects_partial_hipcheck_artifact_configuration() {
-        let mut contents = valid_required_config();
-        let data_dir_start = contents
-            .find("\nhipcheck-data-dir =")
-            .expect("test config has Hipcheck data directory");
-        contents.truncate(data_dir_start);
-        let file = TempConfigFile::new(&contents);
-
-        let error = Config::parse(file.path()).expect_err("partial Hipcheck config should fail");
-        let ConfigLoadError::FailedToParseConfigFileFields(_, ConfigErrors(errors)) = error else {
-            panic!("expected field parsing error");
-        };
-        let ConfigError::StrParse(error) = &errors[0] else {
-            panic!("expected Hipcheck path error");
-        };
-        assert_eq!(&*error.key, "hipcheck-data-dir");
-        assert_eq!(
-            &*error.err,
-            "must be configured with every Hipcheck artifact path"
         );
     }
 
@@ -2312,12 +1843,12 @@ mod tests {
     fn parses_database_connection_file_from_spookey_config() {
         let secret_file = TempConfigFile::new("postgres://user:password@localhost:5432/nv\n");
         restrict_secret_file_permissions(secret_file.path());
-        let file = TempConfigFile::new(&config_with_hipcheck(&format!(
+        let file = TempConfigFile::new(&format!(
             "server-address = 127.0.0.1:0\n\
             cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection-file = {}\n",
             secret_file.path()
-        )));
+        ));
 
         let config = Config::parse(file.path()).expect("config should parse");
 
@@ -2333,11 +1864,11 @@ mod tests {
 
     #[test]
     fn config_display_redacts_inline_database_connection() {
-        let file = TempConfigFile::new(&config_with_hipcheck(
+        let file = TempConfigFile::new(
             "server-address = 127.0.0.1:0\n\
             cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection = postgres://user:password@localhost:5432/nv\n",
-        ));
+        );
 
         let config = Config::parse(file.path()).expect("config should parse");
         let report = format!("{config}");
@@ -2351,12 +1882,12 @@ mod tests {
     fn config_display_redacts_database_connection_file_path_and_contents() {
         let secret_file = TempConfigFile::new("postgres://user:password@localhost:5432/nv\n");
         restrict_secret_file_permissions(secret_file.path());
-        let file = TempConfigFile::new(&config_with_hipcheck(&format!(
+        let file = TempConfigFile::new(&format!(
             "server-address = 127.0.0.1:0\n\
             cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection-file = {}\n",
             secret_file.path()
-        )));
+        ));
 
         let config = Config::parse(file.path()).expect("config should parse");
         let report = format!("{config}");
@@ -2369,12 +1900,12 @@ mod tests {
 
     #[test]
     fn config_rejects_cve_list_repository_url_with_authentication() {
-        let file = TempConfigFile::new(&config_with_hipcheck(
+        let file = TempConfigFile::new(
             "server-address = 127.0.0.1:0\n\
             database-connection = sqlite::memory:\n\
             cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             cve-list-repository-url = https://user:token@example.test/cvelistV5.git\n",
-        ));
+        );
 
         let error = Config::parse(file.path()).expect_err("config should reject authentication");
         let ConfigLoadError::FailedToParseConfigFileFields(_, ConfigErrors(errors)) = error else {
@@ -2411,26 +1942,6 @@ mod tests {
             ("database-idle-timeout", "later", "invalid digit"),
             ("database-acquire-timeout", "eventually", "invalid digit"),
             ("database-max-lifetime", "forever", "invalid digit"),
-            (
-                "package-source-contents-max-bytes",
-                "0",
-                "must be greater than 0",
-            ),
-            (
-                "package-source-contents-max-bytes",
-                "1048577",
-                "must not exceed 1048576",
-            ),
-            (
-                "package-source-request-timeout",
-                "0",
-                "must be greater than 0",
-            ),
-            (
-                "package-source-max-concurrency",
-                "0",
-                "must be greater than 0",
-            ),
             ("async-worker-threads", "several", "invalid digit"),
             ("async-worker-thread-stack-size", "large", "invalid digit"),
             ("async-max-blocking-threads", "lots", "invalid digit"),
@@ -2514,10 +2025,10 @@ mod tests {
 
     #[test]
     fn missing_database_connection_source_returns_config_field_error() {
-        let file = TempConfigFile::new(&config_with_hipcheck(
+        let file = TempConfigFile::new(
             "server-address = 127.0.0.1:0\n\
             cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n",
-        ));
+        );
 
         let error =
             Config::parse(file.path()).expect_err("missing database connection should fail");
@@ -2539,10 +2050,10 @@ mod tests {
 
     #[test]
     fn missing_required_key_returns_spookey_parse_error() {
-        let file = TempConfigFile::new(&config_with_hipcheck(
+        let file = TempConfigFile::new(
             "database-connection = sqlite::memory:\n\
             cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n",
-        ));
+        );
 
         let error = Config::parse(file.path()).expect_err("missing required key should fail");
 
@@ -2559,10 +2070,10 @@ mod tests {
 
     #[test]
     fn missing_cve_list_checkout_path_returns_spookey_parse_error() {
-        let file = TempConfigFile::new(&config_with_hipcheck(
+        let file = TempConfigFile::new(
             "server-address = 127.0.0.1:0\n\
             database-connection = sqlite::memory:\n",
-        ));
+        );
 
         let error = Config::parse(file.path()).expect_err("missing checkout path should fail");
 
@@ -2579,12 +2090,12 @@ mod tests {
 
     #[test]
     fn mutually_exclusive_database_connection_sources_fail_config_parse() {
-        let file = TempConfigFile::new(&config_with_hipcheck(
+        let file = TempConfigFile::new(
             "server-address = 127.0.0.1:0\n\
             cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection = sqlite::memory:\n\
             database-connection-file = /run/secrets/nv-server/database-url\n",
-        ));
+        );
 
         let error = Config::parse(file.path()).expect_err("exclusive database sources should fail");
 
@@ -2614,12 +2125,12 @@ mod tests {
             secret_file.path(),
             TestFilePermissions::UnixGroupOrWorldReadable,
         );
-        let file = TempConfigFile::new(&config_with_hipcheck(&format!(
+        let file = TempConfigFile::new(&format!(
             "server-address = 127.0.0.1:0\n\
             cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection-file = {}\n",
             secret_file.path()
-        )));
+        ));
 
         let error = Config::parse(file.path()).expect_err("insecure secret file should fail");
 
@@ -2638,12 +2149,12 @@ mod tests {
     fn config_parse_rejects_insecure_database_connection_file_permissions() {
         let secret_file = TempConfigFile::new("postgres://user:password@localhost:5432/nv\n");
         let _grant_read = GrantReadAclGuard::new(secret_file.path());
-        let file = TempConfigFile::new(&config_with_hipcheck(&format!(
+        let file = TempConfigFile::new(&format!(
             "server-address = 127.0.0.1:0\n\
             cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
             database-connection-file = {}\n",
             secret_file.path()
-        )));
+        ));
 
         let error =
             Config::parse(file.path()).expect_err("broadly-readable secret file should fail");
@@ -2680,7 +2191,7 @@ mod tests {
         let ConfigError::Warning(warning) = &errors[0] else {
             panic!("expected Warning config error, got {:?}", errors[0]);
         };
-        assert_eq!(warning.line_number, 10);
+        assert_eq!(warning.line_number, 4);
         let spookey::WarningKind::UnexpectedKey { key } = &warning.kind else {
             panic!("expected UnexpectedKey warning, got {warning:?}");
         };

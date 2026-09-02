@@ -31,6 +31,7 @@ default-members = ["nv-server"]
 
 anyhow = "1.0.102"
 async-trait = "0.1.89"
+async-channel = "2.5.0"
 camino = "1.2.2"
 cargo-manifest = "0.21.0"
 chrono = "0.4.44"

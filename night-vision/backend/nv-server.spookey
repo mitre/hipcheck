@@ -149,6 +149,36 @@ cve-record-max-bytes =
 # cve-list-write-batch-size, capped at 1024.
 cve-list-write-channel-size =
 
+# The NPM registry base URL used for package-source elaboration.
+#
+# Default: https://registry.npmjs.org/
+npm-registry-url =
+
+# The number of concurrent package elaboration workers.
+#
+# Default: auto, four times async worker threads, between 4 and 32.
+package-elaboration-worker-concurrency =
+
+# The bounded package elaboration work queue capacity.
+#
+# Default: four times package-elaboration-worker-concurrency.
+package-elaboration-work-queue-capacity =
+
+# The maximum NPM packument response size in bytes.
+#
+# Default: 5242880
+package-elaboration-max-packument-bytes =
+
+# The maximum concrete package versions in one elaboration result.
+#
+# Default: 10000
+package-elaboration-max-packages =
+
+# The maximum acyclic derivation paths in one elaboration result.
+#
+# Default: 100000
+package-elaboration-max-derivations =
+
 # The number of async worker threads to use for handling requests.
 #
 # Default: (the number of CPU cores available on the system)

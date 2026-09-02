@@ -1,0 +1,801 @@
+//! Concurrent elaboration of NPM package sources.
+//!
+//! An elaboration run expands every registry-resolvable dependency in a
+//! validated [`NpmPackageJson`] into concrete package versions. The supervisor
+//! owns the result; workers only inspect one concrete package version and send
+//! one report through the one-shot channel attached to their work item.
+
+use super::{
+    package_json::NpmPackageJson,
+    packument::{NpmPackument, NpmVersion},
+    types::{DependencyMap, DependencyPackageName, DependencySpec, NpmPackageName},
+};
+use crate::npm_semver::{NpmVersion as RangeVersion, elaborate_npm_version_bounds, parse_range};
+use async_channel::Receiver;
+use async_trait::async_trait;
+use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
+use semver::Version;
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    sync::Arc,
+};
+use thiserror::Error;
+use tokio::sync::{Mutex, OnceCell, oneshot};
+use url::Url;
+
+/// A concrete NPM package identity.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct PackageVersion {
+    pub name: Box<str>,
+    pub version: Box<str>,
+}
+
+impl PackageVersion {
+    fn from_npm(name: &NpmPackageName, version: impl std::fmt::Display) -> Self {
+        Self {
+            name: name.as_str().into(),
+            version: version.to_string().into_boxed_str(),
+        }
+    }
+
+    /// Returns this package version's NPM Package URL.
+    pub fn purl(&self) -> String {
+        match self
+            .name
+            .strip_prefix('@')
+            .and_then(|name| name.split_once('/'))
+        {
+            Some((scope, package)) => format!("pkg:npm/%40{scope}/{package}@{}", self.version),
+            None => format!("pkg:npm/{}@{}", self.name, self.version),
+        }
+    }
+}
+
+/// A nonfatal dependency specification that v1 cannot resolve through NPM.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ElaborationWarning {
+    pub declared_by: Option<PackageVersion>,
+    pub dependency_name: Box<str>,
+    pub specification_kind: UnsupportedSpecificationKind,
+}
+
+/// The unsupported source form encountered while elaborating a dependency.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UnsupportedSpecificationKind {
+    File,
+    Git,
+    Url,
+}
+
+/// A package version and all known acyclic derivations reaching it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ElaboratedPackage {
+    pub package: PackageVersion,
+    pub derivations: Vec<Vec<PackageVersion>>,
+}
+
+/// The complete, in-memory result of elaborating one package source.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ElaborationResult {
+    pub packages: Vec<ElaboratedPackage>,
+    pub warnings: Vec<ElaborationWarning>,
+}
+
+/// Resource limits for a single elaboration run.
+#[derive(Clone, Debug)]
+pub struct ElaborationLimits {
+    pub worker_concurrency: usize,
+    pub work_queue_capacity: usize,
+    pub max_packages: usize,
+    pub max_derivations: usize,
+}
+
+impl Default for ElaborationLimits {
+    fn default() -> Self {
+        Self {
+            worker_concurrency: 4,
+            work_queue_capacity: 16,
+            max_packages: 10_000,
+            max_derivations: 100_000,
+        }
+    }
+}
+
+impl ElaborationLimits {
+    fn validate(&self) -> Result<(), ElaborationError> {
+        if self.worker_concurrency == 0 || self.work_queue_capacity == 0 {
+            return Err(ElaborationError::InvalidLimits);
+        }
+        Ok(())
+    }
+}
+
+/// Retrieves validated packuments from the configured registry.
+#[async_trait]
+pub trait PackumentProvider: Send + Sync {
+    async fn fetch(&self, package: &NpmPackageName)
+    -> Result<NpmPackument, PackumentProviderError>;
+}
+
+/// HTTP client for the configured NPM registry.
+pub struct NpmRegistryClient {
+    client: reqwest::Client,
+    registry_url: Url,
+    max_packument_bytes: usize,
+}
+
+impl NpmRegistryClient {
+    /// Creates a registry client with a validated base URL and response limit.
+    pub fn new(
+        registry_url: Url,
+        max_packument_bytes: usize,
+    ) -> Result<Self, PackumentProviderError> {
+        if max_packument_bytes == 0 {
+            return Err(PackumentProviderError::Request);
+        }
+        Ok(Self {
+            client: reqwest::Client::new(),
+            registry_url,
+            max_packument_bytes,
+        })
+    }
+
+    /// Creates a client for the public NPM registry.
+    pub fn public_npm(max_packument_bytes: usize) -> Result<Self, PackumentProviderError> {
+        Self::new(
+            Url::parse("https://registry.npmjs.org/").expect("public NPM URL is valid"),
+            max_packument_bytes,
+        )
+    }
+
+    fn packument_url(&self, package: &NpmPackageName) -> Result<Url, PackumentProviderError> {
+        let encoded = utf8_percent_encode(package.as_str(), NON_ALPHANUMERIC).to_string();
+        self.registry_url
+            .join(&encoded)
+            .map_err(|_| PackumentProviderError::Request)
+    }
+}
+
+#[async_trait]
+impl PackumentProvider for NpmRegistryClient {
+    async fn fetch(
+        &self,
+        package: &NpmPackageName,
+    ) -> Result<NpmPackument, PackumentProviderError> {
+        let response = self
+            .client
+            .get(self.packument_url(package)?)
+            .header("Accept", "application/vnd.npm.install-v1+json")
+            .send()
+            .await
+            .map_err(|_| PackumentProviderError::Request)?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PackumentProviderError::NotFound);
+        }
+        if !response.status().is_success()
+            || response
+                .content_length()
+                .is_some_and(|length| length > self.max_packument_bytes as u64)
+        {
+            return Err(PackumentProviderError::Request);
+        }
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|_| PackumentProviderError::Request)?;
+        if bytes.len() > self.max_packument_bytes {
+            return Err(PackumentProviderError::Request);
+        }
+        super::packument::parse_packument(bytes.as_ref())
+            .map_err(|_| PackumentProviderError::InvalidPackument)
+    }
+}
+
+/// A registry access failure safe to return to callers.
+#[derive(Debug, Error)]
+pub enum PackumentProviderError {
+    #[error("packument was not found")]
+    NotFound,
+    #[error("registry request failed")]
+    Request,
+    #[error("registry returned an invalid packument")]
+    InvalidPackument,
+}
+
+/// An elaboration failure. Failures never produce a partial result.
+#[derive(Debug, Error)]
+pub enum ElaborationError {
+    #[error("elaboration limits must be positive")]
+    InvalidLimits,
+    #[error("failed to retrieve packument for {package}")]
+    Packument {
+        package: Box<str>,
+        #[source]
+        source: PackumentProviderError,
+    },
+    #[error("invalid NPM range for {package}")]
+    InvalidRange { package: Box<str> },
+    #[error("NPM tag {tag:?} does not exist for {package}")]
+    UnknownTag { package: Box<str>, tag: Box<str> },
+    #[error("package version {package}@{version} is no longer available")]
+    MissingVersion {
+        package: Box<str>,
+        version: Box<str>,
+    },
+    #[error("elaboration exceeded the package limit")]
+    PackageLimitExceeded,
+    #[error("elaboration exceeded the derivation-path limit")]
+    DerivationLimitExceeded,
+    #[error("a worker stopped before reporting its result")]
+    WorkerStopped,
+}
+
+/// Expand every NPM package version reachable from `source`.
+pub async fn elaborate(
+    source: &NpmPackageJson,
+    provider: Arc<dyn PackumentProvider>,
+    limits: ElaborationLimits,
+) -> Result<ElaborationResult, ElaborationError> {
+    limits.validate()?;
+    let cache = PackumentCache::default();
+    let (work_sender, work_receiver) = async_channel::bounded(limits.work_queue_capacity);
+    let mut workers = Vec::with_capacity(limits.worker_concurrency);
+    for _ in 0..limits.worker_concurrency {
+        workers.push(tokio::spawn(worker(
+            work_receiver.clone(),
+            cache.clone(),
+            provider.clone(),
+        )));
+    }
+    drop(work_receiver);
+
+    let mut state = SupervisorState::default();
+    let mut pending = Vec::new();
+    for root in source.root_dependencies() {
+        let versions = resolve_specification(
+            &cache,
+            provider.as_ref(),
+            &root.name,
+            &root.specification,
+            None,
+            &mut state.warnings,
+        )
+        .await?;
+        for version in versions {
+            pending.push((version.clone(), vec![version]));
+        }
+    }
+
+    while !pending.is_empty() {
+        let mut replies = Vec::new();
+        let mut work = BTreeMap::<PackageVersion, Vec<Vec<PackageVersion>>>::new();
+        while let Some((package, derivation)) = pending.pop() {
+            if !state.record_derivation(package.clone(), derivation.clone(), &limits)? {
+                continue;
+            }
+            work.entry(package).or_default().push(derivation);
+        }
+
+        for (package, derivations) in work {
+            let (reply_sender, reply_receiver) = oneshot::channel();
+            work_sender
+                .send(WorkItem {
+                    package,
+                    derivations,
+                    reply_sender,
+                })
+                .await
+                .map_err(|_| ElaborationError::WorkerStopped)?;
+            replies.push(reply_receiver);
+        }
+
+        for reply in replies {
+            let report = reply.await.map_err(|_| ElaborationError::WorkerStopped)??;
+            for dependency in report.dependencies {
+                let versions = resolve_specification(
+                    &cache,
+                    provider.as_ref(),
+                    &dependency.name,
+                    &dependency.specification,
+                    Some(&report.package),
+                    &mut state.warnings,
+                )
+                .await?;
+                for derivation in &report.derivations {
+                    for version in &versions {
+                        if derivation.contains(version) {
+                            continue;
+                        }
+                        let mut child_derivation = derivation.clone();
+                        child_derivation.push(version.clone());
+                        pending.push((version.clone(), child_derivation));
+                    }
+                }
+            }
+        }
+    }
+
+    drop(work_sender);
+    for worker in workers {
+        worker.await.map_err(|_| ElaborationError::WorkerStopped)?;
+    }
+    Ok(state.finish())
+}
+
+#[derive(Default)]
+struct PackumentCache {
+    entries: Arc<Mutex<HashMap<PkgName, CachedNpmPackument>>>,
+}
+
+type PkgName = Box<str>;
+type CachedNpmPackument = Arc<OnceCell<Arc<NpmPackument>>>;
+
+impl Clone for PackumentCache {
+    fn clone(&self) -> Self {
+        Self {
+            entries: self.entries.clone(),
+        }
+    }
+}
+
+impl PackumentCache {
+    async fn get(
+        &self,
+        provider: &dyn PackumentProvider,
+        package: &NpmPackageName,
+    ) -> Result<Arc<NpmPackument>, ElaborationError> {
+        let cell = {
+            let mut entries = self.entries.lock().await;
+            entries
+                .entry(package.as_str().into())
+                .or_insert_with(|| Arc::new(OnceCell::new()))
+                .clone()
+        };
+        let package_name = package.as_str().to_owned();
+        cell.get_or_try_init(|| async {
+            provider
+                .fetch(package)
+                .await
+                .map(Arc::new)
+                .map_err(|source| ElaborationError::Packument {
+                    package: package_name.into_boxed_str(),
+                    source,
+                })
+        })
+        .await
+        .cloned()
+    }
+}
+
+struct WorkItem {
+    package: PackageVersion,
+    derivations: Vec<Vec<PackageVersion>>,
+    reply_sender: oneshot::Sender<Result<WorkerReport, ElaborationError>>,
+}
+
+struct WorkerReport {
+    package: PackageVersion,
+    derivations: Vec<Vec<PackageVersion>>,
+    dependencies: Vec<DeclaredDependency>,
+}
+
+struct DeclaredDependency {
+    name: DependencyPackageName,
+    specification: DependencySpec,
+}
+
+async fn worker(
+    receiver: Receiver<WorkItem>,
+    cache: PackumentCache,
+    provider: Arc<dyn PackumentProvider>,
+) {
+    while let Ok(item) = receiver.recv().await {
+        let result = inspect_package(
+            item.package.clone(),
+            item.derivations,
+            &cache,
+            provider.as_ref(),
+        )
+        .await;
+        let _ = item.reply_sender.send(result);
+    }
+}
+
+async fn inspect_package(
+    package: PackageVersion,
+    derivations: Vec<Vec<PackageVersion>>,
+    cache: &PackumentCache,
+    provider: &dyn PackumentProvider,
+) -> Result<WorkerReport, ElaborationError> {
+    let name = NpmPackageName::parse(package.name.to_string())
+        .expect("package names originate in packuments");
+    let packument = cache.get(provider, &name).await?;
+    let version = Version::parse(&package.version).expect("versions originate in packuments");
+    let npm_version =
+        packument
+            .versions
+            .get(&version)
+            .ok_or_else(|| ElaborationError::MissingVersion {
+                package: package.name.clone(),
+                version: package.version.clone(),
+            })?;
+    Ok(WorkerReport {
+        package,
+        derivations,
+        dependencies: declared_dependencies(npm_version),
+    })
+}
+
+fn declared_dependencies(version: &NpmVersion) -> Vec<DeclaredDependency> {
+    let mut dependencies = Vec::new();
+    append_dependencies(&mut dependencies, &version.dependencies);
+    append_dependencies(&mut dependencies, &version.dev_dependencies);
+    append_dependencies(&mut dependencies, &version.peer_dependencies);
+    append_dependencies(&mut dependencies, &version.optional_dependencies);
+    dependencies.sort_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
+    dependencies
+}
+
+fn append_dependencies(output: &mut Vec<DeclaredDependency>, dependencies: &DependencyMap) {
+    output.extend(
+        dependencies
+            .iter()
+            .map(|(name, specification)| DeclaredDependency {
+                name: name.clone(),
+                specification: specification.clone(),
+            }),
+    );
+}
+
+async fn resolve_specification(
+    cache: &PackumentCache,
+    provider: &dyn PackumentProvider,
+    name: &DependencyPackageName,
+    specification: &DependencySpec,
+    declared_by: Option<&PackageVersion>,
+    warnings: &mut Vec<ElaborationWarning>,
+) -> Result<Vec<PackageVersion>, ElaborationError> {
+    let mut name = name;
+    let mut specification = specification;
+    while let DependencySpec::NpmAlias {
+        package,
+        specification: target_specification,
+    } = specification
+    {
+        name = package;
+        specification = target_specification;
+    }
+
+    match specification {
+        DependencySpec::NpmAlias { .. } => unreachable!("aliases were unwrapped above"),
+        DependencySpec::File(_) => {
+            warnings.push(ElaborationWarning {
+                declared_by: declared_by.cloned(),
+                dependency_name: name.as_str().into(),
+                specification_kind: UnsupportedSpecificationKind::File,
+            });
+            Ok(Vec::new())
+        }
+        DependencySpec::Git(_) => {
+            warnings.push(ElaborationWarning {
+                declared_by: declared_by.cloned(),
+                dependency_name: name.as_str().into(),
+                specification_kind: UnsupportedSpecificationKind::Git,
+            });
+            Ok(Vec::new())
+        }
+        DependencySpec::Url(_) => {
+            warnings.push(ElaborationWarning {
+                declared_by: declared_by.cloned(),
+                dependency_name: name.as_str().into(),
+                specification_kind: UnsupportedSpecificationKind::Url,
+            });
+            Ok(Vec::new())
+        }
+        DependencySpec::Registry(_) | DependencySpec::Tag(_) => {
+            let package = NpmPackageName::parse(name.as_str().to_owned()).map_err(|_| {
+                ElaborationError::InvalidRange {
+                    package: name.as_str().into(),
+                }
+            })?;
+            let packument = cache.get(provider, &package).await?;
+            match specification {
+                DependencySpec::Registry(raw_range) => {
+                    let range = parse_range(raw_range.as_str()).map_err(|_| {
+                        ElaborationError::InvalidRange {
+                            package: package.as_str().into(),
+                        }
+                    })?;
+                    let mut versions = packument
+                        .versions
+                        .keys()
+                        .map(|version| {
+                            RangeVersion::parse(version.to_string())
+                                .expect("packument versions are valid SemVer")
+                        })
+                        .collect::<Vec<_>>();
+                    versions.sort();
+                    Ok(elaborate_npm_version_bounds(&versions, &range)
+                        .expect("versions were sorted")
+                        .into_iter()
+                        .map(|version| PackageVersion::from_npm(&packument.name, version))
+                        .collect())
+                }
+                DependencySpec::Tag(tag) => packument
+                    .dist_tags
+                    .get(tag)
+                    .map(|version| vec![PackageVersion::from_npm(&packument.name, version)])
+                    .ok_or_else(|| ElaborationError::UnknownTag {
+                        package: package.as_str().into(),
+                        tag: tag.clone().into_boxed_str(),
+                    }),
+                _ => unreachable!("the outer match constrains specification"),
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+struct SupervisorState {
+    packages: BTreeMap<PackageVersion, BTreeSet<Vec<PackageVersion>>>,
+    warnings: Vec<ElaborationWarning>,
+}
+
+impl SupervisorState {
+    fn record_derivation(
+        &mut self,
+        package: PackageVersion,
+        derivation: Vec<PackageVersion>,
+        limits: &ElaborationLimits,
+    ) -> Result<bool, ElaborationError> {
+        if !self.packages.contains_key(&package) && self.packages.len() == limits.max_packages {
+            return Err(ElaborationError::PackageLimitExceeded);
+        }
+        if self
+            .packages
+            .get(&package)
+            .is_some_and(|paths| paths.contains(&derivation))
+        {
+            return Ok(false);
+        }
+        let count = self.packages.values().map(BTreeSet::len).sum::<usize>();
+        if count == limits.max_derivations {
+            return Err(ElaborationError::DerivationLimitExceeded);
+        }
+        self.packages.entry(package).or_default().insert(derivation);
+        Ok(true)
+    }
+
+    fn finish(mut self) -> ElaborationResult {
+        self.warnings.sort_by(|left, right| {
+            left.declared_by
+                .cmp(&right.declared_by)
+                .then(left.dependency_name.cmp(&right.dependency_name))
+        });
+        ElaborationResult {
+            packages: self
+                .packages
+                .into_iter()
+                .map(|(package, derivations)| ElaboratedPackage {
+                    package,
+                    derivations: derivations.into_iter().collect(),
+                })
+                .collect(),
+            warnings: self.warnings,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::npm::{package_json::NpmPackageJson, packument::parse_packument};
+    use serde_json::json;
+    use std::{
+        collections::BTreeMap,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+
+    struct MockRegistry {
+        packuments: BTreeMap<String, String>,
+    }
+
+    #[async_trait]
+    impl PackumentProvider for MockRegistry {
+        async fn fetch(
+            &self,
+            package: &NpmPackageName,
+        ) -> Result<NpmPackument, PackumentProviderError> {
+            let Some(packument) = self.packuments.get(package.as_str()) else {
+                return Err(PackumentProviderError::NotFound);
+            };
+            parse_packument(packument.as_bytes())
+                .map_err(|_| PackumentProviderError::InvalidPackument)
+        }
+    }
+
+    fn packument(name: &str, version: &str, dependencies: serde_json::Value) -> String {
+        json!({
+            "name": name,
+            "dist-tags": { "latest": version },
+            "versions": {
+                version: {
+                    "name": name,
+                    "version": version,
+                    "dependencies": dependencies,
+                    "dist": {
+                        "tarball": format!("https://registry.example/{name}-{version}.tgz"),
+                        "shasum": "0123456789012345678901234567890123456789"
+                    }
+                }
+            }
+        })
+        .to_string()
+    }
+
+    fn source(value: serde_json::Value) -> NpmPackageJson {
+        NpmPackageJson::parse_package_json(value.to_string().as_bytes()).expect("valid manifest")
+    }
+
+    fn run(
+        source: &NpmPackageJson,
+        registry: MockRegistry,
+    ) -> Result<ElaborationResult, ElaborationError> {
+        tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(elaborate(
+                source,
+                Arc::new(registry),
+                ElaborationLimits::default(),
+            ))
+    }
+
+    #[test]
+    fn elaborates_ranges_and_transitive_dependencies() {
+        let source = source(json!({ "dependencies": { "root": "^1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([
+                (
+                    "root".to_owned(),
+                    packument("root", "1.0.0", json!({ "child": "^2.0.0" })),
+                ),
+                ("child".to_owned(), packument("child", "2.0.0", json!({}))),
+            ]),
+        };
+
+        let result = run(&source, registry).expect("elaboration succeeds");
+
+        assert_eq!(result.packages.len(), 2);
+        assert_eq!(result.packages[0].package.purl(), "pkg:npm/child@2.0.0");
+        assert_eq!(result.packages[1].package.purl(), "pkg:npm/root@1.0.0");
+        assert_eq!(
+            result.packages[0].derivations[0]
+                .iter()
+                .map(PackageVersion::purl)
+                .collect::<Vec<_>>(),
+            ["pkg:npm/root@1.0.0", "pkg:npm/child@2.0.0"]
+        );
+    }
+
+    #[test]
+    fn records_non_registry_specifications_as_warnings() {
+        let source = source(json!({ "dependencies": { "local": "file:../local" } }));
+
+        let result = run(
+            &source,
+            MockRegistry {
+                packuments: BTreeMap::new(),
+            },
+        )
+        .expect("unsupported dependency is nonfatal");
+
+        assert!(result.packages.is_empty());
+        assert_eq!(result.warnings.len(), 1);
+        assert_eq!(
+            result.warnings[0].specification_kind,
+            UnsupportedSpecificationKind::File
+        );
+    }
+
+    #[test]
+    fn stops_expanding_cycles_but_retains_the_reachable_versions() {
+        let source = source(json!({ "dependencies": { "left": "1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([
+                (
+                    "left".to_owned(),
+                    packument("left", "1.0.0", json!({ "right": "1.0.0" })),
+                ),
+                (
+                    "right".to_owned(),
+                    packument("right", "1.0.0", json!({ "left": "1.0.0" })),
+                ),
+            ]),
+        };
+
+        let result = run(&source, registry).expect("cycle is finite");
+
+        assert_eq!(result.packages.len(), 2);
+        assert_eq!(result.packages[1].derivations.len(), 1);
+    }
+
+    #[test]
+    fn fails_when_a_limit_is_exceeded() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([(
+                "root".to_owned(),
+                packument("root", "1.0.0", json!({})),
+            )]),
+        };
+        let limits = ElaborationLimits {
+            max_packages: 0,
+            ..ElaborationLimits::default()
+        };
+
+        let error = tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(elaborate(&source, Arc::new(registry), limits))
+            .expect_err("package limit is enforced");
+
+        assert!(matches!(error, ElaborationError::PackageLimitExceeded));
+    }
+
+    #[test]
+    fn resolves_dist_tags_and_npm_aliases() {
+        let source = source(json!({
+            "dependencies": { "alias": "npm:target@latest" }
+        }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([(
+                "target".to_owned(),
+                packument("target", "1.0.0", json!({})),
+            )]),
+        };
+
+        let result = run(&source, registry).expect("tagged alias resolves");
+
+        assert_eq!(result.packages.len(), 1);
+        assert_eq!(result.packages[0].package.purl(), "pkg:npm/target@1.0.0");
+    }
+
+    struct CountingRegistry {
+        packument: String,
+        requests: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl PackumentProvider for CountingRegistry {
+        async fn fetch(
+            &self,
+            _package: &NpmPackageName,
+        ) -> Result<NpmPackument, PackumentProviderError> {
+            self.requests.fetch_add(1, Ordering::SeqCst);
+            parse_packument(self.packument.as_bytes())
+                .map_err(|_| PackumentProviderError::InvalidPackument)
+        }
+    }
+
+    #[test]
+    fn cache_reuses_a_packument_across_dependency_kinds() {
+        let source = source(json!({
+            "dependencies": { "shared": "1.0.0" },
+            "devDependencies": { "shared": "1.0.0" }
+        }));
+        let registry = Arc::new(CountingRegistry {
+            packument: packument("shared", "1.0.0", json!({})),
+            requests: AtomicUsize::new(0),
+        });
+        let result = tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(elaborate(
+                &source,
+                registry.clone(),
+                ElaborationLimits::default(),
+            ))
+            .expect("elaboration succeeds");
+
+        assert_eq!(result.packages.len(), 1);
+        assert_eq!(registry.requests.load(Ordering::SeqCst), 1);
+    }
+}

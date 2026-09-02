@@ -190,6 +190,13 @@ pub enum DependencySpec {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NpmVersionRange(String);
 
+impl NpmVersionRange {
+    /// Returns the range exactly as it appeared in the dependency declaration.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// A map of validated npm dependency names and specifications.
 pub type DependencyMap = HashMap<DependencyPackageName, DependencySpec>;
 
