@@ -72,7 +72,8 @@ implementation for the existing package-source CLI commands.
 Each elaboration run has one Tokio supervisor task. It is the sole owner of
 the mutable result and the only producer for a bounded `async-channel` work
 queue. It spawns a configured number of workers; all workers consume from the
-same queue and send reports through a bounded result channel.
+same queue. Each work item includes a bounded one-shot return channel, through
+which its worker sends exactly one report to the supervisor.
 
 A work item contains a concrete package/version and the derivation prefixes
 that have not yet been propagated through that version. A worker retrieves the
