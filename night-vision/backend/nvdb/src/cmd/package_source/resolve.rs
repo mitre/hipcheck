@@ -33,15 +33,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
     let result = runtime.block_on(resolve(config, source_id))?;
     if matches.get_flag("json") {
-        println!(
-            "{}",
-            serde_json::json!({
-                "sourceId": source_id,
-                "packages": result.package_count,
-                "snapshotBehavior": "replaces-previous",
-                "warnings": result.warnings,
-            })
-        );
+        println!("{}", json_output(source_id, &result));
     } else {
         println!("source_id: {source_id}");
         println!("resolved_packages: {}", result.package_count);
@@ -49,6 +41,15 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         print_warnings(&result.warnings);
     }
     Ok(())
+}
+
+fn json_output(source_id: &str, result: &ResolutionSummary) -> serde_json::Value {
+    serde_json::json!({
+        "sourceId": source_id,
+        "packages": result.package_count,
+        "snapshotBehavior": "replaces-previous",
+        "warnings": result.warnings,
+    })
 }
 
 async fn resolve(config: &Config, source_id: &str) -> Result<ResolutionSummary> {
@@ -119,12 +120,33 @@ fn json_argument() -> clap::Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::command;
+    use super::{ResolutionSummary, command, json_output};
 
     #[test]
     fn resolve_accepts_a_source_id() {
         command()
             .try_get_matches_from(["resolve", "source-1", "--json"])
             .expect("package-source resolve should parse");
+    }
+
+    #[test]
+    fn resolve_json_output_describes_the_published_snapshot() {
+        let output = json_output(
+            "source-1",
+            &ResolutionSummary {
+                package_count: 2,
+                warnings: Vec::new(),
+            },
+        );
+
+        assert_eq!(
+            output,
+            serde_json::json!({
+                "sourceId": "source-1",
+                "packages": 2,
+                "snapshotBehavior": "replaces-previous",
+                "warnings": [],
+            })
+        );
     }
 }

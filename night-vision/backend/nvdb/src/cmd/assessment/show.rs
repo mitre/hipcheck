@@ -35,22 +35,18 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     if matches.get_flag("json") {
         println!(
             "{}",
-            serde_json::json!({
-                "id": run.run.id,
-                "state": run.run.status,
-                "target": run.run.target_purl,
-                "policy": {
-                    "id": run.run.policy_id,
-                    "version": run.run.policy_version,
-                },
-                "hipcheck": {
-                    "version": run.run.hipcheck_version,
-                    "commit": run.run.hipcheck_commit,
-                },
-                "recommendation": run.run.policy_recommendation,
-                "createdAt": run.run.created_at,
-                "findings": findings,
-            })
+            json_output(
+                run.run.id,
+                &run.run.status,
+                run.run.target_purl.as_deref(),
+                run.run.policy_id.as_deref(),
+                run.run.policy_version.as_deref(),
+                run.run.hipcheck_version.as_deref(),
+                run.run.hipcheck_commit.as_deref(),
+                run.run.policy_recommendation.as_deref(),
+                run.run.created_at,
+                findings,
+            )
         );
     } else {
         println!("assessment {}: {}", run.run.id, run.run.status);
@@ -78,6 +74,34 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the persisted assessment provenance is represented as flat database fields"
+)]
+fn json_output(
+    id: i32,
+    state: &str,
+    target: Option<&str>,
+    policy_id: Option<&str>,
+    policy_version: Option<&str>,
+    hipcheck_version: Option<&str>,
+    hipcheck_commit: Option<&str>,
+    recommendation: Option<&str>,
+    created_at: impl serde::Serialize,
+    findings: Vec<serde_json::Value>,
+) -> serde_json::Value {
+    serde_json::json!({
+        "id": id,
+        "state": state,
+        "target": target,
+        "policy": { "id": policy_id, "version": policy_version },
+        "hipcheck": { "version": hipcheck_version, "commit": hipcheck_commit },
+        "recommendation": recommendation,
+        "createdAt": created_at,
+        "findings": findings,
+    })
+}
+
 fn display_option(value: &Option<String>) -> &str {
     value.as_deref().unwrap_or("<none>")
 }
@@ -98,12 +122,33 @@ fn json_argument() -> clap::Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::command;
+    use super::{command, json_output};
 
     #[test]
     fn show_accepts_an_assessment_id() {
         command()
             .try_get_matches_from(["show", "assessment-1", "--json"])
             .expect("assessment show should parse");
+    }
+
+    #[test]
+    fn show_json_output_includes_assessment_provenance() {
+        let output = json_output(
+            7,
+            "completed",
+            Some("pkg:npm/example@1.2.3"),
+            Some("night-vision"),
+            Some("1"),
+            Some("0.10.0"),
+            Some("abc123"),
+            Some("pass"),
+            "2026-09-03T00:00:00Z",
+            vec![serde_json::json!({"kind": "concern"})],
+        );
+
+        assert_eq!(output["target"], "pkg:npm/example@1.2.3");
+        assert_eq!(output["policy"]["id"], "night-vision");
+        assert_eq!(output["hipcheck"]["commit"], "abc123");
+        assert_eq!(output["findings"][0]["kind"], "concern");
     }
 }

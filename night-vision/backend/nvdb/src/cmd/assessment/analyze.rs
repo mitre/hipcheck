@@ -36,7 +36,13 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     if matches.get_flag("json") {
         println!(
             "{}",
-            serde_json::json!({"id": run.run.id, "target": purl, "state": run.run.status, "recommendation": run.run.policy_recommendation, "findingCount": run.findings.len()})
+            json_output(
+                run.run.id,
+                purl,
+                &run.run.status,
+                run.run.policy_recommendation.as_deref(),
+                run.findings.len(),
+            )
         );
     } else {
         println!(
@@ -49,6 +55,22 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         );
     }
     Ok(())
+}
+
+fn json_output(
+    id: i32,
+    purl: &str,
+    state: &str,
+    recommendation: Option<&str>,
+    finding_count: usize,
+) -> serde_json::Value {
+    serde_json::json!({
+        "id": id,
+        "target": purl,
+        "state": state,
+        "recommendation": recommendation,
+        "findingCount": finding_count,
+    })
 }
 
 fn purl_argument() -> clap::Arg {
@@ -67,12 +89,26 @@ fn json_argument() -> clap::Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::command;
+    use super::{command, json_output};
 
     #[test]
     fn analyze_accepts_a_purl() {
         command()
             .try_get_matches_from(["analyze", "pkg:npm/example@1.2.3", "--json"])
             .expect("assessment analyze should parse");
+    }
+
+    #[test]
+    fn analyze_json_output_preserves_the_completed_assessment_summary() {
+        assert_eq!(
+            json_output(7, "pkg:npm/example@1.2.3", "completed", Some("pass"), 2),
+            serde_json::json!({
+                "id": 7,
+                "target": "pkg:npm/example@1.2.3",
+                "state": "completed",
+                "recommendation": "pass",
+                "findingCount": 2,
+            })
+        );
     }
 }

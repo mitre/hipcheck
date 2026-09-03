@@ -49,13 +49,13 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         let output = runs
             .iter()
             .map(|run| {
-                serde_json::json!({
-                    "id": run.id,
-                    "target": run.target_purl,
-                    "state": run.status,
-                    "recommendation": run.policy_recommendation,
-                    "createdAt": run.created_at,
-                })
+                json_run_output(
+                    run.id,
+                    run.target_purl.as_deref(),
+                    &run.status,
+                    run.policy_recommendation.as_deref(),
+                    run.created_at,
+                )
             })
             .collect::<Vec<_>>();
         println!("{}", serde_json::json!({"runs":output}));
@@ -73,6 +73,22 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn json_run_output(
+    id: i32,
+    target: Option<&str>,
+    state: &str,
+    recommendation: Option<&str>,
+    created_at: impl serde::Serialize,
+) -> serde_json::Value {
+    serde_json::json!({
+        "id": id,
+        "target": target,
+        "state": state,
+        "recommendation": recommendation,
+        "createdAt": created_at,
+    })
 }
 
 fn npm_package_name_from_purl(purl: &str) -> Result<NpmPackageName> {
@@ -116,7 +132,7 @@ fn json_argument() -> clap::Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::{command, npm_package_name_from_purl};
+    use super::{command, json_run_output, npm_package_name_from_purl};
     use clap::error::ErrorKind;
 
     #[test]
@@ -160,5 +176,25 @@ mod tests {
         ] {
             assert!(npm_package_name_from_purl(purl).is_err(), "{purl}");
         }
+    }
+
+    #[test]
+    fn runs_json_output_includes_the_assessed_version() {
+        assert_eq!(
+            json_run_output(
+                7,
+                Some("pkg:npm/example@1.2.3"),
+                "completed",
+                Some("pass"),
+                "2026-09-03T00:00:00Z",
+            ),
+            serde_json::json!({
+                "id": 7,
+                "target": "pkg:npm/example@1.2.3",
+                "state": "completed",
+                "recommendation": "pass",
+                "createdAt": "2026-09-03T00:00:00Z",
+            })
+        );
     }
 }

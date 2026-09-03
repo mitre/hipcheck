@@ -32,11 +32,15 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
     let id = runtime.block_on(store(config, path, contents))?;
     if matches.get_flag("json") {
-        println!("{}", serde_json::json!({ "id": id }));
+        println!("{}", json_output(&id));
     } else {
         println!("{id}");
     }
     Ok(())
+}
+
+fn json_output(id: &str) -> serde_json::Value {
+    serde_json::json!({ "id": id })
 }
 
 async fn store(config: &Config, path: &Utf8PathBuf, contents: String) -> Result<String> {
@@ -68,7 +72,7 @@ fn json_argument() -> clap::Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::command;
+    use super::{command, json_output};
     use clap::error::ErrorKind;
 
     #[test]
@@ -85,5 +89,13 @@ mod tests {
         command()
             .try_get_matches_from(["import", "package.json", "--json"])
             .expect("package-source import should parse");
+    }
+
+    #[test]
+    fn import_json_output_contains_the_source_id() {
+        assert_eq!(
+            json_output("source-1"),
+            serde_json::json!({"id": "source-1"})
+        );
     }
 }

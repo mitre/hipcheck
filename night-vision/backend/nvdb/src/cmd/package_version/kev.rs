@@ -156,14 +156,18 @@ impl<'a> From<&'a KevAffectedNpmPackageVersion> for KevMatchOutput<'a> {
 }
 
 fn print_json(purl: &str, matches: &[KevAffectedNpmPackageVersion]) -> Result<()> {
-    let matches = matches.iter().map(KevMatchOutput::from).collect::<Vec<_>>();
-    let output = serde_json::to_string_pretty(&serde_json::json!({
-        "purl": purl,
-        "matches": matches,
-    }))
-    .context("failed to serialize KEV package-version matches")?;
+    let output = serde_json::to_string_pretty(&json_output(purl, matches))
+        .context("failed to serialize KEV package-version matches")?;
     println!("{output}");
     Ok(())
+}
+
+fn json_output(purl: &str, matches: &[KevAffectedNpmPackageVersion]) -> serde_json::Value {
+    let matches = matches.iter().map(KevMatchOutput::from).collect::<Vec<_>>();
+    serde_json::json!({
+        "purl": purl,
+        "matches": matches,
+    })
 }
 
 fn print_matches(purl: &str, matches: &[KevAffectedNpmPackageVersion]) {
@@ -212,8 +216,11 @@ fn print_values(label: &str, values: &[String]) {
 
 #[cfg(test)]
 mod tests {
-    use super::{command, npm_package_version_from_purl};
+    use super::{command, json_output, npm_package_version_from_purl};
     use clap::error::ErrorKind;
+    use nv_common::cve::kev::{
+        KevAffectedNpmPackageVersion, KevContext, KevNpmMatchConfidence, KevNpmMatchStatus,
+    };
 
     #[test]
     fn kev_requires_a_purl() {
@@ -259,5 +266,36 @@ mod tests {
         ] {
             assert!(npm_package_version_from_purl(purl).is_err(), "{purl}");
         }
+    }
+
+    #[test]
+    fn kev_json_output_preserves_match_evidence_and_caveats() {
+        let output = json_output(
+            "pkg:npm/example@1.2.3",
+            &[KevAffectedNpmPackageVersion {
+                cve_id: "CVE-2026-0001".to_owned(),
+                kev_context: KevContext {
+                    cve_id: "CVE-2026-0001".to_owned(),
+                    vendor_project: Some("example".to_owned()),
+                    product: Some("example".to_owned()),
+                    vulnerability_name: None,
+                    date_added: Some("2026-01-01".to_owned()),
+                },
+                package_name: Some("example".to_owned()),
+                affected_version: Some("1.2.3".to_owned()),
+                source_evidence: vec!["CVE record".to_owned()],
+                confidence: KevNpmMatchConfidence::High,
+                caveats: vec!["range matched".to_owned()],
+                status: KevNpmMatchStatus::Affected,
+            }],
+        );
+
+        assert_eq!(output["purl"], "pkg:npm/example@1.2.3");
+        assert_eq!(output["matches"][0]["cveId"], "CVE-2026-0001");
+        assert_eq!(output["matches"][0]["confidence"], "high");
+        assert_eq!(
+            output["matches"][0]["caveats"],
+            serde_json::json!(["range matched"])
+        );
     }
 }

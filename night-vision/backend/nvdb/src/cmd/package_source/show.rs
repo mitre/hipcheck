@@ -19,16 +19,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
     let result = runtime.block_on(show(config, source_id))?;
     if matches.get_flag("json") {
-        println!(
-            "{}",
-            serde_json::json!({
-                "id": result.source.source_id,
-                "fileName": result.source.file_name,
-                "status": result.source.resolution_status,
-                "error": result.source.resolution_error,
-                "warnings": result.warnings,
-            })
-        );
+        println!("{}", json_output(&result));
     } else {
         println!("id: {}", result.source.source_id);
         println!("file_name: {}", result.source.file_name);
@@ -44,6 +35,16 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         print_warnings(&result.warnings);
     }
     Ok(())
+}
+
+fn json_output(result: &PackageSourceDetails) -> serde_json::Value {
+    serde_json::json!({
+        "id": result.source.source_id,
+        "fileName": result.source.file_name,
+        "status": result.source.resolution_status,
+        "error": result.source.resolution_error,
+        "warnings": result.warnings,
+    })
 }
 
 async fn show(config: &Config, source_id: &str) -> Result<PackageSourceDetails> {
@@ -81,12 +82,36 @@ fn json_argument() -> clap::Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::command;
+    use super::{PackageSourceDetails, command, json_output};
+    use nv_common::db::entities::package_sources;
 
     #[test]
     fn show_accepts_a_source_id() {
         command()
             .try_get_matches_from(["show", "source-1", "--json"])
             .expect("package-source show should parse");
+    }
+
+    #[test]
+    fn show_json_output_preserves_source_state() {
+        let output = json_output(&PackageSourceDetails {
+            source: package_sources::Model {
+                id: 1,
+                source_id: "source-1".to_owned(),
+                file_name: "package.json".to_owned(),
+                file_contents: "{}".to_owned(),
+                inferred_type: "npm-package-json".to_owned(),
+                resolution_status: "failed".to_owned(),
+                resolution_error: Some("registry unavailable".to_owned()),
+                created_at: "2026-09-03T00:00:00Z".parse().expect("valid timestamp"),
+            },
+            warnings: Vec::new(),
+        });
+
+        assert_eq!(output["id"], "source-1");
+        assert_eq!(output["fileName"], "package.json");
+        assert_eq!(output["status"], "failed");
+        assert_eq!(output["error"], "registry unavailable");
+        assert_eq!(output["warnings"], serde_json::json!([]));
     }
 }

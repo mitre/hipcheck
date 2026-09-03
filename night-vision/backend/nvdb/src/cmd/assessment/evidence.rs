@@ -67,13 +67,13 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
             .collect::<Vec<_>>();
         println!(
             "{}",
-            serde_json::json!({
-                "id": run.run.id,
-                "checks": checks,
-                "concerns": concerns,
-                "findings": findings,
-                "rawHipcheck": if raw { run.run.raw_json } else { None::<String> },
-            })
+            json_output(
+                run.run.id,
+                checks,
+                concerns,
+                findings,
+                raw.then_some(run.run.raw_json).flatten(),
+            )
         );
     } else {
         println!("assessment {} evidence", run.run.id);
@@ -109,6 +109,22 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     Ok(())
 }
 
+fn json_output(
+    id: i32,
+    checks: Vec<serde_json::Value>,
+    concerns: Vec<serde_json::Value>,
+    findings: Vec<serde_json::Value>,
+    raw_hipcheck: Option<String>,
+) -> serde_json::Value {
+    serde_json::json!({
+        "id": id,
+        "checks": checks,
+        "concerns": concerns,
+        "findings": findings,
+        "rawHipcheck": raw_hipcheck,
+    })
+}
+
 fn assessment_id_argument() -> clap::Arg {
     clap::Arg::new("assessment-id")
         .required(true)
@@ -125,12 +141,28 @@ fn json_argument() -> clap::Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::command;
+    use super::{command, json_output};
 
     #[test]
     fn evidence_accepts_raw_hipcheck_output() {
         command()
             .try_get_matches_from(["evidence", "assessment-1", "--raw-hipcheck", "--json"])
             .expect("assessment evidence should parse");
+    }
+
+    #[test]
+    fn evidence_json_output_hides_raw_hipcheck_by_default() {
+        let output = json_output(
+            7,
+            vec![serde_json::json!({"id": 1})],
+            Vec::new(),
+            vec![serde_json::json!({"kind": "concern"})],
+            None,
+        );
+
+        assert_eq!(output["id"], 7);
+        assert_eq!(output["checks"][0]["id"], 1);
+        assert_eq!(output["findings"][0]["kind"], "concern");
+        assert!(output["rawHipcheck"].is_null());
     }
 }

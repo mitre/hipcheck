@@ -23,10 +23,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
     let result = runtime.block_on(versions(config, source_id))?;
     if matches.get_flag("json") {
-        println!(
-            "{}",
-            serde_json::json!({ "versions": result.versions, "warnings": result.warnings })
-        );
+        println!("{}", json_output(&result));
     } else {
         for version in result.versions {
             let root_dependency_kinds = (!version.root_dependency_kinds.is_empty())
@@ -44,6 +41,10 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         print_warnings(&result.warnings);
     }
     Ok(())
+}
+
+fn json_output(result: &ResolvedVersions) -> serde_json::Value {
+    serde_json::json!({ "versions": result.versions, "warnings": result.warnings })
 }
 
 async fn versions(config: &Config, source_id: &str) -> Result<ResolvedVersions> {
@@ -117,12 +118,36 @@ fn json_argument() -> clap::Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::command;
+    use super::{ResolvedVersion, ResolvedVersions, command, json_output};
 
     #[test]
     fn versions_accepts_a_source_id() {
         command()
             .try_get_matches_from(["versions", "source-1", "--json"])
             .expect("package-source versions should parse");
+    }
+
+    #[test]
+    fn versions_json_output_preserves_derivation_metadata() {
+        let output = json_output(&ResolvedVersions {
+            versions: vec![ResolvedVersion {
+                purl: "pkg:npm/example@1.2.3".to_owned(),
+                root_dependency_kinds: vec!["dependency".to_owned()],
+                derivation_count: 1,
+                derivations: vec![vec![
+                    "<root>".to_owned(),
+                    "pkg:npm/example@1.2.3".to_owned(),
+                ]],
+            }],
+            warnings: Vec::new(),
+        });
+
+        assert_eq!(output["versions"][0]["purl"], "pkg:npm/example@1.2.3");
+        assert_eq!(
+            output["versions"][0]["rootDependencyKinds"],
+            serde_json::json!(["dependency"])
+        );
+        assert_eq!(output["versions"][0]["derivationCount"], 1);
+        assert_eq!(output["warnings"], serde_json::json!([]));
     }
 }
