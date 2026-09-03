@@ -40,12 +40,29 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
             .context("package version not found")?;
         Ok::<_, anyhow::Error>(list_hipcheck_runs(&db, version.id, limit).await?)
     })?;
-    let output = runs.iter().map(|run| serde_json::json!({"id":run.id,"state":run.status,"recommendation":run.policy_recommendation,"createdAt":run.created_at})).collect::<Vec<_>>();
     if matches.get_flag("json") {
+        let output = runs
+            .iter()
+            .map(|run| {
+                serde_json::json!({
+                    "id": run.id,
+                    "state": run.status,
+                    "recommendation": run.policy_recommendation,
+                    "createdAt": run.created_at,
+                })
+            })
+            .collect::<Vec<_>>();
         println!("{}", serde_json::json!({"runs":output}));
     } else {
-        for run in output {
-            println!("{run}");
+        println!("assessments: {}", runs.len());
+        for run in runs {
+            println!(
+                "{} {} {} {}",
+                run.id,
+                run.status,
+                run.policy_recommendation.as_deref().unwrap_or("<none>"),
+                run.created_at,
+            );
         }
     }
     Ok(())

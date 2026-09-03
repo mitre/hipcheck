@@ -27,11 +27,85 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
             .await?
             .context("assessment not found")
     })?;
-    let checks = run.checks.iter().map(|check| serde_json::json!({"id":check.id,"state":check.state,"effect":check.effect,"summary":check.summary})).collect::<Vec<_>>();
-    let concerns = run.concerns.iter().map(|concern| serde_json::json!({"checkId":concern.check_id,"kind":concern.kind,"message":concern.message,"details":concern.details})).collect::<Vec<_>>();
-    let findings = run.findings.iter().map(|finding| serde_json::json!({"kind":finding.kind,"effect":finding.effect,"severity":finding.severity,"summary":finding.summary,"evidence":finding.evidence})).collect::<Vec<_>>();
-    let evidence = serde_json::json!({"id":run.run.id,"checks":checks,"concerns":concerns,"findings":findings,"rawHipcheck": if raw { run.run.raw_json } else { None::<String> }});
-    println!("{evidence}");
+    if matches.get_flag("json") {
+        let checks = run
+            .checks
+            .iter()
+            .map(|check| {
+                serde_json::json!({
+                    "id": check.id,
+                    "state": check.state,
+                    "effect": check.effect,
+                    "summary": check.summary,
+                })
+            })
+            .collect::<Vec<_>>();
+        let concerns = run
+            .concerns
+            .iter()
+            .map(|concern| {
+                serde_json::json!({
+                    "checkId": concern.check_id,
+                    "kind": concern.kind,
+                    "message": concern.message,
+                    "details": concern.details,
+                })
+            })
+            .collect::<Vec<_>>();
+        let findings = run
+            .findings
+            .iter()
+            .map(|finding| {
+                serde_json::json!({
+                    "kind": finding.kind,
+                    "effect": finding.effect,
+                    "severity": finding.severity,
+                    "summary": finding.summary,
+                    "evidence": finding.evidence,
+                })
+            })
+            .collect::<Vec<_>>();
+        println!(
+            "{}",
+            serde_json::json!({
+                "id": run.run.id,
+                "checks": checks,
+                "concerns": concerns,
+                "findings": findings,
+                "rawHipcheck": if raw { run.run.raw_json } else { None::<String> },
+            })
+        );
+    } else {
+        println!("assessment {} evidence", run.run.id);
+        println!("checks: {}", run.checks.len());
+        for check in &run.checks {
+            println!(
+                "  {} {} {}: {}",
+                check.id, check.state, check.effect, check.summary
+            );
+        }
+        println!("concerns: {}", run.concerns.len());
+        for concern in &run.concerns {
+            println!(
+                "  check {} {}: {}",
+                concern.check_id, concern.kind, concern.message
+            );
+        }
+        println!("findings: {}", run.findings.len());
+        for finding in &run.findings {
+            println!(
+                "  {} {} {}: {}",
+                finding.severity.as_deref().unwrap_or("<none>"),
+                finding.effect,
+                finding.kind,
+                finding.summary
+            );
+        }
+        if raw {
+            println!("raw_hipcheck:");
+            println!("{}", run.run.raw_json.as_deref().unwrap_or("<none>"));
+        }
+    }
     Ok(())
 }
 
