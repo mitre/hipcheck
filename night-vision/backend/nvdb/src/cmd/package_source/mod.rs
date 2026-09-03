@@ -47,7 +47,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn source_by_id(
+pub async fn source_by_id(
     db: &DatabaseConnection,
     source_id: &str,
 ) -> Result<package_sources::Model> {
@@ -60,7 +60,7 @@ pub(crate) async fn source_by_id(
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ResolvedWarning {
+pub struct ResolvedWarning {
     declared_by_purl: Option<String>,
     dependency_name: String,
     specification_kind: String,
@@ -78,7 +78,7 @@ impl From<PersistedElaborationWarning> for ResolvedWarning {
     }
 }
 
-pub(crate) fn print_warnings(warnings: &[ResolvedWarning]) {
+pub fn print_warnings(warnings: &[ResolvedWarning]) {
     println!("warnings: {}", warnings.len());
     for warning in warnings {
         println!(

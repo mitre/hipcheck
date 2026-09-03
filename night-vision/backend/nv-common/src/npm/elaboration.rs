@@ -131,7 +131,7 @@ impl Default for ElaborationLimits {
             worker_concurrency: 4,
             work_queue_capacity: 16,
             request_timeout: Duration::from_secs(30),
-            total_run_timeout: Duration::from_secs(300),
+            total_run_timeout: Duration::from_mins(5),
             max_packages: 10_000,
             max_edges: 100_000,
             max_queued_work: 100_000,
@@ -338,7 +338,7 @@ async fn elaborate_inner(
     let mut pending = Vec::new();
     for root in source.root_dependencies() {
         let versions = resolve_specification(
-            &cache,
+            cache,
             provider.as_ref(),
             &root.name,
             &root.specification,
@@ -365,7 +365,7 @@ async fn elaborate_inner(
         let mut replies = Vec::new();
         let mut work = BTreeMap::<PackageVersion, Vec<Vec<PackageVersion>>>::new();
         while let Some((package, derivation)) = pending.pop() {
-            if !state.record_derivation(package.clone(), derivation.clone(), &limits)? {
+            if !state.record_derivation(package.clone(), derivation.clone(), limits)? {
                 continue;
             }
             work.entry(package).or_default().push(derivation);
@@ -388,7 +388,7 @@ async fn elaborate_inner(
             let report = reply.await.map_err(|_| ElaborationError::WorkerStopped)??;
             for dependency in report.dependencies {
                 let versions = resolve_specification(
-                    &cache,
+                    cache,
                     provider.as_ref(),
                     &dependency.name,
                     &dependency.specification,

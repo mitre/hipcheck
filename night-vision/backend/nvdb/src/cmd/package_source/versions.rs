@@ -29,9 +29,13 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         );
     } else {
         for version in result.versions {
+            let root_dependency_kinds = (!version.root_dependency_kinds.is_empty())
+                .then(|| format!("; root kinds: {}", version.root_dependency_kinds.join(", ")));
             println!(
-                "{} ({} derivations)",
-                version.purl, version.derivation_count
+                "{} ({} derivations{})",
+                version.purl,
+                version.derivation_count,
+                root_dependency_kinds.unwrap_or_default(),
             );
             for derivation in version.derivations {
                 println!("  {}", derivation.join(" -> "));
@@ -65,6 +69,7 @@ async fn versions(config: &Config, source_id: &str) -> Result<ResolvedVersions> 
                         .collect::<Vec<_>>();
                     ResolvedVersion {
                         purl: version.package_url,
+                        root_dependency_kinds: version.root_dependency_kinds,
                         derivation_count: derivations.len(),
                         derivations,
                     }
@@ -91,6 +96,7 @@ struct ResolvedVersions {
 #[serde(rename_all = "camelCase")]
 struct ResolvedVersion {
     purl: String,
+    root_dependency_kinds: Vec<String>,
     derivation_count: usize,
     derivations: Vec<Vec<String>>,
 }

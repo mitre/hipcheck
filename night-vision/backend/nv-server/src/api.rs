@@ -178,6 +178,8 @@ impl NvServerApi for RestApi {
         )?;
         let file_name = body.file_name;
         let contents = body.contents;
+        NpmPackageJson::parse_package_json(contents.as_bytes())
+            .map_err(|error| HttpError::for_bad_request(None, error.to_string()))?;
 
         let admission = context.try_admit_package_elaboration().ok_or_else(|| {
             HttpError::for_unavail(
@@ -185,7 +187,7 @@ impl NvServerApi for RestApi {
                 "package-source elaboration capacity is exhausted".to_owned(),
             )
         })?;
-        let stored = store_package_source(db, file_name, contents).await?;
+        let stored = store_validated_package_source(db, file_name, contents).await?;
         let worker_db = db.clone();
         let registry_url = context.npm_registry_url().clone();
         let limits = context.package_elaboration_limits();
@@ -259,13 +261,11 @@ fn unsupported_package_source_media_type() -> HttpError {
     )
 }
 
-async fn store_package_source(
+async fn store_validated_package_source(
     db: &DatabaseConnection,
     file_name: String,
     contents: String,
 ) -> Result<StoredPackageSource, HttpError> {
-    NpmPackageJson::parse_package_json(contents.as_bytes())
-        .map_err(|error| HttpError::for_bad_request(None, error.to_string()))?;
     let id = Uuid::now_v7();
     let source = nv_common::db::entities::package_sources::ActiveModel {
         source_id: Set(id.to_string()),
@@ -397,7 +397,10 @@ async fn lookup_package_source(
         .map_err(|error| HttpError::for_internal_error(error.to_string()))?
         .into_iter()
         .map(|version| VersionedPackage {
-            id: Uuid::from_u64_pair(source.id as u64, version.id as u64),
+            id: Uuid::from_u64_pair(
+                u64::try_from(source.id).expect("database source IDs are nonnegative"),
+                u64::try_from(version.id).expect("database package-version IDs are nonnegative"),
+            ),
             name: npm_package_name_from_purl(&version.package_url),
             version: version.version,
             ecosystem: PackageSourceEcosystem::Npm,
@@ -443,10 +446,12 @@ async fn lookup_package_source(
         )));
     }
 
-    let warnings_truncated = warnings.len() > MAX_API_WARNINGS as usize;
+    let max_api_warnings =
+        usize::try_from(MAX_API_WARNINGS).expect("API warning limit must fit in usize");
+    let warnings_truncated = warnings.len() > max_api_warnings;
     let warnings = warnings
         .into_iter()
-        .take(MAX_API_WARNINGS as usize)
+        .take(max_api_warnings)
         .map(|warning| PackageSourceWarning {
             declared_by_purl: warning.declared_by_purl,
             dependency_name: warning.dependency_name,

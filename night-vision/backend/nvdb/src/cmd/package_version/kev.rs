@@ -67,15 +67,9 @@ fn npm_package_version_from_purl(purl: &str) -> Result<ReachableNpmPackageVersio
     let Some((encoded_name, encoded_version)) = package_and_version.rsplit_once('@') else {
         bail!("PURL must include a package version");
     };
-    let package_name = percent_decode_str(encoded_name)
-        .decode_utf8()
-        .context("PURL package name has invalid percent encoding")?
-        .into_owned();
+    let package_name = decode_purl_component(encoded_name, "package name")?;
     NpmPackageName::from_str(&package_name).context("PURL has an invalid npm package name")?;
-    let version = percent_decode_str(encoded_version)
-        .decode_utf8()
-        .context("PURL version has invalid percent encoding")?
-        .into_owned();
+    let version = decode_purl_component(encoded_version, "version")?;
     if version.is_empty() || version.contains(['/', '@']) {
         bail!("PURL must include one non-empty package version");
     }
@@ -85,6 +79,32 @@ fn npm_package_version_from_purl(purl: &str) -> Result<ReachableNpmPackageVersio
         version,
         source_evidence: format!("queried package version PURL {purl}"),
     })
+}
+
+fn decode_purl_component(component: &str, name: &str) -> Result<String> {
+    if !has_valid_percent_encoding(component) {
+        bail!("PURL {name} has invalid percent encoding");
+    }
+    percent_decode_str(component)
+        .decode_utf8()
+        .with_context(|| format!("PURL {name} is not valid UTF-8"))
+        .map(std::borrow::Cow::into_owned)
+}
+
+fn has_valid_percent_encoding(value: &str) -> bool {
+    let mut bytes = value.bytes();
+    while let Some(byte) = bytes.next() {
+        if byte != b'%' {
+            continue;
+        }
+        let (Some(first), Some(second)) = (bytes.next(), bytes.next()) else {
+            return false;
+        };
+        if !first.is_ascii_hexdigit() || !second.is_ascii_hexdigit() {
+            return false;
+        }
+    }
+    true
 }
 
 #[derive(Serialize)]
@@ -235,6 +255,7 @@ mod tests {
             "pkg:npm/example",
             "pkg:cargo/example@1.2.3",
             "pkg:npm/example@1.2.3?repository_url=https://example.test",
+            "pkg:npm/example@1.2%ZZ",
         ] {
             assert!(npm_package_version_from_purl(purl).is_err(), "{purl}");
         }

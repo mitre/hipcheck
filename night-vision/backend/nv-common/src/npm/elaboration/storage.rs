@@ -18,6 +18,7 @@ use thiserror::Error;
 /// them. The diagnostic is deliberately short because it may contain text from
 /// an external registry.
 pub const MAX_FAILURE_DIAGNOSTIC_BYTES: usize = 1024;
+const DIAGNOSTIC_TRUNCATION_SUFFIX: &str = "...";
 
 /// A resolved package version together with every acyclic path reaching it.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,6 +26,7 @@ pub struct PersistedPackageVersion {
     pub id: i32,
     pub version: String,
     pub package_url: String,
+    pub root_dependency_kinds: Vec<String>,
     pub derivations: Vec<Vec<String>>,
 }
 
@@ -84,6 +86,7 @@ pub async fn persisted_package_versions(
         .map(|version| (version.id, version.package_url.clone()))
         .collect::<BTreeMap<_, _>>();
     let mut children = BTreeMap::<Option<i32>, BTreeSet<i32>>::new();
+    let mut root_dependency_kinds = BTreeMap::<i32, BTreeSet<String>>::new();
     for edge in edges {
         if !package_urls.contains_key(&edge.child_package_version_id)
             || edge
@@ -96,6 +99,14 @@ pub async fn persisted_package_versions(
             .entry(edge.parent_package_version_id)
             .or_default()
             .insert(edge.child_package_version_id);
+        if edge.parent_package_version_id.is_none()
+            && let Some(kind) = edge.root_dependency_kind
+        {
+            root_dependency_kinds
+                .entry(edge.child_package_version_id)
+                .or_default()
+                .insert(kind);
+        }
     }
     let children = children
         .into_iter()
@@ -123,6 +134,11 @@ pub async fn persisted_package_versions(
             id: version.id,
             version: version.version,
             package_url: version.package_url,
+            root_dependency_kinds: root_dependency_kinds
+                .remove(&version.id)
+                .unwrap_or_default()
+                .into_iter()
+                .collect(),
             derivations: derivations
                 .remove(&version.id)
                 .unwrap_or_default()
@@ -290,11 +306,15 @@ pub fn bounded_diagnostic(error: &str) -> String {
         return error.to_owned();
     }
 
-    let mut end = MAX_FAILURE_DIAGNOSTIC_BYTES - "...".len();
+    let mut end = MAX_FAILURE_DIAGNOSTIC_BYTES
+        .checked_sub(DIAGNOSTIC_TRUNCATION_SUFFIX.len())
+        .expect("diagnostic limit must exceed the truncation suffix length");
     while !error.is_char_boundary(end) {
-        end -= 1;
+        end = end
+            .checked_sub(1)
+            .expect("diagnostic must contain a character boundary");
     }
-    format!("{}...", &error[..end])
+    format!("{}{DIAGNOSTIC_TRUNCATION_SUFFIX}", &error[..end])
 }
 
 async fn find_or_insert_package(
@@ -455,11 +475,13 @@ mod tests {
         .map(
             |(index, (parent_package_version_id, child_package_version_id))| {
                 package_source_edges::Model {
-                    id: index as i32,
+                    id: i32::try_from(index).expect("test edge ID fits in i32"),
                     source_id: 7,
                     parent_package_version_id,
                     child_package_version_id,
-                    root_dependency_kind: None,
+                    root_dependency_kind: parent_package_version_id
+                        .is_none()
+                        .then(|| "dependencies".to_owned()),
                     declared_dependency: None,
                     declared_specification: None,
                 }
@@ -473,6 +495,7 @@ mod tests {
 
         let result = persisted_package_versions(&db, 7).await.unwrap();
 
+        assert_eq!(result[0].root_dependency_kinds, vec!["dependencies"]);
         assert_eq!(result[2].package_url, "pkg:npm/c@1.0.0");
         assert_eq!(
             result[2].derivations,

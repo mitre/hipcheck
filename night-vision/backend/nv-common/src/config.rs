@@ -610,14 +610,16 @@ impl Config {
         );
         let package_elaboration_limits = resolve_package_elaboration_limits(
             async_worker_threads,
-            package_elaboration_worker_concurrency,
-            package_elaboration_work_queue_capacity,
-            package_elaboration_request_timeout,
-            package_elaboration_total_run_timeout,
-            package_elaboration_max_packages,
-            package_elaboration_max_edges,
-            package_elaboration_max_queued_work,
-            package_elaboration_max_derivations,
+            PackageElaborationLimitSettings {
+                worker_concurrency: package_elaboration_worker_concurrency,
+                work_queue_capacity: package_elaboration_work_queue_capacity,
+                request_timeout: package_elaboration_request_timeout,
+                total_run_timeout: package_elaboration_total_run_timeout,
+                max_packages: package_elaboration_max_packages,
+                max_edges: package_elaboration_max_edges,
+                max_queued_work: package_elaboration_max_queued_work,
+                max_derivations: package_elaboration_max_derivations,
+            },
         );
 
         let config = Self {
@@ -984,8 +986,7 @@ fn default_npm_registry_url() -> Url {
     Url::parse(DEFAULT_NPM_REGISTRY_URL).expect("default NPM registry URL is valid")
 }
 
-fn resolve_package_elaboration_limits(
-    async_worker_threads: Option<usize>,
+struct PackageElaborationLimitSettings {
     worker_concurrency: Option<usize>,
     work_queue_capacity: Option<usize>,
     request_timeout: u64,
@@ -994,8 +995,13 @@ fn resolve_package_elaboration_limits(
     max_edges: usize,
     max_queued_work: usize,
     max_derivations: usize,
+}
+
+fn resolve_package_elaboration_limits(
+    async_worker_threads: Option<usize>,
+    settings: PackageElaborationLimitSettings,
 ) -> ElaborationLimits {
-    let worker_concurrency = worker_concurrency.unwrap_or_else(|| {
+    let worker_concurrency = settings.worker_concurrency.unwrap_or_else(|| {
         async_worker_threads
             .unwrap_or_else(available_parallelism)
             .saturating_mul(4)
@@ -1003,14 +1009,15 @@ fn resolve_package_elaboration_limits(
     });
     ElaborationLimits {
         worker_concurrency,
-        work_queue_capacity: work_queue_capacity
+        work_queue_capacity: settings
+            .work_queue_capacity
             .unwrap_or_else(|| worker_concurrency.saturating_mul(4)),
-        request_timeout: Duration::from_millis(request_timeout),
-        total_run_timeout: Duration::from_millis(total_run_timeout),
-        max_packages,
-        max_edges,
-        max_queued_work,
-        max_derivations,
+        request_timeout: Duration::from_millis(settings.request_timeout),
+        total_run_timeout: Duration::from_millis(settings.total_run_timeout),
+        max_packages: settings.max_packages,
+        max_edges: settings.max_edges,
+        max_queued_work: settings.max_queued_work,
+        max_derivations: settings.max_derivations,
     }
 }
 
