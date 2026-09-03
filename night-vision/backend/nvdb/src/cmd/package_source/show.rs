@@ -1,5 +1,9 @@
 use anyhow::{Context as _, Result};
-use nv_common::{config::Config, db, rt};
+use nv_common::{
+    config::Config, db, npm::elaboration::storage::persisted_elaboration_warnings, rt,
+};
+
+use super::{ResolvedWarning, print_warnings};
 
 pub fn command() -> clap::Command {
     clap::Command::new("show")
@@ -13,37 +17,52 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         .get_one::<String>("source-id")
         .expect("required source ID");
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
-    let source = runtime.block_on(show(config, source_id))?;
+    let result = runtime.block_on(show(config, source_id))?;
     if matches.get_flag("json") {
         println!(
             "{}",
             serde_json::json!({
-                "id": source.source_id,
-                "fileName": source.file_name,
-                "status": source.resolution_status,
-                "error": source.resolution_error,
+                "id": result.source.source_id,
+                "fileName": result.source.file_name,
+                "status": result.source.resolution_status,
+                "error": result.source.resolution_error,
+                "warnings": result.warnings,
             })
         );
     } else {
-        println!("id: {}", source.source_id);
-        println!("file_name: {}", source.file_name);
-        println!("status: {}", source.resolution_status);
+        println!("id: {}", result.source.source_id);
+        println!("file_name: {}", result.source.file_name);
+        println!("status: {}", result.source.resolution_status);
         println!(
             "error: {}",
-            source.resolution_error.as_deref().unwrap_or("<none>")
+            result
+                .source
+                .resolution_error
+                .as_deref()
+                .unwrap_or("<none>")
         );
+        print_warnings(&result.warnings);
     }
     Ok(())
 }
 
-async fn show(
-    config: &Config,
-    source_id: &str,
-) -> Result<nv_common::db::entities::package_sources::Model> {
+async fn show(config: &Config, source_id: &str) -> Result<PackageSourceDetails> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
-    super::source_by_id(&db, source_id).await
+    let source = super::source_by_id(&db, source_id).await?;
+    let warnings = persisted_elaboration_warnings(&db, source.id)
+        .await
+        .context("failed to read persisted elaboration warnings")?
+        .into_iter()
+        .map(ResolvedWarning::from)
+        .collect();
+    Ok(PackageSourceDetails { source, warnings })
+}
+
+struct PackageSourceDetails {
+    source: nv_common::db::entities::package_sources::Model,
+    warnings: Vec<ResolvedWarning>,
 }
 
 fn source_id_argument() -> clap::Arg {

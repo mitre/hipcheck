@@ -105,19 +105,27 @@ The `api` command is listed in help output, but it is not implemented yet.
 Running it currently reaches a placeholder in the binary. Use the
 [REST API Usage](./rest-api-usage.md) guide for current API examples.
 
-## Demo workflow command stubs
+## Package-source commands
 
-The following commands define the planned package-assessment demonstration
-workflow. They currently stop with an explicit not-implemented placeholder when
-run; they are available now so the command interface, help output, and parser
-tests can stabilize before their services are implemented.
+The following commands store, resolve, and inspect NPM `package.json` sources.
+Resolution and inspection output includes any persisted unsupported-specification
+warnings.
 
-| Command | Planned purpose |
+| Command | Purpose |
 | --- | --- |
 | `package-source import <FILE> [--json]` | Store a validated npm `package.json` source. |
 | `package-source resolve <SOURCE-ID> [--json]` | Resolve and persist reachable package versions. |
 | `package-source show <SOURCE-ID> [--json]` | Show package-source metadata and state. |
 | `package-source versions <SOURCE-ID> [--json]` | List resolved versions, derivation paths, and path counts. |
+
+## Demo workflow command stubs
+
+The following planned commands still stop with an explicit not-implemented
+placeholder. They remain available so their command interfaces, help output,
+and parser tests can stabilize before their services are implemented.
+
+| Command | Planned purpose |
+| --- | --- |
 | `package-source kevs <SOURCE-ID> [--json]` | List KEV-linked matches for source versions. |
 | `package-version kev <PURL> [--json]` | List KEV-linked CVE matches for one version. |
 | `assessment analyze <PURL> [--json]` | Run and persist the configured assessment. |

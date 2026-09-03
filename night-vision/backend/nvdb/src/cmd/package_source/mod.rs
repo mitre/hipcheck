@@ -1,6 +1,10 @@
 use anyhow::Result;
-use nv_common::{config::Config, db::entities::package_sources};
+use nv_common::{
+    config::Config, db::entities::package_sources,
+    npm::elaboration::storage::PersistedElaborationWarning,
+};
 use sea_orm::{ColumnTrait as _, DatabaseConnection, EntityTrait as _, QueryFilter as _};
+use serde::Serialize;
 
 pub mod import;
 pub mod kevs;
@@ -52,4 +56,37 @@ pub(crate) async fn source_by_id(
         .one(db)
         .await?
         .ok_or_else(|| anyhow::anyhow!("unknown package source {source_id}"))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResolvedWarning {
+    declared_by_purl: Option<String>,
+    dependency_name: String,
+    specification_kind: String,
+    message: String,
+}
+
+impl From<PersistedElaborationWarning> for ResolvedWarning {
+    fn from(warning: PersistedElaborationWarning) -> Self {
+        Self {
+            declared_by_purl: warning.declared_by_purl,
+            dependency_name: warning.dependency_name,
+            specification_kind: warning.specification_kind,
+            message: warning.message,
+        }
+    }
+}
+
+pub(crate) fn print_warnings(warnings: &[ResolvedWarning]) {
+    println!("warnings: {}", warnings.len());
+    for warning in warnings {
+        println!(
+            "  {}: {} ({}) — {}",
+            warning.declared_by_purl.as_deref().unwrap_or("<root>"),
+            warning.dependency_name,
+            warning.specification_kind,
+            warning.message,
+        );
+    }
 }

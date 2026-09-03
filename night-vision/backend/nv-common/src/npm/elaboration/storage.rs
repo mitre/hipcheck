@@ -28,6 +28,39 @@ pub struct PersistedPackageVersion {
     pub derivations: Vec<Vec<String>>,
 }
 
+/// A nonfatal unsupported dependency specification recorded for a source.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PersistedElaborationWarning {
+    pub declared_by_purl: Option<String>,
+    pub dependency_name: String,
+    pub specification_kind: String,
+    pub message: String,
+}
+
+/// Read source-scoped elaboration warnings in their deterministic insertion order.
+pub async fn persisted_elaboration_warnings(
+    db: &DatabaseConnection,
+    source_id: i32,
+) -> Result<Vec<PersistedElaborationWarning>, ElaborationStorageError> {
+    package_source_warnings::Entity::find()
+        .filter(package_source_warnings::Column::SourceId.eq(source_id))
+        .order_by_asc(package_source_warnings::Column::Id)
+        .all(db)
+        .await
+        .map_err(ElaborationStorageError::Database)
+        .map(|warnings| {
+            warnings
+                .into_iter()
+                .map(|warning| PersistedElaborationWarning {
+                    declared_by_purl: warning.declared_by_purl,
+                    dependency_name: warning.dependency_name,
+                    specification_kind: warning.specification_kind,
+                    message: warning.message,
+                })
+                .collect()
+        })
+}
+
 /// Read source-scoped package versions and derive deterministic paths from the
 /// stored edge graph.
 pub async fn persisted_package_versions(
@@ -199,6 +232,7 @@ pub async fn persist_completed_elaboration(
             declared_by_purl: Set(warning.declared_by.as_ref().map(PackageVersion::purl)),
             dependency_name: Set(warning.dependency_name.to_string()),
             specification_kind: Set(warning_kind(warning.specification_kind).to_owned()),
+            message: Set(warning.specification_kind.safe_message().to_owned()),
             ..Default::default()
         }
         .insert(&transaction)
@@ -347,10 +381,10 @@ pub enum ElaborationStorageError {
 mod tests {
     use super::{
         MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic, persist_completed_elaboration,
-        persisted_package_versions, record_elaboration_failure,
+        persisted_elaboration_warnings, persisted_package_versions, record_elaboration_failure,
     };
     use crate::{
-        db::entities::{package_source_edges, package_versions, packages},
+        db::entities::{package_source_edges, package_source_warnings, package_versions, packages},
         npm::elaboration::{ElaboratedPackage, ElaborationResult, PackageVersion},
     };
     use sea_orm::{DbBackend, MockDatabase, MockExecResult};
@@ -362,6 +396,31 @@ mod tests {
         assert!(diagnostic.len() <= MAX_FAILURE_DIAGNOSTIC_BYTES);
         assert!(diagnostic.ends_with("..."));
         assert!(diagnostic.is_char_boundary(diagnostic.len()));
+    }
+
+    #[tokio::test]
+    async fn reads_persisted_warning_details() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![package_source_warnings::Model {
+                id: 1,
+                source_id: 7,
+                declared_by_purl: Some("pkg:npm/root@1.0.0".to_owned()),
+                dependency_name: "local-package".to_owned(),
+                specification_kind: "file".to_owned(),
+                message: "File dependencies cannot be resolved.".to_owned(),
+            }]])
+            .into_connection();
+
+        let warnings = persisted_elaboration_warnings(&db, 7).await.unwrap();
+
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].declared_by_purl.as_deref(),
+            Some("pkg:npm/root@1.0.0")
+        );
+        assert_eq!(warnings[0].dependency_name, "local-package");
+        assert_eq!(warnings[0].specification_kind, "file");
+        assert_eq!(warnings[0].message, "File dependencies cannot be resolved.");
     }
 
     #[tokio::test]

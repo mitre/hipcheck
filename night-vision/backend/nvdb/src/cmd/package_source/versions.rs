@@ -1,6 +1,13 @@
 use anyhow::{Context as _, Result};
-use nv_common::{config::Config, db, npm::elaboration::storage::persisted_package_versions, rt};
+use nv_common::{
+    config::Config,
+    db,
+    npm::elaboration::storage::{persisted_elaboration_warnings, persisted_package_versions},
+    rt,
+};
 use serde::Serialize;
+
+use super::{ResolvedWarning, print_warnings};
 
 pub fn command() -> clap::Command {
     clap::Command::new("versions")
@@ -14,11 +21,14 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         .get_one::<String>("source-id")
         .expect("required source ID");
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
-    let versions = runtime.block_on(versions(config, source_id))?;
+    let result = runtime.block_on(versions(config, source_id))?;
     if matches.get_flag("json") {
-        println!("{}", serde_json::json!({ "versions": versions }));
+        println!(
+            "{}",
+            serde_json::json!({ "versions": result.versions, "warnings": result.warnings })
+        );
     } else {
-        for version in versions {
+        for version in result.versions {
             println!(
                 "{} ({} derivations)",
                 version.purl, version.derivation_count
@@ -27,16 +37,17 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
                 println!("  {}", derivation.join(" -> "));
             }
         }
+        print_warnings(&result.warnings);
     }
     Ok(())
 }
 
-async fn versions(config: &Config, source_id: &str) -> Result<Vec<ResolvedVersion>> {
+async fn versions(config: &Config, source_id: &str) -> Result<ResolvedVersions> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
     let source = super::source_by_id(&db, source_id).await?;
-    persisted_package_versions(&db, source.id)
+    let versions = persisted_package_versions(&db, source.id)
         .await
         .context("failed to read resolved package derivations")
         .map(|versions| {
@@ -59,7 +70,21 @@ async fn versions(config: &Config, source_id: &str) -> Result<Vec<ResolvedVersio
                     }
                 })
                 .collect()
-        })
+        })?;
+    let warnings = persisted_elaboration_warnings(&db, source.id)
+        .await
+        .context("failed to read persisted elaboration warnings")?
+        .into_iter()
+        .map(ResolvedWarning::from)
+        .collect();
+    Ok(ResolvedVersions { versions, warnings })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResolvedVersions {
+    versions: Vec<ResolvedVersion>,
+    warnings: Vec<ResolvedWarning>,
 }
 
 #[derive(Serialize)]

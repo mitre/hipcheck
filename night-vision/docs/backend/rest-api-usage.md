@@ -195,8 +195,10 @@ The intended package-source workflow is asynchronous:
    `completed`, `completed-with-warnings`, or `failed`.
 4. Read `versionedPackages` from a completed response. A
    `completed-with-warnings` response also includes up to 100 structured
-   warnings and sets `warningsTruncated` when more were recorded. A `failed`
-   response includes a diagnostic capped at 1024 UTF-8 bytes.
+   warnings, each with a safe explanatory `message`, and sets
+   `warningsTruncated` when more were recorded. A `failed`
+   response includes a diagnostic capped at 1024 UTF-8 bytes and retains the
+   last successful graph in `previousVersionedPackages`, when one exists.
 
 At the API boundary, package sources currently support the `npm` ecosystem and
 the `package.json` style of input described in

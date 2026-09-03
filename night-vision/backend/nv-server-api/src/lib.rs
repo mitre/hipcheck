@@ -158,6 +158,11 @@ pub struct PackageSourceStatusFailed {
     // `jiff`.
     pub created_at: DateTime<Utc>,
     pub diagnostic: String,
+    /// The last successfully published reachable-version snapshot, if any.
+    ///
+    /// A failed re-elaboration does not replace the prior snapshot, so callers
+    /// can continue to inspect it while acting on `diagnostic`.
+    pub previous_versioned_packages: Vec<VersionedPackage>,
 }
 
 #[derive(Serialize, JsonSchema, Debug, Clone)]
@@ -166,6 +171,8 @@ pub struct PackageSourceWarning {
     pub declared_by_purl: Option<String>,
     pub dependency_name: String,
     pub specification_kind: String,
+    /// A fixed explanation that does not include untrusted registry content.
+    pub message: String,
 }
 
 #[derive(Serialize, JsonSchema, Debug, Clone)]

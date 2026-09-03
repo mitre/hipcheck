@@ -11,6 +11,7 @@ pub struct Model {
     pub declared_by_purl: Option<String>,
     pub dependency_name: String,
     pub specification_kind: String,
+    pub message: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

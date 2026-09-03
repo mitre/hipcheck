@@ -70,6 +70,23 @@ pub enum UnsupportedSpecificationKind {
     Url,
 }
 
+impl UnsupportedSpecificationKind {
+    /// Returns a fixed explanation that is safe to expose to API and CLI callers.
+    pub fn safe_message(self) -> &'static str {
+        match self {
+            Self::File => {
+                "File, link, and workspace dependencies cannot be resolved through the configured NPM registry."
+            }
+            Self::Git => {
+                "Git and repository dependencies cannot be resolved through the configured NPM registry."
+            }
+            Self::Url => {
+                "Direct URL dependencies cannot be resolved through the configured NPM registry."
+            }
+        }
+    }
+}
+
 /// A package version and all known acyclic derivations reaching it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ElaboratedPackage {
@@ -912,6 +929,10 @@ mod tests {
         assert_eq!(
             result.warnings[0].specification_kind,
             UnsupportedSpecificationKind::File
+        );
+        assert_eq!(
+            result.warnings[0].specification_kind.safe_message(),
+            "File, link, and workspace dependencies cannot be resolved through the configured NPM registry."
         );
     }
 

@@ -5,13 +5,18 @@ use nv_common::{
     npm::{
         elaboration::{
             NpmRegistryClient, elaborate,
-            storage::{persist_completed_elaboration, record_elaboration_failure},
+            storage::{
+                persist_completed_elaboration, persisted_elaboration_warnings,
+                record_elaboration_failure,
+            },
         },
         package_json::NpmPackageJson,
     },
     rt,
 };
 use std::sync::Arc;
+
+use super::{ResolvedWarning, print_warnings};
 
 pub fn command() -> clap::Command {
     clap::Command::new("resolve")
@@ -29,16 +34,16 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     if matches.get_flag("json") {
         println!(
             "{}",
-            serde_json::json!({ "packages": result.0, "warnings": result.1 })
+            serde_json::json!({ "packages": result.package_count, "warnings": result.warnings })
         );
     } else {
-        println!("resolved_packages: {}", result.0);
-        println!("warnings: {}", result.1);
+        println!("resolved_packages: {}", result.package_count);
+        print_warnings(&result.warnings);
     }
     Ok(())
 }
 
-async fn resolve(config: &Config, source_id: &str) -> Result<(usize, usize)> {
+async fn resolve(config: &Config, source_id: &str) -> Result<ResolutionSummary> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
@@ -59,11 +64,20 @@ async fn resolve(config: &Config, source_id: &str) -> Result<(usize, usize)> {
     .await;
     match result {
         Ok(result) => {
-            let summary = (result.packages.len(), result.warnings.len());
+            let package_count = result.packages.len();
             persist_completed_elaboration(&db, source.id, &result)
                 .await
                 .context("failed to persist elaboration result")?;
-            Ok(summary)
+            let warnings = persisted_elaboration_warnings(&db, source.id)
+                .await
+                .context("failed to read persisted elaboration warnings")?
+                .into_iter()
+                .map(ResolvedWarning::from)
+                .collect();
+            Ok(ResolutionSummary {
+                package_count,
+                warnings,
+            })
         }
         Err(error) => {
             record_elaboration_failure(&db, source.id, &error.to_string())
@@ -72,6 +86,11 @@ async fn resolve(config: &Config, source_id: &str) -> Result<(usize, usize)> {
             Err(error.into())
         }
     }
+}
+
+struct ResolutionSummary {
+    package_count: usize,
+    warnings: Vec<ResolvedWarning>,
 }
 
 fn source_id_argument() -> clap::Arg {

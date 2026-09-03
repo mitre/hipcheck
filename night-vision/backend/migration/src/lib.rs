@@ -16,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260711_000000_add_cisa_kev_entry_removed_at::Migration),
             Box::new(m20260903_000000_add_package_source_elaboration::Migration),
             Box::new(m20260903_010000_add_package_source_created_at::Migration),
+            Box::new(m20260903_020000_add_package_source_warning_message::Migration),
         ]
     }
 }
@@ -29,3 +30,4 @@ mod m20260710_010000_create_cve_list_record_staging;
 mod m20260711_000000_add_cisa_kev_entry_removed_at;
 mod m20260903_000000_add_package_source_elaboration;
 mod m20260903_010000_add_package_source_created_at;
+mod m20260903_020000_add_package_source_warning_message;

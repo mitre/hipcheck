@@ -372,33 +372,25 @@ async fn lookup_package_source(
         return Ok(None);
     };
     let created_at = source.created_at.with_timezone(&Utc);
-    match source.resolution_status.as_str() {
+    let failure_diagnostic = match source.resolution_status.as_str() {
         "pending" => {
             return Ok(Some(PackageSourceStatus::Processing(
                 PackageSourceStatusProcessing { id, created_at },
             )));
         }
-        "failed" => {
-            return Ok(Some(PackageSourceStatus::Failed(
-                PackageSourceStatusFailed {
-                    id,
-                    created_at,
-                    diagnostic: bounded_diagnostic(
-                        source
-                            .resolution_error
-                            .as_deref()
-                            .unwrap_or("Elaboration failed."),
-                    ),
-                },
-            )));
-        }
-        "completed" => {}
+        "failed" => Some(bounded_diagnostic(
+            source
+                .resolution_error
+                .as_deref()
+                .unwrap_or("Elaboration failed."),
+        )),
+        "completed" => None,
         status => {
             return Err(HttpError::for_internal_error(format!(
                 "unknown package source resolution status {status:?}"
             )));
         }
-    }
+    };
 
     let versioned_packages = persisted_package_versions(db, source.id)
         .await
@@ -421,6 +413,17 @@ async fn lookup_package_source(
                 .collect(),
         })
         .collect();
+
+    if let Some(diagnostic) = failure_diagnostic {
+        return Ok(Some(PackageSourceStatus::Failed(
+            PackageSourceStatusFailed {
+                id,
+                created_at,
+                diagnostic,
+                previous_versioned_packages: versioned_packages,
+            },
+        )));
+    }
 
     let warnings = package_source_warnings::Entity::find()
         .filter(package_source_warnings::Column::SourceId.eq(source.id))
@@ -448,6 +451,7 @@ async fn lookup_package_source(
             declared_by_purl: warning.declared_by_purl,
             dependency_name: warning.dependency_name,
             specification_kind: warning.specification_kind,
+            message: warning.message,
         })
         .collect();
     Ok(Some(PackageSourceStatus::CompletedWithWarnings(
@@ -548,6 +552,8 @@ mod tests {
         let id = Uuid::now_v7();
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([vec![source(id, "failed", Some("x".repeat(2048)))]])
+            .append_query_results([Vec::<package_versions::Model>::new()])
+            .append_query_results([Vec::<package_source_edges::Model>::new()])
             .into_connection();
 
         let status = lookup_package_source(&db, id).await.unwrap().unwrap();
@@ -557,6 +563,48 @@ mod tests {
         };
         assert!(failed.diagnostic.len() <= MAX_FAILURE_DIAGNOSTIC_BYTES);
         assert!(failed.diagnostic.ends_with("..."));
+        assert!(failed.previous_versioned_packages.is_empty());
+    }
+
+    #[tokio::test]
+    async fn lookup_keeps_the_prior_snapshot_visible_after_a_failure() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(
+                id,
+                "failed",
+                Some("registry request failed".to_owned()),
+            )]])
+            .append_query_results([vec![package_versions::Model {
+                id: 1,
+                package_id: 1,
+                source_id: 1,
+                version: "1.0.0".to_owned(),
+                package_url: "pkg:npm/root@1.0.0".to_owned(),
+                source_repository: None,
+                source_repository_tag: None,
+            }]])
+            .append_query_results([vec![package_source_edges::Model {
+                id: 1,
+                source_id: 1,
+                parent_package_version_id: None,
+                child_package_version_id: 1,
+                root_dependency_kind: Some("dependencies".to_owned()),
+                declared_dependency: Some("root".to_owned()),
+                declared_specification: Some("1.0.0".to_owned()),
+            }]])
+            .into_connection();
+
+        let status = lookup_package_source(&db, id).await.unwrap().unwrap();
+
+        let PackageSourceStatus::Failed(failed) = status else {
+            panic!("expected failed package source status");
+        };
+        assert_eq!(failed.diagnostic, "registry request failed");
+        assert_eq!(
+            failed.previous_versioned_packages[0].derivations,
+            vec![vec!["<root>".to_owned(), "pkg:npm/root@1.0.0".to_owned()]]
+        );
     }
 
     #[tokio::test]
@@ -588,6 +636,7 @@ mod tests {
                 declared_by_purl: None,
                 dependency_name: "local-package".to_owned(),
                 specification_kind: "file".to_owned(),
+                message: "File dependencies cannot be resolved.".to_owned(),
             }]])
             .into_connection();
 
@@ -599,6 +648,10 @@ mod tests {
         assert!(!completed.warnings_truncated);
         assert_eq!(completed.warnings.len(), 1);
         assert_eq!(completed.warnings[0].dependency_name, "local-package");
+        assert_eq!(
+            completed.warnings[0].message,
+            "File dependencies cannot be resolved."
+        );
         assert_eq!(completed.versioned_packages[0].name, "@scope/root");
         assert_eq!(
             completed.versioned_packages[0].derivations,

@@ -346,6 +346,13 @@
                 "type": "string",
                 "format": "uuid"
               },
+              "previousVersionedPackages": {
+                "description": "The last successfully published reachable-version snapshot, if any.\n\nA failed re-elaboration does not replace the prior snapshot, so callers can continue to inspect it while acting on `diagnostic`.",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VersionedPackage"
+                }
+              },
               "status": {
                 "type": "string",
                 "enum": [
@@ -357,6 +364,7 @@
               "createdAt",
               "diagnostic",
               "id",
+              "previousVersionedPackages",
               "status"
             ]
           }
@@ -372,12 +380,17 @@
           "dependencyName": {
             "type": "string"
           },
+          "message": {
+            "description": "A fixed explanation that does not include untrusted registry content.",
+            "type": "string"
+          },
           "specificationKind": {
             "type": "string"
           }
         },
         "required": [
           "dependencyName",
+          "message",
           "specificationKind"
         ]
       },
