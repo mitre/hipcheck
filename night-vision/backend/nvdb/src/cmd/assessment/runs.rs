@@ -1,5 +1,8 @@
-use anyhow::Result;
-use nv_common::config::Config;
+use anyhow::{Context as _, Result};
+use nv_common::{
+    config::Config, db, db::entities::package_versions, hipcheck::storage::list_hipcheck_runs, rt,
+};
+use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
 
 const DEFAULT_LIMIT: u64 = 10;
 
@@ -24,8 +27,28 @@ pub fn command() -> clap::Command {
         .arg(json_argument())
 }
 
-pub fn run(_config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
-    todo!("assessment runs is not implemented")
+pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
+    let purl = matches.get_one::<String>("package").expect("required PURL");
+    let limit = *matches.get_one::<u64>("limit").expect("default limit");
+    let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
+    let runs = runtime.block_on(async {
+        let db = db::connection(config).await?;
+        let version = package_versions::Entity::find()
+            .filter(package_versions::Column::PackageUrl.eq(purl))
+            .one(&db)
+            .await?
+            .context("package version not found")?;
+        Ok::<_, anyhow::Error>(list_hipcheck_runs(&db, version.id, limit).await?)
+    })?;
+    let output = runs.iter().map(|run| serde_json::json!({"id":run.id,"state":run.status,"recommendation":run.policy_recommendation,"createdAt":run.created_at})).collect::<Vec<_>>();
+    if matches.get_flag("json") {
+        println!("{}", serde_json::json!({"runs":output}));
+    } else {
+        for run in output {
+            println!("{run}");
+        }
+    }
+    Ok(())
 }
 
 fn json_argument() -> clap::Arg {

@@ -205,6 +205,20 @@ package-elaboration-max-queued-work =
 # Default: 100000
 package-elaboration-max-derivations =
 
+# Hipcheck assessments run the bundled policy with this bounded process configuration.
+# Default concurrency: 1.
+hipcheck-bin-path =
+hipcheck-policy-path =
+hipcheck-exec-config-path =
+hipcheck-working-dir =
+hipcheck-cache-dir =
+hipcheck-data-dir =
+hipcheck-timeout =
+hipcheck-stdout-max-bytes =
+hipcheck-stderr-max-bytes =
+hipcheck-json-max-bytes =
+hipcheck-max-concurrent-runs =
+
 # The number of async worker threads to use for handling requests.
 #
 # Default: (the number of CPU cores available on the system)

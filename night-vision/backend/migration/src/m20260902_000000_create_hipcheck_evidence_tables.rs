@@ -69,6 +69,16 @@ impl MigrationTrait for Migration {
             )
             .await?;
         manager
+            .create_index(
+                Index::create()
+                    .name("idx_hipcheck_runs_package_version_created_at")
+                    .table(HipcheckRuns::Table)
+                    .col(HipcheckRuns::PackageVersionId)
+                    .col(HipcheckRuns::CreatedAt)
+                    .to_owned(),
+            )
+            .await?;
+        manager
             .create_table(
                 Table::create()
                     .table(HipcheckChecks::Table)
@@ -163,6 +173,14 @@ impl MigrationTrait for Migration {
             .await
     }
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("idx_hipcheck_runs_package_version_created_at")
+                    .table(HipcheckRuns::Table)
+                    .to_owned(),
+            )
+            .await?;
         manager
             .drop_table(Table::drop().table(HipcheckFindings::Table).to_owned())
             .await?;

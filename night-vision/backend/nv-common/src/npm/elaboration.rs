@@ -92,6 +92,8 @@ impl UnsupportedSpecificationKind {
 pub struct ElaboratedPackage {
     pub package: PackageVersion,
     pub derivations: Vec<Vec<PackageVersion>>,
+    /// The resolved source repository for this concrete package version.
+    pub source_repository: Option<String>,
 }
 
 /// A normalized dependency edge in an elaborated package source.
@@ -386,6 +388,9 @@ async fn elaborate_inner(
 
         for reply in replies {
             let report = reply.await.map_err(|_| ElaborationError::WorkerStopped)??;
+            state
+                .repositories
+                .insert(report.package.clone(), report.source_repository.clone());
             for dependency in report.dependencies {
                 let versions = resolve_specification(
                     cache,
@@ -537,6 +542,7 @@ struct WorkerReport {
     package: PackageVersion,
     derivations: Vec<Vec<PackageVersion>>,
     dependencies: Vec<DeclaredDependency>,
+    source_repository: Option<String>,
 }
 
 struct DeclaredDependency {
@@ -583,6 +589,11 @@ async fn inspect_package(
         package,
         derivations,
         dependencies: declared_dependencies(npm_version),
+        source_repository: npm_version
+            .repository
+            .as_ref()
+            .or(packument.repository.as_ref())
+            .and_then(|repository| normalize_repository_url(&repository.url)),
     })
 }
 
@@ -742,6 +753,7 @@ struct SupervisorState {
     packages: BTreeMap<PackageVersion, BTreeSet<Vec<PackageVersion>>>,
     edges: BTreeSet<ElaborationEdge>,
     warnings: Vec<ElaborationWarning>,
+    repositories: BTreeMap<PackageVersion, Option<String>>,
 }
 
 impl SupervisorState {
@@ -795,6 +807,7 @@ impl SupervisorState {
                 .packages
                 .into_iter()
                 .map(|(package, derivations)| ElaboratedPackage {
+                    source_repository: self.repositories.remove(&package).flatten(),
                     package,
                     derivations: derivations.into_iter().collect(),
                 })
@@ -803,6 +816,12 @@ impl SupervisorState {
             warnings: self.warnings,
         }
     }
+}
+
+fn normalize_repository_url(value: &str) -> Option<String> {
+    let value = value.strip_prefix("git+").unwrap_or(value);
+    let url = Url::parse(value).ok()?;
+    matches!(url.scheme(), "http" | "https").then(|| url.into())
 }
 
 #[cfg(test)]

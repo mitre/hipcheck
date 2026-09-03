@@ -211,7 +211,7 @@ pub async fn persist_completed_elaboration(
             source_id: Set(source_id),
             version: Set(elaborated.package.version.to_string()),
             package_url: Set(elaborated.package.purl()),
-            source_repository: Set(None),
+            source_repository: Set(elaborated.source_repository.clone()),
             source_repository_tag: Set(None),
             ..Default::default()
         }
@@ -605,6 +605,7 @@ mod tests {
                 packages: vec![ElaboratedPackage {
                     package,
                     derivations: Vec::new(),
+                    source_repository: None,
                 }],
                 edges: Vec::new(),
                 warnings: Vec::new(),

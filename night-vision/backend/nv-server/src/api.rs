@@ -12,8 +12,8 @@ use camino::{Utf8Path, Utf8PathBuf};
 // `jiff`.
 use chrono::Utc;
 use dropshot::{
-    ClientErrorStatusCode, HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext,
-    ServerBuilder, UntypedBody,
+    ClientErrorStatusCode, HttpError, HttpResponseAccepted, HttpResponseOk, Path, Query,
+    RequestContext, ServerBuilder, UntypedBody,
 };
 use nv_common::{
     config::Config,
@@ -21,6 +21,10 @@ use nv_common::{
         has_cve_list_records, last_successful_cve_list_sync_commit, latest_cve_list_sync_run,
     },
     db::entities::cve_list_sync_runs::Model as CveListSyncRun,
+    hipcheck::{
+        assessment::{execute_queued_assessment, queue_assessment},
+        storage::load_hipcheck_run,
+    },
     npm::elaboration::{
         NpmRegistryClient, elaborate,
         storage::{
@@ -31,12 +35,13 @@ use nv_common::{
     npm::package_json::NpmPackageJson,
 };
 use nv_server_api::{
-    CveIngestHealth, CveListSyncRunHealth, Health, NvServerApi, PackageSource,
-    PackageSourceEcosystem, PackageSourcePathParams, PackageSourceStatus,
-    PackageSourceStatusCompleted, PackageSourceStatusCompletedWithWarnings,
+    AssessmentCheck, AssessmentEvidence, AssessmentEvidenceQuery, AssessmentFinding,
+    AssessmentPathParams, AssessmentStatus, CveIngestHealth, CveListSyncRunHealth, Health,
+    NvServerApi, PackageSource, PackageSourceEcosystem, PackageSourcePathParams,
+    PackageSourceStatus, PackageSourceStatusCompleted, PackageSourceStatusCompletedWithWarnings,
     PackageSourceStatusFailed, PackageSourceStatusProcessing, PackageSourceWarning,
-    PostPackageSourceBody, PostPackageSourceResponse, VersionedPackage,
-    nv_server_api_mod::api_description,
+    PostAssessmentBody, PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
+    VersionedPackage, nv_server_api_mod::api_description,
 };
 use percent_encoding::percent_decode_str;
 use sea_orm::{
@@ -233,6 +238,116 @@ impl NvServerApi for RestApi {
                 None,
                 format!("unknown package source {id}"),
             )),
+        }
+    }
+
+    async fn post_assessment(
+        ctx: RequestContext<Self::Context>,
+        body_param: UntypedBody,
+    ) -> Result<HttpResponseAccepted<PostAssessmentResponse>, HttpError> {
+        validate_package_source_media_type(
+            ctx.request
+                .headers()
+                .get("content-type")
+                .and_then(|value| value.to_str().ok()),
+        )?;
+        let body =
+            serde_json::from_slice::<PostAssessmentBody>(body_param.as_bytes()).map_err(|_| {
+                HttpError::for_bad_request(
+                    Some("InvalidAssessmentRequest".to_owned()),
+                    "assessment request body must be valid JSON".to_owned(),
+                )
+            })?;
+        let context = ctx.context();
+        let admission = context.try_admit_hipcheck().ok_or_else(|| {
+            HttpError::for_unavail(
+                Some("AssessmentCapacity".to_owned()),
+                "assessment capacity is exhausted".to_owned(),
+            )
+        })?;
+        let queued = queue_assessment(context.db(), &body.purl)
+            .await
+            .map_err(assessment_http_error)?;
+        let id = queued.id;
+        let db = context.db().clone();
+        let runner = context.hipcheck_runner_config();
+        let log = ctx.log.new(slog::o!("assessment_id" => id));
+        tokio::spawn(async move {
+            let _admission = admission;
+            if let Err(error) = execute_queued_assessment(&db, &queued, &runner).await {
+                slog::error!(log, "assessment could not persist terminal state"; "error" => error.to_string());
+            }
+        });
+        Ok(HttpResponseAccepted(PostAssessmentResponse { id }))
+    }
+
+    async fn get_assessment(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<AssessmentPathParams>,
+    ) -> Result<HttpResponseOk<AssessmentStatus>, HttpError> {
+        let id = path_params.into_inner().id;
+        let stored = load_hipcheck_run(ctx.context().db(), id)
+            .await
+            .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+            .ok_or_else(|| HttpError::for_not_found(None, format!("unknown assessment {id}")))?;
+        Ok(HttpResponseOk(AssessmentStatus {
+            id,
+            state: stored.run.status,
+            target: stored.run.target_purl,
+            recommendation: stored.run.policy_recommendation,
+            finding_count: stored.findings.len(),
+            error_kind: stored.run.error_kind,
+            retryable: stored.run.retryable,
+        }))
+    }
+
+    async fn get_assessment_evidence(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<AssessmentPathParams>,
+        query: Query<AssessmentEvidenceQuery>,
+    ) -> Result<HttpResponseOk<AssessmentEvidence>, HttpError> {
+        let id = path_params.into_inner().id;
+        let stored = load_hipcheck_run(ctx.context().db(), id)
+            .await
+            .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+            .ok_or_else(|| HttpError::for_not_found(None, format!("unknown assessment {id}")))?;
+        let include_raw = query.into_inner().include_raw_hipcheck.unwrap_or(false);
+        Ok(HttpResponseOk(AssessmentEvidence {
+            id,
+            checks: stored
+                .checks
+                .into_iter()
+                .map(|check| AssessmentCheck {
+                    state: check.state,
+                    effect: check.effect,
+                    summary: check.summary,
+                })
+                .collect(),
+            findings: stored
+                .findings
+                .into_iter()
+                .map(|finding| AssessmentFinding {
+                    kind: finding.kind,
+                    effect: finding.effect,
+                    severity: finding.severity,
+                    summary: finding.summary,
+                })
+                .collect(),
+            raw_hipcheck: include_raw.then_some(stored.run.raw_json).flatten(),
+        }))
+    }
+}
+
+fn assessment_http_error(error: nv_common::hipcheck::assessment::AssessmentError) -> HttpError {
+    match error {
+        nv_common::hipcheck::assessment::AssessmentError::UnknownPurl(_) => {
+            HttpError::for_bad_request(
+                Some("UnknownAssessmentPurl".to_owned()),
+                "PURL is not an elaborated package version".to_owned(),
+            )
+        }
+        nv_common::hipcheck::assessment::AssessmentError::Database(error) => {
+            HttpError::for_internal_error(error.to_string())
         }
     }
 }

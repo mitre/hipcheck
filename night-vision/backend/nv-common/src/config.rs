@@ -10,6 +10,7 @@ use crate::{
         sync::{CveListSyncPipelineConfig, CveListSyncTimeoutConfig},
     },
     error::ErrorSourceIterator as _,
+    hipcheck::HipcheckRunnerConfig,
     npm::elaboration::ElaborationLimits,
     secret::{SecretFileError, SecretSource, SecretSourceKind},
 };
@@ -18,6 +19,7 @@ use dropshot::{ConfigDropshot, HandlerTaskMode};
 use itertools::Itertools as _;
 use secrecy::SecretString;
 use std::{
+    collections::BTreeMap,
     error::Error as _,
     fmt::{Debug, Display},
     fs::File,
@@ -51,6 +53,16 @@ const DEFAULT_PACKAGE_ELABORATION_MAX_EDGES: usize = 100_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_QUEUED_WORK: usize = 100_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_DERIVATIONS: usize = 100_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_CONCURRENT_RUNS: usize = 4;
+const DEFAULT_HIPCHECK_BIN_PATH: &str = "/usr/local/bin/hc";
+const DEFAULT_HIPCHECK_POLICY_PATH: &str = "/opt/night-vision/hipcheck/config/Hipcheck.kdl";
+const DEFAULT_HIPCHECK_EXEC_CONFIG_PATH: &str = "/opt/night-vision/hipcheck/config/Exec.kdl";
+const DEFAULT_HIPCHECK_WORKING_DIR: &str = "/opt/night-vision/hipcheck";
+const DEFAULT_HIPCHECK_CACHE_DIR: &str = "/var/cache/night-vision/hipcheck";
+const DEFAULT_HIPCHECK_TIMEOUT: u64 = 300_000;
+const DEFAULT_HIPCHECK_STDOUT_MAX_BYTES: usize = 1024 * 1024;
+const DEFAULT_HIPCHECK_STDERR_MAX_BYTES: usize = 1024 * 1024;
+const DEFAULT_HIPCHECK_JSON_MAX_BYTES: usize = 4 * 1024 * 1024;
+const DEFAULT_HIPCHECK_MAX_CONCURRENT_RUNS: usize = 1;
 
 /// Errors that can occur while loading configuration.
 pub enum ConfigLoadError {
@@ -257,6 +269,19 @@ pub struct Config {
 
     /// The maximum number of package-source elaborations running at once.
     pub package_elaboration_max_concurrent_runs: usize,
+
+    /// Process-boundary configuration for bundled Hipcheck assessments.
+    pub hipcheck_bin_path: Utf8PathBuf,
+    pub hipcheck_policy_path: Utf8PathBuf,
+    pub hipcheck_exec_config_path: Utf8PathBuf,
+    pub hipcheck_working_dir: Utf8PathBuf,
+    pub hipcheck_cache_dir: Utf8PathBuf,
+    pub hipcheck_data_dir: Utf8PathBuf,
+    pub hipcheck_timeout: u64,
+    pub hipcheck_stdout_max_bytes: usize,
+    pub hipcheck_stderr_max_bytes: usize,
+    pub hipcheck_json_max_bytes: usize,
+    pub hipcheck_max_concurrent_runs: usize,
 }
 
 /// Where a resolved configuration value came from.
@@ -444,6 +469,17 @@ impl Config {
                     "package-elaboration-max-queued-work",
                     "package-elaboration-max-derivations",
                     "package-elaboration-max-concurrent-runs",
+                    "hipcheck-bin-path",
+                    "hipcheck-policy-path",
+                    "hipcheck-exec-config-path",
+                    "hipcheck-working-dir",
+                    "hipcheck-cache-dir",
+                    "hipcheck-data-dir",
+                    "hipcheck-timeout",
+                    "hipcheck-stdout-max-bytes",
+                    "hipcheck-stderr-max-bytes",
+                    "hipcheck-json-max-bytes",
+                    "hipcheck-max-concurrent-runs",
                 ],
             },
             BufReader::new(
@@ -596,6 +632,49 @@ impl Config {
             DEFAULT_PACKAGE_ELABORATION_MAX_CONCURRENT_RUNS,
             &mut errors,
         );
+        let hipcheck_bin_path = parse_value(&parsed, "hipcheck-bin-path", &mut errors)
+            .unwrap_or_else(|| Utf8PathBuf::from(DEFAULT_HIPCHECK_BIN_PATH));
+        let hipcheck_policy_path = parse_value(&parsed, "hipcheck-policy-path", &mut errors)
+            .unwrap_or_else(|| Utf8PathBuf::from(DEFAULT_HIPCHECK_POLICY_PATH));
+        let hipcheck_exec_config_path =
+            parse_value(&parsed, "hipcheck-exec-config-path", &mut errors)
+                .unwrap_or_else(|| Utf8PathBuf::from(DEFAULT_HIPCHECK_EXEC_CONFIG_PATH));
+        let hipcheck_working_dir = parse_value(&parsed, "hipcheck-working-dir", &mut errors)
+            .unwrap_or_else(|| Utf8PathBuf::from(DEFAULT_HIPCHECK_WORKING_DIR));
+        let hipcheck_cache_dir = parse_value(&parsed, "hipcheck-cache-dir", &mut errors)
+            .unwrap_or_else(|| Utf8PathBuf::from(DEFAULT_HIPCHECK_CACHE_DIR));
+        let hipcheck_data_dir = parse_value(&parsed, "hipcheck-data-dir", &mut errors)
+            .unwrap_or_else(|| Utf8PathBuf::from("/var/lib/night-vision/hipcheck"));
+        let hipcheck_timeout = parse_positive_u64(
+            &parsed,
+            "hipcheck-timeout",
+            DEFAULT_HIPCHECK_TIMEOUT,
+            &mut errors,
+        );
+        let hipcheck_stdout_max_bytes = parse_positive_usize(
+            &parsed,
+            "hipcheck-stdout-max-bytes",
+            DEFAULT_HIPCHECK_STDOUT_MAX_BYTES,
+            &mut errors,
+        );
+        let hipcheck_stderr_max_bytes = parse_positive_usize(
+            &parsed,
+            "hipcheck-stderr-max-bytes",
+            DEFAULT_HIPCHECK_STDERR_MAX_BYTES,
+            &mut errors,
+        );
+        let hipcheck_json_max_bytes = parse_positive_usize(
+            &parsed,
+            "hipcheck-json-max-bytes",
+            DEFAULT_HIPCHECK_JSON_MAX_BYTES,
+            &mut errors,
+        );
+        let hipcheck_max_concurrent_runs = parse_positive_usize(
+            &parsed,
+            "hipcheck-max-concurrent-runs",
+            DEFAULT_HIPCHECK_MAX_CONCURRENT_RUNS,
+            &mut errors,
+        );
 
         check_errors(path, parsed.warnings, errors)?;
 
@@ -662,6 +741,17 @@ impl Config {
             package_elaboration_limits,
             package_elaboration_max_packument_bytes,
             package_elaboration_max_concurrent_runs,
+            hipcheck_bin_path,
+            hipcheck_policy_path,
+            hipcheck_exec_config_path,
+            hipcheck_working_dir,
+            hipcheck_cache_dir,
+            hipcheck_data_dir,
+            hipcheck_timeout,
+            hipcheck_stdout_max_bytes,
+            hipcheck_stderr_max_bytes,
+            hipcheck_json_max_bytes,
+            hipcheck_max_concurrent_runs,
         };
 
         Ok(config)
@@ -700,6 +790,22 @@ impl Config {
     /// Get the configured database connection string.
     pub fn database_connection(&self) -> &SecretString {
         &self.database_connection
+    }
+
+    /// Build the deliberately hermetic Hipcheck process configuration.
+    pub fn hipcheck_runner_config(&self) -> HipcheckRunnerConfig {
+        HipcheckRunnerConfig {
+            program: self.hipcheck_bin_path.clone(),
+            working_directory: self.hipcheck_working_dir.clone(),
+            policy_path: self.hipcheck_policy_path.clone(),
+            exec_config_path: self.hipcheck_exec_config_path.clone(),
+            cache_directory: self.hipcheck_cache_dir.clone(),
+            environment: BTreeMap::new(),
+            timeout: Duration::from_millis(self.hipcheck_timeout),
+            stdout_max_bytes: self.hipcheck_stdout_max_bytes,
+            stderr_max_bytes: self.hipcheck_stderr_max_bytes,
+            json_max_bytes: self.hipcheck_json_max_bytes,
+        }
     }
 
     /// Build runtime configuration for the CVE List worker.

@@ -3,7 +3,8 @@ use super::{HipcheckCheck, HipcheckReport};
 use crate::db::entities::{hipcheck_checks, hipcheck_concerns, hipcheck_findings, hipcheck_runs};
 use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, ConnectionTrait, DbErr,
-    EntityTrait as _, QueryFilter as _, QueryOrder as _, TransactionSession as _, TransactionTrait,
+    EntityTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _, TransactionSession as _,
+    TransactionTrait,
 };
 use serde_json::json;
 
@@ -27,6 +28,161 @@ pub struct StoredHipcheckRun {
     pub checks: Vec<hipcheck_checks::Model>,
     pub concerns: Vec<hipcheck_concerns::Model>,
     pub findings: Vec<hipcheck_findings::Model>,
+}
+
+/// Create the durable record before an assessment is dispatched.
+pub async fn create_queued_hipcheck_run<C: ConnectionTrait>(
+    db: &C,
+    package_version_id: i32,
+) -> Result<i32, DbErr> {
+    hipcheck_runs::ActiveModel {
+        package_version_id: Set(package_version_id),
+        status: Set("queued".to_owned()),
+        raw_json: Set(None),
+        raw_json_bytes: Set(0),
+        raw_json_truncated: Set(false),
+        stdout: Set(None),
+        stdout_truncated: Set(false),
+        stderr: Set(None),
+        stderr_truncated: Set(false),
+        exit_status: Set(None),
+        error_kind: Set(None),
+        error_message: Set(None),
+        retryable: Set(None),
+        schema_version: Set(None),
+        hipcheck_version: Set(None),
+        hipcheck_commit: Set(None),
+        target_kind: Set(None),
+        target_purl: Set(None),
+        source_repository_url: Set(None),
+        policy_id: Set(None),
+        policy_version: Set(None),
+        policy_source: Set(None),
+        policy_recommendation: Set(None),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .map(|run| run.id)
+}
+
+/// Mark a previously queued assessment as executing.
+pub async fn mark_hipcheck_run_running<C: ConnectionTrait>(
+    db: &C,
+    run_id: i32,
+) -> Result<(), DbErr> {
+    hipcheck_runs::ActiveModel {
+        id: Set(run_id),
+        status: Set("running".to_owned()),
+        ..Default::default()
+    }
+    .update(db)
+    .await
+    .map(|_| ())
+}
+
+/// Record a terminal failure while preserving bounded diagnostics.
+pub async fn fail_hipcheck_run<C: ConnectionTrait>(
+    db: &C,
+    run_id: i32,
+    diagnostics: &HipcheckExecutionDiagnostics,
+    raw_json: Option<&str>,
+) -> Result<(), DbErr> {
+    let (stdout, stdout_truncated) = bound(&diagnostics.stdout);
+    let (stderr, stderr_truncated) = bound(&diagnostics.stderr);
+    let (raw_json, raw_json_truncated, raw_json_bytes) = raw_json
+        .map(|value| {
+            let (bounded, truncated) = bound(value);
+            (
+                Some(bounded),
+                truncated,
+                i32::try_from(value.len()).unwrap_or(i32::MAX),
+            )
+        })
+        .unwrap_or((None, false, 0));
+    hipcheck_runs::ActiveModel {
+        id: Set(run_id),
+        status: Set("failed".to_owned()),
+        raw_json: Set(raw_json),
+        raw_json_bytes: Set(raw_json_bytes),
+        raw_json_truncated: Set(raw_json_truncated),
+        stdout: Set(Some(stdout)),
+        stdout_truncated: Set(stdout_truncated),
+        stderr: Set(Some(stderr)),
+        stderr_truncated: Set(stderr_truncated),
+        exit_status: Set(diagnostics.exit_status),
+        error_kind: Set(diagnostics.error_kind.clone()),
+        error_message: Set(diagnostics
+            .error_message
+            .as_deref()
+            .map(|value| bound(value).0)),
+        retryable: Set(diagnostics.retryable),
+        ..Default::default()
+    }
+    .update(db)
+    .await
+    .map(|_| ())
+}
+
+/// Complete an existing run and add normalized evidence atomically.
+pub async fn complete_hipcheck_run<C: ConnectionTrait + TransactionTrait>(
+    db: &C,
+    run_id: i32,
+    raw_json: &str,
+    report: &HipcheckReport,
+    diagnostics: &HipcheckExecutionDiagnostics,
+) -> Result<(), DbErr> {
+    let transaction = db.begin().await?;
+    let raw_json_bytes = i32::try_from(raw_json.len()).unwrap_or(i32::MAX);
+    let (raw_json, raw_json_truncated) = bound(raw_json);
+    let (stdout, stdout_truncated) = bound(&diagnostics.stdout);
+    let (stderr, stderr_truncated) = bound(&diagnostics.stderr);
+    hipcheck_runs::ActiveModel {
+        id: Set(run_id),
+        status: Set("completed".to_owned()),
+        raw_json: Set(Some(raw_json)),
+        raw_json_bytes: Set(raw_json_bytes),
+        raw_json_truncated: Set(raw_json_truncated),
+        stdout: Set(Some(stdout)),
+        stdout_truncated: Set(stdout_truncated),
+        stderr: Set(Some(stderr)),
+        stderr_truncated: Set(stderr_truncated),
+        exit_status: Set(diagnostics.exit_status),
+        error_kind: Set(None),
+        error_message: Set(None),
+        retryable: Set(Some(false)),
+        schema_version: Set(Some(report.schema_version.clone())),
+        hipcheck_version: Set(Some(report.hipcheck.version.clone())),
+        hipcheck_commit: Set(Some(report.hipcheck.commit.clone())),
+        target_kind: Set(Some(report.target.kind.clone())),
+        target_purl: Set(report.target.purl.clone()),
+        source_repository_url: Set(Some(report.target.source_repository_url.clone())),
+        policy_id: Set(Some(report.policy.id.clone())),
+        policy_version: Set(report.policy.version.clone()),
+        policy_source: Set(Some(report.policy.source.clone())),
+        policy_recommendation: Set(Some(recommendation(report))),
+        ..Default::default()
+    }
+    .update(&transaction)
+    .await?;
+    for (ordinal, check) in report.checks.iter().enumerate() {
+        store_check(&transaction, run_id, ordinal, check).await?;
+    }
+    transaction.commit().await
+}
+
+/// List the newest persisted assessments for one resolved package version.
+pub async fn list_hipcheck_runs<C: ConnectionTrait>(
+    db: &C,
+    package_version_id: i32,
+    limit: u64,
+) -> Result<Vec<hipcheck_runs::Model>, DbErr> {
+    hipcheck_runs::Entity::find()
+        .filter(hipcheck_runs::Column::PackageVersionId.eq(package_version_id))
+        .order_by_desc(hipcheck_runs::Column::CreatedAt)
+        .limit(limit)
+        .all(db)
+        .await
 }
 
 /// Store a parsed report and bounded, explicitly selected execution diagnostics.

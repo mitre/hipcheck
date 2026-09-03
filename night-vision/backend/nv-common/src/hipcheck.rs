@@ -1,3 +1,4 @@
+pub mod assessment;
 mod report;
 mod runner;
 pub use report::*;

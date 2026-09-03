@@ -82,6 +82,24 @@ identity fields, result state, or parseable structured output are missing.
 
 ## Integration Requirements
 
+### Assessment lifecycle
+
+Each assessment is created as `queued`, changes to `running` when its process
+is dispatched, and finishes as `completed` or `failed`. Every terminal attempt
+retains bounded stdout and stderr. Raw Hipcheck JSON is never returned by
+default.
+
+`nvdb assessment analyze <PURL>` waits synchronously. `POST /assessments`
+returns `202` with an assessment ID and runs in the background; poll
+`GET /assessments/{id}`. Normalized evidence is available from
+`GET /assessments/{id}/evidence`; request raw JSON only with
+`?includeRawHipcheck=true`.
+
+Assessments use only already elaborated package-version PURLs. The target is
+the persisted HTTP(S) repository URL: per-version NPM metadata takes
+precedence over package metadata, and `git+http(s)` URLs are normalized. A
+version without a usable repository records `target-resolution` failure.
+
 The Night Vision backend should add a clear boundary around Hipcheck execution.
 That boundary should handle:
 

@@ -1,5 +1,5 @@
-use anyhow::Result;
-use nv_common::config::Config;
+use anyhow::{Context as _, Result};
+use nv_common::{config::Config, db, hipcheck::storage::load_hipcheck_run, rt};
 
 pub fn command() -> clap::Command {
     clap::Command::new("evidence")
@@ -14,8 +14,25 @@ pub fn command() -> clap::Command {
         .arg(json_argument())
 }
 
-pub fn run(_config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
-    todo!("assessment evidence is not implemented")
+pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
+    let id = matches
+        .get_one::<String>("assessment-id")
+        .expect("required ID")
+        .parse::<i32>()?;
+    let raw = matches.get_flag("raw-hipcheck");
+    let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
+    let run = runtime.block_on(async {
+        let db = db::connection(config).await?;
+        load_hipcheck_run(&db, id)
+            .await?
+            .context("assessment not found")
+    })?;
+    let checks = run.checks.iter().map(|check| serde_json::json!({"id":check.id,"state":check.state,"effect":check.effect,"summary":check.summary})).collect::<Vec<_>>();
+    let concerns = run.concerns.iter().map(|concern| serde_json::json!({"checkId":concern.check_id,"kind":concern.kind,"message":concern.message,"details":concern.details})).collect::<Vec<_>>();
+    let findings = run.findings.iter().map(|finding| serde_json::json!({"kind":finding.kind,"effect":finding.effect,"severity":finding.severity,"summary":finding.summary,"evidence":finding.evidence})).collect::<Vec<_>>();
+    let evidence = serde_json::json!({"id":run.run.id,"checks":checks,"concerns":concerns,"findings":findings,"rawHipcheck": if raw { run.run.raw_json } else { None::<String> }});
+    println!("{evidence}");
+    Ok(())
 }
 
 fn assessment_id_argument() -> clap::Arg {

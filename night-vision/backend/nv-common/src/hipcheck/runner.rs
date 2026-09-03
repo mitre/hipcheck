@@ -132,6 +132,7 @@ pub async fn run_hipcheck_check(
     config: &HipcheckRunnerConfig,
     request: &HipcheckCheckRequest,
 ) -> Result<HipcheckExecutionOutput, HipcheckExecutionError> {
+    validate_paths(config).map_err(HipcheckExecutionError::Start)?;
     let stdout_limit = config.stdout_max_bytes.min(config.json_max_bytes);
     let stderr_limit = config.stderr_max_bytes;
     let stdout_overflow = if config.stdout_max_bytes <= config.json_max_bytes {
@@ -256,6 +257,40 @@ pub async fn run_hipcheck_check(
         stderr: stderr.bytes,
         json,
     })
+}
+
+fn validate_paths(config: &HipcheckRunnerConfig) -> Result<(), std::io::Error> {
+    for path in [
+        &config.program,
+        &config.policy_path,
+        &config.exec_config_path,
+    ] {
+        let path = resolve_path(&config.working_directory, path);
+        if !path.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Hipcheck artifact is not a file: {path}"),
+            ));
+        }
+    }
+    for path in [&config.working_directory, &config.cache_directory] {
+        let path = resolve_path(&config.working_directory, path);
+        if !path.is_dir() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Hipcheck runtime path is not a directory: {path}"),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn resolve_path<'a>(working_directory: &'a Utf8PathBuf, path: &'a Utf8PathBuf) -> Utf8PathBuf {
+    if path.is_absolute() {
+        path.clone()
+    } else {
+        working_directory.join(path)
+    }
 }
 
 struct BoundedOutput {
@@ -472,6 +507,12 @@ exec sleep 5"#,
             ));
             let working_directory = root.join("working");
             fs::create_dir_all(&working_directory).expect("test directory should create");
+            fs::write(working_directory.join("policy file.hc"), "policy")
+                .expect("test policy should write");
+            fs::write(working_directory.join("exec file.hc"), "exec")
+                .expect("test exec config should write");
+            fs::create_dir(working_directory.join("cache directory"))
+                .expect("test cache directory should create");
             let program = root.join("fake-hc");
             fs::write(&program, format!("#!/bin/sh\n{script}\n"))
                 .expect("test program should write");

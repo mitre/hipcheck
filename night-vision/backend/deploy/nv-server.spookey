@@ -137,6 +137,7 @@ hipcheck-timeout =
 hipcheck-stdout-max-bytes =
 hipcheck-stderr-max-bytes =
 hipcheck-json-max-bytes =
+hipcheck-max-concurrent-runs = 1
 
 # The number of async worker threads to use for handling requests.
 #

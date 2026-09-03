@@ -1,5 +1,7 @@
 use crate::error::FatalError;
-use nv_common::{config::Config, npm::elaboration::ElaborationLimits};
+use nv_common::{
+    config::Config, hipcheck::HipcheckRunnerConfig, npm::elaboration::ElaborationLimits,
+};
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -15,6 +17,8 @@ pub struct ApiCtx {
     package_elaboration_limits: ElaborationLimits,
     package_elaboration_max_packument_bytes: usize,
     package_elaboration_admission: PackageElaborationAdmission,
+    hipcheck_runner_config: HipcheckRunnerConfig,
+    hipcheck_admission: PackageElaborationAdmission,
 }
 
 impl ApiCtx {
@@ -28,6 +32,10 @@ impl ApiCtx {
             package_elaboration_max_packument_bytes: config.package_elaboration_max_packument_bytes,
             package_elaboration_admission: PackageElaborationAdmission::new(
                 config.package_elaboration_max_concurrent_runs,
+            ),
+            hipcheck_runner_config: config.hipcheck_runner_config(),
+            hipcheck_admission: PackageElaborationAdmission::new(
+                config.hipcheck_max_concurrent_runs,
             ),
         })
     }
@@ -52,6 +60,12 @@ impl ApiCtx {
     /// The returned permit remains held until the background task exits.
     pub fn try_admit_package_elaboration(&self) -> Option<OwnedSemaphorePermit> {
         self.package_elaboration_admission.try_acquire()
+    }
+    pub fn hipcheck_runner_config(&self) -> HipcheckRunnerConfig {
+        self.hipcheck_runner_config.clone()
+    }
+    pub fn try_admit_hipcheck(&self) -> Option<OwnedSemaphorePermit> {
+        self.hipcheck_admission.try_acquire()
     }
 }
 

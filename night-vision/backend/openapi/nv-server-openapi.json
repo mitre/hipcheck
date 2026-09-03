@@ -5,6 +5,116 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/assessments": {
+      "post": {
+        "operationId": "post_assessment",
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "successfully enqueued operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostAssessmentResponse"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/assessments/{id}": {
+      "get": {
+        "operationId": "get_assessment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentStatus"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/assessments/{id}/evidence": {
+      "get": {
+        "operationId": "get_assessment_evidence",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeRawHipcheck",
+            "schema": {
+              "nullable": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentEvidence"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "operationId": "health",
@@ -33,9 +143,10 @@
         "operationId": "post_package_source",
         "requestBody": {
           "content": {
-            "application/json": {
+            "application/octet-stream": {
               "schema": {
-                "$ref": "#/components/schemas/PostPackageSourceBody"
+                "type": "string",
+                "format": "binary"
               }
             }
           },
@@ -98,6 +209,116 @@
   },
   "components": {
     "schemas": {
+      "AssessmentCheck": {
+        "type": "object",
+        "properties": {
+          "effect": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "effect",
+          "state",
+          "summary"
+        ]
+      },
+      "AssessmentEvidence": {
+        "type": "object",
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentCheck"
+            }
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentFinding"
+            }
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rawHipcheck": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "checks",
+          "findings",
+          "id"
+        ]
+      },
+      "AssessmentFinding": {
+        "type": "object",
+        "properties": {
+          "effect": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "nullable": true,
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "effect",
+          "kind",
+          "summary"
+        ]
+      },
+      "AssessmentStatus": {
+        "type": "object",
+        "properties": {
+          "errorKind": {
+            "nullable": true,
+            "type": "string"
+          },
+          "findingCount": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recommendation": {
+            "nullable": true,
+            "type": "string"
+          },
+          "retryable": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "target": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "findingCount",
+          "id",
+          "state"
+        ]
+      },
       "CveIngestHealth": {
         "type": "object",
         "properties": {
@@ -394,21 +615,17 @@
           "specificationKind"
         ]
       },
-      "PostPackageSourceBody": {
+      "PostAssessmentResponse": {
         "type": "object",
         "properties": {
-          "contents": {
-            "type": "string"
-          },
-          "fileName": {
-            "type": "string"
+          "id": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "required": [
-          "contents",
-          "fileName"
-        ],
-        "additionalProperties": false
+          "id"
+        ]
       },
       "PostPackageSourceResponse": {
         "type": "object",

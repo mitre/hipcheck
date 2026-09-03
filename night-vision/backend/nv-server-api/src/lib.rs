@@ -47,6 +47,78 @@ pub trait NvServerApi {
         ctx: RequestContext<Self::Context>,
         path_params: Path<PackageSourcePathParams>,
     ) -> Result<HttpResponseOk<PackageSourceStatus>, HttpError>;
+
+    #[endpoint { method = POST, path = "/assessments", content_type = "application/json" }]
+    async fn post_assessment(
+        ctx: RequestContext<Self::Context>,
+        body_param: UntypedBody,
+    ) -> Result<HttpResponseAccepted<PostAssessmentResponse>, HttpError>;
+
+    #[endpoint { method = GET, path = "/assessments/{id}" }]
+    async fn get_assessment(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<AssessmentPathParams>,
+    ) -> Result<HttpResponseOk<AssessmentStatus>, HttpError>;
+
+    #[endpoint { method = GET, path = "/assessments/{id}/evidence" }]
+    async fn get_assessment_evidence(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<AssessmentPathParams>,
+        query: dropshot::Query<AssessmentEvidenceQuery>,
+    ) -> Result<HttpResponseOk<AssessmentEvidence>, HttpError>;
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PostAssessmentBody {
+    pub purl: String,
+}
+#[derive(Serialize, JsonSchema)]
+pub struct PostAssessmentResponse {
+    pub id: i32,
+}
+#[derive(Deserialize, JsonSchema)]
+pub struct AssessmentPathParams {
+    pub id: i32,
+}
+#[derive(Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentEvidenceQuery {
+    pub include_raw_hipcheck: Option<bool>,
+}
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentStatus {
+    pub id: i32,
+    pub state: String,
+    pub target: Option<String>,
+    pub recommendation: Option<String>,
+    pub finding_count: usize,
+    pub error_kind: Option<String>,
+    pub retryable: Option<bool>,
+}
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentEvidence {
+    pub id: i32,
+    pub checks: Vec<AssessmentCheck>,
+    pub findings: Vec<AssessmentFinding>,
+    pub raw_hipcheck: Option<String>,
+}
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentCheck {
+    pub state: String,
+    pub effect: String,
+    pub summary: String,
+}
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentFinding {
+    pub kind: String,
+    pub effect: String,
+    pub severity: Option<String>,
+    pub summary: String,
 }
 
 #[derive(Serialize, JsonSchema)]
