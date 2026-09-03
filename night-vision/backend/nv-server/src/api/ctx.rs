@@ -1,6 +1,8 @@
 use crate::error::FatalError;
 use nv_common::{config::Config, npm::elaboration::ElaborationLimits};
 use sea_orm::DatabaseConnection;
+use std::sync::Arc;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use url::Url;
 
 /// Shared app context, available to every endpoint handler.
@@ -12,6 +14,7 @@ pub struct ApiCtx {
     npm_registry_url: Url,
     package_elaboration_limits: ElaborationLimits,
     package_elaboration_max_packument_bytes: usize,
+    package_elaboration_admission: PackageElaborationAdmission,
 }
 
 impl ApiCtx {
@@ -23,6 +26,9 @@ impl ApiCtx {
             npm_registry_url: config.npm_registry_url.clone(),
             package_elaboration_limits: config.package_elaboration_limits(),
             package_elaboration_max_packument_bytes: config.package_elaboration_max_packument_bytes,
+            package_elaboration_admission: PackageElaborationAdmission::new(
+                config.package_elaboration_max_concurrent_runs,
+            ),
         })
     }
 
@@ -39,5 +45,41 @@ impl ApiCtx {
     }
     pub fn package_elaboration_max_packument_bytes(&self) -> usize {
         self.package_elaboration_max_packument_bytes
+    }
+
+    /// Try to reserve a process-wide elaboration run slot.
+    ///
+    /// The returned permit remains held until the background task exits.
+    pub fn try_admit_package_elaboration(&self) -> Option<OwnedSemaphorePermit> {
+        self.package_elaboration_admission.try_acquire()
+    }
+}
+
+#[derive(Clone)]
+struct PackageElaborationAdmission(Arc<Semaphore>);
+
+impl PackageElaborationAdmission {
+    fn new(max_concurrent_runs: usize) -> Self {
+        Self(Arc::new(Semaphore::new(max_concurrent_runs)))
+    }
+
+    fn try_acquire(&self) -> Option<OwnedSemaphorePermit> {
+        self.0.clone().try_acquire_owned().ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PackageElaborationAdmission;
+
+    #[test]
+    fn admission_slot_is_released_when_its_permit_drops() {
+        let admission = PackageElaborationAdmission::new(1);
+        let permit = admission.try_acquire().expect("first run is admitted");
+        assert!(admission.try_acquire().is_none());
+
+        drop(permit);
+
+        assert!(admission.try_acquire().is_some());
     }
 }

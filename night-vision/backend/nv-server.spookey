@@ -164,6 +164,12 @@ package-elaboration-worker-concurrency =
 # Default: four times package-elaboration-worker-concurrency.
 package-elaboration-work-queue-capacity =
 
+# The maximum number of package-source elaborations that may run at once.
+#
+# Requests beyond this capacity receive a retryable service-unavailable response.
+# Default: 4.
+package-elaboration-max-concurrent-runs =
+
 # The maximum NPM packument response size in bytes.
 #
 # Default: 5242880

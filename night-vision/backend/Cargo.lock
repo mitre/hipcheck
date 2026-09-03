@@ -2495,6 +2495,7 @@ dependencies = [
  "dropshot",
  "nv-common",
  "nv-server-api",
+ "percent-encoding",
  "sea-orm",
  "serde_json",
  "slog",

@@ -71,6 +71,7 @@ SeaORM, or Tokio setting at its default unless noted below.
 | `npm-registry-url` | NPM registry base URL for package-source elaboration. | URL | `https://registry.npmjs.org/`. |
 | `package-elaboration-worker-concurrency` | Concurrent package-version elaboration workers. | Tasks | Four times Tokio worker threads, with a minimum of 4 and maximum of 32. Values must be greater than 0. |
 | `package-elaboration-work-queue-capacity` | Bounded elaboration work queue capacity. | Work items | Four times elaboration worker concurrency. Values must be greater than 0. |
+| `package-elaboration-max-concurrent-runs` | Maximum package-source elaborations running process-wide. New requests are rejected while all slots are occupied. | Runs | 4. Values must be greater than 0. |
 | `package-elaboration-max-packument-bytes` | Maximum accepted NPM packument response size. | Bytes | 5242880 bytes (5 MiB). Values must be greater than 0. |
 | `package-elaboration-request-timeout` | Maximum duration for one NPM registry request. | Milliseconds | 30000 milliseconds. Values must be greater than 0. |
 | `package-elaboration-total-run-timeout` | Maximum duration for one complete elaboration. | Milliseconds | 300000 milliseconds. Values must be greater than 0. |

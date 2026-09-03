@@ -7,6 +7,7 @@ use crate::db::entities::{
 use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, DatabaseConnection, DbErr,
     EntityTrait as _, QueryFilter as _, QueryOrder as _, TransactionTrait as _,
+    sea_query::OnConflict,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
@@ -275,14 +276,31 @@ async fn find_or_insert_package(
     {
         return Ok(existing);
     }
-    packages::ActiveModel {
+
+    match packages::Entity::insert(packages::ActiveModel {
         name: Set(package.name.to_string()),
         package_host: Set("npm".to_owned()),
         ..Default::default()
-    }
-    .insert(db)
+    })
+    .on_conflict(
+        OnConflict::columns([packages::Column::Name, packages::Column::PackageHost])
+            .do_nothing()
+            .to_owned(),
+    )
+    .exec(db)
     .await
-    .map_err(ElaborationStorageError::Database)
+    {
+        Ok(_) | Err(DbErr::RecordNotInserted) => {}
+        Err(error) => return Err(ElaborationStorageError::Database(error)),
+    }
+
+    packages::Entity::find()
+        .filter(packages::Column::Name.eq(package.name.to_string()))
+        .filter(packages::Column::PackageHost.eq("npm"))
+        .one(db)
+        .await
+        .map_err(ElaborationStorageError::Database)?
+        .ok_or_else(|| ElaborationStorageError::MissingPackage(package.purl()))
 }
 
 fn version_id(
@@ -332,8 +350,8 @@ mod tests {
         persisted_package_versions, record_elaboration_failure,
     };
     use crate::{
-        db::entities::{package_source_edges, package_versions},
-        npm::elaboration::ElaborationResult,
+        db::entities::{package_source_edges, package_versions, packages},
+        npm::elaboration::{ElaboratedPackage, ElaborationResult, PackageVersion},
     };
     use sea_orm::{DbBackend, MockDatabase, MockExecResult};
 
@@ -464,6 +482,67 @@ mod tests {
         assert!(statements.iter().any(|sql| sql.contains("package_sources")));
         assert_eq!(statements.first(), Some(&"BEGIN".to_owned()));
         assert_eq!(statements.last(), Some(&"COMMIT".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn reuses_a_package_created_by_a_concurrent_snapshot() {
+        let package = PackageVersion {
+            name: "shared".into(),
+            version: "1.0.0".into(),
+        };
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<packages::Model>::new()])
+            .append_query_results([Vec::<packages::Model>::new()])
+            .append_query_results([vec![packages::Model {
+                id: 12,
+                name: "shared".to_owned(),
+                package_host: "npm".to_owned(),
+            }]])
+            .append_query_results([vec![package_versions::Model {
+                id: 1,
+                package_id: 12,
+                source_id: 7,
+                version: "1.0.0".to_owned(),
+                package_url: "pkg:npm/shared@1.0.0".to_owned(),
+                source_repository: None,
+                source_repository_tag: None,
+            }]])
+            .append_exec_results(std::iter::repeat_n(
+                MockExecResult {
+                    last_insert_id: 1,
+                    rows_affected: 1,
+                },
+                6,
+            ))
+            .into_connection();
+
+        persist_completed_elaboration(
+            &db,
+            7,
+            &ElaborationResult {
+                packages: vec![ElaboratedPackage {
+                    package,
+                    derivations: Vec::new(),
+                }],
+                edges: Vec::new(),
+                warnings: Vec::new(),
+            },
+        )
+        .await
+        .expect("a concurrent package insert is reused");
+
+        let statements = db
+            .into_transaction_log()
+            .into_iter()
+            .flat_map(|entry| entry.statements().to_vec())
+            .map(|statement| statement.sql)
+            .collect::<Vec<_>>();
+        assert!(
+            statements
+                .iter()
+                .any(|sql| { sql.contains("ON CONFLICT (\"name\", \"package_host\") DO NOTHING") }),
+            "{statements:#?}"
+        );
     }
 
     #[tokio::test]

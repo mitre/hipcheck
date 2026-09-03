@@ -38,13 +38,17 @@ use nv_server_api::{
     PostPackageSourceBody, PostPackageSourceResponse, VersionedPackage,
     nv_server_api_mod::api_description,
 };
+use percent_encoding::percent_decode_str;
 use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, DatabaseConnection,
     EntityTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _,
 };
 use slog::Logger;
-use std::fs::File;
+use std::{fs::File, time::Duration};
 use uuid::Uuid;
+
+const TERMINAL_PERSISTENCE_ATTEMPTS: usize = 3;
+const TERMINAL_PERSISTENCE_RETRY_DELAY: Duration = Duration::from_millis(100);
 
 /// The REST API interface.
 ///
@@ -175,13 +179,23 @@ impl NvServerApi for RestApi {
         let file_name = body.file_name;
         let contents = body.contents;
 
+        let admission = context.try_admit_package_elaboration().ok_or_else(|| {
+            HttpError::for_unavail(
+                Some("PackageElaborationCapacity".to_owned()),
+                "package-source elaboration capacity is exhausted".to_owned(),
+            )
+        })?;
         let stored = store_package_source(db, file_name, contents).await?;
         let worker_db = db.clone();
         let registry_url = context.npm_registry_url().clone();
         let limits = context.package_elaboration_limits();
         let max_packument_bytes = context.package_elaboration_max_packument_bytes();
+        let log = ctx
+            .log
+            .new(slog::o!("package_source_id" => stored.id.to_string()));
         tokio::spawn(async move {
-            run_package_source_elaboration(
+            let _admission = admission;
+            if let Err(error) = run_package_source_elaboration(
                 worker_db,
                 stored.database_id,
                 stored.contents,
@@ -189,7 +203,14 @@ impl NvServerApi for RestApi {
                 limits,
                 max_packument_bytes,
             )
-            .await;
+            .await
+            {
+                slog::error!(
+                    log,
+                    "package-source elaboration could not record its terminal state";
+                    "error" => error,
+                );
+            }
         });
         let uuid = stored.id;
         let resp = HttpResponseAccepted(PostPackageSourceResponse { id: uuid });
@@ -278,7 +299,7 @@ async fn run_package_source_elaboration(
     registry_url: url::Url,
     limits: nv_common::npm::elaboration::ElaborationLimits,
     max_packument_bytes: usize,
-) {
+) -> Result<(), String> {
     let result = NpmPackageJson::parse_package_json(contents.as_bytes())
         .map_err(|error| error.to_string())
         .and_then(|source| {
@@ -292,24 +313,47 @@ async fn run_package_source_elaboration(
             .map_err(|error| error.to_string()),
         Err(error) => Err(error),
     };
-    finalize_package_source_elaboration(&db, source_id, result).await;
+    finalize_package_source_elaboration(&db, source_id, result).await
 }
 
 async fn finalize_package_source_elaboration(
     db: &DatabaseConnection,
     source_id: i32,
     result: Result<nv_common::npm::elaboration::ElaborationResult, String>,
-) {
+) -> Result<(), String> {
     match result {
-        Ok(result) => {
-            if let Err(error) = persist_completed_elaboration(db, source_id, &result).await {
-                let _ = record_elaboration_failure(db, source_id, &error.to_string()).await;
+        Ok(result) => match persist_completed_elaboration(db, source_id, &result).await {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                let diagnostic = format!("failed to persist completed elaboration: {error}");
+                record_terminal_failure_with_retry(db, source_id, &diagnostic)
+                    .await
+                    .map_err(|failure| format!("{diagnostic}; {failure}"))
             }
+        },
+        Err(error) => record_terminal_failure_with_retry(db, source_id, &error).await,
+    }
+}
+
+async fn record_terminal_failure_with_retry(
+    db: &DatabaseConnection,
+    source_id: i32,
+    diagnostic: &str,
+) -> Result<(), String> {
+    let mut last_error = None;
+    for attempt in 1..=TERMINAL_PERSISTENCE_ATTEMPTS {
+        match record_elaboration_failure(db, source_id, diagnostic).await {
+            Ok(()) => return Ok(()),
+            Err(error) => last_error = Some(format!("{error:?}")),
         }
-        Err(error) => {
-            let _ = record_elaboration_failure(db, source_id, &error).await;
+        if attempt < TERMINAL_PERSISTENCE_ATTEMPTS {
+            tokio::time::sleep(TERMINAL_PERSISTENCE_RETRY_DELAY).await;
         }
     }
+    let error = last_error.expect("at least one terminal persistence attempt was made");
+    Err(format!(
+        "failed to record elaboration failure after {TERMINAL_PERSISTENCE_ATTEMPTS} attempts: {error}"
+    ))
 }
 
 async fn lookup_package_source(
@@ -362,13 +406,7 @@ async fn lookup_package_source(
         .into_iter()
         .map(|version| VersionedPackage {
             id: Uuid::from_u64_pair(source.id as u64, version.id as u64),
-            name: version
-                .package_url
-                .trim_start_matches("pkg:npm/")
-                .split('@')
-                .next()
-                .unwrap_or_default()
-                .to_owned(),
+            name: npm_package_name_from_purl(&version.package_url),
             version: version.version,
             ecosystem: PackageSourceEcosystem::Npm,
             purl: version.package_url,
@@ -432,6 +470,16 @@ fn package_source(file_name: String, contents: String) -> PackageSource {
     }
 }
 
+fn npm_package_name_from_purl(package_url: &str) -> String {
+    let encoded_name = package_url
+        .strip_prefix("pkg:npm/")
+        .and_then(|purl| purl.rsplit_once('@').map(|(name, _)| name))
+        .unwrap_or_default();
+    percent_decode_str(encoded_name)
+        .decode_utf8_lossy()
+        .into_owned()
+}
+
 async fn cve_ingest_health(db: &DatabaseConnection) -> Result<CveIngestHealth, HttpError> {
     let records_available = has_cve_list_records(db)
         .await
@@ -476,7 +524,7 @@ mod tests {
         },
         npm::elaboration::storage::MAX_FAILURE_DIAGNOSTIC_BYTES,
     };
-    use sea_orm::{DbBackend, MockDatabase, MockExecResult};
+    use sea_orm::{DbBackend, DbErr, MockDatabase, MockExecResult};
 
     fn source(
         id: Uuid,
@@ -521,7 +569,7 @@ mod tests {
                 package_id: 1,
                 source_id: 1,
                 version: "1.0.0".to_owned(),
-                package_url: "pkg:npm/root@1.0.0".to_owned(),
+                package_url: "pkg:npm/%40scope/root@1.0.0".to_owned(),
                 source_repository: None,
                 source_repository_tag: None,
             }]])
@@ -551,9 +599,13 @@ mod tests {
         assert!(!completed.warnings_truncated);
         assert_eq!(completed.warnings.len(), 1);
         assert_eq!(completed.warnings[0].dependency_name, "local-package");
+        assert_eq!(completed.versioned_packages[0].name, "@scope/root");
         assert_eq!(
             completed.versioned_packages[0].derivations,
-            vec![vec!["<root>".to_owned(), "pkg:npm/root@1.0.0".to_owned(),]]
+            vec![vec![
+                "<root>".to_owned(),
+                "pkg:npm/%40scope/root@1.0.0".to_owned(),
+            ]]
         );
     }
 
@@ -578,7 +630,8 @@ mod tests {
                 warnings: Vec::new(),
             }),
         )
-        .await;
+        .await
+        .expect("successful elaboration publishes its terminal state");
 
         let statements = db
             .into_transaction_log()
@@ -604,7 +657,9 @@ mod tests {
                 }])
                 .into_connection();
 
-            finalize_package_source_elaboration(&db, 1, Err(error.to_owned())).await;
+            finalize_package_source_elaboration(&db, 1, Err(error.to_owned()))
+                .await
+                .expect("failed elaboration records its terminal state");
 
             let statements = db
                 .into_transaction_log()
@@ -616,5 +671,22 @@ mod tests {
             assert!(statements[0].contains("package_sources"));
             assert!(!statements[0].contains("DELETE"));
         }
+    }
+
+    #[tokio::test]
+    async fn background_failure_reports_exhausted_terminal_persistence_retries() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_errors(std::iter::repeat_n(
+                DbErr::Custom("database unavailable".to_owned()),
+                TERMINAL_PERSISTENCE_ATTEMPTS,
+            ))
+            .into_connection();
+
+        let error = finalize_package_source_elaboration(&db, 1, Err("registry failed".to_owned()))
+            .await
+            .expect_err("unrecorded terminal failure is returned to the task");
+
+        assert!(error.contains("failed to record elaboration failure"));
+        assert!(error.contains("database unavailable"));
     }
 }

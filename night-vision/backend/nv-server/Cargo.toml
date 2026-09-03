@@ -19,6 +19,7 @@ clap-verbosity-flag.workspace = true
 dropshot.workspace = true
 nv-common.workspace = true
 nv-server-api.workspace = true
+percent-encoding.workspace = true
 sea-orm.workspace = true
 serde_json.workspace = true
 slog.workspace = true

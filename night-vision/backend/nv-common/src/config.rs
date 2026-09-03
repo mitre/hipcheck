@@ -50,6 +50,7 @@ const DEFAULT_PACKAGE_ELABORATION_MAX_PACKAGES: usize = 10_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_EDGES: usize = 100_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_QUEUED_WORK: usize = 100_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_DERIVATIONS: usize = 100_000;
+const DEFAULT_PACKAGE_ELABORATION_MAX_CONCURRENT_RUNS: usize = 4;
 
 /// Errors that can occur while loading configuration.
 pub enum ConfigLoadError {
@@ -253,6 +254,9 @@ pub struct Config {
 
     /// The maximum accepted NPM packument response size in bytes.
     pub package_elaboration_max_packument_bytes: usize,
+
+    /// The maximum number of package-source elaborations running at once.
+    pub package_elaboration_max_concurrent_runs: usize,
 }
 
 /// Where a resolved configuration value came from.
@@ -439,6 +443,7 @@ impl Config {
                     "package-elaboration-max-edges",
                     "package-elaboration-max-queued-work",
                     "package-elaboration-max-derivations",
+                    "package-elaboration-max-concurrent-runs",
                 ],
             },
             BufReader::new(
@@ -585,6 +590,12 @@ impl Config {
             DEFAULT_PACKAGE_ELABORATION_MAX_QUEUED_WORK,
             &mut errors,
         );
+        let package_elaboration_max_concurrent_runs = parse_positive_usize(
+            &parsed,
+            "package-elaboration-max-concurrent-runs",
+            DEFAULT_PACKAGE_ELABORATION_MAX_CONCURRENT_RUNS,
+            &mut errors,
+        );
 
         check_errors(path, parsed.warnings, errors)?;
 
@@ -648,6 +659,7 @@ impl Config {
             npm_registry_url,
             package_elaboration_limits,
             package_elaboration_max_packument_bytes,
+            package_elaboration_max_concurrent_runs,
         };
 
         Ok(config)
@@ -951,6 +963,11 @@ impl Display for Config {
             f,
             "package-elaboration-max-derivations",
             &self.package_elaboration_limits.max_derivations
+        )?;
+        write_report_line!(
+            f,
+            "package-elaboration-max-concurrent-runs",
+            &self.package_elaboration_max_concurrent_runs
         )?;
 
         write_report_separator!(f)?;
@@ -1781,6 +1798,13 @@ mod tests {
                     );
                 },
             ),
+            ConfigFieldParseCase::new(
+                "package_elaboration_max_concurrent_runs",
+                "package-elaboration-max-concurrent-runs = 3",
+                |config, _| {
+                    assert_eq!(config.package_elaboration_max_concurrent_runs, 3);
+                },
+            ),
         ];
 
         for case in cases {
@@ -1862,6 +1886,10 @@ mod tests {
         assert_eq!(config.package_elaboration_limits.max_edges, 100_000);
         assert_eq!(config.package_elaboration_limits.max_queued_work, 100_000);
         assert_eq!(config.package_elaboration_limits.max_derivations, 100_000);
+        assert_eq!(
+            config.package_elaboration_max_concurrent_runs,
+            DEFAULT_PACKAGE_ELABORATION_MAX_CONCURRENT_RUNS
+        );
         assert_eq!(
             config.cve_list_parse_concurrency,
             default_cve_list_parse_concurrency(None, None)
@@ -2052,6 +2080,11 @@ mod tests {
             ("cve-list-write-batch-size", "0", "must be greater than 0"),
             ("cve-record-max-bytes", "0", "must be greater than 0"),
             ("cve-list-write-channel-size", "0", "must be greater than 0"),
+            (
+                "package-elaboration-max-concurrent-runs",
+                "0",
+                "must be greater than 0",
+            ),
         ];
 
         for (key, value, expected_error) in cases {
