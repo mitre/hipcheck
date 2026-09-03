@@ -266,6 +266,35 @@ pub enum PackumentProviderError {
     InvalidPackument(#[source] PackumentParseError),
 }
 
+/// The declaration that attempted to add an edge beyond the elaboration limit.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EdgeLimitOrigin {
+    RootDependency {
+        dependency: Box<str>,
+    },
+    Dependency {
+        parent: PackageVersion,
+        dependency: Box<str>,
+    },
+}
+
+impl std::fmt::Display for EdgeLimitOrigin {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RootDependency { dependency } => {
+                write!(formatter, "root dependency {dependency}")
+            }
+            Self::Dependency { parent, dependency } => {
+                write!(
+                    formatter,
+                    "dependency {dependency} declared by {}@{}",
+                    parent.name, parent.version
+                )
+            }
+        }
+    }
+}
+
 /// An elaboration failure. Failures never produce a partial result.
 #[derive(Debug, Error)]
 pub enum ElaborationError {
@@ -288,8 +317,14 @@ pub enum ElaborationError {
     },
     #[error("elaboration exceeded the package limit")]
     PackageLimitExceeded,
-    #[error("elaboration exceeded the dependency-edge limit")]
-    EdgeLimitExceeded,
+    #[error(
+        "elaboration exceeded dependency-edge limit of {limit}: {edge_count} edges were already recorded while expanding {origin}"
+    )]
+    EdgeLimitExceeded {
+        limit: usize,
+        edge_count: usize,
+        origin: EdgeLimitOrigin,
+    },
     #[error("elaboration exceeded the derivation-path limit")]
     DerivationLimitExceeded,
     #[error("elaboration exceeded the total-run timeout")]
@@ -946,7 +981,11 @@ impl SupervisorState {
             return Ok(());
         }
         if self.edges.len() == limits.max_edges {
-            return Err(ElaborationError::EdgeLimitExceeded);
+            return Err(ElaborationError::EdgeLimitExceeded {
+                limit: limits.max_edges,
+                edge_count: self.edges.len(),
+                origin: EdgeLimitOrigin::from(&edge),
+            });
         }
         self.edges.insert(edge);
         Ok(())
@@ -994,6 +1033,20 @@ impl SupervisorState {
                 .collect(),
             edges: self.edges.into_iter().collect(),
             warnings: self.warnings,
+        }
+    }
+}
+
+impl From<&ElaborationEdge> for EdgeLimitOrigin {
+    fn from(edge: &ElaborationEdge) -> Self {
+        match &edge.parent {
+            Some(parent) => Self::Dependency {
+                parent: parent.clone(),
+                dependency: edge.declared_dependency.clone(),
+            },
+            None => Self::RootDependency {
+                dependency: edge.declared_dependency.clone(),
+            },
         }
     }
 }
@@ -1323,7 +1376,20 @@ mod tests {
             .block_on(elaborate(&source, Arc::new(registry), limits))
             .expect_err("edge limit is enforced");
 
-        assert!(matches!(error, ElaborationError::EdgeLimitExceeded));
+        assert_eq!(
+            error.to_string(),
+            "elaboration exceeded dependency-edge limit of 1: 1 edges were already recorded while expanding dependency child declared by root@1.0.0"
+        );
+        assert!(matches!(
+            error,
+            ElaborationError::EdgeLimitExceeded {
+                limit: 1,
+                edge_count: 1,
+                origin: EdgeLimitOrigin::Dependency { parent, dependency },
+            } if parent.name.as_ref() == "root"
+                && parent.version.as_ref() == "1.0.0"
+                && dependency.as_ref() == "child"
+        ));
     }
 
     #[test]
