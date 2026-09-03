@@ -218,6 +218,13 @@ known, locally available KEV-linked evidence. The database should already
 contain the CVE List and KEV catalog data; the demo does not include their
 synchronization.
 
+Create the local, ignored `backend/demo/package.json` input with
+`@react-native-community/cli-server-api` pinned at `4.8.0`, which resolves to
+`pkg:npm/%40react-native-community/cli-server-api@4.8.0`. In the local catalog
+used to prepare this RFD, that PURL has a high-confidence match for
+`CVE-2025-11953`. Reconfirm the match during preflight because catalog data can
+change.
+
 1. Run `package-source import` and point out the returned source ID.
 2. Run `package-source resolve` and explain that Night Vision expands version
    ranges into the reachable version collection rather than assuming a
