@@ -34,10 +34,15 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     if matches.get_flag("json") {
         println!(
             "{}",
-            serde_json::json!({ "packages": result.package_count, "warnings": result.warnings })
+            serde_json::json!({
+                "packages": result.package_count,
+                "snapshotBehavior": "replaces-previous",
+                "warnings": result.warnings,
+            })
         );
     } else {
         println!("resolved_packages: {}", result.package_count);
+        println!("resolution_snapshot: replaces any previous snapshot");
         print_warnings(&result.warnings);
     }
     Ok(())

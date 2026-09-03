@@ -129,6 +129,10 @@ warnings.
 | `package-source show <SOURCE-ID> [--json]` | Show package-source metadata and state. |
 | `package-source versions <SOURCE-ID> [--json]` | List resolved versions, derivation paths, and path counts. |
 
+Each successful `package-source resolve` atomically publishes a new resolution
+snapshot. Re-running it replaces the source's prior resolved versions, edges,
+and warnings; it does not append another snapshot.
+
 ## Package-version commands
 
 | Command | Purpose |
