@@ -90,16 +90,15 @@ pub async fn fail_hipcheck_run<C: ConnectionTrait>(
 ) -> Result<(), DbErr> {
     let (stdout, stdout_truncated) = bound(&diagnostics.stdout);
     let (stderr, stderr_truncated) = bound(&diagnostics.stderr);
-    let (raw_json, raw_json_truncated, raw_json_bytes) = raw_json
-        .map(|value| {
+    let (raw_json, raw_json_truncated, raw_json_bytes) =
+        raw_json.map_or((None, false, 0), |value| {
             let (bounded, truncated) = bound(value);
             (
                 Some(bounded),
                 truncated,
                 i32::try_from(value.len()).unwrap_or(i32::MAX),
             )
-        })
-        .unwrap_or((None, false, 0));
+        });
     hipcheck_runs::ActiveModel {
         id: Set(run_id),
         status: Set("failed".to_owned()),

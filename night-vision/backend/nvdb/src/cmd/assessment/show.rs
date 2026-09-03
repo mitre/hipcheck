@@ -29,7 +29,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     } else {
         println!("assessment {}: {}", run.run.id, run.run.status);
         for finding in findings {
-            println!("{}", finding);
+            println!("{finding}");
         }
     }
     Ok(())
