@@ -1,6 +1,14 @@
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use camino::Utf8PathBuf;
-use nv_common::config::Config;
+use nv_common::{
+    config::Config,
+    db::{self, entities::package_sources},
+    npm::package_json::NpmPackageJson,
+    rt,
+};
+use sea_orm::{ActiveModelTrait as _, ActiveValue::Set};
+use std::fs;
+use uuid::Uuid;
 
 pub fn command() -> clap::Command {
     clap::Command::new("import")
@@ -15,8 +23,40 @@ pub fn command() -> clap::Command {
         .arg(json_argument())
 }
 
-pub fn run(_config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
-    todo!("package-source import is not implemented")
+pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
+    let path = matches
+        .get_one::<Utf8PathBuf>("file")
+        .expect("required file");
+    let contents = fs::read_to_string(path).context("failed to read package source")?;
+    NpmPackageJson::parse_package_json(contents.as_bytes()).context("invalid npm package.json")?;
+    let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
+    let id = runtime.block_on(store(config, path, contents))?;
+    if matches.get_flag("json") {
+        println!("{}", serde_json::json!({ "id": id }));
+    } else {
+        println!("{id}");
+    }
+    Ok(())
+}
+
+async fn store(config: &Config, path: &Utf8PathBuf, contents: String) -> Result<String> {
+    let db = db::connection(config)
+        .await
+        .context("failed to connect to database")?;
+    let id = Uuid::now_v7().to_string();
+    package_sources::ActiveModel {
+        source_id: Set(id.clone()),
+        file_name: Set(path.file_name().unwrap_or("package.json").to_owned()),
+        file_contents: Set(contents),
+        inferred_type: Set("npm-package-json".to_owned()),
+        resolution_status: Set("pending".to_owned()),
+        resolution_error: Set(None),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await
+    .context("failed to store package source")?;
+    Ok(id)
 }
 
 fn json_argument() -> clap::Arg {

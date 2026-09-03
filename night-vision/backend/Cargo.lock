@@ -2536,6 +2536,7 @@ dependencies = [
  "serde_json",
  "slog",
  "url",
+ "uuid",
  "workspace-hack",
 ]
 

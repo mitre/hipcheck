@@ -1,5 +1,17 @@
-use anyhow::Result;
-use nv_common::config::Config;
+use anyhow::{Context as _, Result};
+use nv_common::{
+    config::Config,
+    db,
+    npm::{
+        elaboration::{
+            NpmRegistryClient, elaborate,
+            storage::{persist_completed_elaboration, record_elaboration_failure},
+        },
+        package_json::NpmPackageJson,
+    },
+    rt,
+};
+use std::sync::Arc;
 
 pub fn command() -> clap::Command {
     clap::Command::new("resolve")
@@ -8,8 +20,57 @@ pub fn command() -> clap::Command {
         .arg(json_argument())
 }
 
-pub fn run(_config: &Config, _matches: &clap::ArgMatches) -> Result<()> {
-    todo!("package-source resolve is not implemented")
+pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
+    let source_id = matches
+        .get_one::<String>("source-id")
+        .expect("required source ID");
+    let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
+    let result = runtime.block_on(resolve(config, source_id))?;
+    if matches.get_flag("json") {
+        println!(
+            "{}",
+            serde_json::json!({ "packages": result.0, "warnings": result.1 })
+        );
+    } else {
+        println!("resolved_packages: {}", result.0);
+        println!("warnings: {}", result.1);
+    }
+    Ok(())
+}
+
+async fn resolve(config: &Config, source_id: &str) -> Result<(usize, usize)> {
+    let db = db::connection(config)
+        .await
+        .context("failed to connect to database")?;
+    let source = super::source_by_id(&db, source_id).await?;
+    let source_document = NpmPackageJson::parse_package_json(source.file_contents.as_bytes())
+        .context("stored source is not a valid npm package.json")?;
+    let client = NpmRegistryClient::new(
+        config.npm_registry_url.clone(),
+        config.package_elaboration_max_packument_bytes,
+    )
+    .context("invalid NPM registry configuration")?;
+    let result = elaborate(
+        &source_document,
+        Arc::new(client),
+        config.package_elaboration_limits(),
+    )
+    .await;
+    match result {
+        Ok(result) => {
+            let summary = (result.packages.len(), result.warnings.len());
+            persist_completed_elaboration(&db, source.id, &result)
+                .await
+                .context("failed to persist elaboration result")?;
+            Ok(summary)
+        }
+        Err(error) => {
+            record_elaboration_failure(&db, source.id, &error.to_string())
+                .await
+                .context("failed to record elaboration failure")?;
+            Err(error.into())
+        }
+    }
 }
 
 fn source_id_argument() -> clap::Arg {

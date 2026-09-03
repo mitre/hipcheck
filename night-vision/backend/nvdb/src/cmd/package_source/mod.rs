@@ -1,5 +1,6 @@
 use anyhow::Result;
-use nv_common::config::Config;
+use nv_common::{config::Config, db::entities::package_sources};
+use sea_orm::{ColumnTrait as _, DatabaseConnection, EntityTrait as _, QueryFilter as _};
 
 pub mod import;
 pub mod kevs;
@@ -40,4 +41,15 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub(crate) async fn source_by_id(
+    db: &DatabaseConnection,
+    source_id: &str,
+) -> Result<package_sources::Model> {
+    package_sources::Entity::find()
+        .filter(package_sources::Column::SourceId.eq(source_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("unknown package source {source_id}"))
 }
