@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -124,6 +124,17 @@ pkg:npm/transitive@4.5.6     transitive     <root> -> example@1.2.3 -> transitiv
 The source should be immutable once stored. Re-running `resolve` must make its
 idempotency or replacement behavior explicit in output and documentation.
 
+Package-source IDs are UUIDv7 values in their canonical string representation.
+They are stable, opaque identifiers: callers may store and pass them back to
+`nvdb`, but must not infer source state, timestamps, or other semantics from
+their contents.
+
+`package-source import` does not resolve the source automatically. It validates
+and stores the immutable input, then returns its source ID. `package-source
+resolve` remains the explicit network-dependent step so operators can observe
+progress, inspect a failed source, and retry resolution without resubmitting
+the input.
+
 ### Package-version KEV query
 
 The KEV query belongs on `package-version`, because it answers what Night
@@ -177,6 +188,17 @@ The configured policy is intentionally not a normal command argument. RFD 0002
 calls for a predetermined Night Vision policy; allowing a casual per-command
 policy selection would make the demo and assessment semantics ambiguous.
 
+For the demo, `nvdb assessment analyze` runs synchronously: it returns only
+after the assessment reaches a terminal state and then prints the persisted
+assessment ID and summary. This keeps the command sequence linear while
+retaining persisted assessments for later `show`, `runs`, and `evidence`
+inspection.
+
+The demo assessment display is sufficient when it includes the target PURL,
+policy identity and version, Hipcheck version and commit, recommendation,
+normalized findings, and timestamps. Additional fields may be added later when
+they improve evidence inspection without making the default display noisy.
+
 ### Mutation and output conventions
 
 Commands should reserve `--destructive` for irreversible or operator-oriented
@@ -225,18 +247,6 @@ and the chosen sample's expected PURL and match.
 5. Add unit tests for command parsing and output-model tests for each command.
 6. Update the `nvdb` command reference with only implemented commands and
    perform a rehearsal against the prepared demo data.
-
-## Open Questions
-
-- Should `package-source import` trigger resolution automatically, or should
-  `resolve` remain an explicit command for operator visibility and retry?
-- What stable source identifier format should be used in the CLI while the
-  package-source persistence model evolves?
-- Should assessment execution be synchronous for the demo, or should
-  `assessment analyze` enqueue work and require a subsequent `show` or
-  `runs` call?
-- Which normalized assessment fields are sufficient for the demo without
-  exposing raw, untrusted Hipcheck details by default?
 
 ## Consequences
 

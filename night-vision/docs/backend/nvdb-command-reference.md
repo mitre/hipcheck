@@ -134,6 +134,12 @@ Each successful `package-source resolve` atomically publishes a new resolution
 snapshot. Re-running it replaces the source's prior resolved versions, edges,
 and warnings; it does not append another snapshot.
 
+`package-source import` returns a UUIDv7 source ID. Treat it as an opaque,
+stable identifier and retain it for later `package-source` commands; do not
+derive meaning from its contents. Import validates and stores the source only;
+run `package-source resolve` explicitly for the network-dependent resolution
+step and to retry a failed resolution without resubmitting the source.
+
 ## Package-version commands
 
 | Command | Purpose |
@@ -154,7 +160,8 @@ version and expose the persisted Night Vision assessment and its evidence.
 
 `assessment evidence` omits raw Hipcheck JSON unless `--raw-hipcheck` is
 provided. All commands use concise text by default and emit structured output
-with `--json`.
+with `--json`. `assessment analyze` runs synchronously and prints its
+persisted assessment ID only after the assessment reaches a terminal state.
 
 See [RFD 0004](../rfds/0004-nvdb-demo-workflow.md) for the intended workflow
 and output conventions.
