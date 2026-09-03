@@ -151,6 +151,7 @@ pub enum Override {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum DependencyKind {
     Dependencies,
+    BundleDependencies,
     DevDependencies,
     PeerDependencies,
     OptionalDependencies,
@@ -211,6 +212,12 @@ impl NpmPackageJson {
     pub fn root_dependencies(&self) -> Vec<RootDependency> {
         let mut roots = Vec::new();
         append_root_dependencies(&mut roots, DependencyKind::Dependencies, &self.dependencies);
+        append_bundle_root_dependencies(
+            &mut roots,
+            DependencyKind::BundleDependencies,
+            &self.bundle_dependencies,
+            &self.dependencies,
+        );
         append_root_dependencies(
             &mut roots,
             DependencyKind::DevDependencies,
@@ -411,6 +418,21 @@ fn append_root_dependencies(
                 kind,
             }),
     );
+}
+
+fn append_bundle_root_dependencies(
+    roots: &mut Vec<RootDependency>,
+    kind: DependencyKind,
+    bundled: &BundleDependencies,
+    dependencies: &DependencyMap,
+) {
+    roots.extend(bundled.as_slice().iter().filter_map(|name| {
+        dependencies.get(name).map(|specification| RootDependency {
+            name: name.clone(),
+            specification: specification.clone(),
+            kind,
+        })
+    }));
 }
 
 fn parse_overrides(value: Value, path: &str) -> Result<Overrides, PackageParseError> {
@@ -1010,6 +1032,11 @@ mod tests {
                     name: dependency_name("bundled"),
                     specification: dependency_spec("5.0.0"),
                     kind: DependencyKind::Dependencies,
+                },
+                RootDependency {
+                    name: dependency_name("bundled"),
+                    specification: dependency_spec("5.0.0"),
+                    kind: DependencyKind::BundleDependencies,
                 },
                 RootDependency {
                     name: dependency_name("development"),

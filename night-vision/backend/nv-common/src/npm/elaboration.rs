@@ -575,7 +575,15 @@ fn declared_dependencies(version: &NpmVersion) -> Vec<DeclaredDependency> {
     append_dependencies(&mut dependencies, &version.dev_dependencies);
     append_dependencies(&mut dependencies, &version.peer_dependencies);
     append_dependencies(&mut dependencies, &version.optional_dependencies);
+    append_bundled_dependencies(
+        &mut dependencies,
+        &version.bundle_dependencies,
+        &version.dependencies,
+    );
     dependencies.sort_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
+    dependencies.dedup_by(|left, right| {
+        left.name == right.name && left.specification == right.specification
+    });
     dependencies
 }
 
@@ -588,6 +596,21 @@ fn append_dependencies(output: &mut Vec<DeclaredDependency>, dependencies: &Depe
                 specification: specification.clone(),
             }),
     );
+}
+
+fn append_bundled_dependencies(
+    output: &mut Vec<DeclaredDependency>,
+    bundled: &super::types::BundleDependencies,
+    dependencies: &DependencyMap,
+) {
+    output.extend(bundled.as_slice().iter().filter_map(|name| {
+        dependencies
+            .get(name)
+            .map(|specification| DeclaredDependency {
+                name: name.clone(),
+                specification: specification.clone(),
+            })
+    }));
 }
 
 fn format_dependency_specification(specification: &DependencySpec) -> Box<str> {
@@ -890,6 +913,27 @@ mod tests {
             result.warnings[0].specification_kind,
             UnsupportedSpecificationKind::File
         );
+    }
+
+    #[test]
+    fn records_bundle_dependencies_as_root_edges() {
+        let source = source(json!({
+            "dependencies": { "bundled": "1.0.0" },
+            "bundleDependencies": ["bundled"],
+        }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([(
+                "bundled".to_owned(),
+                packument("bundled", "1.0.0", json!({})),
+            )]),
+        };
+
+        let result = run(&source, registry).expect("bundle dependency resolves");
+
+        assert!(result.edges.iter().any(|edge| {
+            edge.root_dependency_kind == Some(DependencyKind::BundleDependencies)
+                && edge.child.purl() == "pkg:npm/bundled@1.0.0"
+        }));
     }
 
     #[test]

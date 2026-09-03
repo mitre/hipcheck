@@ -298,6 +298,7 @@ fn version_id(
 fn root_kind(kind: super::DependencyKind) -> String {
     match kind {
         super::DependencyKind::Dependencies => "dependencies",
+        super::DependencyKind::BundleDependencies => "bundleDependencies",
         super::DependencyKind::DevDependencies => "devDependencies",
         super::DependencyKind::PeerDependencies => "peerDependencies",
         super::DependencyKind::OptionalDependencies => "optionalDependencies",
