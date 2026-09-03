@@ -5,8 +5,10 @@
 //! owns the result; workers only inspect one concrete package version and send
 //! one report through the one-shot channel attached to their work item.
 
+pub mod storage;
+
 use super::{
-    package_json::NpmPackageJson,
+    package_json::{DependencyKind, NpmPackageJson},
     packument::{NpmPackument, NpmVersion},
     types::{DependencyMap, DependencyPackageName, DependencySpec, NpmPackageName},
 };
@@ -74,10 +76,21 @@ pub struct ElaboratedPackage {
     pub derivations: Vec<Vec<PackageVersion>>,
 }
 
+/// A normalized dependency edge in an elaborated package source.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct ElaborationEdge {
+    pub parent: Option<PackageVersion>,
+    pub child: PackageVersion,
+    pub root_dependency_kind: Option<DependencyKind>,
+    pub declared_dependency: Box<str>,
+    pub declared_specification: Box<str>,
+}
+
 /// The complete, in-memory result of elaborating one package source.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ElaborationResult {
     pub packages: Vec<ElaboratedPackage>,
+    pub edges: Vec<ElaborationEdge>,
     pub warnings: Vec<ElaborationWarning>,
 }
 
@@ -262,6 +275,13 @@ pub async fn elaborate(
         )
         .await?;
         for version in versions {
+            state.edges.insert(ElaborationEdge {
+                parent: None,
+                child: version.clone(),
+                root_dependency_kind: Some(root.kind),
+                declared_dependency: root.name.as_str().into(),
+                declared_specification: format_dependency_specification(&root.specification),
+            });
             pending.push((version.clone(), vec![version]));
         }
     }
@@ -303,6 +323,15 @@ pub async fn elaborate(
                 .await?;
                 for derivation in &report.derivations {
                     for version in &versions {
+                        state.edges.insert(ElaborationEdge {
+                            parent: Some(report.package.clone()),
+                            child: version.clone(),
+                            root_dependency_kind: None,
+                            declared_dependency: dependency.name.as_str().into(),
+                            declared_specification: format_dependency_specification(
+                                &dependency.specification,
+                            ),
+                        });
                         if derivation.contains(version) {
                             continue;
                         }
@@ -447,6 +476,25 @@ fn append_dependencies(output: &mut Vec<DeclaredDependency>, dependencies: &Depe
     );
 }
 
+fn format_dependency_specification(specification: &DependencySpec) -> Box<str> {
+    match specification {
+        DependencySpec::Registry(range) => range.as_str().into(),
+        DependencySpec::Tag(tag) | DependencySpec::File(tag) | DependencySpec::Git(tag) => {
+            tag.clone().into_boxed_str()
+        }
+        DependencySpec::Url(url) => url.as_str().into(),
+        DependencySpec::NpmAlias {
+            package,
+            specification,
+        } => format!(
+            "npm:{}@{}",
+            package.as_str(),
+            format_dependency_specification(specification)
+        )
+        .into_boxed_str(),
+    }
+}
+
 async fn resolve_specification(
     cache: &PackumentCache,
     provider: &dyn PackumentProvider,
@@ -538,6 +586,7 @@ async fn resolve_specification(
 #[derive(Default)]
 struct SupervisorState {
     packages: BTreeMap<PackageVersion, BTreeSet<Vec<PackageVersion>>>,
+    edges: BTreeSet<ElaborationEdge>,
     warnings: Vec<ElaborationWarning>,
 }
 
@@ -581,6 +630,7 @@ impl SupervisorState {
                     derivations: derivations.into_iter().collect(),
                 })
                 .collect(),
+            edges: self.edges.into_iter().collect(),
             warnings: self.warnings,
         }
     }
@@ -666,6 +716,20 @@ mod tests {
         let result = run(&source, registry).expect("elaboration succeeds");
 
         assert_eq!(result.packages.len(), 2);
+        assert_eq!(result.edges.len(), 2);
+        assert!(result.edges.iter().any(|edge| {
+            edge.parent.is_none()
+                && edge.child.purl() == "pkg:npm/root@1.0.0"
+                && edge.root_dependency_kind == Some(DependencyKind::Dependencies)
+                && edge.declared_specification.as_ref() == "^1.0.0"
+        }));
+        assert!(result.edges.iter().any(|edge| {
+            edge.parent
+                .as_ref()
+                .is_some_and(|parent| parent.purl() == "pkg:npm/root@1.0.0")
+                && edge.child.purl() == "pkg:npm/child@2.0.0"
+                && edge.declared_dependency.as_ref() == "child"
+        }));
         assert_eq!(result.packages[0].package.purl(), "pkg:npm/child@2.0.0");
         assert_eq!(result.packages[1].package.purl(), "pkg:npm/root@1.0.0");
         assert_eq!(
