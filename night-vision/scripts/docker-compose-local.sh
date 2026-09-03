@@ -56,7 +56,9 @@ nv-server:local, DOCKER_SECRET_MOUNT_DIR overrides the Docker-approved host
 directory used for staged local secrets, and DOCKER_HOST_REPO_ROOT overrides the
 repository root used to derive the default Linux staging directory when Docker
 needs a host-visible path. Set CA_FILE_SECRET_FILE to pass network CA
-certificates to the backend image build.
+certificates to the backend image build. Export HIPCHECK_GITLAB_TOKEN for
+commands that build the backend image; Compose passes it only as a BuildKit
+secret.
 EOF
 }
 

@@ -240,8 +240,9 @@ pub struct Config {
     /// Whether CVE List write channel size was explicit or computed.
     pub cve_list_write_channel_size_source: ConfigValueSource,
 
-    /// Paths and resource limits for the bundled Hipcheck execution boundary.
-    pub hipcheck: HipcheckExecutionConfig,
+    /// Paths and resource limits for the bundled Hipcheck execution boundary,
+    /// when this process executes the container-bundled artifact.
+    pub hipcheck: Option<HipcheckExecutionConfig>,
 }
 
 /// Configuration for invoking the bundled Hipcheck artifact.
@@ -435,16 +436,7 @@ impl Config {
                 // `database-connection` or `database-connection-file`, they're both listed as
                 // optional here because we validate that only one of them is present after
                 // parsing with `spookey`.
-                required_keys: vec![
-                    "server-address",
-                    "cve-list-checkout-path",
-                    "hipcheck-bin-path",
-                    "hipcheck-policy-path",
-                    "hipcheck-exec-config-path",
-                    "hipcheck-working-dir",
-                    "hipcheck-cache-dir",
-                    "hipcheck-data-dir",
-                ],
+                required_keys: vec!["server-address", "cve-list-checkout-path"],
                 optional_keys: vec![
                     "openapi-dest-path",
                     "kev-url",
@@ -475,6 +467,12 @@ impl Config {
                     "cve-list-write-batch-size",
                     "cve-record-max-bytes",
                     "cve-list-write-channel-size",
+                    "hipcheck-bin-path",
+                    "hipcheck-policy-path",
+                    "hipcheck-exec-config-path",
+                    "hipcheck-working-dir",
+                    "hipcheck-cache-dir",
+                    "hipcheck-data-dir",
                     "hipcheck-timeout",
                     "hipcheck-stdout-max-bytes",
                     "hipcheck-stderr-max-bytes",
@@ -571,23 +569,13 @@ impl Config {
         );
         let cve_list_write_channel_size =
             parse_positive_usize_option(&parsed, "cve-list-write-channel-size", &mut errors);
-        let hipcheck_binary_path: Utf8PathBuf =
-            parse_value(&parsed, "hipcheck-bin-path", &mut errors)
-                .expect("hipcheck-bin-path is required");
-        let hipcheck_policy_path: Utf8PathBuf =
-            parse_value(&parsed, "hipcheck-policy-path", &mut errors)
-                .expect("hipcheck-policy-path is required");
-        let hipcheck_exec_config_path: Utf8PathBuf =
-            parse_value(&parsed, "hipcheck-exec-config-path", &mut errors)
-                .expect("hipcheck-exec-config-path is required");
-        let hipcheck_working_dir: Utf8PathBuf =
-            parse_value(&parsed, "hipcheck-working-dir", &mut errors)
-                .expect("hipcheck-working-dir is required");
-        let hipcheck_cache_dir: Utf8PathBuf =
-            parse_value(&parsed, "hipcheck-cache-dir", &mut errors)
-                .expect("hipcheck-cache-dir is required");
-        let hipcheck_data_dir: Utf8PathBuf = parse_value(&parsed, "hipcheck-data-dir", &mut errors)
-            .expect("hipcheck-data-dir is required");
+        let hipcheck_binary_path = parse_value(&parsed, "hipcheck-bin-path", &mut errors);
+        let hipcheck_policy_path = parse_value(&parsed, "hipcheck-policy-path", &mut errors);
+        let hipcheck_exec_config_path =
+            parse_value(&parsed, "hipcheck-exec-config-path", &mut errors);
+        let hipcheck_working_dir = parse_value(&parsed, "hipcheck-working-dir", &mut errors);
+        let hipcheck_cache_dir = parse_value(&parsed, "hipcheck-cache-dir", &mut errors);
+        let hipcheck_data_dir = parse_value(&parsed, "hipcheck-data-dir", &mut errors);
         let hipcheck_timeout = parse_positive_u64(
             &parsed,
             "hipcheck-timeout",
@@ -613,13 +601,17 @@ impl Config {
             &mut errors,
         );
 
-        validate_hipcheck_paths(
-            &hipcheck_binary_path,
-            &hipcheck_policy_path,
-            &hipcheck_exec_config_path,
-            &hipcheck_working_dir,
-            &hipcheck_cache_dir,
-            &hipcheck_data_dir,
+        let hipcheck = resolve_hipcheck_execution_config(
+            hipcheck_binary_path,
+            hipcheck_policy_path,
+            hipcheck_exec_config_path,
+            hipcheck_working_dir,
+            hipcheck_cache_dir,
+            hipcheck_data_dir,
+            hipcheck_timeout,
+            hipcheck_stdout_max_bytes,
+            hipcheck_stderr_max_bytes,
+            hipcheck_json_max_bytes,
             &mut errors,
         );
 
@@ -671,18 +663,7 @@ impl Config {
             cve_list_parse_concurrency_source: cve_list_pipeline_config.parse_concurrency_source,
             cve_list_write_batch_size_source: cve_list_pipeline_config.write_batch_size_source,
             cve_list_write_channel_size_source: cve_list_pipeline_config.write_channel_size_source,
-            hipcheck: HipcheckExecutionConfig {
-                binary_path: hipcheck_binary_path,
-                policy_path: hipcheck_policy_path,
-                exec_config_path: hipcheck_exec_config_path,
-                working_dir: hipcheck_working_dir,
-                cache_dir: hipcheck_cache_dir,
-                data_dir: hipcheck_data_dir,
-                timeout: Duration::from_millis(hipcheck_timeout),
-                stdout_max_bytes: hipcheck_stdout_max_bytes,
-                stderr_max_bytes: hipcheck_stderr_max_bytes,
-                json_max_bytes: hipcheck_json_max_bytes,
-            },
+            hipcheck,
         };
 
         Ok(config)
@@ -933,24 +914,18 @@ impl Display for Config {
             "cve-list-write-channel-size",
             &self.cve_list_write_channel_size
         )?;
-        write_report_line!(f, "hipcheck-bin-path", "<configured>")?;
-        write_report_line!(f, "hipcheck-policy-path", "<configured>")?;
-        write_report_line!(f, "hipcheck-exec-config-path", "<configured>")?;
-        write_report_line!(f, "hipcheck-working-dir", "<configured>")?;
-        write_report_line!(f, "hipcheck-cache-dir", "<configured>")?;
-        write_report_line!(f, "hipcheck-data-dir", "<configured>")?;
-        write_report_line!(f, "hipcheck-timeout", self.hipcheck.timeout().as_millis())?;
-        write_report_line!(
-            f,
-            "hipcheck-stdout-max-bytes",
-            self.hipcheck.stdout_max_bytes()
-        )?;
-        write_report_line!(
-            f,
-            "hipcheck-stderr-max-bytes",
-            self.hipcheck.stderr_max_bytes()
-        )?;
-        write_report_line!(f, "hipcheck-json-max-bytes", self.hipcheck.json_max_bytes())?;
+        if let Some(hipcheck) = &self.hipcheck {
+            write_report_line!(f, "hipcheck-bin-path", "<configured>")?;
+            write_report_line!(f, "hipcheck-policy-path", "<configured>")?;
+            write_report_line!(f, "hipcheck-exec-config-path", "<configured>")?;
+            write_report_line!(f, "hipcheck-working-dir", "<configured>")?;
+            write_report_line!(f, "hipcheck-cache-dir", "<configured>")?;
+            write_report_line!(f, "hipcheck-data-dir", "<configured>")?;
+            write_report_line!(f, "hipcheck-timeout", hipcheck.timeout().as_millis())?;
+            write_report_line!(f, "hipcheck-stdout-max-bytes", hipcheck.stdout_max_bytes())?;
+            write_report_line!(f, "hipcheck-stderr-max-bytes", hipcheck.stderr_max_bytes())?;
+            write_report_line!(f, "hipcheck-json-max-bytes", hipcheck.json_max_bytes())?;
+        }
 
         write_report_separator!(f)?;
 
@@ -1159,6 +1134,80 @@ fn parse_kev_refresh_interval(
         None
     } else {
         Some(value)
+    }
+}
+
+fn resolve_hipcheck_execution_config(
+    binary_path: Option<Utf8PathBuf>,
+    policy_path: Option<Utf8PathBuf>,
+    exec_config_path: Option<Utf8PathBuf>,
+    working_dir: Option<Utf8PathBuf>,
+    cache_dir: Option<Utf8PathBuf>,
+    data_dir: Option<Utf8PathBuf>,
+    timeout: u64,
+    stdout_max_bytes: usize,
+    stderr_max_bytes: usize,
+    json_max_bytes: usize,
+    errors: &mut Vec<ConfigError>,
+) -> Option<HipcheckExecutionConfig> {
+    match (
+        binary_path,
+        policy_path,
+        exec_config_path,
+        working_dir,
+        cache_dir,
+        data_dir,
+    ) {
+        (
+            Some(binary_path),
+            Some(policy_path),
+            Some(exec_config_path),
+            Some(working_dir),
+            Some(cache_dir),
+            Some(data_dir),
+        ) => {
+            validate_hipcheck_paths(
+                &binary_path,
+                &policy_path,
+                &exec_config_path,
+                &working_dir,
+                &cache_dir,
+                &data_dir,
+                errors,
+            );
+            Some(HipcheckExecutionConfig {
+                binary_path,
+                policy_path,
+                exec_config_path,
+                working_dir,
+                cache_dir,
+                data_dir,
+                timeout: Duration::from_millis(timeout),
+                stdout_max_bytes,
+                stderr_max_bytes,
+                json_max_bytes,
+            })
+        }
+        (None, None, None, None, None, None) => None,
+        (binary_path, policy_path, exec_config_path, working_dir, cache_dir, data_dir) => {
+            for (key, value) in [
+                ("hipcheck-bin-path", binary_path),
+                ("hipcheck-policy-path", policy_path),
+                ("hipcheck-exec-config-path", exec_config_path),
+                ("hipcheck-working-dir", working_dir),
+                ("hipcheck-cache-dir", cache_dir),
+                ("hipcheck-data-dir", data_dir),
+            ] {
+                if value.is_none() {
+                    errors.push(ConfigError::StrParse(StrParseError {
+                        key: key.to_owned().into_boxed_str(),
+                        value: "".into(),
+                        err: "must be configured with every Hipcheck artifact path".into(),
+                    }));
+                }
+            }
+            None
+        }
     }
 }
 
@@ -1987,22 +2036,23 @@ mod tests {
             config.cve_list_write_channel_size_source,
             ConfigValueSource::ComputedDefault
         );
+        let hipcheck = config
+            .hipcheck
+            .as_ref()
+            .expect("Hipcheck should be configured");
         assert_eq!(
-            config.hipcheck.timeout(),
+            hipcheck.timeout(),
             Duration::from_millis(DEFAULT_HIPCHECK_TIMEOUT)
         );
         assert_eq!(
-            config.hipcheck.stdout_max_bytes(),
+            hipcheck.stdout_max_bytes(),
             DEFAULT_HIPCHECK_STDOUT_MAX_BYTES
         );
         assert_eq!(
-            config.hipcheck.stderr_max_bytes(),
+            hipcheck.stderr_max_bytes(),
             DEFAULT_HIPCHECK_STDERR_MAX_BYTES
         );
-        assert_eq!(
-            config.hipcheck.json_max_bytes(),
-            DEFAULT_HIPCHECK_JSON_MAX_BYTES
-        );
+        assert_eq!(hipcheck.json_max_bytes(), DEFAULT_HIPCHECK_JSON_MAX_BYTES);
     }
 
     #[test]
@@ -2039,10 +2089,14 @@ mod tests {
         ));
 
         let config = Config::parse(file.path()).expect("config should parse");
-        assert_eq!(config.hipcheck.timeout(), Duration::from_secs(1));
-        assert_eq!(config.hipcheck.stdout_max_bytes(), 200);
-        assert_eq!(config.hipcheck.stderr_max_bytes(), 300);
-        assert_eq!(config.hipcheck.json_max_bytes(), 400);
+        let hipcheck = config
+            .hipcheck
+            .as_ref()
+            .expect("Hipcheck should be configured");
+        assert_eq!(hipcheck.timeout(), Duration::from_secs(1));
+        assert_eq!(hipcheck.stdout_max_bytes(), 200);
+        assert_eq!(hipcheck.stderr_max_bytes(), 300);
+        assert_eq!(hipcheck.json_max_bytes(), 400);
     }
 
     #[cfg(unix)]
@@ -2051,7 +2105,12 @@ mod tests {
         let file = TempConfigFile::new(&valid_required_config());
         let config = Config::parse(file.path()).expect("config should parse");
         fs::set_permissions(
-            config.hipcheck.binary_path().as_std_path(),
+            config
+                .hipcheck
+                .as_ref()
+                .expect("Hipcheck should be configured")
+                .binary_path()
+                .as_std_path(),
             std::os::unix::fs::PermissionsExt::from_mode(0o644),
         )
         .expect("failed to remove test binary execute permission");
@@ -2066,6 +2125,41 @@ mod tests {
         };
         assert_eq!(&*error.key, "hipcheck-bin-path");
         assert_eq!(&*error.err, "must be executable");
+    }
+
+    #[test]
+    fn host_config_does_not_require_hipcheck_artifacts() {
+        let file = TempConfigFile::new(
+            "server-address = 127.0.0.1:0\n\
+            database-connection = sqlite::memory:\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n",
+        );
+
+        let config = Config::parse(file.path()).expect("host config should parse");
+        assert!(config.hipcheck.is_none());
+    }
+
+    #[test]
+    fn rejects_partial_hipcheck_artifact_configuration() {
+        let mut contents = valid_required_config();
+        let data_dir_start = contents
+            .find("\nhipcheck-data-dir =")
+            .expect("test config has Hipcheck data directory");
+        contents.truncate(data_dir_start);
+        let file = TempConfigFile::new(&contents);
+
+        let error = Config::parse(file.path()).expect_err("partial Hipcheck config should fail");
+        let ConfigLoadError::FailedToParseConfigFileFields(_, ConfigErrors(errors)) = error else {
+            panic!("expected field parsing error");
+        };
+        let ConfigError::StrParse(error) = &errors[0] else {
+            panic!("expected Hipcheck path error");
+        };
+        assert_eq!(&*error.key, "hipcheck-data-dir");
+        assert_eq!(
+            &*error.err,
+            "must be configured with every Hipcheck artifact path"
+        );
     }
 
     #[test]

@@ -11,6 +11,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       args:
+        HIPCHECK_REF: ${HIPCHECK_REF:-06a3db9394742a58a7fb3412b677db25feb6f678}
         HIPCHECK_FETCH_EPOCH: ${CI_PIPELINE_ID:-0}
       secrets:
         - ca_file

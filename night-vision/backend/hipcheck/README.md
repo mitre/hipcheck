@@ -8,7 +8,7 @@ MVP. It is deliberately separate from a developer's Hipcheck install.
 | Artifact | Pinned value |
 | --- | --- |
 | Source repository | `https://github.com/mitre/hipcheck` |
-| Build ref | `HIPCHECK_REF`, defaulting to `HEAD` |
+| Build ref | `HIPCHECK_REF`, defaulting to `06a3db9394742a58a7fb3412b677db25feb6f678` |
 | Resolved commit | `/opt/night-vision/hipcheck/REVISION` in the built image |
 | MVP policy | `config/Hipcheck.kdl` |
 | MVP plugin | `mitre/binary`, built locally from the same commit |
@@ -19,10 +19,9 @@ checks out the resulting commit detached, and records its full SHA in
 The policy references a local plugin manifest with an exact local version
 (`0.0.0`), so a run cannot download an upgraded plugin.
 
-`HEAD` is suitable for development and CI verification. Docker does not detect
-updates behind a floating ref, so change `HIPCHECK_FETCH_EPOCH` or use
-`--no-cache` to refresh it. Release builds must set `HIPCHECK_REF` to a full
-commit SHA and retain the image's `REVISION` file as provenance.
+The default is the reviewed MVP commit used by local and CI builds. Upgrade it
+only by changing `HIPCHECK_REF` to another full commit SHA and retaining the
+image's `REVISION` file as provenance.
 
 ## Artifact layout
 
@@ -64,7 +63,7 @@ installing Hipcheck locally:
 ```sh
 docker build \
 
-  --build-arg HIPCHECK_REF=HEAD \
+  --build-arg HIPCHECK_REF=06a3db9394742a58a7fb3412b677db25feb6f678 \
   --build-arg HIPCHECK_FETCH_EPOCH="$(date -u +%s)" \
   -f backend/Dockerfile -t nv-server:hipcheck-mvp backend
 docker run --rm --entrypoint /usr/local/bin/hc nv-server:hipcheck-mvp \

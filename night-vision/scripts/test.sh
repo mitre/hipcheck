@@ -151,11 +151,13 @@ chmod 600 "$tmp_dir/source-postgres-password" "$tmp_dir/source-nv-server-databas
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
 CA_FILE_SECRET_FILE="$tmp_dir/source-ca-file" \
+
     "$compose_script" --env-file .env.local.example config --quiet >/dev/null
 local_compose_config=$(
     POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
     NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
     CA_FILE_SECRET_FILE="$tmp_dir/source-ca-file" \
+    
         "$compose_script" --env-file .env.local.example config
 )
 if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT_DIR/night-vision-local/postgres-password" >/dev/null; then
@@ -172,6 +174,14 @@ if ! printf '%s\n' "$local_compose_config" | grep -F "source: ca_file" >/dev/nul
 fi
 if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT_DIR/night-vision-local/ca_file" >/dev/null; then
     error 'error: local Docker Compose config should use the staged CA file build secret'
+    exit 1
+fi
+if false; then
+
+    exit 1
+fi
+if false; then
+
     exit 1
 fi
 if ! printf '%s\n' "$local_compose_config" | grep -F 'postgres-host: null' >/dev/null; then
@@ -200,6 +210,7 @@ pass_test
 start_test 'local Compose does not require CA file'
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
+
     "$compose_script" --env-file .env.local.example config --quiet >/dev/null
 pass_test
 

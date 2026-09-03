@@ -127,8 +127,14 @@ authorities, set `CA_FILE_SECRET_FILE` to the certificate bundle before running
 the local Compose wrapper. The wrapper stages the file with the other local
 secrets and passes it to the backend Dockerfile as the `ca_file` build secret.
 
+
+
+
+
 ```sh
-CA_FILE_SECRET_FILE="$HOME/.config/certs/system_certs.pem" scripts/docker-compose-local.sh up --build
+
+CA_FILE_SECRET_FILE="$HOME/.config/certs/system_certs.pem" \
+scripts/docker-compose-local.sh up --build
 ```
 
 To choose a different local password, pass it only to the setup command:

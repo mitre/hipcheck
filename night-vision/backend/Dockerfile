@@ -5,7 +5,7 @@
 #   docker build \
 #     --secret id=ca_file,src="$HOME/.config/certs/system_certs.pem" \
 #   
-#     --build-arg HIPCHECK_REF=HEAD \
+#     --build-arg HIPCHECK_REF=06a3db9394742a58a7fb3412b677db25feb6f678 \
 #     --build-arg HIPCHECK_FETCH_EPOCH="$(date -u +%s)" \
 #     --build-arg IMAGE_CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 #     --build-arg IMAGE_REVISION="$(git rev-parse HEAD)" \
@@ -18,9 +18,9 @@
 ARG RUST_VERSION=1.95.0-bookworm
 ARG CARGO_CHEF_VERSION=0.1.77
 ARG HIPCHECK_RUST_VERSION=1.95.0-bookworm
-ARG HIPCHECK_REF=HEAD
-# Docker cannot detect updates behind a floating Git ref. Change this value, or
-# build with --no-cache, when a fresh checkout is required.
+ARG HIPCHECK_REF=06a3db9394742a58a7fb3412b677db25feb6f678
+# Change the reviewed commit value to upgrade Hipcheck. HIPCHECK_FETCH_EPOCH
+# allows CI to invalidate this layer without changing the pinned source.
 ARG HIPCHECK_FETCH_EPOCH=0
 
 # OCI Image Metadata.

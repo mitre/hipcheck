@@ -131,22 +131,6 @@ cve-record-max-bytes =
 # cve-list-write-batch-size, capped at 1024.
 cve-list-write-channel-size =
 
-# Hipcheck is supplied by the container artifact bundle. For local development,
-# use the Compose image workflow documented in docs/backend/hipcheck-integration.md.
-hipcheck-bin-path = "/usr/local/bin/hc"
-hipcheck-policy-path = "/opt/night-vision/hipcheck/config/Hipcheck.kdl"
-hipcheck-exec-config-path = "/opt/night-vision/hipcheck/config/Exec.kdl"
-hipcheck-working-dir = "/opt/night-vision/hipcheck"
-hipcheck-cache-dir = "/var/cache/night-vision/hipcheck"
-hipcheck-data-dir = "/var/lib/night-vision/hipcheck"
-
-# Defaults: 300000 ms, 1048576 stdout bytes, 1048576 stderr bytes, and
-# 4194304 JSON bytes.
-hipcheck-timeout =
-hipcheck-stdout-max-bytes =
-hipcheck-stderr-max-bytes =
-hipcheck-json-max-bytes =
-
 # The number of async worker threads to use for handling requests.
 #
 # Default: (the number of CPU cores available on the system)
