@@ -228,7 +228,7 @@ mod tests {
 
         assert_eq!(
             report,
-            "failed to sync CVE List data\n\nCaused by:\n    0: Execution Error\n    1: error returned from database\n"
+            "failed to sync CVE List data\n\nCaused by:\n    0: execution failed\n    1: error returned from database\n"
         );
     }
 
@@ -255,7 +255,7 @@ mod tests {
 
     impl std::fmt::Display for ExecutionError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "Execution Error: {}", self.0)
+            f.write_str("execution failed")
         }
     }
 

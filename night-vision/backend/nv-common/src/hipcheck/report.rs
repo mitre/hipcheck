@@ -137,7 +137,7 @@ impl From<serde_json::Error> for HipcheckReportError {
 impl fmt::Display for HipcheckReportError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Json(error) => write!(formatter, "invalid Hipcheck report JSON: {error}"),
+            Self::Json(_) => formatter.write_str("invalid Hipcheck report JSON"),
             Self::Contract { detail } => {
                 write!(formatter, "invalid Hipcheck report contract: {detail}")
             }

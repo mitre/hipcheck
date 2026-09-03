@@ -253,7 +253,7 @@ impl Display for Error {
             Self::MissingRequiredFields(items) => {
                 write!(f, "missing required fields: {}", items.join(", "))
             }
-            Self::Io(error) => error.fmt(f),
+            Self::Io(_) => f.write_str("I/O error while parsing configuration"),
         }
     }
 }

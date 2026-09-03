@@ -43,7 +43,7 @@ pub enum PackageParseError {
     #[error("Invalid package version '{version}': {details}")]
     InvalidPackageVersion { version: String, details: String },
 
-    #[error("Invalid dependency in '{section}' for '{name}': {source}")]
+    #[error("Invalid dependency in '{section}' for '{name}'")]
     InvalidDependency {
         section: &'static str,
         name: String,

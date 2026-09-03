@@ -53,7 +53,7 @@ impl Display for FatalError {
             }
             Self::FailedToBuildTokioRuntime(_) => write!(f, "failed to build tokio runtime"),
             Self::FailedToConnectToDatabase(_) => write!(f, "failed to connect to database"),
-            Self::FailedToLoadConfig(err) => write!(f, "{err}"),
+            Self::FailedToLoadConfig(_) => write!(f, "failed to load configuration"),
             Self::FailedToCreateOpenApiDescFile(path, _) => {
                 write!(f, "failed to create OpenAPI Description file '{path}'")
             }

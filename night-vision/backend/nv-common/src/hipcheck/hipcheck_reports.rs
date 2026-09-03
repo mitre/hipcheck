@@ -4,6 +4,7 @@
 //! `docs/backend/hipcheck-integration.md`.
 
 use super::{HipcheckCheckState, HipcheckEffect, HipcheckRecommendation, parse_hipcheck_report};
+use std::error::Error as _;
 
 const VALID_MVP_REPORT: &str =
     include_str!("../../testdata/define-hipcheck/fixtures/valid_mvp.json");
@@ -99,10 +100,13 @@ fn missing_required_fields_fixture_is_rejected_with_a_stable_error() {
     let error = parse_hipcheck_report(MISSING_REQUIRED_FIELDS_REPORT)
         .expect_err("report is missing the required check state");
 
+    assert_eq!(error.to_string(), "invalid Hipcheck report JSON");
     assert!(
         error
+            .source()
+            .expect("JSON error is preserved")
             .to_string()
-            .starts_with("invalid Hipcheck report JSON: missing field `state`")
+            .starts_with("missing field `state`")
     );
 }
 
@@ -118,6 +122,8 @@ fn missing_required_target_identity_is_rejected() {
 
     assert!(
         error
+            .source()
+            .expect("JSON error is preserved")
             .to_string()
             .contains("missing field `source_repository_url`")
     );
@@ -144,7 +150,13 @@ fn missing_required_check_state_is_rejected() {
 
     let error = parse_hipcheck_report(&input).expect_err("check state is required");
 
-    assert!(error.to_string().contains("missing field `state`"));
+    assert!(
+        error
+            .source()
+            .expect("JSON error is preserved")
+            .to_string()
+            .contains("missing field `state`")
+    );
 }
 
 #[test]
@@ -157,17 +169,26 @@ fn missing_required_structured_value_is_rejected() {
 
     let error = parse_hipcheck_report(&input).expect_err("check value is required");
 
-    assert!(error.to_string().contains("missing field `value`"));
+    assert!(
+        error
+            .source()
+            .expect("JSON error is preserved")
+            .to_string()
+            .contains("missing field `value`")
+    );
 }
 
 #[test]
 fn malformed_json_is_rejected_with_a_parse_error() {
     let error = parse_hipcheck_report(MALFORMED_REPORT).expect_err("JSON must be complete");
 
+    assert_eq!(error.to_string(), "invalid Hipcheck report JSON");
     assert!(
-        error
+        !error
+            .source()
+            .expect("JSON error is preserved")
             .to_string()
-            .starts_with("invalid Hipcheck report JSON:")
+            .is_empty()
     );
 }
 

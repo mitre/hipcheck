@@ -9,7 +9,7 @@ pub mod storage;
 
 use super::{
     package_json::{DependencyKind, NpmPackageJson},
-    packument::{NpmPackument, NpmVersion},
+    packument::{NpmPackument, NpmVersion, PackumentParseError},
     types::{DependencyMap, DependencyPackageName, DependencySpec, NpmPackageName},
 };
 use crate::npm_semver::{NpmVersion as RangeVersion, elaborate_npm_version_bounds, parse_range};
@@ -245,7 +245,7 @@ impl PackumentProvider for NpmRegistryClient {
             return Err(PackumentProviderError::Request);
         }
         super::packument::parse_packument(bytes.as_ref())
-            .map_err(|_| PackumentProviderError::InvalidPackument)
+            .map_err(PackumentProviderError::InvalidPackument)
     }
 }
 
@@ -259,7 +259,7 @@ pub enum PackumentProviderError {
     #[error("registry request timed out")]
     Timeout,
     #[error("registry returned an invalid packument")]
-    InvalidPackument,
+    InvalidPackument(#[source] PackumentParseError),
 }
 
 /// An elaboration failure. Failures never produce a partial result.
@@ -267,7 +267,7 @@ pub enum PackumentProviderError {
 pub enum ElaborationError {
     #[error("elaboration limits must be positive")]
     InvalidLimits,
-    #[error("failed to retrieve packument for {package}: {source}")]
+    #[error("failed to retrieve packument for {package}")]
     Packument {
         package: Box<str>,
         #[source]
@@ -832,6 +832,7 @@ mod tests {
     use serde_json::json;
     use std::{
         collections::BTreeMap,
+        error::Error as _,
         sync::atomic::{AtomicUsize, Ordering},
         time::Duration,
     };
@@ -849,8 +850,7 @@ mod tests {
             let Some(packument) = self.packuments.get(package.as_str()) else {
                 return Err(PackumentProviderError::NotFound);
             };
-            parse_packument(packument.as_bytes())
-                .map_err(|_| PackumentProviderError::InvalidPackument)
+            parse_packument(packument.as_bytes()).map_err(PackumentProviderError::InvalidPackument)
         }
     }
 
@@ -987,6 +987,30 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn reports_the_packument_parse_error() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([("root".to_owned(), "{}".to_owned())]),
+        };
+
+        let error = run(&source, registry).expect_err("invalid packument is reported");
+
+        assert_eq!(error.to_string(), "failed to retrieve packument for root");
+        let provider_error = error.source().expect("provider error is preserved");
+        assert_eq!(
+            provider_error.to_string(),
+            "registry returned an invalid packument"
+        );
+        assert_eq!(
+            provider_error
+                .source()
+                .expect("packument parse error is preserved")
+                .to_string(),
+            "packument is missing required field $.name"
+        );
     }
 
     #[test]
@@ -1183,7 +1207,7 @@ mod tests {
         ) -> Result<NpmPackument, PackumentProviderError> {
             self.requests.fetch_add(1, Ordering::SeqCst);
             parse_packument(self.packument.as_bytes())
-                .map_err(|_| PackumentProviderError::InvalidPackument)
+                .map_err(PackumentProviderError::InvalidPackument)
         }
     }
 
