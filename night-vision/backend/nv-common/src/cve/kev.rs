@@ -132,6 +132,35 @@ pub async fn kev_affected_npm_package_versions(
     Ok(matches)
 }
 
+/// Match KEV-linked CVEs against one concrete NPM package version.
+///
+/// Unknown results without a package identity describe a catalog-enrichment
+/// gap, not an association with the requested package version, so they are
+/// excluded from this single-version view.
+pub async fn kev_affected_npm_package_version(
+    db: &DatabaseConnection,
+    package: ReachableNpmPackageVersion,
+) -> Result<Vec<KevAffectedNpmPackageVersion>, KevNpmMatchError> {
+    let package_name = package.package_name.clone();
+    kev_affected_npm_package_versions(db, &[package])
+        .await
+        .map(|matches| {
+            let mut matches = matches
+                .into_iter()
+                .filter(|matched| {
+                    matched.status == KevNpmMatchStatus::Affected
+                        || matched.package_name.as_deref() == Some(package_name.as_str())
+                })
+                .collect::<Vec<_>>();
+            matches.sort_by(|left, right| {
+                left.cve_id
+                    .cmp(&right.cve_id)
+                    .then(left.affected_version.cmp(&right.affected_version))
+            });
+            matches
+        })
+}
+
 fn match_kev_cve_record_to_reachable_npm(
     kev_context: KevContext,
     cve_record: &Value,
@@ -852,6 +881,25 @@ mod tests {
                 .sql
                 .contains(r#""cve_list_records"."cve_id" IN"#)
         );
+    }
+
+    #[test]
+    fn single_package_version_omits_unrelated_catalog_enrichment_gaps() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_kev_entry("CVE-2026-1007")], vec![]])
+            .into_connection();
+
+        let matches = run_async(kev_affected_npm_package_version(
+            &db,
+            ReachableNpmPackageVersion {
+                package_name: "left-pad".to_owned(),
+                version: "1.1.0".to_owned(),
+                source_evidence: "test query".to_owned(),
+            },
+        ))
+        .expect("matching should succeed");
+
+        assert!(matches.is_empty());
     }
 
     fn mock_kev_entry(cve_id: &str) -> cisa_kev_entries::Model {

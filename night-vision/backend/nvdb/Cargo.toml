@@ -16,6 +16,7 @@ clap-verbosity-flag.workspace = true
 indicatif.workspace = true
 migration.workspace = true
 nv-common.workspace = true
+percent-encoding.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
 secrecy.workspace = true

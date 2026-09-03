@@ -2530,6 +2530,7 @@ dependencies = [
  "indicatif",
  "migration",
  "nv-common",
+ "percent-encoding",
  "reqwest",
  "sea-orm",
  "sea-orm-migration",

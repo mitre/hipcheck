@@ -118,6 +118,12 @@ warnings.
 | `package-source show <SOURCE-ID> [--json]` | Show package-source metadata and state. |
 | `package-source versions <SOURCE-ID> [--json]` | List resolved versions, derivation paths, and path counts. |
 
+## Package-version commands
+
+| Command | Purpose |
+| --- | --- |
+| `package-version kev <PURL> [--json]` | List KEV-linked CVE matches for one version. A no-match result only reflects locally available data and does not mean the version is safe. |
+
 ## Demo workflow command stubs
 
 The following planned commands still stop with an explicit not-implemented
@@ -127,7 +133,6 @@ and parser tests can stabilize before their services are implemented.
 | Command | Planned purpose |
 | --- | --- |
 | `package-source kevs <SOURCE-ID> [--json]` | List KEV-linked matches for source versions. |
-| `package-version kev <PURL> [--json]` | List KEV-linked CVE matches for one version. |
 | `assessment analyze <PURL> [--json]` | Run and persist the configured assessment. |
 | `assessment show <ASSESSMENT-ID> [--json]` | Show normalized assessment findings. |
 | `assessment runs --package <PURL> [--limit <N>] [--json]` | List persisted assessments for a package. |
