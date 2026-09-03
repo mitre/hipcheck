@@ -14,7 +14,7 @@ use super::types::{
 pub use super::types::{
     DependencyPackageName, DependencySpec, NpmPackageName, NpmVersionRange,
     PackumentBundleDependencies, PackumentDependencyMap, PackumentPeerDependencyMetaMap,
-    ParsedDependencyPackageName, PeerDependencyMeta,
+    ParsedDependencyPackageName, ParsedDependencySpec, PeerDependencyMeta,
 };
 
 mod raw;
@@ -359,7 +359,7 @@ impl NpmPackument {
             )?;
 
             let dependencies =
-                parse_packument_dependency_map(raw_version.dependencies.unwrap_or_default())?;
+                parse_packument_dependency_map(raw_version.dependencies.unwrap_or_default());
             let bundle_dependencies =
                 parse_bundle_dependencies(raw_version.bundle_dependencies, &dependencies);
 
@@ -388,15 +388,15 @@ impl NpmPackument {
 
                 accept_dependencies: parse_packument_dependency_map(
                     raw_version.accept_dependencies.unwrap_or_default(),
-                )?,
+                ),
 
                 dev_dependencies: parse_packument_dependency_map(
                     raw_version.dev_dependencies.unwrap_or_default(),
-                )?,
+                ),
 
                 peer_dependencies: parse_packument_dependency_map(
                     raw_version.peer_dependencies.unwrap_or_default(),
-                )?,
+                ),
 
                 peer_dependencies_meta: parse_packument_peer_dependency_meta_map(
                     convert_peer_dependencies_meta(
@@ -406,7 +406,7 @@ impl NpmPackument {
 
                 optional_dependencies: parse_packument_dependency_map(
                     raw_version.optional_dependencies.unwrap_or_default(),
-                )?,
+                ),
 
                 bundle_dependencies,
 
@@ -836,7 +836,7 @@ mod tests {
             version
                 .dependencies
                 .get(&ParsedDependencyPackageName::parse("serde".to_owned())),
-            Some(&DependencySpec::parse("^1.0.0".to_owned()).unwrap())
+            Some(&ParsedDependencySpec::parse("^1.0.0".to_owned()))
         );
     }
 
@@ -955,6 +955,23 @@ mod tests {
         assert!(matches!(
             version.dependencies.keys().next(),
             Some(ParsedDependencyPackageName::Invalid(name)) if name.as_ref() == "equire('express'"
+        ));
+    }
+
+    #[test]
+    fn preserves_invalid_dependency_specifications() {
+        let mut packument = valid_packument("example", "1.0.0", "1.0.0");
+        packument["versions"]["1.0.0"]["devDependencies"] = json!({ "async_testing": "" });
+
+        let packument = parse_value(&packument).expect("malformed upstream spec is retained");
+        let version = packument
+            .versions
+            .get(&semantic_version("1.0.0"))
+            .expect("version should be present");
+
+        assert!(matches!(
+            version.dev_dependencies.values().next(),
+            Some(ParsedDependencySpec::Invalid(specification)) if specification.is_empty()
         ));
     }
 

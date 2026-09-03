@@ -1166,7 +1166,10 @@ mod tests {
                 .map(|(name, specification)| {
                     (
                         name.valid().expect("fixture names are valid").clone(),
-                        specification.clone(),
+                        specification
+                            .valid()
+                            .expect("fixture specifications are valid")
+                            .clone(),
                     )
                 })
                 .collect::<DependencyMap>()

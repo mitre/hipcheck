@@ -223,6 +223,35 @@ pub enum DependencySpec {
     },
 }
 
+/// A dependency specification parsed from upstream registry metadata.
+///
+/// Registry packuments can contain malformed dependency specifications. Those
+/// specifications are retained as data, but callers must explicitly extract a
+/// [`DependencySpec`] before using one for package operations.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ParsedDependencySpec {
+    Valid(DependencySpec),
+    Invalid(Box<str>),
+}
+
+impl ParsedDependencySpec {
+    /// Parses a dependency specification without rejecting malformed registry metadata.
+    pub fn parse(value: String) -> Self {
+        match DependencySpec::parse(value.clone()) {
+            Ok(specification) => Self::Valid(specification),
+            Err(_) => Self::Invalid(value.into_boxed_str()),
+        }
+    }
+
+    /// Returns the valid specification, if this metadata may be used in package operations.
+    pub fn valid(&self) -> Option<&DependencySpec> {
+        match self {
+            Self::Valid(specification) => Some(specification),
+            Self::Invalid(_) => None,
+        }
+    }
+}
+
 /// An npm registry version range.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NpmVersionRange(String);
@@ -239,7 +268,7 @@ pub type DependencyMap = HashMap<DependencyPackageName, DependencySpec>;
 
 /// A dependency map from an upstream packument, which can retain malformed
 /// dependency names without allowing them to be resolved.
-pub type PackumentDependencyMap = HashMap<ParsedDependencyPackageName, DependencySpec>;
+pub type PackumentDependencyMap = HashMap<ParsedDependencyPackageName, ParsedDependencySpec>;
 
 /// Metadata associated with a peer dependency.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -329,19 +358,13 @@ pub fn parse_dependency_map(
 }
 
 /// Parses upstream packument dependencies while retaining malformed names.
-pub fn parse_packument_dependency_map(
-    raw: HashMap<String, String>,
-) -> Result<PackumentDependencyMap, DependencyCollectionParseError> {
+pub fn parse_packument_dependency_map(raw: HashMap<String, String>) -> PackumentDependencyMap {
     raw.into_iter()
         .map(|(name, specification)| {
-            let parsed_name = ParsedDependencyPackageName::parse(name);
-            let parsed_specification = DependencySpec::parse(specification).map_err(|source| {
-                DependencyCollectionParseError {
-                    name: parsed_name.as_str().to_owned(),
-                    source,
-                }
-            })?;
-            Ok((parsed_name, parsed_specification))
+            (
+                ParsedDependencyPackageName::parse(name),
+                ParsedDependencySpec::parse(specification),
+            )
         })
         .collect()
 }

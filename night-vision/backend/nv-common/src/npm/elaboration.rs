@@ -625,7 +625,7 @@ fn append_dependencies(
     output.extend(dependencies.iter().filter_map(|(name, specification)| {
         Some(DeclaredDependency {
             name: name.valid()?.clone(),
-            specification: specification.clone(),
+            specification: specification.valid()?.clone(),
         })
     }));
 }
@@ -640,7 +640,9 @@ fn append_bundled_dependencies(
         dependencies
             .iter()
             .find_map(|(dependency_name, specification)| {
-                (dependency_name.valid() == Some(name)).then_some(specification)
+                (dependency_name.valid() == Some(name))
+                    .then(|| specification.valid())
+                    .flatten()
             })
             .map(|specification| DeclaredDependency {
                 name: name.clone(),
@@ -981,6 +983,28 @@ mod tests {
                 .packages
                 .iter()
                 .all(|package| package.package.name.as_ref() != "equire('express'")
+        );
+    }
+
+    #[test]
+    fn ignores_invalid_packument_dependency_specifications() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([(
+                "root".to_owned(),
+                packument("root", "1.0.0", json!({ "async_testing": "" })),
+            )]),
+        };
+
+        let result =
+            run(&source, registry).expect("invalid upstream specification is not resolved");
+
+        assert_eq!(result.packages.len(), 1);
+        assert!(
+            result
+                .packages
+                .iter()
+                .all(|package| package.package.name.as_ref() != "async_testing")
         );
     }
 
