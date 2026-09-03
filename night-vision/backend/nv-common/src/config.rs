@@ -49,7 +49,7 @@ const DEFAULT_PACKAGE_ELABORATION_MAX_PACKUMENT_BYTES: usize = 5 * 1024 * 1024;
 const DEFAULT_PACKAGE_ELABORATION_REQUEST_TIMEOUT: u64 = 30_000;
 const DEFAULT_PACKAGE_ELABORATION_TOTAL_RUN_TIMEOUT: u64 = 300_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_PACKAGES: usize = 10_000;
-const DEFAULT_PACKAGE_ELABORATION_MAX_EDGES: usize = 100_000;
+const DEFAULT_PACKAGE_ELABORATION_MAX_EDGES: usize = 1_000_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_QUEUED_WORK: usize = 100_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_DERIVATIONS: usize = 100_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_CONCURRENT_RUNS: usize = 4;
@@ -2033,7 +2033,7 @@ mod tests {
             Duration::from_millis(DEFAULT_PACKAGE_ELABORATION_TOTAL_RUN_TIMEOUT)
         );
         assert_eq!(config.package_elaboration_limits.max_packages, 10_000);
-        assert_eq!(config.package_elaboration_limits.max_edges, 100_000);
+        assert_eq!(config.package_elaboration_limits.max_edges, 1_000_000);
         assert_eq!(config.package_elaboration_limits.max_queued_work, 100_000);
         assert_eq!(config.package_elaboration_limits.max_derivations, 100_000);
         assert_eq!(

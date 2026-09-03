@@ -192,7 +192,7 @@ package-elaboration-max-packages =
 
 # The maximum dependency edges in one elaboration result.
 #
-# Default: 100000
+# Default: 1000000
 package-elaboration-max-edges =
 
 # The maximum not-yet-dispatched dependency work items in one elaboration run.
