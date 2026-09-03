@@ -67,12 +67,13 @@ pub struct ElaborationWarning {
     pub specification_kind: UnsupportedSpecificationKind,
 }
 
-/// The unsupported source form encountered while elaborating a dependency.
+/// The unsupported dependency declaration encountered while elaborating a dependency.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UnsupportedSpecificationKind {
     File,
     Git,
     Url,
+    HistoricName,
 }
 
 impl UnsupportedSpecificationKind {
@@ -87,6 +88,9 @@ impl UnsupportedSpecificationKind {
             }
             Self::Url => {
                 "Direct URL dependencies cannot be resolved through the configured NPM registry."
+            }
+            Self::HistoricName => {
+                "Historic mixed-case NPM package names cannot be resolved through the configured NPM registry."
             }
         }
     }
@@ -1148,6 +1152,15 @@ async fn resolve_specification(
         specification = target_specification;
     }
 
+    if matches!(name, DependencyPackageName::Historic(_)) {
+        warnings.push(ElaborationWarning {
+            declared_by: declared_by.cloned(),
+            dependency_name: name.as_str().into(),
+            specification_kind: UnsupportedSpecificationKind::HistoricName,
+        });
+        return Ok(Vec::new());
+    }
+
     match specification {
         DependencySpec::NpmAlias { .. } => unreachable!("aliases were unwrapped above"),
         DependencySpec::File(_) => {
@@ -1507,6 +1520,74 @@ mod tests {
         assert_eq!(
             result.warnings[0].specification_kind.safe_message(),
             "File, link, and workspace dependencies cannot be resolved through the configured NPM registry."
+        );
+    }
+
+    #[test]
+    fn records_historic_transitive_dev_dependency_names_as_warnings() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let mut root =
+            serde_json::from_str::<serde_json::Value>(&packument("root", "1.0.0", json!({})))
+                .expect("valid packument fixture");
+        root["versions"]["1.0.0"]["devDependencies"] = json!({ "Deferred": "~0.1.1" });
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([("root".to_owned(), root.to_string())]),
+        };
+
+        let result = run(&source, registry).expect("historic name is nonfatal");
+
+        assert_eq!(
+            result
+                .packages
+                .iter()
+                .map(|package| package.package.purl())
+                .collect::<Vec<_>>(),
+            ["pkg:npm/root@1.0.0"]
+        );
+        assert_eq!(result.warnings.len(), 1);
+        assert_eq!(
+            result.warnings[0]
+                .declared_by
+                .as_ref()
+                .map(PackageVersion::purl),
+            Some("pkg:npm/root@1.0.0".to_owned())
+        );
+        assert_eq!(result.warnings[0].dependency_name.as_ref(), "Deferred");
+        assert_eq!(
+            result.warnings[0].specification_kind,
+            UnsupportedSpecificationKind::HistoricName
+        );
+        assert_eq!(
+            result.warnings[0].specification_kind.safe_message(),
+            "Historic mixed-case NPM package names cannot be resolved through the configured NPM registry."
+        );
+    }
+
+    #[test]
+    fn records_historic_root_alias_targets_as_warnings() {
+        let source = source(json!({
+            "dependencies": { "legacy": "npm:Deferred@~0.1.1" }
+        }));
+
+        let result = run(
+            &source,
+            MockRegistry {
+                packuments: BTreeMap::new(),
+            },
+        )
+        .expect("historic alias target is nonfatal");
+
+        assert!(result.packages.is_empty());
+        assert_eq!(result.warnings.len(), 1);
+        assert!(result.warnings[0].declared_by.is_none());
+        assert_eq!(result.warnings[0].dependency_name.as_ref(), "Deferred");
+        assert_eq!(
+            result.warnings[0].specification_kind,
+            UnsupportedSpecificationKind::HistoricName
+        );
+        assert_eq!(
+            result.warnings[0].specification_kind.safe_message(),
+            "Historic mixed-case NPM package names cannot be resolved through the configured NPM registry."
         );
     }
 

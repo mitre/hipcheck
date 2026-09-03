@@ -383,6 +383,7 @@ fn warning_kind(kind: UnsupportedSpecificationKind) -> &'static str {
         UnsupportedSpecificationKind::File => "file",
         UnsupportedSpecificationKind::Git => "git",
         UnsupportedSpecificationKind::Url => "url",
+        UnsupportedSpecificationKind::HistoricName => "historic-name",
     }
 }
 
@@ -402,10 +403,13 @@ mod tests {
     use super::{
         MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic, persist_completed_elaboration,
         persisted_elaboration_warnings, persisted_package_versions, record_elaboration_failure,
+        warning_kind,
     };
     use crate::{
         db::entities::{package_source_edges, package_source_warnings, package_versions, packages},
-        npm::elaboration::{ElaboratedPackage, ElaborationResult, PackageVersion},
+        npm::elaboration::{
+            ElaboratedPackage, ElaborationResult, PackageVersion, UnsupportedSpecificationKind,
+        },
     };
     use sea_orm::{DbBackend, MockDatabase, MockExecResult};
 
@@ -416,6 +420,14 @@ mod tests {
         assert!(diagnostic.len() <= MAX_FAILURE_DIAGNOSTIC_BYTES);
         assert!(diagnostic.ends_with("..."));
         assert!(diagnostic.is_char_boundary(diagnostic.len()));
+    }
+
+    #[test]
+    fn persists_historic_names_with_a_stable_warning_kind() {
+        assert_eq!(
+            warning_kind(UnsupportedSpecificationKind::HistoricName),
+            "historic-name"
+        );
     }
 
     #[tokio::test]
