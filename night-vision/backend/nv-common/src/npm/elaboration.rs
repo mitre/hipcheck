@@ -227,29 +227,47 @@ impl PackumentProvider for NpmRegistryClient {
                 .header("Accept", "application/vnd.npm.install-v1+json")
                 .send()
                 .await
-                .map_err(|_| PackumentProviderError::Request)?;
+                .map_err(map_request_error)?;
             if response.status() == reqwest::StatusCode::NOT_FOUND {
                 return Err(PackumentProviderError::NotFound);
             }
-            if !response.status().is_success()
-                || response
-                    .content_length()
-                    .is_some_and(|length| length > self.max_packument_bytes as u64)
+            if !response.status().is_success() {
+                return Err(PackumentProviderError::HttpStatus {
+                    status: response.status().as_u16(),
+                });
+            }
+            if response
+                .content_length()
+                .is_some_and(|length| length > self.max_packument_bytes as u64)
             {
-                return Err(PackumentProviderError::Request);
+                return Err(PackumentProviderError::ResponseTooLarge {
+                    limit: self.max_packument_bytes,
+                });
             }
             response
                 .bytes()
                 .await
-                .map_err(|_| PackumentProviderError::Request)
+                .map_err(|_| PackumentProviderError::ResponseBody)
         })
         .await
         .map_err(|_| PackumentProviderError::Timeout)??;
         if bytes.len() > self.max_packument_bytes {
-            return Err(PackumentProviderError::Request);
+            return Err(PackumentProviderError::ResponseTooLarge {
+                limit: self.max_packument_bytes,
+            });
         }
         super::packument::parse_packument(bytes.as_ref())
             .map_err(PackumentProviderError::InvalidPackument)
+    }
+}
+
+fn map_request_error(error: reqwest::Error) -> PackumentProviderError {
+    if error.is_timeout() {
+        PackumentProviderError::Timeout
+    } else if error.is_connect() {
+        PackumentProviderError::Connection
+    } else {
+        PackumentProviderError::Request
     }
 }
 
@@ -258,10 +276,18 @@ impl PackumentProvider for NpmRegistryClient {
 pub enum PackumentProviderError {
     #[error("packument was not found")]
     NotFound,
+    #[error("registry connection failed")]
+    Connection,
     #[error("registry request failed")]
     Request,
     #[error("registry request timed out")]
     Timeout,
+    #[error("registry returned HTTP status {status}")]
+    HttpStatus { status: u16 },
+    #[error("registry response exceeds the {limit}-byte packument limit")]
+    ResponseTooLarge { limit: usize },
+    #[error("failed to read registry response body")]
+    ResponseBody,
     #[error("registry returned an invalid packument")]
     InvalidPackument(#[source] PackumentParseError),
 }
@@ -1583,6 +1609,33 @@ mod tests {
         let error = client.fetch(&package).await.expect_err("request times out");
 
         assert!(matches!(error, PackumentProviderError::Timeout));
+    }
+
+    #[tokio::test]
+    async fn registry_client_reports_unsuccessful_statuses() {
+        let server = MockServer::start();
+        let _mock = server.mock(|when, then| {
+            when.method(GET).path("/root");
+            then.status(503);
+        });
+        let client = NpmRegistryClient::new(
+            Url::parse(&format!("{}/", server.base_url())).expect("valid mock URL"),
+            1024,
+            Duration::from_secs(1),
+        )
+        .expect("valid client");
+        let package = NpmPackageName::parse("root".to_owned()).expect("valid package name");
+
+        let error = client
+            .fetch(&package)
+            .await
+            .expect_err("unsuccessful status is reported");
+
+        assert_eq!(error.to_string(), "registry returned HTTP status 503");
+        assert!(matches!(
+            error,
+            PackumentProviderError::HttpStatus { status: 503 }
+        ));
     }
 
     #[test]
