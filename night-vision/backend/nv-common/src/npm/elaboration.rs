@@ -9,8 +9,11 @@ pub mod storage;
 
 use super::{
     package_json::{DependencyKind, NpmPackageJson},
-    packument::{NpmPackument, NpmVersion, PackumentParseError},
-    types::{DependencyMap, DependencyPackageName, DependencySpec, NpmPackageName},
+    packument::{
+        NpmPackument, NpmVersion, PackumentBundleDependencies, PackumentDependencyMap,
+        PackumentParseError,
+    },
+    types::{DependencyPackageName, DependencySpec, NpmPackageName},
 };
 use crate::npm_semver::{NpmVersion as RangeVersion, elaborate_npm_version_bounds, parse_range};
 use async_channel::Receiver;
@@ -615,25 +618,30 @@ fn declared_dependencies(version: &NpmVersion) -> Vec<DeclaredDependency> {
     dependencies
 }
 
-fn append_dependencies(output: &mut Vec<DeclaredDependency>, dependencies: &DependencyMap) {
-    output.extend(
-        dependencies
-            .iter()
-            .map(|(name, specification)| DeclaredDependency {
-                name: name.clone(),
-                specification: specification.clone(),
-            }),
-    );
+fn append_dependencies(
+    output: &mut Vec<DeclaredDependency>,
+    dependencies: &PackumentDependencyMap,
+) {
+    output.extend(dependencies.iter().filter_map(|(name, specification)| {
+        Some(DeclaredDependency {
+            name: name.valid()?.clone(),
+            specification: specification.clone(),
+        })
+    }));
 }
 
 fn append_bundled_dependencies(
     output: &mut Vec<DeclaredDependency>,
-    bundled: &super::types::BundleDependencies,
-    dependencies: &DependencyMap,
+    bundled: &PackumentBundleDependencies,
+    dependencies: &PackumentDependencyMap,
 ) {
     output.extend(bundled.as_slice().iter().filter_map(|name| {
+        let name = name.valid()?;
         dependencies
-            .get(name)
+            .iter()
+            .find_map(|(dependency_name, specification)| {
+                (dependency_name.valid() == Some(name)).then_some(specification)
+            })
             .map(|specification| DeclaredDependency {
                 name: name.clone(),
                 specification: specification.clone(),
@@ -952,6 +960,27 @@ mod tests {
         assert_eq!(
             result.warnings[0].specification_kind.safe_message(),
             "File, link, and workspace dependencies cannot be resolved through the configured NPM registry."
+        );
+    }
+
+    #[test]
+    fn ignores_invalid_packument_dependency_names() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([(
+                "root".to_owned(),
+                packument("root", "1.0.0", json!({ "equire('express'": "*" })),
+            )]),
+        };
+
+        let result = run(&source, registry).expect("invalid upstream name is not resolved");
+
+        assert_eq!(result.packages.len(), 1);
+        assert!(
+            result
+                .packages
+                .iter()
+                .all(|package| package.package.name.as_ref() != "equire('express'")
         );
     }
 

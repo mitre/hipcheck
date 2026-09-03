@@ -172,6 +172,43 @@ impl DependencyPackageName {
     }
 }
 
+/// A dependency package name parsed from upstream registry metadata.
+///
+/// Registry packuments can contain historic malformed dependency names. Those
+/// names are retained as data, but callers must explicitly extract a
+/// [`DependencyPackageName`] before using a name for package operations.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum ParsedDependencyPackageName {
+    Valid(DependencyPackageName),
+    Invalid(Box<str>),
+}
+
+impl ParsedDependencyPackageName {
+    /// Parses a dependency name without rejecting malformed upstream metadata.
+    pub fn parse(value: String) -> Self {
+        match DependencyPackageName::parse(value.clone()) {
+            Ok(name) => Self::Valid(name),
+            Err(_) => Self::Invalid(value.into_boxed_str()),
+        }
+    }
+
+    /// Returns the valid package name, if this metadata may be used in package operations.
+    pub fn valid(&self) -> Option<&DependencyPackageName> {
+        match self {
+            Self::Valid(name) => Some(name),
+            Self::Invalid(_) => None,
+        }
+    }
+
+    /// Returns the name exactly as supplied by the registry.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Valid(name) => name.as_str(),
+            Self::Invalid(value) => value,
+        }
+    }
+}
+
 /// A dependency specification accepted by npm.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DependencySpec {
@@ -200,6 +237,10 @@ impl NpmVersionRange {
 /// A map of validated npm dependency names and specifications.
 pub type DependencyMap = HashMap<DependencyPackageName, DependencySpec>;
 
+/// A dependency map from an upstream packument, which can retain malformed
+/// dependency names without allowing them to be resolved.
+pub type PackumentDependencyMap = HashMap<ParsedDependencyPackageName, DependencySpec>;
+
 /// Metadata associated with a peer dependency.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PeerDependencyMeta {
@@ -208,6 +249,9 @@ pub struct PeerDependencyMeta {
 
 /// A map of peer dependency metadata keyed by validated dependency names.
 pub type PeerDependencyMetaMap = HashMap<DependencyPackageName, PeerDependencyMeta>;
+
+/// Peer dependency metadata from an upstream packument.
+pub type PackumentPeerDependencyMetaMap = HashMap<ParsedDependencyPackageName, PeerDependencyMeta>;
 
 /// The validated package names bundled with an npm package.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -237,6 +281,35 @@ impl BundleDependencies {
     }
 }
 
+/// Bundle dependency names from an upstream packument.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PackumentBundleDependencies(Vec<ParsedDependencyPackageName>);
+
+impl PackumentBundleDependencies {
+    /// Parses bundle dependency names without rejecting malformed registry metadata.
+    pub fn parse(names: Vec<String>) -> Self {
+        Self(
+            names
+                .into_iter()
+                .map(ParsedDependencyPackageName::parse)
+                .collect(),
+        )
+    }
+
+    /// Creates a bundle list containing every declared packument dependency.
+    pub fn all_dependencies(dependencies: &PackumentDependencyMap) -> Self {
+        Self(dependencies.keys().cloned().collect())
+    }
+
+    pub fn as_slice(&self) -> &[ParsedDependencyPackageName] {
+        &self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
 /// Parses a raw dependency map into validated names and specifications.
 pub fn parse_dependency_map(
     raw: HashMap<String, String>,
@@ -255,12 +328,39 @@ pub fn parse_dependency_map(
         .collect()
 }
 
+/// Parses upstream packument dependencies while retaining malformed names.
+pub fn parse_packument_dependency_map(
+    raw: HashMap<String, String>,
+) -> Result<PackumentDependencyMap, DependencyCollectionParseError> {
+    raw.into_iter()
+        .map(|(name, specification)| {
+            let parsed_name = ParsedDependencyPackageName::parse(name);
+            let parsed_specification = DependencySpec::parse(specification).map_err(|source| {
+                DependencyCollectionParseError {
+                    name: parsed_name.as_str().to_owned(),
+                    source,
+                }
+            })?;
+            Ok((parsed_name, parsed_specification))
+        })
+        .collect()
+}
+
 /// Parses raw peer dependency metadata keyed by npm dependency names.
 pub fn parse_peer_dependency_meta_map(
     raw: HashMap<String, PeerDependencyMeta>,
 ) -> Result<PeerDependencyMetaMap, DependencyCollectionParseError> {
     raw.into_iter()
         .map(|(name, meta)| Ok((parse_dependency_name(name)?, meta)))
+        .collect()
+}
+
+/// Parses upstream packument peer metadata while retaining malformed names.
+pub fn parse_packument_peer_dependency_meta_map(
+    raw: HashMap<String, PeerDependencyMeta>,
+) -> PackumentPeerDependencyMetaMap {
+    raw.into_iter()
+        .map(|(name, meta)| (ParsedDependencyPackageName::parse(name), meta))
         .collect()
 }
 

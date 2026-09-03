@@ -498,7 +498,7 @@ impl From<RawWorkspaces> for Workspaces {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::npm::packument::parse_packument;
+    use crate::npm::packument::{PackumentDependencyMap, parse_packument};
     use proptest::prelude::*;
     use serde_json::json;
     use std::{
@@ -1160,19 +1160,58 @@ mod tests {
             .as_bytes(),
         )?;
         let version = packument.versions.values().next().unwrap();
+        let valid_dependencies = |dependencies: &PackumentDependencyMap| {
+            dependencies
+                .iter()
+                .map(|(name, specification)| {
+                    (
+                        name.valid().expect("fixture names are valid").clone(),
+                        specification.clone(),
+                    )
+                })
+                .collect::<DependencyMap>()
+        };
+        let valid_peer_dependencies_meta = version
+            .peer_dependencies_meta
+            .iter()
+            .map(|(name, meta)| {
+                (
+                    name.valid().expect("fixture names are valid").clone(),
+                    meta.clone(),
+                )
+            })
+            .collect::<PeerDependencyMetaMap>();
+        let valid_bundle_dependencies = version
+            .bundle_dependencies
+            .as_slice()
+            .iter()
+            .map(|name| name.valid().expect("fixture names are valid").clone())
+            .collect::<Vec<_>>();
 
-        assert_eq!(manifest.dependencies, version.dependencies);
-        assert_eq!(manifest.dev_dependencies, version.dev_dependencies);
-        assert_eq!(manifest.peer_dependencies, version.peer_dependencies);
+        assert_eq!(
+            manifest.dependencies,
+            valid_dependencies(&version.dependencies)
+        );
+        assert_eq!(
+            manifest.dev_dependencies,
+            valid_dependencies(&version.dev_dependencies)
+        );
+        assert_eq!(
+            manifest.peer_dependencies,
+            valid_dependencies(&version.peer_dependencies)
+        );
         assert_eq!(
             manifest.peer_dependencies_meta,
-            version.peer_dependencies_meta
+            valid_peer_dependencies_meta
         );
         assert_eq!(
             manifest.optional_dependencies,
-            version.optional_dependencies
+            valid_dependencies(&version.optional_dependencies)
         );
-        assert_eq!(manifest.bundle_dependencies, version.bundle_dependencies);
+        assert_eq!(
+            manifest.bundle_dependencies.as_slice(),
+            valid_bundle_dependencies.as_slice()
+        );
 
         Ok(())
     }

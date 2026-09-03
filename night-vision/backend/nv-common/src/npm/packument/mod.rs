@@ -7,13 +7,14 @@ use std::fmt;
 use std::io::Read;
 use url::Url;
 
-pub use super::types::{
-    BundleDependencies, DependencyMap, DependencyPackageName, DependencySpec, NpmPackageName,
-    NpmVersionRange, PeerDependencyMeta, PeerDependencyMetaMap,
-};
 use super::types::{
-    DependencyCollectionParseError, NpmPackageNameError, NpmTypeParseError, parse_dependency_map,
-    parse_peer_dependency_meta_map,
+    DependencyCollectionParseError, NpmPackageNameError, NpmTypeParseError,
+    parse_packument_dependency_map, parse_packument_peer_dependency_meta_map,
+};
+pub use super::types::{
+    DependencyPackageName, DependencySpec, NpmPackageName, NpmVersionRange,
+    PackumentBundleDependencies, PackumentDependencyMap, PackumentPeerDependencyMetaMap,
+    ParsedDependencyPackageName, PeerDependencyMeta,
 };
 
 mod raw;
@@ -72,8 +73,11 @@ impl fmt::Display for PackumentParseError {
             }
             Self::EmptyPackageName => formatter.write_str("package name cannot be empty"),
             Self::PackageNameTooLong => formatter.write_str("package name is too long"),
-            Self::InvalidPackageName(_) => {
-                formatter.write_str("packument contains an invalid package name")
+            Self::InvalidPackageName(package_name) => {
+                write!(
+                    formatter,
+                    "packument contains an invalid package name {package_name:?}"
+                )
             }
             Self::EmptyDependencySpecification => {
                 formatter.write_str("dependency specification cannot be empty")
@@ -211,13 +215,13 @@ pub struct NpmVersion {
     pub maintainers: Vec<Human>,
     pub repository: Option<Repository>,
 
-    pub dependencies: DependencyMap,
-    pub accept_dependencies: DependencyMap,
-    pub dev_dependencies: DependencyMap,
-    pub peer_dependencies: DependencyMap,
-    pub peer_dependencies_meta: PeerDependencyMetaMap,
-    pub optional_dependencies: DependencyMap,
-    pub bundle_dependencies: BundleDependencies,
+    pub dependencies: PackumentDependencyMap,
+    pub accept_dependencies: PackumentDependencyMap,
+    pub dev_dependencies: PackumentDependencyMap,
+    pub peer_dependencies: PackumentDependencyMap,
+    pub peer_dependencies_meta: PackumentPeerDependencyMetaMap,
+    pub optional_dependencies: PackumentDependencyMap,
+    pub bundle_dependencies: PackumentBundleDependencies,
 
     pub bin: HashMap<String, String>,
     pub directories: HashMap<String, String>,
@@ -354,9 +358,10 @@ impl NpmPackument {
                 format!("{version_path}.dist.tarball"),
             )?;
 
-            let dependencies = parse_dependency_map(raw_version.dependencies.unwrap_or_default())?;
+            let dependencies =
+                parse_packument_dependency_map(raw_version.dependencies.unwrap_or_default())?;
             let bundle_dependencies =
-                parse_bundle_dependencies(raw_version.bundle_dependencies, &dependencies)?;
+                parse_bundle_dependencies(raw_version.bundle_dependencies, &dependencies);
 
             let npm_version = NpmVersion {
                 id: raw_version.id,
@@ -381,25 +386,25 @@ impl NpmPackument {
 
                 dependencies,
 
-                accept_dependencies: parse_dependency_map(
+                accept_dependencies: parse_packument_dependency_map(
                     raw_version.accept_dependencies.unwrap_or_default(),
                 )?,
 
-                dev_dependencies: parse_dependency_map(
+                dev_dependencies: parse_packument_dependency_map(
                     raw_version.dev_dependencies.unwrap_or_default(),
                 )?,
 
-                peer_dependencies: parse_dependency_map(
+                peer_dependencies: parse_packument_dependency_map(
                     raw_version.peer_dependencies.unwrap_or_default(),
                 )?,
 
-                peer_dependencies_meta: parse_peer_dependency_meta_map(
+                peer_dependencies_meta: parse_packument_peer_dependency_meta_map(
                     convert_peer_dependencies_meta(
                         raw_version.peer_dependencies_meta.unwrap_or_default(),
                     ),
-                )?,
+                ),
 
-                optional_dependencies: parse_dependency_map(
+                optional_dependencies: parse_packument_dependency_map(
                     raw_version.optional_dependencies.unwrap_or_default(),
                 )?,
 
@@ -641,15 +646,15 @@ fn convert_deprecated(raw: Option<RawDeprecated>) -> Option<String> {
 
 fn parse_bundle_dependencies(
     raw: Option<RawBundleDependencies>,
-    dependencies: &DependencyMap,
-) -> Result<BundleDependencies, DependencyCollectionParseError> {
+    dependencies: &PackumentDependencyMap,
+) -> PackumentBundleDependencies {
     match raw {
-        Some(RawBundleDependencies::List(packages)) => BundleDependencies::parse(packages),
+        Some(RawBundleDependencies::List(packages)) => PackumentBundleDependencies::parse(packages),
         Some(RawBundleDependencies::LegacyBoolean(true)) => {
-            Ok(BundleDependencies::all_dependencies(dependencies))
+            PackumentBundleDependencies::all_dependencies(dependencies)
         }
         Some(RawBundleDependencies::LegacyBoolean(false)) | None => {
-            Ok(BundleDependencies::default())
+            PackumentBundleDependencies::default()
         }
     }
 }
@@ -816,7 +821,7 @@ mod tests {
         assert_eq!(
             version
                 .dependencies
-                .get(&DependencyPackageName::parse("serde".to_owned()).unwrap()),
+                .get(&ParsedDependencyPackageName::parse("serde".to_owned())),
             Some(&DependencySpec::parse("^1.0.0".to_owned()).unwrap())
         );
     }
@@ -885,6 +890,36 @@ mod tests {
             let result = NpmPackageName::parse(package_name.to_owned());
             assert!(result.is_err(), "{package_name} should be rejected");
         }
+    }
+
+    #[test]
+    fn invalid_package_name_error_includes_the_name() {
+        let error = parse_value(&valid_packument("UPPERCASE", "1.0.0", "1.0.0"))
+            .expect_err("uppercase package name is invalid");
+
+        assert_eq!(
+            error.to_string(),
+            "packument contains an invalid package name \"UPPERCASE\""
+        );
+    }
+
+    #[test]
+    fn preserves_invalid_dependency_names() {
+        let mut packument = valid_packument("example", "1.0.0", "1.0.0");
+        packument["versions"]["1.0.0"]["dependencies"] = json!({
+            "equire('express'": "*"
+        });
+
+        let packument = parse_value(&packument).expect("malformed upstream name is retained");
+        let version = packument
+            .versions
+            .get(&semantic_version("1.0.0"))
+            .expect("version should be present");
+
+        assert!(matches!(
+            version.dependencies.keys().next(),
+            Some(ParsedDependencyPackageName::Invalid(name)) if name.as_ref() == "equire('express'"
+        ));
     }
 
     #[test]
@@ -1018,12 +1053,18 @@ mod tests {
             .expect("version should be present");
 
         assert_eq!(version.bundle_dependencies.as_slice().len(), 2);
-        assert!(version.bundle_dependencies.as_slice().contains(
-            &DependencyPackageName::parse("react".to_owned()).expect("valid dependency name")
-        ));
-        assert!(version.bundle_dependencies.as_slice().contains(
-            &DependencyPackageName::parse("scheduler".to_owned()).expect("valid dependency name")
-        ));
+        assert!(
+            version
+                .bundle_dependencies
+                .as_slice()
+                .contains(&ParsedDependencyPackageName::parse("react".to_owned()))
+        );
+        assert!(
+            version
+                .bundle_dependencies
+                .as_slice()
+                .contains(&ParsedDependencyPackageName::parse("scheduler".to_owned()))
+        );
     }
 
     #[test]
@@ -1036,9 +1077,12 @@ mod tests {
             .versions
             .get(&semantic_version("1.0.0"))
             .expect("version should be present");
-        let name = DependencyPackageName::parse("Deferred".to_owned()).expect("name should parse");
+        let name = ParsedDependencyPackageName::parse("Deferred".to_owned());
 
-        assert!(matches!(&name, DependencyPackageName::Historic(_)));
+        assert!(matches!(
+            &name,
+            ParsedDependencyPackageName::Valid(DependencyPackageName::Historic(_))
+        ));
         assert!(version.dependencies.contains_key(&name));
     }
 
