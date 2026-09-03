@@ -21,6 +21,12 @@ pub struct HipcheckRunnerConfig {
     pub program: Utf8PathBuf,
     /// Night Vision-owned directory from which Hipcheck executes.
     pub working_directory: Utf8PathBuf,
+    /// Absolute path to the Night Vision Hipcheck policy.
+    pub policy_path: Utf8PathBuf,
+    /// Absolute path to the Night Vision Hipcheck exec configuration.
+    pub exec_config_path: Utf8PathBuf,
+    /// Night Vision-owned writable Hipcheck cache directory.
+    pub cache_directory: Utf8PathBuf,
     /// Complete allowlisted environment passed to Hipcheck and its plugins.
     pub environment: BTreeMap<OsString, OsString>,
     /// Maximum wall-clock time for the check.
@@ -33,10 +39,10 @@ pub struct HipcheckRunnerConfig {
     pub json_max_bytes: usize,
 }
 
-/// Explicit, already-tokenized arguments following the fixed hc check.
+/// Explicit, already-tokenized target arguments following the fixed hc check.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HipcheckCheckRequest {
-    /// Arguments passed without shell interpretation.
+    /// Target arguments passed without shell interpretation.
     pub arguments: Vec<OsString>,
 }
 
@@ -135,6 +141,12 @@ pub async fn run_hipcheck_check(
     };
     let mut command = Command::new(&config.program);
     command
+        .arg("--policy")
+        .arg(&config.policy_path)
+        .arg("--exec")
+        .arg(&config.exec_config_path)
+        .arg("--cache")
+        .arg(&config.cache_directory)
         .arg("check")
         .args(&request.arguments)
         .current_dir(&config.working_directory)
@@ -326,11 +338,7 @@ printf '{"report":"ok"}'
 "#,
             );
             let request = HipcheckCheckRequest {
-                arguments: vec![
-                    OsString::from("--policy"),
-                    OsString::from("policy file.hc"),
-                    OsString::from("; touch should-not-run"),
-                ],
+                arguments: vec![OsString::from("; touch should-not-run")],
             };
             let output = run_hipcheck_check(&fixture.config(), &request)
                 .await
@@ -358,9 +366,13 @@ printf '{"report":"ok"}'
                 captured_lines.collect::<Vec<_>>(),
                 [
                     "allowed",
-                    "check",
                     "--policy",
                     "policy file.hc",
+                    "--exec",
+                    "exec file.hc",
+                    "--cache",
+                    "cache directory",
+                    "check",
                     "; touch should-not-run"
                 ]
             );
@@ -373,13 +385,20 @@ printf '{"report":"ok"}'
         run_async(async {
             let fixture = TestFixture::new(
                 r#"printf '%s' "$$" > "$NV_PID"
+while test ! -f "$NV_RELEASE"; do sleep 0.01; done
 printf '{"partial":'
 exec sleep 5"#,
             );
             let mut config = fixture.config();
-            config.timeout = Duration::from_millis(250);
-            let error = run_hipcheck_check(&config, &HipcheckCheckRequest { arguments: vec![] })
+            config.timeout = Duration::from_secs(1);
+            let run = tokio::spawn(async move {
+                run_hipcheck_check(&config, &HipcheckCheckRequest { arguments: vec![] }).await
+            });
+            wait_for_file(&fixture.process_id_path()).await;
+            fs::write(fixture.release_path(), "release").expect("release signal should write");
+            let error = run
                 .await
+                .expect("runner task should not panic")
                 .expect_err("check should time out");
 
             assert!(error.retryable());
@@ -472,10 +491,18 @@ exec sleep 5"#,
         }
 
         fn process_id(&self) -> String {
-            fs::read_to_string(self.root.join("pid"))
+            fs::read_to_string(self.process_id_path())
                 .expect("process ID should be captured")
                 .trim()
                 .to_owned()
+        }
+
+        fn process_id_path(&self) -> PathBuf {
+            self.root.join("pid")
+        }
+
+        fn release_path(&self) -> PathBuf {
+            self.root.join("release")
         }
 
         fn config(&self) -> HipcheckRunnerConfig {
@@ -487,13 +514,20 @@ exec sleep 5"#,
             );
             environment.insert(
                 OsString::from("NV_PID"),
-                self.root.join("pid").into_os_string(),
+                self.process_id_path().into_os_string(),
+            );
+            environment.insert(
+                OsString::from("NV_RELEASE"),
+                self.release_path().into_os_string(),
             );
             HipcheckRunnerConfig {
                 program: Utf8PathBuf::from_path_buf(self.root.join("fake-hc"))
                     .expect("test program path should be UTF-8"),
                 working_directory: Utf8PathBuf::from_path_buf(self.working_directory.clone())
                     .expect("test working directory should be UTF-8"),
+                policy_path: Utf8PathBuf::from("policy file.hc"),
+                exec_config_path: Utf8PathBuf::from("exec file.hc"),
+                cache_directory: Utf8PathBuf::from("cache directory"),
                 environment,
                 timeout: Duration::from_secs(2),
                 stdout_max_bytes: 1024,
@@ -507,6 +541,16 @@ exec sleep 5"#,
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.root);
         }
+    }
+
+    async fn wait_for_file(path: &std::path::Path) {
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while !path.exists() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("fake Hipcheck process should signal that it started");
     }
 
     fn process_exists(process_id: String) -> bool {
