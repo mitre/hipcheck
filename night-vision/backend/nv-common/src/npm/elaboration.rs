@@ -325,8 +325,16 @@ pub enum ElaborationError {
         edge_count: usize,
         origin: EdgeLimitOrigin,
     },
-    #[error("elaboration exceeded the derivation-path limit")]
-    DerivationLimitExceeded,
+    #[error(
+        "elaboration exceeded derivation-path limit of {limit}: {derivation_count} paths were already recorded while adding a path of length {path_length} for {package}@{version}"
+    )]
+    DerivationLimitExceeded {
+        limit: usize,
+        derivation_count: usize,
+        package: Box<str>,
+        version: Box<str>,
+        path_length: usize,
+    },
     #[error("elaboration exceeded the total-run timeout")]
     TotalRunTimeout,
     #[error("a worker stopped before reporting its result")]
@@ -1009,7 +1017,13 @@ impl SupervisorState {
         }
         let count = self.packages.values().map(BTreeSet::len).sum::<usize>();
         if count == limits.max_derivations {
-            return Err(ElaborationError::DerivationLimitExceeded);
+            return Err(ElaborationError::DerivationLimitExceeded {
+                limit: limits.max_derivations,
+                derivation_count: count,
+                package: package.name.clone(),
+                version: package.version,
+                path_length: derivation.len(),
+            });
         }
         self.packages.entry(package).or_default().insert(derivation);
         Ok(true)
@@ -1389,6 +1403,56 @@ mod tests {
             } if parent.name.as_ref() == "root"
                 && parent.version.as_ref() == "1.0.0"
                 && dependency.as_ref() == "child"
+        ));
+    }
+
+    #[test]
+    fn fails_when_the_derivation_limit_is_exceeded() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([
+                (
+                    "root".to_owned(),
+                    packument(
+                        "root",
+                        "1.0.0",
+                        json!({ "left": "1.0.0", "right": "1.0.0" }),
+                    ),
+                ),
+                (
+                    "left".to_owned(),
+                    packument("left", "1.0.0", json!({ "shared": "1.0.0" })),
+                ),
+                (
+                    "right".to_owned(),
+                    packument("right", "1.0.0", json!({ "shared": "1.0.0" })),
+                ),
+                ("shared".to_owned(), packument("shared", "1.0.0", json!({}))),
+            ]),
+        };
+        let limits = ElaborationLimits {
+            max_derivations: 3,
+            ..ElaborationLimits::default()
+        };
+
+        let error = tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(elaborate(&source, Arc::new(registry), limits))
+            .expect_err("derivation limit is enforced");
+
+        assert_eq!(
+            error.to_string(),
+            "elaboration exceeded derivation-path limit of 3: 3 paths were already recorded while adding a path of length 3 for shared@1.0.0"
+        );
+        assert!(matches!(
+            error,
+            ElaborationError::DerivationLimitExceeded {
+                limit: 3,
+                derivation_count: 3,
+                package,
+                version,
+                path_length: 3,
+            } if package.as_ref() == "shared" && version.as_ref() == "1.0.0"
         ));
     }
 
