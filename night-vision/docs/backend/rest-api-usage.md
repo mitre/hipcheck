@@ -158,9 +158,11 @@ Content-Type: application/json
       "version": "18.2.0",
       "ecosystem": "npm",
       "purl": "pkg:npm/react@18.2.0",
-      "derivation": [
-        "<root>",
-        "pkg:npm/react@18.2.0"
+      "derivations": [
+        [
+          "<root>",
+          "pkg:npm/react@18.2.0"
+        ]
       ]
     }
   ]

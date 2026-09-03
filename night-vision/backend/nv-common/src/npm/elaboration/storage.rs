@@ -6,9 +6,9 @@ use crate::db::entities::{
 };
 use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, DatabaseConnection, DbErr,
-    EntityTrait as _, QueryFilter as _, TransactionTrait as _,
+    EntityTrait as _, QueryFilter as _, QueryOrder as _, TransactionTrait as _,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 /// Maximum UTF-8 byte length retained for a source elaboration failure.
@@ -17,6 +17,114 @@ use thiserror::Error;
 /// them. The diagnostic is deliberately short because it may contain text from
 /// an external registry.
 pub const MAX_FAILURE_DIAGNOSTIC_BYTES: usize = 1024;
+
+/// A resolved package version together with every acyclic path reaching it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PersistedPackageVersion {
+    pub id: i32,
+    pub version: String,
+    pub package_url: String,
+    pub derivations: Vec<Vec<String>>,
+}
+
+/// Read source-scoped package versions and derive deterministic paths from the
+/// stored edge graph.
+pub async fn persisted_package_versions(
+    db: &DatabaseConnection,
+    source_id: i32,
+) -> Result<Vec<PersistedPackageVersion>, ElaborationStorageError> {
+    let versions = package_versions::Entity::find()
+        .filter(package_versions::Column::SourceId.eq(source_id))
+        .order_by_asc(package_versions::Column::PackageUrl)
+        .all(db)
+        .await
+        .map_err(ElaborationStorageError::Database)?;
+    let edges = package_source_edges::Entity::find()
+        .filter(package_source_edges::Column::SourceId.eq(source_id))
+        .all(db)
+        .await
+        .map_err(ElaborationStorageError::Database)?;
+
+    let package_urls = versions
+        .iter()
+        .map(|version| (version.id, version.package_url.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let mut children = BTreeMap::<Option<i32>, BTreeSet<i32>>::new();
+    for edge in edges {
+        if !package_urls.contains_key(&edge.child_package_version_id)
+            || edge
+                .parent_package_version_id
+                .is_some_and(|parent| !package_urls.contains_key(&parent))
+        {
+            return Err(ElaborationStorageError::InvalidGraph);
+        }
+        children
+            .entry(edge.parent_package_version_id)
+            .or_default()
+            .insert(edge.child_package_version_id);
+    }
+    let children = children
+        .into_iter()
+        .map(|(parent, children)| {
+            let mut children = children.into_iter().collect::<Vec<_>>();
+            children.sort_by(|left, right| {
+                package_urls[left]
+                    .cmp(&package_urls[right])
+                    .then_with(|| left.cmp(right))
+            });
+            (parent, children)
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let mut derivations = BTreeMap::<i32, BTreeSet<Vec<i32>>>::new();
+    for root in children.get(&None).into_iter().flatten() {
+        let path = vec![*root];
+        derivations.entry(*root).or_default().insert(path.clone());
+        record_child_derivations(*root, path, &children, &mut derivations);
+    }
+
+    Ok(versions
+        .into_iter()
+        .map(|version| PersistedPackageVersion {
+            id: version.id,
+            version: version.version,
+            package_url: version.package_url,
+            derivations: derivations
+                .remove(&version.id)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|path| {
+                    path.into_iter()
+                        .map(|id| package_urls[&id].clone())
+                        .collect()
+                })
+                .collect(),
+        })
+        .collect())
+}
+
+fn record_child_derivations(
+    parent: i32,
+    path: Vec<i32>,
+    children: &BTreeMap<Option<i32>, Vec<i32>>,
+    derivations: &mut BTreeMap<i32, BTreeSet<Vec<i32>>>,
+) {
+    let mut pending = vec![(parent, path)];
+    while let Some((parent, path)) = pending.pop() {
+        for child in children.get(&Some(parent)).into_iter().flatten() {
+            if path.contains(child) {
+                continue;
+            }
+            let mut child_path = path.clone();
+            child_path.push(*child);
+            derivations
+                .entry(*child)
+                .or_default()
+                .insert(child_path.clone());
+            pending.push((*child, child_path));
+        }
+    }
+}
 
 /// Store a completed elaboration snapshot, atomically replacing a source's prior snapshot.
 pub async fn persist_completed_elaboration(
@@ -212,11 +320,15 @@ pub enum ElaborationStorageError {
     Database(#[source] DbErr),
     #[error("elaboration edge refers to missing package {0}")]
     MissingPackage(String),
+    #[error("persisted elaboration graph refers to a version outside its source")]
+    InvalidGraph,
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic};
+    use super::{MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic, persisted_package_versions};
+    use crate::db::entities::{package_source_edges, package_versions};
+    use sea_orm::{DbBackend, MockDatabase};
 
     #[test]
     fn bounds_failure_diagnostics_at_a_utf8_boundary() {
@@ -225,5 +337,74 @@ mod tests {
         assert!(diagnostic.len() <= MAX_FAILURE_DIAGNOSTIC_BYTES);
         assert!(diagnostic.ends_with("..."));
         assert!(diagnostic.is_char_boundary(diagnostic.len()));
+    }
+
+    #[tokio::test]
+    async fn derives_all_acyclic_paths_in_package_url_order() {
+        let versions = [
+            (1, "pkg:npm/a@1.0.0"),
+            (2, "pkg:npm/b@1.0.0"),
+            (3, "pkg:npm/c@1.0.0"),
+            (4, "pkg:npm/d@1.0.0"),
+        ]
+        .into_iter()
+        .map(|(id, package_url)| package_versions::Model {
+            id,
+            package_id: id,
+            source_id: 7,
+            version: "1.0.0".to_owned(),
+            package_url: package_url.to_owned(),
+            source_repository: None,
+            source_repository_tag: None,
+        })
+        .collect::<Vec<_>>();
+        let edges = [
+            (None, 1),
+            (None, 2),
+            (Some(1), 3),
+            (Some(2), 3),
+            (Some(3), 4),
+            (Some(4), 1),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(
+            |(index, (parent_package_version_id, child_package_version_id))| {
+                package_source_edges::Model {
+                    id: index as i32,
+                    source_id: 7,
+                    parent_package_version_id,
+                    child_package_version_id,
+                    root_dependency_kind: None,
+                    declared_dependency: None,
+                    declared_specification: None,
+                }
+            },
+        )
+        .collect::<Vec<_>>();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([versions])
+            .append_query_results([edges])
+            .into_connection();
+
+        let result = persisted_package_versions(&db, 7).await.unwrap();
+
+        assert_eq!(result[2].package_url, "pkg:npm/c@1.0.0");
+        assert_eq!(
+            result[2].derivations,
+            vec![
+                vec!["pkg:npm/a@1.0.0".to_owned(), "pkg:npm/c@1.0.0".to_owned()],
+                vec!["pkg:npm/b@1.0.0".to_owned(), "pkg:npm/c@1.0.0".to_owned()],
+            ]
+        );
+        assert_eq!(result[3].derivations.len(), 2);
+        assert!(
+            result
+                .iter()
+                .flat_map(|version| &version.derivations)
+                .all(|path| {
+                    path.iter().collect::<std::collections::BTreeSet<_>>().len() == path.len()
+                })
+        );
     }
 }

@@ -184,7 +184,7 @@ pub struct VersionedPackage {
     pub version: String,
     pub ecosystem: PackageSourceEcosystem,
     pub purl: String,
-    pub derivation: Vec<String>,
+    pub derivations: Vec<Vec<String>>,
 }
 
 #[derive(Serialize, JsonSchema, Debug, Clone)]

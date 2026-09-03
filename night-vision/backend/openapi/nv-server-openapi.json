@@ -412,10 +412,13 @@
       "VersionedPackage": {
         "type": "object",
         "properties": {
-          "derivation": {
+          "derivations": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "ecosystem": {
@@ -436,7 +439,7 @@
           }
         },
         "required": [
-          "derivation",
+          "derivations",
           "ecosystem",
           "id",
           "name",

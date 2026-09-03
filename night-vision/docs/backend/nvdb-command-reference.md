@@ -117,7 +117,7 @@ tests can stabilize before their services are implemented.
 | `package-source import <FILE> [--json]` | Store a validated npm `package.json` source. |
 | `package-source resolve <SOURCE-ID> [--json]` | Resolve and persist reachable package versions. |
 | `package-source show <SOURCE-ID> [--json]` | Show package-source metadata and state. |
-| `package-source versions <SOURCE-ID> [--json]` | List versions resolved from the source. |
+| `package-source versions <SOURCE-ID> [--json]` | List resolved versions, derivation paths, and path counts. |
 | `package-source kevs <SOURCE-ID> [--json]` | List KEV-linked matches for source versions. |
 | `package-version kev <PURL> [--json]` | List KEV-linked CVE matches for one version. |
 | `assessment analyze <PURL> [--json]` | Run and persist the configured assessment. |

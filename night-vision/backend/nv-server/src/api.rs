@@ -23,7 +23,10 @@ use nv_common::{
     db::entities::cve_list_sync_runs::Model as CveListSyncRun,
     npm::elaboration::{
         NpmRegistryClient, elaborate,
-        storage::{bounded_diagnostic, persist_completed_elaboration, record_elaboration_failure},
+        storage::{
+            bounded_diagnostic, persist_completed_elaboration, persisted_package_versions,
+            record_elaboration_failure,
+        },
     },
     npm::package_json::NpmPackageJson,
 };
@@ -305,7 +308,7 @@ async fn lookup_package_source(
     db: &DatabaseConnection,
     id: Uuid,
 ) -> Result<Option<PackageSourceStatus>, HttpError> {
-    use nv_common::db::entities::{package_source_warnings, package_sources, package_versions};
+    use nv_common::db::entities::{package_source_warnings, package_sources};
     const MAX_API_WARNINGS: u64 = 100;
 
     let Some(source) = package_sources::Entity::find()
@@ -345,9 +348,7 @@ async fn lookup_package_source(
         }
     }
 
-    let versioned_packages = package_versions::Entity::find()
-        .filter(package_versions::Column::SourceId.eq(source.id))
-        .all(db)
+    let versioned_packages = persisted_package_versions(db, source.id)
         .await
         .map_err(|error| HttpError::for_internal_error(error.to_string()))?
         .into_iter()
@@ -360,10 +361,18 @@ async fn lookup_package_source(
                 .next()
                 .unwrap_or_default()
                 .to_owned(),
-            version: version.version.clone(),
+            version: version.version,
             ecosystem: PackageSourceEcosystem::Npm,
-            purl: version.package_url.clone(),
-            derivation: vec!["<root>".to_owned(), version.package_url],
+            purl: version.package_url,
+            derivations: version
+                .derivations
+                .into_iter()
+                .map(|derivation| {
+                    std::iter::once("<root>".to_owned())
+                        .chain(derivation)
+                        .collect()
+                })
+                .collect(),
         })
         .collect();
 
@@ -454,7 +463,9 @@ fn cve_list_sync_run_health(run: CveListSyncRun) -> CveListSyncRunHealth {
 mod tests {
     use super::*;
     use nv_common::{
-        db::entities::{package_source_warnings, package_sources, package_versions},
+        db::entities::{
+            package_source_edges, package_source_warnings, package_sources, package_versions,
+        },
         npm::elaboration::storage::MAX_FAILURE_DIAGNOSTIC_BYTES,
     };
     use sea_orm::{DbBackend, MockDatabase};
@@ -497,7 +508,24 @@ mod tests {
         let id = Uuid::now_v7();
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([vec![source(id, "completed", None)]])
-            .append_query_results([Vec::<package_versions::Model>::new()])
+            .append_query_results([vec![package_versions::Model {
+                id: 1,
+                package_id: 1,
+                source_id: 1,
+                version: "1.0.0".to_owned(),
+                package_url: "pkg:npm/root@1.0.0".to_owned(),
+                source_repository: None,
+                source_repository_tag: None,
+            }]])
+            .append_query_results([vec![package_source_edges::Model {
+                id: 1,
+                source_id: 1,
+                parent_package_version_id: None,
+                child_package_version_id: 1,
+                root_dependency_kind: Some("dependencies".to_owned()),
+                declared_dependency: Some("root".to_owned()),
+                declared_specification: Some("1.0.0".to_owned()),
+            }]])
             .append_query_results([vec![package_source_warnings::Model {
                 id: 1,
                 source_id: 1,
@@ -515,5 +543,9 @@ mod tests {
         assert!(!completed.warnings_truncated);
         assert_eq!(completed.warnings.len(), 1);
         assert_eq!(completed.warnings[0].dependency_name, "local-package");
+        assert_eq!(
+            completed.versioned_packages[0].derivations,
+            vec![vec!["<root>".to_owned(), "pkg:npm/root@1.0.0".to_owned(),]]
+        );
     }
 }
