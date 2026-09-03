@@ -116,6 +116,7 @@ pub(super) enum RawBin {
 pub(super) enum RawEngines {
     Map(HashMap<String, String>),
     LegacyList(Vec<String>),
+    LegacyString(String),
 }
 
 #[derive(Debug, Deserialize)]

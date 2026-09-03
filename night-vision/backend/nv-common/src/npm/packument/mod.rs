@@ -643,6 +643,13 @@ fn convert_engines(raw: Option<RawEngines>) -> HashMap<String, String> {
             let _ = legacy;
             HashMap::new()
         }
+        // Some historic npm packages use a single string such as
+        // `"node >= 0.10.0"`. This form is not keyed, so it cannot be
+        // represented by the public field.
+        Some(RawEngines::LegacyString(legacy)) => {
+            let _ = legacy;
+            HashMap::new()
+        }
         None => HashMap::new(),
     }
 }
@@ -1041,6 +1048,20 @@ mod tests {
         packument["versions"]["1.0.0"]["engines"] = json!(["node 0.4"]);
 
         let packument = parse_value(&packument).expect("legacy engines list should parse");
+        let version = packument
+            .versions
+            .get(&semantic_version("1.0.0"))
+            .expect("version should be present");
+
+        assert!(version.engines.is_empty());
+    }
+
+    #[test]
+    fn accepts_legacy_string_engines_metadata() {
+        let mut packument = valid_packument("example", "1.0.0", "1.0.0");
+        packument["versions"]["1.0.0"]["engines"] = json!("node >= 0.10.0");
+
+        let packument = parse_value(&packument).expect("legacy engines string should parse");
         let version = packument
             .versions
             .get(&semantic_version("1.0.0"))
