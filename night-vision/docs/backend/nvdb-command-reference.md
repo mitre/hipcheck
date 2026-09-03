@@ -125,7 +125,7 @@ warnings.
 | Command | Purpose |
 | --- | --- |
 | `package-source import <FILE> [--json]` | Store a validated npm `package.json` source. |
-| `package-source resolve <SOURCE-ID> [--json]` | Resolve and persist reachable package versions. |
+| `package-source resolve <SOURCE-ID> [--json] [--no-progress]` | Resolve and persist reachable package versions. |
 | `package-source show <SOURCE-ID> [--json]` | Show package-source metadata and state. |
 | `package-source versions <SOURCE-ID> [--json]` | List resolved versions, derivation paths, and path counts. |
 | `package-source kevs <SOURCE-ID> [--json]` | List KEV-linked CVE matches across resolved versions. A no-match result only reflects locally available data and does not mean the resolved versions are safe. |
@@ -139,6 +139,11 @@ stable identifier and retain it for later `package-source` commands; do not
 derive meaning from its contents. Import validates and stores the source only;
 run `package-source resolve` explicitly for the network-dependent resolution
 step and to retry a failed resolution without resubmitting the source.
+
+`package-source resolve` reports live resolution progress on standard error by
+default. Standard output remains the final text or JSON result, so `--json`
+remains safe for automation. Use `--no-progress` to suppress transient progress
+output.
 
 ## Package-version commands
 

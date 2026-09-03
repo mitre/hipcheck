@@ -559,12 +559,14 @@ async fn elaborate_inner(
         .worker_concurrency
         .saturating_add(limits.work_queue_capacity);
     let mut completed_work_items = 0;
+    let mut last_snapshot = None;
     report_scheduler_progress(
         progress,
         &state,
         pending.len(),
         replies.len(),
         completed_work_items,
+        &mut last_snapshot,
     );
 
     while !pending.is_empty() || !expansions.is_empty() || !replies.is_empty() {
@@ -591,6 +593,7 @@ async fn elaborate_inner(
                     pending.len(),
                     replies.len(),
                     completed_work_items,
+                    &mut last_snapshot,
                 );
                 continue;
             }
@@ -615,6 +618,7 @@ async fn elaborate_inner(
             pending.len(),
             replies.len(),
             completed_work_items,
+            &mut last_snapshot,
         );
     }
 
@@ -629,10 +633,14 @@ fn report_scheduler_progress(
     queued_work: usize,
     in_flight_work: usize,
     completed_work_items: usize,
+    last_snapshot: &mut Option<ElaborationProgressSnapshot>,
 ) {
-    progress.report(ElaborationProgress::SchedulerUpdated {
-        snapshot: scheduler_snapshot(state, queued_work, in_flight_work, completed_work_items),
-    });
+    let snapshot = scheduler_snapshot(state, queued_work, in_flight_work, completed_work_items);
+    if last_snapshot.is_some_and(|previous| previous == snapshot) {
+        return;
+    }
+    progress.report(ElaborationProgress::SchedulerUpdated { snapshot });
+    *last_snapshot = Some(snapshot);
 }
 
 fn scheduler_snapshot(
@@ -1322,7 +1330,10 @@ mod tests {
     use std::{
         collections::BTreeMap,
         error::Error as _,
-        sync::atomic::{AtomicUsize, Ordering},
+        sync::{
+            Mutex as StdMutex,
+            atomic::{AtomicUsize, Ordering},
+        },
         time::Duration,
     };
 
@@ -1418,6 +1429,61 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["pkg:npm/root@1.0.0", "pkg:npm/child@2.0.0"]
         );
+    }
+
+    #[test]
+    fn reports_elaboration_progress_without_changing_the_result() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([
+                (
+                    "root".to_owned(),
+                    packument("root", "1.0.0", json!({ "child": "1.0.0" })),
+                ),
+                ("child".to_owned(), packument("child", "1.0.0", json!({}))),
+            ]),
+        };
+        let events = Arc::new(StdMutex::new(Vec::new()));
+        let reporter_events = events.clone();
+        let reporter: Arc<dyn ElaborationProgressReporter> = Arc::new(move |progress| {
+            reporter_events
+                .lock()
+                .expect("progress event lock is not poisoned")
+                .push(progress);
+        });
+
+        let result = tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(elaborate_with_progress(
+                &source,
+                Arc::new(registry),
+                ElaborationLimits::default(),
+                reporter,
+            ))
+            .expect("elaboration succeeds");
+        let events = events.lock().expect("progress event lock is not poisoned");
+
+        assert_eq!(result.packages.len(), 2);
+        assert_eq!(result.edges.len(), 2);
+        assert!(matches!(events.first(), Some(ElaborationProgress::Started)));
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| matches!(event, ElaborationProgress::PackumentFetchStarted { .. }))
+                .count(),
+            2
+        );
+        assert!(events.iter().any(|event| {
+            matches!(
+                event,
+                ElaborationProgress::Finished { snapshot }
+                    if snapshot.packages == 2
+                        && snapshot.edges == 2
+                        && snapshot.derivations == 2
+                        && snapshot.queued_work == 0
+                        && snapshot.in_flight_work == 0
+            )
+        }));
     }
 
     #[test]

@@ -1,10 +1,12 @@
 use anyhow::{Context as _, Result};
+use indicatif::{ProgressBar, ProgressStyle};
 use nv_common::{
     config::Config,
     db,
     npm::{
         elaboration::{
-            NpmRegistryClient, elaborate,
+            ElaborationProgress, ElaborationProgressReporter, ElaborationProgressSnapshot,
+            NpmRegistryClient, elaborate, elaborate_with_progress,
             storage::{
                 persist_completed_elaboration, persisted_elaboration_warnings,
                 record_elaboration_failure,
@@ -14,7 +16,11 @@ use nv_common::{
     },
     rt,
 };
-use std::sync::Arc;
+use std::{
+    io::IsTerminal as _,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 use super::{ResolvedWarning, print_warnings};
 
@@ -23,15 +29,20 @@ pub fn command() -> clap::Command {
         .about("Resolve and persist reachable package versions for a source")
         .arg(source_id_argument())
         .arg(json_argument())
+        .arg(no_progress_argument())
 }
 
 pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let source_id = matches
         .get_one::<String>("source-id")
         .expect("required source ID");
-    eprintln!("resolving package source {source_id}");
+    let progress = (!matches.get_flag("no-progress")).then(PackageSourceResolveProgress::new);
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
-    let result = runtime.block_on(resolve(config, source_id))?;
+    let resolution = runtime.block_on(resolve(config, source_id, progress.clone()));
+    if let Some(progress) = &progress {
+        progress.finish();
+    }
+    let result = resolution?;
     if matches.get_flag("json") {
         println!("{}", json_output(source_id, &result));
     } else {
@@ -52,7 +63,11 @@ fn json_output(source_id: &str, result: &ResolutionSummary) -> serde_json::Value
     })
 }
 
-async fn resolve(config: &Config, source_id: &str) -> Result<ResolutionSummary> {
+async fn resolve(
+    config: &Config,
+    source_id: &str,
+    progress: Option<Arc<PackageSourceResolveProgress>>,
+) -> Result<ResolutionSummary> {
     let db = db::connection(config)
         .await
         .context("failed to connect to database")?;
@@ -65,20 +80,23 @@ async fn resolve(config: &Config, source_id: &str) -> Result<ResolutionSummary> 
         config.package_elaboration_limits().request_timeout,
     )
     .context("invalid NPM registry configuration")?;
-    eprintln!("resolving reachable package versions");
-    let result = elaborate(
-        &source_document,
-        Arc::new(client),
-        config.package_elaboration_limits(),
-    )
-    .await;
+    let provider = Arc::new(client);
+    let limits = config.package_elaboration_limits();
+    let result = match &progress {
+        Some(progress) => {
+            elaborate_with_progress(&source_document, provider, limits, progress.clone()).await
+        }
+        None => elaborate(&source_document, provider, limits).await,
+    };
     match result {
         Ok(result) => {
             let package_count = result.packages.len();
+            if let Some(progress) = &progress {
+                progress.publishing_snapshot();
+            }
             persist_completed_elaboration(&db, source.id, &result)
                 .await
                 .context("failed to persist elaboration result")?;
-            eprintln!("published resolution snapshot with {package_count} package versions");
             let warnings = persisted_elaboration_warnings(&db, source.id)
                 .await
                 .context("failed to read persisted elaboration warnings")?
@@ -118,15 +136,195 @@ fn json_argument() -> clap::Arg {
         .help("Print the resolution summary as JSON")
 }
 
+fn no_progress_argument() -> clap::Arg {
+    clap::Arg::new("no-progress")
+        .long("no-progress")
+        .action(clap::ArgAction::SetTrue)
+        .help("Suppress transient resolution progress on stderr")
+}
+
+const NON_TERMINAL_PROGRESS_INTERVAL: Duration = Duration::from_secs(5);
+
+trait ProgressLineWriter: Send + Sync {
+    fn write_line(&self, line: &str);
+}
+
+impl<F> ProgressLineWriter for F
+where
+    F: Fn(&str) + Send + Sync,
+{
+    fn write_line(&self, line: &str) {
+        self(line);
+    }
+}
+
+enum ProgressDisplay {
+    Terminal(ProgressBar),
+    NonTerminal {
+        writer: Arc<dyn ProgressLineWriter>,
+        last_snapshot: Mutex<Option<Instant>>,
+    },
+}
+
+struct PackageSourceResolveProgress {
+    display: ProgressDisplay,
+}
+
+impl PackageSourceResolveProgress {
+    fn new() -> Arc<Self> {
+        Self::with_terminal(
+            std::io::stderr().is_terminal(),
+            Arc::new(|line: &str| eprintln!("{line}")),
+        )
+    }
+
+    fn with_terminal(is_terminal: bool, writer: Arc<dyn ProgressLineWriter>) -> Arc<Self> {
+        let display = if is_terminal {
+            let bar = ProgressBar::new_spinner();
+            bar.set_style(
+                ProgressStyle::with_template("{spinner:.cyan} {msg} {elapsed_precise}")
+                    .expect("spinner progress template should be valid"),
+            );
+            bar.enable_steady_tick(Duration::from_millis(100));
+            ProgressDisplay::Terminal(bar)
+        } else {
+            ProgressDisplay::NonTerminal {
+                writer,
+                last_snapshot: Mutex::new(None),
+            }
+        };
+        Arc::new(Self { display })
+    }
+
+    fn publishing_snapshot(&self) {
+        self.set_phase("publishing resolution snapshot");
+    }
+
+    fn finish(&self) {
+        if let ProgressDisplay::Terminal(bar) = &self.display {
+            bar.finish_and_clear();
+        }
+    }
+
+    fn set_phase(&self, phase: &str) {
+        match &self.display {
+            ProgressDisplay::Terminal(bar) => bar.set_message(phase.to_owned()),
+            ProgressDisplay::NonTerminal { writer, .. } => writer.write_line(phase),
+        }
+    }
+
+    fn set_snapshot(&self, snapshot: ElaborationProgressSnapshot) {
+        let message = progress_snapshot_message(snapshot);
+        match &self.display {
+            ProgressDisplay::Terminal(bar) => bar.set_message(message),
+            ProgressDisplay::NonTerminal {
+                writer,
+                last_snapshot,
+            } => {
+                let mut last_snapshot = last_snapshot
+                    .lock()
+                    .expect("progress update lock is not poisoned");
+                if last_snapshot.is_none_or(|last| last.elapsed() >= NON_TERMINAL_PROGRESS_INTERVAL)
+                {
+                    writer.write_line(&message);
+                    *last_snapshot = Some(Instant::now());
+                }
+            }
+        }
+    }
+}
+
+impl ElaborationProgressReporter for PackageSourceResolveProgress {
+    fn report(&self, progress: ElaborationProgress) {
+        match progress {
+            ElaborationProgress::Started => self.set_phase("resolving reachable package versions"),
+            ElaborationProgress::PackumentFetchStarted { package } => {
+                if let ProgressDisplay::Terminal(bar) = &self.display {
+                    bar.println(format!("fetching packument for {package}"));
+                }
+            }
+            ElaborationProgress::PackumentFetchCompleted { .. } => {}
+            ElaborationProgress::SchedulerUpdated { snapshot }
+            | ElaborationProgress::Finished { snapshot } => self.set_snapshot(snapshot),
+        }
+    }
+}
+
+fn progress_snapshot_message(snapshot: ElaborationProgressSnapshot) -> String {
+    format!(
+        "{} packages · {} edges · {} paths · {} active · {} queued · {} completed",
+        snapshot.packages,
+        snapshot.edges,
+        snapshot.derivations,
+        snapshot.in_flight_work,
+        snapshot.queued_work,
+        snapshot.completed_work_items,
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ResolutionSummary, command, json_output};
+    use super::{
+        PackageSourceResolveProgress, ResolutionSummary, command, json_output,
+        progress_snapshot_message,
+    };
+    use nv_common::npm::elaboration::{
+        ElaborationProgress, ElaborationProgressReporter as _, ElaborationProgressSnapshot,
+    };
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn resolve_accepts_a_source_id() {
         command()
             .try_get_matches_from(["resolve", "source-1", "--json"])
             .expect("package-source resolve should parse");
+    }
+
+    #[test]
+    fn resolve_accepts_no_progress_with_json_output() {
+        command()
+            .try_get_matches_from(["resolve", "source-1", "--json", "--no-progress"])
+            .expect("package-source resolve should accept --no-progress");
+    }
+
+    #[test]
+    fn non_terminal_progress_throttles_snapshots() {
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let writer_lines = lines.clone();
+        let progress = PackageSourceResolveProgress::with_terminal(
+            false,
+            Arc::new(move |line: &str| {
+                writer_lines
+                    .lock()
+                    .expect("progress line lock is not poisoned")
+                    .push(line.to_owned());
+            }),
+        );
+        let snapshot = ElaborationProgressSnapshot {
+            packages: 4,
+            edges: 7,
+            derivations: 9,
+            queued_work: 2,
+            in_flight_work: 3,
+            completed_work_items: 1,
+        };
+
+        progress.report(ElaborationProgress::Started);
+        progress.report(ElaborationProgress::SchedulerUpdated { snapshot });
+        progress.report(ElaborationProgress::SchedulerUpdated { snapshot });
+        progress.publishing_snapshot();
+
+        assert_eq!(
+            lines
+                .lock()
+                .expect("progress line lock is not poisoned")
+                .as_slice(),
+            [
+                "resolving reachable package versions",
+                progress_snapshot_message(snapshot).as_str(),
+                "publishing resolution snapshot",
+            ]
+        );
     }
 
     #[test]
