@@ -202,7 +202,7 @@ package-elaboration-max-queued-work =
 
 # The maximum acyclic derivation paths in one elaboration result.
 #
-# Default: 100000
+# Default: 1000000
 package-elaboration-max-derivations =
 
 # Hipcheck assessments run the bundled policy with this bounded process configuration.

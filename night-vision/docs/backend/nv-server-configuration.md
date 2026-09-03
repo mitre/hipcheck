@@ -78,7 +78,7 @@ SeaORM, or Tokio setting at its default unless noted below.
 | `package-elaboration-max-packages` | Maximum concrete package versions in one elaboration result. | Versions | 10000. Values must be greater than 0. |
 | `package-elaboration-max-edges` | Maximum dependency edges in one elaboration result. | Edges | 1000000. Values must be greater than 0. |
 | `package-elaboration-max-queued-work` | Maximum buffered, not-yet-dispatched dependency work items. Reaching the limit applies backpressure until workers make room. | Work items | 100000. Values must be greater than 0. |
-| `package-elaboration-max-derivations` | Maximum acyclic derivation paths in one elaboration result. | Paths | 100000. Values must be greater than 0. |
+| `package-elaboration-max-derivations` | Maximum acyclic derivation paths in one elaboration result. | Paths | 1000000. Values must be greater than 0. |
 
 ## Secret Files
 
