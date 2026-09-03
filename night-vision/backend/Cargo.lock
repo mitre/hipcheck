@@ -2499,6 +2499,7 @@ dependencies = [
  "serde_json",
  "slog",
  "tokio",
+ "url",
  "uuid",
  "workspace-hack",
 ]

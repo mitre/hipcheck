@@ -21,6 +21,10 @@ use nv_common::{
         has_cve_list_records, last_successful_cve_list_sync_commit, latest_cve_list_sync_run,
     },
     db::entities::cve_list_sync_runs::Model as CveListSyncRun,
+    npm::elaboration::{
+        NpmRegistryClient, elaborate,
+        storage::{persist_completed_elaboration, record_elaboration_failure},
+    },
     npm::package_json::NpmPackageJson,
 };
 use nv_server_api::{
@@ -153,27 +157,36 @@ impl NvServerApi for RestApi {
                 .get("content-type")
                 .and_then(|value| value.to_str().ok()),
         )?;
+        let context = ctx.context();
+        let db = context.db();
+        let body = serde_json::from_slice::<PostPackageSourceBody>(body_param.as_bytes()).map_err(
+            |_| {
+                HttpError::for_bad_request(
+                    Some("InvalidPackageSourceRequest".to_owned()),
+                    "package-source request body must be valid JSON".to_owned(),
+                )
+            },
+        )?;
+        let file_name = body.file_name;
+        let contents = body.contents;
 
-        // Retain this permit until the request is accepted. This bounds request
-        // parsing, manifest validation, and future persistence work per server
-        // process.
-        let _submission_slot = ctx.context().try_acquire_package_source_submission_slot()?;
-        let db = ctx.context().db();
-        let uuid = tokio::time::timeout(
-            ctx.context().package_source_request_timeout(),
-            accept_package_source(
-                db,
-                body_param.as_bytes(),
-                ctx.context().package_source_contents_max_bytes(),
-            ),
-        )
-        .await
-        .map_err(|_| {
-            HttpError::for_unavail(
-                Some("PackageSourceRequestTimedOut".to_owned()),
-                "package-source submission timed out".to_owned(),
+        let stored = store_package_source(db, file_name, contents).await?;
+        let worker_db = db.clone();
+        let registry_url = context.npm_registry_url().clone();
+        let limits = context.package_elaboration_limits();
+        let max_packument_bytes = context.package_elaboration_max_packument_bytes();
+        tokio::spawn(async move {
+            run_package_source_elaboration(
+                worker_db,
+                stored.database_id,
+                stored.contents,
+                registry_url,
+                limits,
+                max_packument_bytes,
             )
-        })??;
+            .await;
+        });
+        let uuid = stored.id;
         let resp = HttpResponseAccepted(PostPackageSourceResponse { id: uuid });
 
         Ok(resp)
@@ -194,16 +207,6 @@ impl NvServerApi for RestApi {
             )),
         }
     }
-}
-
-async fn accept_package_source(
-    db: &DatabaseConnection,
-    request_body: &[u8],
-    max_contents_bytes: usize,
-) -> Result<Uuid, HttpError> {
-    let body = parse_package_source_body(request_body)?;
-    validate_package_source(&body.file_name, &body.contents, max_contents_bytes)?;
-    store_package_source(db, body.file_name, body.contents).await
 }
 
 fn validate_package_source_media_type(content_type: Option<&str>) -> Result<(), HttpError> {
@@ -230,64 +233,15 @@ fn unsupported_package_source_media_type() -> HttpError {
     )
 }
 
-fn parse_package_source_body(contents: &[u8]) -> Result<PostPackageSourceBody, HttpError> {
-    serde_json::from_slice(contents).map_err(|_| {
-        HttpError::for_bad_request(
-            Some("InvalidPackageSourceRequest".to_owned()),
-            "package-source request body must be valid JSON".to_owned(),
-        )
-    })
-}
-
-fn validate_package_source(
-    file_name: &str,
-    contents: &str,
-    max_contents_bytes: usize,
-) -> Result<(), HttpError> {
-    if file_name != "package.json" {
-        return Err(HttpError::for_bad_request(
-            Some("InvalidPackageSourceFileName".to_owned()),
-            "fileName must be exactly \"package.json\"".to_owned(),
-        ));
-    }
-
-    if contents.len() > max_contents_bytes {
-        return Err(HttpError::for_client_error(
-            Some("PackageSourceContentsTooLarge".to_owned()),
-            ClientErrorStatusCode::PAYLOAD_TOO_LARGE,
-            format!("contents must not exceed {max_contents_bytes} bytes"),
-        ));
-    }
-
-    match nv_common::npm::package_json::NpmPackageJson::parse_package_json(contents.as_bytes()) {
-        Ok(_) => {}
-        Err(nv_common::npm::package_json::PackageParseError::PackageTooLarge) => {
-            return Err(HttpError::for_client_error(
-                Some("PackageSourceContentsTooLarge".to_owned()),
-                ClientErrorStatusCode::PAYLOAD_TOO_LARGE,
-                "contents exceeds the supported package.json size limit".to_owned(),
-            ));
-        }
-        Err(_) => {
-            return Err(HttpError::for_bad_request(
-                Some("InvalidPackageSourceContents".to_owned()),
-                "contents must be a valid npm package.json document".to_owned(),
-            ));
-        }
-    }
-
-    Ok(())
-}
-
 async fn store_package_source(
     db: &DatabaseConnection,
     file_name: String,
     contents: String,
-) -> Result<Uuid, HttpError> {
+) -> Result<StoredPackageSource, HttpError> {
     NpmPackageJson::parse_package_json(contents.as_bytes())
         .map_err(|error| HttpError::for_bad_request(None, error.to_string()))?;
     let id = Uuid::now_v7();
-    nv_common::db::entities::package_sources::ActiveModel {
+    let source = nv_common::db::entities::package_sources::ActiveModel {
         source_id: Set(id.to_string()),
         file_name: Set(file_name),
         file_contents: Set(contents),
@@ -299,7 +253,50 @@ async fn store_package_source(
     .insert(db)
     .await
     .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
-    Ok(id)
+    Ok(StoredPackageSource {
+        id,
+        database_id: source.id,
+        contents: source.file_contents,
+    })
+}
+
+struct StoredPackageSource {
+    id: Uuid,
+    database_id: i32,
+    contents: String,
+}
+
+async fn run_package_source_elaboration(
+    db: DatabaseConnection,
+    source_id: i32,
+    contents: String,
+    registry_url: url::Url,
+    limits: nv_common::npm::elaboration::ElaborationLimits,
+    max_packument_bytes: usize,
+) {
+    let result = NpmPackageJson::parse_package_json(contents.as_bytes())
+        .map_err(|error| error.to_string())
+        .and_then(|source| {
+            NpmRegistryClient::new(registry_url, max_packument_bytes)
+                .map(|client| (source, client))
+                .map_err(|error| error.to_string())
+        });
+    let result = match result {
+        Ok((source, client)) => elaborate(&source, std::sync::Arc::new(client), limits)
+            .await
+            .map_err(|error| error.to_string()),
+        Err(error) => Err(error),
+    };
+    match result {
+        Ok(result) => {
+            if let Err(error) = persist_completed_elaboration(&db, source_id, &result).await {
+                let _ = record_elaboration_failure(&db, source_id, &error.to_string()).await;
+            }
+        }
+        Err(error) => {
+            let _ = record_elaboration_failure(&db, source_id, &error).await;
+        }
+    }
 }
 
 async fn lookup_package_source(
@@ -388,47 +385,5 @@ fn cve_list_sync_run_health(run: CveListSyncRun) -> CveListSyncRunHealth {
         records_inserted: run.records_inserted,
         records_updated: run.records_updated,
         error: run.error,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const CONTENTS_MAX_BYTES: usize = 1024;
-
-    #[test]
-    fn package_source_body_rejects_unknown_fields() {
-        let _error = parse_package_source_body(
-            br#"{"fileName":"package.json","contents":"{}","extra":true}"#,
-        )
-        .expect_err("unknown request fields should be rejected");
-    }
-
-    #[test]
-    fn package_source_media_type_requires_json() {
-        let _error = validate_package_source_media_type(Some("text/plain"))
-            .expect_err("non-JSON media types should be rejected");
-        validate_package_source_media_type(Some("application/json; charset=utf-8"))
-            .expect("JSON media types should be accepted");
-    }
-
-    #[test]
-    fn package_source_validation_rejects_noncanonical_file_names() {
-        let _error = validate_package_source("../package.json", "{}", CONTENTS_MAX_BYTES)
-            .expect_err("noncanonical file names should be rejected");
-    }
-
-    #[test]
-    fn package_source_validation_rejects_malformed_manifest_contents() {
-        let _error = validate_package_source("package.json", "{", CONTENTS_MAX_BYTES)
-            .expect_err("malformed manifest contents should be rejected");
-    }
-
-    #[test]
-    fn package_source_validation_rejects_oversized_contents() {
-        let contents = "x".repeat(CONTENTS_MAX_BYTES + 1);
-        let _error = validate_package_source("package.json", &contents, CONTENTS_MAX_BYTES)
-            .expect_err("oversized manifest contents should be rejected");
     }
 }
