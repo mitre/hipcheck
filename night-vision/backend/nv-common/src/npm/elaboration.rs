@@ -915,6 +915,40 @@ mod tests {
         );
     }
 
+    struct FailingRegistry;
+
+    #[async_trait]
+    impl PackumentProvider for FailingRegistry {
+        async fn fetch(
+            &self,
+            _package: &NpmPackageName,
+        ) -> Result<NpmPackument, PackumentProviderError> {
+            Err(PackumentProviderError::Request)
+        }
+    }
+
+    #[test]
+    fn reports_mocked_registry_failures() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+
+        let error = tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(elaborate(
+                &source,
+                Arc::new(FailingRegistry),
+                ElaborationLimits::default(),
+            ))
+            .expect_err("registry failure is reported");
+
+        assert!(matches!(
+            error,
+            ElaborationError::Packument {
+                source: PackumentProviderError::Request,
+                ..
+            }
+        ));
+    }
+
     #[test]
     fn records_bundle_dependencies_as_root_edges() {
         let source = source(json!({

@@ -292,14 +292,22 @@ async fn run_package_source_elaboration(
             .map_err(|error| error.to_string()),
         Err(error) => Err(error),
     };
+    finalize_package_source_elaboration(&db, source_id, result).await;
+}
+
+async fn finalize_package_source_elaboration(
+    db: &DatabaseConnection,
+    source_id: i32,
+    result: Result<nv_common::npm::elaboration::ElaborationResult, String>,
+) {
     match result {
         Ok(result) => {
-            if let Err(error) = persist_completed_elaboration(&db, source_id, &result).await {
-                let _ = record_elaboration_failure(&db, source_id, &error.to_string()).await;
+            if let Err(error) = persist_completed_elaboration(db, source_id, &result).await {
+                let _ = record_elaboration_failure(db, source_id, &error.to_string()).await;
             }
         }
         Err(error) => {
-            let _ = record_elaboration_failure(&db, source_id, &error).await;
+            let _ = record_elaboration_failure(db, source_id, &error).await;
         }
     }
 }
@@ -468,7 +476,7 @@ mod tests {
         },
         npm::elaboration::storage::MAX_FAILURE_DIAGNOSTIC_BYTES,
     };
-    use sea_orm::{DbBackend, MockDatabase};
+    use sea_orm::{DbBackend, MockDatabase, MockExecResult};
 
     fn source(
         id: Uuid,
@@ -547,5 +555,66 @@ mod tests {
             completed.versioned_packages[0].derivations,
             vec![vec!["<root>".to_owned(), "pkg:npm/root@1.0.0".to_owned(),]]
         );
+    }
+
+    #[tokio::test]
+    async fn background_completion_publishes_a_snapshot() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results(std::iter::repeat_n(
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+                4,
+            ))
+            .into_connection();
+
+        finalize_package_source_elaboration(
+            &db,
+            1,
+            Ok(nv_common::npm::elaboration::ElaborationResult {
+                packages: Vec::new(),
+                edges: Vec::new(),
+                warnings: Vec::new(),
+            }),
+        )
+        .await;
+
+        let statements = db
+            .into_transaction_log()
+            .into_iter()
+            .flat_map(|entry| entry.statements().to_vec())
+            .map(|statement| statement.sql)
+            .collect::<Vec<_>>();
+        assert!(statements.iter().any(|sql| sql.contains("package_sources")));
+        assert_eq!(statements.first(), Some(&"BEGIN".to_owned()));
+        assert_eq!(statements.last(), Some(&"COMMIT".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn background_failures_record_failed_lifecycle_state() {
+        for error in [
+            "failed to retrieve packument for root: registry request failed",
+            "elaboration exceeded the package limit",
+        ] {
+            let db = MockDatabase::new(DbBackend::Postgres)
+                .append_exec_results([MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                }])
+                .into_connection();
+
+            finalize_package_source_elaboration(&db, 1, Err(error.to_owned())).await;
+
+            let statements = db
+                .into_transaction_log()
+                .into_iter()
+                .flat_map(|entry| entry.statements().to_vec())
+                .map(|statement| statement.sql)
+                .collect::<Vec<_>>();
+            assert_eq!(statements.len(), 1);
+            assert!(statements[0].contains("package_sources"));
+            assert!(!statements[0].contains("DELETE"));
+        }
     }
 }

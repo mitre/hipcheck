@@ -327,9 +327,15 @@ pub enum ElaborationStorageError {
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic, persisted_package_versions};
-    use crate::db::entities::{package_source_edges, package_versions};
-    use sea_orm::{DbBackend, MockDatabase};
+    use super::{
+        MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic, persist_completed_elaboration,
+        persisted_package_versions, record_elaboration_failure,
+    };
+    use crate::{
+        db::entities::{package_source_edges, package_versions},
+        npm::elaboration::ElaborationResult,
+    };
+    use sea_orm::{DbBackend, MockDatabase, MockExecResult};
 
     #[test]
     fn bounds_failure_diagnostics_at_a_utf8_boundary() {
@@ -407,5 +413,80 @@ mod tests {
                     path.iter().collect::<std::collections::BTreeSet<_>>().len() == path.len()
                 })
         );
+    }
+
+    #[tokio::test]
+    async fn replaces_a_snapshot_in_one_transaction() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results(std::iter::repeat_n(
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+                4,
+            ))
+            .into_connection();
+
+        persist_completed_elaboration(
+            &db,
+            7,
+            &ElaborationResult {
+                packages: Vec::new(),
+                edges: Vec::new(),
+                warnings: Vec::new(),
+            },
+        )
+        .await
+        .expect("empty snapshot replacement succeeds");
+
+        let statements = db
+            .into_transaction_log()
+            .into_iter()
+            .flat_map(|entry| entry.statements().to_vec())
+            .map(|statement| statement.sql)
+            .collect::<Vec<_>>();
+        assert!(
+            statements
+                .iter()
+                .any(|sql| sql.contains("package_source_edges")),
+            "{statements:#?}"
+        );
+        assert!(
+            statements
+                .iter()
+                .any(|sql| sql.contains("package_source_warnings")),
+            "{statements:#?}"
+        );
+        assert!(
+            statements.iter().any(|sql| sql.contains("package_version")),
+            "{statements:#?}"
+        );
+        assert!(statements.iter().any(|sql| sql.contains("package_sources")));
+        assert_eq!(statements.first(), Some(&"BEGIN".to_owned()));
+        assert_eq!(statements.last(), Some(&"COMMIT".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn failure_preserves_the_published_snapshot() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        record_elaboration_failure(&db, 7, "registry request failed")
+            .await
+            .expect("failure is recorded");
+
+        let statements = db
+            .into_transaction_log()
+            .into_iter()
+            .flat_map(|entry| entry.statements().to_vec())
+            .map(|statement| statement.sql)
+            .collect::<Vec<_>>();
+        assert_eq!(statements.len(), 1);
+        assert!(statements[0].contains("package_sources"), "{statements:#?}");
+        assert!(!statements[0].contains("DELETE"));
     }
 }
