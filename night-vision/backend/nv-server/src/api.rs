@@ -10,7 +10,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 // an old version of `schemars` that doesn't support `jiff`. When we
 // can use a newer version of `schemars`, we should switch to using
 // `jiff`.
-use chrono::{TimeZone as _, Utc};
+use chrono::Utc;
 use dropshot::{
     ClientErrorStatusCode, HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext,
     ServerBuilder, UntypedBody,
@@ -21,6 +21,7 @@ use nv_common::{
         has_cve_list_records, last_successful_cve_list_sync_commit, latest_cve_list_sync_run,
     },
     db::entities::cve_list_sync_runs::Model as CveListSyncRun,
+    npm::package_json::NpmPackageJson,
 };
 use nv_server_api::{
     CveIngestHealth, CveListSyncRunHealth, Health, NvServerApi, PackageSource,
@@ -28,7 +29,10 @@ use nv_server_api::{
     PackageSourceStatusCompleted, PackageSourceStatusProcessing, PostPackageSourceBody,
     PostPackageSourceResponse, VersionedPackage, nv_server_api_mod::api_description,
 };
-use sea_orm::DatabaseConnection;
+use sea_orm::{
+    ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, DatabaseConnection,
+    EntityTrait as _, QueryFilter as _,
+};
 use slog::Logger;
 use std::fs::File;
 use uuid::Uuid;
@@ -275,68 +279,81 @@ fn validate_package_source(
     Ok(())
 }
 
-/// Placeholder implementation of storing a submitted Package Source
-/// to persistent storage.
-/// TODO implement it via real database calls.
 async fn store_package_source(
-    _db: &DatabaseConnection,
-    _file_name: String,
-    _contents: String,
+    db: &DatabaseConnection,
+    file_name: String,
+    contents: String,
 ) -> Result<Uuid, HttpError> {
-    // TODO replace this hardcoded value
-    let uuid_a = Uuid::from_u64_pair(0, 1);
-    Ok(uuid_a)
+    NpmPackageJson::parse_package_json(contents.as_bytes())
+        .map_err(|error| HttpError::for_bad_request(None, error.to_string()))?;
+    let id = Uuid::now_v7();
+    nv_common::db::entities::package_sources::ActiveModel {
+        source_id: Set(id.to_string()),
+        file_name: Set(file_name),
+        file_contents: Set(contents),
+        inferred_type: Set("npm-package-json".to_owned()),
+        resolution_status: Set("pending".to_owned()),
+        resolution_error: Set(None),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+    Ok(id)
 }
 
-/// Placeholder implementation of looking up the status of a Package Source
-/// from persistent storage.
-/// TODO implement it via real database calls.
 async fn lookup_package_source(
-    _db: &DatabaseConnection,
+    db: &DatabaseConnection,
     id: Uuid,
 ) -> Result<Option<PackageSourceStatus>, HttpError> {
-    use std::collections::HashMap;
-    // TODO replace these hardcoded values
-    let uuid_a = Uuid::from_u64_pair(0, 1);
-    let uuid_b = Uuid::from_u64_pair(0, 2);
-    let uuid_c = Uuid::from_u64_pair(0, 3);
-
-    // TODO replace this hardcoded value
-    let dt = Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap();
-
-    // TODO replace these hardcoded values
-    let fake_statuses: HashMap<Uuid, PackageSourceStatus> = HashMap::from([
-        (
-            uuid_a,
-            PackageSourceStatus::Processing(PackageSourceStatusProcessing {
-                id: uuid_a,
-                created_at: dt,
-            }),
-        ),
-        (
-            uuid_b,
-            PackageSourceStatus::Completed(PackageSourceStatusCompleted {
-                id: uuid_b,
-                created_at: dt,
-                source: PackageSource {
-                    ecosystem: PackageSourceEcosystem::Npm,
-                    file_name: "package.json".to_owned(),
-                    contents: "{}".to_owned(),
-                },
-                versioned_packages: vec![VersionedPackage {
-                    id: uuid_c,
-                    name: "react".to_owned(),
-                    version: "18.2.0".to_owned(),
-                    ecosystem: PackageSourceEcosystem::Npm,
-                    purl: "pkg:npm/react@18.2.0".to_owned(),
-                    derivation: vec!["<root>".to_owned(), "pkg:npm/react@18.2.0".to_owned()],
-                }],
-            }),
-        ),
-    ]);
-
-    let status = fake_statuses.get(&id).cloned();
-    Ok(status)
+    use nv_common::db::entities::{package_sources, package_versions};
+    let Some(source) = package_sources::Entity::find()
+        .filter(package_sources::Column::SourceId.eq(id.to_string()))
+        .one(db)
+        .await
+        .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+    else {
+        return Ok(None);
+    };
+    let created_at = source.created_at.with_timezone(&Utc);
+    if source.resolution_status != "completed" {
+        return Ok(Some(PackageSourceStatus::Processing(
+            PackageSourceStatusProcessing { id, created_at },
+        )));
+    }
+    let versions = package_versions::Entity::find()
+        .filter(package_versions::Column::SourceId.eq(source.id))
+        .all(db)
+        .await
+        .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+        .into_iter()
+        .map(|version| VersionedPackage {
+            id: Uuid::from_u64_pair(source.id as u64, version.id as u64),
+            name: version
+                .package_url
+                .trim_start_matches("pkg:npm/")
+                .split('@')
+                .next()
+                .unwrap_or_default()
+                .to_owned(),
+            version: version.version.clone(),
+            ecosystem: PackageSourceEcosystem::Npm,
+            purl: version.package_url.clone(),
+            derivation: vec!["<root>".to_owned(), version.package_url],
+        })
+        .collect();
+    Ok(Some(PackageSourceStatus::Completed(
+        PackageSourceStatusCompleted {
+            id,
+            created_at,
+            source: PackageSource {
+                ecosystem: PackageSourceEcosystem::Npm,
+                file_name: source.file_name,
+                contents: source.file_contents,
+            },
+            versioned_packages: versions,
+        },
+    )))
 }
 
 async fn cve_ingest_health(db: &DatabaseConnection) -> Result<CveIngestHealth, HttpError> {

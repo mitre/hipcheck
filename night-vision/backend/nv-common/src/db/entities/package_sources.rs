@@ -15,6 +15,7 @@ pub struct Model {
     pub resolution_status: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub resolution_error: Option<String>,
+    pub created_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
