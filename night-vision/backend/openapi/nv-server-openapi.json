@@ -285,7 +285,100 @@
               "status",
               "versionedPackages"
             ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "source": {
+                "$ref": "#/components/schemas/PackageSource"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "completed-with-warnings"
+                ]
+              },
+              "versionedPackages": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VersionedPackage"
+                }
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PackageSourceWarning"
+                }
+              },
+              "warningsTruncated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "createdAt",
+              "id",
+              "source",
+              "status",
+              "versionedPackages",
+              "warnings",
+              "warningsTruncated"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "diagnostic": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "failed"
+                ]
+              }
+            },
+            "required": [
+              "createdAt",
+              "diagnostic",
+              "id",
+              "status"
+            ]
           }
+        ]
+      },
+      "PackageSourceWarning": {
+        "type": "object",
+        "properties": {
+          "declaredByPurl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "dependencyName": {
+            "type": "string"
+          },
+          "specificationKind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dependencyName",
+          "specificationKind"
         ]
       },
       "PostPackageSourceBody": {

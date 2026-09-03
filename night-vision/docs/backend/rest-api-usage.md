@@ -189,18 +189,20 @@ The intended package-source workflow is asynchronous:
 
 1. Submit a package source with `POST /package-sources`.
 2. Store the returned `id`.
-3. Poll `GET /package-sources/{id}` until the status is `completed`.
-4. Read `versionedPackages` from the completed response.
+3. Poll `GET /package-sources/{id}` until it reaches a terminal status:
+   `completed`, `completed-with-warnings`, or `failed`.
+4. Read `versionedPackages` from a completed response. A
+   `completed-with-warnings` response also includes up to 100 structured
+   warnings and sets `warningsTruncated` when more were recorded. A `failed`
+   response includes a diagnostic capped at 1024 UTF-8 bytes.
 
 At the API boundary, package sources currently support the `npm` ecosystem and
 the `package.json` style of input described in
 [Resolving Packages](./resolving-packages.md).
 
-The current backend handler still uses placeholder package-source storage and
-lookup behavior. `POST /package-sources` returns a fixed example UUID, and
-`GET /package-sources/{id}` returns hardcoded example statuses for known
-placeholder IDs. Treat these examples as the current local API contract, not as
-evidence of completed persistence or package resolution.
+The server persists the submitted source before returning `202 Accepted` and
+runs elaboration in a background task. `GET /package-sources/{id}` reports the
+persisted lifecycle state and stored result snapshot.
 
 ## Error Responses
 

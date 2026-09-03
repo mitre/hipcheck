@@ -11,6 +11,13 @@ use sea_orm::{
 use std::collections::BTreeMap;
 use thiserror::Error;
 
+/// Maximum UTF-8 byte length retained for a source elaboration failure.
+///
+/// This bounds durable diagnostics and, in turn, the API response that exposes
+/// them. The diagnostic is deliberately short because it may contain text from
+/// an external registry.
+pub const MAX_FAILURE_DIAGNOSTIC_BYTES: usize = 1024;
+
 /// Store a completed elaboration snapshot, atomically replacing a source's prior snapshot.
 pub async fn persist_completed_elaboration(
     db: &DatabaseConnection,
@@ -116,6 +123,7 @@ pub async fn record_elaboration_failure(
     source_id: i32,
     error: &str,
 ) -> Result<(), ElaborationStorageError> {
+    let diagnostic = bounded_diagnostic(error);
     package_sources::Entity::update_many()
         .col_expr(
             package_sources::Column::ResolutionStatus,
@@ -123,13 +131,27 @@ pub async fn record_elaboration_failure(
         )
         .col_expr(
             package_sources::Column::ResolutionError,
-            sea_orm::sea_query::Expr::value(error),
+            sea_orm::sea_query::Expr::value(diagnostic),
         )
         .filter(package_sources::Column::Id.eq(source_id))
         .exec(db)
         .await
         .map_err(ElaborationStorageError::Database)?;
     Ok(())
+}
+
+/// Return a diagnostic that is safe to persist or expose under the API's
+/// bounded diagnostic contract.
+pub fn bounded_diagnostic(error: &str) -> String {
+    if error.len() <= MAX_FAILURE_DIAGNOSTIC_BYTES {
+        return error.to_owned();
+    }
+
+    let mut end = MAX_FAILURE_DIAGNOSTIC_BYTES - "...".len();
+    while !error.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}...", &error[..end])
 }
 
 async fn find_or_insert_package(
@@ -190,4 +212,18 @@ pub enum ElaborationStorageError {
     Database(#[source] DbErr),
     #[error("elaboration edge refers to missing package {0}")]
     MissingPackage(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic};
+
+    #[test]
+    fn bounds_failure_diagnostics_at_a_utf8_boundary() {
+        let diagnostic = bounded_diagnostic(&"🦀".repeat(MAX_FAILURE_DIAGNOSTIC_BYTES));
+
+        assert!(diagnostic.len() <= MAX_FAILURE_DIAGNOSTIC_BYTES);
+        assert!(diagnostic.ends_with("..."));
+        assert!(diagnostic.is_char_boundary(diagnostic.len()));
+    }
 }

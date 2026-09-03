@@ -23,19 +23,21 @@ use nv_common::{
     db::entities::cve_list_sync_runs::Model as CveListSyncRun,
     npm::elaboration::{
         NpmRegistryClient, elaborate,
-        storage::{persist_completed_elaboration, record_elaboration_failure},
+        storage::{bounded_diagnostic, persist_completed_elaboration, record_elaboration_failure},
     },
     npm::package_json::NpmPackageJson,
 };
 use nv_server_api::{
     CveIngestHealth, CveListSyncRunHealth, Health, NvServerApi, PackageSource,
     PackageSourceEcosystem, PackageSourcePathParams, PackageSourceStatus,
-    PackageSourceStatusCompleted, PackageSourceStatusProcessing, PostPackageSourceBody,
-    PostPackageSourceResponse, VersionedPackage, nv_server_api_mod::api_description,
+    PackageSourceStatusCompleted, PackageSourceStatusCompletedWithWarnings,
+    PackageSourceStatusFailed, PackageSourceStatusProcessing, PackageSourceWarning,
+    PostPackageSourceBody, PostPackageSourceResponse, VersionedPackage,
+    nv_server_api_mod::api_description,
 };
 use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, DatabaseConnection,
-    EntityTrait as _, QueryFilter as _,
+    EntityTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _,
 };
 use slog::Logger;
 use std::fs::File;
@@ -303,7 +305,9 @@ async fn lookup_package_source(
     db: &DatabaseConnection,
     id: Uuid,
 ) -> Result<Option<PackageSourceStatus>, HttpError> {
-    use nv_common::db::entities::{package_sources, package_versions};
+    use nv_common::db::entities::{package_source_warnings, package_sources, package_versions};
+    const MAX_API_WARNINGS: u64 = 100;
+
     let Some(source) = package_sources::Entity::find()
         .filter(package_sources::Column::SourceId.eq(id.to_string()))
         .one(db)
@@ -313,12 +317,35 @@ async fn lookup_package_source(
         return Ok(None);
     };
     let created_at = source.created_at.with_timezone(&Utc);
-    if source.resolution_status != "completed" {
-        return Ok(Some(PackageSourceStatus::Processing(
-            PackageSourceStatusProcessing { id, created_at },
-        )));
+    match source.resolution_status.as_str() {
+        "pending" => {
+            return Ok(Some(PackageSourceStatus::Processing(
+                PackageSourceStatusProcessing { id, created_at },
+            )));
+        }
+        "failed" => {
+            return Ok(Some(PackageSourceStatus::Failed(
+                PackageSourceStatusFailed {
+                    id,
+                    created_at,
+                    diagnostic: bounded_diagnostic(
+                        source
+                            .resolution_error
+                            .as_deref()
+                            .unwrap_or("Elaboration failed."),
+                    ),
+                },
+            )));
+        }
+        "completed" => {}
+        status => {
+            return Err(HttpError::for_internal_error(format!(
+                "unknown package source resolution status {status:?}"
+            )));
+        }
     }
-    let versions = package_versions::Entity::find()
+
+    let versioned_packages = package_versions::Entity::find()
         .filter(package_versions::Column::SourceId.eq(source.id))
         .all(db)
         .await
@@ -339,18 +366,53 @@ async fn lookup_package_source(
             derivation: vec!["<root>".to_owned(), version.package_url],
         })
         .collect();
-    Ok(Some(PackageSourceStatus::Completed(
-        PackageSourceStatusCompleted {
+
+    let warnings = package_source_warnings::Entity::find()
+        .filter(package_source_warnings::Column::SourceId.eq(source.id))
+        .order_by_asc(package_source_warnings::Column::Id)
+        .limit(MAX_API_WARNINGS + 1)
+        .all(db)
+        .await
+        .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+    if warnings.is_empty() {
+        return Ok(Some(PackageSourceStatus::Completed(
+            PackageSourceStatusCompleted {
+                id,
+                created_at,
+                source: package_source(source.file_name, source.file_contents),
+                versioned_packages,
+            },
+        )));
+    }
+
+    let warnings_truncated = warnings.len() > MAX_API_WARNINGS as usize;
+    let warnings = warnings
+        .into_iter()
+        .take(MAX_API_WARNINGS as usize)
+        .map(|warning| PackageSourceWarning {
+            declared_by_purl: warning.declared_by_purl,
+            dependency_name: warning.dependency_name,
+            specification_kind: warning.specification_kind,
+        })
+        .collect();
+    Ok(Some(PackageSourceStatus::CompletedWithWarnings(
+        PackageSourceStatusCompletedWithWarnings {
             id,
             created_at,
-            source: PackageSource {
-                ecosystem: PackageSourceEcosystem::Npm,
-                file_name: source.file_name,
-                contents: source.file_contents,
-            },
-            versioned_packages: versions,
+            source: package_source(source.file_name, source.file_contents),
+            versioned_packages,
+            warnings,
+            warnings_truncated,
         },
     )))
+}
+
+fn package_source(file_name: String, contents: String) -> PackageSource {
+    PackageSource {
+        ecosystem: PackageSourceEcosystem::Npm,
+        file_name,
+        contents,
+    }
 }
 
 async fn cve_ingest_health(db: &DatabaseConnection) -> Result<CveIngestHealth, HttpError> {
@@ -385,5 +447,73 @@ fn cve_list_sync_run_health(run: CveListSyncRun) -> CveListSyncRunHealth {
         records_inserted: run.records_inserted,
         records_updated: run.records_updated,
         error: run.error,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nv_common::{
+        db::entities::{package_source_warnings, package_sources, package_versions},
+        npm::elaboration::storage::MAX_FAILURE_DIAGNOSTIC_BYTES,
+    };
+    use sea_orm::{DbBackend, MockDatabase};
+
+    fn source(
+        id: Uuid,
+        resolution_status: &str,
+        resolution_error: Option<String>,
+    ) -> package_sources::Model {
+        package_sources::Model {
+            id: 1,
+            source_id: id.to_string(),
+            file_name: "package.json".to_owned(),
+            file_contents: "{}".to_owned(),
+            inferred_type: "npm-package-json".to_owned(),
+            resolution_status: resolution_status.to_owned(),
+            resolution_error,
+            created_at: Utc::now().fixed_offset(),
+        }
+    }
+
+    #[tokio::test]
+    async fn lookup_returns_bounded_failed_diagnostic() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(id, "failed", Some("x".repeat(2048)))]])
+            .into_connection();
+
+        let status = lookup_package_source(&db, id).await.unwrap().unwrap();
+
+        let PackageSourceStatus::Failed(failed) = status else {
+            panic!("expected failed package source status");
+        };
+        assert!(failed.diagnostic.len() <= MAX_FAILURE_DIAGNOSTIC_BYTES);
+        assert!(failed.diagnostic.ends_with("..."));
+    }
+
+    #[tokio::test]
+    async fn lookup_returns_completed_with_persisted_warnings() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(id, "completed", None)]])
+            .append_query_results([Vec::<package_versions::Model>::new()])
+            .append_query_results([vec![package_source_warnings::Model {
+                id: 1,
+                source_id: 1,
+                declared_by_purl: None,
+                dependency_name: "local-package".to_owned(),
+                specification_kind: "file".to_owned(),
+            }]])
+            .into_connection();
+
+        let status = lookup_package_source(&db, id).await.unwrap().unwrap();
+
+        let PackageSourceStatus::CompletedWithWarnings(completed) = status else {
+            panic!("expected completed-with-warnings package source status");
+        };
+        assert!(!completed.warnings_truncated);
+        assert_eq!(completed.warnings.len(), 1);
+        assert_eq!(completed.warnings[0].dependency_name, "local-package");
     }
 }

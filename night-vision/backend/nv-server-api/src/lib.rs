@@ -104,6 +104,9 @@ pub struct PackageSourcePathParams {
 pub enum PackageSourceStatus {
     Processing(PackageSourceStatusProcessing),
     Completed(PackageSourceStatusCompleted),
+    #[serde(rename = "completed-with-warnings")]
+    CompletedWithWarnings(PackageSourceStatusCompletedWithWarnings),
+    Failed(PackageSourceStatusFailed),
 }
 
 #[derive(Serialize, JsonSchema, Debug, Clone)]
@@ -128,6 +131,41 @@ pub struct PackageSourceStatusCompleted {
     pub created_at: DateTime<Utc>,
     pub source: PackageSource,
     pub versioned_packages: Vec<VersionedPackage>,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSourceStatusCompletedWithWarnings {
+    pub id: Uuid,
+    // We'd prefer to use `jiff` over `chrono`, but `dropshot` depends on
+    // an old version of `schemars` that doesn't support `jiff`. When we
+    // can use a newer version of `schemars`, we should switch to using
+    // `jiff`.
+    pub created_at: DateTime<Utc>,
+    pub source: PackageSource,
+    pub versioned_packages: Vec<VersionedPackage>,
+    pub warnings: Vec<PackageSourceWarning>,
+    pub warnings_truncated: bool,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSourceStatusFailed {
+    pub id: Uuid,
+    // We'd prefer to use `jiff` over `chrono`, but `dropshot` depends on
+    // an old version of `schemars` that doesn't support `jiff`. When we
+    // can use a newer version of `schemars`, we should switch to using
+    // `jiff`.
+    pub created_at: DateTime<Utc>,
+    pub diagnostic: String,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSourceWarning {
+    pub declared_by_purl: Option<String>,
+    pub dependency_name: String,
+    pub specification_kind: String,
 }
 
 #[derive(Serialize, JsonSchema, Debug, Clone)]
