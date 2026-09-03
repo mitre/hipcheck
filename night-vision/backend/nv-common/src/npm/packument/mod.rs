@@ -19,8 +19,8 @@ pub use super::types::{
 
 mod raw;
 use raw::{
-    RawBin, RawBundleDependencies, RawDeprecated, RawEngines, RawFunding, RawHuman,
-    RawNpmPackument, RawPeerDependencyMeta, RawRepository,
+    RawBin, RawBundleDependencies, RawDeprecated, RawEngines, RawFunding, RawFundingEntry,
+    RawHuman, RawNpmPackument, RawPeerDependencyMeta, RawRepository,
 };
 
 #[derive(Debug)]
@@ -231,7 +231,7 @@ pub struct NpmVersion {
     pub has_shrinkwrap: Option<bool>,
     pub has_install_script: Option<bool>,
 
-    pub funding: Option<Funding>,
+    pub funding: Vec<Funding>,
 
     pub cpu: Vec<String>,
     pub os: Vec<String>,
@@ -526,19 +526,33 @@ fn parse_sha1_digest(value: String) -> Result<Sha1Digest, PackumentParseError> {
     Ok(Sha1Digest(value))
 }
 
-fn convert_funding(raw: Option<RawFunding>) -> Result<Option<Funding>, PackumentParseError> {
+fn convert_funding(raw: Option<RawFunding>) -> Result<Vec<Funding>, PackumentParseError> {
     match raw {
-        Some(RawFunding::Url(url)) => Ok(Some(Funding {
-            url: validate_url(url, "$.funding")?,
+        Some(RawFunding::Url(url)) => convert_funding_entry(RawFundingEntry::Url(url), "$.funding")
+            .map(|funding| vec![funding]),
+        Some(RawFunding::Object { url, type_field }) => {
+            convert_funding_entry(RawFundingEntry::Object { url, type_field }, "$.funding")
+                .map(|funding| vec![funding])
+        }
+        Some(RawFunding::Array(entries)) => entries
+            .into_iter()
+            .enumerate()
+            .map(|(index, entry)| convert_funding_entry(entry, &format!("$.funding[{index}]")))
+            .collect(),
+        None => Ok(Vec::new()),
+    }
+}
+
+fn convert_funding_entry(raw: RawFundingEntry, path: &str) -> Result<Funding, PackumentParseError> {
+    match raw {
+        RawFundingEntry::Url(url) => Ok(Funding {
+            url: validate_url(url, path)?,
             type_field: None,
-        })),
-
-        Some(RawFunding::Object { url, type_field }) => Ok(Some(Funding {
-            url: validate_url(url, "$.funding.url")?,
+        }),
+        RawFundingEntry::Object { url, type_field } => Ok(Funding {
+            url: validate_url(url, format!("{path}.url"))?,
             type_field,
-        })),
-
-        None => Ok(None),
+        }),
     }
 }
 
@@ -855,6 +869,28 @@ mod tests {
         assert!(package.description.is_none());
         assert!(package.homepage.is_none());
         assert!(package.repository.is_none());
+    }
+
+    #[test]
+    fn parses_funding_arrays() {
+        let mut packument = valid_packument("example", "1.0.0", "1.0.0");
+        packument["versions"]["1.0.0"]["funding"] = json!([
+            "https://github.com/sponsors/example",
+            { "url": "https://opencollective.com/example", "type": "collective" }
+        ]);
+
+        let packument = parse_value(&packument).expect("funding array should parse");
+        let funding = &packument
+            .versions
+            .get(&semantic_version("1.0.0"))
+            .expect("version should be present")
+            .funding;
+
+        assert_eq!(funding.len(), 2);
+        assert_eq!(funding[0].url, "https://github.com/sponsors/example");
+        assert_eq!(funding[0].type_field, None);
+        assert_eq!(funding[1].url, "https://opencollective.com/example");
+        assert_eq!(funding[1].type_field.as_deref(), Some("collective"));
     }
 
     #[test]

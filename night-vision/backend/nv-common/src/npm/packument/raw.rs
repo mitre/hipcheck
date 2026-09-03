@@ -90,6 +90,18 @@ pub(super) enum RawFunding {
         #[serde(rename = "type")]
         type_field: Option<String>,
     },
+    Array(Vec<RawFundingEntry>),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub(super) enum RawFundingEntry {
+    Url(String),
+    Object {
+        url: String,
+        #[serde(rename = "type")]
+        type_field: Option<String>,
+    },
 }
 
 #[derive(Debug, Deserialize)]
