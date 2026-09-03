@@ -18,15 +18,21 @@ pub fn command() -> clap::Command {
 
 pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let purl = matches.get_one::<String>("purl").expect("required PURL");
+    eprintln!("queuing assessment for {purl}");
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
     let run = runtime.block_on(async {
         let db = db::connection(config).await?;
         let queued = queue_assessment(&db, purl).await?;
+        eprintln!(
+            "running configured Hipcheck policy for assessment {}",
+            queued.id
+        );
         execute_queued_assessment(&db, &queued, &config.hipcheck_runner_config()).await?;
         load_hipcheck_run(&db, queued.id)
             .await?
             .context("assessment disappeared after persistence")
     })?;
+    eprintln!("completed assessment {}", run.run.id);
     if matches.get_flag("json") {
         println!(
             "{}",

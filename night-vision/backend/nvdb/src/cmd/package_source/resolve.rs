@@ -29,18 +29,21 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let source_id = matches
         .get_one::<String>("source-id")
         .expect("required source ID");
+    eprintln!("resolving package source {source_id}");
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
     let result = runtime.block_on(resolve(config, source_id))?;
     if matches.get_flag("json") {
         println!(
             "{}",
             serde_json::json!({
+                "sourceId": source_id,
                 "packages": result.package_count,
                 "snapshotBehavior": "replaces-previous",
                 "warnings": result.warnings,
             })
         );
     } else {
+        println!("source_id: {source_id}");
         println!("resolved_packages: {}", result.package_count);
         println!("resolution_snapshot: replaces any previous snapshot");
         print_warnings(&result.warnings);
@@ -61,6 +64,7 @@ async fn resolve(config: &Config, source_id: &str) -> Result<ResolutionSummary> 
         config.package_elaboration_limits().request_timeout,
     )
     .context("invalid NPM registry configuration")?;
+    eprintln!("resolving reachable package versions");
     let result = elaborate(
         &source_document,
         Arc::new(client),
@@ -73,6 +77,7 @@ async fn resolve(config: &Config, source_id: &str) -> Result<ResolutionSummary> 
             persist_completed_elaboration(&db, source.id, &result)
                 .await
                 .context("failed to persist elaboration result")?;
+            eprintln!("published resolution snapshot with {package_count} package versions");
             let warnings = persisted_elaboration_warnings(&db, source.id)
                 .await
                 .context("failed to read persisted elaboration warnings")?
