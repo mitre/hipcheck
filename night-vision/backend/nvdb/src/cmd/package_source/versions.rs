@@ -5,6 +5,7 @@ use nv_common::{
     npm::elaboration::storage::{persisted_elaboration_warnings, persisted_package_versions},
     rt,
 };
+use percent_encoding::percent_decode_str;
 use serde::Serialize;
 
 use super::{ResolvedWarning, print_warnings};
@@ -30,17 +31,28 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
                 .then(|| format!("; root kinds: {}", version.root_dependency_kinds.join(", ")));
             println!(
                 "{} ({} derivations{})",
-                version.purl,
+                display_purl(&version.purl),
                 version.derivation_count,
                 root_dependency_kinds.unwrap_or_default(),
             );
             for derivation in version.derivations {
-                println!("  {}", derivation.join(" -> "));
+                println!(
+                    "  {}",
+                    derivation
+                        .iter()
+                        .map(|purl| display_purl(purl))
+                        .collect::<Vec<_>>()
+                        .join(" -> ")
+                );
             }
         }
         print_warnings(&result.warnings);
     }
     Ok(())
+}
+
+fn display_purl(purl: &str) -> std::borrow::Cow<'_, str> {
+    percent_decode_str(purl).decode_utf8_lossy()
 }
 
 fn json_output(result: &ResolvedVersions) -> serde_json::Value {
@@ -118,7 +130,7 @@ fn json_argument() -> clap::Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::{ResolvedVersion, ResolvedVersions, command, json_output};
+    use super::{ResolvedVersion, ResolvedVersions, command, display_purl, json_output};
 
     #[test]
     fn versions_accepts_a_source_id() {
@@ -149,5 +161,13 @@ mod tests {
         );
         assert_eq!(output["versions"][0]["derivationCount"], 1);
         assert_eq!(output["warnings"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn display_purl_decodes_scoped_npm_package_names() {
+        assert_eq!(
+            display_purl("pkg:npm/%40types/node@26.1.2"),
+            "pkg:npm/@types/node@26.1.2"
+        );
     }
 }
