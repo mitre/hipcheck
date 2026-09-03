@@ -45,7 +45,7 @@ const DEFAULT_CVE_LIST_WRITE_CHANNEL_SIZE_CAP: usize = DEFAULT_CVE_LIST_RECORD_W
 const DEFAULT_ASYNC_MAX_BLOCKING_THREADS: usize = 512;
 const MIN_COMPUTED_CVE_LIST_PARSE_CONCURRENCY: usize = 2;
 const DEFAULT_NPM_REGISTRY_URL: &str = "https://registry.npmjs.org/";
-const DEFAULT_PACKAGE_ELABORATION_MAX_PACKUMENT_BYTES: usize = 5 * 1024 * 1024;
+const DEFAULT_PACKAGE_ELABORATION_MAX_PACKUMENT_BYTES: usize = 64 * 1024 * 1024;
 const DEFAULT_PACKAGE_ELABORATION_REQUEST_TIMEOUT: u64 = 30_000;
 const DEFAULT_PACKAGE_ELABORATION_TOTAL_RUN_TIMEOUT: u64 = 300_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_PACKAGES: usize = 10_000;
@@ -2022,7 +2022,7 @@ mod tests {
         assert_eq!(config.npm_registry_url.as_str(), DEFAULT_NPM_REGISTRY_URL);
         assert_eq!(
             config.package_elaboration_max_packument_bytes,
-            5 * 1024 * 1024
+            64 * 1024 * 1024
         );
         assert_eq!(
             config.package_elaboration_limits.request_timeout,

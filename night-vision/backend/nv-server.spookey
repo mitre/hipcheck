@@ -172,8 +172,8 @@ package-elaboration-max-concurrent-runs =
 
 # The maximum NPM packument response size in bytes.
 #
-# Default: 5242880
-package-elaboration-max-packument-bytes =
+# Default: 67108864
+package-elaboration-max-packument-bytes = 67108864
 
 # The maximum time allowed for one NPM registry request in milliseconds.
 #

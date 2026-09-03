@@ -132,6 +132,65 @@ pub struct ElaborationLimits {
     pub max_derivations: usize,
 }
 
+/// A point-in-time view of NPM package elaboration work.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ElaborationProgressSnapshot {
+    /// Distinct concrete package versions discovered so far.
+    pub packages: usize,
+    /// Distinct dependency edges discovered so far.
+    pub edges: usize,
+    /// Distinct acyclic derivation paths discovered so far.
+    pub derivations: usize,
+    /// Work buffered by the scheduler but not yet dispatched to a worker.
+    pub queued_work: usize,
+    /// Work dispatched to workers and awaiting a report.
+    pub in_flight_work: usize,
+    /// Worker reports processed by the scheduler.
+    pub completed_work_items: usize,
+}
+
+/// A progress event emitted while elaborating an NPM package source.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ElaborationProgress {
+    /// Elaboration has started.
+    Started,
+    /// A previously unseen packument is being fetched from the registry.
+    PackumentFetchStarted { package: Box<str> },
+    /// A packument fetch has completed, whether successfully or with an error.
+    PackumentFetchCompleted { package: Box<str> },
+    /// The scheduler's known work and result counts have changed.
+    SchedulerUpdated {
+        snapshot: ElaborationProgressSnapshot,
+    },
+    /// Elaboration has completed successfully.
+    Finished {
+        snapshot: ElaborationProgressSnapshot,
+    },
+}
+
+/// Receives NPM package elaboration progress events.
+pub trait ElaborationProgressReporter: Send + Sync {
+    /// Reports one progress event.
+    fn report(&self, progress: ElaborationProgress);
+}
+
+impl<F> ElaborationProgressReporter for F
+where
+    F: Fn(ElaborationProgress) + Send + Sync,
+{
+    fn report(&self, progress: ElaborationProgress) {
+        self(progress);
+    }
+}
+
+/// A progress reporter that ignores all events.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NoopElaborationProgress;
+
+impl ElaborationProgressReporter for NoopElaborationProgress {
+    fn report(&self, _progress: ElaborationProgress) {}
+}
+
 impl Default for ElaborationLimits {
     fn default() -> Self {
         Self {
@@ -437,8 +496,19 @@ pub async fn elaborate(
     provider: Arc<dyn PackumentProvider>,
     limits: ElaborationLimits,
 ) -> Result<ElaborationResult, ElaborationError> {
+    elaborate_with_progress(source, provider, limits, Arc::new(NoopElaborationProgress)).await
+}
+
+/// Expand every NPM package version reachable from `source`, reporting progress.
+pub async fn elaborate_with_progress(
+    source: &NpmPackageJson,
+    provider: Arc<dyn PackumentProvider>,
+    limits: ElaborationLimits,
+    progress: Arc<dyn ElaborationProgressReporter>,
+) -> Result<ElaborationResult, ElaborationError> {
     limits.validate()?;
-    let cache = PackumentCache::default();
+    progress.report(ElaborationProgress::Started);
+    let cache = PackumentCache::with_progress(progress.clone());
     let mut workers = WorkerPool::new(
         limits.worker_concurrency,
         limits.work_queue_capacity,
@@ -447,7 +517,14 @@ pub async fn elaborate(
     );
     let result = tokio::time::timeout(
         limits.total_run_timeout,
-        elaborate_inner(source, provider, &limits, &cache, workers.sender()),
+        elaborate_inner(
+            source,
+            provider,
+            &limits,
+            &cache,
+            workers.sender(),
+            progress.as_ref(),
+        ),
     )
     .await
     .map_err(|_| ElaborationError::TotalRunTimeout)
@@ -470,6 +547,7 @@ async fn elaborate_inner(
     limits: &ElaborationLimits,
     cache: &PackumentCache,
     work_sender: &async_channel::Sender<WorkItem>,
+    progress: &dyn ElaborationProgressReporter,
 ) -> Result<ElaborationResult, ElaborationError> {
     let mut state = SupervisorState::default();
     let mut pending = VecDeque::new();
@@ -480,6 +558,14 @@ async fn elaborate_inner(
     let max_in_flight = limits
         .worker_concurrency
         .saturating_add(limits.work_queue_capacity);
+    let mut completed_work_items = 0;
+    report_scheduler_progress(
+        progress,
+        &state,
+        pending.len(),
+        replies.len(),
+        completed_work_items,
+    );
 
     while !pending.is_empty() || !expansions.is_empty() || !replies.is_empty() {
         dispatch_pending(&mut pending, &mut replies, work_sender, max_in_flight)?;
@@ -499,6 +585,13 @@ async fn elaborate_inner(
                     }
                     expansions.push_back(expansion);
                 }
+                report_scheduler_progress(
+                    progress,
+                    &state,
+                    pending.len(),
+                    replies.len(),
+                    completed_work_items,
+                );
                 continue;
             }
             expansions.push_front(expansion);
@@ -509,13 +602,53 @@ async fn elaborate_inner(
             .await
             .expect("work is pending only when a worker reply is outstanding")
             .map_err(|_| ElaborationError::WorkerStopped)??;
+        completed_work_items = completed_work_items
+            .checked_add(1)
+            .expect("completed work item count fits in usize");
         state
             .repositories
             .insert(report.package.clone(), report.source_repository.clone());
         expansions.push_back(WorkExpansion::Report(ReportExpansion::new(report)));
+        report_scheduler_progress(
+            progress,
+            &state,
+            pending.len(),
+            replies.len(),
+            completed_work_items,
+        );
     }
 
+    let snapshot = scheduler_snapshot(&state, 0, 0, completed_work_items);
+    progress.report(ElaborationProgress::Finished { snapshot });
     Ok(state.finish())
+}
+
+fn report_scheduler_progress(
+    progress: &dyn ElaborationProgressReporter,
+    state: &SupervisorState,
+    queued_work: usize,
+    in_flight_work: usize,
+    completed_work_items: usize,
+) {
+    progress.report(ElaborationProgress::SchedulerUpdated {
+        snapshot: scheduler_snapshot(state, queued_work, in_flight_work, completed_work_items),
+    });
+}
+
+fn scheduler_snapshot(
+    state: &SupervisorState,
+    queued_work: usize,
+    in_flight_work: usize,
+    completed_work_items: usize,
+) -> ElaborationProgressSnapshot {
+    ElaborationProgressSnapshot {
+        packages: state.packages.len(),
+        edges: state.edges.len(),
+        derivations: state.derivation_count,
+        queued_work,
+        in_flight_work,
+        completed_work_items,
+    }
 }
 
 fn dispatch_pending(
@@ -748,9 +881,9 @@ impl ResolvedDependencyExpansion {
     }
 }
 
-#[derive(Default)]
 struct PackumentCache {
     entries: Arc<Mutex<HashMap<PkgName, CachedNpmPackument>>>,
+    progress: Arc<dyn ElaborationProgressReporter>,
 }
 
 type PkgName = Box<str>;
@@ -760,11 +893,19 @@ impl Clone for PackumentCache {
     fn clone(&self) -> Self {
         Self {
             entries: self.entries.clone(),
+            progress: self.progress.clone(),
         }
     }
 }
 
 impl PackumentCache {
+    fn with_progress(progress: Arc<dyn ElaborationProgressReporter>) -> Self {
+        Self {
+            entries: Arc::new(Mutex::new(HashMap::new())),
+            progress,
+        }
+    }
+
     async fn get(
         &self,
         provider: &dyn PackumentProvider,
@@ -779,9 +920,16 @@ impl PackumentCache {
         };
         let package_name = package.as_str().to_owned();
         cell.get_or_try_init(|| async {
-            provider
-                .fetch(package)
-                .await
+            self.progress
+                .report(ElaborationProgress::PackumentFetchStarted {
+                    package: package_name.clone().into_boxed_str(),
+                });
+            let fetched = provider.fetch(package).await;
+            self.progress
+                .report(ElaborationProgress::PackumentFetchCompleted {
+                    package: package_name.clone().into_boxed_str(),
+                });
+            fetched
                 .map(Arc::new)
                 .map_err(|source| ElaborationError::Packument {
                     package: package_name.into_boxed_str(),
@@ -1067,6 +1215,7 @@ struct SupervisorState {
     edges: BTreeSet<ElaborationEdge>,
     warnings: Vec<ElaborationWarning>,
     repositories: BTreeMap<PackageVersion, Option<String>>,
+    derivation_count: usize,
 }
 
 impl SupervisorState {
@@ -1105,17 +1254,20 @@ impl SupervisorState {
         {
             return Ok(false);
         }
-        let count = self.packages.values().map(BTreeSet::len).sum::<usize>();
-        if count == limits.max_derivations {
+        if self.derivation_count == limits.max_derivations {
             return Err(ElaborationError::DerivationLimitExceeded {
                 limit: limits.max_derivations,
-                derivation_count: count,
+                derivation_count: self.derivation_count,
                 package: package.name.clone(),
                 version: package.version,
                 path_length: derivation.len(),
             });
         }
         self.packages.entry(package).or_default().insert(derivation);
+        self.derivation_count = self
+            .derivation_count
+            .checked_add(1)
+            .expect("derivation count fits in usize");
         Ok(true)
     }
 

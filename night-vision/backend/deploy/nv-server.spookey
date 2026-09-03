@@ -122,6 +122,11 @@ cve-record-max-bytes =
 # cve-list-write-batch-size, capped at 1024.
 cve-list-write-channel-size =
 
+# The maximum NPM packument response size in bytes.
+#
+# Default: 67108864
+package-elaboration-max-packument-bytes = 67108864
+
 # The bundled Hipcheck artifact and its writable Night Vision-owned runtime
 # state. Startup validates these paths before the server accepts requests.
 hipcheck-bin-path = "/usr/local/bin/hc"
