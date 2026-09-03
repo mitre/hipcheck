@@ -20,11 +20,12 @@ use async_channel::{Receiver, TrySendError};
 use async_trait::async_trait;
 use futures_util::{StreamExt as _, stream::FuturesUnordered};
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
+use reqwest::header::RETRY_AFTER;
 use semver::Version;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     sync::Arc,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 use thiserror::Error;
 use tokio::sync::{Mutex, OnceCell, oneshot};
@@ -169,6 +170,13 @@ pub trait PackumentProvider: Send + Sync {
 }
 
 /// HTTP client for the configured NPM registry.
+const MAX_RATE_LIMIT_RETRIES: usize = 3;
+const RATE_LIMIT_BACKOFFS: [Duration; MAX_RATE_LIMIT_RETRIES] = [
+    Duration::from_millis(250),
+    Duration::from_millis(500),
+    Duration::from_secs(1),
+];
+
 pub struct NpmRegistryClient {
     client: reqwest::Client,
     registry_url: Url,
@@ -220,45 +228,101 @@ impl PackumentProvider for NpmRegistryClient {
         &self,
         package: &NpmPackageName,
     ) -> Result<NpmPackument, PackumentProviderError> {
-        let bytes = tokio::time::timeout(self.request_timeout, async {
-            let response = self
-                .client
-                .get(self.packument_url(package)?)
-                .header("Accept", "application/vnd.npm.install-v1+json")
-                .send()
-                .await
-                .map_err(map_request_error)?;
-            if response.status() == reqwest::StatusCode::NOT_FOUND {
-                return Err(PackumentProviderError::NotFound);
+        for retry in 0..=MAX_RATE_LIMIT_RETRIES {
+            let attempt = tokio::time::timeout(self.request_timeout, async {
+                let response = self
+                    .client
+                    .get(
+                        self.packument_url(package)
+                            .map_err(FetchAttemptError::Provider)?,
+                    )
+                    .header("Accept", "application/vnd.npm.install-v1+json")
+                    .send()
+                    .await
+                    .map_err(map_request_error)
+                    .map_err(FetchAttemptError::Provider)?;
+                if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                    return Err(FetchAttemptError::RateLimited(retry_after(
+                        response.headers(),
+                    )));
+                }
+                if response.status() == reqwest::StatusCode::NOT_FOUND {
+                    return Err(FetchAttemptError::Provider(
+                        PackumentProviderError::NotFound,
+                    ));
+                }
+                if !response.status().is_success() {
+                    return Err(FetchAttemptError::Provider(
+                        PackumentProviderError::HttpStatus {
+                            status: response.status().as_u16(),
+                        },
+                    ));
+                }
+                if response
+                    .content_length()
+                    .is_some_and(|length| length > self.max_packument_bytes as u64)
+                {
+                    return Err(FetchAttemptError::Provider(
+                        PackumentProviderError::ResponseTooLarge {
+                            limit: self.max_packument_bytes,
+                        },
+                    ));
+                }
+                response
+                    .bytes()
+                    .await
+                    .map_err(|_| FetchAttemptError::Provider(PackumentProviderError::ResponseBody))
+            })
+            .await
+            .map_err(|_| PackumentProviderError::Timeout)?;
+
+            match attempt {
+                Ok(bytes) => {
+                    if bytes.len() > self.max_packument_bytes {
+                        return Err(PackumentProviderError::ResponseTooLarge {
+                            limit: self.max_packument_bytes,
+                        });
+                    }
+                    return super::packument::parse_packument(bytes.as_ref())
+                        .map_err(PackumentProviderError::InvalidPackument);
+                }
+                Err(FetchAttemptError::Provider(error)) => return Err(error),
+                Err(FetchAttemptError::RateLimited(_)) if retry == MAX_RATE_LIMIT_RETRIES => {
+                    return Err(PackumentProviderError::HttpStatus { status: 429 });
+                }
+                Err(FetchAttemptError::RateLimited(retry_after)) => {
+                    tokio::time::sleep(rate_limit_delay(retry_after, retry)).await;
+                }
             }
-            if !response.status().is_success() {
-                return Err(PackumentProviderError::HttpStatus {
-                    status: response.status().as_u16(),
-                });
-            }
-            if response
-                .content_length()
-                .is_some_and(|length| length > self.max_packument_bytes as u64)
-            {
-                return Err(PackumentProviderError::ResponseTooLarge {
-                    limit: self.max_packument_bytes,
-                });
-            }
-            response
-                .bytes()
-                .await
-                .map_err(|_| PackumentProviderError::ResponseBody)
-        })
-        .await
-        .map_err(|_| PackumentProviderError::Timeout)??;
-        if bytes.len() > self.max_packument_bytes {
-            return Err(PackumentProviderError::ResponseTooLarge {
-                limit: self.max_packument_bytes,
-            });
         }
-        super::packument::parse_packument(bytes.as_ref())
-            .map_err(PackumentProviderError::InvalidPackument)
+
+        unreachable!("the final rate-limited request returns an error")
     }
+}
+
+enum FetchAttemptError {
+    Provider(PackumentProviderError),
+    RateLimited(Option<Duration>),
+}
+
+fn retry_after(headers: &reqwest::header::HeaderMap) -> Option<Duration> {
+    let value = headers.get(RETRY_AFTER)?.to_str().ok()?;
+    if let Ok(seconds) = value.parse::<u64>() {
+        return Some(Duration::from_secs(seconds));
+    }
+    let retry_at = httpdate::parse_http_date(value).ok()?;
+    Some(
+        retry_at
+            .duration_since(SystemTime::now())
+            .unwrap_or(Duration::ZERO),
+    )
+}
+
+fn rate_limit_delay(retry_after: Option<Duration>, retry: usize) -> Duration {
+    let maximum_jitter = u64::try_from(RATE_LIMIT_BACKOFFS[retry].as_millis())
+        .expect("rate-limit backoff fits in milliseconds");
+    let jitter = Duration::from_millis(fastrand::u64(0..=maximum_jitter));
+    retry_after.unwrap_or(Duration::ZERO).saturating_add(jitter)
 }
 
 fn map_request_error(error: reqwest::Error) -> PackumentProviderError {
@@ -1636,6 +1700,100 @@ mod tests {
             error,
             PackumentProviderError::HttpStatus { status: 503 }
         ));
+    }
+
+    #[test]
+    fn parses_retry_after_values() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(RETRY_AFTER, reqwest::header::HeaderValue::from_static("42"));
+        assert_eq!(retry_after(&headers), Some(Duration::from_secs(42)));
+
+        headers.insert(
+            RETRY_AFTER,
+            reqwest::header::HeaderValue::from_static("Sun, 06 Nov 1994 08:49:37 GMT"),
+        );
+        assert_eq!(retry_after(&headers), Some(Duration::ZERO));
+
+        headers.insert(
+            RETRY_AFTER,
+            reqwest::header::HeaderValue::from_static("not a retry delay"),
+        );
+        assert_eq!(retry_after(&headers), None);
+    }
+
+    #[test]
+    fn rate_limit_delay_honors_retry_after_and_bounds_jitter() {
+        let retry_after = Duration::from_secs(2);
+        let delay = rate_limit_delay(Some(retry_after), 0);
+
+        assert!(delay >= retry_after);
+        assert!(delay <= retry_after.saturating_add(RATE_LIMIT_BACKOFFS[0]));
+    }
+
+    #[tokio::test]
+    async fn registry_client_retries_rate_limits() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/root");
+            then.status(429).header("Retry-After", "0");
+        });
+        let client = NpmRegistryClient::new(
+            Url::parse(&format!("{}/", server.base_url())).expect("valid mock URL"),
+            1024,
+            Duration::from_secs(1),
+        )
+        .expect("valid client");
+        let package = NpmPackageName::parse("root".to_owned()).expect("valid package name");
+
+        let error = client
+            .fetch(&package)
+            .await
+            .expect_err("persistent rate limit is reported");
+
+        assert!(matches!(
+            error,
+            PackumentProviderError::HttpStatus { status: 429 }
+        ));
+        mock.assert_calls(MAX_RATE_LIMIT_RETRIES.saturating_add(1));
+    }
+
+    #[tokio::test]
+    async fn registry_client_recovers_after_a_rate_limit() {
+        let server = MockServer::start();
+        let rate_limited = server.mock(|when, then| {
+            when.method(GET).path("/root");
+            then.status(429).header("Retry-After", "0");
+        });
+        let client = NpmRegistryClient::new(
+            Url::parse(&format!("{}/", server.base_url())).expect("valid mock URL"),
+            1024,
+            Duration::from_secs(1),
+        )
+        .expect("valid client");
+        let package = NpmPackageName::parse("root".to_owned()).expect("valid package name");
+        let fetch = tokio::spawn(async move { client.fetch(&package).await });
+
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while rate_limited.calls_async().await == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("rate-limited request arrives");
+        rate_limited.assert_calls(1);
+        rate_limited.delete_async().await;
+        let success = server.mock(|when, then| {
+            when.method(GET).path("/root");
+            then.status(200).body(packument("root", "1.0.0", json!({})));
+        });
+
+        let packument = fetch
+            .await
+            .expect("fetch task completes")
+            .expect("retry succeeds after the rate limit");
+
+        assert_eq!(packument.name.as_str(), "root");
+        success.assert_calls(1);
     }
 
     #[test]
