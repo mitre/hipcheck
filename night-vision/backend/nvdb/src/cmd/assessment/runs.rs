@@ -1,8 +1,11 @@
 use anyhow::{Context as _, Result};
 use nv_common::{
-    config::Config, db, db::entities::package_versions, hipcheck::storage::list_hipcheck_runs, rt,
+    config::Config, db, db::entities::packages, hipcheck::storage::list_hipcheck_runs_for_package,
+    npm::types::NpmPackageName, rt,
 };
+use percent_encoding::percent_decode_str;
 use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
+use std::str::FromStr as _;
 
 const DEFAULT_LIMIT: u64 = 10;
 
@@ -33,12 +36,14 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
     let runs = runtime.block_on(async {
         let db = db::connection(config).await?;
-        let version = package_versions::Entity::find()
-            .filter(package_versions::Column::PackageUrl.eq(purl))
+        let package_name = npm_package_name_from_purl(purl).context("invalid NPM package PURL")?;
+        let package = packages::Entity::find()
+            .filter(packages::Column::PackageHost.eq("npm"))
+            .filter(packages::Column::Name.eq(package_name.as_str()))
             .one(&db)
             .await?
-            .context("package version not found")?;
-        Ok::<_, anyhow::Error>(list_hipcheck_runs(&db, version.id, limit).await?)
+            .context("package not found")?;
+        Ok::<_, anyhow::Error>(list_hipcheck_runs_for_package(&db, package.id, limit).await?)
     })?;
     if matches.get_flag("json") {
         let output = runs
@@ -46,6 +51,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
             .map(|run| {
                 serde_json::json!({
                     "id": run.id,
+                    "target": run.target_purl,
                     "state": run.status,
                     "recommendation": run.policy_recommendation,
                     "createdAt": run.created_at,
@@ -57,8 +63,9 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         println!("assessments: {}", runs.len());
         for run in runs {
             println!(
-                "{} {} {} {}",
+                "{} {} {} {} {}",
                 run.id,
+                run.target_purl.as_deref().unwrap_or("<none>"),
                 run.status,
                 run.policy_recommendation.as_deref().unwrap_or("<none>"),
                 run.created_at,
@@ -66,6 +73,38 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn npm_package_name_from_purl(purl: &str) -> Result<NpmPackageName> {
+    let Some(encoded_name) = purl.strip_prefix("pkg:npm/") else {
+        anyhow::bail!("PURL must use the pkg:npm type");
+    };
+    if encoded_name.is_empty() || encoded_name.contains(['@', '?', '#']) {
+        anyhow::bail!("PURL must identify an unversioned npm package");
+    }
+    if !has_valid_percent_encoding(encoded_name) {
+        anyhow::bail!("PURL package name has invalid percent encoding");
+    }
+    let name = percent_decode_str(encoded_name)
+        .decode_utf8()
+        .context("PURL package name is not valid UTF-8")?;
+    NpmPackageName::from_str(&name).context("PURL has an invalid npm package name")
+}
+
+fn has_valid_percent_encoding(value: &str) -> bool {
+    let mut bytes = value.bytes();
+    while let Some(byte) = bytes.next() {
+        if byte != b'%' {
+            continue;
+        }
+        let (Some(first), Some(second)) = (bytes.next(), bytes.next()) else {
+            return false;
+        };
+        if !first.is_ascii_hexdigit() || !second.is_ascii_hexdigit() {
+            return false;
+        }
+    }
+    true
 }
 
 fn json_argument() -> clap::Arg {
@@ -77,7 +116,7 @@ fn json_argument() -> clap::Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::command;
+    use super::{command, npm_package_name_from_purl};
     use clap::error::ErrorKind;
 
     #[test]
@@ -101,5 +140,25 @@ mod tests {
                 "--json",
             ])
             .expect("assessment runs should parse");
+    }
+
+    #[test]
+    fn parses_unversioned_npm_package_purl() {
+        let package =
+            npm_package_name_from_purl("pkg:npm/%40scope/example").expect("PURL should parse");
+
+        assert_eq!(package.as_str(), "@scope/example");
+    }
+
+    #[test]
+    fn rejects_versioned_or_non_npm_package_purls() {
+        for purl in [
+            "pkg:npm/example@1.2.3",
+            "pkg:cargo/example",
+            "pkg:npm/example?repository_url=https://example.test",
+            "pkg:npm/example%ZZ",
+        ] {
+            assert!(npm_package_name_from_purl(purl).is_err(), "{purl}");
+        }
     }
 }

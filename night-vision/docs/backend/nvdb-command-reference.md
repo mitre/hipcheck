@@ -150,7 +150,7 @@ and parser tests can stabilize before their services are implemented.
 | `package-source kevs <SOURCE-ID> [--json]` | List KEV-linked matches for source versions. |
 | `assessment analyze <PURL> [--json]` | Run and persist the configured assessment. |
 | `assessment show <ASSESSMENT-ID> [--json]` | Show normalized assessment findings. |
-| `assessment runs --package <PURL> [--limit <N>] [--json]` | List persisted assessments for a package. |
+| `assessment runs --package <PURL> [--limit <N>] [--json]` | List persisted assessments across all resolved versions of an unversioned npm package PURL, such as `pkg:npm/example`. |
 | `assessment evidence <ASSESSMENT-ID> [--raw-hipcheck] [--json]` | Inspect retained assessment evidence. |
 
 See [RFD 0004](../rfds/0004-nvdb-demo-workflow.md) for the intended workflow

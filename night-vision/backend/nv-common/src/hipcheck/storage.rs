@@ -1,6 +1,8 @@
 //! Transactional persistence for untrusted Hipcheck evidence.
 use super::{HipcheckCheck, HipcheckReport};
-use crate::db::entities::{hipcheck_checks, hipcheck_concerns, hipcheck_findings, hipcheck_runs};
+use crate::db::entities::{
+    hipcheck_checks, hipcheck_concerns, hipcheck_findings, hipcheck_runs, package_versions,
+};
 use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, ConnectionTrait, DbErr,
     EntityTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _, TransactionSession as _,
@@ -178,6 +180,31 @@ pub async fn list_hipcheck_runs<C: ConnectionTrait>(
 ) -> Result<Vec<hipcheck_runs::Model>, DbErr> {
     hipcheck_runs::Entity::find()
         .filter(hipcheck_runs::Column::PackageVersionId.eq(package_version_id))
+        .order_by_desc(hipcheck_runs::Column::CreatedAt)
+        .limit(limit)
+        .all(db)
+        .await
+}
+
+/// List the newest persisted assessments across every resolved version of a package.
+pub async fn list_hipcheck_runs_for_package<C: ConnectionTrait>(
+    db: &C,
+    package_id: i32,
+    limit: u64,
+) -> Result<Vec<hipcheck_runs::Model>, DbErr> {
+    let package_version_ids = package_versions::Entity::find()
+        .filter(package_versions::Column::PackageId.eq(package_id))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|version| version.id)
+        .collect::<Vec<_>>();
+    if package_version_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    hipcheck_runs::Entity::find()
+        .filter(hipcheck_runs::Column::PackageVersionId.is_in(package_version_ids))
         .order_by_desc(hipcheck_runs::Column::CreatedAt)
         .limit(limit)
         .all(db)
