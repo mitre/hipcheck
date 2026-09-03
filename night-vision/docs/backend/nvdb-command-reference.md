@@ -139,19 +139,27 @@ and warnings; it does not append another snapshot.
 | --- | --- |
 | `package-version kev <PURL> [--json]` | List KEV-linked CVE matches for one version. A no-match result only reflects locally available data and does not mean the version is safe. |
 
-## Demo workflow command stubs
+## Assessment commands
 
-The following planned commands still stop with an explicit not-implemented
-placeholder. They remain available so their command interfaces, help output,
-and parser tests can stabilize before their services are implemented.
+Assessment commands run the configured Hipcheck policy for a resolved package
+version and expose the persisted Night Vision assessment and its evidence.
+
+| Command | Purpose |
+| --- | --- |
+| `assessment analyze <PURL> [--json]` | Run and persist the configured assessment. |
+| `assessment show <ASSESSMENT-ID> [--json]` | Show persisted assessment provenance and normalized findings. |
+| `assessment runs --package <PURL> [--limit <N>] [--json]` | List persisted assessments across all resolved versions of an unversioned npm package PURL, such as `pkg:npm/example`. |
+| `assessment evidence <ASSESSMENT-ID> [--raw-hipcheck] [--json]` | Inspect retained assessment evidence. |
+
+`assessment evidence` omits raw Hipcheck JSON unless `--raw-hipcheck` is
+provided. All commands use concise text by default and emit structured output
+with `--json`.
+
+## Planned command stub
 
 | Command | Planned purpose |
 | --- | --- |
-| `package-source kevs <SOURCE-ID> [--json]` | List KEV-linked matches for source versions. |
-| `assessment analyze <PURL> [--json]` | Run and persist the configured assessment. |
-| `assessment show <ASSESSMENT-ID> [--json]` | Show normalized assessment findings. |
-| `assessment runs --package <PURL> [--limit <N>] [--json]` | List persisted assessments across all resolved versions of an unversioned npm package PURL, such as `pkg:npm/example`. |
-| `assessment evidence <ASSESSMENT-ID> [--raw-hipcheck] [--json]` | Inspect retained assessment evidence. |
+| `package-source kevs <SOURCE-ID> [--json]` | List KEV-linked matches for source versions. This optional aggregate view is not implemented. |
 
 See [RFD 0004](../rfds/0004-nvdb-demo-workflow.md) for the intended workflow
 and output conventions.
