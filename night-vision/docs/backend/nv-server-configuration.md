@@ -61,7 +61,7 @@ SeaORM, or Tokio setting at its default unless noted below.
 | `kev-response-body-max-bytes` | Maximum size of a KEV catalog response body. | Bytes | 16777216 bytes (16 MiB). Values must be greater than 0. The limit applies while streaming, even when the response has no `Content-Length`. |
 | `http-request-body-max-bytes` | Maximum request body size. | Bytes | Dropshot default, currently 1024 bytes in project comments and sample config. |
 | `http-early-disconnect-behavior` | `continue` or `cancel`. | Enum | Dropshot default, which matches `continue`: handlers are detached and run to completion after early disconnect. |
-| `package-source-contents-max-bytes` | Maximum size of a submitted `package.json` document. | Bytes | 1048576 (1 MiB). Values must be greater than 0. The npm parser imposes the same maximum. |
+| `package-source-contents-max-bytes` | Maximum size of a submitted `package.json` document. | Bytes | 1048576 (1 MiB). Values must be greater than 0 and must not exceed 1048576, the npm parser limit. |
 | `package-source-request-timeout` | Timeout while validating and accepting one package-source submission. | Milliseconds | 5000 milliseconds. Values must be greater than 0. |
 | `package-source-max-concurrency` | Maximum in-flight package-source submissions per server process. | Requests | 4. Values must be greater than 0. Excess submissions receive `503 Service Unavailable`. |
 | `database-max-connections` | Maximum database pool connections. | Connections | SeaORM default. The sample config documents 100. |

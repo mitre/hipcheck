@@ -52,7 +52,7 @@ http-request-body-max-bytes =
 http-early-disconnect-behavior =
 
 # Maximum size in bytes of the package.json contents submitted to the
-# package-source endpoint. Must be greater than 0.
+# package-source endpoint. Must be greater than 0 and must not exceed 1048576.
 #
 # Default: 1048576 (1 MiB)
 package-source-contents-max-bytes =

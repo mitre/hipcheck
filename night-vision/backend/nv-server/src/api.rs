@@ -149,23 +149,19 @@ impl NvServerApi for RestApi {
                 .get("content-type")
                 .and_then(|value| value.to_str().ok()),
         )?;
-        let body = parse_package_source_body(body_param.as_bytes())?;
 
-        // Retain this permit until the request is accepted. This bounds both
-        // manifest parsing and future persistence work per server process.
+        // Retain this permit until the request is accepted. This bounds request
+        // parsing, manifest validation, and future persistence work per server
+        // process.
         let _submission_slot = ctx.context().try_acquire_package_source_submission_slot()?;
         let db = ctx.context().db();
-        let file_name = body.file_name;
-        let contents = body.contents;
-
-        validate_package_source(
-            &file_name,
-            &contents,
-            ctx.context().package_source_contents_max_bytes(),
-        )?;
         let uuid = tokio::time::timeout(
             ctx.context().package_source_request_timeout(),
-            store_package_source(db, file_name, contents),
+            accept_package_source(
+                db,
+                body_param.as_bytes(),
+                ctx.context().package_source_contents_max_bytes(),
+            ),
         )
         .await
         .map_err(|_| {
@@ -194,6 +190,16 @@ impl NvServerApi for RestApi {
             )),
         }
     }
+}
+
+async fn accept_package_source(
+    db: &DatabaseConnection,
+    request_body: &[u8],
+    max_contents_bytes: usize,
+) -> Result<Uuid, HttpError> {
+    let body = parse_package_source_body(request_body)?;
+    validate_package_source(&body.file_name, &body.contents, max_contents_bytes)?;
+    store_package_source(db, body.file_name, body.contents).await
 }
 
 fn validate_package_source_media_type(content_type: Option<&str>) -> Result<(), HttpError> {
@@ -377,7 +383,7 @@ mod tests {
     #[test]
     fn package_source_body_rejects_unknown_fields() {
         let _error = parse_package_source_body(
-            br#"{\"fileName\":\"package.json\",\"contents\":\"{}\",\"extra\":true}"#,
+            br#"{"fileName":"package.json","contents":"{}","extra":true}"#,
         )
         .expect_err("unknown request fields should be rejected");
     }

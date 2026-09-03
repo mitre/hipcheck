@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Maximum encoded JSON request size for a package-source submission.
-pub const MAX_PACKAGE_SOURCE_REQUEST_BODY_BYTES: usize = 2 * 1024 * 1024;
+///
+/// This accommodates a maximally escaped 1 MiB `package.json` document plus
+/// the JSON request envelope.
+pub const MAX_PACKAGE_SOURCE_REQUEST_BODY_BYTES: usize = 3 * 1024 * 1024;
 
 #[dropshot::api_description]
 pub trait NvServerApi {
@@ -77,6 +80,7 @@ pub struct CveListSyncRunHealth {
 #[derive(Deserialize, JsonSchema, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
+#[schemars(deny_unknown_fields)]
 pub struct PostPackageSourceBody {
     pub file_name: String,
     pub contents: String,

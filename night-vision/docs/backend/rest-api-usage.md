@@ -221,7 +221,7 @@ Oversized manifest contents return `413 Payload Too Large`. If the configured
 submission concurrency limit is exhausted, or the configured submission timeout
 expires, the endpoint returns `503 Service Unavailable`.
 
-The endpoint has a fixed 2 MiB request-body limit, including JSON encoding.
+The endpoint has a fixed 3 MiB request-body limit, including JSON encoding.
 Dropshot rejects a body exceeding that limit before the handler runs with a
 `400 Bad Request`. The process-local concurrency limit protects server capacity;
 production ingress must still provide caller-aware rate limiting before the API

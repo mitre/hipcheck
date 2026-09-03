@@ -10,6 +10,7 @@ use crate::{
         sync::{CveListSyncPipelineConfig, CveListSyncTimeoutConfig},
     },
     error::ErrorSourceIterator as _,
+    npm::package_json::MAX_PACKAGE_JSON_BYTES,
     secret::{SecretFileError, SecretSource, SecretSourceKind},
 };
 use camino::{Utf8Path, Utf8PathBuf};
@@ -45,7 +46,8 @@ const DEFAULT_HIPCHECK_TIMEOUT: u64 = 300_000;
 const DEFAULT_HIPCHECK_STDOUT_MAX_BYTES: usize = 1_048_576;
 const DEFAULT_HIPCHECK_STDERR_MAX_BYTES: usize = 1_048_576;
 const DEFAULT_HIPCHECK_JSON_MAX_BYTES: usize = 4_194_304;
-const DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES: usize = 1024 * 1024;
+const MAX_PACKAGE_SOURCE_CONTENTS_MAX_BYTES: usize = MAX_PACKAGE_JSON_BYTES as usize;
+const DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES: usize = MAX_PACKAGE_SOURCE_CONTENTS_MAX_BYTES;
 const DEFAULT_PACKAGE_SOURCE_REQUEST_TIMEOUT: u64 = 5_000;
 const DEFAULT_PACKAGE_SOURCE_MAX_CONCURRENCY: usize = 4;
 
@@ -527,10 +529,9 @@ impl Config {
             parse_value(&parsed, "http-request-body-max-bytes", &mut errors);
         let http_early_disconnect_behavior =
             parse_value(&parsed, "http-early-disconnect-behavior", &mut errors);
-        let package_source_contents_max_bytes = parse_positive_usize(
+        let package_source_contents_max_bytes = parse_package_source_contents_max_bytes(
             &parsed,
             "package-source-contents-max-bytes",
-            DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES,
             &mut errors,
         );
         let package_source_request_timeout = parse_positive_u64(
@@ -1142,6 +1143,28 @@ fn parse_positive_usize(
     };
 
     value
+}
+
+fn parse_package_source_contents_max_bytes(
+    parsed: &spookey::ParseResult,
+    key: &'static str,
+    errors: &mut Vec<ConfigError>,
+) -> usize {
+    let Some(value) = parse_positive_usize_option(parsed, key, errors) else {
+        return DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES;
+    };
+
+    if value > MAX_PACKAGE_SOURCE_CONTENTS_MAX_BYTES {
+        errors.push(ConfigError::StrParse(StrParseError {
+            key: key.to_owned().into_boxed_str(),
+            value: value.to_string().into_boxed_str(),
+            err: format!("must not exceed {MAX_PACKAGE_SOURCE_CONTENTS_MAX_BYTES}")
+                .into_boxed_str(),
+        }));
+        DEFAULT_PACKAGE_SOURCE_CONTENTS_MAX_BYTES
+    } else {
+        value
+    }
 }
 
 fn parse_positive_u64_option(
@@ -2392,6 +2415,11 @@ mod tests {
                 "package-source-contents-max-bytes",
                 "0",
                 "must be greater than 0",
+            ),
+            (
+                "package-source-contents-max-bytes",
+                "1048577",
+                "must not exceed 1048576",
             ),
             (
                 "package-source-request-timeout",
