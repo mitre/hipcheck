@@ -8,7 +8,7 @@
 pub mod storage;
 
 use super::{
-    package_json::{DependencyKind, NpmPackageJson},
+    package_json::{DependencyKind, NpmPackageJson, RootDependency},
     packument::{
         NpmPackument, NpmVersion, PackumentBundleDependencies, PackumentDependencyMap,
         PackumentParseError,
@@ -16,12 +16,13 @@ use super::{
     types::{DependencyPackageName, DependencySpec, NpmPackageName},
 };
 use crate::npm_semver::{NpmVersion as RangeVersion, elaborate_npm_version_bounds, parse_range};
-use async_channel::Receiver;
+use async_channel::{Receiver, TrySendError};
 use async_trait::async_trait;
+use futures_util::{StreamExt as _, stream::FuturesUnordered};
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use semver::Version;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     sync::Arc,
     time::Duration,
 };
@@ -289,8 +290,6 @@ pub enum ElaborationError {
     PackageLimitExceeded,
     #[error("elaboration exceeded the dependency-edge limit")]
     EdgeLimitExceeded,
-    #[error("elaboration exceeded the queued-work limit")]
-    QueuedWorkLimitExceeded,
     #[error("elaboration exceeded the derivation-path limit")]
     DerivationLimitExceeded,
     #[error("elaboration exceeded the total-run timeout")]
@@ -340,109 +339,280 @@ async fn elaborate_inner(
     work_sender: &async_channel::Sender<WorkItem>,
 ) -> Result<ElaborationResult, ElaborationError> {
     let mut state = SupervisorState::default();
-    let mut pending = Vec::new();
-    for root in source.root_dependencies() {
-        let versions = resolve_specification(
-            cache,
-            provider.as_ref(),
-            &root.name,
-            &root.specification,
-            None,
-            &mut state.warnings,
-        )
-        .await?;
-        for version in versions {
-            state.record_edge(
-                ElaborationEdge {
-                    parent: None,
-                    child: version.clone(),
-                    root_dependency_kind: Some(root.kind),
-                    declared_dependency: root.name.as_str().into(),
-                    declared_specification: format_dependency_specification(&root.specification),
-                },
-                limits,
-            )?;
-            enqueue_work(&mut pending, (version.clone(), vec![version]), limits)?;
-        }
-    }
+    let mut pending = VecDeque::new();
+    let mut expansions = VecDeque::from([WorkExpansion::Roots(RootExpansion::new(
+        source.root_dependencies(),
+    ))]);
+    let mut replies = FuturesUnordered::new();
+    let max_in_flight = limits
+        .worker_concurrency
+        .saturating_add(limits.work_queue_capacity);
 
-    while !pending.is_empty() {
-        let mut replies = Vec::new();
-        let mut work = BTreeMap::<PackageVersion, Vec<Vec<PackageVersion>>>::new();
-        while let Some((package, derivation)) = pending.pop() {
-            if !state.record_derivation(package.clone(), derivation.clone(), limits)? {
+    while !pending.is_empty() || !expansions.is_empty() || !replies.is_empty() {
+        dispatch_pending(&mut pending, &mut replies, work_sender, max_in_flight)?;
+
+        if let Some(mut expansion) = expansions.pop_front() {
+            if pending.len() < limits.max_queued_work {
+                if let Some(work) = expansion
+                    .next_work(&mut state, cache, provider.as_ref(), limits)
+                    .await?
+                {
+                    if state.record_derivation(
+                        work.package.clone(),
+                        work.derivation.clone(),
+                        limits,
+                    )? {
+                        pending.push_back(work);
+                    }
+                    expansions.push_back(expansion);
+                }
                 continue;
             }
-            work.entry(package).or_default().push(derivation);
+            expansions.push_front(expansion);
         }
 
-        for (package, derivations) in work {
-            let (reply_sender, reply_receiver) = oneshot::channel();
-            work_sender
-                .send(WorkItem {
-                    package,
-                    derivations,
-                    reply_sender,
-                })
-                .await
-                .map_err(|_| ElaborationError::WorkerStopped)?;
-            replies.push(reply_receiver);
-        }
-
-        for reply in replies {
-            let report = reply.await.map_err(|_| ElaborationError::WorkerStopped)??;
-            state
-                .repositories
-                .insert(report.package.clone(), report.source_repository.clone());
-            for dependency in report.dependencies {
-                let versions = resolve_specification(
-                    cache,
-                    provider.as_ref(),
-                    &dependency.name,
-                    &dependency.specification,
-                    Some(&report.package),
-                    &mut state.warnings,
-                )
-                .await?;
-                for derivation in &report.derivations {
-                    for version in &versions {
-                        state.record_edge(
-                            ElaborationEdge {
-                                parent: Some(report.package.clone()),
-                                child: version.clone(),
-                                root_dependency_kind: None,
-                                declared_dependency: dependency.name.as_str().into(),
-                                declared_specification: format_dependency_specification(
-                                    &dependency.specification,
-                                ),
-                            },
-                            limits,
-                        )?;
-                        if derivation.contains(version) {
-                            continue;
-                        }
-                        let mut child_derivation = derivation.clone();
-                        child_derivation.push(version.clone());
-                        enqueue_work(&mut pending, (version.clone(), child_derivation), limits)?;
-                    }
-                }
-            }
-        }
+        let report = replies
+            .next()
+            .await
+            .expect("work is pending only when a worker reply is outstanding")
+            .map_err(|_| ElaborationError::WorkerStopped)??;
+        state
+            .repositories
+            .insert(report.package.clone(), report.source_repository.clone());
+        expansions.push_back(WorkExpansion::Report(ReportExpansion::new(report)));
     }
 
     Ok(state.finish())
 }
 
-fn enqueue_work(
-    pending: &mut Vec<(PackageVersion, Vec<PackageVersion>)>,
-    work: (PackageVersion, Vec<PackageVersion>),
-    limits: &ElaborationLimits,
+fn dispatch_pending(
+    pending: &mut VecDeque<PendingWork>,
+    replies: &mut FuturesUnordered<oneshot::Receiver<Result<WorkerReport, ElaborationError>>>,
+    work_sender: &async_channel::Sender<WorkItem>,
+    max_in_flight: usize,
 ) -> Result<(), ElaborationError> {
-    if pending.len() == limits.max_queued_work {
-        return Err(ElaborationError::QueuedWorkLimitExceeded);
+    while replies.len() < max_in_flight {
+        let Some(work) = pending.pop_front() else {
+            break;
+        };
+        let (reply_sender, reply_receiver) = oneshot::channel();
+        match work_sender.try_send(WorkItem {
+            package: work.package,
+            derivations: vec![work.derivation],
+            reply_sender,
+        }) {
+            Ok(()) => replies.push(reply_receiver),
+            Err(TrySendError::Full(work)) => {
+                pending.push_front(PendingWork {
+                    package: work.package,
+                    derivation: work
+                        .derivations
+                        .into_iter()
+                        .next()
+                        .expect("scheduled work has one derivation"),
+                });
+                break;
+            }
+            Err(TrySendError::Closed(_)) => return Err(ElaborationError::WorkerStopped),
+        }
     }
-    pending.push(work);
     Ok(())
+}
+
+struct PendingWork {
+    package: PackageVersion,
+    derivation: Vec<PackageVersion>,
+}
+
+enum WorkExpansion {
+    Roots(RootExpansion),
+    Report(ReportExpansion),
+}
+
+impl WorkExpansion {
+    async fn next_work(
+        &mut self,
+        state: &mut SupervisorState,
+        cache: &PackumentCache,
+        provider: &dyn PackumentProvider,
+        limits: &ElaborationLimits,
+    ) -> Result<Option<PendingWork>, ElaborationError> {
+        match self {
+            Self::Roots(expansion) => expansion.next_work(state, cache, provider, limits).await,
+            Self::Report(expansion) => expansion.next_work(state, cache, provider, limits).await,
+        }
+    }
+}
+
+struct RootExpansion {
+    roots: VecDeque<RootDependency>,
+    current: Option<(RootDependency, std::vec::IntoIter<PackageVersion>)>,
+}
+
+impl RootExpansion {
+    fn new(roots: Vec<RootDependency>) -> Self {
+        Self {
+            roots: roots.into(),
+            current: None,
+        }
+    }
+
+    async fn next_work(
+        &mut self,
+        state: &mut SupervisorState,
+        cache: &PackumentCache,
+        provider: &dyn PackumentProvider,
+        limits: &ElaborationLimits,
+    ) -> Result<Option<PendingWork>, ElaborationError> {
+        loop {
+            if let Some((root, versions)) = self.current.as_mut() {
+                if let Some(version) = versions.next() {
+                    state.record_edge(
+                        ElaborationEdge {
+                            parent: None,
+                            child: version.clone(),
+                            root_dependency_kind: Some(root.kind),
+                            declared_dependency: root.name.as_str().into(),
+                            declared_specification: format_dependency_specification(
+                                &root.specification,
+                            ),
+                        },
+                        limits,
+                    )?;
+                    return Ok(Some(PendingWork {
+                        package: version.clone(),
+                        derivation: vec![version],
+                    }));
+                }
+                self.current = None;
+            }
+
+            let Some(root) = self.roots.pop_front() else {
+                return Ok(None);
+            };
+            let versions = resolve_specification(
+                cache,
+                provider,
+                &root.name,
+                &root.specification,
+                None,
+                &mut state.warnings,
+            )
+            .await?;
+            self.current = Some((root, versions.into_iter()));
+        }
+    }
+}
+
+struct ReportExpansion {
+    parent: PackageVersion,
+    derivations: Vec<Vec<PackageVersion>>,
+    dependencies: VecDeque<DeclaredDependency>,
+    current: Option<ResolvedDependencyExpansion>,
+}
+
+impl ReportExpansion {
+    fn new(report: WorkerReport) -> Self {
+        Self {
+            parent: report.package,
+            derivations: report.derivations,
+            dependencies: report.dependencies.into(),
+            current: None,
+        }
+    }
+
+    async fn next_work(
+        &mut self,
+        state: &mut SupervisorState,
+        cache: &PackumentCache,
+        provider: &dyn PackumentProvider,
+        limits: &ElaborationLimits,
+    ) -> Result<Option<PendingWork>, ElaborationError> {
+        loop {
+            if let Some(current) = self.current.as_mut() {
+                let declared_dependency = current.dependency.name.as_str().to_owned();
+                let declared_specification =
+                    format_dependency_specification(&current.dependency.specification);
+                if let Some((version, derivation_index)) = current.next_candidate(&self.derivations)
+                {
+                    let derivation = &self.derivations[derivation_index];
+                    state.record_edge(
+                        ElaborationEdge {
+                            parent: Some(self.parent.clone()),
+                            child: version.clone(),
+                            root_dependency_kind: None,
+                            declared_dependency: declared_dependency.into_boxed_str(),
+                            declared_specification,
+                        },
+                        limits,
+                    )?;
+                    if derivation.contains(&version) {
+                        continue;
+                    }
+                    let mut child_derivation = derivation.clone();
+                    child_derivation.push(version.clone());
+                    return Ok(Some(PendingWork {
+                        package: version,
+                        derivation: child_derivation,
+                    }));
+                }
+                self.current = None;
+            }
+
+            let Some(dependency) = self.dependencies.pop_front() else {
+                return Ok(None);
+            };
+            let versions = resolve_specification(
+                cache,
+                provider,
+                &dependency.name,
+                &dependency.specification,
+                Some(&self.parent),
+                &mut state.warnings,
+            )
+            .await?;
+            self.current = Some(ResolvedDependencyExpansion::new(dependency, versions));
+        }
+    }
+}
+
+struct ResolvedDependencyExpansion {
+    dependency: DeclaredDependency,
+    versions: Vec<PackageVersion>,
+    derivation_index: usize,
+    version_index: usize,
+}
+
+impl ResolvedDependencyExpansion {
+    fn new(dependency: DeclaredDependency, versions: Vec<PackageVersion>) -> Self {
+        Self {
+            dependency,
+            versions,
+            derivation_index: 0,
+            version_index: 0,
+        }
+    }
+
+    fn next_candidate(
+        &mut self,
+        derivations: &[Vec<PackageVersion>],
+    ) -> Option<(PackageVersion, usize)> {
+        while self.derivation_index < derivations.len() {
+            if let Some(version) = self.versions.get(self.version_index) {
+                self.version_index = self
+                    .version_index
+                    .checked_add(1)
+                    .expect("version index is within the resolved version list");
+                return Some((version.clone(), self.derivation_index));
+            }
+            self.derivation_index = self
+                .derivation_index
+                .checked_add(1)
+                .expect("derivation index is within the reported derivation list");
+            self.version_index = 0;
+        }
+        None
+    }
 }
 
 #[derive(Default)]
@@ -1157,27 +1327,83 @@ mod tests {
     }
 
     #[test]
-    fn fails_when_the_pending_work_limit_is_exceeded() {
-        let source = source(json!({
-            "dependencies": { "left": "1.0.0", "right": "1.0.0" }
-        }));
+    fn backpressures_when_the_pending_work_limit_is_reached() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
         let registry = MockRegistry {
             packuments: BTreeMap::from([
+                (
+                    "root".to_owned(),
+                    packument(
+                        "root",
+                        "1.0.0",
+                        json!({ "left": "1.0.0", "right": "1.0.0" }),
+                    ),
+                ),
                 ("left".to_owned(), packument("left", "1.0.0", json!({}))),
                 ("right".to_owned(), packument("right", "1.0.0", json!({}))),
             ]),
         };
         let limits = ElaborationLimits {
+            worker_concurrency: 1,
+            work_queue_capacity: 1,
             max_queued_work: 1,
             ..ElaborationLimits::default()
         };
 
-        let error = tokio::runtime::Runtime::new()
+        let result = tokio::runtime::Runtime::new()
             .expect("runtime")
             .block_on(elaborate(&source, Arc::new(registry), limits))
-            .expect_err("queued-work limit is enforced");
+            .expect("queued work is backpressured");
 
-        assert!(matches!(error, ElaborationError::QueuedWorkLimitExceeded));
+        assert_eq!(result.packages.len(), 3);
+        assert_eq!(result.edges.len(), 3);
+    }
+
+    #[test]
+    fn resumes_multi_level_expansion_after_backpressure() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([
+                (
+                    "root".to_owned(),
+                    packument(
+                        "root",
+                        "1.0.0",
+                        json!({ "left": "1.0.0", "right": "1.0.0" }),
+                    ),
+                ),
+                (
+                    "left".to_owned(),
+                    packument("left", "1.0.0", json!({ "left-leaf": "1.0.0" })),
+                ),
+                (
+                    "right".to_owned(),
+                    packument("right", "1.0.0", json!({ "right-leaf": "1.0.0" })),
+                ),
+                (
+                    "left-leaf".to_owned(),
+                    packument("left-leaf", "1.0.0", json!({})),
+                ),
+                (
+                    "right-leaf".to_owned(),
+                    packument("right-leaf", "1.0.0", json!({})),
+                ),
+            ]),
+        };
+        let limits = ElaborationLimits {
+            worker_concurrency: 1,
+            work_queue_capacity: 1,
+            max_queued_work: 1,
+            ..ElaborationLimits::default()
+        };
+
+        let result = tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(elaborate(&source, Arc::new(registry), limits))
+            .expect("queued work is backpressured across levels");
+
+        assert_eq!(result.packages.len(), 5);
+        assert_eq!(result.edges.len(), 5);
     }
 
     struct DelayedRegistry;
