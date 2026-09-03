@@ -32,7 +32,8 @@ pub fn command() -> clap::Command {
 
 pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let purl = matches.get_one::<String>("purl").expect("required PURL");
-    let package = npm_package_version_from_purl(purl).context("invalid NPM package PURL")?;
+    let package =
+        reachable_npm_package_version_from_purl(purl).context("invalid NPM package PURL")?;
     let runtime = rt::AsyncRuntime::new(config).context("failed to create async runtime")?;
     let results = runtime.block_on(kev(config, package))?;
 
@@ -57,7 +58,7 @@ async fn kev(
         .context("failed to match the package version against KEV-linked CVEs")
 }
 
-fn npm_package_version_from_purl(purl: &str) -> Result<ReachableNpmPackageVersion> {
+pub fn reachable_npm_package_version_from_purl(purl: &str) -> Result<ReachableNpmPackageVersion> {
     let Some(package_and_version) = purl.strip_prefix("pkg:npm/") else {
         bail!("PURL must use the pkg:npm type");
     };
@@ -109,7 +110,7 @@ fn has_valid_percent_encoding(value: &str) -> bool {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct KevMatchOutput<'a> {
+pub struct KevMatchOutput<'a> {
     cve_id: &'a str,
     status: &'a str,
     confidence: &'a str,
@@ -216,7 +217,7 @@ fn print_values(label: &str, values: &[String]) {
 
 #[cfg(test)]
 mod tests {
-    use super::{command, json_output, npm_package_version_from_purl};
+    use super::{command, json_output, reachable_npm_package_version_from_purl};
     use clap::error::ErrorKind;
     use nv_common::cve::kev::{
         KevAffectedNpmPackageVersion, KevContext, KevNpmMatchConfidence, KevNpmMatchStatus,
@@ -240,8 +241,8 @@ mod tests {
 
     #[test]
     fn parses_unscoped_npm_package_version_purl() {
-        let package =
-            npm_package_version_from_purl("pkg:npm/example@1.2.3").expect("PURL should parse");
+        let package = reachable_npm_package_version_from_purl("pkg:npm/example@1.2.3")
+            .expect("PURL should parse");
 
         assert_eq!(package.package_name, "example");
         assert_eq!(package.version, "1.2.3");
@@ -249,7 +250,7 @@ mod tests {
 
     #[test]
     fn parses_percent_encoded_scoped_npm_package_version_purl() {
-        let package = npm_package_version_from_purl("pkg:npm/%40scope/example@1.2.3")
+        let package = reachable_npm_package_version_from_purl("pkg:npm/%40scope/example@1.2.3")
             .expect("PURL should parse");
 
         assert_eq!(package.package_name, "@scope/example");
@@ -264,7 +265,10 @@ mod tests {
             "pkg:npm/example@1.2.3?repository_url=https://example.test",
             "pkg:npm/example@1.2%ZZ",
         ] {
-            assert!(npm_package_version_from_purl(purl).is_err(), "{purl}");
+            assert!(
+                reachable_npm_package_version_from_purl(purl).is_err(),
+                "{purl}"
+            );
         }
     }
 

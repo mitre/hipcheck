@@ -128,6 +128,7 @@ warnings.
 | `package-source resolve <SOURCE-ID> [--json]` | Resolve and persist reachable package versions. |
 | `package-source show <SOURCE-ID> [--json]` | Show package-source metadata and state. |
 | `package-source versions <SOURCE-ID> [--json]` | List resolved versions, derivation paths, and path counts. |
+| `package-source kevs <SOURCE-ID> [--json]` | List KEV-linked CVE matches across resolved versions. A no-match result only reflects locally available data and does not mean the resolved versions are safe. |
 
 Each successful `package-source resolve` atomically publishes a new resolution
 snapshot. Re-running it replaces the source's prior resolved versions, edges,
@@ -154,12 +155,6 @@ version and expose the persisted Night Vision assessment and its evidence.
 `assessment evidence` omits raw Hipcheck JSON unless `--raw-hipcheck` is
 provided. All commands use concise text by default and emit structured output
 with `--json`.
-
-## Planned command stub
-
-| Command | Planned purpose |
-| --- | --- |
-| `package-source kevs <SOURCE-ID> [--json]` | List KEV-linked matches for source versions. This optional aggregate view is not implemented. |
 
 See [RFD 0004](../rfds/0004-nvdb-demo-workflow.md) for the intended workflow
 and output conventions.
