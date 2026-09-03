@@ -1,6 +1,7 @@
 //! KEV-linked vulnerability matching for reachable NPM package versions.
 
 use crate::db::entities::{cisa_kev_entries, cve_list_records, package_sources};
+use crate::npm_semver::{NpmVersion as NpmRangeVersion, parse_range};
 use percent_encoding::percent_decode_str;
 use sea_orm::{ColumnTrait as _, DatabaseConnection, EntityTrait as _, QueryFilter as _};
 use semver::Version;
@@ -66,6 +67,7 @@ struct AffectedVersionRange {
     fixed: Option<String>,
     last_affected: Option<String>,
     exact: Option<String>,
+    npm_range: Option<String>,
     evidence: String,
 }
 
@@ -166,7 +168,7 @@ fn match_kev_cve_record_to_reachable_npm(
     cve_record: &Value,
     reachable: &[ReachableNpmPackageVersion],
 ) -> Vec<KevAffectedNpmPackageVersion> {
-    let affected_packages = npm_affected_packages_from_cve(cve_record);
+    let affected_packages = npm_affected_packages_from_cve(&kev_context, cve_record);
     if affected_packages.is_empty() {
         return vec![unknown(
             kev_context,
@@ -235,14 +237,21 @@ fn match_kev_cve_record_to_reachable_npm(
     results
 }
 
-fn npm_affected_packages_from_cve(cve_record: &Value) -> Vec<NpmAffectedPackage> {
+fn npm_affected_packages_from_cve(
+    kev_context: &KevContext,
+    cve_record: &Value,
+) -> Vec<NpmAffectedPackage> {
     cve_record
         .pointer("/containers/cna")
-        .map(|container| affected_from_container(container, "containers.cna"))
+        .map(|container| affected_from_container(kev_context, container, "containers.cna"))
         .unwrap_or_default()
 }
 
-fn affected_from_container(container: &Value, base_path: &str) -> Vec<NpmAffectedPackage> {
+fn affected_from_container(
+    kev_context: &KevContext,
+    container: &Value,
+    base_path: &str,
+) -> Vec<NpmAffectedPackage> {
     container
         .get("affected")
         .and_then(Value::as_array)
@@ -251,19 +260,27 @@ fn affected_from_container(container: &Value, base_path: &str) -> Vec<NpmAffecte
                 .iter()
                 .enumerate()
                 .filter_map(|(index, entry)| {
-                    npm_affected_package(entry, &format!("{base_path}.affected[{index}]"))
+                    npm_affected_package(
+                        kev_context,
+                        entry,
+                        &format!("{base_path}.affected[{index}]"),
+                    )
                 })
                 .collect()
         })
         .unwrap_or_default()
 }
 
-fn npm_affected_package(entry: &Value, path: &str) -> Option<NpmAffectedPackage> {
-    if !affected_entry_is_npm(entry) {
+fn npm_affected_package(
+    kev_context: &KevContext,
+    entry: &Value,
+    path: &str,
+) -> Option<NpmAffectedPackage> {
+    if !affected_entry_is_npm(kev_context, entry) {
         return None;
     }
 
-    let package_name = package_name_from_affected_entry(entry);
+    let package_name = package_name_from_affected_entry(kev_context, entry);
     let mut caveats = Vec::new();
     if package_name.is_none() {
         caveats.push(
@@ -281,8 +298,10 @@ fn npm_affected_package(entry: &Value, path: &str) -> Option<NpmAffectedPackage>
     })
 }
 
-fn affected_entry_is_npm(entry: &Value) -> bool {
-    package_name_from_package_url(entry).is_some() || collection_url_is_npm(entry)
+fn affected_entry_is_npm(kev_context: &KevContext, entry: &Value) -> bool {
+    package_name_from_package_url(entry).is_some()
+        || collection_url_is_npm(entry)
+        || kev_context.vendor_project.as_deref() == Some("Npm package")
 }
 
 fn collection_url_is_npm(entry: &Value) -> bool {
@@ -297,12 +316,21 @@ fn collection_url_is_npm(entry: &Value) -> bool {
         })
 }
 
-fn package_name_from_affected_entry(entry: &Value) -> Option<String> {
+fn package_name_from_affected_entry(kev_context: &KevContext, entry: &Value) -> Option<String> {
     if let Some(package_name) = package_name_from_package_url(entry) {
         return Some(package_name);
     }
 
-    let package_name = entry.get("packageName").and_then(Value::as_str)?;
+    let package_name = entry
+        .get("packageName")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            if kev_context.vendor_project.as_deref() == Some("Npm package") {
+                entry.get("product").and_then(Value::as_str)
+            } else {
+                None
+            }
+        })?;
     npm_package_name_from_string(package_name)
 }
 
@@ -367,6 +395,7 @@ fn affected_ranges_from_entry(
                             .and_then(Value::as_str)
                             .map(str::to_owned),
                         exact: None,
+                        npm_range: None,
                         evidence: format!("{path}.versions[{index}] affected range"),
                     });
                 } else if let Some(exact) = version_value {
@@ -374,8 +403,9 @@ fn affected_ranges_from_entry(
                         introduced: None,
                         fixed: None,
                         last_affected: None,
-                        exact: Some(exact),
-                        evidence: format!("{path}.versions[{index}] exact affected version"),
+                        exact: None,
+                        npm_range: Some(exact),
+                        evidence: format!("{path}.versions[{index}] affected NPM range"),
                     });
                 } else {
                     caveats.push(format!(
@@ -392,6 +422,7 @@ fn affected_ranges_from_entry(
                         fixed: Some(fixed),
                         last_affected: None,
                         exact: None,
+                        npm_range: None,
                         evidence: format!("{path}.versions[{index}] closes affected range"),
                     });
                 }
@@ -419,6 +450,19 @@ fn affected_ranges_include_version(ranges: &[AffectedVersionRange], version: &st
     };
 
     for range in ranges {
+        if let Some(npm_range) = &range.npm_range {
+            let Ok(npm_range) = parse_range(npm_range) else {
+                return RangeMatch::Unknown("CVE affected NPM range is not valid SemVer");
+            };
+            let Ok(npm_version) = NpmRangeVersion::parse(version.to_string()) else {
+                return RangeMatch::Unknown("reachable package version is not valid SemVer");
+            };
+            if npm_range.satisfies(&npm_version) {
+                return RangeMatch::Matched(range.evidence.clone());
+            }
+            continue;
+        }
+
         if let Some(exact) = &range.exact {
             let Ok(exact) = Version::parse(exact) else {
                 return RangeMatch::Unknown("CVE affected exact version is not valid SemVer");
@@ -621,6 +665,13 @@ mod tests {
         }
     }
 
+    fn npm_kev_context(cve_id: &str) -> KevContext {
+        KevContext {
+            vendor_project: Some("Npm package".to_owned()),
+            ..kev_context(cve_id)
+        }
+    }
+
     fn reachable(package_name: &str, version: &str) -> Vec<ReachableNpmPackageVersion> {
         vec![ReachableNpmPackageVersion {
             package_name: package_name.to_owned(),
@@ -711,6 +762,60 @@ mod tests {
     }
 
     #[test]
+    fn npm_kev_context_identifies_product_only_cna_metadata() {
+        let record = json!({
+            "containers": {
+                "cna": {
+                    "affected": [{
+                        "vendor": "sebhildebrandt",
+                        "product": "systeminformation",
+                        "versions": [{ "status": "affected", "version": "< 5.3.1" }]
+                    }]
+                }
+            }
+        });
+
+        let matches = match_kev_cve_record_to_reachable_npm(
+            npm_kev_context("CVE-2021-21315"),
+            &record,
+            &reachable("systeminformation", "5.3.0"),
+        );
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].status, KevNpmMatchStatus::Affected);
+        assert_eq!(
+            matches[0].package_name.as_deref(),
+            Some("systeminformation")
+        );
+        assert_eq!(matches[0].affected_version.as_deref(), Some("5.3.0"));
+    }
+
+    #[test]
+    fn product_only_cna_metadata_without_npm_kev_context_is_ignored() {
+        let record = json!({
+            "containers": {
+                "cna": {
+                    "affected": [{
+                        "vendor": "sebhildebrandt",
+                        "product": "systeminformation",
+                        "versions": [{ "status": "affected", "version": "< 5.3.1" }]
+                    }]
+                }
+            }
+        });
+
+        let matches = match_kev_cve_record_to_reachable_npm(
+            kev_context("CVE-2021-21315"),
+            &record,
+            &reachable("systeminformation", "5.3.0"),
+        );
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].status, KevNpmMatchStatus::Unknown);
+        assert!(matches[0].package_name.is_none());
+    }
+
+    #[test]
     fn missing_version_ranges_returns_unknown_with_caveat() {
         let record = cve(json!("left-pad"), json!([]));
 
@@ -788,7 +893,7 @@ mod tests {
         });
 
         assert_eq!(
-            package_name_from_affected_entry(&entry).as_deref(),
+            package_name_from_affected_entry(&kev_context("CVE-2026-1006"), &entry).as_deref(),
             Some("@scope/name")
         );
     }
@@ -800,7 +905,7 @@ mod tests {
         });
 
         assert_eq!(
-            package_name_from_affected_entry(&entry).as_deref(),
+            package_name_from_affected_entry(&kev_context("CVE-2026-1007"), &entry).as_deref(),
             Some("@scope/name")
         );
     }
@@ -814,7 +919,7 @@ mod tests {
         });
 
         assert_eq!(
-            package_name_from_affected_entry(&entry).as_deref(),
+            package_name_from_affected_entry(&kev_context("CVE-2026-1008"), &entry).as_deref(),
             Some("right-name")
         );
     }
@@ -826,9 +931,9 @@ mod tests {
             "packageName": "left-pad"
         });
 
-        assert!(affected_entry_is_npm(&entry));
+        assert!(affected_entry_is_npm(&kev_context("CVE-2026-1009"), &entry));
         assert_eq!(
-            package_name_from_affected_entry(&entry).as_deref(),
+            package_name_from_affected_entry(&kev_context("CVE-2026-1009"), &entry).as_deref(),
             Some("left-pad")
         );
     }
