@@ -44,7 +44,11 @@ const DEFAULT_ASYNC_MAX_BLOCKING_THREADS: usize = 512;
 const MIN_COMPUTED_CVE_LIST_PARSE_CONCURRENCY: usize = 2;
 const DEFAULT_NPM_REGISTRY_URL: &str = "https://registry.npmjs.org/";
 const DEFAULT_PACKAGE_ELABORATION_MAX_PACKUMENT_BYTES: usize = 5 * 1024 * 1024;
+const DEFAULT_PACKAGE_ELABORATION_REQUEST_TIMEOUT: u64 = 30_000;
+const DEFAULT_PACKAGE_ELABORATION_TOTAL_RUN_TIMEOUT: u64 = 300_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_PACKAGES: usize = 10_000;
+const DEFAULT_PACKAGE_ELABORATION_MAX_EDGES: usize = 100_000;
+const DEFAULT_PACKAGE_ELABORATION_MAX_QUEUED_WORK: usize = 100_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_DERIVATIONS: usize = 100_000;
 
 /// Errors that can occur while loading configuration.
@@ -429,7 +433,11 @@ impl Config {
                     "package-elaboration-worker-concurrency",
                     "package-elaboration-work-queue-capacity",
                     "package-elaboration-max-packument-bytes",
+                    "package-elaboration-request-timeout",
+                    "package-elaboration-total-run-timeout",
                     "package-elaboration-max-packages",
+                    "package-elaboration-max-edges",
+                    "package-elaboration-max-queued-work",
                     "package-elaboration-max-derivations",
                 ],
             },
@@ -541,6 +549,18 @@ impl Config {
             DEFAULT_PACKAGE_ELABORATION_MAX_PACKUMENT_BYTES,
             &mut errors,
         );
+        let package_elaboration_request_timeout = parse_positive_u64(
+            &parsed,
+            "package-elaboration-request-timeout",
+            DEFAULT_PACKAGE_ELABORATION_REQUEST_TIMEOUT,
+            &mut errors,
+        );
+        let package_elaboration_total_run_timeout = parse_positive_u64(
+            &parsed,
+            "package-elaboration-total-run-timeout",
+            DEFAULT_PACKAGE_ELABORATION_TOTAL_RUN_TIMEOUT,
+            &mut errors,
+        );
         let package_elaboration_max_packages = parse_positive_usize(
             &parsed,
             "package-elaboration-max-packages",
@@ -551,6 +571,18 @@ impl Config {
             &parsed,
             "package-elaboration-max-derivations",
             DEFAULT_PACKAGE_ELABORATION_MAX_DERIVATIONS,
+            &mut errors,
+        );
+        let package_elaboration_max_edges = parse_positive_usize(
+            &parsed,
+            "package-elaboration-max-edges",
+            DEFAULT_PACKAGE_ELABORATION_MAX_EDGES,
+            &mut errors,
+        );
+        let package_elaboration_max_queued_work = parse_positive_usize(
+            &parsed,
+            "package-elaboration-max-queued-work",
+            DEFAULT_PACKAGE_ELABORATION_MAX_QUEUED_WORK,
             &mut errors,
         );
 
@@ -569,7 +601,11 @@ impl Config {
             async_worker_threads,
             package_elaboration_worker_concurrency,
             package_elaboration_work_queue_capacity,
+            package_elaboration_request_timeout,
+            package_elaboration_total_run_timeout,
             package_elaboration_max_packages,
+            package_elaboration_max_edges,
+            package_elaboration_max_queued_work,
             package_elaboration_max_derivations,
         );
 
@@ -885,8 +921,31 @@ impl Display for Config {
         )?;
         write_report_line!(
             f,
+            "package-elaboration-request-timeout",
+            &self.package_elaboration_limits.request_timeout.as_millis()
+        )?;
+        write_report_line!(
+            f,
+            "package-elaboration-total-run-timeout",
+            &self
+                .package_elaboration_limits
+                .total_run_timeout
+                .as_millis()
+        )?;
+        write_report_line!(
+            f,
             "package-elaboration-max-packages",
             &self.package_elaboration_limits.max_packages
+        )?;
+        write_report_line!(
+            f,
+            "package-elaboration-max-edges",
+            &self.package_elaboration_limits.max_edges
+        )?;
+        write_report_line!(
+            f,
+            "package-elaboration-max-queued-work",
+            &self.package_elaboration_limits.max_queued_work
         )?;
         write_report_line!(
             f,
@@ -912,7 +971,11 @@ fn resolve_package_elaboration_limits(
     async_worker_threads: Option<usize>,
     worker_concurrency: Option<usize>,
     work_queue_capacity: Option<usize>,
+    request_timeout: u64,
+    total_run_timeout: u64,
     max_packages: usize,
+    max_edges: usize,
+    max_queued_work: usize,
     max_derivations: usize,
 ) -> ElaborationLimits {
     let worker_concurrency = worker_concurrency.unwrap_or_else(|| {
@@ -925,7 +988,11 @@ fn resolve_package_elaboration_limits(
         worker_concurrency,
         work_queue_capacity: work_queue_capacity
             .unwrap_or_else(|| worker_concurrency.saturating_mul(4)),
+        request_timeout: Duration::from_millis(request_timeout),
+        total_run_timeout: Duration::from_millis(total_run_timeout),
         max_packages,
+        max_edges,
+        max_queued_work,
         max_derivations,
     }
 }
@@ -1783,7 +1850,17 @@ mod tests {
             config.package_elaboration_max_packument_bytes,
             5 * 1024 * 1024
         );
+        assert_eq!(
+            config.package_elaboration_limits.request_timeout,
+            Duration::from_millis(DEFAULT_PACKAGE_ELABORATION_REQUEST_TIMEOUT)
+        );
+        assert_eq!(
+            config.package_elaboration_limits.total_run_timeout,
+            Duration::from_millis(DEFAULT_PACKAGE_ELABORATION_TOTAL_RUN_TIMEOUT)
+        );
         assert_eq!(config.package_elaboration_limits.max_packages, 10_000);
+        assert_eq!(config.package_elaboration_limits.max_edges, 100_000);
+        assert_eq!(config.package_elaboration_limits.max_queued_work, 100_000);
         assert_eq!(config.package_elaboration_limits.max_derivations, 100_000);
         assert_eq!(
             config.cve_list_parse_concurrency,

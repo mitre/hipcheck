@@ -282,7 +282,7 @@ async fn run_package_source_elaboration(
     let result = NpmPackageJson::parse_package_json(contents.as_bytes())
         .map_err(|error| error.to_string())
         .and_then(|source| {
-            NpmRegistryClient::new(registry_url, max_packument_bytes)
+            NpmRegistryClient::new(registry_url, max_packument_bytes, limits.request_timeout)
                 .map(|client| (source, client))
                 .map_err(|error| error.to_string())
         });

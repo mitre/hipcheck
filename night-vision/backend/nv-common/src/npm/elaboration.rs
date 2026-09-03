@@ -20,6 +20,7 @@ use semver::Version;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     sync::Arc,
+    time::Duration,
 };
 use thiserror::Error;
 use tokio::sync::{Mutex, OnceCell, oneshot};
@@ -99,7 +100,11 @@ pub struct ElaborationResult {
 pub struct ElaborationLimits {
     pub worker_concurrency: usize,
     pub work_queue_capacity: usize,
+    pub request_timeout: Duration,
+    pub total_run_timeout: Duration,
     pub max_packages: usize,
+    pub max_edges: usize,
+    pub max_queued_work: usize,
     pub max_derivations: usize,
 }
 
@@ -108,7 +113,11 @@ impl Default for ElaborationLimits {
         Self {
             worker_concurrency: 4,
             work_queue_capacity: 16,
+            request_timeout: Duration::from_secs(30),
+            total_run_timeout: Duration::from_secs(300),
             max_packages: 10_000,
+            max_edges: 100_000,
+            max_queued_work: 100_000,
             max_derivations: 100_000,
         }
     }
@@ -116,7 +125,13 @@ impl Default for ElaborationLimits {
 
 impl ElaborationLimits {
     fn validate(&self) -> Result<(), ElaborationError> {
-        if self.worker_concurrency == 0 || self.work_queue_capacity == 0 {
+        if self.worker_concurrency == 0
+            || self.work_queue_capacity == 0
+            || self.request_timeout.is_zero()
+            || self.total_run_timeout.is_zero()
+            || self.max_edges == 0
+            || self.max_queued_work == 0
+        {
             return Err(ElaborationError::InvalidLimits);
         }
         Ok(())
@@ -135,6 +150,7 @@ pub struct NpmRegistryClient {
     client: reqwest::Client,
     registry_url: Url,
     max_packument_bytes: usize,
+    request_timeout: Duration,
 }
 
 impl NpmRegistryClient {
@@ -142,22 +158,28 @@ impl NpmRegistryClient {
     pub fn new(
         registry_url: Url,
         max_packument_bytes: usize,
+        request_timeout: Duration,
     ) -> Result<Self, PackumentProviderError> {
-        if max_packument_bytes == 0 {
+        if max_packument_bytes == 0 || request_timeout.is_zero() {
             return Err(PackumentProviderError::Request);
         }
         Ok(Self {
             client: reqwest::Client::new(),
             registry_url,
             max_packument_bytes,
+            request_timeout,
         })
     }
 
     /// Creates a client for the public NPM registry.
-    pub fn public_npm(max_packument_bytes: usize) -> Result<Self, PackumentProviderError> {
+    pub fn public_npm(
+        max_packument_bytes: usize,
+        request_timeout: Duration,
+    ) -> Result<Self, PackumentProviderError> {
         Self::new(
             Url::parse("https://registry.npmjs.org/").expect("public NPM URL is valid"),
             max_packument_bytes,
+            request_timeout,
         )
     }
 
@@ -175,27 +197,31 @@ impl PackumentProvider for NpmRegistryClient {
         &self,
         package: &NpmPackageName,
     ) -> Result<NpmPackument, PackumentProviderError> {
-        let response = self
-            .client
-            .get(self.packument_url(package)?)
-            .header("Accept", "application/vnd.npm.install-v1+json")
-            .send()
-            .await
-            .map_err(|_| PackumentProviderError::Request)?;
-        if response.status() == reqwest::StatusCode::NOT_FOUND {
-            return Err(PackumentProviderError::NotFound);
-        }
-        if !response.status().is_success()
-            || response
-                .content_length()
-                .is_some_and(|length| length > self.max_packument_bytes as u64)
-        {
-            return Err(PackumentProviderError::Request);
-        }
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|_| PackumentProviderError::Request)?;
+        let bytes = tokio::time::timeout(self.request_timeout, async {
+            let response = self
+                .client
+                .get(self.packument_url(package)?)
+                .header("Accept", "application/vnd.npm.install-v1+json")
+                .send()
+                .await
+                .map_err(|_| PackumentProviderError::Request)?;
+            if response.status() == reqwest::StatusCode::NOT_FOUND {
+                return Err(PackumentProviderError::NotFound);
+            }
+            if !response.status().is_success()
+                || response
+                    .content_length()
+                    .is_some_and(|length| length > self.max_packument_bytes as u64)
+            {
+                return Err(PackumentProviderError::Request);
+            }
+            response
+                .bytes()
+                .await
+                .map_err(|_| PackumentProviderError::Request)
+        })
+        .await
+        .map_err(|_| PackumentProviderError::Timeout)??;
         if bytes.len() > self.max_packument_bytes {
             return Err(PackumentProviderError::Request);
         }
@@ -211,6 +237,8 @@ pub enum PackumentProviderError {
     NotFound,
     #[error("registry request failed")]
     Request,
+    #[error("registry request timed out")]
+    Timeout,
     #[error("registry returned an invalid packument")]
     InvalidPackument,
 }
@@ -220,7 +248,7 @@ pub enum PackumentProviderError {
 pub enum ElaborationError {
     #[error("elaboration limits must be positive")]
     InvalidLimits,
-    #[error("failed to retrieve packument for {package}")]
+    #[error("failed to retrieve packument for {package}: {source}")]
     Packument {
         package: Box<str>,
         #[source]
@@ -237,8 +265,14 @@ pub enum ElaborationError {
     },
     #[error("elaboration exceeded the package limit")]
     PackageLimitExceeded,
+    #[error("elaboration exceeded the dependency-edge limit")]
+    EdgeLimitExceeded,
+    #[error("elaboration exceeded the queued-work limit")]
+    QueuedWorkLimitExceeded,
     #[error("elaboration exceeded the derivation-path limit")]
     DerivationLimitExceeded,
+    #[error("elaboration exceeded the total-run timeout")]
+    TotalRunTimeout,
     #[error("a worker stopped before reporting its result")]
     WorkerStopped,
 }
@@ -251,17 +285,38 @@ pub async fn elaborate(
 ) -> Result<ElaborationResult, ElaborationError> {
     limits.validate()?;
     let cache = PackumentCache::default();
-    let (work_sender, work_receiver) = async_channel::bounded(limits.work_queue_capacity);
-    let mut workers = Vec::with_capacity(limits.worker_concurrency);
-    for _ in 0..limits.worker_concurrency {
-        workers.push(tokio::spawn(worker(
-            work_receiver.clone(),
-            cache.clone(),
-            provider.clone(),
-        )));
+    let mut workers = WorkerPool::new(
+        limits.worker_concurrency,
+        limits.work_queue_capacity,
+        cache.clone(),
+        provider.clone(),
+    );
+    let result = tokio::time::timeout(
+        limits.total_run_timeout,
+        elaborate_inner(source, provider, &limits, &cache, workers.sender()),
+    )
+    .await
+    .map_err(|_| ElaborationError::TotalRunTimeout)
+    .and_then(|result| result);
+    match result {
+        Ok(result) => {
+            workers.shutdown().await?;
+            Ok(result)
+        }
+        Err(error) => {
+            workers.abort();
+            Err(error)
+        }
     }
-    drop(work_receiver);
+}
 
+async fn elaborate_inner(
+    source: &NpmPackageJson,
+    provider: Arc<dyn PackumentProvider>,
+    limits: &ElaborationLimits,
+    cache: &PackumentCache,
+    work_sender: &async_channel::Sender<WorkItem>,
+) -> Result<ElaborationResult, ElaborationError> {
     let mut state = SupervisorState::default();
     let mut pending = Vec::new();
     for root in source.root_dependencies() {
@@ -275,14 +330,17 @@ pub async fn elaborate(
         )
         .await?;
         for version in versions {
-            state.edges.insert(ElaborationEdge {
-                parent: None,
-                child: version.clone(),
-                root_dependency_kind: Some(root.kind),
-                declared_dependency: root.name.as_str().into(),
-                declared_specification: format_dependency_specification(&root.specification),
-            });
-            pending.push((version.clone(), vec![version]));
+            state.record_edge(
+                ElaborationEdge {
+                    parent: None,
+                    child: version.clone(),
+                    root_dependency_kind: Some(root.kind),
+                    declared_dependency: root.name.as_str().into(),
+                    declared_specification: format_dependency_specification(&root.specification),
+                },
+                limits,
+            )?;
+            enqueue_work(&mut pending, (version.clone(), vec![version]), limits)?;
         }
     }
 
@@ -323,32 +381,43 @@ pub async fn elaborate(
                 .await?;
                 for derivation in &report.derivations {
                     for version in &versions {
-                        state.edges.insert(ElaborationEdge {
-                            parent: Some(report.package.clone()),
-                            child: version.clone(),
-                            root_dependency_kind: None,
-                            declared_dependency: dependency.name.as_str().into(),
-                            declared_specification: format_dependency_specification(
-                                &dependency.specification,
-                            ),
-                        });
+                        state.record_edge(
+                            ElaborationEdge {
+                                parent: Some(report.package.clone()),
+                                child: version.clone(),
+                                root_dependency_kind: None,
+                                declared_dependency: dependency.name.as_str().into(),
+                                declared_specification: format_dependency_specification(
+                                    &dependency.specification,
+                                ),
+                            },
+                            limits,
+                        )?;
                         if derivation.contains(version) {
                             continue;
                         }
                         let mut child_derivation = derivation.clone();
                         child_derivation.push(version.clone());
-                        pending.push((version.clone(), child_derivation));
+                        enqueue_work(&mut pending, (version.clone(), child_derivation), limits)?;
                     }
                 }
             }
         }
     }
 
-    drop(work_sender);
-    for worker in workers {
-        worker.await.map_err(|_| ElaborationError::WorkerStopped)?;
-    }
     Ok(state.finish())
+}
+
+fn enqueue_work(
+    pending: &mut Vec<(PackageVersion, Vec<PackageVersion>)>,
+    work: (PackageVersion, Vec<PackageVersion>),
+    limits: &ElaborationLimits,
+) -> Result<(), ElaborationError> {
+    if pending.len() == limits.max_queued_work {
+        return Err(ElaborationError::QueuedWorkLimitExceeded);
+    }
+    pending.push(work);
+    Ok(())
 }
 
 #[derive(Default)]
@@ -400,6 +469,51 @@ struct WorkItem {
     package: PackageVersion,
     derivations: Vec<Vec<PackageVersion>>,
     reply_sender: oneshot::Sender<Result<WorkerReport, ElaborationError>>,
+}
+
+struct WorkerPool {
+    sender: async_channel::Sender<WorkItem>,
+    workers: Vec<tokio::task::JoinHandle<()>>,
+}
+
+impl WorkerPool {
+    fn new(
+        concurrency: usize,
+        capacity: usize,
+        cache: PackumentCache,
+        provider: Arc<dyn PackumentProvider>,
+    ) -> Self {
+        let (sender, receiver) = async_channel::bounded(capacity);
+        let workers = (0..concurrency)
+            .map(|_| tokio::spawn(worker(receiver.clone(), cache.clone(), provider.clone())))
+            .collect();
+        Self { sender, workers }
+    }
+
+    fn sender(&self) -> &async_channel::Sender<WorkItem> {
+        &self.sender
+    }
+
+    async fn shutdown(&mut self) -> Result<(), ElaborationError> {
+        self.sender.close();
+        for worker in self.workers.drain(..) {
+            worker.await.map_err(|_| ElaborationError::WorkerStopped)?;
+        }
+        Ok(())
+    }
+
+    fn abort(&mut self) {
+        self.sender.close();
+        for worker in self.workers.drain(..) {
+            worker.abort();
+        }
+    }
+}
+
+impl Drop for WorkerPool {
+    fn drop(&mut self) {
+        self.abort();
+    }
 }
 
 struct WorkerReport {
@@ -591,6 +705,21 @@ struct SupervisorState {
 }
 
 impl SupervisorState {
+    fn record_edge(
+        &mut self,
+        edge: ElaborationEdge,
+        limits: &ElaborationLimits,
+    ) -> Result<(), ElaborationError> {
+        if self.edges.contains(&edge) {
+            return Ok(());
+        }
+        if self.edges.len() == limits.max_edges {
+            return Err(ElaborationError::EdgeLimitExceeded);
+        }
+        self.edges.insert(edge);
+        Ok(())
+    }
+
     fn record_derivation(
         &mut self,
         package: PackageVersion,
@@ -640,10 +769,12 @@ impl SupervisorState {
 mod tests {
     use super::*;
     use crate::npm::{package_json::NpmPackageJson, packument::parse_packument};
+    use httpmock::prelude::*;
     use serde_json::json;
     use std::{
         collections::BTreeMap,
         sync::atomic::{AtomicUsize, Ordering},
+        time::Duration,
     };
 
     struct MockRegistry {
@@ -803,6 +934,104 @@ mod tests {
             .expect_err("package limit is enforced");
 
         assert!(matches!(error, ElaborationError::PackageLimitExceeded));
+    }
+
+    #[test]
+    fn fails_when_the_edge_limit_is_exceeded() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([
+                (
+                    "root".to_owned(),
+                    packument("root", "1.0.0", json!({ "child": "1.0.0" })),
+                ),
+                ("child".to_owned(), packument("child", "1.0.0", json!({}))),
+            ]),
+        };
+        let limits = ElaborationLimits {
+            max_edges: 1,
+            ..ElaborationLimits::default()
+        };
+
+        let error = tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(elaborate(&source, Arc::new(registry), limits))
+            .expect_err("edge limit is enforced");
+
+        assert!(matches!(error, ElaborationError::EdgeLimitExceeded));
+    }
+
+    #[test]
+    fn fails_when_the_pending_work_limit_is_exceeded() {
+        let source = source(json!({
+            "dependencies": { "left": "1.0.0", "right": "1.0.0" }
+        }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([
+                ("left".to_owned(), packument("left", "1.0.0", json!({}))),
+                ("right".to_owned(), packument("right", "1.0.0", json!({}))),
+            ]),
+        };
+        let limits = ElaborationLimits {
+            max_queued_work: 1,
+            ..ElaborationLimits::default()
+        };
+
+        let error = tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(elaborate(&source, Arc::new(registry), limits))
+            .expect_err("queued-work limit is enforced");
+
+        assert!(matches!(error, ElaborationError::QueuedWorkLimitExceeded));
+    }
+
+    struct DelayedRegistry;
+
+    #[async_trait]
+    impl PackumentProvider for DelayedRegistry {
+        async fn fetch(
+            &self,
+            _package: &NpmPackageName,
+        ) -> Result<NpmPackument, PackumentProviderError> {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            unreachable!("the total timeout should cancel this fetch")
+        }
+    }
+
+    #[test]
+    fn fails_when_the_total_run_timeout_is_exceeded() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let limits = ElaborationLimits {
+            total_run_timeout: Duration::from_millis(1),
+            ..ElaborationLimits::default()
+        };
+
+        let error = tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(elaborate(&source, Arc::new(DelayedRegistry), limits))
+            .expect_err("total-run timeout is enforced");
+
+        assert!(matches!(error, ElaborationError::TotalRunTimeout));
+    }
+
+    #[tokio::test]
+    async fn registry_client_enforces_the_request_timeout() {
+        let server = MockServer::start();
+        let _mock = server.mock(|when, then| {
+            when.method(GET).path("/root");
+            then.status(200).delay(Duration::from_millis(50));
+        });
+        let client = NpmRegistryClient::new(
+            Url::parse(&format!("{}/", server.base_url())).expect("valid mock URL"),
+            1024,
+            Duration::from_millis(1),
+        )
+        .expect("valid client");
+        let package = NpmPackageName::parse("root".to_owned()).expect("valid package name");
+
+        let error = client.fetch(&package).await.expect_err("request times out");
+
+        assert!(matches!(error, PackumentProviderError::Timeout));
     }
 
     #[test]

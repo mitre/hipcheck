@@ -169,10 +169,30 @@ package-elaboration-work-queue-capacity =
 # Default: 5242880
 package-elaboration-max-packument-bytes =
 
+# The maximum time allowed for one NPM registry request in milliseconds.
+#
+# Default: 30000
+package-elaboration-request-timeout =
+
+# The maximum time allowed for an entire package elaboration run in milliseconds.
+#
+# Default: 300000
+package-elaboration-total-run-timeout =
+
 # The maximum concrete package versions in one elaboration result.
 #
 # Default: 10000
 package-elaboration-max-packages =
+
+# The maximum dependency edges in one elaboration result.
+#
+# Default: 100000
+package-elaboration-max-edges =
+
+# The maximum not-yet-dispatched dependency work items in one elaboration run.
+#
+# Default: 100000
+package-elaboration-max-queued-work =
 
 # The maximum acyclic derivation paths in one elaboration result.
 #

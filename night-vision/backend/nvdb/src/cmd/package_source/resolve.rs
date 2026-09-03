@@ -48,6 +48,7 @@ async fn resolve(config: &Config, source_id: &str) -> Result<(usize, usize)> {
     let client = NpmRegistryClient::new(
         config.npm_registry_url.clone(),
         config.package_elaboration_max_packument_bytes,
+        config.package_elaboration_limits().request_timeout,
     )
     .context("invalid NPM registry configuration")?;
     let result = elaborate(

@@ -72,7 +72,11 @@ SeaORM, or Tokio setting at its default unless noted below.
 | `package-elaboration-worker-concurrency` | Concurrent package-version elaboration workers. | Tasks | Four times Tokio worker threads, with a minimum of 4 and maximum of 32. Values must be greater than 0. |
 | `package-elaboration-work-queue-capacity` | Bounded elaboration work queue capacity. | Work items | Four times elaboration worker concurrency. Values must be greater than 0. |
 | `package-elaboration-max-packument-bytes` | Maximum accepted NPM packument response size. | Bytes | 5242880 bytes (5 MiB). Values must be greater than 0. |
+| `package-elaboration-request-timeout` | Maximum duration for one NPM registry request. | Milliseconds | 30000 milliseconds. Values must be greater than 0. |
+| `package-elaboration-total-run-timeout` | Maximum duration for one complete elaboration. | Milliseconds | 300000 milliseconds. Values must be greater than 0. |
 | `package-elaboration-max-packages` | Maximum concrete package versions in one elaboration result. | Versions | 10000. Values must be greater than 0. |
+| `package-elaboration-max-edges` | Maximum dependency edges in one elaboration result. | Edges | 100000. Values must be greater than 0. |
+| `package-elaboration-max-queued-work` | Maximum not-yet-dispatched dependency work items. | Work items | 100000. Values must be greater than 0. |
 | `package-elaboration-max-derivations` | Maximum acyclic derivation paths in one elaboration result. | Paths | 100000. Values must be greater than 0. |
 
 ## Secret Files
