@@ -12,6 +12,9 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub file_contents: String,
     pub inferred_type: String,
+    pub resolution_status: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub resolution_error: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
