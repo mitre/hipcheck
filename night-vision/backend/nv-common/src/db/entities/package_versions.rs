@@ -8,7 +8,6 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub package_id: i32,
-    pub source_id: i32,
     pub version: String,
     pub package_url: String,
     pub source_repository: Option<String>,

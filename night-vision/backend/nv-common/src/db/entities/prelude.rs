@@ -10,6 +10,7 @@ pub use super::hipcheck_concerns::Entity as HipcheckConcerns;
 pub use super::hipcheck_findings::Entity as HipcheckFindings;
 pub use super::hipcheck_runs::Entity as HipcheckRuns;
 pub use super::package_source_edges::Entity as PackageSourceEdges;
+pub use super::package_source_versions::Entity as PackageSourceVersions;
 pub use super::package_source_warnings::Entity as PackageSourceWarnings;
 pub use super::package_sources::Entity as PackageSources;
 pub use super::package_versions::Entity as PackageVersions;

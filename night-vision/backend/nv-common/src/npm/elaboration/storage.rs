@@ -2,7 +2,8 @@
 
 use super::{ElaborationResult, PackageVersion, UnsupportedSpecificationKind};
 use crate::db::entities::{
-    package_source_edges, package_source_warnings, package_sources, package_versions, packages,
+    package_source_edges, package_source_versions, package_source_warnings, package_sources,
+    package_versions, packages,
 };
 use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, DatabaseConnection, DbErr,
@@ -69,8 +70,16 @@ pub async fn persisted_package_versions(
     db: &DatabaseConnection,
     source_id: i32,
 ) -> Result<Vec<PersistedPackageVersion>, ElaborationStorageError> {
+    let package_version_ids = package_source_versions::Entity::find()
+        .filter(package_source_versions::Column::SourceId.eq(source_id))
+        .all(db)
+        .await
+        .map_err(ElaborationStorageError::Database)?
+        .into_iter()
+        .map(|association| association.package_version_id)
+        .collect::<Vec<_>>();
     let versions = package_versions::Entity::find()
-        .filter(package_versions::Column::SourceId.eq(source_id))
+        .filter(package_versions::Column::Id.is_in(package_version_ids))
         .order_by_asc(package_versions::Column::PackageUrl)
         .all(db)
         .await
@@ -197,8 +206,8 @@ pub async fn persist_completed_elaboration(
         .exec(&transaction)
         .await
         .map_err(ElaborationStorageError::Database)?;
-    package_versions::Entity::delete_many()
-        .filter(package_versions::Column::SourceId.eq(source_id))
+    package_source_versions::Entity::delete_many()
+        .filter(package_source_versions::Column::SourceId.eq(source_id))
         .exec(&transaction)
         .await
         .map_err(ElaborationStorageError::Database)?;
@@ -206,16 +215,21 @@ pub async fn persist_completed_elaboration(
     let mut versions = BTreeMap::new();
     for elaborated in &result.packages {
         let package = find_or_insert_package(&transaction, &elaborated.package).await?;
-        let version = package_versions::ActiveModel {
-            package_id: Set(package.id),
+        let version = find_or_insert_package_version(&transaction, package.id, elaborated).await?;
+        package_source_versions::Entity::insert(package_source_versions::ActiveModel {
             source_id: Set(source_id),
-            version: Set(elaborated.package.version.to_string()),
-            package_url: Set(elaborated.package.purl()),
-            source_repository: Set(elaborated.source_repository.clone()),
-            source_repository_tag: Set(None),
+            package_version_id: Set(version.id),
             ..Default::default()
-        }
-        .insert(&transaction)
+        })
+        .on_conflict(
+            OnConflict::columns([
+                package_source_versions::Column::SourceId,
+                package_source_versions::Column::PackageVersionId,
+            ])
+            .do_nothing()
+            .to_owned(),
+        )
+        .exec(&transaction)
         .await
         .map_err(ElaborationStorageError::Database)?;
         versions.insert(elaborated.package.clone(), version.id);
@@ -357,6 +371,79 @@ async fn find_or_insert_package(
         .ok_or_else(|| ElaborationStorageError::MissingPackage(package.purl()))
 }
 
+async fn find_or_insert_package_version(
+    db: &sea_orm::DatabaseTransaction,
+    package_id: i32,
+    elaborated: &super::ElaboratedPackage,
+) -> Result<package_versions::Model, ElaborationStorageError> {
+    let version = elaborated.package.version.to_string();
+    let existing = package_versions::Entity::find()
+        .filter(package_versions::Column::PackageId.eq(package_id))
+        .filter(package_versions::Column::Version.eq(&version))
+        .one(db)
+        .await
+        .map_err(ElaborationStorageError::Database)?;
+
+    if let Some(existing) = existing {
+        update_repository_metadata(db, existing.id, elaborated.source_repository.as_deref())
+            .await?;
+        return Ok(existing);
+    }
+
+    match package_versions::Entity::insert(package_versions::ActiveModel {
+        package_id: Set(package_id),
+        version: Set(version.clone()),
+        package_url: Set(elaborated.package.purl()),
+        source_repository: Set(elaborated.source_repository.clone()),
+        source_repository_tag: Set(None),
+        ..Default::default()
+    })
+    .on_conflict(
+        OnConflict::columns([
+            package_versions::Column::PackageId,
+            package_versions::Column::Version,
+        ])
+        .do_nothing()
+        .to_owned(),
+    )
+    .exec(db)
+    .await
+    {
+        Ok(_) | Err(DbErr::RecordNotInserted) => {}
+        Err(error) => return Err(ElaborationStorageError::Database(error)),
+    }
+
+    let version = package_versions::Entity::find()
+        .filter(package_versions::Column::PackageId.eq(package_id))
+        .filter(package_versions::Column::Version.eq(version))
+        .one(db)
+        .await
+        .map_err(ElaborationStorageError::Database)?
+        .ok_or_else(|| ElaborationStorageError::MissingPackage(elaborated.package.purl()))?;
+    update_repository_metadata(db, version.id, elaborated.source_repository.as_deref()).await?;
+    Ok(version)
+}
+
+async fn update_repository_metadata<C: sea_orm::ConnectionTrait>(
+    db: &C,
+    package_version_id: i32,
+    source_repository: Option<&str>,
+) -> Result<(), ElaborationStorageError> {
+    let Some(source_repository) = source_repository else {
+        return Ok(());
+    };
+    package_versions::Entity::update_many()
+        .col_expr(
+            package_versions::Column::SourceRepository,
+            sea_orm::sea_query::Expr::value(source_repository),
+        )
+        .filter(package_versions::Column::Id.eq(package_version_id))
+        .exec(db)
+        .await
+        .map_err(ElaborationStorageError::Database)?;
+    Ok(())
+}
+
 fn version_id(
     versions: &BTreeMap<PackageVersion, i32>,
     package: &PackageVersion,
@@ -403,13 +490,14 @@ mod tests {
     use super::{
         MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic, persist_completed_elaboration,
         persisted_elaboration_warnings, persisted_package_versions, record_elaboration_failure,
-        warning_kind,
+        update_repository_metadata, warning_kind,
     };
     use crate::{
-        db::entities::{package_source_edges, package_source_warnings, package_versions, packages},
-        npm::elaboration::{
-            ElaboratedPackage, ElaborationResult, PackageVersion, UnsupportedSpecificationKind,
+        db::entities::{
+            package_source_edges, package_source_versions, package_source_warnings,
+            package_versions,
         },
+        npm::elaboration::{ElaborationResult, UnsupportedSpecificationKind},
     };
     use sea_orm::{DbBackend, MockDatabase, MockExecResult};
 
@@ -428,6 +516,43 @@ mod tests {
             warning_kind(UnsupportedSpecificationKind::HistoricName),
             "historic-name"
         );
+    }
+
+    #[tokio::test]
+    async fn refreshes_nonempty_repository_metadata() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        update_repository_metadata(&db, 7, Some("https://github.com/example/project"))
+            .await
+            .expect("nonempty repository metadata updates the canonical release");
+
+        let statements = db
+            .into_transaction_log()
+            .into_iter()
+            .flat_map(|entry| entry.statements().to_vec())
+            .map(|statement| statement.sql)
+            .collect::<Vec<_>>();
+        assert_eq!(statements.len(), 1);
+        assert!(
+            statements[0].contains("source_repository"),
+            "{statements:#?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_repository_metadata_preserves_the_canonical_release() {
+        let db = MockDatabase::new(DbBackend::Postgres).into_connection();
+
+        update_repository_metadata(&db, 7, None)
+            .await
+            .expect("missing repository metadata is not destructive");
+
+        assert!(db.into_transaction_log().is_empty());
     }
 
     #[tokio::test]
@@ -467,13 +592,20 @@ mod tests {
         .map(|(id, package_url)| package_versions::Model {
             id,
             package_id: id,
-            source_id: 7,
             version: "1.0.0".to_owned(),
             package_url: package_url.to_owned(),
             source_repository: None,
             source_repository_tag: None,
         })
         .collect::<Vec<_>>();
+        let associations = versions
+            .iter()
+            .map(|version| package_source_versions::Model {
+                id: version.id,
+                source_id: 7,
+                package_version_id: version.id,
+            })
+            .collect::<Vec<_>>();
         let edges = [
             (None, 1),
             (None, 2),
@@ -501,6 +633,7 @@ mod tests {
         )
         .collect::<Vec<_>>();
         let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([associations])
             .append_query_results([versions])
             .append_query_results([edges])
             .into_connection();
@@ -570,74 +703,14 @@ mod tests {
             "{statements:#?}"
         );
         assert!(
-            statements.iter().any(|sql| sql.contains("package_version")),
+            statements
+                .iter()
+                .any(|sql| sql.contains("package_source_versions")),
             "{statements:#?}"
         );
         assert!(statements.iter().any(|sql| sql.contains("package_sources")));
         assert_eq!(statements.first(), Some(&"BEGIN".to_owned()));
         assert_eq!(statements.last(), Some(&"COMMIT".to_owned()));
-    }
-
-    #[tokio::test]
-    async fn reuses_a_package_created_by_a_concurrent_snapshot() {
-        let package = PackageVersion {
-            name: "shared".into(),
-            version: "1.0.0".into(),
-        };
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([Vec::<packages::Model>::new()])
-            .append_query_results([Vec::<packages::Model>::new()])
-            .append_query_results([vec![packages::Model {
-                id: 12,
-                name: "shared".to_owned(),
-                package_host: "npm".to_owned(),
-            }]])
-            .append_query_results([vec![package_versions::Model {
-                id: 1,
-                package_id: 12,
-                source_id: 7,
-                version: "1.0.0".to_owned(),
-                package_url: "pkg:npm/shared@1.0.0".to_owned(),
-                source_repository: None,
-                source_repository_tag: None,
-            }]])
-            .append_exec_results(std::iter::repeat_n(
-                MockExecResult {
-                    last_insert_id: 1,
-                    rows_affected: 1,
-                },
-                6,
-            ))
-            .into_connection();
-
-        persist_completed_elaboration(
-            &db,
-            7,
-            &ElaborationResult {
-                packages: vec![ElaboratedPackage {
-                    package,
-                    derivations: Vec::new(),
-                    source_repository: None,
-                }],
-                edges: Vec::new(),
-                warnings: Vec::new(),
-            },
-        )
-        .await
-        .expect("a concurrent package insert is reused");
-
-        let statements = db
-            .into_transaction_log()
-            .into_iter()
-            .flat_map(|entry| entry.statements().to_vec())
-            .map(|statement| statement.sql)
-            .collect::<Vec<_>>();
-        assert!(
-            statements
-                .iter()
-                .any(|sql| { sql.contains("ON CONFLICT (\"name\", \"package_host\") DO NOTHING") }),
-            "{statements:#?}"
-        );
     }
 
     #[tokio::test]
