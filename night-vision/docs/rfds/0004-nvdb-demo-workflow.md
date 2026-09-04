@@ -18,7 +18,8 @@ Night Vision should have a coherent demonstration of its delivered
 package-assessment capabilities through one `nvdb` workflow:
 
 ```text
-package source -> resolved package versions -> KEV matches -> assessment evidence
+package source -> KEV-affected baseline -> upgrade candidates
+-> selected target -> assessment evidence
 ```
 
 The demonstration should use stable package-source identifiers and Package URLs
@@ -42,8 +43,9 @@ The planned demo should focus on work not previously demonstrated:
 
 1. expanding an npm `package.json` source into reachable package versions;
 2. finding KEV-linked CVEs that affect one of those versions; and
-3. running Hipcheck for a selected version and retaining the resulting
-   Night Vision assessment evidence.
+3. discovering upgrade targets for a KEV-affected version; and
+4. running Hipcheck for an operator-selected eligible target and retaining the
+   resulting Night Vision assessment evidence.
 
 The package-source API model already establishes useful domain identifiers:
 a package-source ID, a completed source representation, and versioned packages
@@ -64,28 +66,32 @@ normalized findings.
 
 - Re-demonstrating CVE List or KEV catalog synchronization.
 - Defining the final public API or frontend interaction model.
-- Claiming that a version with no match is safe.
+- Claiming that a candidate with no known active KEV match is safe.
 - Making Hipcheck responsible for vulnerability matching, KEV data,
   package-source resolution, or the final Night Vision verdict.
 - Running Hipcheck for every dependency in a submitted source.
 
 ## Decision
 
-### Use a source-to-assessment workflow
+### Use a KEV-driven upgrade-assessment workflow
 
-The demo should begin with a source submission and end with an assessment of a
-selected package version. A package-source ID identifies the submitted
-`package.json`; a PURL identifies a resolved version at every later stage.
+The demo should begin with a source submission and end with Hipcheck assessing
+an operator-selected upgrade target. A package-source ID identifies the
+submitted `package.json`; the KEV-affected baseline is a PURL reachable from
+that source. The selected target is a separate canonical package release and
+does not need to be reachable from the submitted source snapshot.
 
 ```mermaid
 flowchart LR
     source[package.json] --> import[package-source import]
     import --> id[package-source ID]
     id --> resolve[package-source resolve]
-    resolve --> purl[resolved version PURL]
+    resolve --> baseline[resolved KEV-affected PURL]
     resolve --> kevs[package-source kevs]
-    kevs --> candidates[package-version candidates]
-    candidates --> assessment[assessment analyze affected target]
+    kevs --> baseline
+    baseline --> candidates[package-version candidates]
+    candidates --> target[operator-selected target PURL]
+    target --> assessment[assessment analyze affected target]
     assessment --> evidence[assessment show / evidence]
 ```
 
@@ -170,11 +176,25 @@ cargo nvdb assessment runs --package pkg:npm/example --limit 10
 cargo nvdb assessment evidence <ASSESSMENT-UUID> --raw-hipcheck
 ```
 
+`package-version candidates <AFFECTED-PURL>` requires locally available
+active KEV-linked evidence for the baseline. It lists strictly newer published
+versions in deterministic order with publish metadata, SemVer compatibility,
+exclusion reasons, and KEV status. Deprecated and prerelease releases remain
+visible but are ineligible. A status of no known active KEV match is evidence
+from local data, not a claim that a candidate is safe.
+
+`assessment analyze <AFFECTED-PURL> <TARGET-PURL>` requires the same npm
+package, a strictly newer published target, an eligible candidate, and no
+locally known active KEV match for that target. It persists the exact target's
+canonical release metadata and normalized repository URL before it queues
+Hipcheck, without adding a source-snapshot association. Hipcheck therefore
+assesses the target, never the KEV-affected baseline.
+
 `assessment analyze` prints a UUID v7 assessment ID, affected and target PURLs, completion
 state, Hipcheck recommendation, and a small finding summary. The UUID is the
 stable public identifier used by `show` and `evidence`; keep it opaque and copy
 it exactly. `assessment show`
-should display the target, policy identity and version, Hipcheck version and
+should display the affected and target PURLs, policy identity and version, Hipcheck version and
 commit, recommendation, normalized findings, and timestamps. Raw Hipcheck JSON
 is evidence and belongs behind the explicit `evidence --raw-hipcheck` request.
 
@@ -188,8 +208,8 @@ UUID v7 assessment ID and summary. This keeps the command sequence linear while
 retaining persisted assessments for later `show`, `runs`, and `evidence`
 inspection.
 
-The demo assessment display is sufficient when it includes the target PURL,
-policy identity and version, Hipcheck version and commit, recommendation,
+The demo assessment display is sufficient when it includes the affected and
+target PURLs, policy identity and version, Hipcheck version and commit, recommendation,
 normalized findings, and timestamps. Additional fields may be added later when
 they improve evidence inspection without making the default display noisy.
 
@@ -243,18 +263,19 @@ and the chosen sample's expected PURL and match.
 
 ## Implementation Plan
 
-1. Add the `package-source` command namespace around the package-source
-   persistence and resolution work.
-2. Add presentation-focused `show` and `versions` output, with deterministic
-   ordering and `--json` representations.
-3. Add `package-source kevs` on top of the KEV-linked package-version matching
-   service, preserving resolved-version context, confidence, evidence, and
-   caveats.
-4. Add assessment persistence, Hipcheck execution, normalized findings, and
-   the `assessment` command namespace.
-5. Add unit tests for command parsing and output-model tests for each command.
-6. Update the `nvdb` command reference with only implemented commands and
-   perform a rehearsal against the prepared demo data.
+1. Add the `package-source` command namespace around package-source
+   persistence, resolution, display, and source-scoped KEV matching.
+2. Add `package-version candidates`, including registry discovery, deterministic
+   presentation, candidate exclusion reasons, and batch KEV matching.
+3. Make assessments upgrade-only: validate baseline and target PURLs, persist
+   the selected target independently of the source graph, and reject targets
+   with locally known active KEV matches.
+4. Persist affected-PURL provenance with every new Hipcheck run and expose it
+   through status, show, evidence, JSON, and OpenAPI responses.
+5. Add storage, CLI, API, and migration coverage for candidate eligibility,
+   upgrade lineage, and canonical target persistence.
+6. Update the command reference and perform a rehearsal against the prepared
+   demo data.
 
 ## Consequences
 
