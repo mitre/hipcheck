@@ -50,7 +50,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
             .iter()
             .map(|run| {
                 json_run_output(
-                    run.id,
+                    &run.assessment_id,
                     run.target_purl.as_deref(),
                     &run.status,
                     run.policy_recommendation.as_deref(),
@@ -64,7 +64,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         for run in runs {
             println!(
                 "{} {} {} {} {}",
-                run.id,
+                run.assessment_id,
                 run.target_purl.as_deref().unwrap_or("<none>"),
                 run.status,
                 run.policy_recommendation.as_deref().unwrap_or("<none>"),
@@ -76,7 +76,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
 }
 
 fn json_run_output(
-    id: i32,
+    id: &str,
     target: Option<&str>,
     state: &str,
     recommendation: Option<&str>,
@@ -135,6 +135,8 @@ mod tests {
     use super::{command, json_run_output, npm_package_name_from_purl};
     use clap::error::ErrorKind;
 
+    const ASSESSMENT_ID: &str = "0198f30e-2bfa-7000-8000-000000000007";
+
     #[test]
     fn runs_requires_a_package() {
         let error = command()
@@ -182,14 +184,14 @@ mod tests {
     fn runs_json_output_includes_the_assessed_version() {
         assert_eq!(
             json_run_output(
-                7,
+                ASSESSMENT_ID,
                 Some("pkg:npm/example@1.2.3"),
                 "completed",
                 Some("pass"),
                 "2026-09-03T00:00:00Z",
             ),
             serde_json::json!({
-                "id": 7,
+                "id": ASSESSMENT_ID,
                 "target": "pkg:npm/example@1.2.3",
                 "state": "completed",
                 "recommendation": "pass",

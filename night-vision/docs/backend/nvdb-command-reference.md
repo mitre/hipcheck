@@ -163,10 +163,19 @@ version and expose the persisted Night Vision assessment and its evidence.
 | `assessment runs --package <PURL> [--limit <N>] [--json]` | List persisted assessments across all resolved versions of an unversioned npm package PURL, such as `pkg:npm/example`. |
 | `assessment evidence <ASSESSMENT-ID> [--raw-hipcheck] [--json]` | Inspect retained assessment evidence. |
 
-`assessment evidence` omits raw Hipcheck JSON unless `--raw-hipcheck` is
-provided. All commands use concise text by default and emit structured output
-with `--json`. `assessment analyze` runs synchronously and prints its
-persisted assessment ID only after the assessment reaches a terminal state.
+Assessment IDs are UUID v7 values. Pass the full value emitted by `assessment
+analyze` to `show` and `evidence`.
+
+`assessment show` includes persisted run provenance and terminal diagnostics.
+`assessment evidence` includes bounded stdout, stderr, exit status, error
+details, and output-truncation indicators; it omits raw Hipcheck JSON unless
+`--raw-hipcheck` is provided. All commands use concise text by default and emit
+structured output with `--json`. `assessment analyze` submits work to the
+configured `nv-server` and polls synchronously until the persisted assessment
+reaches a terminal state.
+For local development, start the Compose stack first with
+`scripts/docker-compose-local.sh up --build`; Hipcheck then runs from the
+server container's bundled artifacts, not from the host running `nvdb`.
 
 See [RFD 0004](../rfds/0004-nvdb-demo-workflow.md) for the intended workflow
 and output conventions.

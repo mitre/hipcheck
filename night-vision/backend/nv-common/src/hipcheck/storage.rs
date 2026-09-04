@@ -9,6 +9,7 @@ use sea_orm::{
     TransactionTrait,
 };
 use serde_json::json;
+use uuid::Uuid;
 
 /// Maximum bytes retained for each process diagnostic or raw report payload.
 pub const MAX_STORED_HIPCHECK_OUTPUT_BYTES: usize = 64 * 1024;
@@ -36,8 +37,10 @@ pub struct StoredHipcheckRun {
 pub async fn create_queued_hipcheck_run<C: ConnectionTrait>(
     db: &C,
     package_version_id: i32,
+    assessment_id: &Uuid,
 ) -> Result<i32, DbErr> {
     hipcheck_runs::ActiveModel {
+        assessment_id: Set(assessment_id.to_string()),
         package_version_id: Set(package_version_id),
         status: Set("queued".to_owned()),
         raw_json: Set(None),
@@ -233,6 +236,7 @@ pub async fn store_hipcheck_run<C: ConnectionTrait + TransactionTrait>(
         .map(|value| bound(value).0);
     let run = hipcheck_runs::ActiveModel {
         id: Default::default(),
+        assessment_id: Set(Uuid::now_v7().to_string()),
         package_version_id: Set(package_version_id),
         status: Set(diagnostics.status.clone()),
         raw_json: Set(Some(raw_json)),
@@ -297,6 +301,21 @@ pub async fn load_hipcheck_run<C: ConnectionTrait>(
         concerns,
         findings,
     }))
+}
+
+/// Load a run by its externally visible UUID v7 assessment identifier.
+pub async fn load_hipcheck_run_by_assessment_id<C: ConnectionTrait>(
+    db: &C,
+    assessment_id: &Uuid,
+) -> Result<Option<StoredHipcheckRun>, DbErr> {
+    let Some(run) = hipcheck_runs::Entity::find()
+        .filter(hipcheck_runs::Column::AssessmentId.eq(assessment_id.to_string()))
+        .one(db)
+        .await?
+    else {
+        return Ok(None);
+    };
+    load_hipcheck_run(db, run.id).await
 }
 
 async fn store_check<C: ConnectionTrait>(

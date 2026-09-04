@@ -18,6 +18,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260903_000000_add_package_source_elaboration::Migration),
             Box::new(m20260903_010000_add_package_source_created_at::Migration),
             Box::new(m20260903_020000_add_package_source_warning_message::Migration),
+            Box::new(m20260904_000000_add_hipcheck_assessment_id::Migration),
         ]
     }
 }
@@ -34,3 +35,4 @@ mod m20260902_000000_create_hipcheck_evidence_tables;
 mod m20260903_000000_add_package_source_elaboration;
 mod m20260903_010000_add_package_source_created_at;
 mod m20260903_020000_add_package_source_warning_message;
+mod m20260904_000000_add_hipcheck_assessment_id;

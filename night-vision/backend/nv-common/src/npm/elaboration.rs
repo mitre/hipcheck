@@ -1330,8 +1330,33 @@ impl From<&ElaborationEdge> for EdgeLimitOrigin {
 
 fn normalize_repository_url(value: &str) -> Option<String> {
     let value = value.strip_prefix("git+").unwrap_or(value);
+    if let Some(path) = value.strip_prefix("git@github.com:") {
+        return github_https_url(path);
+    }
+
     let url = Url::parse(value).ok()?;
-    matches!(url.scheme(), "http" | "https").then(|| url.into())
+    match url.scheme() {
+        "http" | "https" => Some(url.into()),
+        "git" if url.host_str() == Some("github.com") => github_https_url_from_url(&url),
+        "ssh" if url.host_str() == Some("github.com") && url.username() == "git" => {
+            github_https_url_from_url(&url)
+        }
+        _ => None,
+    }
+}
+
+fn github_https_url(path: &str) -> Option<String> {
+    Url::parse(&format!("https://github.com/{path}"))
+        .ok()
+        .map(Into::into)
+}
+
+fn github_https_url_from_url(url: &Url) -> Option<String> {
+    let mut normalized = Url::parse("https://github.com").ok()?;
+    normalized.set_path(url.path());
+    normalized.set_query(url.query());
+    normalized.set_fragment(url.fragment());
+    Some(normalized.into())
 }
 
 #[cfg(test)]
@@ -1401,6 +1426,38 @@ mod tests {
                 Arc::new(registry),
                 ElaborationLimits::default(),
             ))
+    }
+
+    #[test]
+    fn normalizes_github_git_transports_to_https() {
+        for (input, expected) in [
+            (
+                "git://github.com/sebhildebrandt/systeminformation.git",
+                "https://github.com/sebhildebrandt/systeminformation.git",
+            ),
+            (
+                "git+ssh://git@github.com/sebhildebrandt/systeminformation.git",
+                "https://github.com/sebhildebrandt/systeminformation.git",
+            ),
+            (
+                "git@github.com:sebhildebrandt/systeminformation.git",
+                "https://github.com/sebhildebrandt/systeminformation.git",
+            ),
+        ] {
+            assert_eq!(normalize_repository_url(input).as_deref(), Some(expected));
+        }
+    }
+
+    #[test]
+    fn does_not_normalize_unrecognized_git_transports() {
+        assert_eq!(
+            normalize_repository_url("git://gitlab.com/example/project.git"),
+            None
+        );
+        assert_eq!(
+            normalize_repository_url("ssh://developer@github.com/example/project.git"),
+            None
+        );
     }
 
     #[test]

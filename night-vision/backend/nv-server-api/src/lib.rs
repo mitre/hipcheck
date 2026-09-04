@@ -75,11 +75,11 @@ pub struct PostAssessmentBody {
 }
 #[derive(Serialize, JsonSchema)]
 pub struct PostAssessmentResponse {
-    pub id: i32,
+    pub id: Uuid,
 }
 #[derive(Deserialize, JsonSchema)]
 pub struct AssessmentPathParams {
-    pub id: i32,
+    pub id: Uuid,
 }
 #[derive(Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
@@ -89,21 +89,38 @@ pub struct AssessmentEvidenceQuery {
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AssessmentStatus {
-    pub id: i32,
+    pub id: Uuid,
     pub state: String,
     pub target: Option<String>,
+    pub source_repository_url: Option<String>,
     pub recommendation: Option<String>,
     pub finding_count: usize,
+    pub exit_status: Option<i32>,
     pub error_kind: Option<String>,
+    pub error_message: Option<String>,
     pub retryable: Option<bool>,
 }
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AssessmentEvidence {
-    pub id: i32,
+    pub id: Uuid,
+    pub diagnostics: AssessmentDiagnostics,
     pub checks: Vec<AssessmentCheck>,
     pub findings: Vec<AssessmentFinding>,
     pub raw_hipcheck: Option<String>,
+}
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentDiagnostics {
+    pub source_repository_url: Option<String>,
+    pub stdout: Option<String>,
+    pub stdout_truncated: bool,
+    pub stderr: Option<String>,
+    pub stderr_truncated: bool,
+    pub exit_status: Option<i32>,
+    pub error_kind: Option<String>,
+    pub error_message: Option<String>,
+    pub retryable: Option<bool>,
 }
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

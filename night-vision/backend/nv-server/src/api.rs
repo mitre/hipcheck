@@ -20,10 +20,10 @@ use nv_common::{
     cve::storage::{
         has_cve_list_records, last_successful_cve_list_sync_commit, latest_cve_list_sync_run,
     },
-    db::entities::cve_list_sync_runs::Model as CveListSyncRun,
+    db::entities::{cve_list_sync_runs::Model as CveListSyncRun, hipcheck_runs},
     hipcheck::{
         assessment::{execute_queued_assessment, queue_assessment},
-        storage::load_hipcheck_run,
+        storage::load_hipcheck_run_by_assessment_id,
     },
     npm::elaboration::{
         NpmRegistryClient, elaborate,
@@ -35,13 +35,14 @@ use nv_common::{
     npm::package_json::NpmPackageJson,
 };
 use nv_server_api::{
-    AssessmentCheck, AssessmentEvidence, AssessmentEvidenceQuery, AssessmentFinding,
-    AssessmentPathParams, AssessmentStatus, CveIngestHealth, CveListSyncRunHealth, Health,
-    NvServerApi, PackageSource, PackageSourceEcosystem, PackageSourcePathParams,
-    PackageSourceStatus, PackageSourceStatusCompleted, PackageSourceStatusCompletedWithWarnings,
-    PackageSourceStatusFailed, PackageSourceStatusProcessing, PackageSourceWarning,
-    PostAssessmentBody, PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
-    VersionedPackage, nv_server_api_mod::api_description,
+    AssessmentCheck, AssessmentDiagnostics, AssessmentEvidence, AssessmentEvidenceQuery,
+    AssessmentFinding, AssessmentPathParams, AssessmentStatus, CveIngestHealth,
+    CveListSyncRunHealth, Health, NvServerApi, PackageSource, PackageSourceEcosystem,
+    PackageSourcePathParams, PackageSourceStatus, PackageSourceStatusCompleted,
+    PackageSourceStatusCompletedWithWarnings, PackageSourceStatusFailed,
+    PackageSourceStatusProcessing, PackageSourceWarning, PostAssessmentBody,
+    PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse, VersionedPackage,
+    nv_server_api_mod::api_description,
 };
 use percent_encoding::percent_decode_str;
 use sea_orm::{
@@ -271,7 +272,7 @@ impl NvServerApi for RestApi {
         let id = queued.id;
         let db = context.db().clone();
         let runner = context.hipcheck_runner_config();
-        let log = ctx.log.new(slog::o!("assessment_id" => id));
+        let log = ctx.log.new(slog::o!("assessment_id" => id.to_string()));
         tokio::spawn(async move {
             let _admission = admission;
             if let Err(error) = execute_queued_assessment(&db, &queued, &runner).await {
@@ -286,7 +287,7 @@ impl NvServerApi for RestApi {
         path_params: Path<AssessmentPathParams>,
     ) -> Result<HttpResponseOk<AssessmentStatus>, HttpError> {
         let id = path_params.into_inner().id;
-        let stored = load_hipcheck_run(ctx.context().db(), id)
+        let stored = load_hipcheck_run_by_assessment_id(ctx.context().db(), &id)
             .await
             .map_err(|error| HttpError::for_internal_error(error.to_string()))?
             .ok_or_else(|| HttpError::for_not_found(None, format!("unknown assessment {id}")))?;
@@ -294,9 +295,12 @@ impl NvServerApi for RestApi {
             id,
             state: stored.run.status,
             target: stored.run.target_purl,
+            source_repository_url: stored.run.source_repository_url,
             recommendation: stored.run.policy_recommendation,
             finding_count: stored.findings.len(),
+            exit_status: stored.run.exit_status,
             error_kind: stored.run.error_kind,
+            error_message: stored.run.error_message,
             retryable: stored.run.retryable,
         }))
     }
@@ -307,13 +311,14 @@ impl NvServerApi for RestApi {
         query: Query<AssessmentEvidenceQuery>,
     ) -> Result<HttpResponseOk<AssessmentEvidence>, HttpError> {
         let id = path_params.into_inner().id;
-        let stored = load_hipcheck_run(ctx.context().db(), id)
+        let stored = load_hipcheck_run_by_assessment_id(ctx.context().db(), &id)
             .await
             .map_err(|error| HttpError::for_internal_error(error.to_string()))?
             .ok_or_else(|| HttpError::for_not_found(None, format!("unknown assessment {id}")))?;
         let include_raw = query.into_inner().include_raw_hipcheck.unwrap_or(false);
         Ok(HttpResponseOk(AssessmentEvidence {
             id,
+            diagnostics: assessment_diagnostics(&stored.run),
             checks: stored
                 .checks
                 .into_iter()
@@ -335,6 +340,20 @@ impl NvServerApi for RestApi {
                 .collect(),
             raw_hipcheck: include_raw.then_some(stored.run.raw_json).flatten(),
         }))
+    }
+}
+
+fn assessment_diagnostics(run: &hipcheck_runs::Model) -> AssessmentDiagnostics {
+    AssessmentDiagnostics {
+        source_repository_url: run.source_repository_url.clone(),
+        stdout: run.stdout.clone(),
+        stdout_truncated: run.stdout_truncated,
+        stderr: run.stderr.clone(),
+        stderr_truncated: run.stderr_truncated,
+        exit_status: run.exit_status,
+        error_kind: run.error_kind.clone(),
+        error_message: run.error_message.clone(),
+        retryable: run.retryable,
     }
 }
 
@@ -649,6 +668,53 @@ mod tests {
         npm::elaboration::storage::MAX_FAILURE_DIAGNOSTIC_BYTES,
     };
     use sea_orm::{DbBackend, DbErr, MockDatabase, MockExecResult};
+
+    fn hipcheck_run() -> hipcheck_runs::Model {
+        hipcheck_runs::Model {
+            id: 7,
+            assessment_id: "0198f30e-2bfa-7000-8000-000000000007".to_owned(),
+            package_version_id: 1,
+            status: "failed".to_owned(),
+            raw_json: None,
+            raw_json_bytes: 0,
+            raw_json_truncated: false,
+            stdout: Some("partial report".to_owned()),
+            stdout_truncated: true,
+            stderr: Some("plugin warning".to_owned()),
+            stderr_truncated: false,
+            exit_status: Some(1),
+            error_kind: Some("target-resolution".to_owned()),
+            error_message: Some("package version has no usable source repository".to_owned()),
+            retryable: Some(false),
+            schema_version: None,
+            hipcheck_version: None,
+            hipcheck_commit: None,
+            target_kind: None,
+            target_purl: None,
+            source_repository_url: Some("https://github.com/example/project".to_owned()),
+            policy_id: None,
+            policy_version: None,
+            policy_source: None,
+            policy_recommendation: None,
+            created_at: Utc::now().fixed_offset(),
+        }
+    }
+
+    #[test]
+    fn assessment_diagnostics_expose_persisted_run_fields() {
+        let diagnostics = assessment_diagnostics(&hipcheck_run());
+
+        assert_eq!(diagnostics.stdout.as_deref(), Some("partial report"));
+        assert!(diagnostics.stdout_truncated);
+        assert_eq!(diagnostics.stderr.as_deref(), Some("plugin warning"));
+        assert_eq!(diagnostics.exit_status, Some(1));
+        assert_eq!(diagnostics.error_kind.as_deref(), Some("target-resolution"));
+        assert_eq!(
+            diagnostics.error_message.as_deref(),
+            Some("package version has no usable source repository")
+        );
+        assert_eq!(diagnostics.retryable, Some(false));
+    }
 
     fn source(
         id: Uuid,

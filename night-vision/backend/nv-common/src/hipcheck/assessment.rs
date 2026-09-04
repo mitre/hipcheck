@@ -11,11 +11,13 @@ use crate::db::entities::package_versions;
 use async_trait::async_trait;
 use sea_orm::{ColumnTrait as _, DatabaseConnection, EntityTrait as _, QueryFilter as _};
 use std::ffi::OsString;
+use uuid::Uuid;
 
 /// Result of resolving a persisted target and creating its durable queue record.
 #[derive(Clone, Debug)]
 pub struct QueuedAssessment {
-    pub id: i32,
+    pub id: Uuid,
+    pub run_id: i32,
     pub package_version_id: i32,
     pub purl: String,
 }
@@ -55,11 +57,13 @@ pub async fn queue_assessment(
         .await
         .map_err(AssessmentError::Database)?
         .ok_or_else(|| AssessmentError::UnknownPurl(purl.to_owned()))?;
-    let id = create_queued_hipcheck_run(db, version.id)
+    let id = Uuid::now_v7();
+    let run_id = create_queued_hipcheck_run(db, version.id, &id)
         .await
         .map_err(AssessmentError::Database)?;
     Ok(QueuedAssessment {
         id,
+        run_id,
         package_version_id: version.id,
         purl: version.package_url,
     })
@@ -81,7 +85,7 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
     config: &HipcheckRunnerConfig,
     executor: &E,
 ) -> Result<(), AssessmentError> {
-    mark_hipcheck_run_running(db, queued.id)
+    mark_hipcheck_run_running(db, queued.run_id)
         .await
         .map_err(AssessmentError::Database)?;
     let version = package_versions::Entity::find_by_id(queued.package_version_id)
@@ -95,7 +99,7 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
     else {
         return persist_failure(
             db,
-            queued.id,
+            queued.run_id,
             diagnostics(
                 "target-resolution",
                 "package version has no usable source repository",
@@ -117,11 +121,11 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
         )
         .await
     {
-        Ok(output) if output.status.success() => complete_output(db, queued.id, output).await,
+        Ok(output) if output.status.success() => complete_output(db, queued.run_id, output).await,
         Ok(output) => {
             persist_failure(
                 db,
-                queued.id,
+                queued.run_id,
                 diagnostics(
                     "nonzero-exit",
                     "Hipcheck exited unsuccessfully",
@@ -138,7 +142,7 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
             let (stdout, stderr) = error_diagnostics(&error);
             persist_failure(
                 db,
-                queued.id,
+                queued.run_id,
                 diagnostics(
                     error_kind(&error),
                     &error.to_string(),

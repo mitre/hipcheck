@@ -48,8 +48,8 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int32"
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -82,8 +82,8 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int32"
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -228,6 +228,50 @@
           "summary"
         ]
       },
+      "AssessmentDiagnostics": {
+        "type": "object",
+        "properties": {
+          "errorKind": {
+            "nullable": true,
+            "type": "string"
+          },
+          "errorMessage": {
+            "nullable": true,
+            "type": "string"
+          },
+          "exitStatus": {
+            "nullable": true,
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryable": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "sourceRepositoryUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "stderr": {
+            "nullable": true,
+            "type": "string"
+          },
+          "stderrTruncated": {
+            "type": "boolean"
+          },
+          "stdout": {
+            "nullable": true,
+            "type": "string"
+          },
+          "stdoutTruncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stderrTruncated",
+          "stdoutTruncated"
+        ]
+      },
       "AssessmentEvidence": {
         "type": "object",
         "properties": {
@@ -237,6 +281,9 @@
               "$ref": "#/components/schemas/AssessmentCheck"
             }
           },
+          "diagnostics": {
+            "$ref": "#/components/schemas/AssessmentDiagnostics"
+          },
           "findings": {
             "type": "array",
             "items": {
@@ -244,8 +291,8 @@
             }
           },
           "id": {
-            "type": "integer",
-            "format": "int32"
+            "type": "string",
+            "format": "uuid"
           },
           "rawHipcheck": {
             "nullable": true,
@@ -254,6 +301,7 @@
         },
         "required": [
           "checks",
+          "diagnostics",
           "findings",
           "id"
         ]
@@ -288,14 +336,23 @@
             "nullable": true,
             "type": "string"
           },
+          "errorMessage": {
+            "nullable": true,
+            "type": "string"
+          },
+          "exitStatus": {
+            "nullable": true,
+            "type": "integer",
+            "format": "int32"
+          },
           "findingCount": {
             "type": "integer",
             "format": "uint",
             "minimum": 0
           },
           "id": {
-            "type": "integer",
-            "format": "int32"
+            "type": "string",
+            "format": "uuid"
           },
           "recommendation": {
             "nullable": true,
@@ -304,6 +361,10 @@
           "retryable": {
             "nullable": true,
             "type": "boolean"
+          },
+          "sourceRepositoryUrl": {
+            "nullable": true,
+            "type": "string"
           },
           "state": {
             "type": "string"
@@ -619,8 +680,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int32"
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
