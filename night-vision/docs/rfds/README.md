@@ -16,3 +16,5 @@ implementation guidance.
   Assessments](./0004-nvdb-demo-workflow.md)
 - [RFD 0005: Package Source
   Elaboration](./0005-package-source-elaboration.md)
+- [RFD 0006: MVP Frontend Assessment
+  Flow](./0006-mvp-frontend-assessment-flow.md)
