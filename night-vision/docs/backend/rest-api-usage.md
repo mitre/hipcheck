@@ -37,6 +37,9 @@ Current examples include:
 Package-source status responses are tagged by a `status` field. Current status
 values are `processing` and `completed`.
 
+Upgrade-assessment status responses are also tagged by `status`. Their values
+are `processing`, `completed`, and `failed`.
+
 ## Endpoints
 
 ### `GET /health`
@@ -184,6 +187,92 @@ Content-Type: application/json
 ```
 
 Malformed UUID path values are rejected by Dropshot before the handler runs.
+
+### `POST /upgrade-assessments`
+
+Request an asynchronous assessment of an NPM package version. A trigger is
+either the CVE that prompted the assessment or a previously-created exposure
+identifier. `candidateVersion` is optional: clients can use it to request a
+specific upgrade candidate.
+
+```sh
+curl -X POST http://127.0.0.1:8080/upgrade-assessments \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "packageName": "example-package",
+    "currentVersion": "1.2.3",
+    "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" },
+    "candidateVersion": "1.2.7"
+  }'
+```
+
+The successful `202 Accepted` response returns a unique assessment ID. The
+request is persisted before in-process evaluation begins, so clients may poll
+it immediately.
+
+```json
+{ "id": "01990e55-6bae-7aa7-8760-ff4ac5e9d9a8" }
+```
+
+Empty package names, versions, or trigger references return `400 Bad Request`.
+CVE triggers must use a `CVE-YYYY-NNNN`-style identifier in `trigger.cve_id`.
+
+### `GET /upgrade-assessments/{id}`
+
+Retrieve a persisted assessment. While work is pending, the response includes
+the normalized NPM input:
+
+```json
+{
+  "status": "processing",
+  "id": "01990e55-6bae-7aa7-8760-ff4ac5e9d9a8",
+  "createdAt": "2026-09-01T12:00:00Z",
+  "input": {
+    "ecosystem": "npm",
+    "packageName": "example-package",
+    "currentVersion": "1.2.3",
+    "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" },
+    "candidateVersion": "1.2.7"
+  }
+}
+```
+
+A completed report includes the input, verdict, candidate versions,
+vulnerability/KEV context, dependency delta, supply-chain findings,
+confidence, caveats, and evidence links. The current first implementation
+returns an `unknown` verdict and explicit caveats until CVE/KEV correlation,
+NPM metadata discovery, dependency comparison, and Hipcheck analysis are
+connected to this lifecycle.
+
+```json
+{
+  "status": "completed",
+  "id": "01990e55-6bae-7aa7-8760-ff4ac5e9d9a8",
+  "createdAt": "2026-09-01T12:00:00Z",
+  "completedAt": "2026-09-01T12:00:01Z",
+  "report": {
+    "input": {
+      "ecosystem": "npm",
+      "packageName": "example-package",
+      "currentVersion": "1.2.3",
+      "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" },
+      "candidateVersion": "1.2.7"
+    },
+    "verdict": "unknown",
+    "candidateVersions": [{ "version": "1.2.7", "verdict": "unknown", "caveats": [] }],
+    "vulnerabilityContext": { "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" }, "kevLinked": null },
+    "dependencyDelta": { "added": [], "removed": [], "changed": [] },
+    "supplyChainFindings": [],
+    "confidence": "unknown",
+    "caveats": ["Analysis sources have not yet been connected."],
+    "evidenceLinks": []
+  }
+}
+```
+
+If evaluation fails after acceptance, `status` is `failed` and the response
+contains `failedAt`, the original input, and a non-secret error message. An
+unknown ID returns `404 Not Found`.
 
 ## Package-Source Lifecycle
 

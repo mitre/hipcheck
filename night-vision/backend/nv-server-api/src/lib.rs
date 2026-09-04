@@ -66,6 +66,24 @@ pub trait NvServerApi {
         path_params: Path<AssessmentPathParams>,
         query: dropshot::Query<AssessmentEvidenceQuery>,
     ) -> Result<HttpResponseOk<AssessmentEvidence>, HttpError>;
+
+    #[endpoint {
+        method = POST,
+        path = "/upgrade-assessments",
+    }]
+    async fn post_upgrade_assessment(
+        ctx: RequestContext<Self::Context>,
+        body_param: TypedBody<PostUpgradeAssessmentBody>,
+    ) -> Result<HttpResponseAccepted<PostUpgradeAssessmentResponse>, HttpError>;
+
+    #[endpoint {
+        method = GET,
+        path = "/upgrade-assessments/{id}",
+    }]
+    async fn get_upgrade_assessment(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<UpgradeAssessmentPathParams>,
+    ) -> Result<HttpResponseOk<UpgradeAssessmentStatus>, HttpError>;
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -288,8 +306,147 @@ pub struct VersionedPackage {
     pub derivations: Vec<Vec<String>>,
 }
 
-#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum PackageSourceEcosystem {
     Npm,
+}
+
+/// Input for an asynchronous NPM upgrade-safety assessment.
+#[derive(Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PostUpgradeAssessmentBody {
+    pub package_name: String,
+    pub current_version: String,
+    pub trigger: UpgradeAssessmentTrigger,
+    pub candidate_version: Option<String>,
+}
+
+/// The vulnerability or previously-created exposure that caused this assessment.
+#[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum UpgradeAssessmentTrigger {
+    Cve { cve_id: String },
+    Exposure { exposure_id: String },
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PostUpgradeAssessmentResponse {
+    pub id: Uuid,
+}
+
+#[derive(Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentPathParams {
+    pub id: Uuid,
+}
+
+/// The durable lifecycle state of an upgrade assessment.
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum UpgradeAssessmentStatus {
+    Processing(UpgradeAssessmentProcessing),
+    Completed(UpgradeAssessmentCompleted),
+    Failed(UpgradeAssessmentFailed),
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentProcessing {
+    pub id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub input: UpgradeAssessmentInput,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentCompleted {
+    pub id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub completed_at: DateTime<Utc>,
+    pub report: UpgradeAssessmentReport,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentFailed {
+    pub id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub failed_at: DateTime<Utc>,
+    pub input: UpgradeAssessmentInput,
+    pub error: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentInput {
+    pub ecosystem: PackageSourceEcosystem,
+    pub package_name: String,
+    pub current_version: String,
+    pub trigger: UpgradeAssessmentTrigger,
+    pub candidate_version: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentReport {
+    pub input: UpgradeAssessmentInput,
+    pub verdict: UpgradeAssessmentVerdict,
+    pub candidate_versions: Vec<UpgradeAssessmentCandidate>,
+    pub vulnerability_context: UpgradeAssessmentVulnerabilityContext,
+    pub dependency_delta: UpgradeAssessmentDependencyDelta,
+    pub supply_chain_findings: Vec<UpgradeAssessmentFinding>,
+    pub confidence: UpgradeAssessmentConfidence,
+    pub caveats: Vec<String>,
+    pub evidence_links: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum UpgradeAssessmentVerdict {
+    Recommended,
+    Caution,
+    Avoid,
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum UpgradeAssessmentConfidence {
+    High,
+    Medium,
+    Low,
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentCandidate {
+    pub version: String,
+    pub verdict: UpgradeAssessmentVerdict,
+    pub caveats: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentVulnerabilityContext {
+    pub trigger: UpgradeAssessmentTrigger,
+    pub kev_linked: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentDependencyDelta {
+    pub added: Vec<String>,
+    pub removed: Vec<String>,
+    pub changed: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentFinding {
+    pub effect: String,
+    pub summary: String,
+    pub evidence_links: Vec<String>,
 }

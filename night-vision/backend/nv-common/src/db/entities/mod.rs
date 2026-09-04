@@ -17,3 +17,4 @@ pub mod package_source_warnings;
 pub mod package_sources;
 pub mod package_versions;
 pub mod packages;
+pub mod upgrade_assessments;

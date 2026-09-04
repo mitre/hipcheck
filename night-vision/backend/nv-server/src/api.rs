@@ -10,7 +10,8 @@ use camino::{Utf8Path, Utf8PathBuf};
 // an old version of `schemars` that doesn't support `jiff`. When we
 // can use a newer version of `schemars`, we should switch to using
 // `jiff`.
-use chrono::Utc;
+//use chrono::Utc;
+use chrono::{DateTime, Utc};
 use dropshot::{
     ClientErrorStatusCode, HttpError, HttpResponseAccepted, HttpResponseOk, Path, Query,
     RequestContext, ServerBuilder, TypedBody, UntypedBody,
@@ -21,7 +22,9 @@ use nv_common::{
     cve::storage::{
         has_cve_list_records, last_successful_cve_list_sync_commit, latest_cve_list_sync_run,
     },
-    db::entities::{cve_list_sync_runs::Model as CveListSyncRun, hipcheck_runs},
+    db::entities::{
+        cve_list_sync_runs::Model as CveListSyncRun, hipcheck_runs, upgrade_assessments,
+    },
     hipcheck::{
         assessment::{execute_queued_assessment, queue_assessment},
         storage::load_hipcheck_run_by_assessment_id,
@@ -38,6 +41,7 @@ use nv_common::{
         },
         package_json::NpmPackageJson,
         purl::NpmPackagePurl,
+        types::NpmPackageName,
     },
 };
 use nv_server_api::{
@@ -47,8 +51,13 @@ use nv_server_api::{
     PackageSourcePathParams, PackageSourceStatus, PackageSourceStatusCompleted,
     PackageSourceStatusCompletedWithWarnings, PackageSourceStatusFailed,
     PackageSourceStatusProcessing, PackageSourceWarning, PostAssessmentBody,
-    PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse, VersionedPackage,
-    nv_server_api_mod::api_description,
+    PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
+    PostUpgradeAssessmentBody, PostUpgradeAssessmentResponse, UpgradeAssessmentCandidate,
+    UpgradeAssessmentCompleted, UpgradeAssessmentConfidence, UpgradeAssessmentDependencyDelta,
+    UpgradeAssessmentFailed, UpgradeAssessmentInput, UpgradeAssessmentPathParams,
+    UpgradeAssessmentProcessing, UpgradeAssessmentReport, UpgradeAssessmentStatus,
+    UpgradeAssessmentTrigger, UpgradeAssessmentVerdict, UpgradeAssessmentVulnerabilityContext,
+    VersionedPackage, nv_server_api_mod::api_description,
 };
 use percent_encoding::percent_decode_str;
 use sea_orm::{
@@ -345,6 +354,45 @@ impl NvServerApi for RestApi {
                 .collect(),
             raw_hipcheck: include_raw.then_some(stored.run.raw_json).flatten(),
         }))
+    }
+
+    async fn post_upgrade_assessment(
+        ctx: RequestContext<Self::Context>,
+        body_param: TypedBody<PostUpgradeAssessmentBody>,
+    ) -> Result<HttpResponseAccepted<PostUpgradeAssessmentResponse>, HttpError> {
+        let body = body_param.into_inner();
+        validate_upgrade_assessment_request(&body)?;
+        let id = Uuid::now_v7();
+        let input = input_from_request(&body);
+        create_upgrade_assessment(ctx.context().db(), id, &input).await?;
+
+        // The row is inserted before spawning work.  Therefore a client can always
+        // poll the durable processing state, even when it races this task.
+        let db = ctx.context().db().clone();
+        tokio::spawn(async move {
+            if let Err(error) = complete_upgrade_assessment(&db, id, input).await {
+                // A failure to record the failure is only possible when the database itself
+                // is unavailable; the original processing row remains available for recovery.
+                let _ = mark_upgrade_assessment_failed(&db, id, error.to_string()).await;
+            }
+        });
+
+        Ok(HttpResponseAccepted(PostUpgradeAssessmentResponse { id }))
+    }
+
+    async fn get_upgrade_assessment(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<UpgradeAssessmentPathParams>,
+    ) -> Result<HttpResponseOk<UpgradeAssessmentStatus>, HttpError> {
+        let id = path_params.into_inner().id;
+        let assessment = upgrade_assessments::Entity::find_by_id(id.to_string())
+            .one(ctx.context().db())
+            .await
+            .map_err(internal_error)?
+            .ok_or_else(|| {
+                HttpError::for_not_found(None, format!("unknown upgrade assessment {id}"))
+            })?;
+        Ok(HttpResponseOk(assessment_status(assessment)?))
     }
 }
 
@@ -761,9 +809,262 @@ fn cve_list_sync_run_health(run: CveListSyncRun) -> CveListSyncRunHealth {
     }
 }
 
+fn validate_upgrade_assessment_request(body: &PostUpgradeAssessmentBody) -> Result<(), HttpError> {
+    if NpmPackageName::parse(body.package_name.clone()).is_err() {
+        return Err(HttpError::for_bad_request(
+            None,
+            "packageName must be a valid NPM package name".to_owned(),
+        ));
+    }
+    if semver::Version::parse(&body.current_version).is_err() {
+        return Err(HttpError::for_bad_request(
+            None,
+            "currentVersion must be a valid semantic version".to_owned(),
+        ));
+    }
+    if body
+        .candidate_version
+        .as_deref()
+        .is_some_and(|version| version.trim().is_empty())
+    {
+        return Err(HttpError::for_bad_request(
+            None,
+            "candidateVersion must not be empty when supplied".to_owned(),
+        ));
+    }
+    if body
+        .candidate_version
+        .as_deref()
+        .is_some_and(|version| semver::Version::parse(version).is_err())
+    {
+        return Err(HttpError::for_bad_request(
+            None,
+            "candidateVersion must be a valid semantic version when supplied".to_owned(),
+        ));
+    }
+    match &body.trigger {
+        UpgradeAssessmentTrigger::Cve { cve_id } if !is_cve_id(cve_id) => Err(
+            HttpError::for_bad_request(None, "trigger.cve_id must be a CVE identifier".to_owned()),
+        ),
+        UpgradeAssessmentTrigger::Exposure { exposure_id } if exposure_id.trim().is_empty() => Err(
+            HttpError::for_bad_request(None, "trigger.exposure_id must not be empty".to_owned()),
+        ),
+        _ => Ok(()),
+    }
+}
+
+fn is_cve_id(value: &str) -> bool {
+    let Some(number) = value.strip_prefix("CVE-") else {
+        return false;
+    };
+    let Some((year, sequence)) = number.split_once('-') else {
+        return false;
+    };
+    year.len() == 4
+        && year.bytes().all(|byte| byte.is_ascii_digit())
+        && sequence.len() >= 4
+        && sequence.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn input_from_request(body: &PostUpgradeAssessmentBody) -> UpgradeAssessmentInput {
+    UpgradeAssessmentInput {
+        ecosystem: PackageSourceEcosystem::Npm,
+        package_name: body.package_name.clone(),
+        current_version: body.current_version.clone(),
+        trigger: body.trigger.clone(),
+        candidate_version: body.candidate_version.clone(),
+    }
+}
+
+async fn create_upgrade_assessment(
+    db: &DatabaseConnection,
+    id: Uuid,
+    input: &UpgradeAssessmentInput,
+) -> Result<(), HttpError> {
+    let (trigger_kind, trigger_reference) = trigger_parts(&input.trigger);
+    upgrade_assessments::ActiveModel {
+        id: Set(id.to_string()),
+        package_name: Set(input.package_name.clone()),
+        current_version: Set(input.current_version.clone()),
+        trigger_kind: Set(trigger_kind.to_owned()),
+        trigger_reference: Set(trigger_reference.to_owned()),
+        candidate_version: Set(input.candidate_version.clone()),
+        status: Set("processing".to_owned()),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .map_err(internal_error)?;
+    Ok(())
+}
+
+async fn complete_upgrade_assessment(
+    db: &DatabaseConnection,
+    id: Uuid,
+    input: UpgradeAssessmentInput,
+) -> Result<(), HttpError> {
+    let report = initial_assessment_report(input);
+    let report = serde_json::to_value(report).map_err(internal_error)?;
+    upgrade_assessments::ActiveModel {
+        id: Set(id.to_string()),
+        status: Set("completed".to_owned()),
+        finished_at: Set(Some(Utc::now().fixed_offset())),
+        report: Set(Some(report)),
+        error: Set(None),
+        ..Default::default()
+    }
+    .update(db)
+    .await
+    .map_err(internal_error)?;
+    Ok(())
+}
+
+async fn mark_upgrade_assessment_failed(
+    db: &DatabaseConnection,
+    id: Uuid,
+    error: String,
+) -> Result<(), HttpError> {
+    upgrade_assessments::ActiveModel {
+        id: Set(id.to_string()),
+        status: Set("failed".to_owned()),
+        finished_at: Set(Some(Utc::now().fixed_offset())),
+        error: Set(Some(error)),
+        ..Default::default()
+    }
+    .update(db)
+    .await
+    .map_err(internal_error)?;
+    Ok(())
+}
+
+fn initial_assessment_report(input: UpgradeAssessmentInput) -> UpgradeAssessmentReport {
+    let candidate_versions = input
+        .candidate_version
+        .iter()
+        .map(|version| UpgradeAssessmentCandidate {
+            version: version.clone(),
+            verdict: UpgradeAssessmentVerdict::Unknown,
+            caveats: vec![
+                "Candidate analysis has not yet been populated from NPM metadata.".to_owned(),
+            ],
+        })
+        .collect();
+    UpgradeAssessmentReport {
+        vulnerability_context: UpgradeAssessmentVulnerabilityContext {
+            trigger: input.trigger.clone(),
+            kev_linked: None,
+        },
+        input,
+        verdict: UpgradeAssessmentVerdict::Unknown,
+        candidate_versions,
+        dependency_delta: UpgradeAssessmentDependencyDelta {
+            added: Vec::new(),
+            removed: Vec::new(),
+            changed: Vec::new(),
+        },
+        supply_chain_findings: Vec::new(),
+        confidence: UpgradeAssessmentConfidence::Unknown,
+        caveats: vec![
+            "This assessment is persisted for review, but CVE/KEV correlation, dependency comparison, and supply-chain analysis are not yet available.".to_owned(),
+        ],
+        evidence_links: Vec::new(),
+    }
+}
+
+fn assessment_status(
+    assessment: upgrade_assessments::Model,
+) -> Result<UpgradeAssessmentStatus, HttpError> {
+    let id = Uuid::parse_str(&assessment.id).map_err(internal_error)?;
+    let created_at = utc(assessment.created_at);
+    let input = input_from_model(&assessment)?;
+    match assessment.status.as_str() {
+        "processing" => Ok(UpgradeAssessmentStatus::Processing(
+            UpgradeAssessmentProcessing {
+                id,
+                created_at,
+                input,
+            },
+        )),
+        "completed" => {
+            let finished_at = assessment.finished_at.ok_or_else(|| {
+                internal_error("completed upgrade assessment has no completion time")
+            })?;
+            let report = assessment
+                .report
+                .ok_or_else(|| internal_error("completed upgrade assessment has no report"))?;
+            let report = serde_json::from_value(report).map_err(internal_error)?;
+            Ok(UpgradeAssessmentStatus::Completed(
+                UpgradeAssessmentCompleted {
+                    id,
+                    created_at,
+                    completed_at: utc(finished_at),
+                    report,
+                },
+            ))
+        }
+        "failed" => {
+            let finished_at = assessment
+                .finished_at
+                .ok_or_else(|| internal_error("failed upgrade assessment has no failure time"))?;
+            let error = assessment
+                .error
+                .ok_or_else(|| internal_error("failed upgrade assessment has no error"))?;
+            Ok(UpgradeAssessmentStatus::Failed(UpgradeAssessmentFailed {
+                id,
+                created_at,
+                failed_at: utc(finished_at),
+                input,
+                error,
+            }))
+        }
+        _ => Err(internal_error("upgrade assessment has an invalid status")),
+    }
+}
+
+fn input_from_model(
+    assessment: &upgrade_assessments::Model,
+) -> Result<UpgradeAssessmentInput, HttpError> {
+    let trigger = match assessment.trigger_kind.as_str() {
+        "cve" => UpgradeAssessmentTrigger::Cve {
+            cve_id: assessment.trigger_reference.clone(),
+        },
+        "exposure" => UpgradeAssessmentTrigger::Exposure {
+            exposure_id: assessment.trigger_reference.clone(),
+        },
+        _ => {
+            return Err(internal_error(
+                "upgrade assessment has an invalid trigger kind",
+            ));
+        }
+    };
+    Ok(UpgradeAssessmentInput {
+        ecosystem: PackageSourceEcosystem::Npm,
+        package_name: assessment.package_name.clone(),
+        current_version: assessment.current_version.clone(),
+        trigger,
+        candidate_version: assessment.candidate_version.clone(),
+    })
+}
+
+fn trigger_parts(trigger: &UpgradeAssessmentTrigger) -> (&str, &str) {
+    match trigger {
+        UpgradeAssessmentTrigger::Cve { cve_id } => ("cve", cve_id),
+        UpgradeAssessmentTrigger::Exposure { exposure_id } => ("exposure", exposure_id),
+    }
+}
+
+fn utc(value: DateTime<chrono::FixedOffset>) -> DateTime<Utc> {
+    value.with_timezone(&Utc)
+}
+
+fn internal_error(error: impl std::fmt::Display) -> HttpError {
+    HttpError::for_internal_error(error.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone as _;
     use nv_common::{
         db::entities::{
             package_source_edges, package_source_versions, package_source_warnings,
@@ -836,6 +1137,197 @@ mod tests {
             resolution_error,
             created_at: Utc::now().fixed_offset(),
         }
+    }
+
+    fn input() -> UpgradeAssessmentInput {
+        UpgradeAssessmentInput {
+            ecosystem: PackageSourceEcosystem::Npm,
+            package_name: "example-package".to_owned(),
+            current_version: "1.2.3".to_owned(),
+            trigger: UpgradeAssessmentTrigger::Cve {
+                cve_id: "CVE-2026-1234".to_owned(),
+            },
+            candidate_version: Some("1.2.7".to_owned()),
+        }
+    }
+
+    #[test]
+    fn upgrade_assessment_trigger_uses_snake_case_fields() {
+        let value = serde_json::json!({
+            "kind": "cve",
+            "cve_id": "CVE-2026-1234",
+        });
+        let trigger = serde_json::from_value::<UpgradeAssessmentTrigger>(value.clone())
+            .expect("snake_case trigger fields must deserialize");
+
+        assert_eq!(serde_json::to_value(trigger).unwrap(), value);
+        serde_json::from_value::<UpgradeAssessmentTrigger>(serde_json::json!({
+            "kind": "cve",
+            "cveId": "CVE-2026-1234",
+        }))
+        .unwrap_err();
+    }
+
+    #[test]
+    fn initial_report_retains_reviewable_input_and_caveats() {
+        let report = initial_assessment_report(input());
+        let serialized = serde_json::to_value(&report).expect("report must serialize");
+
+        assert_eq!(serialized["input"]["packageName"], "example-package");
+        assert_eq!(serialized["verdict"], "unknown");
+        assert_eq!(serialized["candidateVersions"][0]["version"], "1.2.7");
+        assert!(
+            serialized["caveats"]
+                .as_array()
+                .is_some_and(|caveats| !caveats.is_empty())
+        );
+        assert!(serialized.get("dependencyDelta").is_some());
+        assert!(serialized.get("supplyChainFindings").is_some());
+        assert!(serialized.get("evidenceLinks").is_some());
+    }
+
+    #[test]
+    fn persisted_completed_assessment_deserializes_to_completed_status() {
+        let id = Uuid::now_v7();
+        let report = serde_json::to_value(initial_assessment_report(input()))
+            .expect("report must serialize");
+        let timestamp = Utc
+            .with_ymd_and_hms(2026, 9, 1, 12, 0, 0)
+            .unwrap()
+            .fixed_offset();
+        let model = upgrade_assessments::Model {
+            id: id.to_string(),
+            package_name: "example-package".to_owned(),
+            current_version: "1.2.3".to_owned(),
+            trigger_kind: "cve".to_owned(),
+            trigger_reference: "CVE-2026-1234".to_owned(),
+            candidate_version: Some("1.2.7".to_owned()),
+            status: "completed".to_owned(),
+            created_at: timestamp,
+            finished_at: Some(timestamp),
+            report: Some(report),
+            error: None,
+        };
+
+        let status = assessment_status(model).expect("stored report must be readable");
+        assert!(matches!(status, UpgradeAssessmentStatus::Completed(_)));
+    }
+
+    #[test]
+    fn persisted_failed_assessment_deserializes_to_failed_status() {
+        let id = Uuid::now_v7();
+        let timestamp = Utc
+            .with_ymd_and_hms(2026, 9, 1, 12, 0, 0)
+            .unwrap()
+            .fixed_offset();
+        let model = upgrade_assessments::Model {
+            id: id.to_string(),
+            package_name: "example-package".to_owned(),
+            current_version: "1.2.3".to_owned(),
+            trigger_kind: "cve".to_owned(),
+            trigger_reference: "CVE-2026-1234".to_owned(),
+            candidate_version: None,
+            status: "failed".to_owned(),
+            created_at: timestamp,
+            finished_at: Some(timestamp),
+            report: None,
+            error: Some("analysis unavailable".to_owned()),
+        };
+
+        let status = assessment_status(model).expect("stored failure must be readable");
+        assert!(matches!(status, UpgradeAssessmentStatus::Failed(_)));
+    }
+
+    #[test]
+    fn invalid_requests_are_rejected_before_persistence() {
+        let invalid = PostUpgradeAssessmentBody {
+            package_name: "example-package".to_owned(),
+            current_version: "1.2.3".to_owned(),
+            trigger: UpgradeAssessmentTrigger::Cve {
+                cve_id: "not-a-cve".to_owned(),
+            },
+            candidate_version: None,
+        };
+
+        assert!(validate_upgrade_assessment_request(&invalid).is_err());
+    }
+
+    #[test]
+    fn lifecycle_persists_request_then_completed_report() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![upgrade_assessments::Model {
+                    id: id.to_string(),
+                    package_name: "example-package".to_owned(),
+                    current_version: "1.2.3".to_owned(),
+                    trigger_kind: "cve".to_owned(),
+                    trigger_reference: "CVE-2026-1234".to_owned(),
+                    candidate_version: Some("1.2.7".to_owned()),
+                    status: "processing".to_owned(),
+                    created_at: Utc::now().fixed_offset(),
+                    finished_at: None,
+                    report: None,
+                    error: None,
+                }],
+                vec![upgrade_assessments::Model {
+                    id: id.to_string(),
+                    package_name: "example-package".to_owned(),
+                    current_version: "1.2.3".to_owned(),
+                    trigger_kind: "cve".to_owned(),
+                    trigger_reference: "CVE-2026-1234".to_owned(),
+                    candidate_version: Some("1.2.7".to_owned()),
+                    status: "completed".to_owned(),
+                    created_at: Utc::now().fixed_offset(),
+                    finished_at: Some(Utc::now().fixed_offset()),
+                    report: Some(serde_json::to_value(initial_assessment_report(input())).unwrap()),
+                    error: None,
+                }],
+            ])
+            .append_exec_results([
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+            ])
+            .into_connection();
+        let runtime = tokio::runtime::Runtime::new().expect("test runtime must start");
+
+        runtime.block_on(async {
+            create_upgrade_assessment(&db, id, &input())
+                .await
+                .expect("request must persist");
+            complete_upgrade_assessment(&db, id, input())
+                .await
+                .expect("report must persist");
+        });
+
+        let transaction_log = db.into_transaction_log();
+        assert_eq!(transaction_log.len(), 2);
+        assert!(
+            transaction_log[0].statements()[0]
+                .sql
+                .contains(r#"INSERT INTO "public"."upgrade_assessments""#)
+        );
+        assert!(
+            transaction_log[1].statements()[0]
+                .sql
+                .contains(r#"UPDATE "public"."upgrade_assessments""#)
+        );
+        assert!(
+            transaction_log[1].statements()[0]
+                .sql
+                .contains(r#""status" = $"#)
+        );
+        assert!(
+            transaction_log[1].statements()[0]
+                .sql
+                .contains(r#""report" = $"#)
+        );
     }
 
     #[tokio::test]

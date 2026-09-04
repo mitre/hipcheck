@@ -204,6 +204,73 @@
           }
         }
       }
+    },
+    "/upgrade-assessments": {
+      "post": {
+        "operationId": "post_upgrade_assessment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostUpgradeAssessmentBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "successfully enqueued operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostUpgradeAssessmentResponse"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/upgrade-assessments/{id}": {
+      "get": {
+        "operationId": "get_upgrade_assessment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpgradeAssessmentStatus"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -721,6 +788,373 @@
         },
         "required": [
           "id"
+        ]
+      },
+      "PostUpgradeAssessmentBody": {
+        "description": "Input for an asynchronous NPM upgrade-safety assessment.",
+        "type": "object",
+        "properties": {
+          "candidateVersion": {
+            "nullable": true,
+            "type": "string"
+          },
+          "currentVersion": {
+            "type": "string"
+          },
+          "packageName": {
+            "type": "string"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/UpgradeAssessmentTrigger"
+          }
+        },
+        "required": [
+          "currentVersion",
+          "packageName",
+          "trigger"
+        ]
+      },
+      "PostUpgradeAssessmentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "UpgradeAssessmentCandidate": {
+        "type": "object",
+        "properties": {
+          "caveats": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/UpgradeAssessmentVerdict"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "caveats",
+          "verdict",
+          "version"
+        ]
+      },
+      "UpgradeAssessmentConfidence": {
+        "type": "string",
+        "enum": [
+          "high",
+          "medium",
+          "low",
+          "unknown"
+        ]
+      },
+      "UpgradeAssessmentDependencyDelta": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "added",
+          "changed",
+          "removed"
+        ]
+      },
+      "UpgradeAssessmentFinding": {
+        "type": "object",
+        "properties": {
+          "effect": {
+            "type": "string"
+          },
+          "evidenceLinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "effect",
+          "evidenceLinks",
+          "summary"
+        ]
+      },
+      "UpgradeAssessmentInput": {
+        "type": "object",
+        "properties": {
+          "candidateVersion": {
+            "nullable": true,
+            "type": "string"
+          },
+          "currentVersion": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "$ref": "#/components/schemas/PackageSourceEcosystem"
+          },
+          "packageName": {
+            "type": "string"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/UpgradeAssessmentTrigger"
+          }
+        },
+        "required": [
+          "currentVersion",
+          "ecosystem",
+          "packageName",
+          "trigger"
+        ]
+      },
+      "UpgradeAssessmentReport": {
+        "type": "object",
+        "properties": {
+          "candidateVersions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpgradeAssessmentCandidate"
+            }
+          },
+          "caveats": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/UpgradeAssessmentConfidence"
+          },
+          "dependencyDelta": {
+            "$ref": "#/components/schemas/UpgradeAssessmentDependencyDelta"
+          },
+          "evidenceLinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpgradeAssessmentInput"
+          },
+          "supplyChainFindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpgradeAssessmentFinding"
+            }
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/UpgradeAssessmentVerdict"
+          },
+          "vulnerabilityContext": {
+            "$ref": "#/components/schemas/UpgradeAssessmentVulnerabilityContext"
+          }
+        },
+        "required": [
+          "candidateVersions",
+          "caveats",
+          "confidence",
+          "dependencyDelta",
+          "evidenceLinks",
+          "input",
+          "supplyChainFindings",
+          "verdict",
+          "vulnerabilityContext"
+        ]
+      },
+      "UpgradeAssessmentStatus": {
+        "description": "The durable lifecycle state of an upgrade assessment.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "input": {
+                "$ref": "#/components/schemas/UpgradeAssessmentInput"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "processing"
+                ]
+              }
+            },
+            "required": [
+              "createdAt",
+              "id",
+              "input",
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "completedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "report": {
+                "$ref": "#/components/schemas/UpgradeAssessmentReport"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "completed"
+                ]
+              }
+            },
+            "required": [
+              "completedAt",
+              "createdAt",
+              "id",
+              "report",
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "error": {
+                "type": "string"
+              },
+              "failedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "input": {
+                "$ref": "#/components/schemas/UpgradeAssessmentInput"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "failed"
+                ]
+              }
+            },
+            "required": [
+              "createdAt",
+              "error",
+              "failedAt",
+              "id",
+              "input",
+              "status"
+            ]
+          }
+        ]
+      },
+      "UpgradeAssessmentTrigger": {
+        "description": "The vulnerability or previously-created exposure that caused this assessment.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "cve_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "cve"
+                ]
+              }
+            },
+            "required": [
+              "cve_id",
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "exposure_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "exposure"
+                ]
+              }
+            },
+            "required": [
+              "exposure_id",
+              "kind"
+            ]
+          }
+        ]
+      },
+      "UpgradeAssessmentVerdict": {
+        "type": "string",
+        "enum": [
+          "recommended",
+          "caution",
+          "avoid",
+          "unknown"
+        ]
+      },
+      "UpgradeAssessmentVulnerabilityContext": {
+        "type": "object",
+        "properties": {
+          "kevLinked": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/UpgradeAssessmentTrigger"
+          }
+        },
+        "required": [
+          "trigger"
         ]
       },
       "VersionedPackage": {

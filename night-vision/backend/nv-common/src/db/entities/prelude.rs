@@ -15,3 +15,4 @@ pub use super::package_source_warnings::Entity as PackageSourceWarnings;
 pub use super::package_sources::Entity as PackageSources;
 pub use super::package_versions::Entity as PackageVersions;
 pub use super::packages::Entity as Packages;
+pub use super::upgrade_assessments::Entity as UpgradeAssessments;

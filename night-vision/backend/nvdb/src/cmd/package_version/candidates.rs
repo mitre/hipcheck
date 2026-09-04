@@ -188,6 +188,6 @@ mod tests {
 
     #[test]
     fn candidates_requires_an_affected_purl() {
-        assert!(command().try_get_matches_from(["candidates"]).is_err());
+        command().try_get_matches_from(["candidates"]).unwrap_err();
     }
 }
