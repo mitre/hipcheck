@@ -70,6 +70,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
             "{}",
             json_output(
                 &run.run.assessment_id,
+                run.run.affected_purl.as_deref(),
                 checks,
                 concerns,
                 findings,
@@ -79,6 +80,10 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         );
     } else {
         println!("assessment {} evidence", run.run.assessment_id);
+        println!(
+            "affected_purl: {}",
+            run.run.affected_purl.as_deref().unwrap_or("<none>")
+        );
         print_diagnostics(&run.run);
         println!("checks: {}", run.checks.len());
         for check in &run.checks {
@@ -114,6 +119,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
 
 fn json_output(
     id: &str,
+    affected_purl: Option<&str>,
     checks: Vec<serde_json::Value>,
     concerns: Vec<serde_json::Value>,
     findings: Vec<serde_json::Value>,
@@ -122,6 +128,7 @@ fn json_output(
 ) -> serde_json::Value {
     serde_json::json!({
         "id": id,
+        "affectedPurl": affected_purl,
         "checks": checks,
         "concerns": concerns,
         "findings": findings,
@@ -206,6 +213,7 @@ mod tests {
     fn evidence_json_output_hides_raw_hipcheck_by_default() {
         let output = json_output(
             ASSESSMENT_ID,
+            Some("pkg:npm/example@1.2.2"),
             vec![serde_json::json!({"id": 1})],
             Vec::new(),
             vec![serde_json::json!({"kind": "concern"})],
@@ -214,6 +222,7 @@ mod tests {
         );
 
         assert_eq!(output["id"], ASSESSMENT_ID);
+        assert_eq!(output["affectedPurl"], "pkg:npm/example@1.2.2");
         assert_eq!(output["checks"][0]["id"], 1);
         assert_eq!(output["findings"][0]["kind"], "concern");
         assert!(output["rawHipcheck"].is_null());

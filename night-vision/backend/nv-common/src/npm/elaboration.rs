@@ -39,7 +39,7 @@ pub struct PackageVersion {
 }
 
 impl PackageVersion {
-    fn from_npm(name: &NpmPackageName, version: impl std::fmt::Display) -> Self {
+    pub fn from_npm(name: &NpmPackageName, version: impl std::fmt::Display) -> Self {
         Self {
             name: name.as_str().into(),
             version: version.to_string().into_boxed_str(),
@@ -1328,7 +1328,8 @@ impl From<&ElaborationEdge> for EdgeLimitOrigin {
     }
 }
 
-fn normalize_repository_url(value: &str) -> Option<String> {
+/// Normalize registry repository metadata into a URL Hipcheck can consume.
+pub fn normalize_repository_url(value: &str) -> Option<String> {
     let value = value.strip_prefix("git+").unwrap_or(value);
     if let Some(path) = value.strip_prefix("git@github.com:") {
         return github_https_url(path);

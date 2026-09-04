@@ -290,6 +290,37 @@ pub async fn persist_completed_elaboration(
         .map_err(ElaborationStorageError::Database)
 }
 
+/// Persist a canonical release discovered outside an imported source snapshot.
+///
+/// Upgrade assessments use this for their selected target. It deliberately
+/// creates no `package_source_versions` association or dependency edges.
+pub async fn persist_assessment_target(
+    db: &DatabaseConnection,
+    package: &PackageVersion,
+    source_repository: Option<String>,
+) -> Result<package_versions::Model, ElaborationStorageError> {
+    let transaction = db
+        .begin()
+        .await
+        .map_err(ElaborationStorageError::Database)?;
+    let stored_package = find_or_insert_package(&transaction, package).await?;
+    let stored_version = find_or_insert_package_version(
+        &transaction,
+        stored_package.id,
+        &super::ElaboratedPackage {
+            package: package.clone(),
+            derivations: Vec::new(),
+            source_repository,
+        },
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(ElaborationStorageError::Database)?;
+    Ok(stored_version)
+}
+
 /// Record a terminal elaboration failure without changing the last published snapshot.
 pub async fn record_elaboration_failure(
     db: &DatabaseConnection,

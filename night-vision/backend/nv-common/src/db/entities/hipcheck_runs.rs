@@ -7,6 +7,7 @@ pub struct Model {
     pub id: i32,
     pub assessment_id: String,
     pub package_version_id: i32,
+    pub affected_purl: Option<String>,
     pub status: String,
     pub raw_json: Option<String>,
     pub raw_json_bytes: i32,

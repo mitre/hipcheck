@@ -10,10 +10,9 @@
         "operationId": "post_assessment",
         "requestBody": {
           "content": {
-            "application/octet-stream": {
+            "application/json": {
               "schema": {
-                "type": "string",
-                "format": "binary"
+                "$ref": "#/components/schemas/PostAssessmentBody"
               }
             }
           },
@@ -275,6 +274,10 @@
       "AssessmentEvidence": {
         "type": "object",
         "properties": {
+          "affectedPurl": {
+            "nullable": true,
+            "type": "string"
+          },
           "checks": {
             "type": "array",
             "items": {
@@ -332,6 +335,10 @@
       "AssessmentStatus": {
         "type": "object",
         "properties": {
+          "affectedPurl": {
+            "nullable": true,
+            "type": "string"
+          },
           "errorKind": {
             "nullable": true,
             "type": "string"
@@ -675,6 +682,22 @@
           "message",
           "specificationKind"
         ]
+      },
+      "PostAssessmentBody": {
+        "type": "object",
+        "properties": {
+          "affectedPurl": {
+            "type": "string"
+          },
+          "targetPurl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "affectedPurl",
+          "targetPurl"
+        ],
+        "additionalProperties": false
       },
       "PostAssessmentResponse": {
         "type": "object",

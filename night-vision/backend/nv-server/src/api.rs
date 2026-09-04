@@ -13,10 +13,11 @@ use camino::{Utf8Path, Utf8PathBuf};
 use chrono::Utc;
 use dropshot::{
     ClientErrorStatusCode, HttpError, HttpResponseAccepted, HttpResponseOk, Path, Query,
-    RequestContext, ServerBuilder, UntypedBody,
+    RequestContext, ServerBuilder, TypedBody, UntypedBody,
 };
 use nv_common::{
     config::Config,
+    cve::kev::{KevNpmMatchStatus, ReachableNpmPackageVersion, kev_affected_npm_package_version},
     cve::storage::{
         has_cve_list_records, last_successful_cve_list_sync_commit, latest_cve_list_sync_run,
     },
@@ -25,14 +26,19 @@ use nv_common::{
         assessment::{execute_queued_assessment, queue_assessment},
         storage::load_hipcheck_run_by_assessment_id,
     },
-    npm::elaboration::{
-        NpmRegistryClient, elaborate,
-        storage::{
-            bounded_diagnostic, persist_completed_elaboration, persisted_package_versions,
-            record_elaboration_failure,
+    npm::{
+        candidates::{CandidateStatus, validate_explicit_candidate},
+        elaboration::{
+            NpmRegistryClient, PackageVersion, PackumentProvider as _, elaborate,
+            normalize_repository_url,
+            storage::{
+                bounded_diagnostic, persist_assessment_target, persist_completed_elaboration,
+                persisted_package_versions, record_elaboration_failure,
+            },
         },
+        package_json::NpmPackageJson,
+        purl::NpmPackagePurl,
     },
-    npm::package_json::NpmPackageJson,
 };
 use nv_server_api::{
     AssessmentCheck, AssessmentDiagnostics, AssessmentEvidence, AssessmentEvidenceQuery,
@@ -244,7 +250,7 @@ impl NvServerApi for RestApi {
 
     async fn post_assessment(
         ctx: RequestContext<Self::Context>,
-        body_param: UntypedBody,
+        body_param: TypedBody<PostAssessmentBody>,
     ) -> Result<HttpResponseAccepted<PostAssessmentResponse>, HttpError> {
         validate_package_source_media_type(
             ctx.request
@@ -252,13 +258,7 @@ impl NvServerApi for RestApi {
                 .get("content-type")
                 .and_then(|value| value.to_str().ok()),
         )?;
-        let body =
-            serde_json::from_slice::<PostAssessmentBody>(body_param.as_bytes()).map_err(|_| {
-                HttpError::for_bad_request(
-                    Some("InvalidAssessmentRequest".to_owned()),
-                    "assessment request body must be valid JSON".to_owned(),
-                )
-            })?;
+        let body = body_param.into_inner();
         let context = ctx.context();
         let admission = context.try_admit_hipcheck().ok_or_else(|| {
             HttpError::for_unavail(
@@ -266,7 +266,10 @@ impl NvServerApi for RestApi {
                 "assessment capacity is exhausted".to_owned(),
             )
         })?;
-        let queued = queue_assessment(context.db(), &body.purl)
+        let target =
+            validate_and_persist_upgrade_target(context, &body.affected_purl, &body.target_purl)
+                .await?;
+        let queued = queue_assessment(context.db(), &body.affected_purl, &target)
             .await
             .map_err(assessment_http_error)?;
         let id = queued.id;
@@ -294,6 +297,7 @@ impl NvServerApi for RestApi {
         Ok(HttpResponseOk(AssessmentStatus {
             id,
             state: stored.run.status,
+            affected_purl: stored.run.affected_purl,
             target: stored.run.target_purl,
             source_repository_url: stored.run.source_repository_url,
             recommendation: stored.run.policy_recommendation,
@@ -318,6 +322,7 @@ impl NvServerApi for RestApi {
         let include_raw = query.into_inner().include_raw_hipcheck.unwrap_or(false);
         Ok(HttpResponseOk(AssessmentEvidence {
             id,
+            affected_purl: stored.run.affected_purl.clone(),
             diagnostics: assessment_diagnostics(&stored.run),
             checks: stored
                 .checks
@@ -341,6 +346,104 @@ impl NvServerApi for RestApi {
             raw_hipcheck: include_raw.then_some(stored.run.raw_json).flatten(),
         }))
     }
+}
+
+async fn validate_and_persist_upgrade_target(
+    context: &ApiCtx,
+    affected_purl: &str,
+    target_purl: &str,
+) -> Result<String, HttpError> {
+    let affected = NpmPackagePurl::parse(affected_purl).map_err(invalid_upgrade_request)?;
+    let target = NpmPackagePurl::parse(target_purl).map_err(invalid_upgrade_request)?;
+    if affected.name != target.name {
+        return Err(upgrade_validation_error(
+            "affected and target PURLs must name the same npm package",
+        ));
+    }
+    let baseline_matches =
+        kev_affected_npm_package_version(context.db(), reachable_package(&affected, affected_purl))
+            .await
+            .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+    if !baseline_matches
+        .iter()
+        .any(|matched| matched.status == KevNpmMatchStatus::Affected)
+    {
+        return Err(upgrade_validation_error(
+            "affected PURL has no locally known active KEV match",
+        ));
+    }
+    let client = NpmRegistryClient::new(
+        context.npm_registry_url().clone(),
+        context.package_elaboration_max_packument_bytes(),
+        context.package_elaboration_limits().request_timeout,
+    )
+    .map_err(|_| upgrade_validation_error("invalid NPM registry configuration"))?;
+    let packument = client.fetch(&affected.name).await.map_err(|error| {
+        upgrade_validation_error(&format!("failed to fetch NPM package metadata: {error}"))
+    })?;
+    let candidate = validate_explicit_candidate(
+        &packument,
+        affected.name.as_str(),
+        &affected.version,
+        &target.version,
+    )
+    .map_err(|error| upgrade_validation_error(&error.to_string()))?;
+    if candidate.version
+        <= semver::Version::parse(&affected.version).map_err(|_| {
+            upgrade_validation_error("affected PURL has an invalid semantic version")
+        })?
+    {
+        return Err(upgrade_validation_error(
+            "target PURL must be strictly newer than affected PURL",
+        ));
+    }
+    if !matches!(candidate.status, CandidateStatus::Included) {
+        return Err(upgrade_validation_error(
+            "target PURL is an excluded upgrade candidate",
+        ));
+    }
+    let target_matches =
+        kev_affected_npm_package_version(context.db(), reachable_package(&target, target_purl))
+            .await
+            .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+    if target_matches
+        .iter()
+        .any(|matched| matched.status == KevNpmMatchStatus::Affected)
+    {
+        return Err(upgrade_validation_error(
+            "target PURL matches a locally known active KEV vulnerability",
+        ));
+    }
+    let repository = packument
+        .versions
+        .get(&candidate.version)
+        .and_then(|version| version.repository.as_ref())
+        .or(packument.repository.as_ref())
+        .and_then(|repository| normalize_repository_url(&repository.url));
+    let target_release = PackageVersion::from_npm(&target.name, &target.version);
+    persist_assessment_target(context.db(), &target_release, repository)
+        .await
+        .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+    Ok(target_release.purl())
+}
+
+fn reachable_package(package: &NpmPackagePurl, purl: &str) -> ReachableNpmPackageVersion {
+    ReachableNpmPackageVersion {
+        package_name: package.name.as_str().to_owned(),
+        version: package.version.clone(),
+        source_evidence: format!("assessment upgrade PURL {purl}"),
+    }
+}
+
+fn invalid_upgrade_request(error: impl std::fmt::Display) -> HttpError {
+    upgrade_validation_error(&error.to_string())
+}
+
+fn upgrade_validation_error(message: &str) -> HttpError {
+    HttpError::for_bad_request(
+        Some("InvalidUpgradeAssessment".to_owned()),
+        message.to_owned(),
+    )
 }
 
 fn assessment_diagnostics(run: &hipcheck_runs::Model) -> AssessmentDiagnostics {
@@ -663,7 +766,8 @@ mod tests {
     use super::*;
     use nv_common::{
         db::entities::{
-            package_source_edges, package_source_warnings, package_sources, package_versions,
+            package_source_edges, package_source_versions, package_source_warnings,
+            package_sources, package_versions,
         },
         npm::elaboration::storage::MAX_FAILURE_DIAGNOSTIC_BYTES,
     };
@@ -674,6 +778,7 @@ mod tests {
             id: 7,
             assessment_id: "0198f30e-2bfa-7000-8000-000000000007".to_owned(),
             package_version_id: 1,
+            affected_purl: None,
             status: "failed".to_owned(),
             raw_json: None,
             raw_json_bytes: 0,
@@ -738,6 +843,7 @@ mod tests {
         let id = Uuid::now_v7();
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([vec![source(id, "failed", Some("x".repeat(2048)))]])
+            .append_query_results([Vec::<package_source_versions::Model>::new()])
             .append_query_results([Vec::<package_versions::Model>::new()])
             .append_query_results([Vec::<package_source_edges::Model>::new()])
             .into_connection();
@@ -761,10 +867,14 @@ mod tests {
                 "failed",
                 Some("registry request failed".to_owned()),
             )]])
+            .append_query_results([vec![package_source_versions::Model {
+                id: 1,
+                source_id: 1,
+                package_version_id: 1,
+            }]])
             .append_query_results([vec![package_versions::Model {
                 id: 1,
                 package_id: 1,
-                source_id: 1,
                 version: "1.0.0".to_owned(),
                 package_url: "pkg:npm/root@1.0.0".to_owned(),
                 source_repository: None,
@@ -798,10 +908,14 @@ mod tests {
         let id = Uuid::now_v7();
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([vec![source(id, "completed", None)]])
+            .append_query_results([vec![package_source_versions::Model {
+                id: 1,
+                source_id: 1,
+                package_version_id: 1,
+            }]])
             .append_query_results([vec![package_versions::Model {
                 id: 1,
                 package_id: 1,
-                source_id: 1,
                 version: "1.0.0".to_owned(),
                 package_url: "pkg:npm/%40scope/root@1.0.0".to_owned(),
                 source_repository: None,

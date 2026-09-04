@@ -37,11 +37,13 @@ pub struct StoredHipcheckRun {
 pub async fn create_queued_hipcheck_run<C: ConnectionTrait>(
     db: &C,
     package_version_id: i32,
+    affected_purl: &str,
     assessment_id: &Uuid,
 ) -> Result<i32, DbErr> {
     hipcheck_runs::ActiveModel {
         assessment_id: Set(assessment_id.to_string()),
         package_version_id: Set(package_version_id),
+        affected_purl: Set(Some(affected_purl.to_owned())),
         status: Set("queued".to_owned()),
         raw_json: Set(None),
         raw_json_bytes: Set(0),
@@ -238,6 +240,7 @@ pub async fn store_hipcheck_run<C: ConnectionTrait + TransactionTrait>(
         id: Default::default(),
         assessment_id: Set(Uuid::now_v7().to_string()),
         package_version_id: Set(package_version_id),
+        affected_purl: Set(None),
         status: Set(diagnostics.status.clone()),
         raw_json: Set(Some(raw_json)),
         raw_json_bytes: Set(raw_json_bytes),

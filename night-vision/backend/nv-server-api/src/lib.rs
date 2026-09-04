@@ -4,7 +4,7 @@
 // `jiff`.
 use chrono::{DateTime, Utc};
 use dropshot::{
-    HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, UntypedBody,
+    HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, TypedBody, UntypedBody,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -51,7 +51,7 @@ pub trait NvServerApi {
     #[endpoint { method = POST, path = "/assessments", content_type = "application/json" }]
     async fn post_assessment(
         ctx: RequestContext<Self::Context>,
-        body_param: UntypedBody,
+        body_param: TypedBody<PostAssessmentBody>,
     ) -> Result<HttpResponseAccepted<PostAssessmentResponse>, HttpError>;
 
     #[endpoint { method = GET, path = "/assessments/{id}" }]
@@ -71,7 +71,10 @@ pub trait NvServerApi {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PostAssessmentBody {
-    pub purl: String,
+    #[serde(rename = "affectedPurl")]
+    pub affected_purl: String,
+    #[serde(rename = "targetPurl")]
+    pub target_purl: String,
 }
 #[derive(Serialize, JsonSchema)]
 pub struct PostAssessmentResponse {
@@ -91,6 +94,7 @@ pub struct AssessmentEvidenceQuery {
 pub struct AssessmentStatus {
     pub id: Uuid,
     pub state: String,
+    pub affected_purl: Option<String>,
     pub target: Option<String>,
     pub source_repository_url: Option<String>,
     pub recommendation: Option<String>,
@@ -104,6 +108,7 @@ pub struct AssessmentStatus {
 #[serde(rename_all = "camelCase")]
 pub struct AssessmentEvidence {
     pub id: Uuid,
+    pub affected_purl: Option<String>,
     pub diagnostics: AssessmentDiagnostics,
     pub checks: Vec<AssessmentCheck>,
     pub findings: Vec<AssessmentFinding>,

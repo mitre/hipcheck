@@ -49,16 +49,17 @@ impl HipcheckExecutor for RunnerExecutor {
 /// Create a queued assessment for an already elaborated package version.
 pub async fn queue_assessment(
     db: &DatabaseConnection,
-    purl: &str,
+    affected_purl: &str,
+    target_purl: &str,
 ) -> Result<QueuedAssessment, AssessmentError> {
     let version = package_versions::Entity::find()
-        .filter(package_versions::Column::PackageUrl.eq(purl))
+        .filter(package_versions::Column::PackageUrl.eq(target_purl))
         .one(db)
         .await
         .map_err(AssessmentError::Database)?
-        .ok_or_else(|| AssessmentError::UnknownPurl(purl.to_owned()))?;
+        .ok_or_else(|| AssessmentError::UnknownPurl(target_purl.to_owned()))?;
     let id = Uuid::now_v7();
-    let run_id = create_queued_hipcheck_run(db, version.id, &id)
+    let run_id = create_queued_hipcheck_run(db, version.id, affected_purl, &id)
         .await
         .map_err(AssessmentError::Database)?;
     Ok(QueuedAssessment {

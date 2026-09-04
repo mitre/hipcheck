@@ -25,6 +25,8 @@ pub struct AssessmentSubmission {
 pub struct AssessmentStatus {
     pub id: Uuid,
     pub state: String,
+    #[serde(rename = "affectedPurl")]
+    pub affected_purl: Option<String>,
     #[serde(rename = "sourceRepositoryUrl")]
     pub source_repository_url: Option<String>,
     pub recommendation: Option<String>,
@@ -41,21 +43,28 @@ pub struct AssessmentStatus {
 
 #[derive(Serialize)]
 struct AssessmentRequest<'a> {
-    purl: &'a str,
+    #[serde(rename = "affectedPurl")]
+    affected_purl: &'a str,
+    #[serde(rename = "targetPurl")]
+    target_purl: &'a str,
 }
 
 /// Submit one assessment to the configured server container.
 pub fn submit_assessment(
     client: &Client,
     server_url: &str,
-    purl: &str,
+    affected_purl: &str,
+    target_purl: &str,
 ) -> Result<AssessmentSubmission> {
     let url = format!("{server_url}/assessments");
     let response = client
         .post(&url)
         .header(USER_AGENT, USER_AGENT_VALUE)
         .header(CONTENT_TYPE, "application/json")
-        .json(&AssessmentRequest { purl })
+        .json(&AssessmentRequest {
+            affected_purl,
+            target_purl,
+        })
         .send()
         .with_context(|| format!("failed to submit assessment to {url}"))?;
     require_status(response, StatusCode::ACCEPTED, &url)?
@@ -138,7 +147,7 @@ mod tests {
                 .path("/assessments")
                 .header("content-type", "application/json")
                 .header("user-agent", "nvdb")
-                .json_body_obj(&serde_json::json!({"purl": "pkg:npm/example@1.2.3"}));
+                .json_body_obj(&serde_json::json!({"affectedPurl": "pkg:npm/example@1.2.3", "targetPurl": "pkg:npm/example@1.2.4"}));
             then.status(202)
                 .header("content-type", "application/json")
                 .body(format!(r#"{{"id":"{ASSESSMENT_ID}"}}"#));
@@ -148,6 +157,7 @@ mod tests {
             &reqwest::blocking::Client::new(),
             &server.base_url(),
             "pkg:npm/example@1.2.3",
+            "pkg:npm/example@1.2.4",
         )
         .expect("submission should succeed");
 
@@ -195,6 +205,7 @@ mod tests {
             &reqwest::blocking::Client::new(),
             &server.base_url(),
             "pkg:npm/example@1.2.3",
+            "pkg:npm/example@1.2.4",
         )
         .expect_err("non-202 response must fail");
 

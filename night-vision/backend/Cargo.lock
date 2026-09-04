@@ -2500,6 +2500,7 @@ dependencies = [
  "nv-server-api",
  "percent-encoding",
  "sea-orm",
+ "semver",
  "serde_json",
  "slog",
  "tokio",

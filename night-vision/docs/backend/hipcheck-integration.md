@@ -89,14 +89,16 @@ is dispatched, and finishes as `completed` or `failed`. Every terminal attempt
 retains bounded stdout and stderr. Raw Hipcheck JSON is never returned by
 default.
 
-`nvdb assessment analyze <PURL>` waits synchronously. `POST /assessments`
+`nvdb assessment analyze <AFFECTED-PURL> <TARGET-PURL>` waits synchronously. `POST /assessments`
 returns `202` with an assessment ID and runs in the background; poll
 `GET /assessments/{id}`. Normalized evidence is available from
 `GET /assessments/{id}/evidence`; request raw JSON only with
 `?includeRawHipcheck=true`.
 
-Assessments use only already elaborated package-version PURLs. The target is
-the persisted HTTP(S) repository URL: per-version NPM metadata takes
+Assessments require a locally KEV-affected baseline and an explicit eligible
+newer NPM target. The target is persisted even when it is not in the submitted
+source snapshot. Hipcheck receives the persisted HTTP(S) repository URL:
+per-version NPM metadata takes
 precedence over package metadata, and `git+http(s)` URLs are normalized. A
 version without a usable repository records `target-resolution` failure.
 

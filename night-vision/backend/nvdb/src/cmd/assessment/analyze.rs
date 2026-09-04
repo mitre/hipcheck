@@ -10,17 +10,23 @@ const ASSESSMENT_WAIT_GRACE: Duration = Duration::from_secs(30);
 
 pub fn command() -> clap::Command {
     clap::Command::new("analyze")
-        .about("Run the configured assessment policy for a package version")
-        .arg(purl_argument())
+        .about("Run the configured assessment policy for an explicit upgrade")
+        .arg(affected_purl_argument())
+        .arg(target_purl_argument())
         .arg(json_argument())
 }
 
 pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
-    let purl = matches.get_one::<String>("purl").expect("required PURL");
-    eprintln!("queuing assessment for {purl}");
+    let affected_purl = matches
+        .get_one::<String>("affected-purl")
+        .expect("required PURL");
+    let target_purl = matches
+        .get_one::<String>("target-purl")
+        .expect("required PURL");
+    eprintln!("queuing assessment for upgrade from {affected_purl} to {target_purl}");
     let server_url = format!("http://{}", config.server_address);
     let client = assessment_client()?;
-    let submitted = submit_assessment(&client, &server_url, purl)?;
+    let submitted = submit_assessment(&client, &server_url, affected_purl, target_purl)?;
     eprintln!(
         "running configured Hipcheck policy for assessment {}",
         submitted.id
@@ -30,13 +36,15 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         .context("assessment wait timeout overflowed")?;
     let assessment =
         wait_for_terminal_assessment(&client, &server_url, submitted.id, wait_timeout)?;
+    let persisted_affected_purl = assessment.affected_purl.as_deref().unwrap_or(affected_purl);
     eprintln!("completed assessment {}", assessment.id);
     if matches.get_flag("json") {
         println!(
             "{}",
             json_output(
                 assessment.id,
-                purl,
+                persisted_affected_purl,
+                target_purl,
                 &assessment.state,
                 assessment.recommendation.as_deref(),
                 assessment.finding_count,
@@ -49,9 +57,10 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         );
     } else {
         println!(
-            "assessment {}\ntarget: {}\nstate: {}\nrecommendation: {}\nfindings: {}{}",
+            "assessment {}\naffected_purl: {}\ntarget: {}\nstate: {}\nrecommendation: {}\nfindings: {}{}",
             assessment.id,
-            purl,
+            persisted_affected_purl,
+            target_purl,
             assessment.state,
             assessment.recommendation.as_deref().unwrap_or("n/a"),
             assessment.finding_count,
@@ -74,7 +83,8 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
 )]
 fn json_output(
     id: uuid::Uuid,
-    purl: &str,
+    affected_purl: &str,
+    target_purl: &str,
     state: &str,
     recommendation: Option<&str>,
     finding_count: usize,
@@ -86,7 +96,8 @@ fn json_output(
 ) -> serde_json::Value {
     serde_json::json!({
         "id": id,
-        "target": purl,
+        "affectedPurl": affected_purl,
+        "target": target_purl,
         "state": state,
         "recommendation": recommendation,
         "findingCount": finding_count,
@@ -119,11 +130,17 @@ fn failed_diagnostics(
     )
 }
 
-fn purl_argument() -> clap::Arg {
-    clap::Arg::new("purl")
+fn affected_purl_argument() -> clap::Arg {
+    clap::Arg::new("affected-purl")
         .required(true)
-        .value_name("PURL")
-        .help("Package URL for the version to assess")
+        .value_name("AFFECTED-PURL")
+        .help("KEV-affected package URL to upgrade from")
+}
+fn target_purl_argument() -> clap::Arg {
+    clap::Arg::new("target-purl")
+        .required(true)
+        .value_name("TARGET-PURL")
+        .help("Eligible newer package URL to assess")
 }
 
 fn json_argument() -> clap::Arg {
@@ -141,9 +158,14 @@ mod tests {
     const ASSESSMENT_ID: &str = "0198f30e-2bfa-7000-8000-000000000007";
 
     #[test]
-    fn analyze_accepts_a_purl() {
+    fn analyze_accepts_upgrade_purls() {
         command()
-            .try_get_matches_from(["analyze", "pkg:npm/example@1.2.3", "--json"])
+            .try_get_matches_from([
+                "analyze",
+                "pkg:npm/example@1.2.3",
+                "pkg:npm/example@1.2.4",
+                "--json",
+            ])
             .expect("assessment analyze should parse");
     }
 
@@ -153,6 +175,7 @@ mod tests {
             json_output(
                 Uuid::parse_str(ASSESSMENT_ID).expect("assessment ID must be valid"),
                 "pkg:npm/example@1.2.3",
+                "pkg:npm/example@1.2.4",
                 "completed",
                 Some("pass"),
                 2,
@@ -164,7 +187,8 @@ mod tests {
             ),
             serde_json::json!({
                 "id": ASSESSMENT_ID,
-                "target": "pkg:npm/example@1.2.3",
+                "affectedPurl": "pkg:npm/example@1.2.3",
+                "target": "pkg:npm/example@1.2.4",
                 "state": "completed",
                 "recommendation": "pass",
                 "findingCount": 2,

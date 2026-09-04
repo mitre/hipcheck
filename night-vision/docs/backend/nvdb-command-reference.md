@@ -150,15 +150,16 @@ output.
 | Command | Purpose |
 | --- | --- |
 | `package-version kev <PURL> [--json]` | List KEV-linked CVE matches for one version. A no-match result only reflects locally available data and does not mean the version is safe. |
+| `package-version candidates <AFFECTED-PURL> [--json]` | List newer published NPM upgrades for a locally KEV-affected baseline. It reports eligibility, SemVer compatibility, publish metadata, and KEV match status; no match is not a safety claim. |
 
 ## Assessment commands
 
-Assessment commands run the configured Hipcheck policy for a resolved package
-version and expose the persisted Night Vision assessment and its evidence.
+Assessment commands run the configured Hipcheck policy only for an
+operator-selected eligible upgrade and expose the persisted lineage and evidence.
 
 | Command | Purpose |
 | --- | --- |
-| `assessment analyze <PURL> [--json]` | Run and persist the configured assessment. |
+| `assessment analyze <AFFECTED-PURL> <TARGET-PURL> [--json]` | Validate and assess an explicit eligible upgrade. |
 | `assessment show <ASSESSMENT-ID> [--json]` | Show persisted assessment provenance and normalized findings. |
 | `assessment runs --package <PURL> [--limit <N>] [--json]` | List persisted assessments across all resolved versions of an unversioned npm package PURL, such as `pkg:npm/example`. |
 | `assessment evidence <ASSESSMENT-ID> [--raw-hipcheck] [--json]` | Inspect retained assessment evidence. |
@@ -173,6 +174,13 @@ details, and output-truncation indicators; it omits raw Hipcheck JSON unless
 structured output with `--json`. `assessment analyze` submits work to the
 configured `nv-server` and polls synchronously until the persisted assessment
 reaches a terminal state.
+
+The affected PURL must have locally available active KEV-linked evidence. The
+target must be the same npm package, strictly newer, published, neither
+deprecated nor prerelease, and have no locally known active KEV match. A
+no-known-match result is evidence only, not a safety guarantee. The server
+fetches and persists the target release metadata before running Hipcheck; it
+does not associate that target with the imported source snapshot.
 For local development, start the Compose stack first with
 `scripts/docker-compose-local.sh up --build`; Hipcheck then runs from the
 server container's bundled artifacts, not from the host running `nvdb`.

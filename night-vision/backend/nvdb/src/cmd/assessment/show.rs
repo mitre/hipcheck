@@ -39,6 +39,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
             json_output(
                 &run.run.assessment_id,
                 &run.run.status,
+                run.run.affected_purl.as_deref(),
                 run.run.target_purl.as_deref(),
                 run.run.source_repository_url.as_deref(),
                 run.run.policy_id.as_deref(),
@@ -56,6 +57,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         );
     } else {
         println!("assessment {}: {}", run.run.assessment_id, run.run.status);
+        println!("affected_purl: {}", display_option(&run.run.affected_purl));
         println!("target: {}", display_option(&run.run.target_purl));
         println!(
             "source_repository_url: {}",
@@ -95,6 +97,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
 fn json_output(
     id: &str,
     state: &str,
+    affected_purl: Option<&str>,
     target: Option<&str>,
     source_repository_url: Option<&str>,
     policy_id: Option<&str>,
@@ -112,6 +115,7 @@ fn json_output(
     serde_json::json!({
         "id": id,
         "state": state,
+        "affectedPurl": affected_purl,
         "target": target,
         "sourceRepositoryUrl": source_repository_url,
         "policy": { "id": policy_id, "version": policy_version },
@@ -170,6 +174,7 @@ mod tests {
         let output = json_output(
             ASSESSMENT_ID,
             "completed",
+            Some("pkg:npm/example@1.2.2"),
             Some("pkg:npm/example@1.2.3"),
             Some("https://github.com/example/project"),
             Some("night-vision"),
@@ -186,6 +191,7 @@ mod tests {
         );
 
         assert_eq!(output["target"], "pkg:npm/example@1.2.3");
+        assert_eq!(output["affectedPurl"], "pkg:npm/example@1.2.2");
         assert_eq!(
             output["sourceRepositoryUrl"],
             "https://github.com/example/project"

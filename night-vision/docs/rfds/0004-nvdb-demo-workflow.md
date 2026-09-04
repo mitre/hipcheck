@@ -84,7 +84,8 @@ flowchart LR
     id --> resolve[package-source resolve]
     resolve --> purl[resolved version PURL]
     resolve --> kevs[package-source kevs]
-    purl --> assessment[assessment analyze]
+    kevs --> candidates[package-version candidates]
+    candidates --> assessment[assessment analyze affected target]
     assessment --> evidence[assessment show / evidence]
 ```
 
@@ -155,8 +156,9 @@ Hipcheck execution and persisted results should be surfaced as Night Vision
 assessments:
 
 ```sh
-# Run the configured Hipcheck policy for the selected version and persist it.
-cargo nvdb assessment analyze pkg:npm/example@1.2.3
+# Discover upgrades, then run Hipcheck only for the selected target.
+cargo nvdb package-version candidates pkg:npm/systeminformation@5.3.0
+cargo nvdb assessment analyze pkg:npm/systeminformation@5.3.0 pkg:npm/systeminformation@5.3.1
 
 # Copy the UUID v7 assessment ID printed by analyze, then inspect that run.
 cargo nvdb assessment show <ASSESSMENT-UUID>
@@ -168,7 +170,7 @@ cargo nvdb assessment runs --package pkg:npm/example --limit 10
 cargo nvdb assessment evidence <ASSESSMENT-UUID> --raw-hipcheck
 ```
 
-`assessment analyze` prints a UUID v7 assessment ID, target PURL, completion
+`assessment analyze` prints a UUID v7 assessment ID, affected and target PURLs, completion
 state, Hipcheck recommendation, and a small finding summary. The UUID is the
 stable public identifier used by `show` and `evidence`; keep it opaque and copy
 it exactly. `assessment show`
@@ -227,10 +229,11 @@ change.
    `systeminformation@5.3.0` match for `CVE-2021-21315`. Point out that the
    result is limited to locally available data and does not declare the
    resolved versions safe when it contains no matches.
-5. Run `assessment analyze pkg:npm/systeminformation@5.3.0` and copy the
-   persisted UUID v7 assessment ID. The current metadata has no usable HTTP(S)
-   source repository, so this run demonstrates the retained
-   `target-resolution` diagnostic rather than a completed Hipcheck report.
+5. Run `package-version candidates pkg:npm/systeminformation@5.3.0`, select
+   `pkg:npm/systeminformation@5.3.1`, then run `assessment analyze
+   pkg:npm/systeminformation@5.3.0 pkg:npm/systeminformation@5.3.1` and copy
+   the persisted UUID v7 assessment ID. Hipcheck assesses `5.3.1`, never the
+   KEV-affected `5.3.0` baseline.
 6. Run `assessment show <ASSESSMENT-UUID>`. Use `assessment evidence` only when
    inspection of the underlying Hipcheck output is needed.
 
