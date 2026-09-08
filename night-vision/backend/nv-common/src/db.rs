@@ -2,6 +2,9 @@
 
 pub mod entities;
 
+#[cfg(test)]
+mod assessment_integration_tests;
+
 use crate::config::Config;
 use migration::{Migrator, MigratorTrait as _};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};

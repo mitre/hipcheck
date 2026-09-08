@@ -22,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260904_000000_add_hipcheck_assessment_id::Migration),
             Box::new(m20260904_010000_canonical_package_versions::Migration),
             Box::new(m20260904_020000_add_assessment_upgrade_provenance::Migration),
+            Box::new(m20260905_000000_create_upgrade_assessment_evidence_tables::Migration),
         ]
     }
 }
@@ -42,3 +43,4 @@ mod m20260903_020000_add_package_source_warning_message;
 mod m20260904_000000_add_hipcheck_assessment_id;
 mod m20260904_010000_canonical_package_versions;
 mod m20260904_020000_add_assessment_upgrade_provenance;
+mod m20260905_000000_create_upgrade_assessment_evidence_tables;
