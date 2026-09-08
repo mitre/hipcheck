@@ -4,6 +4,54 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type AssessmentCheck = {
+    effect: string;
+    state: string;
+    summary: string;
+};
+
+export type AssessmentDiagnostics = {
+    errorKind?: string | null;
+    errorMessage?: string | null;
+    exitStatus?: number | null;
+    retryable?: boolean | null;
+    sourceRepositoryUrl?: string | null;
+    stderr?: string | null;
+    stderrTruncated: boolean;
+    stdout?: string | null;
+    stdoutTruncated: boolean;
+};
+
+export type AssessmentEvidence = {
+    affectedPurl?: string | null;
+    checks: Array<AssessmentCheck>;
+    diagnostics: AssessmentDiagnostics;
+    findings: Array<AssessmentFinding>;
+    id: string;
+    rawHipcheck?: string | null;
+};
+
+export type AssessmentFinding = {
+    effect: string;
+    kind: string;
+    severity?: string | null;
+    summary: string;
+};
+
+export type AssessmentStatus = {
+    affectedPurl?: string | null;
+    errorKind?: string | null;
+    errorMessage?: string | null;
+    exitStatus?: number | null;
+    findingCount: number;
+    id: string;
+    recommendation?: string | null;
+    retryable?: boolean | null;
+    sourceRepositoryUrl?: string | null;
+    state: string;
+    target?: string | null;
+};
+
 export type CveIngestHealth = {
     latestRun?: CveListSyncRunHealth | null;
     latestSuccessfulCommit?: string | null;
@@ -53,25 +101,246 @@ export type PackageSourceStatus = {
     source: PackageSource;
     status: 'completed';
     versionedPackages: Array<VersionedPackage>;
+} | {
+    createdAt: string;
+    id: string;
+    source: PackageSource;
+    status: 'completed-with-warnings';
+    versionedPackages: Array<VersionedPackage>;
+    warnings: Array<PackageSourceWarning>;
+    warningsTruncated: boolean;
+} | {
+    createdAt: string;
+    diagnostic: string;
+    id: string;
+    /**
+     * The last successfully published reachable-version snapshot, if any.
+     *
+     * A failed re-elaboration does not replace the prior snapshot, so callers can continue to inspect it while acting on `diagnostic`.
+     */
+    previousVersionedPackages: Array<VersionedPackage>;
+    status: 'failed';
 };
 
-export type PostPackageSourceBody = {
-    contents: string;
-    fileName: string;
+export type PackageSourceWarning = {
+    declaredByPurl?: string | null;
+    dependencyName: string;
+    /**
+     * A fixed explanation that does not include untrusted registry content.
+     */
+    message: string;
+    specificationKind: string;
+};
+
+export type PostAssessmentBody = {
+    affectedPurl: string;
+    targetPurl: string;
+};
+
+export type PostAssessmentResponse = {
+    id: string;
 };
 
 export type PostPackageSourceResponse = {
     id: string;
 };
 
+/**
+ * Input for an asynchronous NPM upgrade-safety assessment.
+ */
+export type PostUpgradeAssessmentBody = {
+    candidateVersion?: string | null;
+    currentVersion: string;
+    packageName: string;
+    trigger: UpgradeAssessmentTrigger;
+};
+
+export type PostUpgradeAssessmentResponse = {
+    id: string;
+};
+
+export type UpgradeAssessmentCandidate = {
+    caveats: Array<string>;
+    verdict: UpgradeAssessmentVerdict;
+    version: string;
+};
+
+export type UpgradeAssessmentConfidence = 'high' | 'medium' | 'low' | 'unknown';
+
+export type UpgradeAssessmentDependencyDelta = {
+    added: Array<string>;
+    changed: Array<string>;
+    removed: Array<string>;
+};
+
+export type UpgradeAssessmentFinding = {
+    effect: string;
+    evidenceLinks: Array<string>;
+    summary: string;
+};
+
+export type UpgradeAssessmentInput = {
+    candidateVersion?: string | null;
+    currentVersion: string;
+    ecosystem: PackageSourceEcosystem;
+    packageName: string;
+    trigger: UpgradeAssessmentTrigger;
+};
+
+export type UpgradeAssessmentReport = {
+    candidateVersions: Array<UpgradeAssessmentCandidate>;
+    caveats: Array<string>;
+    confidence: UpgradeAssessmentConfidence;
+    dependencyDelta: UpgradeAssessmentDependencyDelta;
+    evidenceLinks: Array<string>;
+    input: UpgradeAssessmentInput;
+    supplyChainFindings: Array<UpgradeAssessmentFinding>;
+    verdict: UpgradeAssessmentVerdict;
+    vulnerabilityContext: UpgradeAssessmentVulnerabilityContext;
+};
+
+/**
+ * The durable lifecycle state of an upgrade assessment.
+ */
+export type UpgradeAssessmentStatus = {
+    createdAt: string;
+    id: string;
+    input: UpgradeAssessmentInput;
+    status: 'processing';
+} | {
+    completedAt: string;
+    createdAt: string;
+    id: string;
+    report: UpgradeAssessmentReport;
+    status: 'completed';
+} | {
+    createdAt: string;
+    error: string;
+    failedAt: string;
+    id: string;
+    input: UpgradeAssessmentInput;
+    status: 'failed';
+};
+
+/**
+ * The vulnerability or previously-created exposure that caused this assessment.
+ */
+export type UpgradeAssessmentTrigger = {
+    cve_id: string;
+    kind: 'cve';
+} | {
+    exposure_id: string;
+    kind: 'exposure';
+};
+
+export type UpgradeAssessmentVerdict = 'recommended' | 'caution' | 'avoid' | 'unknown';
+
+export type UpgradeAssessmentVulnerabilityContext = {
+    kevLinked?: boolean | null;
+    trigger: UpgradeAssessmentTrigger;
+};
+
 export type VersionedPackage = {
-    derivation: Array<string>;
+    derivations: Array<Array<string>>;
     ecosystem: PackageSourceEcosystem;
     id: string;
     name: string;
     purl: string;
     version: string;
 };
+
+export type PostAssessmentData = {
+    body: PostAssessmentBody;
+    path?: never;
+    query?: never;
+    url: '/assessments';
+};
+
+export type PostAssessmentErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type PostAssessmentError = PostAssessmentErrors[keyof PostAssessmentErrors];
+
+export type PostAssessmentResponses = {
+    /**
+     * successfully enqueued operation
+     */
+    202: PostAssessmentResponse;
+};
+
+export type PostAssessmentResponse2 = PostAssessmentResponses[keyof PostAssessmentResponses];
+
+export type GetAssessmentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/assessments/{id}';
+};
+
+export type GetAssessmentErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type GetAssessmentError = GetAssessmentErrors[keyof GetAssessmentErrors];
+
+export type GetAssessmentResponses = {
+    /**
+     * successful operation
+     */
+    200: AssessmentStatus;
+};
+
+export type GetAssessmentResponse = GetAssessmentResponses[keyof GetAssessmentResponses];
+
+export type GetAssessmentEvidenceData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        includeRawHipcheck?: boolean | null;
+    };
+    url: '/assessments/{id}/evidence';
+};
+
+export type GetAssessmentEvidenceErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type GetAssessmentEvidenceError = GetAssessmentEvidenceErrors[keyof GetAssessmentEvidenceErrors];
+
+export type GetAssessmentEvidenceResponses = {
+    /**
+     * successful operation
+     */
+    200: AssessmentEvidence;
+};
+
+export type GetAssessmentEvidenceResponse = GetAssessmentEvidenceResponses[keyof GetAssessmentEvidenceResponses];
 
 export type HealthData = {
     body?: never;
@@ -103,7 +372,7 @@ export type HealthResponses = {
 export type HealthResponse = HealthResponses[keyof HealthResponses];
 
 export type PostPackageSourceData = {
-    body: PostPackageSourceBody;
+    body: Blob | File;
     path?: never;
     query?: never;
     url: '/package-sources';
@@ -161,3 +430,63 @@ export type GetPackageSourceResponses = {
 };
 
 export type GetPackageSourceResponse = GetPackageSourceResponses[keyof GetPackageSourceResponses];
+
+export type PostUpgradeAssessmentData = {
+    body: PostUpgradeAssessmentBody;
+    path?: never;
+    query?: never;
+    url: '/upgrade-assessments';
+};
+
+export type PostUpgradeAssessmentErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type PostUpgradeAssessmentError = PostUpgradeAssessmentErrors[keyof PostUpgradeAssessmentErrors];
+
+export type PostUpgradeAssessmentResponses = {
+    /**
+     * successfully enqueued operation
+     */
+    202: PostUpgradeAssessmentResponse;
+};
+
+export type PostUpgradeAssessmentResponse2 = PostUpgradeAssessmentResponses[keyof PostUpgradeAssessmentResponses];
+
+export type GetUpgradeAssessmentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/upgrade-assessments/{id}';
+};
+
+export type GetUpgradeAssessmentErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type GetUpgradeAssessmentError = GetUpgradeAssessmentErrors[keyof GetUpgradeAssessmentErrors];
+
+export type GetUpgradeAssessmentResponses = {
+    /**
+     * successful operation
+     */
+    200: UpgradeAssessmentStatus;
+};
+
+export type GetUpgradeAssessmentResponse = GetUpgradeAssessmentResponses[keyof GetUpgradeAssessmentResponses];
