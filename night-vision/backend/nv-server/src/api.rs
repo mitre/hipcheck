@@ -1110,7 +1110,7 @@ mod tests {
         },
         npm::elaboration::storage::MAX_FAILURE_DIAGNOSTIC_BYTES,
     };
-    use sea_orm::{DbBackend, DbErr, MockDatabase, MockExecResult};
+    use sea_orm::{DbBackend, DbErr, MockDatabase, MockExecResult, Value};
 
     fn hipcheck_run() -> hipcheck_runs::Model {
         hipcheck_runs::Model {
@@ -1548,15 +1548,23 @@ mod tests {
                 .into_transaction_log()
                 .into_iter()
                 .flat_map(|entry| entry.statements().to_vec())
-                .map(|statement| statement.sql)
                 .collect::<Vec<_>>();
             assert_eq!(statements.len(), 1);
-            assert!(statements[0].contains("package_sources"));
-            assert!(!statements[0].contains("DELETE"));
-            assert!(
-                statements[0].contains(ExternalOperation::PackageSourceElaboration.diagnostic())
-            );
-            assert!(!statements[0].contains(unsafe_error));
+            assert!(statements[0].sql.contains("package_sources"));
+            assert!(!statements[0].sql.contains("DELETE"));
+            let values = statements[0]
+                .values
+                .as_ref()
+                .expect("failure update must have bound values");
+            assert!(values.iter().any(|value| matches!(
+                value,
+                Value::String(Some(message))
+                    if message == ExternalOperation::PackageSourceElaboration.diagnostic()
+            )));
+            assert!(!values.iter().any(|value| matches!(
+                value,
+                Value::String(Some(message)) if message == unsafe_error
+            )));
         }
     }
 
