@@ -146,7 +146,7 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
                 queued.run_id,
                 diagnostics(
                     error_kind(&error),
-                    &error.to_string(),
+                    safe_error_message(&error),
                     None,
                     error.retryable(),
                     &stdout,
@@ -168,13 +168,13 @@ async fn complete_output(
         String::from_utf8_lossy(output.json.as_deref().unwrap_or(&output.stdout)).into_owned();
     let report = match parse_hipcheck_report(&raw) {
         Ok(report) => report,
-        Err(error) => {
+        Err(_) => {
             return persist_failure(
                 db,
                 id,
                 diagnostics(
                     "report-parse",
-                    &error.to_string(),
+                    "assessment analysis returned an invalid report",
                     output.status.code(),
                     false,
                     &output.stdout,
@@ -250,10 +250,39 @@ fn error_kind(error: &HipcheckExecutionError) -> &'static str {
     }
 }
 
+/// Returns a stable diagnostic for process-boundary failures.
+///
+/// Do not use `HipcheckExecutionError`'s `Display` output here: its source
+/// chain and captured tool output are not safe to persist as a normal
+/// assessment error or to reflect through an API.
+fn safe_error_message(error: &HipcheckExecutionError) -> &'static str {
+    let _ = error;
+    "assessment analysis failed"
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum AssessmentError {
     #[error("unknown persisted package version: {0}")]
     UnknownPurl(String),
     #[error("assessment database operation failed")]
     Database(#[source] sea_orm::DbErr),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::safe_error_message;
+    use crate::hipcheck::HipcheckExecutionError;
+
+    #[test]
+    fn execution_failure_diagnostic_does_not_include_source_error_text() {
+        let error = HipcheckExecutionError::Start(std::io::Error::other(
+            "token=correct-horse-battery-staple; external tool stderr",
+        ));
+
+        let diagnostic = safe_error_message(&error);
+
+        assert_eq!(diagnostic, "assessment analysis failed");
+        assert!(!diagnostic.contains("correct-horse-battery-staple"));
+        assert!(!diagnostic.contains("external tool stderr"));
+    }
 }

@@ -118,6 +118,32 @@ decisions that must be specified before production use.
 | API and worker capacity | Availability-critical | Bound requests, Git work, parsing, database use, and retries. |
 | Logs and errors | Operational data | Useful to operators but safe for their intended audience. |
 
+### Package-source and analyzer logging policy
+
+Package-source submissions and analyzer executions cross untrusted boundaries.
+Their contents, dependency metadata, URLs with credentials, tool stdout,
+stderr, and dependency error text are not safe logging fields or normal API
+diagnostics.
+
+For these flows, logs may include only structured, Night Vision-controlled
+context: the package-source or assessment ID, operation name, durable state,
+stable failure kind, retryability, exit status, and configured numeric limits.
+They must not include request bodies, package-source file names or contents,
+secrets or tokens, raw tool output, command environments, or error text from a
+registry, analyzer, plugin, or other external dependency.
+
+Normal caller-facing and durable failure diagnostics must use stable,
+Night-Vision-defined messages. The server may retain bounded raw analyzer
+evidence only in the explicitly requested evidence workflow; it is not a log
+field or a normal error response. That evidence remains untrusted and requires
+the authorization, retention, and display-safety controls for package-source
+data.
+
+New package-source formats, registries, analyzers, plugins, and subprocesses
+inherit this policy. Their implementation must add a safe failure mapping and
+tests before their output or error values cross a logging, persistence, or API
+boundary.
+
 ## Current Controls
 
 The following controls exist today and are security-relevant:

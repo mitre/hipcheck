@@ -153,6 +153,11 @@ The MVP integration should enforce these boundaries:
   artifact sizes.
 - Store raw Hipcheck output as evidence only after applying the same storage,
   retention, and display-safety rules used for other untrusted evidence.
+- Do not write raw Hipcheck stdout, stderr, plugin output, or external error
+  text to normal logs or caller-facing failure messages. Map execution and
+  report-parse failures to stable Night Vision failure kinds and messages;
+  log only safe structured context such as an assessment ID, failure kind,
+  retryability, exit status, and configured limits.
 - Treat plugin paths and manifests as deployment artifacts, not as values
   supplied by end users.
 

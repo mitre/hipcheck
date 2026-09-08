@@ -4,7 +4,10 @@ pub mod ctx;
 
 mod cve_worker;
 
-use crate::{api::ctx::ApiCtx, error::FatalError};
+use crate::{
+    api::ctx::ApiCtx,
+    error::{ExternalOperation, FatalError},
+};
 use camino::{Utf8Path, Utf8PathBuf};
 // We'd prefer to use `jiff` over `chrono`, but `dropshot` depends on
 // an old version of `schemars` that doesn't support `jiff`. When we
@@ -200,7 +203,7 @@ impl NvServerApi for RestApi {
         let file_name = body.file_name;
         let contents = body.contents;
         NpmPackageJson::parse_package_json(contents.as_bytes())
-            .map_err(|error| HttpError::for_bad_request(None, error.to_string()))?;
+            .map_err(|_| invalid_package_source_contents())?;
 
         let admission = context.try_admit_package_elaboration().ok_or_else(|| {
             HttpError::for_unavail(
@@ -231,7 +234,7 @@ impl NvServerApi for RestApi {
                 slog::error!(
                     log,
                     "package-source elaboration could not record its terminal state";
-                    "error" => error,
+                    "failure_kind" => error,
                 );
             }
         });
@@ -287,8 +290,15 @@ impl NvServerApi for RestApi {
         let log = ctx.log.new(slog::o!("assessment_id" => id.to_string()));
         tokio::spawn(async move {
             let _admission = admission;
-            if let Err(error) = execute_queued_assessment(&db, &queued, &runner).await {
-                slog::error!(log, "assessment could not persist terminal state"; "error" => error.to_string());
+            if execute_queued_assessment(&db, &queued, &runner)
+                .await
+                .is_err()
+            {
+                slog::error!(
+                    log,
+                    "assessment could not persist terminal state";
+                    "failure_kind" => "terminal-state-persistence",
+                );
             }
         });
         Ok(HttpResponseAccepted(PostAssessmentResponse { id }))
@@ -301,7 +311,7 @@ impl NvServerApi for RestApi {
         let id = path_params.into_inner().id;
         let stored = load_hipcheck_run_by_assessment_id(ctx.context().db(), &id)
             .await
-            .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+            .map_err(|_| internal_server_error())?
             .ok_or_else(|| HttpError::for_not_found(None, format!("unknown assessment {id}")))?;
         Ok(HttpResponseOk(AssessmentStatus {
             id,
@@ -326,7 +336,7 @@ impl NvServerApi for RestApi {
         let id = path_params.into_inner().id;
         let stored = load_hipcheck_run_by_assessment_id(ctx.context().db(), &id)
             .await
-            .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+            .map_err(|_| internal_server_error())?
             .ok_or_else(|| HttpError::for_not_found(None, format!("unknown assessment {id}")))?;
         let include_raw = query.into_inner().include_raw_hipcheck.unwrap_or(false);
         Ok(HttpResponseOk(AssessmentEvidence {
@@ -516,10 +526,19 @@ fn assessment_http_error(error: nv_common::hipcheck::assessment::AssessmentError
                 "PURL is not an elaborated package version".to_owned(),
             )
         }
-        nv_common::hipcheck::assessment::AssessmentError::Database(error) => {
-            HttpError::for_internal_error(error.to_string())
-        }
+        nv_common::hipcheck::assessment::AssessmentError::Database(_) => internal_server_error(),
     }
+}
+
+fn internal_server_error() -> HttpError {
+    HttpError::for_internal_error("internal server error".to_owned())
+}
+
+fn invalid_package_source_contents() -> HttpError {
+    HttpError::for_bad_request(
+        Some("InvalidPackageSourceRequest".to_owned()),
+        "package-source contents are invalid".to_owned(),
+    )
 }
 
 fn validate_package_source_media_type(content_type: Option<&str>) -> Result<(), HttpError> {
@@ -563,7 +582,7 @@ async fn store_validated_package_source(
     }
     .insert(db)
     .await
-    .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+    .map_err(|_| internal_server_error())?;
     Ok(StoredPackageSource {
         id,
         database_id: source.id,
@@ -586,16 +605,28 @@ async fn run_package_source_elaboration(
     max_packument_bytes: usize,
 ) -> Result<(), String> {
     let result = NpmPackageJson::parse_package_json(contents.as_bytes())
-        .map_err(|error| error.to_string())
+        .map_err(|_| {
+            ExternalOperation::PackageSourceElaboration
+                .diagnostic()
+                .to_owned()
+        })
         .and_then(|source| {
             NpmRegistryClient::new(registry_url, max_packument_bytes, limits.request_timeout)
                 .map(|client| (source, client))
-                .map_err(|error| error.to_string())
+                .map_err(|_| {
+                    ExternalOperation::PackageSourceElaboration
+                        .diagnostic()
+                        .to_owned()
+                })
         });
     let result = match result {
         Ok((source, client)) => elaborate(&source, std::sync::Arc::new(client), limits)
             .await
-            .map_err(|error| error.to_string()),
+            .map_err(|_| {
+                ExternalOperation::PackageSourceElaboration
+                    .diagnostic()
+                    .to_owned()
+            }),
         Err(error) => Err(error),
     };
     finalize_package_source_elaboration(&db, source_id, result).await
@@ -609,14 +640,21 @@ async fn finalize_package_source_elaboration(
     match result {
         Ok(result) => match persist_completed_elaboration(db, source_id, &result).await {
             Ok(()) => Ok(()),
-            Err(error) => {
-                let diagnostic = format!("failed to persist completed elaboration: {error}");
+            Err(_) => {
+                let diagnostic = ExternalOperation::PackageSourcePersistence.diagnostic();
                 record_terminal_failure_with_retry(db, source_id, &diagnostic)
                     .await
-                    .map_err(|failure| format!("{diagnostic}; {failure}"))
+                    .map_err(|_| diagnostic.to_owned())
             }
         },
-        Err(error) => record_terminal_failure_with_retry(db, source_id, &error).await,
+        Err(_) => {
+            record_terminal_failure_with_retry(
+                db,
+                source_id,
+                ExternalOperation::PackageSourceElaboration.diagnostic(),
+            )
+            .await
+        }
     }
 }
 
@@ -629,16 +667,16 @@ async fn record_terminal_failure_with_retry(
     for attempt in 1..=TERMINAL_PERSISTENCE_ATTEMPTS {
         match record_elaboration_failure(db, source_id, diagnostic).await {
             Ok(()) => return Ok(()),
-            Err(error) => last_error = Some(format!("{error:?}")),
+            Err(_) => last_error = Some(()),
         }
         if attempt < TERMINAL_PERSISTENCE_ATTEMPTS {
             tokio::time::sleep(TERMINAL_PERSISTENCE_RETRY_DELAY).await;
         }
     }
-    let error = last_error.expect("at least one terminal persistence attempt was made");
-    Err(format!(
-        "failed to record elaboration failure after {TERMINAL_PERSISTENCE_ATTEMPTS} attempts: {error}"
-    ))
+    last_error.expect("at least one terminal persistence attempt was made");
+    Err(ExternalOperation::PackageSourcePersistence
+        .diagnostic()
+        .to_owned())
 }
 
 async fn lookup_package_source(
@@ -652,7 +690,7 @@ async fn lookup_package_source(
         .filter(package_sources::Column::SourceId.eq(id.to_string()))
         .one(db)
         .await
-        .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+        .map_err(|_| internal_server_error())?
     else {
         return Ok(None);
     };
@@ -679,7 +717,7 @@ async fn lookup_package_source(
 
     let versioned_packages = persisted_package_versions(db, source.id)
         .await
-        .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+        .map_err(|_| internal_server_error())?
         .into_iter()
         .map(|version| VersionedPackage {
             id: Uuid::from_u64_pair(
@@ -719,7 +757,7 @@ async fn lookup_package_source(
         .limit(MAX_API_WARNINGS + 1)
         .all(db)
         .await
-        .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+        .map_err(|_| internal_server_error())?;
     if warnings.is_empty() {
         return Ok(Some(PackageSourceStatus::Completed(
             PackageSourceStatusCompleted {
@@ -777,14 +815,14 @@ fn npm_package_name_from_purl(package_url: &str) -> String {
 async fn cve_ingest_health(db: &DatabaseConnection) -> Result<CveIngestHealth, HttpError> {
     let records_available = has_cve_list_records(db)
         .await
-        .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+        .map_err(|_| internal_server_error())?;
     let latest_successful_commit = last_successful_cve_list_sync_commit(db)
         .await
-        .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+        .map_err(|_| internal_server_error())?
         .map(|commit| commit.as_str().to_owned());
     let latest_run = latest_cve_list_sync_run(db)
         .await
-        .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+        .map_err(|_| internal_server_error())?
         .map(cve_list_sync_run_health);
 
     Ok(CveIngestHealth {
@@ -1490,10 +1528,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn background_failures_record_failed_lifecycle_state() {
-        for error in [
+    async fn background_failures_record_a_stable_redacted_diagnostic() {
+        for unsafe_error in [
             "failed to retrieve packument for root: registry request failed",
-            "elaboration exceeded the package limit",
+            "password=correct-horse-battery-staple",
         ] {
             let db = MockDatabase::new(DbBackend::Postgres)
                 .append_exec_results([MockExecResult {
@@ -1502,7 +1540,7 @@ mod tests {
                 }])
                 .into_connection();
 
-            finalize_package_source_elaboration(&db, 1, Err(error.to_owned()))
+            finalize_package_source_elaboration(&db, 1, Err(unsafe_error.to_owned()))
                 .await
                 .expect("failed elaboration records its terminal state");
 
@@ -1515,6 +1553,10 @@ mod tests {
             assert_eq!(statements.len(), 1);
             assert!(statements[0].contains("package_sources"));
             assert!(!statements[0].contains("DELETE"));
+            assert!(
+                statements[0].contains(ExternalOperation::PackageSourceElaboration.diagnostic())
+            );
+            assert!(!statements[0].contains(unsafe_error));
         }
     }
 
@@ -1527,11 +1569,18 @@ mod tests {
             ))
             .into_connection();
 
-        let error = finalize_package_source_elaboration(&db, 1, Err("registry failed".to_owned()))
-            .await
-            .expect_err("unrecorded terminal failure is returned to the task");
+        let error = finalize_package_source_elaboration(
+            &db,
+            1,
+            Err("password=correct-horse-battery-staple".to_owned()),
+        )
+        .await
+        .expect_err("unrecorded terminal failure is returned to the task");
 
-        assert!(error.contains("failed to record elaboration failure"));
-        assert!(error.contains("database unavailable"));
+        assert_eq!(
+            error,
+            ExternalOperation::PackageSourcePersistence.diagnostic()
+        );
+        assert!(!error.contains("correct-horse-battery-staple"));
     }
 }

@@ -305,6 +305,15 @@ storing, or returning it. If it is needed for debugging but could contain
 secret or hostile content, redact it, summarize it, or keep it behind an
 operator-only diagnostic path.
 
+For package-source and analyzer flows, use a stricter default: raw request
+contents, dependency error text, stdout, and stderr are never normal log
+fields, durable status diagnostics, or reflected API errors. Map failures to
+stable Night Vision messages and record only safe structured context such as a
+durable ID, operation, failure kind, retryability, exit status, and configured
+numeric limit. Bounded raw analyzer evidence is a separate, explicitly
+authorized diagnostic surface; it must not be treated as a safe error message
+or log field.
+
 ## Review Checklist
 
 Use this checklist when reviewing backend error-handling changes:
