@@ -642,7 +642,7 @@ async fn finalize_package_source_elaboration(
             Ok(()) => Ok(()),
             Err(_) => {
                 let diagnostic = ExternalOperation::PackageSourcePersistence.diagnostic();
-                record_terminal_failure_with_retry(db, source_id, &diagnostic)
+                record_terminal_failure_with_retry(db, source_id, diagnostic)
                     .await
                     .map_err(|_| diagnostic.to_owned())
             }

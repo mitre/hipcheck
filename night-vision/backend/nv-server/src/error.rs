@@ -17,7 +17,7 @@ use std::{
 /// or external-tool output. Those values must never be reflected through
 /// normal API errors, package-source status, or structured log fields.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ExternalOperation {
+pub enum ExternalOperation {
     PackageSourceElaboration,
     PackageSourcePersistence,
 }
