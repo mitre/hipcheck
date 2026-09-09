@@ -14,8 +14,11 @@ Use an activated Flox environment for normal development commands.
 ### Direct Local Server
 
 The direct local server uses `backend/nv-server.spookey`. It binds the server
-to `127.0.0.1:8080` and connects to the loopback-published local Compose
-database. Set up and start Compose before running it:
+to `127.0.0.1:8080` and connects to a loopback PostgreSQL database. For a
+complete Docker-free frontend, backend, and database setup, follow
+[Local Development Without Docker](../project/local-development-without-docker.md).
+To use the Compose database with a direct local backend, set up and start
+Compose before running it:
 
 ```sh
 scripts/setup-compose-secrets.sh -x

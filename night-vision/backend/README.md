@@ -44,8 +44,10 @@ time, including by keeping compile times reasonable.
 ## Database
 
 Night Vision's database of choice is PostgreSQL version 18. Local development
-uses the Compose Postgres service, published only to `127.0.0.1:5432`. We also
-recommend installing pgAdmin if you want a GUI for inspecting the database.
+can use the Compose Postgres service or a direct loopback PostgreSQL instance;
+see [Local Development Without Docker](../docs/project/local-development-without-docker.md)
+for the latter. We also recommend installing pgAdmin if you want a GUI for
+inspecting the database.
 
 For local backend startup, health checks, logs, PostgreSQL checks, and recovery
 steps, see the

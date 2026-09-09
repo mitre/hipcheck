@@ -404,6 +404,18 @@ impl NvServerApi for RestApi {
         let id = Uuid::now_v7();
         let input = input_from_request(&body);
         let context = ctx.context();
+        let admission = input
+            .candidate_version
+            .as_ref()
+            .map(|_| {
+                context.try_admit_hipcheck().ok_or_else(|| {
+                    HttpError::for_unavail(
+                        Some("AssessmentCapacity".to_owned()),
+                        "assessment capacity is exhausted".to_owned(),
+                    )
+                })
+            })
+            .transpose()?;
         let candidate = match input.candidate_version.as_deref() {
             Some(candidate_version) => {
                 let package_name = NpmPackageName::parse(input.package_name.clone())
@@ -418,24 +430,23 @@ impl NvServerApi for RestApi {
             }
             None => None,
         };
-        let admission = candidate
-            .as_ref()
-            .map(|_| {
-                context.try_admit_hipcheck().ok_or_else(|| {
-                    HttpError::for_unavail(
-                        Some("AssessmentCapacity".to_owned()),
-                        "assessment capacity is exhausted".to_owned(),
-                    )
-                })
-            })
-            .transpose()?;
         create_upgrade_assessment(context.db(), id, &input).await?;
         let queued = match candidate.as_ref() {
-            Some((affected_purl, target_purl)) => Some(
-                queue_assessment_with_id(context.db(), id, affected_purl, target_purl)
-                    .await
-                    .map_err(assessment_http_error)?,
-            ),
+            Some((affected_purl, target_purl)) => {
+                match queue_assessment_with_id(context.db(), id, affected_purl, target_purl).await {
+                    Ok(queued) => Some(queued),
+                    Err(error) => {
+                        let response_error = assessment_http_error(error);
+                        let _ = mark_upgrade_assessment_failed(
+                            context.db(),
+                            id,
+                            "assessment queue setup failed".to_owned(),
+                        )
+                        .await;
+                        return Err(response_error);
+                    }
+                }
+            }
             None => None,
         };
 
@@ -1167,16 +1178,24 @@ fn assessment_report(
         .iter()
         .map(|version| {
             let mut candidate = assessment_candidate(&input.current_version, version);
-            candidate.verdict = if matches!(
+            let is_major = matches!(
                 candidate.upgrade_distance,
                 UpgradeAssessmentUpgradeDistance::Major
-            ) && matches!(verdict, UpgradeAssessmentVerdict::Recommended)
+            );
+            candidate.verdict = if is_major
+                && (matches!(verdict, UpgradeAssessmentVerdict::Recommended)
+                    || (matches!(verdict, UpgradeAssessmentVerdict::Unknown)
+                        && supply_chain_findings.is_empty()))
             {
                 UpgradeAssessmentVerdict::Caution
             } else {
                 verdict.clone()
             };
-            candidate.caveats = candidate_caveats.clone();
+            if is_major {
+                candidate.caveats.extend(candidate_caveats.clone());
+            } else {
+                candidate.caveats = candidate_caveats.clone();
+            }
             candidate
         })
         .collect();
@@ -1496,6 +1515,48 @@ mod tests {
             health_diagnostics_authorization(Some(&token), [Some("Bearer operator-token")]),
             HealthDiagnosticsAuthorization::Authorized
         );
+    }
+
+    #[tokio::test]
+    async fn upgrade_assessment_checks_capacity_before_candidate_validation() {
+        let db = MockDatabase::new(DbBackend::Postgres).into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let _admission = context
+            .try_admit_hipcheck()
+            .expect("test must occupy the only Hipcheck slot");
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+        let request = Request::builder()
+            .method(http::Method::POST)
+            .uri(test_context.client_testctx.url("/upgrade-assessments"))
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                serde_json::json!({
+                    "packageName": "example-package",
+                    "currentVersion": "1.2.3",
+                    "candidateVersion": "1.2.4",
+                    "trigger": {
+                        "kind": "cve",
+                        "cve_id": "CVE-2026-1234"
+                    }
+                })
+                .to_string(),
+            ))
+            .expect("upgrade request should build");
+
+        let error = test_context
+            .client_testctx
+            .make_request_with_request(request, StatusCode::SERVICE_UNAVAILABLE)
+            .await
+            .expect_err("exhausted capacity must reject the request before registry access");
+
+        assert_eq!(error.error_code.as_deref(), Some("AssessmentCapacity"));
+        test_context.teardown().await;
     }
 
     #[test]
@@ -1910,6 +1971,79 @@ mod tests {
             transaction_log[1].statements()[0]
                 .sql
                 .contains(r#""report" = $"#)
+        );
+    }
+
+    #[test]
+    fn lifecycle_marks_queue_setup_failure_as_failed() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                vec![upgrade_assessments::Model {
+                    id: id.to_string(),
+                    package_name: "example-package".to_owned(),
+                    current_version: "1.2.3".to_owned(),
+                    trigger_kind: "cve".to_owned(),
+                    trigger_reference: "CVE-2026-1234".to_owned(),
+                    candidate_version: Some("1.2.7".to_owned()),
+                    status: "processing".to_owned(),
+                    created_at: Utc::now().fixed_offset(),
+                    finished_at: None,
+                    report: None,
+                    error: None,
+                }],
+                vec![upgrade_assessments::Model {
+                    id: id.to_string(),
+                    package_name: "example-package".to_owned(),
+                    current_version: "1.2.3".to_owned(),
+                    trigger_kind: "cve".to_owned(),
+                    trigger_reference: "CVE-2026-1234".to_owned(),
+                    candidate_version: Some("1.2.7".to_owned()),
+                    status: "failed".to_owned(),
+                    created_at: Utc::now().fixed_offset(),
+                    finished_at: Some(Utc::now().fixed_offset()),
+                    report: None,
+                    error: Some("assessment queue setup failed".to_owned()),
+                }],
+            ])
+            .append_exec_results([
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+            ])
+            .into_connection();
+        let runtime = tokio::runtime::Runtime::new().expect("test runtime must start");
+
+        runtime.block_on(async {
+            create_upgrade_assessment(&db, id, &input())
+                .await
+                .expect("request must persist");
+            mark_upgrade_assessment_failed(&db, id, "assessment queue setup failed".to_owned())
+                .await
+                .expect("queue failure must persist a terminal state");
+        });
+
+        let transaction_log = db.into_transaction_log();
+        assert_eq!(transaction_log.len(), 2);
+        assert!(
+            transaction_log[1].statements()[0]
+                .sql
+                .contains(r#"UPDATE "public"."upgrade_assessments""#)
+        );
+        assert!(
+            transaction_log[1].statements()[0]
+                .sql
+                .contains(r#""status" = $"#)
+        );
+        assert!(
+            transaction_log[1].statements()[0]
+                .sql
+                .contains(r#""error" = $"#)
         );
     }
 

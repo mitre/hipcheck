@@ -1,5 +1,6 @@
 .env
 .secrets/
+.local/
 compose-smoke-secrets/
 /backend/nv-common/testdata/npm/packument/cache/
 .DS_Store
