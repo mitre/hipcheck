@@ -158,7 +158,12 @@ dependency-delta assessment.
 The MVP does not prove application compatibility, automatically modify a
 user's source tree or open dependency-update merge requests, support every
 package ecosystem, provide a complete malware-detection system, or calculate
-BOD 26-04 remediation deadlines. The full rationale and boundaries are in
+BOD 26-04 remediation deadlines. Its shipped Hipcheck policy provides only
+`mitre/binary` analysis; NPM release, artifact, provenance, publication, and
+dependency signal classes are unavailable checks that assessments must show as
+missing evidence or caveats, never as passes.
+
+The full rationale and boundaries are in
 [RFD 0001](../rfds/0001-mvp-upgrade-safety-assessments.md).
 
 ## Tracking Conventions

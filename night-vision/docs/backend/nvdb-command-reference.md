@@ -156,6 +156,10 @@ output.
 
 Assessment commands run the configured Hipcheck policy only for an
 operator-selected eligible upgrade and expose the persisted lineage and evidence.
+The shipped MVP policy runs only `mitre/binary` analysis. NPM release, artifact,
+maintainer, provenance, manifest, publication, and dependency checks are
+unavailable and must be interpreted as missing evidence or caveats, never as
+successful checks.
 
 | Command | Purpose |
 | --- | --- |

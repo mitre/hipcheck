@@ -102,8 +102,8 @@ known vulnerability exposure and known supply chain risk signals.
 - Focus the initial assessment on moving from a vulnerable package version to a
   newer patch version of the same package.
 - Explain recommendations with evidence, confidence, and caveats.
-- Include supply chain risk signals in upgrade assessments where defensible
-  data is available.
+- Include the shipped binary-analysis signal in upgrade assessments and expose
+  unavailable supply-chain checks as missing evidence or caveats.
 - Preserve the existing package and vulnerability analysis direction where it
   supports the assessment workflow.
 - Avoid claiming that Night Vision can prove runtime compatibility or absolute
@@ -167,6 +167,23 @@ The MVP assessment should consider:
 
 ## Supply Chain Risk Detections in Recommendations
 
+### Shipped MVP scope amendment
+
+The shipped MVP policy provides only pinned `mitre/binary` analysis. It can
+report binary-file evidence from the candidate's resolved source repository;
+it does not inspect NPM release history, package artifacts, manifests,
+maintainers, provenance, publication behavior, or dependency ranges. A passed
+binary check is not evidence that any of those unavailable signal classes
+passed.
+
+An assessment must represent each unavailable class as missing evidence or a
+caveat. That limitation reduces evidence quality and can produce `caution` or
+`unknown` when the unavailable class is important to the decision. Expanded
+NPM signal coverage is deferred to [issue #85][issue-85].
+
+The following table preserves the intended post-MVP detection direction; it
+does not describe checks delivered by the current MVP policy.
+
 Supply chain detections should feed the assessment verdict as weighted findings,
 not as independent alerts. Each finding should describe the detected condition,
 the affected version or version range, the evidence source, the confidence, and
@@ -182,7 +199,7 @@ recommendation effects:
 - Missing-check findings should reduce evidence quality and may produce
   `unknown` when Night Vision cannot check an important risk class.
 
-For the MVP, detections should affect recommendations as follows:
+When implemented, these detections should affect recommendations as follows:
 
 | Detection | Recommendation effect | User-facing guidance |
 | --- | --- | --- |
@@ -274,8 +291,9 @@ The initial MVP should be constrained to:
   compatibility classification;
 - KEV-linked vulnerability context;
 - direct package vulnerability assessment;
-- supply chain risk assessment where defensible package metadata is available;
-- dependency-delta assessment where feasible.
+- pinned binary-file analysis through Hipcheck;
+- explicit missing-evidence or caveat reporting for unavailable NPM
+  supply-chain and dependency-delta checks.
 
 ## Consequences
 
@@ -284,3 +302,4 @@ package versions by choosing lower-risk upgrades, prioritizing SemVer-compatible
 versions.
 
 [bod-26-04]: https://www.cisa.gov/news-events/directives/bod-26-04-prioritizing-security-updates-based-risk
+

@@ -1,8 +1,25 @@
 # Hipcheck Integration
 
 Night Vision consumes Hipcheck output as supply chain evidence for upgrade
-assessments. This document defines the backend-facing Hipcheck JSON contract
-and tracks expected Night Vision-driven Hipcheck plugin work for the MVP.
+assessments. This document defines the backend-facing Hipcheck JSON contract,
+the shipped MVP policy, and deferred post-MVP plugin work.
+
+## Shipped MVP Policy and Limitations
+
+The shipped policy is
+[`backend/hipcheck/config/Hipcheck.kdl`](../../backend/hipcheck/config/Hipcheck.kdl).
+It pins `mitre/binary` and checks for binary files in the resolved source
+repository. This is the only shipped Hipcheck supply-chain signal.
+
+The policy does not check NPM release continuity, package size or contents,
+maintainers, provenance, install scripts, source/tag consistency, dependency
+ranges, `bin` entries, native-build dependencies, publication behavior, or
+obfuscation. These are unavailable checks, not passed checks. Assessment
+results must surface them as missing evidence or caveats, reduce evidence
+quality accordingly, and use `caution` or `unknown` when an unavailable class
+is material to the decision.
+
+
 
 ## JSON Contract
 
@@ -192,13 +209,14 @@ Vision change set as the policy and backend integration. Later deployments can
 add a stronger plugin update process, artifact mirroring, and cache management
 once the integration is stable.
 
-## Plugin Plan
+## Post-MVP Plugin Plan
 
-When Night Vision needs a supply chain signal that Hipcheck does not already
-provide, the Night Vision team should implement that signal as a Hipcheck
-plugin instead of building an equivalent analyzer directly into Night Vision.
+The following work is not part of the shipped MVP. After funding and product
+approval, Night Vision should implement needed supply-chain signals as Hipcheck
+plugins rather than equivalent native analyzers.
 
-### Initial Plugin Areas
+
+### Deferred Plugin Areas
 
 Likely Night Vision-driven Hipcheck plugin work includes:
 
@@ -212,24 +230,24 @@ Likely Night Vision-driven Hipcheck plugin work includes:
 - Obfuscation or suspicious artifact detection for newly introduced packaged
   files.
 
-### RFD 0001 Detection Coverage
+### Deferred RFD 0001 Detection Coverage
 
 The RFD 0001 supply chain detections should map to Hipcheck coverage as
 follows:
 
-| RFD 0001 detection | Additional Hipcheck plugin needed? |
-| --- | --- |
-| Discontiguous version | Yes. This requires package registry release-history comparison. |
-| Package size increase | Yes. This requires comparing published package artifacts across versions. |
-| New package maintainer | Yes. This requires registry maintainer or publisher history. |
-| Broken provenance attestation | Yes. This requires package provenance validation and historical comparison. |
-| New install script | Yes. This requires package manifest comparison across versions. |
-| Source/tag mismatch | Yes. Existing repository analysis may help, but Night Vision needs package-to-source consistency checks. |
-| Overly broad dependency range | Yes. This requires dependency range comparison and reachability context. |
-| Malicious `bin` entries | Yes. This requires package manifest and executable-name analysis. |
-| Introduction of `node-gyp` dependency | Yes. This requires dependency delta analysis for native build paths. |
-| Malicious publication behavior | Partially. General Hipcheck project-practice signals may contribute, but package-release-specific signals need new plugin work. |
-| Introduction of obfuscated code | Yes. This requires artifact inspection and comparison against prior package contents. |
+| RFD 0001 detection | Shipped MVP coverage | Post-MVP requirement |
+| --- | --- | --- |
+| Discontiguous version | Unavailable. | Package registry release-history comparison. |
+| Package size increase | Unavailable. | Published package-artifact comparison. |
+| New package maintainer | Unavailable. | Registry maintainer or publisher history. |
+| Broken provenance attestation | Unavailable. | Package provenance validation and historical comparison. |
+| New install script | Unavailable. | Package manifest comparison across versions. |
+| Source/tag mismatch | Unavailable. | Package-to-source consistency checks. |
+| Overly broad dependency range | Unavailable. | Dependency range comparison and reachability context. |
+| Malicious `bin` entries | Unavailable. | Package manifest and executable-name analysis. |
+| Introduction of `node-gyp` dependency | Unavailable. | Dependency delta analysis for native build paths. |
+| Malicious publication behavior | Unavailable. | Package-release-specific publication-risk analysis. |
+| Introduction of obfuscated code | Unavailable. | Artifact inspection and comparison against prior package contents. |
 
 ### Data Plugin Needs
 

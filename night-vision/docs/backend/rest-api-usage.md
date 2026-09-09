@@ -271,6 +271,12 @@ returns an `unknown` verdict and explicit caveats until CVE/KEV correlation,
 NPM metadata discovery, dependency comparison, and Hipcheck analysis are
 connected to this lifecycle.
 
+When Hipcheck analysis is available, the shipped MVP policy provides only the
+`mitre/binary` source-repository check. NPM release, artifact, maintainer,
+provenance, manifest, publication, and dependency signal classes remain
+unavailable. Clients must read those limitations from missing-evidence findings
+or caveats; a missing finding does not mean an unavailable check passed.
+
 ```json
 {
   "status": "completed",

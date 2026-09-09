@@ -24,6 +24,23 @@ Where Night Vision needs risk signals that Hipcheck does not yet provide, the
 Night Vision team should build new Hipcheck plugins rather than equivalent
 analyzers inside Night Vision.
 
+## MVP Scope Amendment
+
+The shipped MVP policy is
+[`backend/hipcheck/config/Hipcheck.kdl`](../../backend/hipcheck/config/Hipcheck.kdl).
+It pins only the `mitre/binary` plugin and detects binary files in the resolved
+source repository. The NPM release, artifact, manifest, maintainer, provenance,
+publication-behavior, dependency, and obfuscation signals contemplated by RFD
+0001 are not shipped MVP checks.
+
+This reduced scope was chosen because the required new Hipcheck plugins and
+data-plugin capabilities could not be delivered during the MVP period of
+performance. Assessments must describe those signal classes as unavailable
+checks or missing evidence; they must never treat their absence as a pass.
+
+
+
+
 ## Background
 
 RFD 0001 reoriented Night Vision around upgrade safety assessment. In that
@@ -51,7 +68,7 @@ risk.
   verdict language.
 - Store enough Hipcheck evidence for users to understand why a candidate
   version received its Night Vision verdict.
-- Build new analysis capabilities as Hipcheck plugins when existing Hipcheck
+- Build new analysis capabilities as Hipcheck plugins after MVP when existing
   plugins do not cover Night Vision's upgrade assessment needs.
 - Keep the MVP integration simple enough to run inside the existing Night
   Vision backend architecture.
@@ -107,10 +124,10 @@ package described by an SBOM, not each dependency in the SBOM. Night Vision can
 still resolve and reason about dependency deltas itself, then use Hipcheck for
 focused analysis of the package versions that matter to the upgrade decision.
 
-Night Vision should ship one predetermined Hipcheck policy file as part of its
-backend configuration. That policy should select the Hipcheck plugins that
-matter for upgrade assessment and group their results into Night Vision finding
-categories.
+Night Vision ships one predetermined Hipcheck policy file as part of its backend
+configuration. For the shipped MVP, it selects only `mitre/binary`; it is not a
+general NPM upgrade-risk policy. Night Vision must record the other planned
+signal classes as unavailable checks or missing evidence.
 
 Hipcheck's score and `PASS` or `INVESTIGATE` recommendation should be treated
 as one input to the Night Vision verdict. Night Vision should preserve the RFD
@@ -168,5 +185,6 @@ technical risk: instead of building analyzers from scratch, Night Vision must
 make Hipcheck invocation reliable, parseable, and explainable inside an upgrade
 assessment product.
 
-The team should expect some Hipcheck work to be necessary because existing
-plugins will not cover every package-version comparison Night Vision wants.
+The team should expect post-MVP Hipcheck work because existing plugins do not
+cover every package-version comparison Night Vision wants.
+by 
