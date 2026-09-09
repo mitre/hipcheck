@@ -91,6 +91,13 @@ yourself.
 Whenever you want to stop using the Flox environment, run `exit` or quit
 your terminal.
 
+### Local Development Without Docker
+
+If Docker is unavailable on your workstation, use the
+[local development without Docker guide](docs/project/local-development-without-docker.md).
+It starts PostgreSQL, the Rust backend, and the SvelteKit frontend directly on
+your workstation using the project Flox environment.
+
 ### Limitations on Windows
 
 Unfortunately, [Nix] (which Flox uses under the hood) does not support Windows,
