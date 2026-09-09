@@ -233,8 +233,8 @@ storage or processing:
 - Add schema ownership/tenant constraints and access-control tests.
 - Maintain package-source media-type, size, file-name, contents, timeout, and
   concurrency tests as processing behavior expands.
-- Define and test the resource lifecycle for retries, cancellation, deletion,
-  retention, and error visibility.
+- Implement and test the documented [package-source lifecycle](./package-source-lifecycle.md),
+  including retries, cancellation, deletion, retention, and error visibility.
 
 ### Before external deployment
 

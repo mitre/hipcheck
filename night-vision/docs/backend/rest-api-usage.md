@@ -34,8 +34,12 @@ Current examples include:
 - `createdAt`
 - `versionedPackages`
 
-Package-source status responses are tagged by a `status` field. Current status
-values are `processing` and `completed`.
+Package-source status responses are tagged by a `status` field. The current
+schemas include `processing`, `completed`, `completed-with-warnings`, and
+`failed`. The planned durable semantics for these states, and for future
+`pending` and `cancelled` states, are defined in the
+[package-source lifecycle](./package-source-lifecycle.md). The guide below
+describes only endpoints implemented today.
 
 Upgrade-assessment status responses are also tagged by `status`. Their values
 are `processing`, `completed`, and `failed`.
@@ -137,7 +141,9 @@ Content-Type: application/json
 
 The `202 Accepted` status means the server accepted work that may not be
 complete yet. Use the returned `id` with `GET /package-sources/{id}` to check
-the package-source status.
+the package-source status. Durable queueing, retries, cancellation, deletion,
+and retention are not yet implemented; their intended behavior is defined in
+the [package-source lifecycle](./package-source-lifecycle.md).
 
 ### `GET /package-sources/{id}`
 
@@ -307,7 +313,7 @@ If evaluation fails after acceptance, `status` is `failed` and the response
 contains `failedAt`, the original input, and a non-secret error message. An
 unknown ID returns `404 Not Found`.
 
-## Package-Source Lifecycle
+## Current Package-Source Workflow
 
 The intended package-source workflow is asynchronous:
 
@@ -329,6 +335,9 @@ the `package.json` style of input described in
 The server persists the submitted source before returning `202 Accepted` and
 runs elaboration in a background task. `GET /package-sources/{id}` reports the
 persisted lifecycle state and stored result snapshot.
+
+For the durable lifecycle planned for retries, cancellation, deletion, and
+retention, see [Package-Source Lifecycle](./package-source-lifecycle.md).
 
 ## Error Responses
 
