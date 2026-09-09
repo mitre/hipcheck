@@ -861,14 +861,39 @@
           "id"
         ]
       },
+      "UpgradeAssessmentApiCompatibility": {
+        "type": "string",
+        "enum": [
+          "compatible",
+          "incompatible",
+          "no-guarantee",
+          "unknown"
+        ]
+      },
       "UpgradeAssessmentCandidate": {
         "type": "object",
         "properties": {
+          "apiCompatibility": {
+            "default": "unknown",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpgradeAssessmentApiCompatibility"
+              }
+            ]
+          },
           "caveats": {
             "type": "array",
             "items": {
               "type": "string"
             }
+          },
+          "upgradeDistance": {
+            "default": "unknown",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpgradeAssessmentUpgradeDistance"
+              }
+            ]
           },
           "verdict": {
             "$ref": "#/components/schemas/UpgradeAssessmentVerdict"
@@ -1166,6 +1191,15 @@
               "kind"
             ]
           }
+        ]
+      },
+      "UpgradeAssessmentUpgradeDistance": {
+        "type": "string",
+        "enum": [
+          "patch",
+          "minor",
+          "major",
+          "unknown"
         ]
       },
       "UpgradeAssessmentVerdict": {

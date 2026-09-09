@@ -16,7 +16,7 @@ Proposed
 
 The Night Vision MVP frontend should organize package sources, KEV-linked
 exposures, and upgrade assessments around one clear decision: whether a newer
-patch version is a reasonable lower-risk upgrade. The assessment detail page is
+package version is a reasonable lower-risk upgrade. The assessment detail page is
 the primary destination for a notification or source result; the site is not an
 alert inbox or a general-purpose security dashboard.
 
@@ -135,15 +135,17 @@ The interface must distinguish the affected current version from candidates.
 It must not imply that a KEV link establishes an agency-specific BOD 26-04
 deadline.
 
-### Stage 2: Select a patch candidate
+### Stage 2: Select an upgrade candidate
 
-The second stage lists newer patch versions of the same NPM package. Each row
-shows the candidate version and its known-exposure state. Selecting a candidate
-updates the remaining stages in place and marks that row as selected.
+The second stage lists newer versions of the same NPM package. Each row shows
+the candidate version, upgrade distance, SemVer compatibility, and
+known-exposure state. Selecting a candidate updates the remaining stages in
+place and marks that row as selected.
 
-The MVP should not use this control to offer minor or major upgrades. When no
-candidate is available, the page must state that result rather than presenting
-an empty recommendation.
+Major upgrades remain selectable, but must explain that Night Vision cannot
+establish application compatibility and therefore cannot recommend them. When
+no candidate is available, the page must state that result rather than
+presenting an empty recommendation.
 
 ### Stage 3: Explain the checks
 
@@ -207,7 +209,7 @@ may use a different visual treatment when it preserves the requirements below.
 
 Each row must identify the affected package version, its KEV-linked CVE
 context, the submitted package source, and a concise reachability explanation.
-When available, it also shows the selected or best patch candidate, the current
+When available, it also shows the selected or best candidate, the current
 assessment verdict, and when the assessment was last updated. The primary row
 action opens that assessment directly.
 
@@ -356,7 +358,7 @@ their completed results and present warnings separately from failures.
 
 For a completed source, the primary result is a table of its KEV-linked
 exposures. Each row identifies the affected package and version, KEV-linked CVE
-context, concise reachability path, selected or best patch candidate when
+context, concise reachability path, selected or best candidate when
 available, and current assessment state. Its primary action opens the related
 assessment directly.
 

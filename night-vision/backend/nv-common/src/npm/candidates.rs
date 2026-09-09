@@ -31,9 +31,19 @@ pub struct UpgradeCandidate {
     pub purl: String,
     /// The version's publish time, when the packument carries that data.
     pub published_at: Option<Timestamp>,
+    /// The SemVer distance from the vulnerable version to this candidate.
+    pub upgrade_distance: UpgradeDistance,
     /// The API compatibility guarantee SemVer provides for this upgrade.
     pub api_compatibility: ApiCompatibility,
     pub status: CandidateStatus,
+}
+
+/// The SemVer distance between an affected version and a newer candidate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpgradeDistance {
+    Patch,
+    Minor,
+    Major,
 }
 
 /// The compatibility guarantee SemVer provides between two package versions.
@@ -128,6 +138,13 @@ pub fn validate_explicit_candidate(
     let vulnerable_version = parse_version(vulnerable_version)
         .map_err(|(value, source)| CandidateValidationError::MalformedVersion { value, source })?;
 
+    if candidate_version <= vulnerable_version {
+        return Err(CandidateValidationError::NotNewer {
+            current: vulnerable_version,
+            candidate: candidate_version,
+        });
+    }
+
     let version = packument.versions.get(&candidate_version).ok_or(
         CandidateValidationError::VersionNotAvailable(candidate_version),
     )?;
@@ -163,12 +180,28 @@ fn build_candidate(
         version: version.version.clone(),
         purl: build_purl(&packument.name, &version.version),
         published_at: published_at(packument, &version.version),
+        upgrade_distance: upgrade_distance(vulnerable_version, &version.version),
         api_compatibility: api_compatibility(vulnerable_version, &version.version),
         status,
     }
 }
 
-fn api_compatibility(
+/// Classifies how far a newer candidate moves from an affected version.
+pub fn upgrade_distance(
+    vulnerable_version: &Version,
+    candidate_version: &Version,
+) -> UpgradeDistance {
+    if vulnerable_version.major != candidate_version.major {
+        UpgradeDistance::Major
+    } else if vulnerable_version.minor != candidate_version.minor {
+        UpgradeDistance::Minor
+    } else {
+        UpgradeDistance::Patch
+    }
+}
+
+/// Classifies the SemVer API compatibility guarantee for an upgrade.
+pub fn api_compatibility(
     vulnerable_version: &Version,
     candidate_version: &Version,
 ) -> ApiCompatibility {
@@ -251,6 +284,10 @@ pub enum CandidateValidationError {
         source: semver::Error,
     },
     VersionNotAvailable(Version),
+    NotNewer {
+        current: Version,
+        candidate: Version,
+    },
 }
 
 impl Display for CandidateValidationError {
@@ -272,6 +309,12 @@ impl Display for CandidateValidationError {
             Self::VersionNotAvailable(version) => {
                 write!(f, "candidate version {version} is not published")
             }
+            Self::NotNewer { current, candidate } => {
+                write!(
+                    f,
+                    "candidate version {candidate} is not newer than {current}"
+                )
+            }
         }
     }
 }
@@ -281,7 +324,9 @@ impl std::error::Error for CandidateValidationError {
         match self {
             Self::MalformedPackageName(source) => Some(source),
             Self::MalformedVersion { source, .. } => Some(source),
-            Self::PackageIdentityMismatch { .. } | Self::VersionNotAvailable(_) => None,
+            Self::PackageIdentityMismatch { .. }
+            | Self::VersionNotAvailable(_)
+            | Self::NotNewer { .. } => None,
         }
     }
 }
@@ -394,11 +439,13 @@ mod tests {
 
         assert_eq!(candidates.len(), 2);
         assert_eq!(candidates[0].version, Version::parse("1.3.0").unwrap());
+        assert_eq!(candidates[0].upgrade_distance, UpgradeDistance::Minor);
         assert_eq!(
             candidates[0].api_compatibility,
             ApiCompatibility::Compatible
         );
         assert_eq!(candidates[1].version, Version::parse("2.0.0").unwrap());
+        assert_eq!(candidates[1].upgrade_distance, UpgradeDistance::Major);
         assert_eq!(
             candidates[1].api_compatibility,
             ApiCompatibility::Incompatible
@@ -607,6 +654,24 @@ mod tests {
         assert_eq!(candidate.version, Version::parse("1.2.4").unwrap());
         assert_eq!(candidate.api_compatibility, ApiCompatibility::Compatible);
         assert_eq!(candidate.status, CandidateStatus::Included);
+    }
+
+    #[test]
+    fn explicit_validation_rejects_same_or_older_versions() {
+        let packument = packument(
+            "example",
+            vec![
+                version_entry("1.2.2", json!({})),
+                version_entry("1.2.3", json!({})),
+            ],
+        );
+
+        for version in ["1.2.2", "1.2.3"] {
+            assert!(matches!(
+                validate_explicit_candidate(&packument, "example", "1.2.3", version),
+                Err(CandidateValidationError::NotNewer { .. })
+            ));
+        }
     }
 
     #[test]

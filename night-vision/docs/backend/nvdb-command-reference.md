@@ -150,7 +150,7 @@ output.
 | Command | Purpose |
 | --- | --- |
 | `package-version kev <PURL> [--json]` | List KEV-linked CVE matches for one version. A no-match result only reflects locally available data and does not mean the version is safe. |
-| `package-version candidates <AFFECTED-PURL> [--json]` | List newer published NPM upgrades for a locally KEV-affected baseline. It reports eligibility, SemVer compatibility, publish metadata, and KEV match status; no match is not a safety claim. |
+| `package-version candidates <AFFECTED-PURL> [--json]` | List newer published NPM upgrades for a locally KEV-affected baseline. It reports upgrade distance, eligibility, SemVer compatibility, publish metadata, and KEV match status; no match is not a safety claim. |
 
 ## Assessment commands
 

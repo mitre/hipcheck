@@ -16,7 +16,7 @@ Accepted
 
 Night Vision's MVP should shift from broad package threat alerting to upgrade
 assessment. Given a vulnerable package version, Night Vision should help users
-decide whether a newer patch version is a lower-risk upgrade.
+decide whether a newer package version is a lower-risk upgrade.
 
 The assessment should check whether the candidate appears to fix the known
 vulnerability, whether it has known supply chain risk signals, and what evidence
@@ -100,7 +100,7 @@ known vulnerability exposure and known supply chain risk signals.
 - Support FCEB compliance work under CISA's BOD 26-04 by noticing KEV-listed
   package exposure and helping users assess upgrade options.
 - Focus the initial assessment on moving from a vulnerable package version to a
-  newer patch version of the same package.
+  newer version of the same package.
 - Explain recommendations with evidence, confidence, and caveats.
 - Include the shipped binary-analysis signal in upgrade assessments and expose
   unavailable supply-chain checks as missing evidence or caveats.
@@ -125,7 +125,7 @@ The primary MVP workflow should be:
 1. The user provides a package source, such as an NPM `package.json`.
 2. Night Vision resolves reachable direct and transitive dependencies.
 3. Night Vision checks reachable versions against vulnerability and KEV data.
-4. For each KEV-affected package version, Night Vision finds newer patch
+4. For each KEV-affected package version, Night Vision finds newer upgrade
    candidates.
 5. Night Vision assesses each candidate for vulnerability fixes, supply chain
    risk, dependency changes, confidence, and caveats.
@@ -149,6 +149,8 @@ Night Vision should use cautious verdicts:
 
 Night Vision should not call a package version "safe." It should explain what
 is known, what changed, which risk signals were checked, and what is not known.
+A major-version candidate must receive at least `caution`: Night Vision cannot
+establish whether an application remains compatible with a major upgrade.
 
 ## Assessment Dimensions
 
@@ -158,7 +160,9 @@ The MVP assessment should consider:
   avoids other known serious vulnerabilities.
 - KEV relevance: whether the current or candidate version is affected by a
   KEV-listed vulnerability.
-- Upgrade distance: whether the candidate is a patch, minor, or major upgrade.
+- Upgrade distance: whether the candidate is a patch, minor, or major upgrade;
+  major upgrades are always at least `caution` because compatibility is not
+  established.
 - Upgrade risk signals: dependency changes, deprecation or unpublishing,
   suspicious maintainer changes, unusual release timing, provenance gaps, or
   other ecosystem-specific concerns.
@@ -287,8 +291,8 @@ The initial MVP should be constrained to:
 - NPM packages;
 - NPM `package.json` files as package-source input;
 - optional candidate version input;
-- candidate discovery across patch, minor, and major upgrades, with SemVer
-  compatibility classification;
+- candidate discovery across patch, minor, and major upgrades, with explicit
+  upgrade-distance and SemVer compatibility classification;
 - KEV-linked vulnerability context;
 - direct package vulnerability assessment;
 - pinned binary-file analysis through Hipcheck;

@@ -5,7 +5,7 @@
 This roadmap decomposes the work needed to deliver the Minimum Viable Product
 (MVP) described in [RFD 0001](../rfds/0001-mvp-upgrade-safety-assessments.md).
 The MVP helps a user move away from a KEV-affected NPM package version by
-assessing lower-risk patch upgrade candidates.
+assessing lower-risk upgrade candidates.
 
 This document defines the durable product workstreams and their completion
 outcomes. GitHub issues are the source of truth for current
@@ -22,7 +22,7 @@ flowchart LR
     cve[Sync CVE data]
     kev[Sync KEV data]
     correlate[Correlate KEV, CVEs, and NPM versions]
-    candidates[Find patch upgrade candidates]
+    candidates[Find upgrade candidates]
     analyze[Analyze candidates and create assessments]
     report[Report recommendations to users]
 
@@ -99,18 +99,21 @@ for the linkage.
 KEV data, the system creates or updates an explainable KEV-linked exposure;
 unaffected versions are not reported as affected.
 
-### 6. Patch upgrade candidate discovery and exposure validation
+### 6. Upgrade candidate discovery and exposure validation
 
 **Outcome:** For each KEV-linked package version, the system identifies newer
-patch-version candidates and determines whether they appear to remove the
+newer candidate versions and determines whether they appear to remove the
 known exposure.
 
-Candidate discovery is intentionally limited to patch upgrades in the initial
-MVP. A newer version is not a suitable candidate merely because it is newer:
-the assessment must retain the evidence and uncertainty behind the conclusion
-that it no longer matches the affected range.
+Candidate discovery includes newer patch, minor, and major upgrades in the
+initial MVP. The assessment must show each candidate's upgrade distance and
+SemVer compatibility. Major upgrades are selectable but cannot receive a
+`recommended` verdict because Night Vision does not establish application
+compatibility. A newer version is not a suitable candidate merely because it
+is newer: the assessment must retain the evidence and uncertainty behind the
+conclusion that it no longer matches the affected range.
 
-**Complete when:** A KEV-linked exposure yields candidate patch upgrades with
+**Complete when:** A KEV-linked exposure yields candidate upgrades with
 their exposure status and supporting package-version evidence.
 
 ### 7. Candidate analysis, evidence capture, and assessment generation
@@ -151,7 +154,7 @@ candidates, and understand the recommendation and its limitations.
 ## MVP Boundaries
 
 The initial scope is limited to NPM packages, NPM `package.json` inputs,
-patch-version candidate discovery, KEV-linked vulnerability context, direct
+candidate discovery across newer package versions, KEV-linked vulnerability context, direct
 package vulnerability assessment, defensible supply-chain signals, and feasible
 dependency-delta assessment.
 

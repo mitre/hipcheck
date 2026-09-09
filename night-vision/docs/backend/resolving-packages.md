@@ -6,7 +6,7 @@ One important action a new user of Night Vision may perform is to provide a
 packages relevant to that user. This supports both threat alerting and the MVP
 goal described in
 [RFD 0001](../rfds/0001-mvp-upgrade-safety-assessments.md): assessing whether a
-newer patch version is a reasonable move from a known-insecure package version,
+newer package version is a reasonable move from a known-insecure package version,
 with explicit motivation to support Federal Civilian Executive Branch (FCEB)
 compliance with CISA's BOD 26-04 by noticing KEV-listed package exposure and
 identifying safer versions to upgrade to.

@@ -480,8 +480,32 @@ pub enum UpgradeAssessmentConfidence {
 #[serde(rename_all = "camelCase")]
 pub struct UpgradeAssessmentCandidate {
     pub version: String,
+    #[serde(default)]
+    pub upgrade_distance: UpgradeAssessmentUpgradeDistance,
+    #[serde(default)]
+    pub api_compatibility: UpgradeAssessmentApiCompatibility,
     pub verdict: UpgradeAssessmentVerdict,
     pub caveats: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum UpgradeAssessmentUpgradeDistance {
+    Patch,
+    Minor,
+    Major,
+    #[default]
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Default, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum UpgradeAssessmentApiCompatibility {
+    Compatible,
+    Incompatible,
+    NoGuarantee,
+    #[default]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]

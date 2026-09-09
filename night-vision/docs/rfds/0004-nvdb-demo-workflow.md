@@ -178,13 +178,15 @@ cargo nvdb assessment evidence <ASSESSMENT-UUID> --raw-hipcheck
 
 `package-version candidates <AFFECTED-PURL>` requires locally available
 active KEV-linked evidence for the baseline. It lists strictly newer published
-versions in deterministic order with publish metadata, SemVer compatibility,
-exclusion reasons, and KEV status. Deprecated and prerelease releases remain
-visible but are ineligible. A status of no known active KEV match is evidence
+versions in deterministic order with publish metadata, upgrade distance, SemVer
+compatibility, exclusion reasons, and KEV status. Deprecated and prerelease
+releases remain visible but are ineligible. Major versions are eligible for
+assessment but require a compatibility-review caution. A status of no known
+active KEV match is evidence
 from local data, not a claim that a candidate is safe.
 
 `assessment analyze <AFFECTED-PURL> <TARGET-PURL>` requires the same npm
-package, a strictly newer published target, an eligible candidate, and no
+package, a strictly newer published target at any upgrade distance, an eligible candidate, and no
 locally known active KEV match for that target. It persists the exact target's
 canonical release metadata and normalized repository URL before it queues
 Hipcheck, without adding a source-snapshot association. Hipcheck therefore

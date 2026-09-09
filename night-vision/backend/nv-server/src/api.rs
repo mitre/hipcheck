@@ -34,7 +34,10 @@ use nv_common::{
         storage::load_hipcheck_run_by_assessment_id,
     },
     npm::{
-        candidates::{CandidateStatus, validate_explicit_candidate},
+        candidates::{
+            ApiCompatibility, CandidateStatus, UpgradeDistance, api_compatibility,
+            upgrade_distance, validate_explicit_candidate,
+        },
         elaboration::{
             NpmRegistryClient, PackageVersion, PackumentProvider as _, elaborate,
             normalize_repository_url,
@@ -56,12 +59,13 @@ use nv_server_api::{
     PackageSourceStatusCompleted, PackageSourceStatusCompletedWithWarnings,
     PackageSourceStatusFailed, PackageSourceStatusProcessing, PackageSourceWarning,
     PostAssessmentBody, PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
-    PostUpgradeAssessmentBody, PostUpgradeAssessmentResponse, UpgradeAssessmentCandidate,
-    UpgradeAssessmentCompleted, UpgradeAssessmentConfidence, UpgradeAssessmentDependencyDelta,
-    UpgradeAssessmentFailed, UpgradeAssessmentInput, UpgradeAssessmentPathParams,
-    UpgradeAssessmentProcessing, UpgradeAssessmentReport, UpgradeAssessmentStatus,
-    UpgradeAssessmentTrigger, UpgradeAssessmentVerdict, UpgradeAssessmentVulnerabilityContext,
-    VersionedPackage, nv_server_api_mod::api_description,
+    PostUpgradeAssessmentBody, PostUpgradeAssessmentResponse, UpgradeAssessmentApiCompatibility,
+    UpgradeAssessmentCandidate, UpgradeAssessmentCompleted, UpgradeAssessmentConfidence,
+    UpgradeAssessmentDependencyDelta, UpgradeAssessmentFailed, UpgradeAssessmentInput,
+    UpgradeAssessmentPathParams, UpgradeAssessmentProcessing, UpgradeAssessmentReport,
+    UpgradeAssessmentStatus, UpgradeAssessmentTrigger, UpgradeAssessmentUpgradeDistance,
+    UpgradeAssessmentVerdict, UpgradeAssessmentVulnerabilityContext, VersionedPackage,
+    nv_server_api_mod::api_description,
 };
 use percent_encoding::percent_decode_str;
 use sea_orm::{
@@ -523,15 +527,6 @@ async fn validate_and_persist_upgrade_target(
         &target.version,
     )
     .map_err(|error| upgrade_validation_error(&error.to_string()))?;
-    if candidate.version
-        <= semver::Version::parse(&affected.version).map_err(|_| {
-            upgrade_validation_error("affected PURL has an invalid semantic version")
-        })?
-    {
-        return Err(upgrade_validation_error(
-            "target PURL must be strictly newer than affected PURL",
-        ));
-    }
     if !matches!(candidate.status, CandidateStatus::Included) {
         return Err(upgrade_validation_error(
             "target PURL is an excluded upgrade candidate",
@@ -1053,16 +1048,10 @@ async fn mark_upgrade_assessment_failed(
 }
 
 fn initial_assessment_report(input: UpgradeAssessmentInput) -> UpgradeAssessmentReport {
-    let candidate_versions = input
+    let candidate_versions: Vec<UpgradeAssessmentCandidate> = input
         .candidate_version
         .iter()
-        .map(|version| UpgradeAssessmentCandidate {
-            version: version.clone(),
-            verdict: UpgradeAssessmentVerdict::Unknown,
-            caveats: vec![
-                "Candidate analysis has not yet been populated from NPM metadata.".to_owned(),
-            ],
-        })
+        .map(|version| assessment_candidate(&input.current_version, version))
         .collect();
     UpgradeAssessmentReport {
         vulnerability_context: UpgradeAssessmentVulnerabilityContext {
@@ -1083,6 +1072,60 @@ fn initial_assessment_report(input: UpgradeAssessmentInput) -> UpgradeAssessment
             "This assessment is persisted for review, but CVE/KEV correlation, dependency comparison, and supply-chain analysis are not yet available.".to_owned(),
         ],
         evidence_links: Vec::new(),
+    }
+}
+
+fn assessment_candidate(
+    current_version: &str,
+    candidate_version: &str,
+) -> UpgradeAssessmentCandidate {
+    let (upgrade_distance, api_compatibility) = match (
+        semver::Version::parse(current_version),
+        semver::Version::parse(candidate_version),
+    ) {
+        (Ok(current), Ok(candidate)) => (
+            assessment_upgrade_distance(upgrade_distance(&current, &candidate)),
+            assessment_api_compatibility(api_compatibility(&current, &candidate)),
+        ),
+        _ => (
+            UpgradeAssessmentUpgradeDistance::Unknown,
+            UpgradeAssessmentApiCompatibility::Unknown,
+        ),
+    };
+    let is_major = matches!(upgrade_distance, UpgradeAssessmentUpgradeDistance::Major);
+    UpgradeAssessmentCandidate {
+        version: candidate_version.to_owned(),
+        upgrade_distance,
+        api_compatibility,
+        verdict: if is_major {
+            UpgradeAssessmentVerdict::Caution
+        } else {
+            UpgradeAssessmentVerdict::Unknown
+        },
+        caveats: if is_major {
+            vec![
+                "Major upgrades require application compatibility review and cannot be recommended by Night Vision."
+                    .to_owned(),
+            ]
+        } else {
+            vec!["Candidate analysis has not yet been populated from NPM metadata.".to_owned()]
+        },
+    }
+}
+
+fn assessment_upgrade_distance(value: UpgradeDistance) -> UpgradeAssessmentUpgradeDistance {
+    match value {
+        UpgradeDistance::Patch => UpgradeAssessmentUpgradeDistance::Patch,
+        UpgradeDistance::Minor => UpgradeAssessmentUpgradeDistance::Minor,
+        UpgradeDistance::Major => UpgradeAssessmentUpgradeDistance::Major,
+    }
+}
+
+fn assessment_api_compatibility(value: ApiCompatibility) -> UpgradeAssessmentApiCompatibility {
+    match value {
+        ApiCompatibility::Compatible => UpgradeAssessmentApiCompatibility::Compatible,
+        ApiCompatibility::Incompatible => UpgradeAssessmentApiCompatibility::Incompatible,
+        ApiCompatibility::NoGuarantee => UpgradeAssessmentApiCompatibility::NoGuarantee,
     }
 }
 
@@ -1401,6 +1444,14 @@ mod tests {
         assert_eq!(serialized["input"]["packageName"], "example-package");
         assert_eq!(serialized["verdict"], "unknown");
         assert_eq!(serialized["candidateVersions"][0]["version"], "1.2.7");
+        assert_eq!(
+            serialized["candidateVersions"][0]["upgradeDistance"],
+            "patch"
+        );
+        assert_eq!(
+            serialized["candidateVersions"][0]["apiCompatibility"],
+            "compatible"
+        );
         assert!(
             serialized["caveats"]
                 .as_array()
@@ -1409,6 +1460,33 @@ mod tests {
         assert!(serialized.get("dependencyDelta").is_some());
         assert!(serialized.get("supplyChainFindings").is_some());
         assert!(serialized.get("evidenceLinks").is_some());
+    }
+
+    #[test]
+    fn initial_report_marks_major_candidates_as_caution() {
+        let mut assessment_input = input();
+        assessment_input.candidate_version = Some("2.0.0".to_owned());
+
+        let report = initial_assessment_report(assessment_input);
+
+        assert_eq!(
+            report.candidate_versions[0].upgrade_distance,
+            UpgradeAssessmentUpgradeDistance::Major
+        );
+        assert_eq!(
+            report.candidate_versions[0].api_compatibility,
+            UpgradeAssessmentApiCompatibility::Incompatible
+        );
+        assert!(matches!(
+            report.candidate_versions[0].verdict,
+            UpgradeAssessmentVerdict::Caution
+        ));
+        assert!(
+            report.candidate_versions[0]
+                .caveats
+                .iter()
+                .any(|caveat| caveat.contains("compatibility review"))
+        );
     }
 
     #[test]

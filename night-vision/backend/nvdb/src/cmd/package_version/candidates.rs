@@ -10,7 +10,7 @@ use nv_common::{
     db,
     npm::{
         candidates::{
-            ApiCompatibility, CandidateExclusionReason, CandidateStatus,
+            ApiCompatibility, CandidateExclusionReason, CandidateStatus, UpgradeDistance,
             discover_upgrade_candidates,
         },
         elaboration::{NpmRegistryClient, PackumentProvider as _},
@@ -54,8 +54,9 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         println!("affected_purl: {purl}");
         for candidate in candidates {
             println!(
-                "{} compatibility={} published={} eligibility={} kev_status={}",
+                "{} distance={} compatibility={} published={} eligibility={} kev_status={}",
                 candidate.purl,
+                candidate.upgrade_distance,
                 candidate.compatibility,
                 candidate.published_at.as_deref().unwrap_or("unknown"),
                 candidate.eligibility,
@@ -134,6 +135,7 @@ async fn discover(
         };
         output.push(CandidateOutput {
             purl: candidate.purl,
+            upgrade_distance: upgrade_distance(candidate.upgrade_distance),
             compatibility: compatibility(candidate.api_compatibility),
             published_at: candidate
                 .published_at
@@ -150,6 +152,13 @@ fn compatibility(value: ApiCompatibility) -> &'static str {
         ApiCompatibility::Compatible => "compatible",
         ApiCompatibility::Incompatible => "incompatible",
         ApiCompatibility::NoGuarantee => "no-guarantee",
+    }
+}
+fn upgrade_distance(value: UpgradeDistance) -> &'static str {
+    match value {
+        UpgradeDistance::Patch => "patch",
+        UpgradeDistance::Minor => "minor",
+        UpgradeDistance::Major => "major",
     }
 }
 fn exclusion(value: &CandidateExclusionReason) -> String {
@@ -169,6 +178,7 @@ struct CandidatesOutput<'a> {
 #[serde(rename_all = "camelCase")]
 struct CandidateOutput {
     purl: String,
+    upgrade_distance: &'static str,
     compatibility: &'static str,
     published_at: Option<String>,
     eligibility: String,

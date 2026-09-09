@@ -3,7 +3,7 @@
 
 __Night Vision__ is a cyber threat intelligence (CTI) system for open source
 software (OSS) packages. Its Minimum Viable Product (MVP) helps users assess
-whether newer patch versions are reasonable moves from known-insecure package
+whether newer package versions are reasonable moves from known-insecure package
 versions, with explicit motivation to support Federal Civilian Executive
 Branch (FCEB) compliance with CISA's BOD 26-04.
 
@@ -14,7 +14,7 @@ Branch (FCEB) compliance with CISA's BOD 26-04.
 ## What is Night Vision?
 
 With Night Vision, users will assess packages they depend on, starting with
-newer patch versions that may help them move away from known-insecure package
+newer package versions that may help them move away from known-insecure package
 versions. Over time, Night Vision will also support package-source analysis,
 ongoing monitoring, and alerts for new cyber threats affecting dependencies.
 

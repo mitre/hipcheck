@@ -166,8 +166,12 @@ export type PostUpgradeAssessmentResponse = {
     id: string;
 };
 
+export type UpgradeAssessmentApiCompatibility = 'compatible' | 'incompatible' | 'no-guarantee' | 'unknown';
+
 export type UpgradeAssessmentCandidate = {
+    apiCompatibility?: UpgradeAssessmentApiCompatibility;
     caveats: Array<string>;
+    upgradeDistance?: UpgradeAssessmentUpgradeDistance;
     verdict: UpgradeAssessmentVerdict;
     version: string;
 };
@@ -239,6 +243,8 @@ export type UpgradeAssessmentTrigger = {
     exposure_id: string;
     kind: 'exposure';
 };
+
+export type UpgradeAssessmentUpgradeDistance = 'patch' | 'minor' | 'major' | 'unknown';
 
 export type UpgradeAssessmentVerdict = 'recommended' | 'caution' | 'avoid' | 'unknown';
 

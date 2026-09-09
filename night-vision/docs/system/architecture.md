@@ -15,7 +15,7 @@ The architecture of Night Vision is purposefully simple for the purposes of
 our Minimum Viable Product (MVP).
 
 The MVP product goal is upgrade safety assessment: helping users decide whether
-moving from a known-insecure package version to a newer patch version is
+moving from a known-insecure package version to a newer package version is
 reasonable. This is explicitly motivated by supporting Federal Civilian
 Executive Branch (FCEB) compliance with CISA's BOD 26-04. The MVP focuses on
 noticing when reachable package versions enter the Known Exploited
