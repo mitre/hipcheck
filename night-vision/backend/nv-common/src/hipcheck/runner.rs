@@ -420,9 +420,9 @@ printf '{"report":"ok"}'
         run_async(async {
             let fixture = TestFixture::new(
                 r#"printf '%s' "$$" > "$NV_PID"
-while test ! -f "$NV_RELEASE"; do sleep 0.01; done
+while test ! -f "$NV_RELEASE"; do /bin/sleep 0.01; done
 printf '{"partial":'
-exec sleep 5"#,
+exec /bin/sleep 5"#,
             );
             let mut config = fixture.config();
             config.timeout = Duration::from_secs(1);
