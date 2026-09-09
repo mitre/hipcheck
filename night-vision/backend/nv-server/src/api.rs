@@ -19,6 +19,7 @@ use dropshot::{
     ClientErrorStatusCode, HttpError, HttpResponseAccepted, HttpResponseOk, Path, Query,
     RequestContext, ServerBuilder, TypedBody, UntypedBody,
 };
+use http::{HeaderMap, HeaderValue, header::WWW_AUTHENTICATE};
 use nv_common::{
     config::Config,
     cve::kev::{KevNpmMatchStatus, ReachableNpmPackageVersion, kev_affected_npm_package_version},
@@ -50,11 +51,11 @@ use nv_common::{
 use nv_server_api::{
     AssessmentCheck, AssessmentDiagnostics, AssessmentEvidence, AssessmentEvidenceQuery,
     AssessmentFinding, AssessmentPathParams, AssessmentStatus, CveIngestHealth,
-    CveListSyncRunHealth, Health, NvServerApi, PackageSource, PackageSourceEcosystem,
-    PackageSourcePathParams, PackageSourceStatus, PackageSourceStatusCompleted,
-    PackageSourceStatusCompletedWithWarnings, PackageSourceStatusFailed,
-    PackageSourceStatusProcessing, PackageSourceWarning, PostAssessmentBody,
-    PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
+    CveListSyncRunHealth, Health, HealthDiagnostics, NvServerApi, PackageSource,
+    PackageSourceEcosystem, PackageSourcePathParams, PackageSourceStatus,
+    PackageSourceStatusCompleted, PackageSourceStatusCompletedWithWarnings,
+    PackageSourceStatusFailed, PackageSourceStatusProcessing, PackageSourceWarning,
+    PostAssessmentBody, PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
     PostUpgradeAssessmentBody, PostUpgradeAssessmentResponse, UpgradeAssessmentCandidate,
     UpgradeAssessmentCompleted, UpgradeAssessmentConfidence, UpgradeAssessmentDependencyDelta,
     UpgradeAssessmentFailed, UpgradeAssessmentInput, UpgradeAssessmentPathParams,
@@ -67,8 +68,10 @@ use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, DatabaseConnection,
     EntityTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _,
 };
+use secrecy::{ExposeSecret as _, SecretString};
 use slog::Logger;
 use std::{fs::File, time::Duration};
+use subtle::ConstantTimeEq as _;
 use uuid::Uuid;
 
 const TERMINAL_PERSISTENCE_ATTEMPTS: usize = 3;
@@ -170,11 +173,33 @@ impl NvServerApi for RestApi {
     type Context = ApiCtx;
 
     async fn health(
-        ctx: RequestContext<Self::Context>,
+        _ctx: RequestContext<Self::Context>,
     ) -> Result<HttpResponseOk<Health>, HttpError> {
+        Ok(HttpResponseOk(Health {
+            status: "ok".to_owned(),
+        }))
+    }
+
+    async fn health_diagnostics(
+        ctx: RequestContext<Self::Context>,
+    ) -> Result<HttpResponseOk<HealthDiagnostics>, HttpError> {
+        match health_diagnostics_authorization(
+            ctx.context().health_diagnostics_token(),
+            ctx.request
+                .headers()
+                .get_all("authorization")
+                .iter()
+                .map(|value| value.to_str().ok()),
+        ) {
+            HealthDiagnosticsAuthorization::Authorized => {}
+            HealthDiagnosticsAuthorization::Disabled => return Err(health_diagnostics_disabled()),
+            HealthDiagnosticsAuthorization::Unauthorized => {
+                return Err(health_diagnostics_unauthorized());
+            }
+        }
         let cve_ingest = cve_ingest_health(ctx.context().db()).await?;
 
-        Ok(HttpResponseOk(Health {
+        Ok(HttpResponseOk(HealthDiagnostics {
             status: "ok".to_owned(),
             cve_ingest,
         }))
@@ -404,6 +429,58 @@ impl NvServerApi for RestApi {
             })?;
         Ok(HttpResponseOk(assessment_status(assessment)?))
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum HealthDiagnosticsAuthorization {
+    Authorized,
+    Disabled,
+    Unauthorized,
+}
+
+fn health_diagnostics_authorization<'a>(
+    configured_token: Option<&SecretString>,
+    authorization_headers: impl IntoIterator<Item = Option<&'a str>>,
+) -> HealthDiagnosticsAuthorization {
+    let Some(configured_token) = configured_token else {
+        return HealthDiagnosticsAuthorization::Disabled;
+    };
+    let mut authorization_headers = authorization_headers.into_iter();
+    let Some(Some(authorization)) = authorization_headers.next() else {
+        return HealthDiagnosticsAuthorization::Unauthorized;
+    };
+    if authorization_headers.next().is_some() {
+        return HealthDiagnosticsAuthorization::Unauthorized;
+    }
+    let Some(token) = authorization.strip_prefix("Bearer ") else {
+        return HealthDiagnosticsAuthorization::Unauthorized;
+    };
+
+    if token
+        .as_bytes()
+        .ct_eq(configured_token.expose_secret().as_bytes())
+        .into()
+    {
+        HealthDiagnosticsAuthorization::Authorized
+    } else {
+        HealthDiagnosticsAuthorization::Unauthorized
+    }
+}
+
+fn health_diagnostics_disabled() -> HttpError {
+    HttpError::for_not_found(None, "unknown endpoint".to_owned())
+}
+
+fn health_diagnostics_unauthorized() -> HttpError {
+    let mut error = HttpError::for_client_error(
+        Some("HealthDiagnosticsUnauthorized".to_owned()),
+        ClientErrorStatusCode::UNAUTHORIZED,
+        "unauthorized".to_owned(),
+    );
+    let mut headers = HeaderMap::new();
+    headers.insert(WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+    error.headers = Some(Box::new(headers));
+    error
 }
 
 async fn validate_and_persist_upgrade_target(
@@ -1103,6 +1180,11 @@ fn internal_error(error: impl std::fmt::Display) -> HttpError {
 mod tests {
     use super::*;
     use chrono::TimeZone as _;
+    use dropshot::{
+        Body, ConfigDropshot,
+        test_util::{TestContext, read_json},
+    };
+    use http::{Request, StatusCode, header::AUTHORIZATION};
     use nv_common::{
         db::entities::{
             package_source_edges, package_source_versions, package_source_warnings,
@@ -1111,6 +1193,111 @@ mod tests {
         npm::elaboration::storage::MAX_FAILURE_DIAGNOSTIC_BYTES,
     };
     use sea_orm::{DbBackend, DbErr, MockDatabase, MockExecResult, Value};
+    use slog::{Logger, o};
+
+    #[tokio::test]
+    async fn health_routes_serve_public_and_operator_responses() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+            ])
+            .into_connection();
+        let context = ApiCtx::for_test(db, Some(SecretString::from("operator-token")));
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let mut public_response = test_context
+            .client_testctx
+            .make_request_no_body(http::Method::GET, "/health", StatusCode::OK)
+            .await
+            .expect("public health request should succeed");
+        let public_body: serde_json::Value = read_json(&mut public_response).await;
+        assert_eq!(public_body, serde_json::json!({ "status": "ok" }));
+
+        let request = Request::builder()
+            .method(http::Method::GET)
+            .uri(test_context.client_testctx.url("/health/diagnostics"))
+            .header(AUTHORIZATION, "Bearer operator-token")
+            .body(Body::empty())
+            .expect("diagnostics request should build");
+        let mut diagnostics_response = test_context
+            .client_testctx
+            .make_request_with_request(request, StatusCode::OK)
+            .await
+            .expect("authenticated diagnostics request should succeed");
+        let diagnostics_body: serde_json::Value = read_json(&mut diagnostics_response).await;
+        assert_eq!(
+            diagnostics_body,
+            serde_json::json!({
+                "status": "ok",
+                "cveIngest": {
+                    "recordsAvailable": false,
+                    "latestSuccessfulCommit": null,
+                    "latestRun": null,
+                },
+            })
+        );
+
+        test_context.teardown().await;
+    }
+
+    #[test]
+    fn health_diagnostics_requires_one_matching_bearer_token() {
+        let token = SecretString::from("operator-token");
+
+        assert_eq!(
+            health_diagnostics_authorization(None, []),
+            HealthDiagnosticsAuthorization::Disabled
+        );
+        assert_eq!(
+            health_diagnostics_authorization(Some(&token), []),
+            HealthDiagnosticsAuthorization::Unauthorized
+        );
+        assert_eq!(
+            health_diagnostics_authorization(Some(&token), [Some("Basic operator-token")]),
+            HealthDiagnosticsAuthorization::Unauthorized
+        );
+        assert_eq!(
+            health_diagnostics_authorization(Some(&token), [Some("Bearer wrong-token")]),
+            HealthDiagnosticsAuthorization::Unauthorized
+        );
+        assert_eq!(
+            health_diagnostics_authorization(
+                Some(&token),
+                [Some("Bearer operator-token"), Some("Bearer operator-token")],
+            ),
+            HealthDiagnosticsAuthorization::Unauthorized
+        );
+        assert_eq!(
+            health_diagnostics_authorization(Some(&token), [Some("Bearer operator-token")]),
+            HealthDiagnosticsAuthorization::Authorized
+        );
+    }
+
+    #[test]
+    fn unauthorized_diagnostics_response_has_bearer_challenge() {
+        let error = health_diagnostics_unauthorized();
+
+        assert_eq!(error.status_code, ClientErrorStatusCode::UNAUTHORIZED);
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("HealthDiagnosticsUnauthorized")
+        );
+        assert_eq!(
+            error
+                .headers
+                .as_ref()
+                .and_then(|headers| headers.get(WWW_AUTHENTICATE)),
+            Some(&HeaderValue::from_static("Bearer"))
+        );
+    }
 
     fn hipcheck_run() -> hipcheck_runs::Model {
         hipcheck_runs::Model {

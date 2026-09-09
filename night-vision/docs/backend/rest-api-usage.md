@@ -44,7 +44,9 @@ are `processing`, `completed`, and `failed`.
 
 ### `GET /health`
 
-Check whether the server can answer API requests.
+Check whether the server process can answer HTTP requests. This is the public
+liveness endpoint: it is safe to expose to untrusted callers and deliberately
+does not query the database or report operational state.
 
 Request:
 
@@ -61,6 +63,29 @@ Content-Type: application/json
 
 ```json
 {
+  "status": "ok"
+}
+```
+
+`200 OK` means the server process answered the request. It does not indicate
+database availability, CVE List freshness, or whether the initial sync has
+completed.
+
+### `GET /health/diagnostics`
+
+Read CVE ingest state for operators. The endpoint is disabled unless
+`health-diagnostics-token-file` is configured. When enabled, callers must send
+the configured bearer token. Missing, malformed, duplicated, or incorrect
+credentials receive the same `401 Unauthorized` response and a
+`WWW-Authenticate: Bearer` challenge.
+
+```sh
+curl http://127.0.0.1:8080/health/diagnostics \
+  -H "Authorization: Bearer $(<../.secrets/health-diagnostics-token)"
+```
+
+```json
+{
   "status": "ok",
   "cveIngest": {
     "recordsAvailable": false,
@@ -70,10 +95,12 @@ Content-Type: application/json
 }
 ```
 
-`200 OK` means the server answered the request; it does not mean the initial
-CVE List sync has completed. `cveIngest.recordsAvailable` is `true` when active
-CVE records are available. `latestSuccessfulCommit` and `latestRun` describe
-the most recent successful commit and attempted sync, when present.
+`200 OK` means the handler read its diagnostic state; it does not mean the
+initial CVE List sync has completed. `cveIngest.recordsAvailable` is `true`
+when active CVE records are available. `latestSuccessfulCommit` and `latestRun`
+describe the most recent successful commit and attempted sync, when present.
+When diagnostics are disabled, the endpoint returns `404 Not Found` without
+querying the database.
 
 ### `POST /package-sources`
 

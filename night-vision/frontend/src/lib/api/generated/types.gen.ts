@@ -79,6 +79,13 @@ export type Error = {
 };
 
 export type Health = {
+    status: string;
+};
+
+/**
+ * Health information for operators, not untrusted API callers.
+ */
+export type HealthDiagnostics = {
     cveIngest: CveIngestHealth;
     status: string;
 };
@@ -370,6 +377,35 @@ export type HealthResponses = {
 };
 
 export type HealthResponse = HealthResponses[keyof HealthResponses];
+
+export type HealthDiagnosticsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/health/diagnostics';
+};
+
+export type HealthDiagnosticsErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type HealthDiagnosticsError = HealthDiagnosticsErrors[keyof HealthDiagnosticsErrors];
+
+export type HealthDiagnosticsResponses = {
+    /**
+     * successful operation
+     */
+    200: HealthDiagnostics;
+};
+
+export type HealthDiagnosticsResponse = HealthDiagnosticsResponses[keyof HealthDiagnosticsResponses];
 
 export type PostPackageSourceData = {
     body: Blob | File;

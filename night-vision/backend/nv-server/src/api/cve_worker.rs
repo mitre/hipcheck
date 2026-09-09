@@ -235,6 +235,11 @@ mod tests {
                     "/var/lib/night-vision/hipcheck",
                     &data_dir.display().to_string(),
                 );
+            let config = config
+                .lines()
+                .filter(|line| !line.starts_with("health-diagnostics-token-file"))
+                .collect::<Vec<_>>()
+                .join("\n");
 
             let path = std::env::temp_dir().join(format!(
                 "nv-server-cve-worker-config-test-{}-{id}.spookey",

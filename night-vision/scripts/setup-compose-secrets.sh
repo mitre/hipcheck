@@ -10,10 +10,11 @@
 #   POSTGRES_PASSWORD='replace-me' scripts/setup-compose-secrets.sh -x
 #
 # The script reads non-secret database settings from `.env` by default and
-# plans the matching Postgres password and `nv-server` database URL secret
-# files. Use `-x` or `--execute` to write the files. Use `ENV_FILE`,
-# `POSTGRES_PASSWORD_SECRET_FILE`, or
-# `NV_SERVER_DATABASE_URL_SECRET_FILE` to override the defaults.
+# plans the matching Postgres password, `nv-server` database URL, and operator
+# diagnostics token secret files. Use `-x` or `--execute` to write the files.
+# Use `ENV_FILE`, `POSTGRES_PASSWORD_SECRET_FILE`,
+# `NV_SERVER_DATABASE_URL_SECRET_FILE`, or
+# `HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE` to override the defaults.
 
 set -eu
 umask 077
@@ -98,6 +99,10 @@ EOF
       Path to the nv-server database URL secret file.
   NV_LOCAL_DATABASE_URL_SECRET_FILE
       Path to the host-development database URL secret file.
+  HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE
+      Path to the bearer token secret file for operator health diagnostics.
+  HEALTH_DIAGNOSTICS_TOKEN
+      Token to write to the operator health diagnostics secret file.
 
 POSTGRES_USER, POSTGRES_PASSWORD, and POSTGRES_DB are percent-encoded before the
 database URL is written.
@@ -392,6 +397,7 @@ postgres_port=$(env_value POSTGRES_PORT 5432)
 postgres_password_secret_file=$(absolute_path "$(env_value POSTGRES_PASSWORD_SECRET_FILE .secrets/postgres-password)")
 nv_server_database_url_secret_file=$(absolute_path "$(env_value NV_SERVER_DATABASE_URL_SECRET_FILE .secrets/nv-server-database-url)")
 local_database_url_secret_file=$(absolute_path "$(env_value NV_LOCAL_DATABASE_URL_SECRET_FILE .secrets/local-development-database-url)")
+health_diagnostics_token_secret_file=$(absolute_path "$(env_value HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE .secrets/health-diagnostics-token)")
 
 require_nonempty POSTGRES_DB "$postgres_db"
 require_nonempty POSTGRES_USER "$postgres_user"
@@ -400,6 +406,7 @@ require_nonempty POSTGRES_PORT "$postgres_port"
 require_nonempty POSTGRES_PASSWORD_SECRET_FILE "$postgres_password_secret_file"
 require_nonempty NV_SERVER_DATABASE_URL_SECRET_FILE "$nv_server_database_url_secret_file"
 require_nonempty NV_LOCAL_DATABASE_URL_SECRET_FILE "$local_database_url_secret_file"
+require_nonempty HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE "$health_diagnostics_token_secret_file"
 require_single_line POSTGRES_DB "$postgres_db"
 require_single_line POSTGRES_USER "$postgres_user"
 require_single_line POSTGRES_HOST "$postgres_host"
@@ -411,6 +418,7 @@ if [ "$print_paths" = true ]; then
     info "Postgres password secret file: $postgres_password_secret_file"
     info "nv-server database URL secret file: $nv_server_database_url_secret_file"
     info "Local development database URL secret file: $local_database_url_secret_file"
+    info "Health diagnostics token secret file: $health_diagnostics_token_secret_file"
     exit 0
 fi
 
@@ -427,6 +435,20 @@ fi
 
 require_nonempty POSTGRES_PASSWORD "$postgres_password"
 require_single_line POSTGRES_PASSWORD "$postgres_password"
+
+health_diagnostics_token=${HEALTH_DIAGNOSTICS_TOKEN:-}
+health_diagnostics_token_source="HEALTH_DIAGNOSTICS_TOKEN environment variable"
+if [ -z "$health_diagnostics_token" ] && [ -f "$health_diagnostics_token_secret_file" ]; then
+    health_diagnostics_token=$(cat "$health_diagnostics_token_secret_file")
+    health_diagnostics_token_source="existing health diagnostics token secret"
+fi
+if [ -z "$health_diagnostics_token" ]; then
+    health_diagnostics_token=$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')
+    health_diagnostics_token_source="generated local token"
+fi
+
+require_nonempty HEALTH_DIAGNOSTICS_TOKEN "$health_diagnostics_token"
+require_single_line HEALTH_DIAGNOSTICS_TOKEN "$health_diagnostics_token"
 
 encoded_postgres_user=$(percent_encode POSTGRES_USER "$postgres_user")
 encoded_postgres_password=$(percent_encode POSTGRES_PASSWORD "$postgres_password")
@@ -446,18 +468,22 @@ local_database_url=$(printf 'postgres://%s:%s@127.0.0.1:5432/%s' \
 password_action=$(plan_file_action "$postgres_password_secret_file" "$postgres_password")
 database_url_action=$(plan_file_action "$nv_server_database_url_secret_file" "$database_url")
 local_database_url_action=$(plan_file_action "$local_database_url_secret_file" "$local_database_url")
+health_diagnostics_token_action=$(plan_file_action "$health_diagnostics_token_secret_file" "$health_diagnostics_token")
 
 info "Using Postgres password source: $postgres_password_source"
+info "Using health diagnostics token source: $health_diagnostics_token_source"
 
 if [ "$execute" = false ]; then
     plan "Would $password_action Postgres password secret: $postgres_password_secret_file"
     plan "Would $database_url_action nv-server database URL secret: $nv_server_database_url_secret_file"
     plan "Would $local_database_url_action local development database URL secret: $local_database_url_secret_file"
+    plan "Would $health_diagnostics_token_action health diagnostics token secret: $health_diagnostics_token_secret_file"
     info 'Pass -x or --execute to apply these changes.'
 else
     write_secret_file "Postgres password secret" "$postgres_password_secret_file" "$postgres_password" "$password_action"
     write_secret_file "nv-server database URL secret" "$nv_server_database_url_secret_file" "$database_url" "$database_url_action"
     write_secret_file "local development database URL secret" "$local_database_url_secret_file" "$local_database_url" "$local_database_url_action"
+    write_secret_file "health diagnostics token secret" "$health_diagnostics_token_secret_file" "$health_diagnostics_token" "$health_diagnostics_token_action"
 fi
 
 if [ "$validate_compose" = true ]; then
@@ -468,6 +494,7 @@ if [ "$validate_compose" = true ]; then
     POSTGRES_PORT="$postgres_port" \
     POSTGRES_PASSWORD_SECRET_FILE="$postgres_password_secret_file" \
     NV_SERVER_DATABASE_URL_SECRET_FILE="$nv_server_database_url_secret_file" \
+    HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE="$health_diagnostics_token_secret_file" \
         "$script_dir/docker-compose-local.sh" --env-file "$env_file" config --quiet
     success 'Validated local Docker Compose config.'
 fi

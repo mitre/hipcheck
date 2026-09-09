@@ -74,6 +74,7 @@ repo_root=$(
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/night-vision-docker-scripts.XXXXXX")
 trap finish EXIT HUP INT TERM
 export DOCKER_SECRET_MOUNT_DIR="$tmp_dir/docker-mount"
+export HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE="$tmp_dir/health-diagnostics-token"
 export NV_APP_IMAGE=nv-app:local
 export NV_SERVER_IMAGE=nv-server:local
 
@@ -145,8 +146,10 @@ pass_test
 start_test 'local Compose uses staged secrets'
 printf '%s\n' replace-me > "$tmp_dir/source-postgres-password"
 printf '%s\n' postgres://nv-server:replace-me@postgres:5432/nv > "$tmp_dir/source-nv-server-database-url"
+printf '%s\n' local-health-diagnostics-token > "$tmp_dir/source-health-diagnostics-token"
 printf '%s\n' test-ca > "$tmp_dir/source-ca-file"
-chmod 600 "$tmp_dir/source-postgres-password" "$tmp_dir/source-nv-server-database-url" "$tmp_dir/source-ca-file"
+chmod 600 "$tmp_dir/source-postgres-password" "$tmp_dir/source-nv-server-database-url" "$tmp_dir/source-health-diagnostics-token" "$tmp_dir/source-ca-file"
+export HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE="$tmp_dir/source-health-diagnostics-token"
 
 POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
 NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
@@ -166,6 +169,10 @@ if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT
 fi
 if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT_DIR/night-vision-local/nv-server-database-url" >/dev/null; then
     error 'error: local Docker Compose config should use the staged nv-server database URL secret file'
+    exit 1
+fi
+if ! printf '%s\n' "$local_compose_config" | grep -F "file: $DOCKER_SECRET_MOUNT_DIR/night-vision-local/health-diagnostics-token" >/dev/null; then
+    error 'error: local Compose should use the staged health diagnostics token file'
     exit 1
 fi
 if ! printf '%s\n' "$local_compose_config" | grep -F "source: ca_file" >/dev/null; then
@@ -196,6 +203,10 @@ if ! cmp -s "$tmp_dir/source-nv-server-database-url" "$DOCKER_SECRET_MOUNT_DIR/n
     error 'error: staged nv-server database URL secret should match the source secret file'
     exit 1
 fi
+if ! cmp -s "$tmp_dir/source-health-diagnostics-token" "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/health-diagnostics-token"; then
+    error 'error: staged health diagnostics token should match the source secret file'
+    exit 1
+fi
 if ! cmp -s "$tmp_dir/source-ca-file" "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/ca_file"; then
     error 'error: staged CA file should match the source secret file'
     exit 1
@@ -204,6 +215,8 @@ assert_file_mode \
     "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/postgres-password" 444
 assert_file_mode \
     "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/nv-server-database-url" 444
+assert_file_mode \
+    "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/health-diagnostics-token" 444
 assert_file_mode "$DOCKER_SECRET_MOUNT_DIR/night-vision-local/ca_file" 444
 pass_test
 
@@ -214,40 +227,46 @@ NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
     "$compose_script" --env-file .env.local.example config --quiet >/dev/null
 pass_test
 
-start_test 'local Compose uses DOCKER_HOST_REPO_ROOT for Linux default secret staging'
-host_repo_root="$tmp_dir/host-repo-root"
-host_secret_mount_dir="$host_repo_root/.secrets/docker/night-vision-local"
+export HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE="$tmp_dir/health-diagnostics-token"
 
-DOCKER_SECRET_MOUNT_DIR="" \
-DOCKER_HOST_REPO_ROOT="$host_repo_root" \
-POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
-NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
-    "$compose_script" --env-file .env.local.example config --quiet >/dev/null
-host_override_compose_config=$(
+start_test 'local Compose uses DOCKER_HOST_REPO_ROOT for Linux default secret staging'
+if [ "$(uname -s)" = Linux ]; then
+    host_repo_root="$tmp_dir/host-repo-root"
+    host_secret_mount_dir="$host_repo_root/.secrets/docker/night-vision-local"
+
     DOCKER_SECRET_MOUNT_DIR="" \
     DOCKER_HOST_REPO_ROOT="$host_repo_root" \
     POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
     NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
+    HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE="$tmp_dir/source-health-diagnostics-token" \
+        "$compose_script" --env-file .env.local.example config --quiet >/dev/null
+    host_override_compose_config=$(
+    DOCKER_SECRET_MOUNT_DIR="" \
+    DOCKER_HOST_REPO_ROOT="$host_repo_root" \
+    POSTGRES_PASSWORD_SECRET_FILE="$tmp_dir/source-postgres-password" \
+    NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/source-nv-server-database-url" \
+    HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE="$tmp_dir/source-health-diagnostics-token" \
         "$compose_script" --env-file .env.local.example config
-)
-if ! printf '%s\n' "$host_override_compose_config" | grep -F "file: $host_secret_mount_dir/postgres-password" >/dev/null; then
+    )
+    if ! printf '%s\n' "$host_override_compose_config" | grep -F "file: $host_secret_mount_dir/postgres-password" >/dev/null; then
     error 'error: local Docker Compose config should use the DOCKER_HOST_REPO_ROOT staged Postgres secret file'
     exit 1
-fi
-if ! printf '%s\n' "$host_override_compose_config" | grep -F "file: $host_secret_mount_dir/nv-server-database-url" >/dev/null; then
+    fi
+    if ! printf '%s\n' "$host_override_compose_config" | grep -F "file: $host_secret_mount_dir/nv-server-database-url" >/dev/null; then
     error 'error: local Docker Compose config should use the DOCKER_HOST_REPO_ROOT staged nv-server database URL secret file'
     exit 1
-fi
-if ! cmp -s "$tmp_dir/source-postgres-password" "$host_secret_mount_dir/postgres-password"; then
+    fi
+    if ! cmp -s "$tmp_dir/source-postgres-password" "$host_secret_mount_dir/postgres-password"; then
     error 'error: DOCKER_HOST_REPO_ROOT staged Postgres secret should match the source secret file'
     exit 1
-fi
-if ! cmp -s "$tmp_dir/source-nv-server-database-url" "$host_secret_mount_dir/nv-server-database-url"; then
+    fi
+    if ! cmp -s "$tmp_dir/source-nv-server-database-url" "$host_secret_mount_dir/nv-server-database-url"; then
     error 'error: DOCKER_HOST_REPO_ROOT staged nv-server database URL secret should match the source secret file'
     exit 1
+    fi
+    assert_file_mode "$host_secret_mount_dir/postgres-password" 444
+    assert_file_mode "$host_secret_mount_dir/nv-server-database-url" 444
 fi
-assert_file_mode "$host_secret_mount_dir/postgres-password" 444
-assert_file_mode "$host_secret_mount_dir/nv-server-database-url" 444
 pass_test
 
 start_test 'execute creates secret files with strict modes'
@@ -265,10 +284,16 @@ POSTGRES_PASSWORD=replace-me \
 assert_file_mode "$tmp_dir/postgres-password" 600
 assert_file_mode "$tmp_dir/nv-server-database-url" 600
 assert_file_mode "$tmp_dir/local-development-database-url" 600
+assert_file_mode "$tmp_dir/health-diagnostics-token" 600
 assert_line_count "$tmp_dir/postgres-password" 1
 assert_line_count "$tmp_dir/nv-server-database-url" 1
 assert_line_count "$tmp_dir/local-development-database-url" 1
+assert_line_count "$tmp_dir/health-diagnostics-token" 1
 assert_contains "$tmp_dir/local-development-database-url" '@127.0.0.1:5432/nv'
+if [ ! -s "$tmp_dir/health-diagnostics-token" ]; then
+    error 'error: generated health diagnostics token should not be empty'
+    exit 1
+fi
 pass_test
 
 start_test 'plan mode leaves existing secrets unchanged'
@@ -330,11 +355,11 @@ assert_not_exists "$tmp_dir/planned-url"
 pass_test
 
 start_test 'print paths resolves defaults under repo'
-"$setup_script" \
+env -u HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE "$setup_script" \
     -p \
     >/dev/null
 
-paths_output=$("$setup_script" -p)
+paths_output=$(env -u HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE "$setup_script" -p)
 if ! printf '%s\n' "$paths_output" | grep -F "Postgres password secret file: $repo_root/.secrets/postgres-password" >/dev/null; then
     error "error: default Postgres password secret path should resolve under $repo_root/.secrets"
     exit 1
@@ -347,8 +372,12 @@ if ! printf '%s\n' "$paths_output" | grep -F "Local development database URL sec
     error "error: default local development database URL secret path should resolve under $repo_root/.secrets"
     exit 1
 fi
+if ! printf '%s\n' "$paths_output" | grep -F "Health diagnostics token secret file: $repo_root/.secrets/health-diagnostics-token" >/dev/null; then
+    error "error: default health diagnostics token path should resolve under $repo_root/.secrets"
+    exit 1
+fi
 
-"$setup_script" \
+env -u HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE "$setup_script" \
     --print-paths \
     >/dev/null
 pass_test

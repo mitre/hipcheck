@@ -41,6 +41,7 @@ SeaORM, or Tokio setting at its default unless noted below.
 | Key | Value | Units | Unset behavior |
 | --- | --- | --- | --- |
 | `openapi-dest-path` | Path for writing the OpenAPI description on startup. | Path | No OpenAPI file is written. The local sample writes `openapi/nv-server-openapi.json`; the container sample leaves it unset. |
+| `health-diagnostics-token-file` | File-backed bearer token for operator diagnostics. | Path | Diagnostics are disabled and `GET /health/diagnostics` returns `404 Not Found`. The file must meet the secret-file rules below. |
 | `kev-url` | Source URL for the CISA Known Exploited Vulnerabilities catalog. | URL | CISA's published KEV catalog URL. |
 | `kev-refresh-interval` | Delay between recurring KEV catalog sync attempts. | Milliseconds | 3600000 milliseconds. Values must be greater than 0. |
 | `kev-response-body-max-bytes` | Maximum size of a KEV catalog response body. | Bytes | 16777216 bytes (16 MiB). Values must be greater than 0. The limit applies while streaming, even when the response has no `Content-Length`. |
@@ -90,6 +91,10 @@ connection string:
 database-connection-file = "/run/secrets/nv-server/database-url"
 ```
 
+`health-diagnostics-token-file` uses the same one-line and permission rules.
+When configured, clients must send its value as a Bearer token; the value and
+file path are redacted from startup output.
+
 On Unix systems, secret files outside `/run/secrets/` must not grant group or
 world permissions. Use mode `0600` or stricter. Docker Compose secrets mounted
 under `/run/secrets/` are accepted with Docker's read-only `0444` mode.
@@ -107,6 +112,7 @@ For local development, `backend/nv-server.spookey` uses:
 ```spookey
 server-address = "127.0.0.1:8080"
 database-connection-file = "../.secrets/local-development-database-url"
+health-diagnostics-token-file = "../.secrets/health-diagnostics-token"
 openapi-dest-path = "openapi/nv-server-openapi.json"
 ```
 
@@ -115,11 +121,13 @@ For containers, `backend/deploy/nv-server.spookey` uses:
 ```spookey
 server-address = "0.0.0.0:8080"
 database-connection-file = "/run/secrets/nv-server/database-url"
+health-diagnostics-token-file = "/run/secrets/nv-server/health-diagnostics-token"
 ```
 
-The base Compose file mounts `NV_SERVER_DATABASE_URL_SECRET_FILE` into the
-container as the `nv-server/database-url` secret, which appears to the server
-at `/run/secrets/nv-server/database-url`.
+The base Compose file mounts `NV_SERVER_DATABASE_URL_SECRET_FILE` as
+`/run/secrets/nv-server/database-url` and
+`HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE` as
+`/run/secrets/nv-server/health-diagnostics-token`.
 
 ## Tuning Notes
 

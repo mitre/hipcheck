@@ -186,9 +186,13 @@ API needs a more specific response body or recovery path.
 These examples describe the current Night Vision API. Update this section when
 the API surface changes.
 
-- `GET /health` returns `200 OK` with a health response body when the server is
-  able to answer the request. The body includes CVE ingest metadata; `200 OK`
-  does not guarantee that the initial CVE sync has completed.
+- `GET /health` returns `200 OK` with only `{"status":"ok"}` when the server
+  process can answer a request. It does not query dependencies or guarantee
+  that the initial CVE sync has completed.
+- `GET /health/diagnostics` returns `200 OK` with CVE ingest metadata only
+  after a configured bearer token authenticates the caller. It returns `401
+  UNAUTHORIZED` with a Bearer challenge for every credential failure, and `404
+  NOT FOUND` when diagnostics are disabled.
 - `POST /package-sources` currently returns `202 ACCEPTED` with the submitted
   package source ID because package-source processing is asynchronous. The ID
   can be used with `GET /package-sources/{id}` to check status. It accepts only

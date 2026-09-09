@@ -29,6 +29,14 @@ pub trait NvServerApi {
     ) -> Result<HttpResponseOk<Health>, HttpError>;
 
     #[endpoint {
+        method = GET,
+        path = "/health/diagnostics",
+    }]
+    async fn health_diagnostics(
+        ctx: RequestContext<Self::Context>,
+    ) -> Result<HttpResponseOk<HealthDiagnostics>, HttpError>;
+
+    #[endpoint {
         method = POST,
         path = "/package-sources",
         content_type = "application/json",
@@ -165,6 +173,13 @@ pub struct AssessmentFinding {
 #[serde(rename_all = "camelCase")]
 pub struct Health {
     pub status: String,
+}
+
+/// Health information for operators, not untrusted API callers.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct HealthDiagnostics {
+    pub status: String,
     pub cve_ingest: CveIngestHealth,
 }
 
@@ -187,6 +202,47 @@ pub struct CveListSyncRunHealth {
     pub records_inserted: i32,
     pub records_updated: i32,
     pub error: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CveIngestHealth, Health, HealthDiagnostics};
+
+    #[test]
+    fn public_health_omits_operator_diagnostics() {
+        let health = Health {
+            status: "ok".to_owned(),
+        };
+
+        assert_eq!(
+            serde_json::to_string(&health).unwrap(),
+            r#"{"status":"ok"}"#
+        );
+    }
+
+    #[test]
+    fn operator_diagnostics_include_cve_ingest_state() {
+        let health = HealthDiagnostics {
+            status: "ok".to_owned(),
+            cve_ingest: CveIngestHealth {
+                records_available: true,
+                latest_successful_commit: Some("abc123".to_owned()),
+                latest_run: None,
+            },
+        };
+
+        assert_eq!(
+            serde_json::to_value(health).unwrap(),
+            serde_json::json!({
+                "status": "ok",
+                "cveIngest": {
+                    "recordsAvailable": true,
+                    "latestSuccessfulCommit": "abc123",
+                    "latestRun": null,
+                },
+            })
+        );
+    }
 }
 
 #[derive(Deserialize, JsonSchema, Debug, Clone)]

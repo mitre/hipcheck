@@ -137,6 +137,29 @@
         }
       }
     },
+    "/health/diagnostics": {
+      "get": {
+        "operationId": "health_diagnostics",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDiagnostics"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/package-sources": {
       "post": {
         "operationId": "post_package_source",
@@ -542,6 +565,18 @@
         ]
       },
       "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "HealthDiagnostics": {
+        "description": "Health information for operators, not untrusted API callers.",
         "type": "object",
         "properties": {
           "cveIngest": {

@@ -55,6 +55,7 @@ sha2 = { version = "0.10" }
 slab = { version = "0.4" }
 slog = { version = "2", features = ["dynamic-keys", "release_max_level_debug"] }
 smallvec = { version = "1", default-features = false, features = ["const_new"] }
+subtle = { version = "2" }
 thiserror = { version = "2" }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing", "serde"] }
 tokio = { version = "1", features = ["full"] }

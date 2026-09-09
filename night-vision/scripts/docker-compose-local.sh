@@ -56,9 +56,10 @@ nv-server:local, DOCKER_SECRET_MOUNT_DIR overrides the Docker-approved host
 directory used for staged local secrets, and DOCKER_HOST_REPO_ROOT overrides the
 repository root used to derive the default Linux staging directory when Docker
 needs a host-visible path. Set CA_FILE_SECRET_FILE to pass network CA
-certificates to the backend image build. Export HIPCHECK_GITLAB_TOKEN for
-commands that build the backend image; Compose passes it only as a BuildKit
-secret.
+certificates to the backend image build.
+HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE selects the bearer-token secret staged for
+operator health diagnostics.
+build 
 EOF
 }
 
@@ -207,6 +208,7 @@ write_ca_file_compose_override() {
 
 source_postgres_password_secret_file=$(absolute_path "$(env_file_value POSTGRES_PASSWORD_SECRET_FILE .secrets/postgres-password)")
 source_nv_server_database_url_secret_file=$(absolute_path "$(env_file_value NV_SERVER_DATABASE_URL_SECRET_FILE .secrets/nv-server-database-url)")
+source_health_diagnostics_token_secret_file=$(absolute_path "$(env_file_value HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE .secrets/health-diagnostics-token)")
 source_ca_file_secret_file=$(env_file_value CA_FILE_SECRET_FILE "")
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-night-vision-local}"
@@ -216,13 +218,16 @@ export NV_SERVER_IMAGE="${NV_SERVER_IMAGE:-nv-server:local}"
 staged_secret_dir=$(approved_mount_root)/$COMPOSE_PROJECT_NAME
 postgres_password_secret_file=$staged_secret_dir/postgres-password
 nv_server_database_url_secret_file=$staged_secret_dir/nv-server-database-url
+health_diagnostics_token_secret_file=$staged_secret_dir/health-diagnostics-token
 ca_file_compose_override_file=
 
 stage_secret_file "Postgres password secret" "$source_postgres_password_secret_file" "$postgres_password_secret_file"
 stage_secret_file "nv-server database URL secret" "$source_nv_server_database_url_secret_file" "$nv_server_database_url_secret_file"
+stage_secret_file "health diagnostics token secret" "$source_health_diagnostics_token_secret_file" "$health_diagnostics_token_secret_file"
 
 export POSTGRES_PASSWORD_SECRET_FILE="$postgres_password_secret_file"
 export NV_SERVER_DATABASE_URL_SECRET_FILE="$nv_server_database_url_secret_file"
+export HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE="$health_diagnostics_token_secret_file"
 
 if [ -n "$source_ca_file_secret_file" ]; then
     source_ca_file_secret_file=$(absolute_path "$source_ca_file_secret_file")

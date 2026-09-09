@@ -76,24 +76,34 @@ Check the direct local server or the Compose-published backend port:
 curl --fail --silent --show-error http://127.0.0.1:8080/health
 ```
 
-The current health response body is:
+The public liveness response body is:
 
 ```json
 {
-  "status": "ok",
-  "cveIngest": {
-    "recordsAvailable": false,
-    "latestSuccessfulCommit": null,
-    "latestRun": null
-  }
+  "status": "ok"
 }
 ```
 
-`GET /health` returning `200 OK` means the server accepted the request and the
-handler completed. It does not report database or KEV state. The `cveIngest`
-object reports whether active CVE records are available and, when present, the
-latest successful commit and sync attempt. A new server can return `200 OK`
-with `recordsAvailable: false` while its first CVE List sync is still running.
+`GET /health` returning `200 OK` means the server process accepted the request.
+It does not query or report database, CVE, or KEV state. Use it for container
+and load-balancer liveness checks.
+
+For CVE ingest diagnostics, operators can use the bearer-token-protected
+endpoint. The local setup script creates the token file with restrictive
+permissions:
+
+```sh
+curl --fail --silent --show-error http://127.0.0.1:8080/health/diagnostics \
+  -H "Authorization: Bearer $(<.secrets/health-diagnostics-token)"
+```
+
+Its `cveIngest` object reports whether active CVE records are available and,
+when present, the latest successful commit and sync attempt. A new server can
+return `200 OK` with `recordsAvailable: false` while its first CVE List sync is
+still running. Missing or invalid tokens return `401 Unauthorized`; absent
+`health-diagnostics-token-file` configuration disables the endpoint with `404
+Not Found`. Rotate the token by replacing its secret file and restarting
+`nv-server`; do not print or commit token values.
 
 For Compose, inspect container health and recent logs:
 

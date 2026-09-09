@@ -46,5 +46,7 @@ secrets:
 
   nv-server-database-url:
     file: ${NV_SERVER_DATABASE_URL_SECRET_FILE:?NV_SERVER_DATABASE_URL_SECRET_FILE is required}
+  health-diagnostics-token:
+    file: ${HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE:?HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE is required}
   postgres-password:
     file: ${POSTGRES_PASSWORD_SECRET_FILE:?POSTGRES_PASSWORD_SECRET_FILE is required}

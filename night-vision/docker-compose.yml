@@ -67,6 +67,8 @@ services:
     secrets:
       - source: nv-server-database-url
         target: nv-server/database-url
+      - source: health-diagnostics-token
+        target: nv-server/health-diagnostics-token
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,5 +127,7 @@ networks:
 secrets:
   nv-server-database-url:
     file: ${NV_SERVER_DATABASE_URL_SECRET_FILE:?NV_SERVER_DATABASE_URL_SECRET_FILE is required}
+  health-diagnostics-token:
+    file: ${HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE:?HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE is required}
   postgres-password:
     file: ${POSTGRES_PASSWORD_SECRET_FILE:?POSTGRES_PASSWORD_SECRET_FILE is required}

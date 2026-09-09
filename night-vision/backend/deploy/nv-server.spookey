@@ -13,6 +13,10 @@ server-address = "0.0.0.0:8080"
 # `docker compose` configuration.
 database-connection-file = "/run/secrets/nv-server/database-url"
 
+# This token protects GET /health/diagnostics. Docker Compose mounts the value
+# as a runtime secret; do not add it to this configuration file.
+health-diagnostics-token-file = "/run/secrets/nv-server/health-diagnostics-token"
+
 # Maximum size in bytes for the request body.
 #
 # Default: 1024

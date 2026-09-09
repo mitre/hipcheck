@@ -161,6 +161,9 @@ pub struct Config {
     /// String used to connect to the database.
     database_connection: SecretString,
 
+    /// Optional bearer token required to read operator health diagnostics.
+    health_diagnostics_token: Option<SecretString>,
+
     /// The maximum number of connections to the database.
     pub database_max_connections: Option<u32>,
 
@@ -437,6 +440,7 @@ impl Config {
                     "http-early-disconnect-behavior",
                     "database-connection",
                     "database-connection-file",
+                    "health-diagnostics-token-file",
                     "database-max-connections",
                     "database-min-connections",
                     "database-connect-timeout",
@@ -501,6 +505,8 @@ impl Config {
             database_connection_file,
             &mut errors,
         );
+        let health_diagnostics_token_file =
+            parse_value(&parsed, "health-diagnostics-token-file", &mut errors);
 
         let server_address: String = parse_value(&parsed, "server-address", &mut errors)
             .expect("server-address is required");
@@ -680,6 +686,7 @@ impl Config {
 
         let (database_connection_source, database_connection) =
             resolve_database_connection_source(database_connection_source)?;
+        let health_diagnostics_token = resolve_optional_secret_file(health_diagnostics_token_file)?;
         let cve_list_pipeline_config = resolve_cve_list_pipeline_config(
             async_worker_threads,
             async_max_blocking_threads,
@@ -712,6 +719,7 @@ impl Config {
             http_early_disconnect_behavior,
             database_connection_source,
             database_connection,
+            health_diagnostics_token,
             database_max_connections,
             database_min_connections,
             database_connect_timeout,
@@ -790,6 +798,11 @@ impl Config {
     /// Get the configured database connection string.
     pub fn database_connection(&self) -> &SecretString {
         &self.database_connection
+    }
+
+    /// Get the optional token that enables operator health diagnostics.
+    pub fn health_diagnostics_token(&self) -> Option<&SecretString> {
+        self.health_diagnostics_token.as_ref()
     }
 
     /// Build the deliberately hermetic Hipcheck process configuration.
@@ -912,6 +925,14 @@ impl Display for Config {
 
         write_report_line!(f, "server-address", &self.server_address)?;
         write_report_line!(f, "database-connection", &self.database_connection_source)?;
+
+        if self.health_diagnostics_token.is_some() {
+            write_report_line!(
+                f,
+                "health-diagnostics-token",
+                &"<redacted file-backed secret>"
+            )?;
+        }
 
         if let Some(openapi_dest_path) = &self.openapi_dest_path {
             write_report_line!(f, "openapi-dest-path", openapi_dest_path)?;
@@ -1396,6 +1417,20 @@ fn resolve_database_connection_source(
         .resolve()
         .map(crate::secret::ResolvedSecret::into_parts)
         .map_err(|err| ConfigLoadError::FailedToReadSecretFile(err.path, err.error))
+}
+
+/// Resolve an optional file-backed secret, preserving path context for errors.
+fn resolve_optional_secret_file(
+    path: Option<Utf8PathBuf>,
+) -> Result<Option<SecretString>, ConfigLoadError> {
+    path.map(|path| {
+        SecretSource::file(path)
+            .resolve()
+            .map(crate::secret::ResolvedSecret::into_parts)
+            .map(|(_, secret)| secret)
+            .map_err(|err| ConfigLoadError::FailedToReadSecretFile(err.path, err.error))
+    })
+    .transpose()
 }
 
 /// Check collected warnings and field parsing errors, bundling them in a `ConfigLoadError` to report.
@@ -2114,6 +2149,105 @@ mod tests {
         assert!(matches!(
             config.database_connection_source,
             SecretSourceKind::File
+        ));
+    }
+
+    #[test]
+    fn health_diagnostics_token_file_is_optional_and_redacted() {
+        let disabled = TempConfigFile::new(
+            "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
+            database-connection = sqlite::memory:\n",
+        );
+        let disabled_config = Config::parse(disabled.path()).expect("config should parse");
+        assert!(disabled_config.health_diagnostics_token().is_none());
+
+        let secret_file = TempConfigFile::new("operator-token\n");
+        restrict_secret_file_permissions(secret_file.path());
+        let enabled = TempConfigFile::new(&format!(
+            "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
+            database-connection = sqlite::memory:\n\
+            health-diagnostics-token-file = {}\n",
+            secret_file.path()
+        ));
+        let enabled_config = Config::parse(enabled.path()).expect("config should parse");
+        assert_eq!(
+            enabled_config
+                .health_diagnostics_token()
+                .expect("token should be configured")
+                .expose_secret(),
+            "operator-token"
+        );
+        let report = enabled_config.to_string();
+        assert!(report.contains("<redacted file-backed secret>"));
+        assert!(!report.contains("operator-token"));
+        assert!(!report.contains(secret_file.path().as_str()));
+    }
+
+    #[test]
+    fn health_diagnostics_token_file_rejects_empty_multiline_and_missing_files() {
+        for (contents, expects_multiline) in
+            [("\n", false), ("operator-token\nsecond-line\n", true)]
+        {
+            let secret_file = TempConfigFile::new(contents);
+            restrict_secret_file_permissions(secret_file.path());
+            let config_file = TempConfigFile::new(&format!(
+                "server-address = 127.0.0.1:0\n\
+                cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
+                database-connection = sqlite::memory:\n\
+                health-diagnostics-token-file = {}\n",
+                secret_file.path()
+            ));
+
+            let error = Config::parse(config_file.path()).expect_err("secret file should fail");
+            let error_string = error.to_string();
+            let ConfigLoadError::FailedToReadSecretFile(_, secret_error) = error else {
+                panic!("expected FailedToReadSecretFile, got {error:?}");
+            };
+            assert!(if expects_multiline {
+                matches!(secret_error, SecretFileError::MultipleLines)
+            } else {
+                matches!(secret_error, SecretFileError::Empty)
+            });
+            if !contents.trim().is_empty() {
+                assert!(!error_string.contains(contents.trim()));
+            }
+        }
+
+        let config_file = TempConfigFile::new(
+            "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
+            database-connection = sqlite::memory:\n\
+            health-diagnostics-token-file = /tmp/night-vision-missing-diagnostics-token\n",
+        );
+        let error = Config::parse(config_file.path()).expect_err("missing secret file should fail");
+        assert!(matches!(
+            error,
+            ConfigLoadError::FailedToReadSecretFile(_, SecretFileError::Metadata(_))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn health_diagnostics_token_file_rejects_insecure_permissions() {
+        let secret_file = TempConfigFile::new("operator-token\n");
+        set_file_permissions(
+            secret_file.path(),
+            TestFilePermissions::UnixGroupOrWorldReadable,
+        );
+        let config_file = TempConfigFile::new(&format!(
+            "server-address = 127.0.0.1:0\n\
+            cve-list-checkout-path = /tmp/night-vision-test-cvelistV5\n\
+            database-connection = sqlite::memory:\n\
+            health-diagnostics-token-file = {}\n",
+            secret_file.path()
+        ));
+
+        let error = Config::parse(config_file.path()).expect_err("secret file should fail");
+        assert!(matches!(
+            error,
+            ConfigLoadError::FailedToReadSecretFile(_, SecretFileError::InsecurePermissions(_))
         ));
     }
 
