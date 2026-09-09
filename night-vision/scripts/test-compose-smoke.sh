@@ -74,10 +74,12 @@ trap finish EXIT HUP INT TERM
 
 printf '%s\n' replace-me > "$tmp_dir/postgres-password"
 printf '%s\n' postgres://nv-server:replace-me@postgres:5432/nv > "$tmp_dir/nv-server-database-url"
+printf '%s\n' ci-health-diagnostics-token > "$tmp_dir/health-diagnostics-token"
 # Compose file-backed secrets are bind-mounted into containers by Docker
 # Compose. Make the smoke-test fixtures readable by the non-root container
 # users while matching Docker's default /run/secrets file mode.
-chmod 444 "$tmp_dir/postgres-password" "$tmp_dir/nv-server-database-url"
+chmod 444 "$tmp_dir/postgres-password" "$tmp_dir/nv-server-database-url" "$tmp_dir/health-diagnostics-token"
+export HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE="$tmp_dir/health-diagnostics-token"
 
 cd "$repo_root"
 
