@@ -16,8 +16,8 @@ const PACKAGE_VERSION_ID: i32 = 920_001;
 fn hipcheck_evidence_round_trips_through_postgres() {
     run_async(async {
         let db = integration_database().await;
-        execute(&db, "DELETE FROM hipcheck_findings; DELETE FROM hipcheck_concerns; DELETE FROM hipcheck_checks; DELETE FROM hipcheck_runs; DELETE FROM package_version WHERE id = 920001; DELETE FROM packages WHERE id = 920001; DELETE FROM package_sources WHERE id = 920001;").await;
-        execute(&db, "INSERT INTO package_sources (id, source_id, file_name, file_contents, inferred_type) VALUES (920001, 'test-source', 'package.json', '{}', 'npm'); INSERT INTO packages (id, name, package_host) VALUES (920001, 'example', 'npm'); INSERT INTO package_version (id, package_id, source_id, version, package_url, source_repository, source_repository_tag) VALUES (920001, 920001, 920001, '1.2.7', 'pkg:npm/example@1.2.7', 'https://github.com/example/name', NULL);").await;
+        execute(&db, "DELETE FROM hipcheck_findings; DELETE FROM hipcheck_concerns; DELETE FROM hipcheck_checks; DELETE FROM hipcheck_runs; DELETE FROM package_version WHERE id = 920001; DELETE FROM packages WHERE id = 920001;").await;
+        execute(&db, "INSERT INTO packages (id, name, package_host) VALUES (920001, 'example', 'npm'); INSERT INTO package_version (id, package_id, version, package_url, source_repository, source_repository_tag) VALUES (920001, 920001, '1.2.7', 'pkg:npm/example@1.2.7', 'https://github.com/example/name', NULL);").await;
         let report = parse_hipcheck_report(REPORT).expect("fixture report");
         let run_id = store_hipcheck_run(
             &db,
