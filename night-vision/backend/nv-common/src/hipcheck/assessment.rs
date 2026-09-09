@@ -52,13 +52,26 @@ pub async fn queue_assessment(
     affected_purl: &str,
     target_purl: &str,
 ) -> Result<QueuedAssessment, AssessmentError> {
+    queue_assessment_with_id(db, Uuid::now_v7(), affected_purl, target_purl).await
+}
+
+/// Create a queued assessment using an ID owned by a higher-level workflow.
+///
+/// Upgrade assessments use their durable assessment ID here so that their
+/// user-facing report can load the normalized Hipcheck evidence for the same
+/// assessment without a second correlation table.
+pub async fn queue_assessment_with_id(
+    db: &DatabaseConnection,
+    id: Uuid,
+    affected_purl: &str,
+    target_purl: &str,
+) -> Result<QueuedAssessment, AssessmentError> {
     let version = package_versions::Entity::find()
         .filter(package_versions::Column::PackageUrl.eq(target_purl))
         .one(db)
         .await
         .map_err(AssessmentError::Database)?
         .ok_or_else(|| AssessmentError::UnknownPurl(target_purl.to_owned()))?;
-    let id = Uuid::now_v7();
     let run_id = create_queued_hipcheck_run(db, version.id, affected_purl, &id)
         .await
         .map_err(AssessmentError::Database)?;

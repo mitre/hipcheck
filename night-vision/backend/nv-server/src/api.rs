@@ -30,7 +30,7 @@ use nv_common::{
         cve_list_sync_runs::Model as CveListSyncRun, hipcheck_runs, upgrade_assessments,
     },
     hipcheck::{
-        assessment::{execute_queued_assessment, queue_assessment},
+        assessment::{execute_queued_assessment, queue_assessment, queue_assessment_with_id},
         storage::load_hipcheck_run_by_assessment_id,
     },
     npm::{
@@ -403,13 +403,69 @@ impl NvServerApi for RestApi {
         validate_upgrade_assessment_request(&body)?;
         let id = Uuid::now_v7();
         let input = input_from_request(&body);
-        create_upgrade_assessment(ctx.context().db(), id, &input).await?;
+        let context = ctx.context();
+        let candidate = match input.candidate_version.as_deref() {
+            Some(candidate_version) => {
+                let package_name = NpmPackageName::parse(input.package_name.clone())
+                    .map_err(invalid_upgrade_request)?;
+                let affected_purl =
+                    PackageVersion::from_npm(&package_name, &input.current_version).purl();
+                let target_purl = PackageVersion::from_npm(&package_name, candidate_version).purl();
+                let target_purl =
+                    validate_and_persist_upgrade_target(context, &affected_purl, &target_purl)
+                        .await?;
+                Some((affected_purl, target_purl))
+            }
+            None => None,
+        };
+        let admission = candidate
+            .as_ref()
+            .map(|_| {
+                context.try_admit_hipcheck().ok_or_else(|| {
+                    HttpError::for_unavail(
+                        Some("AssessmentCapacity".to_owned()),
+                        "assessment capacity is exhausted".to_owned(),
+                    )
+                })
+            })
+            .transpose()?;
+        create_upgrade_assessment(context.db(), id, &input).await?;
+        let queued = match candidate.as_ref() {
+            Some((affected_purl, target_purl)) => Some(
+                queue_assessment_with_id(context.db(), id, affected_purl, target_purl)
+                    .await
+                    .map_err(assessment_http_error)?,
+            ),
+            None => None,
+        };
 
         // The row is inserted before spawning work.  Therefore a client can always
         // poll the durable processing state, even when it races this task.
-        let db = ctx.context().db().clone();
+        let db = context.db().clone();
+        let runner = context.hipcheck_runner_config();
         tokio::spawn(async move {
-            if let Err(error) = complete_upgrade_assessment(&db, id, input).await {
+            let result = match queued {
+                Some(queued) => {
+                    let _admission = admission;
+                    match execute_queued_assessment(&db, &queued, &runner).await {
+                        Ok(()) => {
+                            complete_upgrade_assessment(
+                                &db,
+                                id,
+                                input,
+                                UpgradeAssessmentVerdict::Recommended,
+                            )
+                            .await
+                        }
+                        Err(error) => Err(HttpError::for_internal_error(error.to_string())),
+                    }
+                }
+                None => {
+                    complete_upgrade_assessment(&db, id, input, UpgradeAssessmentVerdict::Unknown)
+                        .await
+                }
+            };
+            if let Err(error) = result {
                 // A failure to record the failure is only possible when the database itself
                 // is unavailable; the original processing row remains available for recovery.
                 let _ = mark_upgrade_assessment_failed(&db, id, error.to_string()).await;
@@ -1012,8 +1068,19 @@ async fn complete_upgrade_assessment(
     db: &DatabaseConnection,
     id: Uuid,
     input: UpgradeAssessmentInput,
+    base_verdict: UpgradeAssessmentVerdict,
 ) -> Result<(), HttpError> {
-    let report = initial_assessment_report(input);
+    let report = if matches!(base_verdict, UpgradeAssessmentVerdict::Unknown) {
+        initial_assessment_report(input)
+    } else {
+        match load_hipcheck_run_by_assessment_id(db, &id)
+            .await
+            .map_err(internal_error)?
+        {
+            Some(stored) => report_from_hipcheck(input, id, base_verdict, &stored),
+            None => initial_assessment_report(input),
+        }
+    };
     let report = serde_json::to_value(report).map_err(internal_error)?;
     upgrade_assessments::ActiveModel {
         id: Set(id.to_string()),
@@ -1048,30 +1115,137 @@ async fn mark_upgrade_assessment_failed(
 }
 
 fn initial_assessment_report(input: UpgradeAssessmentInput) -> UpgradeAssessmentReport {
-    let candidate_versions: Vec<UpgradeAssessmentCandidate> = input
+    assessment_report(input, UpgradeAssessmentVerdict::Unknown, Vec::new(), None)
+}
+
+fn report_from_hipcheck(
+    input: UpgradeAssessmentInput,
+    assessment_id: Uuid,
+    base_verdict: UpgradeAssessmentVerdict,
+    stored: &nv_common::hipcheck::storage::StoredHipcheckRun,
+) -> UpgradeAssessmentReport {
+    let evidence_link = format!("/assessments/{assessment_id}/evidence");
+    let mut findings: Vec<_> = stored
+        .findings
+        .iter()
+        .map(|finding| nv_server_api::UpgradeAssessmentFinding {
+            effect: finding.effect.clone(),
+            summary: finding.summary.clone(),
+            evidence_links: vec![evidence_link.clone()],
+        })
+        .collect();
+    if stored.run.status != "completed" {
+        findings.push(nv_server_api::UpgradeAssessmentFinding {
+            effect: "missing-check".to_owned(),
+            summary: stored.run.error_message.clone().unwrap_or_else(|| {
+                "Hipcheck did not produce complete supply-chain evidence.".to_owned()
+            }),
+            evidence_links: vec![evidence_link],
+        });
+    }
+    assessment_report(
+        input,
+        base_verdict,
+        findings,
+        stored.run.policy_recommendation.clone(),
+    )
+}
+
+fn assessment_report(
+    input: UpgradeAssessmentInput,
+    base_verdict: UpgradeAssessmentVerdict,
+    supply_chain_findings: Vec<nv_server_api::UpgradeAssessmentFinding>,
+    hipcheck_recommendation: Option<String>,
+) -> UpgradeAssessmentReport {
+    let verdict = upgrade_assessment_verdict(&base_verdict, &supply_chain_findings);
+    let candidate_caveats: Vec<_> = supply_chain_findings
+        .iter()
+        .map(|finding| finding.summary.clone())
+        .collect();
+    let candidate_versions = input
         .candidate_version
         .iter()
-        .map(|version| assessment_candidate(&input.current_version, version))
+        .map(|version| {
+            let mut candidate = assessment_candidate(&input.current_version, version);
+            candidate.verdict = if matches!(
+                candidate.upgrade_distance,
+                UpgradeAssessmentUpgradeDistance::Major
+            ) && matches!(verdict, UpgradeAssessmentVerdict::Recommended)
+            {
+                UpgradeAssessmentVerdict::Caution
+            } else {
+                verdict.clone()
+            };
+            candidate.caveats = candidate_caveats.clone();
+            candidate
+        })
         .collect();
+    let mut caveats = Vec::new();
+    if supply_chain_findings.is_empty() {
+        caveats.push("Candidate analysis has not yet produced supply-chain findings.".to_owned());
+    }
+    if let Some(recommendation) = hipcheck_recommendation {
+        caveats.push(format!(
+            "Hipcheck policy recommendation was {recommendation}; Night Vision used the normalized findings above when determining this verdict."
+        ));
+    }
     UpgradeAssessmentReport {
         vulnerability_context: UpgradeAssessmentVulnerabilityContext {
             trigger: input.trigger.clone(),
-            kev_linked: None,
+            kev_linked: matches!(base_verdict, UpgradeAssessmentVerdict::Recommended)
+                .then_some(true),
         },
         input,
-        verdict: UpgradeAssessmentVerdict::Unknown,
+        verdict: verdict.clone(),
         candidate_versions,
         dependency_delta: UpgradeAssessmentDependencyDelta {
             added: Vec::new(),
             removed: Vec::new(),
             changed: Vec::new(),
         },
-        supply_chain_findings: Vec::new(),
-        confidence: UpgradeAssessmentConfidence::Unknown,
-        caveats: vec![
-            "This assessment is persisted for review, but CVE/KEV correlation, dependency comparison, and supply-chain analysis are not yet available.".to_owned(),
-        ],
-        evidence_links: Vec::new(),
+        evidence_links: supply_chain_findings
+            .iter()
+            .flat_map(|finding| finding.evidence_links.iter().cloned())
+            .collect(),
+        supply_chain_findings,
+        confidence: assessment_confidence(&verdict),
+        caveats,
+    }
+}
+
+/// Apply supply-chain evidence without allowing it to weaken a stricter
+/// vulnerability or upgrade-domain verdict.
+fn upgrade_assessment_verdict(
+    base_verdict: &UpgradeAssessmentVerdict,
+    findings: &[nv_server_api::UpgradeAssessmentFinding],
+) -> UpgradeAssessmentVerdict {
+    if matches!(base_verdict, UpgradeAssessmentVerdict::Avoid)
+        || findings.iter().any(|finding| finding.effect == "blocking")
+    {
+        return UpgradeAssessmentVerdict::Avoid;
+    }
+    if matches!(base_verdict, UpgradeAssessmentVerdict::Unknown)
+        || findings
+            .iter()
+            .any(|finding| finding.effect == "missing-check")
+    {
+        return UpgradeAssessmentVerdict::Unknown;
+    }
+    if matches!(base_verdict, UpgradeAssessmentVerdict::Caution)
+        || findings.iter().any(|finding| finding.effect == "review")
+    {
+        return UpgradeAssessmentVerdict::Caution;
+    }
+    UpgradeAssessmentVerdict::Recommended
+}
+
+fn assessment_confidence(verdict: &UpgradeAssessmentVerdict) -> UpgradeAssessmentConfidence {
+    match verdict {
+        UpgradeAssessmentVerdict::Recommended => UpgradeAssessmentConfidence::Medium,
+        UpgradeAssessmentVerdict::Caution | UpgradeAssessmentVerdict::Avoid => {
+            UpgradeAssessmentConfidence::Medium
+        }
+        UpgradeAssessmentVerdict::Unknown => UpgradeAssessmentConfidence::Unknown,
     }
 }
 
@@ -1419,6 +1593,112 @@ mod tests {
         }
     }
 
+    fn supply_chain_finding(
+        effect: &str,
+        summary: &str,
+    ) -> nv_server_api::UpgradeAssessmentFinding {
+        nv_server_api::UpgradeAssessmentFinding {
+            effect: effect.to_owned(),
+            summary: summary.to_owned(),
+            evidence_links: vec!["/assessments/example/evidence".to_owned()],
+        }
+    }
+
+    #[test]
+    fn blocking_supply_chain_finding_moves_candidate_to_avoid() {
+        let report = assessment_report(
+            input(),
+            UpgradeAssessmentVerdict::Recommended,
+            vec![supply_chain_finding(
+                "blocking",
+                "source and package contents differ",
+            )],
+            Some("INVESTIGATE".to_owned()),
+        );
+
+        assert!(matches!(report.verdict, UpgradeAssessmentVerdict::Avoid));
+        assert!(matches!(
+            report.candidate_versions[0].verdict,
+            UpgradeAssessmentVerdict::Avoid
+        ));
+    }
+
+    #[test]
+    fn review_supply_chain_finding_moves_acceptable_candidate_to_caution() {
+        let report = assessment_report(
+            input(),
+            UpgradeAssessmentVerdict::Recommended,
+            vec![supply_chain_finding("review", "release delta needs review")],
+            Some("INVESTIGATE".to_owned()),
+        );
+
+        assert!(matches!(report.verdict, UpgradeAssessmentVerdict::Caution));
+        assert_eq!(
+            report.candidate_versions[0].caveats,
+            vec!["release delta needs review"]
+        );
+    }
+
+    #[test]
+    fn missing_important_supply_chain_check_produces_unknown_verdict() {
+        let report = assessment_report(
+            input(),
+            UpgradeAssessmentVerdict::Recommended,
+            vec![supply_chain_finding(
+                "missing-check",
+                "source/tag comparison could not run",
+            )],
+            Some("INVESTIGATE".to_owned()),
+        );
+
+        assert!(matches!(report.verdict, UpgradeAssessmentVerdict::Unknown));
+        assert!(matches!(
+            report.confidence,
+            UpgradeAssessmentConfidence::Unknown
+        ));
+    }
+
+    #[test]
+    fn hipcheck_pass_does_not_override_upgrade_domain_blocker() {
+        let report = assessment_report(
+            input(),
+            UpgradeAssessmentVerdict::Avoid,
+            Vec::new(),
+            Some("PASS".to_owned()),
+        );
+
+        assert!(matches!(report.verdict, UpgradeAssessmentVerdict::Avoid));
+        assert!(
+            report
+                .caveats
+                .iter()
+                .any(|caveat| caveat.contains("Hipcheck policy recommendation was PASS"))
+        );
+    }
+
+    #[test]
+    fn assessment_report_explains_supply_chain_findings_used_for_verdict() {
+        let report = assessment_report(
+            input(),
+            UpgradeAssessmentVerdict::Recommended,
+            vec![supply_chain_finding(
+                "review",
+                "new install script requires review",
+            )],
+            Some("INVESTIGATE".to_owned()),
+        );
+
+        assert_eq!(report.supply_chain_findings[0].effect, "review");
+        assert_eq!(
+            report.supply_chain_findings[0].summary,
+            "new install script requires review"
+        );
+        assert_eq!(
+            report.supply_chain_findings[0].evidence_links,
+            vec!["/assessments/example/evidence"]
+        );
+    }
+
     #[test]
     fn upgrade_assessment_trigger_uses_snake_case_fields() {
         let value = serde_json::json!({
@@ -1604,7 +1884,7 @@ mod tests {
             create_upgrade_assessment(&db, id, &input())
                 .await
                 .expect("request must persist");
-            complete_upgrade_assessment(&db, id, input())
+            complete_upgrade_assessment(&db, id, input(), UpgradeAssessmentVerdict::Unknown)
                 .await
                 .expect("report must persist");
         });

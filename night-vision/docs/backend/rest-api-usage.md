@@ -272,10 +272,13 @@ the normalized NPM input:
 
 A completed report includes the input, verdict, candidate versions,
 vulnerability/KEV context, dependency delta, supply-chain findings,
-confidence, caveats, and evidence links. The current first implementation
-returns an `unknown` verdict and explicit caveats until CVE/KEV correlation,
-NPM metadata discovery, dependency comparison, and Hipcheck analysis are
-connected to this lifecycle.
+confidence, caveats, and evidence links. When `candidateVersion` is supplied,
+Night Vision validates the candidate against locally known KEV data, runs
+Hipcheck, and uses normalized Hipcheck findings as supply-chain evidence for
+the verdict. Hipcheck's `PASS` or `INVESTIGATE` policy recommendation is shown
+as context; it does not replace vulnerability or upgrade-domain evidence.
+Requests without a candidate version remain `unknown` until candidate
+discovery is connected to this lifecycle.
 
 When Hipcheck analysis is available, the shipped MVP policy provides only the
 `mitre/binary` source-repository check. NPM release, artifact, maintainer,
