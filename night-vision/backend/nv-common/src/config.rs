@@ -55,6 +55,7 @@ const DEFAULT_PACKAGE_ELABORATION_MAX_QUEUED_WORK: usize = 100_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_DERIVATIONS: usize = 1_000_000;
 const DEFAULT_PACKAGE_ELABORATION_MAX_CONCURRENT_RUNS: usize = 4;
 const DEFAULT_HIPCHECK_BIN_PATH: &str = "/usr/local/bin/hc";
+const HIPCHECK_SYSTEM_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const DEFAULT_HIPCHECK_POLICY_PATH: &str = "/opt/night-vision/hipcheck/config/Hipcheck.kdl";
 const DEFAULT_HIPCHECK_EXEC_CONFIG_PATH: &str = "/opt/night-vision/hipcheck/config/Exec.kdl";
 const DEFAULT_HIPCHECK_WORKING_DIR: &str = "/var/cache/night-vision/hipcheck";
@@ -809,6 +810,7 @@ impl Config {
     /// Build the deliberately hermetic Hipcheck process configuration.
     pub fn hipcheck_runner_config(&self) -> HipcheckRunnerConfig {
         let mut environment = BTreeMap::new();
+        environment.insert(OsString::from("PATH"), OsString::from(HIPCHECK_SYSTEM_PATH));
         environment.insert(
             OsString::from("TMPDIR"),
             OsString::from(self.hipcheck_cache_dir.join("tmp").as_str()),
@@ -2072,10 +2074,13 @@ mod tests {
         );
         assert_eq!(
             config.hipcheck_runner_config().environment,
-            BTreeMap::from([(
-                OsString::from("TMPDIR"),
-                OsString::from(format!("{DEFAULT_HIPCHECK_CACHE_DIR}/tmp")),
-            )])
+            BTreeMap::from([
+                (OsString::from("PATH"), OsString::from(HIPCHECK_SYSTEM_PATH)),
+                (
+                    OsString::from("TMPDIR"),
+                    OsString::from(format!("{DEFAULT_HIPCHECK_CACHE_DIR}/tmp")),
+                ),
+            ])
         );
         assert_eq!(
             config.package_elaboration_max_packument_bytes,

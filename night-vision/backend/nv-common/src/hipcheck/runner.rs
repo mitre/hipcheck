@@ -149,6 +149,7 @@ pub async fn run_hipcheck_check(
         .arg("--cache")
         .arg(&config.cache_directory)
         .arg("check")
+        .args(["--format", "json"])
         .args(&request.arguments)
         .current_dir(&config.working_directory)
         .env_clear()
@@ -367,6 +368,7 @@ mod tests {
             let fixture = TestFixture::new(
                 r#"printf '%s\n' "$PWD" > "$NV_CAPTURE"
 printf '%s\n' "$NV_ALLOWED" >> "$NV_CAPTURE"
+printf '%s\n' "$PATH" >> "$NV_CAPTURE"
 if test -n "$NV_INHERITED"; then exit 21; fi
 printf '%s\n' "$@" >> "$NV_CAPTURE"
 printf '{"report":"ok"}'
@@ -401,6 +403,7 @@ printf '{"report":"ok"}'
                 captured_lines.collect::<Vec<_>>(),
                 [
                     "allowed",
+                    "/allowed/bin",
                     "--policy",
                     "policy file.hc",
                     "--exec",
@@ -408,6 +411,8 @@ printf '{"report":"ok"}'
                     "--cache",
                     "cache directory",
                     "check",
+                    "--format",
+                    "json",
                     "; touch should-not-run"
                 ]
             );
@@ -552,6 +557,7 @@ while :; do :; done"#,
         fn config(&self) -> HipcheckRunnerConfig {
             let mut environment = BTreeMap::new();
             environment.insert(OsString::from("NV_ALLOWED"), OsString::from("allowed"));
+            environment.insert(OsString::from("PATH"), OsString::from("/allowed/bin"));
             environment.insert(
                 OsString::from("NV_CAPTURE"),
                 self.capture_path().into_os_string(),
