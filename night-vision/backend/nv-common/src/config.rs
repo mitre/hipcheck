@@ -21,6 +21,7 @@ use secrecy::SecretString;
 use std::{
     collections::BTreeMap,
     error::Error as _,
+    ffi::OsString,
     fmt::{Debug, Display},
     fs::File,
     io::BufReader,
@@ -807,13 +808,19 @@ impl Config {
 
     /// Build the deliberately hermetic Hipcheck process configuration.
     pub fn hipcheck_runner_config(&self) -> HipcheckRunnerConfig {
+        let mut environment = BTreeMap::new();
+        environment.insert(
+            OsString::from("TMPDIR"),
+            OsString::from(self.hipcheck_cache_dir.join("tmp").as_str()),
+        );
+
         HipcheckRunnerConfig {
             program: self.hipcheck_bin_path.clone(),
             working_directory: self.hipcheck_working_dir.clone(),
             policy_path: self.hipcheck_policy_path.clone(),
             exec_config_path: self.hipcheck_exec_config_path.clone(),
             cache_directory: self.hipcheck_cache_dir.clone(),
-            environment: BTreeMap::new(),
+            environment,
             timeout: Duration::from_millis(self.hipcheck_timeout),
             stdout_max_bytes: self.hipcheck_stdout_max_bytes,
             stderr_max_bytes: self.hipcheck_stderr_max_bytes,
@@ -2062,6 +2069,13 @@ mod tests {
         assert_eq!(
             config.hipcheck_cache_dir,
             Utf8Path::new(DEFAULT_HIPCHECK_CACHE_DIR)
+        );
+        assert_eq!(
+            config.hipcheck_runner_config().environment,
+            BTreeMap::from([(
+                OsString::from("TMPDIR"),
+                OsString::from(format!("{DEFAULT_HIPCHECK_CACHE_DIR}/tmp")),
+            )])
         );
         assert_eq!(
             config.package_elaboration_max_packument_bytes,

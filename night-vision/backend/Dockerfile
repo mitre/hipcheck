@@ -163,6 +163,8 @@ RUN --mount=type=secret,id=ca_file,target=/tmp/build-ca.crt,required=false \
     && useradd --uid 10001 --home-dir /nonexistent --shell /usr/sbin/nologin nv-server \
     && mkdir -p /etc/night-vision /opt/night-vision/hipcheck /var/cache/night-vision/hipcheck /var/lib/night-vision/hipcheck
 
+ENV TMPDIR=/var/cache/night-vision/hipcheck/tmp
+
 COPY --from=builder /usr/src/night-vision/target/release/nv-server /usr/local/bin/nv-server
 COPY --from=hipcheck-builder /usr/src/hipcheck/target/release/hc /usr/local/bin/hc
 COPY --from=hipcheck-builder /usr/src/hipcheck/target/release/binary /opt/night-vision/hipcheck/target/release/binary

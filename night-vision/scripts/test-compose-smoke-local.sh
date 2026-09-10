@@ -4,8 +4,16 @@
 
 set -eu
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+script_dir=$(
+    CDPATH=
+    cd -- "$(dirname -- "$0")"
+    pwd
+)
+repo_root=$(
+    CDPATH=
+    cd -- "$script_dir/.."
+    pwd
+)
 
 if [ -z "${DOCKER_COMPOSE_TMPDIR:-}" ]; then
     case "$(uname -s)" in

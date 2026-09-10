@@ -35,7 +35,7 @@ The backend image installs this bundle at `/opt/night-vision/hipcheck`:
 | Plugin manifest source | `/opt/night-vision/hipcheck/plugins/binary/local-release-plugin.kdl` | `plugins/binary/local-release-plugin.kdl` |
 | Plugin executable source | `/opt/night-vision/hipcheck/target/release/binary` | built from the pin |
 | Plugin manifest and executable | `/var/cache/night-vision/hipcheck/{plugins,target}` | seeded in the image and refreshed from the source at startup |
-| Writable cache and working directory | `/var/cache/night-vision/hipcheck` | runtime volume |
+| Writable cache, working directory, and temporary files | `/var/cache/night-vision/hipcheck` | runtime volume |
 | Writable data/work area | `/var/lib/night-vision/hipcheck` | runtime volume |
 
 The backend process should always invoke Hipcheck with the explicit policy,
@@ -92,7 +92,8 @@ docker run --rm nv-hipcheck:mvp
 manifest, plugin executable, and resolved source revision. At startup, the
 entrypoint copies the pinned plugin manifest and executable into the writable
 cache before starting `nv-server`; this lets Hipcheck atomically manage plugin
-state without crossing filesystem boundaries. The GitLab token is available
-only to the builder stage and is never copied into the image. Deployments must
-provide equivalent writable mounts at the cache and data paths above and must
-not mount over `/opt/night-vision/hipcheck`.
+state without crossing filesystem boundaries. Hipcheck's temporary directory
+is also inside that cache, rather than the container `/tmp` tmpfs.
+
+Deployments must provide equivalent writable mounts at the cache and
+data paths above and must not mount over `/opt/night-vision/hipcheck`.

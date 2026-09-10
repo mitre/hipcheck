@@ -5,7 +5,7 @@ set -eu
 bundle_root=/opt/night-vision/hipcheck
 cache_root=/var/cache/night-vision/hipcheck
 
-mkdir -p "$cache_root/plugins/binary" "$cache_root/target/release"
+mkdir -p "$cache_root/plugins/binary" "$cache_root/target/release" "$cache_root/tmp"
 cp "$bundle_root/plugins/binary/local-release-plugin.kdl" \
     "$cache_root/plugins/binary/local-release-plugin.kdl"
 cp "$bundle_root/target/release/binary" "$cache_root/target/release/binary"
