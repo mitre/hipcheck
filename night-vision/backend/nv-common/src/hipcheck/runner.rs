@@ -150,6 +150,7 @@ pub async fn run_hipcheck_check(
         .arg(&config.cache_directory)
         .arg("check")
         .args(["--format", "json"])
+        .args(["--verbosity", "quiet"])
         .args(&request.arguments)
         .current_dir(&config.working_directory)
         .env_clear()
@@ -413,6 +414,8 @@ printf '{"report":"ok"}'
                     "check",
                     "--format",
                     "json",
+                    "--verbosity",
+                    "quiet",
                     "; touch should-not-run"
                 ]
             );

@@ -1,5 +1,5 @@
 use super::{
-    parse_hipcheck_report,
+    HipcheckReportContext, parse_hipcheck_report,
     storage::{HipcheckExecutionDiagnostics, load_hipcheck_run, store_hipcheck_run},
 };
 use crate::{config::Config, db::connection};
@@ -8,7 +8,7 @@ use sea_orm::{ConnectionTrait as _, DatabaseConnection};
 
 const CONFIG_PATH_ENV: &str = "NV_POSTGRES_INTEGRATION_CONFIG_PATH";
 const DEFAULT_CONFIG_PATH: &str = "src/cve/testdata/nv-server.integration.spookey";
-const REPORT: &str = include_str!("../../testdata/define-hipcheck/fixtures/plugin_error.json");
+const REPORT: &str = include_str!("../../testdata/define-hipcheck/fixtures/native-315-mixed.json");
 const PACKAGE_VERSION_ID: i32 = 920_001;
 
 #[test]
@@ -18,7 +18,15 @@ fn hipcheck_evidence_round_trips_through_postgres() {
         let db = integration_database().await;
         execute(&db, "DELETE FROM hipcheck_findings; DELETE FROM hipcheck_concerns; DELETE FROM hipcheck_checks; DELETE FROM hipcheck_runs; DELETE FROM package_version WHERE id = 920001; DELETE FROM packages WHERE id = 920001;").await;
         execute(&db, "INSERT INTO packages (id, name, package_host) VALUES (920001, 'example', 'npm'); INSERT INTO package_version (id, package_id, version, package_url, source_repository, source_repository_tag) VALUES (920001, 920001, '1.2.7', 'pkg:npm/example@1.2.7', 'https://github.com/example/name', NULL);").await;
-        let report = parse_hipcheck_report(REPORT).expect("fixture report");
+        let report = parse_hipcheck_report(
+            REPORT,
+            &HipcheckReportContext {
+                target_purl: "pkg:npm/name@1.2.7".to_owned(),
+                source_repository_url: "https://github.com/example/name".to_owned(),
+                policy_source: "/opt/night-vision/hipcheck/config/Hipcheck.kdl".to_owned(),
+            },
+        )
+        .expect("fixture report");
         let run_id = store_hipcheck_run(
             &db,
             PACKAGE_VERSION_ID,
@@ -53,9 +61,9 @@ fn hipcheck_evidence_round_trips_through_postgres() {
             stored.run.policy_id.as_deref(),
             Some("night-vision-upgrade-assessment")
         );
-        assert_eq!(stored.run.hipcheck_commit.as_deref(), Some("abc123def456"));
+        assert_eq!(stored.run.hipcheck_commit.as_deref(), Some("unknown"));
         assert_eq!(stored.checks.len(), 2);
-        assert!(stored.concerns.is_empty());
+        assert_eq!(stored.concerns.len(), 2);
         assert_eq!(stored.findings.len(), 2);
         assert_eq!(stored.findings[1].kind, "check-error");
     });

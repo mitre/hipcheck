@@ -1,0 +1,25 @@
+{
+  "repo_name": "systeminformation",
+  "repo_owner": "sebhildebrandt",
+  "repo_head": "origin/HEAD",
+  "hipcheck_version": "3.15.0",
+  "analyzed_at": "2026-09-10T22:39:53.926663637+00:00",
+  "passing": [
+    {
+      "analysis": "Analysis",
+      "name": "mitre/binary",
+      "passed": true,
+      "policy_expr": "(lte $ 0)",
+      "final_value": "0",
+      "message": "0 was the number of detected binary files."
+    }
+  ],
+  "failing": [],
+  "errored": [],
+  "recommendation": {
+    "kind": "Pass",
+    "reason": null,
+    "risk_score": 0.0,
+    "risk_policy": "(gt 0.5 $)"
+  }
+}

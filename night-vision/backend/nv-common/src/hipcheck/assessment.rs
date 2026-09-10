@@ -1,7 +1,7 @@
 //! Shared lifecycle for persisted Hipcheck assessments.
 use super::{
-    HipcheckCheckRequest, HipcheckExecutionError, HipcheckExecutionOutput, HipcheckRunnerConfig,
-    parse_hipcheck_report, run_hipcheck_check,
+    HipcheckCheckRequest, HipcheckExecutionError, HipcheckExecutionOutput, HipcheckReportContext,
+    HipcheckRunnerConfig, parse_hipcheck_report, run_hipcheck_check,
     storage::{
         HipcheckExecutionDiagnostics, complete_hipcheck_run, create_queued_hipcheck_run,
         fail_hipcheck_run, mark_hipcheck_run_running,
@@ -126,6 +126,11 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
         )
         .await;
     };
+    let report_context = HipcheckReportContext {
+        target_purl: queued.purl.clone(),
+        source_repository_url: target.clone(),
+        policy_source: config.policy_path.to_string(),
+    };
     match executor
         .execute(
             config,
@@ -135,7 +140,9 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
         )
         .await
     {
-        Ok(output) if output.status.success() => complete_output(db, queued.run_id, output).await,
+        Ok(output) if output.status.success() => {
+            complete_output(db, queued.run_id, output, &report_context).await
+        }
         Ok(output) => {
             persist_failure(
                 db,
@@ -176,10 +183,11 @@ async fn complete_output(
     db: &DatabaseConnection,
     id: i32,
     output: HipcheckExecutionOutput,
+    context: &HipcheckReportContext,
 ) -> Result<(), AssessmentError> {
     let raw =
         String::from_utf8_lossy(output.json.as_deref().unwrap_or(&output.stdout)).into_owned();
-    let report = match parse_hipcheck_report(&raw) {
+    let report = match parse_hipcheck_report(&raw, context) {
         Ok(report) => report,
         Err(_) => {
             return persist_failure(

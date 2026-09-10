@@ -24,9 +24,23 @@ is material to the decision.
 ## JSON Contract
 
 Night Vision defines the consumer-side contract, normalized types, fixtures,
-and compatibility tests. Hipcheck provides the upstream report fields that
-satisfy this contract. The contract should be implemented through intentional
-Hipcheck report fields, not by scraping display-oriented text.
+and compatibility tests. The deployed Hipcheck 3.15 artifact emits a smaller
+native JSON report; Night Vision retains that JSON as audit evidence and
+normalizes it into this contract using trusted assessment context. The
+integration never scrapes display-oriented text.
+
+### Hipcheck 3.15 Native Report Adapter
+
+Night Vision invokes Hipcheck with `--format json --verbosity quiet`, so stdout
+is one native JSON document. It maps native `passing`, `failing`, and `errored`
+entries to `passed`/`context`, `failed`/`review`, and
+`errored`/`missing-check` results respectively. The native entry is preserved
+as each check's structured value.
+
+The assessment supplies the NPM target PURL, normalized source repository URL,
+and configured policy path. Hipcheck supplies its version and recommendation.
+Hipcheck 3.15 does not supply its build commit or plugin version/query; Night
+Vision stores `unknown` for those fields and records `missing-data` concerns.
 
 ### Top-Level Fields
 

@@ -1,0 +1,32 @@
+{
+  "repo_name": "example",
+  "repo_owner": "owner",
+  "repo_head": "origin/HEAD",
+  "hipcheck_version": "3.15.0",
+  "passing": [],
+  "failing": [
+    {
+      "analysis": "Analysis",
+      "name": "mitre/binary",
+      "passed": false,
+      "policy_expr": "(lte $ 0)",
+      "final_value": "2",
+      "message": "2 binary files were detected."
+    }
+  ],
+  "errored": [
+    {
+      "analysis": "Analysis",
+      "name": "mitre/license",
+      "policy_expr": "(eq $ true)",
+      "message": "plugin did not return a value.",
+      "error": "plugin failure"
+    }
+  ],
+  "recommendation": {
+    "kind": "Investigate",
+    "reason": "risk threshold exceeded",
+    "risk_score": 0.8,
+    "risk_policy": "(gt 0.5 $)"
+  }
+}
