@@ -4,6 +4,6 @@ version "0.0.0"
 license "Apache-2.0"
 
 entrypoint {
-  on arch="aarch64-unknown-linux-gnu" "./target/release/binary"
-  on arch="x86_64-unknown-linux-gnu" "./target/release/binary"
+  on arch="aarch64-unknown-linux-gnu" "/opt/night-vision/hipcheck/target/release/binary"
+  on arch="x86_64-unknown-linux-gnu" "/opt/night-vision/hipcheck/target/release/binary"
 }
