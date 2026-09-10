@@ -166,16 +166,20 @@ RUN --mount=type=secret,id=ca_file,target=/tmp/build-ca.crt,required=false \
 COPY --from=builder /usr/src/night-vision/target/release/nv-server /usr/local/bin/nv-server
 COPY --from=hipcheck-builder /usr/src/hipcheck/target/release/hc /usr/local/bin/hc
 COPY --from=hipcheck-builder /usr/src/hipcheck/target/release/binary /opt/night-vision/hipcheck/target/release/binary
+COPY --from=hipcheck-builder /usr/src/hipcheck/target/release/binary /var/cache/night-vision/hipcheck/target/release/binary
 COPY --from=hipcheck-builder /usr/src/hipcheck/REVISION /opt/night-vision/hipcheck/REVISION
 COPY deploy/nv-server.spookey /etc/night-vision/nv-server.spookey
+COPY deploy/nv-server-entrypoint.sh /usr/local/bin/nv-server-entrypoint
 COPY hipcheck/config /opt/night-vision/hipcheck/config
 COPY hipcheck/plugins /opt/night-vision/hipcheck/plugins
+COPY hipcheck/plugins /var/cache/night-vision/hipcheck/plugins
 
-RUN chown -R nv-server:nv-server /etc/night-vision /opt/night-vision /var/cache/night-vision /var/lib/night-vision
+RUN chmod 755 /usr/local/bin/nv-server-entrypoint \
+    && chown -R nv-server:nv-server /etc/night-vision /opt/night-vision /var/cache/night-vision /var/lib/night-vision
 # Hipcheck atomically moves plugin state into its cache. Keep its working
 # directory on that same filesystem when Compose mounts the cache as a volume.
 WORKDIR /var/cache/night-vision/hipcheck
 USER nv-server
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/nv-server"]
+ENTRYPOINT ["/usr/local/bin/nv-server-entrypoint"]
 CMD ["--config", "/etc/night-vision/nv-server.spookey"]

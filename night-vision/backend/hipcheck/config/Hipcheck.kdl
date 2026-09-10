@@ -4,7 +4,7 @@
 // in ../README.md. Do not replace it with an HTTPS manifest or a version range:
 // that would reintroduce floating plugin resolution.
 plugins {
-    plugin "mitre/binary" version="0.0.0" manifest="/opt/night-vision/hipcheck/plugins/binary/local-release-plugin.kdl"
+    plugin "mitre/binary" version="0.0.0" manifest="/var/cache/night-vision/hipcheck/plugins/binary/local-release-plugin.kdl"
 }
 
 analyze {

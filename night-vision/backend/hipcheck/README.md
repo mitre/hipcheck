@@ -32,8 +32,9 @@ The backend image installs this bundle at `/opt/night-vision/hipcheck`:
 | `hc` executable | `/usr/local/bin/hc` | built from the pin |
 | Policy | `/opt/night-vision/hipcheck/config/Hipcheck.kdl` | `config/Hipcheck.kdl` |
 | Exec configuration | `/opt/night-vision/hipcheck/config/Exec.kdl` | `config/Exec.kdl` |
-| Plugin manifest | `/opt/night-vision/hipcheck/plugins/binary/local-release-plugin.kdl` | `plugins/binary/local-release-plugin.kdl` |
-| Plugin executable | `/opt/night-vision/hipcheck/target/release/binary` | built from the pin |
+| Plugin manifest source | `/opt/night-vision/hipcheck/plugins/binary/local-release-plugin.kdl` | `plugins/binary/local-release-plugin.kdl` |
+| Plugin executable source | `/opt/night-vision/hipcheck/target/release/binary` | built from the pin |
+| Plugin manifest and executable | `/var/cache/night-vision/hipcheck/{plugins,target}` | seeded in the image and refreshed from the source at startup |
 | Writable cache and working directory | `/var/cache/night-vision/hipcheck` | runtime volume |
 | Writable data/work area | `/var/lib/night-vision/hipcheck` | runtime volume |
 
@@ -88,9 +89,10 @@ docker run --rm nv-hipcheck:mvp
 ## Container deployment
 
 `backend/Dockerfile` includes the executable, policy, exec configuration,
-manifest, plugin executable, and resolved source revision. The GitLab token is
-available only to the builder stage and is never copied into the image.
-`docker-compose.yml` mounts separate writable cache and data volumes while
-keeping the policy and plugin paths in the read-only image. Deployments that
-use a different container system must provide equivalent writable mounts at the
-two paths above and must not mount over `/opt/night-vision/hipcheck`.
+manifest, plugin executable, and resolved source revision. At startup, the
+entrypoint copies the pinned plugin manifest and executable into the writable
+cache before starting `nv-server`; this lets Hipcheck atomically manage plugin
+state without crossing filesystem boundaries. The GitLab token is available
+only to the builder stage and is never copied into the image. Deployments must
+provide equivalent writable mounts at the cache and data paths above and must
+not mount over `/opt/night-vision/hipcheck`.
