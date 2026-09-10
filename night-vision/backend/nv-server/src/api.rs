@@ -17,7 +17,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use chrono::{DateTime, Utc};
 use dropshot::{
     ClientErrorStatusCode, HttpError, HttpResponseAccepted, HttpResponseOk, Path, Query,
-    RequestContext, ServerBuilder, TypedBody, UntypedBody,
+    RequestContext, ServerBuilder, TypedBody,
 };
 use http::{HeaderMap, HeaderValue, header::WWW_AUTHENTICATE};
 use nv_common::{
@@ -211,24 +211,11 @@ impl NvServerApi for RestApi {
 
     async fn post_package_source(
         ctx: RequestContext<Self::Context>,
-        body_param: UntypedBody,
+        body_param: TypedBody<PostPackageSourceBody>,
     ) -> Result<HttpResponseAccepted<PostPackageSourceResponse>, HttpError> {
-        validate_package_source_media_type(
-            ctx.request
-                .headers()
-                .get("content-type")
-                .and_then(|value| value.to_str().ok()),
-        )?;
         let context = ctx.context();
         let db = context.db();
-        let body = serde_json::from_slice::<PostPackageSourceBody>(body_param.as_bytes()).map_err(
-            |_| {
-                HttpError::for_bad_request(
-                    Some("InvalidPackageSourceRequest".to_owned()),
-                    "package-source request body must be valid JSON".to_owned(),
-                )
-            },
-        )?;
+        let body = body_param.into_inner();
         let file_name = body.file_name;
         let contents = body.contents;
         NpmPackageJson::parse_package_json(contents.as_bytes())
@@ -293,12 +280,6 @@ impl NvServerApi for RestApi {
         ctx: RequestContext<Self::Context>,
         body_param: TypedBody<PostAssessmentBody>,
     ) -> Result<HttpResponseAccepted<PostAssessmentResponse>, HttpError> {
-        validate_package_source_media_type(
-            ctx.request
-                .headers()
-                .get("content-type")
-                .and_then(|value| value.to_str().ok()),
-        )?;
         let body = body_param.into_inner();
         let context = ctx.context();
         let admission = context.try_admit_hipcheck().ok_or_else(|| {
@@ -677,30 +658,6 @@ fn invalid_package_source_contents() -> HttpError {
     HttpError::for_bad_request(
         Some("InvalidPackageSourceRequest".to_owned()),
         "package-source contents are invalid".to_owned(),
-    )
-}
-
-fn validate_package_source_media_type(content_type: Option<&str>) -> Result<(), HttpError> {
-    let Some(content_type) = content_type else {
-        return Err(unsupported_package_source_media_type());
-    };
-    let media_type = content_type
-        .split_once(';')
-        .map_or(content_type, |(media_type, _)| media_type)
-        .trim();
-
-    if media_type.eq_ignore_ascii_case("application/json") {
-        Ok(())
-    } else {
-        Err(unsupported_package_source_media_type())
-    }
-}
-
-fn unsupported_package_source_media_type() -> HttpError {
-    HttpError::for_client_error(
-        Some("UnsupportedPackageSourceMediaType".to_owned()),
-        ClientErrorStatusCode::UNSUPPORTED_MEDIA_TYPE,
-        "package-source requests must use application/json".to_owned(),
     )
 }
 
@@ -1420,7 +1377,10 @@ mod tests {
         Body, ConfigDropshot,
         test_util::{TestContext, read_json},
     };
-    use http::{Request, StatusCode, header::AUTHORIZATION};
+    use http::{
+        Request, StatusCode,
+        header::{AUTHORIZATION, CONTENT_TYPE},
+    };
     use nv_common::{
         db::entities::{
             package_source_edges, package_source_versions, package_source_warnings,
@@ -1430,6 +1390,63 @@ mod tests {
     };
     use sea_orm::{DbBackend, DbErr, MockDatabase, MockExecResult, Value};
     use slog::{Logger, o};
+
+    #[test]
+    fn checked_in_openapi_matches_the_server_description() {
+        let expected: serde_json::Value =
+            serde_json::from_str(include_str!("../../openapi/nv-server-openapi.json"))
+                .expect("checked-in OpenAPI description is valid JSON");
+        let path = std::env::temp_dir().join(format!(
+            "night-vision-openapi-{}.json",
+            uuid::Uuid::now_v7()
+        ));
+        let path = Utf8PathBuf::from_path_buf(path).expect("temporary path is UTF-8");
+        RestApi::new()
+            .expect("API description builds")
+            .write_openapi(&path)
+            .expect("OpenAPI description writes");
+        let actual: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(&path).expect("generated OpenAPI description reads"),
+        )
+        .expect("generated OpenAPI description is valid JSON");
+        std::fs::remove_file(path).expect("temporary OpenAPI description removes");
+        assert_eq!(
+            actual, expected,
+            "run nv-server --openapi to refresh the contract"
+        );
+    }
+
+    #[tokio::test]
+    async fn package_source_rejects_invalid_json_contents() {
+        let db = MockDatabase::new(DbBackend::Postgres).into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+        let request = Request::builder()
+            .method(http::Method::POST)
+            .uri(test_context.client_testctx.url("/package-sources"))
+            .header(CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                r#"{"fileName":"package.json","contents":"not JSON"}"#,
+            ))
+            .expect("request should build");
+
+        let error = test_context
+            .client_testctx
+            .make_request_with_request(request, StatusCode::BAD_REQUEST)
+            .await
+            .expect_err("invalid package source should be rejected");
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("InvalidPackageSourceRequest")
+        );
+        test_context.teardown().await;
+    }
 
     #[tokio::test]
     async fn health_routes_serve_public_and_operator_responses() {

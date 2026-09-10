@@ -40,7 +40,10 @@ fn apply_checks(manifest: &Manifest, problems: &mut Vec<anyhow::Error>) -> Resul
         ));
     }
 
+    // Progenitor owns the implementation included by `nv-server-client`.
+    // It cannot satisfy the workspace's hand-written-code lint policy.
     if let Some(pkg) = &manifest.package
+        && pkg.name != "nv-server-client"
         && manifest.inherits_workspace_lints().not()
     {
         problems.push(anyhow!(

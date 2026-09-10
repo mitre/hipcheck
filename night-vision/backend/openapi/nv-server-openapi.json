@@ -165,10 +165,9 @@
         "operationId": "post_package_source",
         "requestBody": {
           "content": {
-            "application/octet-stream": {
+            "application/json": {
               "schema": {
-                "type": "string",
-                "format": "binary"
+                "$ref": "#/components/schemas/PostPackageSourceBody"
               }
             }
           },
@@ -812,6 +811,22 @@
         "required": [
           "id"
         ]
+      },
+      "PostPackageSourceBody": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "contents",
+          "fileName"
+        ],
+        "additionalProperties": false
       },
       "PostPackageSourceResponse": {
         "type": "object",

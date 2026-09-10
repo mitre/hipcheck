@@ -352,18 +352,25 @@ fixture and catalog diff before committing it.
 
 ## `api`
 
-Use `api` commands to interact with the API endpoints. Responses will be printed to the command line:
+Use `api` commands for direct, typed access to the configured REST API. Each
+successful command prints its response as pretty JSON and uses the configured
+server address. These commands do not poll asynchronous work; use
+`assessment analyze` for the workflow that submits and waits for an assessment.
 
-```text
-Usage: nvdb api [OPTIONS] [COMMAND]
+| Command | Purpose |
+| --- | --- |
+| `api health` | Get public liveness status. |
+| `api health diagnostics` | Get authenticated operator diagnostics using the configured diagnostics token. |
+| `api package-sources submit <PACKAGE_JSON_FILE>` | Submit raw package-source bytes. |
+| `api package-sources get <ID>` | Get package-source status. |
+| `api assessments submit --affected-purl <PURL> --target-purl <PURL>` | Submit an assessment. |
+| `api assessments get <ID>` | Get assessment status. |
+| `api assessments evidence <ID> [--include-raw-hipcheck]` | Get assessment evidence. |
+| `api upgrade-assessments submit <REQUEST_JSON_FILE>` | Submit a JSON upgrade assessment request. |
+| `api upgrade-assessments get <ID>` | Get upgrade-assessment status. |
 
-Commands:
-  health   Get the status from the health endpoint
-
-Options:
-  -c, --config <FILE>  Path to the configuration file [default: nv-server.spookey]
-  -h, --help           Print help
-```
+`api health diagnostics` requires `health-diagnostics-token-file` in the
+selected configuration. The token is read as a secret and is never printed.
 ## `db`
 
 Use `db` commands for database inspection and maintenance:

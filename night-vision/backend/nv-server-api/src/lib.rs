@@ -3,9 +3,7 @@
 // can use a newer version of `schemars`, we should switch to using
 // `jiff`.
 use chrono::{DateTime, Utc};
-use dropshot::{
-    HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, TypedBody, UntypedBody,
-};
+use dropshot::{HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, TypedBody};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -44,7 +42,7 @@ pub trait NvServerApi {
     }]
     async fn post_package_source(
         ctx: RequestContext<Self::Context>,
-        body_param: UntypedBody,
+        body_param: TypedBody<PostPackageSourceBody>,
     ) -> Result<HttpResponseAccepted<PostPackageSourceResponse>, HttpError>;
 
     #[endpoint {

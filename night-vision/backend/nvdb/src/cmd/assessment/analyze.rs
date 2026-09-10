@@ -1,10 +1,9 @@
 use anyhow::{Context as _, Result};
-use nv_common::config::Config;
+use nv_common::{config::Config, rt::AsyncRuntime};
 use std::time::Duration;
 
-use crate::cmd::api::assessment::{
-    client as assessment_client, submit_assessment, wait_for_terminal_assessment,
-};
+use crate::cmd::api::assessment::{submit_assessment, wait_for_terminal_assessment};
+use crate::cmd::api::client as api_client;
 
 const ASSESSMENT_WAIT_GRACE: Duration = Duration::from_secs(30);
 
@@ -24,9 +23,9 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
         .get_one::<String>("target-purl")
         .expect("required PURL");
     eprintln!("queuing assessment for upgrade from {affected_purl} to {target_purl}");
-    let server_url = format!("http://{}", config.server_address);
-    let client = assessment_client()?;
-    let submitted = submit_assessment(&client, &server_url, affected_purl, target_purl)?;
+    let runtime = AsyncRuntime::new(config).context("failed to create async runtime")?;
+    let client = api_client(&format!("http://{}", config.server_address))?;
+    let submitted = runtime.block_on(submit_assessment(&client, affected_purl, target_purl))?;
     eprintln!(
         "running configured Hipcheck policy for assessment {}",
         submitted.id
@@ -34,8 +33,11 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     let wait_timeout = Duration::from_millis(config.hipcheck_timeout)
         .checked_add(ASSESSMENT_WAIT_GRACE)
         .context("assessment wait timeout overflowed")?;
-    let assessment =
-        wait_for_terminal_assessment(&client, &server_url, submitted.id, wait_timeout)?;
+    let assessment = runtime.block_on(wait_for_terminal_assessment(
+        &client,
+        submitted.id,
+        wait_timeout,
+    ))?;
     let persisted_affected_purl = assessment.affected_purl.as_deref().unwrap_or(affected_purl);
     eprintln!("completed assessment {}", assessment.id);
     if matches.get_flag("json") {
@@ -87,7 +89,7 @@ fn json_output(
     target_purl: &str,
     state: &str,
     recommendation: Option<&str>,
-    finding_count: usize,
+    finding_count: u32,
     error_kind: Option<&str>,
     error_message: Option<&str>,
     exit_status: Option<i32>,

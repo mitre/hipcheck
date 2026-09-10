@@ -148,6 +148,11 @@ export type PostAssessmentResponse = {
     id: string;
 };
 
+export type PostPackageSourceBody = {
+    contents: string;
+    fileName: string;
+};
+
 export type PostPackageSourceResponse = {
     id: string;
 };
@@ -414,7 +419,7 @@ export type HealthDiagnosticsResponses = {
 export type HealthDiagnosticsResponse = HealthDiagnosticsResponses[keyof HealthDiagnosticsResponses];
 
 export type PostPackageSourceData = {
-    body: Blob | File;
+    body: PostPackageSourceBody;
     path?: never;
     query?: never;
     url: '/package-sources';

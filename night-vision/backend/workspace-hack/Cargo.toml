@@ -32,14 +32,19 @@ digest-a6292c17cd707f01 = { package = "digest", version = "0.11", features = ["a
 either = { version = "1", features = ["use_std"] }
 form_urlencoded = { version = "1" }
 futures-channel = { version = "0.3", features = ["sink"] }
+futures-core = { version = "0.3" }
 futures-io = { version = "0.3" }
 futures-sink = { version = "0.3" }
+futures-task = { version = "0.3", default-features = false, features = ["std"] }
 futures-util = { version = "0.3", features = ["channel", "io", "sink"] }
 indexmap = { version = "2", features = ["serde"] }
 memchr = { version = "2" }
 num-traits = { version = "0.2", default-features = false, features = ["i128", "std"] }
+openapiv3 = { version = "2", default-features = false, features = ["skip_serializing_defaults"] }
+percent-encoding = { version = "2" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
 regex-syntax = { version = "0.8" }
+reqwest = { version = "0.13", features = ["blocking", "json", "query", "stream"] }
 rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "aws_lc_rs", "logging", "ring", "std", "tls12"] }
 rustls-webpki = { version = "0.103", default-features = false, features = ["aws-lc-rs", "ring", "std"] }
 schemars = { version = "0.8", features = ["chrono", "uuid1"] }
@@ -48,6 +53,7 @@ sea-orm = { version = "2", features = ["mock", "runtime-tokio-rustls", "schema-s
 sea-query = { version = "1", features = ["hashable-value", "postgres-array", "sea-orm", "thread-safe", "with-chrono", "with-json", "with-rust_decimal", "with-time", "with-uuid"] }
 sea-query-sqlx = { version = "0.9", default-features = false, features = ["postgres-array", "runtime-tokio-rustls", "sqlx-postgres", "with-chrono", "with-json", "with-rust_decimal", "with-time", "with-uuid"] }
 sea-schema = { version = "0.18", default-features = false, features = ["discovery", "probe", "runtime-tokio-rustls", "sqlx-postgres", "writer"] }
+semver = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_core = { version = "1", features = ["alloc", "rc"] }
 serde_json = { version = "1", features = ["raw_value"] }
@@ -64,16 +70,37 @@ tracing = { version = "0.1", features = ["log"] }
 uuid = { version = "1", features = ["serde", "v4", "v7"] }
 
 [build-dependencies]
+base64 = { version = "0.22" }
+bytes = { version = "1", features = ["serde"] }
 cc = { version = "1", default-features = false, features = ["parallel"] }
+chrono = { version = "0.4", features = ["serde"] }
 either = { version = "1", features = ["use_std"] }
+form_urlencoded = { version = "1" }
+futures-channel = { version = "0.3", features = ["sink"] }
+futures-core = { version = "0.3" }
+futures-io = { version = "0.3" }
+futures-sink = { version = "0.3" }
+futures-task = { version = "0.3", default-features = false, features = ["std"] }
+futures-util = { version = "0.3", features = ["channel", "io", "sink"] }
+indexmap = { version = "2", features = ["serde"] }
 memchr = { version = "2" }
+num-traits = { version = "0.2", default-features = false, features = ["i128", "std"] }
+openapiv3 = { version = "2", default-features = false, features = ["skip_serializing_defaults"] }
+percent-encoding = { version = "2" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-build", "dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std", "unicode"] }
 regex-syntax = { version = "0.8" }
+reqwest = { version = "0.13", features = ["blocking", "json", "query", "stream"] }
+schemars = { version = "0.8", features = ["chrono", "uuid1"] }
+semver = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_core = { version = "1", features = ["alloc", "rc"] }
+serde_json = { version = "1", features = ["raw_value"] }
+slab = { version = "0.4" }
+smallvec = { version = "1", default-features = false, features = ["const_new"] }
 syn-7b89eefb6aaa9bf3 = { package = "syn", version = "3", features = ["extra-traits", "full", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 thiserror = { version = "2" }
 time-macros = { version = "0.2", default-features = false, features = ["formatting", "parsing", "serde"] }
+uuid = { version = "1", features = ["serde", "v4", "v7"] }
 
 ### END HAKARI SECTION

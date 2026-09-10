@@ -10,6 +10,7 @@ members = [
     "nv-common",
     "nv-server",
     "nv-server-api",
+    "nv-server-client",
     "nvdb",
     "spookey",
     "windows-acls",
@@ -35,6 +36,9 @@ async-channel = "2.5.0"
 camino = "1.2.2"
 cargo-manifest = "0.21.0"
 chrono = "0.4.44"
+prettyplease = "0.2.37"
+progenitor = "0.14.0"
+progenitor-client = "0.14.0"
 clap = { version = "4.6.1", features = ["string"] }
 clap-verbosity-flag = { version = "3.0.4", default-features = false }
 # SECURITY: Note there are four known vulnerabilities in Dropshot 0.17.0 [1], but 0.18.0 (which
@@ -75,6 +79,7 @@ schemars = { version = "0.8.22", features = ["chrono"] }
 semver = "1.0.28"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
+syn = "2.0.117"
 # This needs to be compatible with the version used by dropshot.
 # See: https://github.com/oxidecomputer/dropshot/issues/1607
 slog = { version = "2.8.2", features = ["release_max_level_debug"] }
@@ -95,6 +100,7 @@ thiserror = "2.0.19"
 url = "2.5.7"
 httpmock = "0.8.3"
 proptest = "1.11.0"
+nv-server-client = { path = "nv-server-client" }
 
 [workspace.dependencies.tokio]
 

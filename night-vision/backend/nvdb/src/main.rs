@@ -69,10 +69,8 @@ fn run() -> Result<()> {
         .get_one::<Utf8PathBuf>("config")
         .expect("config has a default value");
     let config = Config::parse(config_file)?;
-    if let Some(sub_matches) = matches.subcommand_matches("api")
-        && let Some(_sub_matches) = sub_matches.subcommand_matches("health")
-    {
-        return cmd::api::health::run(&config);
+    if let Some(api_matches) = matches.subcommand_matches("api") {
+        return cmd::api::run(&config, api_matches);
     }
     if let Some(db_matches) = matches.subcommand_matches("db") {
         if let Some(_matches) = db_matches.subcommand_matches("ping") {
@@ -162,12 +160,7 @@ fn command() -> clap::Command {
                 .global(true)
                 .help("Display operational timestamps in the local time zone"),
         )
-        .subcommand(
-            clap::Command::new("api")
-                .about("Interact with the REST API")
-                .arg_required_else_help(true)
-                .subcommand(cmd::api::health::command()),
-        )
+        .subcommand(cmd::api::command())
         .subcommand(
             clap::Command::new("db")
                 .about("Manage the database")
