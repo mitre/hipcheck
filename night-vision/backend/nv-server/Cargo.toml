@@ -33,4 +33,5 @@ uuid.workspace = true
 workspace-hack.workspace = true
 
 [dev-dependencies]
+httpmock.workspace = true
 sea-orm = { workspace = true, features = ["mock"] }

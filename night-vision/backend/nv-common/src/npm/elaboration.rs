@@ -283,23 +283,31 @@ impl NpmRegistryClient {
             .join(&encoded)
             .map_err(|_| PackumentProviderError::Request)
     }
-}
 
-#[async_trait]
-impl PackumentProvider for NpmRegistryClient {
-    async fn fetch(
+    /// Retrieves a full packument when compact registry metadata is insufficient.
+    pub async fn fetch_full(
         &self,
         package: &NpmPackageName,
     ) -> Result<NpmPackument, PackumentProviderError> {
+        self.fetch_with_accept(package, None).await
+    }
+
+    async fn fetch_with_accept(
+        &self,
+        package: &NpmPackageName,
+        accept: Option<&str>,
+    ) -> Result<NpmPackument, PackumentProviderError> {
         for retry in 0..=MAX_RATE_LIMIT_RETRIES {
             let attempt = tokio::time::timeout(self.request_timeout, async {
-                let response = self
-                    .client
-                    .get(
-                        self.packument_url(package)
-                            .map_err(FetchAttemptError::Provider)?,
-                    )
-                    .header("Accept", "application/vnd.npm.install-v1+json")
+                let request = self.client.get(
+                    self.packument_url(package)
+                        .map_err(FetchAttemptError::Provider)?,
+                );
+                let request = match accept {
+                    Some(accept) => request.header("Accept", accept),
+                    None => request,
+                };
+                let response = request
                     .send()
                     .await
                     .map_err(map_request_error)
@@ -360,6 +368,17 @@ impl PackumentProvider for NpmRegistryClient {
         }
 
         unreachable!("the final rate-limited request returns an error")
+    }
+}
+
+#[async_trait]
+impl PackumentProvider for NpmRegistryClient {
+    async fn fetch(
+        &self,
+        package: &NpmPackageName,
+    ) -> Result<NpmPackument, PackumentProviderError> {
+        self.fetch_with_accept(package, Some("application/vnd.npm.install-v1+json"))
+            .await
     }
 }
 
@@ -2010,6 +2029,80 @@ mod tests {
             .expect_err("total-run timeout is enforced");
 
         assert!(matches!(error, ElaborationError::TotalRunTimeout));
+    }
+
+    #[tokio::test]
+    async fn registry_client_fetch_uses_compact_packument_media_type() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/root")
+                .header("accept", "application/vnd.npm.install-v1+json");
+            then.status(200).body(packument("root", "1.0.0", json!({})));
+        });
+        let client = NpmRegistryClient::new(
+            Url::parse(&format!("{}/", server.base_url())).expect("valid mock URL"),
+            1024,
+            Duration::from_secs(1),
+        )
+        .expect("valid client");
+        let package = NpmPackageName::parse("root".to_owned()).expect("valid package name");
+
+        client
+            .fetch(&package)
+            .await
+            .expect("compact fetch succeeds");
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn registry_client_fetch_full_omits_compact_packument_media_type() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/root")
+                .header_not("accept", "application/vnd.npm.install-v1+json");
+            then.status(200).body(
+                json!({
+                    "name": "root",
+                    "repository": {
+                        "type": "git",
+                        "url": "git+https://github.com/example/root.git"
+                    },
+                    "dist-tags": { "latest": "1.0.0" },
+                    "versions": {
+                        "1.0.0": {
+                            "name": "root",
+                            "version": "1.0.0",
+                            "dist": {
+                                "tarball": "https://registry.example/root-1.0.0.tgz",
+                                "shasum": "0123456789012345678901234567890123456789"
+                            }
+                        }
+                    }
+                })
+                .to_string(),
+            );
+        });
+        let client = NpmRegistryClient::new(
+            Url::parse(&format!("{}/", server.base_url())).expect("valid mock URL"),
+            1024,
+            Duration::from_secs(1),
+        )
+        .expect("valid client");
+        let package = NpmPackageName::parse("root".to_owned()).expect("valid package name");
+
+        let packument = client
+            .fetch_full(&package)
+            .await
+            .expect("full fetch succeeds");
+
+        assert_eq!(
+            packument.repository.expect("repository is present").url,
+            "git+https://github.com/example/root.git"
+        );
+        mock.assert();
     }
 
     #[tokio::test]

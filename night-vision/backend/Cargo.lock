@@ -2497,6 +2497,7 @@ dependencies = [
  "clap-verbosity-flag",
  "dropshot",
  "http",
+ "httpmock",
  "nv-common",
  "nv-server-api",
  "percent-encoding",

@@ -592,17 +592,79 @@ async fn validate_and_persist_upgrade_target(
             "target PURL matches a locally known active KEV vulnerability",
         ));
     }
-    let repository = packument
-        .versions
-        .get(&candidate.version)
-        .and_then(|version| version.repository.as_ref())
-        .or(packument.repository.as_ref())
-        .and_then(|repository| normalize_repository_url(&repository.url));
+    let repository = repository_for_assessment_target(
+        &client,
+        &affected.name,
+        &affected.version,
+        &target.version,
+        &packument,
+        &candidate,
+    )
+    .await?;
     let target_release = PackageVersion::from_npm(&target.name, &target.version);
     persist_assessment_target(context.db(), &target_release, repository)
         .await
         .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
     Ok(target_release.purl())
+}
+
+async fn repository_for_assessment_target(
+    client: &NpmRegistryClient,
+    package_name: &NpmPackageName,
+    affected_version: &str,
+    target_version: &str,
+    compact_packument: &nv_common::npm::packument::NpmPackument,
+    compact_candidate: &nv_common::npm::candidates::UpgradeCandidate,
+) -> Result<Option<String>, HttpError> {
+    let repository = repository_for_candidate(compact_packument, compact_candidate);
+    let Some(repository) = repository else {
+        let full_packument = client.fetch_full(package_name).await.map_err(|error| {
+            upgrade_validation_error(&format!("failed to fetch NPM package metadata: {error}"))
+        })?;
+        let full_candidate = validate_explicit_candidate(
+            &full_packument,
+            package_name.as_str(),
+            affected_version,
+            target_version,
+        )
+        .map_err(|error| upgrade_validation_error(&error.to_string()))?;
+        if !matches!(full_candidate.status, CandidateStatus::Included) {
+            return Err(upgrade_validation_error(
+                "target PURL is an excluded upgrade candidate",
+            ));
+        }
+        return Ok(repository_for_candidate(&full_packument, &full_candidate));
+    };
+    Ok(Some(repository))
+}
+
+fn repository_for_candidate(
+    packument: &nv_common::npm::packument::NpmPackument,
+    candidate: &nv_common::npm::candidates::UpgradeCandidate,
+) -> Option<String> {
+    source_repository_url(
+        packument
+            .versions
+            .get(&candidate.version)
+            .and_then(|version| version.repository.as_ref()),
+        packument.repository.as_ref(),
+    )
+}
+
+/// Select a usable source repository, preferring version-specific metadata.
+///
+/// NPM package metadata can contain a repository for both a specific version
+/// and the package as a whole. An unusable version-specific value must not
+/// prevent a usable package-level value from being considered.
+fn source_repository_url(
+    version_repository: Option<&nv_common::npm::packument::Repository>,
+    package_repository: Option<&nv_common::npm::packument::Repository>,
+) -> Option<String> {
+    let version_repository =
+        version_repository.and_then(|repository| normalize_repository_url(&repository.url));
+    let package_repository =
+        package_repository.and_then(|repository| normalize_repository_url(&repository.url));
+    version_repository.or(package_repository)
 }
 
 fn reachable_package(package: &NpmPackagePurl, purl: &str) -> ReachableNpmPackageVersion {
@@ -1381,6 +1443,7 @@ mod tests {
         Request, StatusCode,
         header::{AUTHORIZATION, CONTENT_TYPE},
     };
+    use httpmock::prelude::*;
     use nv_common::{
         db::entities::{
             package_source_edges, package_source_versions, package_source_warnings,
@@ -1640,6 +1703,261 @@ mod tests {
             Some("package version has no usable source repository")
         );
         assert_eq!(diagnostics.retryable, Some(false));
+    }
+
+    #[test]
+    fn source_repository_url_falls_back_when_version_repository_is_unusable() {
+        let version_repository = nv_common::npm::packument::Repository {
+            type_field: "git".to_owned(),
+            url: "git://gitlab.example/project.git".to_owned(),
+        };
+        let package_repository = nv_common::npm::packument::Repository {
+            type_field: "git".to_owned(),
+            url: "https://github.com/example/project.git".to_owned(),
+        };
+
+        assert_eq!(
+            source_repository_url(Some(&version_repository), Some(&package_repository)),
+            Some("https://github.com/example/project.git".to_owned())
+        );
+    }
+
+    #[test]
+    fn repository_for_candidate_uses_full_packument_metadata_when_compact_is_missing_it() {
+        let compact = nv_common::npm::packument::parse_packument(
+            serde_json::json!({
+                "name": "systeminformation",
+                "dist-tags": { "latest": "5.3.1" },
+                "versions": {
+                    "5.3.1": {
+                        "name": "systeminformation",
+                        "version": "5.3.1",
+                        "dist": {
+                            "tarball": "https://registry.example/systeminformation-5.3.1.tgz",
+                            "shasum": "0123456789012345678901234567890123456789"
+                        }
+                    }
+                }
+            })
+            .to_string()
+            .as_bytes(),
+        )
+        .expect("compact fixture parses");
+        let full = nv_common::npm::packument::parse_packument(
+            serde_json::json!({
+                "name": "systeminformation",
+                "repository": {
+                    "type": "git",
+                    "url": "git+https://github.com/sebhildebrandt/systeminformation.git"
+                },
+                "dist-tags": { "latest": "5.3.1" },
+                "versions": {
+                    "5.3.1": {
+                        "name": "systeminformation",
+                        "version": "5.3.1",
+                        "dist": {
+                            "tarball": "https://registry.example/systeminformation-5.3.1.tgz",
+                            "shasum": "0123456789012345678901234567890123456789"
+                        }
+                    }
+                }
+            })
+            .to_string()
+            .as_bytes(),
+        )
+        .expect("full fixture parses");
+        let candidate =
+            validate_explicit_candidate(&compact, "systeminformation", "5.3.0", "5.3.1")
+                .expect("candidate validates");
+
+        assert_eq!(repository_for_candidate(&compact, &candidate), None);
+        assert_eq!(
+            repository_for_candidate(&full, &candidate).as_deref(),
+            Some("https://github.com/sebhildebrandt/systeminformation.git")
+        );
+    }
+
+    #[tokio::test]
+    async fn repository_for_assessment_target_rejects_full_packument_fetch_failure() {
+        let server = MockServer::start();
+        let compact = packument_with_versions(&["5.3.1"], None);
+        let compact_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/systeminformation")
+                .header("accept", "application/vnd.npm.install-v1+json");
+            then.status(200).body(compact.to_string());
+        });
+        let full_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/systeminformation")
+                .header_not("accept", "application/vnd.npm.install-v1+json");
+            then.status(503);
+        });
+        let client = NpmRegistryClient::new(
+            url::Url::parse(&format!("{}/", server.base_url())).expect("valid mock URL"),
+            1024,
+            std::time::Duration::from_secs(1),
+        )
+        .expect("valid client");
+        let package = NpmPackageName::parse("systeminformation".to_owned()).expect("valid name");
+        let compact = client
+            .fetch(&package)
+            .await
+            .expect("compact fetch succeeds");
+        let candidate =
+            validate_explicit_candidate(&compact, "systeminformation", "5.3.0", "5.3.1")
+                .expect("candidate validates");
+
+        let error = repository_for_assessment_target(
+            &client, &package, "5.3.0", "5.3.1", &compact, &candidate,
+        )
+        .await
+        .expect_err("full packument fetch failure rejects the assessment before queueing");
+
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("InvalidUpgradeAssessment")
+        );
+        compact_mock.assert();
+        full_mock.assert();
+    }
+
+    #[tokio::test]
+    async fn repository_for_assessment_target_uses_full_packument_repository_metadata() {
+        let server = MockServer::start();
+        let compact = packument_with_versions(&["5.3.1"], None);
+        let full = packument_with_versions(
+            &["5.3.1"],
+            Some(serde_json::json!({
+                "type": "git",
+                "url": "git+https://github.com/sebhildebrandt/systeminformation.git"
+            })),
+        );
+        let compact_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/systeminformation")
+                .header("accept", "application/vnd.npm.install-v1+json");
+            then.status(200).body(compact.to_string());
+        });
+        let full_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/systeminformation")
+                .header_not("accept", "application/vnd.npm.install-v1+json");
+            then.status(200).body(full.to_string());
+        });
+        let client = NpmRegistryClient::new(
+            url::Url::parse(&format!("{}/", server.base_url())).expect("valid mock URL"),
+            1024,
+            std::time::Duration::from_secs(1),
+        )
+        .expect("valid client");
+        let package = NpmPackageName::parse("systeminformation".to_owned()).expect("valid name");
+        let compact = client
+            .fetch(&package)
+            .await
+            .expect("compact fetch succeeds");
+        let candidate =
+            validate_explicit_candidate(&compact, "systeminformation", "5.3.0", "5.3.1")
+                .expect("candidate validates");
+
+        let repository = repository_for_assessment_target(
+            &client, &package, "5.3.0", "5.3.1", &compact, &candidate,
+        )
+        .await
+        .expect("full packument metadata resolves the target repository");
+
+        assert_eq!(
+            repository.as_deref(),
+            Some("https://github.com/sebhildebrandt/systeminformation.git")
+        );
+        compact_mock.assert();
+        full_mock.assert();
+    }
+
+    #[tokio::test]
+    async fn repository_for_assessment_target_rejects_missing_target_in_full_packument() {
+        let server = MockServer::start();
+        let compact = packument_with_versions(&["5.3.1"], None);
+        let full = packument_with_versions(
+            &["5.3.2"],
+            Some(serde_json::json!({
+                "type": "git",
+                "url": "git+https://github.com/sebhildebrandt/systeminformation.git"
+            })),
+        );
+        let compact_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/systeminformation")
+                .header("accept", "application/vnd.npm.install-v1+json");
+            then.status(200).body(compact.to_string());
+        });
+        let full_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/systeminformation")
+                .header_not("accept", "application/vnd.npm.install-v1+json");
+            then.status(200).body(full.to_string());
+        });
+        let client = NpmRegistryClient::new(
+            url::Url::parse(&format!("{}/", server.base_url())).expect("valid mock URL"),
+            1024,
+            std::time::Duration::from_secs(1),
+        )
+        .expect("valid client");
+        let package = NpmPackageName::parse("systeminformation".to_owned()).expect("valid name");
+        let compact = client
+            .fetch(&package)
+            .await
+            .expect("compact fetch succeeds");
+        let candidate =
+            validate_explicit_candidate(&compact, "systeminformation", "5.3.0", "5.3.1")
+                .expect("candidate validates");
+
+        let error = repository_for_assessment_target(
+            &client, &package, "5.3.0", "5.3.1", &compact, &candidate,
+        )
+        .await
+        .expect_err("missing full-packument target rejects the assessment before queueing");
+
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("InvalidUpgradeAssessment")
+        );
+        compact_mock.assert();
+        full_mock.assert();
+    }
+
+    fn packument_with_versions(
+        versions: &[&str],
+        repository: Option<serde_json::Value>,
+    ) -> serde_json::Value {
+        let versions = versions
+            .iter()
+            .map(|version| {
+                (
+                    (*version).to_owned(),
+                    serde_json::json!({
+                        "name": "systeminformation",
+                        "version": version,
+                        "dist": {
+                            "tarball": format!("https://registry.example/systeminformation-{version}.tgz"),
+                            "shasum": "0123456789012345678901234567890123456789"
+                        }
+                    }),
+                )
+            })
+            .collect::<serde_json::Map<_, _>>();
+        let mut packument = serde_json::json!({
+            "name": "systeminformation",
+            "dist-tags": { "latest": versions.keys().next_back() },
+            "versions": versions,
+        });
+        if let Some(repository) = repository {
+            packument
+                .as_object_mut()
+                .expect("packument is an object")
+                .insert("repository".to_owned(), repository);
+        }
+        packument
     }
 
     fn source(
