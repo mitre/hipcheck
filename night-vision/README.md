@@ -165,6 +165,18 @@ To validate the Docker shell scripts and local Compose configuration, run:
 scripts/test.sh
 ```
 
+To run the CI-equivalent Compose smoke test locally, export the read-only
+Hipcheck token and use the local wrapper. It stages its temporary Compose
+secrets under Docker Desktop's approved `/Users/Shared/Docker` mount on macOS
+or `C:/Users/Public/Docker` mount on Windows before delegating to
+`scripts/test-compose-smoke.sh`.
+
+```sh
+scripts/test-compose-smoke-local.sh
+```
+
+Set `DOCKER_COMPOSE_TMPDIR` to use another Docker-approved mount location.
+
 ### Production Deployment
 
 Production Compose uses `docker-compose.yml` only. Copy
