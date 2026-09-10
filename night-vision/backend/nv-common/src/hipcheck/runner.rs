@@ -420,9 +420,9 @@ printf '{"report":"ok"}'
         run_async(async {
             let fixture = TestFixture::new(
                 r#"printf '%s' "$$" > "$NV_PID"
-while test ! -f "$NV_RELEASE"; do /bin/sleep 0.01; done
+while test ! -f "$NV_RELEASE"; do :; done
 printf '{"partial":'
-exec /bin/sleep 5"#,
+while :; do :; done"#,
             );
             let mut config = fixture.config();
             config.timeout = Duration::from_secs(1);
@@ -437,7 +437,10 @@ exec /bin/sleep 5"#,
                 .expect_err("check should time out");
 
             assert!(error.retryable());
-            assert!(matches!(error, HipcheckExecutionError::TimedOut { .. }));
+            let HipcheckExecutionError::TimedOut { stdout, .. } = error else {
+                panic!("check should time out");
+            };
+            assert_eq!(stdout, b"{\"partial\":");
             assert!(!process_exists(fixture.process_id()));
         });
     }
@@ -458,7 +461,7 @@ exec /bin/sleep 5"#,
                 ("printf 12345", "", HipcheckOutputStream::Json, 32, 32, 4),
             ];
             for (stdout, stderr, expected_stream, stdout_limit, stderr_limit, json_limit) in cases {
-                let fixture = TestFixture::new(&format!("{stdout}\n{stderr}\nexec sleep 5"));
+                let fixture = TestFixture::new(&format!("{stdout}\n{stderr}\nwhile :; do :; done"));
                 let mut config = fixture.config();
                 config.stdout_max_bytes = stdout_limit;
                 config.stderr_max_bytes = stderr_limit;
