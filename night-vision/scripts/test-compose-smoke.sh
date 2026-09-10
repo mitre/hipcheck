@@ -136,7 +136,7 @@ NV_SERVER_DATABASE_URL_SECRET_FILE="$tmp_dir/nv-server-database-url" \
     docker compose \
         -f docker-compose.yml \
         -f docker-compose.ci.yml \
-        exec -T nv-server \
+        exec -T --workdir /var/cache/night-vision/hipcheck nv-server \
         /usr/local/bin/hc \
         --policy /opt/night-vision/hipcheck/config/Hipcheck.kdl \
         --exec /opt/night-vision/hipcheck/config/Exec.kdl \

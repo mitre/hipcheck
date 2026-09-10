@@ -56,7 +56,7 @@ const DEFAULT_PACKAGE_ELABORATION_MAX_CONCURRENT_RUNS: usize = 4;
 const DEFAULT_HIPCHECK_BIN_PATH: &str = "/usr/local/bin/hc";
 const DEFAULT_HIPCHECK_POLICY_PATH: &str = "/opt/night-vision/hipcheck/config/Hipcheck.kdl";
 const DEFAULT_HIPCHECK_EXEC_CONFIG_PATH: &str = "/opt/night-vision/hipcheck/config/Exec.kdl";
-const DEFAULT_HIPCHECK_WORKING_DIR: &str = "/opt/night-vision/hipcheck";
+const DEFAULT_HIPCHECK_WORKING_DIR: &str = "/var/cache/night-vision/hipcheck";
 const DEFAULT_HIPCHECK_CACHE_DIR: &str = "/var/cache/night-vision/hipcheck";
 const DEFAULT_HIPCHECK_TIMEOUT: u64 = 300_000;
 const DEFAULT_HIPCHECK_STDOUT_MAX_BYTES: usize = 1024 * 1024;
@@ -2055,6 +2055,14 @@ mod tests {
         );
         assert_eq!(config.cve_record_max_bytes, DEFAULT_CVE_RECORD_MAX_BYTES);
         assert_eq!(config.npm_registry_url.as_str(), DEFAULT_NPM_REGISTRY_URL);
+        assert_eq!(
+            config.hipcheck_working_dir,
+            Utf8Path::new(DEFAULT_HIPCHECK_CACHE_DIR)
+        );
+        assert_eq!(
+            config.hipcheck_cache_dir,
+            Utf8Path::new(DEFAULT_HIPCHECK_CACHE_DIR)
+        );
         assert_eq!(
             config.package_elaboration_max_packument_bytes,
             64 * 1024 * 1024

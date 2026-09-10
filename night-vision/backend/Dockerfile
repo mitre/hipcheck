@@ -172,7 +172,9 @@ COPY hipcheck/config /opt/night-vision/hipcheck/config
 COPY hipcheck/plugins /opt/night-vision/hipcheck/plugins
 
 RUN chown -R nv-server:nv-server /etc/night-vision /opt/night-vision /var/cache/night-vision /var/lib/night-vision
-WORKDIR /opt/night-vision/hipcheck
+# Hipcheck atomically moves plugin state into its cache. Keep its working
+# directory on that same filesystem when Compose mounts the cache as a volume.
+WORKDIR /var/cache/night-vision/hipcheck
 USER nv-server
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/nv-server"]

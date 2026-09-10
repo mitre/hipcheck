@@ -197,10 +197,9 @@ mod tests {
             let binary_path = hipcheck_root.join("hc");
             let policy_path = hipcheck_root.join("Hipcheck.kdl");
             let exec_config_path = hipcheck_root.join("Exec.kdl");
-            let working_dir = hipcheck_root.join("work");
             let cache_dir = hipcheck_root.join("cache");
             let data_dir = hipcheck_root.join("data");
-            for directory in [&working_dir, &cache_dir, &data_dir] {
+            for directory in [&cache_dir, &data_dir] {
                 fs::create_dir_all(directory).expect("failed to create Hipcheck test directory");
             }
             fs::write(&binary_path, "test binary").expect("failed to create Hipcheck test binary");
@@ -222,10 +221,6 @@ mod tests {
                 .replace(
                     "/opt/night-vision/hipcheck/config/Exec.kdl",
                     &exec_config_path.display().to_string(),
-                )
-                .replace(
-                    "/opt/night-vision/hipcheck",
-                    &working_dir.display().to_string(),
                 )
                 .replace(
                     "/var/cache/night-vision/hipcheck",

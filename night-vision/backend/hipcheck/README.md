@@ -34,7 +34,7 @@ The backend image installs this bundle at `/opt/night-vision/hipcheck`:
 | Exec configuration | `/opt/night-vision/hipcheck/config/Exec.kdl` | `config/Exec.kdl` |
 | Plugin manifest | `/opt/night-vision/hipcheck/plugins/binary/local-release-plugin.kdl` | `plugins/binary/local-release-plugin.kdl` |
 | Plugin executable | `/opt/night-vision/hipcheck/target/release/binary` | built from the pin |
-| Writable cache | `/var/cache/night-vision/hipcheck` | runtime volume |
+| Writable cache and working directory | `/var/cache/night-vision/hipcheck` | runtime volume |
 | Writable data/work area | `/var/lib/night-vision/hipcheck` | runtime volume |
 
 The backend process should always invoke Hipcheck with the explicit policy,
@@ -43,7 +43,7 @@ the developer `PATH`, `HC_CACHE`, the user's home directory, or an ambient
 Hipcheck configuration.
 
 ```sh
-cd /opt/night-vision/hipcheck
+cd /var/cache/night-vision/hipcheck
 /usr/local/bin/hc \
   --policy /opt/night-vision/hipcheck/config/Hipcheck.kdl \
   --exec /opt/night-vision/hipcheck/config/Exec.kdl \
@@ -74,7 +74,7 @@ docker run --rm --entrypoint /usr/local/bin/hc nv-server:hipcheck-mvp \
 ```
 
 For an interactive analysis, keep the container's working directory at
-`/opt/night-vision/hipcheck` (the image default) and replace `ready` with
+`/var/cache/night-vision/hipcheck` (the image default) and replace `ready` with
 `check <target>`. The current MVP policy does not require a GitHub token. Add
 only plugin-specific credentials when a later pinned policy requires them.
 

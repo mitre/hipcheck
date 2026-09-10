@@ -136,7 +136,7 @@ package-elaboration-max-packument-bytes = 67108864
 hipcheck-bin-path = "/usr/local/bin/hc"
 hipcheck-policy-path = "/opt/night-vision/hipcheck/config/Hipcheck.kdl"
 hipcheck-exec-config-path = "/opt/night-vision/hipcheck/config/Exec.kdl"
-hipcheck-working-dir = "/opt/night-vision/hipcheck"
+hipcheck-working-dir = "/var/cache/night-vision/hipcheck"
 hipcheck-cache-dir = "/var/cache/night-vision/hipcheck"
 hipcheck-data-dir = "/var/lib/night-vision/hipcheck"
 
