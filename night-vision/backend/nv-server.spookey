@@ -153,7 +153,10 @@ cve-record-max-bytes =
 # cve-list-write-batch-size, capped at 1024.
 cve-list-write-channel-size =
 
-# The NPM registry base URL used for package-source elaboration.
+# The NPM registry base URL used for package-source elaboration. It must use
+# HTTPS and cannot contain a username, password, query, or fragment. HTTP is
+# allowed only for localhost or an IP loopback address, for local development.
+# Redirects are followed only within this URL's scheme, host, and port.
 #
 # Default: https://registry.npmjs.org/
 npm-registry-url =

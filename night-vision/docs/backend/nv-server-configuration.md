@@ -69,7 +69,7 @@ SeaORM, or Tokio setting at its default unless noted below.
 | `cve-list-write-batch-size` | Maximum staged CVE records per database write. | Records | 500. |
 | `cve-record-max-bytes` | Maximum accepted size for one CVE List Git blob. | Bytes | Defaults to 5242880 bytes. Oversized blobs are rejected before allocation. |
 | `cve-list-write-channel-size` | Parsed-record buffer before database staging. | Records | Automatic value based on parser concurrency and batch size, capped at 1024. |
-| `npm-registry-url` | NPM registry base URL for package-source elaboration. | URL | `https://registry.npmjs.org/`. |
+| `npm-registry-url` | NPM registry base URL for package-source elaboration. | URL | `https://registry.npmjs.org/`. The URL must use HTTPS and must not contain a username, password, query, or fragment. HTTP is permitted only for `localhost` or an IP loopback address, for local development and tests. Redirects are followed only within the configured scheme, host, and port. |
 | `package-elaboration-worker-concurrency` | Concurrent package-version elaboration workers. | Tasks | Four times Tokio worker threads, with a minimum of 4 and maximum of 32. Values must be greater than 0. |
 | `package-elaboration-work-queue-capacity` | Bounded elaboration work queue capacity. | Work items | Four times elaboration worker concurrency. Values must be greater than 0. |
 | `package-elaboration-max-concurrent-runs` | Maximum package-source elaborations running process-wide. New requests are rejected while all slots are occupied. | Runs | 4. Values must be greater than 0. |

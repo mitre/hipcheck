@@ -257,8 +257,21 @@ impl NpmRegistryClient {
         if max_packument_bytes == 0 || request_timeout.is_zero() {
             return Err(PackumentProviderError::Request);
         }
+        let redirect_registry_url = registry_url.clone();
         Ok(Self {
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                // Requests may only remain within the configured registry
+                // origin. In particular, do not permit a registry to redirect
+                // package metadata to a different host or scheme.
+                .redirect(reqwest::redirect::Policy::custom(move |attempt| {
+                    if is_safe_registry_redirect(&redirect_registry_url, attempt.url()) {
+                        attempt.follow()
+                    } else {
+                        attempt.stop()
+                    }
+                }))
+                .build()
+                .map_err(|_| PackumentProviderError::Request)?,
             registry_url,
             max_packument_bytes,
             request_timeout,
@@ -283,7 +296,6 @@ impl NpmRegistryClient {
             .join(&encoded)
             .map_err(|_| PackumentProviderError::Request)
     }
-
     /// Retrieves a full packument when compact registry metadata is insufficient.
     pub async fn fetch_full(
         &self,
@@ -369,6 +381,12 @@ impl NpmRegistryClient {
 
         unreachable!("the final rate-limited request returns an error")
     }
+}
+
+fn is_safe_registry_redirect(registry_url: &Url, redirect_url: &Url) -> bool {
+    registry_url.origin() == redirect_url.origin()
+        && redirect_url.username().is_empty()
+        && redirect_url.password().is_none()
 }
 
 #[async_trait]
@@ -2149,6 +2167,61 @@ mod tests {
         assert!(matches!(
             error,
             PackumentProviderError::HttpStatus { status: 503 }
+        ));
+    }
+
+    #[tokio::test]
+    async fn registry_client_does_not_follow_cross_origin_redirects() {
+        let registry = MockServer::start();
+        let other_origin = MockServer::start();
+        let _redirect = registry.mock(|when, then| {
+            when.method(GET).path("/root");
+            then.status(302)
+                .header("Location", format!("{}/root", other_origin.base_url()));
+        });
+        let other_request = other_origin.mock(|when, then| {
+            when.method(GET).path("/root");
+            then.status(200).body(packument("root", "1.0.0", json!({})));
+        });
+        let client = NpmRegistryClient::new(
+            Url::parse(&format!("{}/", registry.base_url())).expect("valid mock URL"),
+            1024,
+            Duration::from_secs(1),
+        )
+        .expect("valid client");
+        let package = NpmPackageName::parse("root".to_owned()).expect("valid package name");
+
+        let error = client
+            .fetch(&package)
+            .await
+            .expect_err("cross-origin redirect is rejected");
+
+        assert!(matches!(
+            error,
+            PackumentProviderError::HttpStatus { status: 302 }
+        ));
+        other_request.assert_calls(0);
+    }
+
+    #[test]
+    fn registry_redirects_must_remain_on_origin_without_authentication() {
+        let registry = Url::parse("https://registry.example.test/base/").expect("valid URL");
+
+        assert!(is_safe_registry_redirect(
+            &registry,
+            &Url::parse("https://registry.example.test/other").expect("valid URL")
+        ));
+        assert!(!is_safe_registry_redirect(
+            &registry,
+            &Url::parse("http://registry.example.test/other").expect("valid URL")
+        ));
+        assert!(!is_safe_registry_redirect(
+            &registry,
+            &Url::parse("https://registry.example.test:8443/other").expect("valid URL")
+        ));
+        assert!(!is_safe_registry_redirect(
+            &registry,
+            &Url::parse("https://user:token@registry.example.test/other").expect("valid URL")
         ));
     }
 

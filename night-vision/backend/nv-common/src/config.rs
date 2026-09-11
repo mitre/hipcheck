@@ -580,8 +580,8 @@ impl Config {
         );
         let cve_list_write_channel_size =
             parse_positive_usize_option(&parsed, "cve-list-write-channel-size", &mut errors);
-        let npm_registry_url = parse_value(&parsed, "npm-registry-url", &mut errors)
-            .unwrap_or_else(default_npm_registry_url);
+        let npm_registry_url =
+            parse_npm_registry_url(&parsed, &mut errors).unwrap_or_else(default_npm_registry_url);
         let package_elaboration_worker_concurrency = parse_positive_usize_option(
             &parsed,
             "package-elaboration-worker-concurrency",
@@ -1090,7 +1090,11 @@ impl Display for Config {
             )?;
         }
 
-        write_report_line!(f, "npm-registry-url", &self.npm_registry_url)?;
+        write_report_line!(
+            f,
+            "npm-registry-url",
+            &redact_url_authentication(&self.npm_registry_url)
+        )?;
         write_report_line!(
             f,
             "package-elaboration-worker-concurrency",
@@ -1213,6 +1217,69 @@ fn parse_cve_list_repository_url(
     None
 }
 
+/// Parse the NPM registry URL, applying the registry trust-boundary policy.
+///
+/// Public registries must use HTTPS. HTTP is allowed only for loopback hosts so
+/// that local development and tests can use an unencrypted local server.
+fn parse_npm_registry_url(
+    parsed: &spookey::ParseResult,
+    errors: &mut Vec<ConfigError>,
+) -> Option<Url> {
+    let value = match (
+        parsed.required_keys.get("npm-registry-url"),
+        parsed.optional_keys.get("npm-registry-url"),
+    ) {
+        (None, None | Some(None)) => return None,
+        (None, Some(Some(value))) | (Some(value), None) => value,
+        (Some(_), Some(_)) => unreachable!(
+            "spookey doesn't permit a single key to be in `required_keys` and `optional_keys`"
+        ),
+    };
+
+    let url = match Url::parse(value) {
+        Ok(url) => url,
+        Err(err) => {
+            errors.push(ConfigError::StrParse(StrParseError {
+                key: "npm-registry-url".into(),
+                value: redact_url_authentication_string(value).into_boxed_str(),
+                err: err.to_string().into_boxed_str(),
+            }));
+            return None;
+        }
+    };
+
+    let error = if !url.username().is_empty() || url.password().is_some() {
+        Some("registry URLs must not include authentication information")
+    } else if url.host().is_none() {
+        Some("registry URLs must include a host")
+    } else if url.query().is_some() || url.fragment().is_some() {
+        Some("registry URLs must not include query parameters or fragments")
+    } else if url.scheme() == "https" || (url.scheme() == "http" && is_loopback_host(&url)) {
+        None
+    } else {
+        Some("registry URLs must use https, or http with a loopback host")
+    };
+
+    if let Some(err) = error {
+        errors.push(ConfigError::StrParse(StrParseError {
+            key: "npm-registry-url".into(),
+            value: redact_url_authentication(&url).as_str().into(),
+            err: err.into(),
+        }));
+        None
+    } else {
+        Some(url)
+    }
+}
+
+fn is_loopback_host(url: &Url) -> bool {
+    url.host().is_some_and(|host| match host {
+        url::Host::Domain(host) => host == "localhost",
+        url::Host::Ipv4(address) => address.is_loopback(),
+        url::Host::Ipv6(address) => address.is_loopback(),
+    })
+}
+
 /// Return a copy of a URL with its authentication components redacted.
 pub fn redact_url_authentication(url: &Url) -> Url {
     let mut redacted = url.clone();
@@ -1229,6 +1296,43 @@ pub fn redact_url_authentication(url: &Url) -> Url {
     }
 
     redacted
+}
+
+/// Redact user information from a URL-shaped string, including one that could
+/// not be parsed as a [`Url`].
+fn redact_url_authentication_string(value: &str) -> String {
+    if let Ok(url) = Url::parse(value) {
+        return redact_url_authentication(&url).to_string();
+    }
+
+    let Some(scheme_end) = value.find("://") else {
+        return value.to_owned();
+    };
+    let authority_start = scheme_end
+        .checked_add(3)
+        .expect("scheme separator fits within its source string");
+    let authority_end =
+        value[authority_start..]
+            .find(['/', '?', '#'])
+            .map_or(value.len(), |index| {
+                authority_start
+                    .checked_add(index)
+                    .expect("authority offset fits within its source string")
+            });
+    let authority = &value[authority_start..authority_end];
+    let Some(at) = authority.rfind('@') else {
+        return value.to_owned();
+    };
+
+    let after_authentication = authority_start
+        .checked_add(at)
+        .and_then(|index| index.checked_add(1))
+        .expect("authentication offset fits within its source string");
+    format!(
+        "{}<redacted>@{}",
+        &value[..authority_start],
+        &value[after_authentication..]
+    )
 }
 
 fn default_cve_list_repository_ref() -> GitRef {
@@ -2414,6 +2518,88 @@ mod tests {
             &*parse_error.err,
             "repository URLs must not include authentication information"
         );
+    }
+
+    #[test]
+    fn config_validates_and_redacts_npm_registry_urls() {
+        let cases = [
+            (
+                "https://user:registry-token@example.test/",
+                "registry URLs must not include authentication information",
+                true,
+            ),
+            (
+                "https://user:registry-token@[::1",
+                "invalid IPv6 address",
+                true,
+            ),
+            (
+                "http://registry.example.test/",
+                "registry URLs must use https, or http with a loopback host",
+                false,
+            ),
+            (
+                "ftp://registry.example.test/",
+                "registry URLs must use https, or http with a loopback host",
+                false,
+            ),
+            (
+                "https://registry.example.test/?credential=registry-token",
+                "registry URLs must not include query parameters or fragments",
+                false,
+            ),
+        ];
+
+        for (value, expected_error, contains_authentication) in cases {
+            let file = TempConfigFile::new(&format!(
+                "{}\nnpm-registry-url = {value}\n",
+                valid_required_config()
+            ));
+            let error = Config::parse(file.path()).expect_err("registry URL should be rejected");
+            let ConfigLoadError::FailedToParseConfigFileFields(_, ConfigErrors(errors)) = error
+            else {
+                panic!("expected a field parsing error");
+            };
+            let ConfigError::StrParse(parse_error) = &errors[0] else {
+                panic!("expected a URL parsing error");
+            };
+
+            assert_eq!(&*parse_error.err, expected_error);
+            if contains_authentication {
+                assert!(!parse_error.value.contains("registry-token"));
+                assert!(!format!("{parse_error:?}").contains("registry-token"));
+            }
+        }
+    }
+
+    #[test]
+    fn config_allows_secure_and_loopback_npm_registry_urls() {
+        for value in [
+            "https://registry.example.test/base/",
+            "http://localhost:4873/",
+            "http://127.0.0.1:4873/",
+            "http://[::1]:4873/",
+        ] {
+            let file = TempConfigFile::new(&format!(
+                "{}\nnpm-registry-url = {value}\n",
+                valid_required_config()
+            ));
+            Config::parse(file.path()).expect("registry URL should be accepted");
+        }
+    }
+
+    #[test]
+    fn config_display_redacts_npm_registry_authentication_defensively() {
+        let file = TempConfigFile::new(&valid_required_config());
+        let mut config = Config::parse(file.path()).expect("config should parse");
+        config.npm_registry_url =
+            Url::parse("https://user:registry-token@example.test/").expect("valid URL");
+
+        let report = format!("{config}");
+
+        assert!(report.contains("%3Credacted%3E:%3Credacted%3E@example.test"));
+        assert!(!report.contains("user:registry-token"));
+        assert!(!report.contains("registry-token"));
     }
 
     #[test]
