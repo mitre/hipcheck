@@ -163,7 +163,8 @@ pub struct Config {
     /// String used to connect to the database.
     database_connection: SecretString,
 
-    /// Optional bearer token required to read operator health diagnostics.
+    /// Optional bearer token required to read operator diagnostics and raw
+    /// Hipcheck evidence.
     health_diagnostics_token: Option<SecretString>,
 
     /// The maximum number of connections to the database.
@@ -802,7 +803,7 @@ impl Config {
         &self.database_connection
     }
 
-    /// Get the optional token that enables operator health diagnostics.
+    /// Get the optional token that enables operator diagnostics and raw Hipcheck evidence.
     pub fn health_diagnostics_token(&self) -> Option<&SecretString> {
         self.health_diagnostics_token.as_ref()
     }

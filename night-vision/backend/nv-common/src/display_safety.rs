@@ -63,13 +63,32 @@ pub fn vetted_https_url(value: &str) -> Option<String> {
 fn display_text(value: &str, max_bytes: usize, preserve_newlines: bool) -> String {
     let normalized = value.replace("\r\n", "\n").replace('\r', "\n");
     let mut displayed = String::new();
+    let mut displayed_part_lengths = Vec::new();
     for character in normalized.chars() {
         let escaped = escaped_character(character, preserve_newlines);
-        if displayed.len() + escaped.len() + TRUNCATION_MARKER.len() > max_bytes {
+        let displayed_len = displayed
+            .len()
+            .checked_add(escaped.len())
+            .expect("display text length cannot overflow usize");
+        if displayed_len > max_bytes {
+            let marker_limit = max_bytes
+                .checked_sub(TRUNCATION_MARKER.len())
+                .expect("display text limit must fit its truncation marker");
+            while displayed.len() > marker_limit {
+                let part_len = displayed_part_lengths
+                    .pop()
+                    .expect("displayed text must contain a complete part");
+                let new_len = displayed
+                    .len()
+                    .checked_sub(part_len)
+                    .expect("complete display part cannot exceed text length");
+                displayed.truncate(new_len);
+            }
             displayed.push_str(TRUNCATION_MARKER);
             return displayed;
         }
         displayed.push_str(&escaped);
+        displayed_part_lengths.push(escaped.len());
     }
     displayed
 }
@@ -144,6 +163,22 @@ mod tests {
         assert!(displayed.ends_with("… [truncated]"));
         assert!(displayed.len() <= MAX_DISPLAY_SUMMARY_BYTES);
         assert!(displayed.is_char_boundary(displayed.len()));
+    }
+
+    #[test]
+    fn display_text_keeps_values_that_exactly_fit_the_limit() {
+        let value = "x".repeat(MAX_DISPLAY_SUMMARY_BYTES);
+
+        assert_eq!(summary_text(&value), value);
+    }
+
+    #[test]
+    fn display_text_adds_a_marker_only_when_content_exceeds_the_limit() {
+        let value = "x".repeat(MAX_DISPLAY_SUMMARY_BYTES + 1);
+        let displayed = summary_text(&value);
+
+        assert!(displayed.ends_with("… [truncated]"));
+        assert_eq!(displayed.len(), MAX_DISPLAY_SUMMARY_BYTES);
     }
 
     #[test]

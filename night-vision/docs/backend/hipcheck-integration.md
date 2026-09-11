@@ -123,8 +123,9 @@ default.
 `nvdb assessment analyze <AFFECTED-PURL> <TARGET-PURL>` waits synchronously. `POST /assessments`
 returns `202` with an assessment ID and runs in the background; poll
 `GET /assessments/{id}`. Normalized evidence is available from
-`GET /assessments/{id}/evidence`; request raw JSON only with
-`?includeRawHipcheck=true`.
+`GET /assessments/{id}/evidence`. Raw JSON is available only to operators: set
+`?includeRawHipcheck=true` and send the configured health-diagnostics bearer
+token. If that token is not configured, raw JSON is disabled.
 
 Assessments require a locally KEV-affected baseline and an explicit eligible
 newer NPM target. The target is persisted even when it is not in the submitted
@@ -181,7 +182,8 @@ Summary fields are single-line; diagnostic fields may preserve normalized
 newlines. Control characters and bidirectional formatting controls are shown
 as visible escapes, and truncation is indicated explicitly without splitting
 UTF-8 characters. Raw Hipcheck JSON is omitted by default; an explicit
-maintainer/debug request returns only a bounded, inert text preview.
+maintainer/debug request authorized with the health-diagnostics bearer token
+returns only a bounded, inert text preview.
 
 URLs are parsed before display. Credentials are redacted in labels. Only
 absolute, credential-free `https` URLs may become UI links; malformed URLs and

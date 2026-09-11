@@ -348,11 +348,21 @@ impl NvServerApi for RestApi {
         query: Query<AssessmentEvidenceQuery>,
     ) -> Result<HttpResponseOk<AssessmentEvidence>, HttpError> {
         let id = path_params.into_inner().id;
+        let include_raw = query.into_inner().include_raw_hipcheck.unwrap_or(false);
+        if include_raw {
+            raw_hipcheck_evidence_authorization(
+                ctx.context().health_diagnostics_token(),
+                ctx.request
+                    .headers()
+                    .get_all("authorization")
+                    .iter()
+                    .map(|value| value.to_str().ok()),
+            )?;
+        }
         let stored = load_hipcheck_run_by_assessment_id(ctx.context().db(), &id)
             .await
             .map_err(|_| internal_server_error())?
             .ok_or_else(|| HttpError::for_not_found(None, format!("unknown assessment {id}")))?;
-        let include_raw = query.into_inner().include_raw_hipcheck.unwrap_or(false);
         Ok(HttpResponseOk(AssessmentEvidence {
             id,
             affected_purl: stored.run.affected_purl.as_deref().map(summary_text),
@@ -533,6 +543,33 @@ fn health_diagnostics_disabled() -> HttpError {
 fn health_diagnostics_unauthorized() -> HttpError {
     let mut error = HttpError::for_client_error(
         Some("HealthDiagnosticsUnauthorized".to_owned()),
+        ClientErrorStatusCode::UNAUTHORIZED,
+        "unauthorized".to_owned(),
+    );
+    let mut headers = HeaderMap::new();
+    headers.insert(WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+    error.headers = Some(Box::new(headers));
+    error
+}
+
+fn raw_hipcheck_evidence_disabled() -> HttpError {
+    HttpError::for_not_found(None, "raw Hipcheck evidence is disabled".to_owned())
+}
+
+fn raw_hipcheck_evidence_authorization<'a>(
+    configured_token: Option<&SecretString>,
+    authorization_headers: impl IntoIterator<Item = Option<&'a str>>,
+) -> Result<(), HttpError> {
+    match health_diagnostics_authorization(configured_token, authorization_headers) {
+        HealthDiagnosticsAuthorization::Authorized => Ok(()),
+        HealthDiagnosticsAuthorization::Disabled => Err(raw_hipcheck_evidence_disabled()),
+        HealthDiagnosticsAuthorization::Unauthorized => Err(raw_hipcheck_evidence_unauthorized()),
+    }
+}
+
+fn raw_hipcheck_evidence_unauthorized() -> HttpError {
+    let mut error = HttpError::for_client_error(
+        Some("RawHipcheckEvidenceUnauthorized".to_owned()),
         ClientErrorStatusCode::UNAUTHORIZED,
         "unauthorized".to_owned(),
     );
@@ -1572,6 +1609,26 @@ mod tests {
     }
 
     #[test]
+    fn raw_hipcheck_evidence_requires_an_operator_token() {
+        let token = SecretString::from("operator-token");
+
+        assert_eq!(
+            raw_hipcheck_evidence_authorization(None, [])
+                .unwrap_err()
+                .status_code,
+            ClientErrorStatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            raw_hipcheck_evidence_authorization(Some(&token), [])
+                .unwrap_err()
+                .status_code,
+            ClientErrorStatusCode::UNAUTHORIZED
+        );
+        raw_hipcheck_evidence_authorization(Some(&token), [Some("Bearer operator-token")])
+            .expect("matching operator token should authorize raw evidence");
+    }
+
+    #[test]
     fn health_diagnostics_requires_one_matching_bearer_token() {
         let token = SecretString::from("operator-token");
 
@@ -1654,6 +1711,24 @@ mod tests {
         assert_eq!(
             error.error_code.as_deref(),
             Some("HealthDiagnosticsUnauthorized")
+        );
+        assert_eq!(
+            error
+                .headers
+                .as_ref()
+                .and_then(|headers| headers.get(WWW_AUTHENTICATE)),
+            Some(&HeaderValue::from_static("Bearer"))
+        );
+    }
+
+    #[test]
+    fn unauthorized_raw_evidence_response_has_bearer_challenge() {
+        let error = raw_hipcheck_evidence_unauthorized();
+
+        assert_eq!(error.status_code, ClientErrorStatusCode::UNAUTHORIZED);
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("RawHipcheckEvidenceUnauthorized")
         );
         assert_eq!(
             error

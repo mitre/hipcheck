@@ -41,7 +41,7 @@ SeaORM, or Tokio setting at its default unless noted below.
 | Key | Value | Units | Unset behavior |
 | --- | --- | --- | --- |
 | `openapi-dest-path` | Path for writing the OpenAPI description on startup. | Path | No OpenAPI file is written. The local sample writes `openapi/nv-server-openapi.json`; the container sample leaves it unset. |
-| `health-diagnostics-token-file` | File-backed bearer token for operator diagnostics. | Path | Diagnostics are disabled and `GET /health/diagnostics` returns `404 Not Found`. The file must meet the secret-file rules below. |
+| `health-diagnostics-token-file` | File-backed bearer token for operator diagnostics and raw Hipcheck evidence. | Path | Diagnostics and raw evidence are disabled. `GET /health/diagnostics` and raw-evidence requests return `404 Not Found`. The file must meet the secret-file rules below. |
 | `kev-url` | Source URL for the CISA Known Exploited Vulnerabilities catalog. | URL | CISA's published KEV catalog URL. |
 | `kev-refresh-interval` | Delay between recurring KEV catalog sync attempts. | Milliseconds | 3600000 milliseconds. Values must be greater than 0. |
 | `kev-response-body-max-bytes` | Maximum size of a KEV catalog response body. | Bytes | 16777216 bytes (16 MiB). Values must be greater than 0. The limit applies while streaming, even when the response has no `Content-Length`. |
@@ -92,8 +92,9 @@ database-connection-file = "/run/secrets/nv-server/database-url"
 ```
 
 `health-diagnostics-token-file` uses the same one-line and permission rules.
-When configured, clients must send its value as a Bearer token; the value and
-file path are redacted from startup output.
+When configured, clients must send its value as a Bearer token to read operator
+diagnostics or raw Hipcheck evidence; the value and file path are redacted from
+startup output.
 
 On Unix systems, secret files outside `/run/secrets/` must not grant group or
 world permissions. Use mode `0600` or stricter. Docker Compose secrets mounted
