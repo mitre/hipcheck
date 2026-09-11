@@ -10,6 +10,7 @@
 pub mod config;
 pub mod cve;
 pub mod db;
+pub mod display_safety;
 pub mod error;
 pub mod hipcheck;
 pub mod kev;

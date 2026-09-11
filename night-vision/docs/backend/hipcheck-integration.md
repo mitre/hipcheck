@@ -169,6 +169,26 @@ should assume that package metadata, package archives, source repositories,
 Hipcheck plugin output, stdout, stderr, and error messages may contain hostile
 or malformed content.
 
+### Evidence Display Safety
+
+All package metadata, CVE and KEV content, Hipcheck output, plugin errors,
+source URLs, package scripts, and raw JSON are untrusted display data. Night
+Vision must retain raw evidence separately from the values it returns through
+normal API responses or renders in the UI.
+
+Normal assessment responses contain bounded, escaped summaries and diagnostics.
+Summary fields are single-line; diagnostic fields may preserve normalized
+newlines. Control characters and bidirectional formatting controls are shown
+as visible escapes, and truncation is indicated explicitly without splitting
+UTF-8 characters. Raw Hipcheck JSON is omitted by default; an explicit
+maintainer/debug request returns only a bounded, inert text preview.
+
+URLs are parsed before display. Credentials are redacted in labels. Only
+absolute, credential-free `https` URLs may become UI links; malformed URLs and
+all other schemes remain inert text. Frontend code must render evidence with
+text interpolation, never HTML injection, and must use `noopener noreferrer`
+for permitted external links.
+
 The MVP integration should enforce these boundaries:
 
 - Build `hc` command arguments without shell interpolation.

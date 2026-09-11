@@ -29,6 +29,7 @@ use nv_common::{
     db::entities::{
         cve_list_sync_runs::Model as CveListSyncRun, hipcheck_runs, upgrade_assessments,
     },
+    display_safety::{diagnostic_text, raw_json_preview, summary_text, url_label},
     hipcheck::{
         assessment::{execute_queued_assessment, queue_assessment, queue_assessment_with_id},
         storage::load_hipcheck_run_by_assessment_id,
@@ -326,14 +327,17 @@ impl NvServerApi for RestApi {
         Ok(HttpResponseOk(AssessmentStatus {
             id,
             state: stored.run.status,
-            affected_purl: stored.run.affected_purl,
-            target: stored.run.target_purl,
-            source_repository_url: stored.run.source_repository_url,
+            affected_purl: stored.run.affected_purl.map(|value| summary_text(&value)),
+            target: stored.run.target_purl.map(|value| summary_text(&value)),
+            source_repository_url: stored
+                .run
+                .source_repository_url
+                .map(|value| url_label(&value)),
             recommendation: stored.run.policy_recommendation,
             finding_count: stored.findings.len(),
             exit_status: stored.run.exit_status,
             error_kind: stored.run.error_kind,
-            error_message: stored.run.error_message,
+            error_message: stored.run.error_message.map(|value| summary_text(&value)),
             retryable: stored.run.retryable,
         }))
     }
@@ -351,7 +355,7 @@ impl NvServerApi for RestApi {
         let include_raw = query.into_inner().include_raw_hipcheck.unwrap_or(false);
         Ok(HttpResponseOk(AssessmentEvidence {
             id,
-            affected_purl: stored.run.affected_purl.clone(),
+            affected_purl: stored.run.affected_purl.as_deref().map(summary_text),
             diagnostics: assessment_diagnostics(&stored.run),
             checks: stored
                 .checks
@@ -359,7 +363,7 @@ impl NvServerApi for RestApi {
                 .map(|check| AssessmentCheck {
                     state: check.state,
                     effect: check.effect,
-                    summary: check.summary,
+                    summary: summary_text(&check.summary),
                 })
                 .collect(),
             findings: stored
@@ -369,10 +373,13 @@ impl NvServerApi for RestApi {
                     kind: finding.kind,
                     effect: finding.effect,
                     severity: finding.severity,
-                    summary: finding.summary,
+                    summary: summary_text(&finding.summary),
                 })
                 .collect(),
-            raw_hipcheck: include_raw.then_some(stored.run.raw_json).flatten(),
+            raw_hipcheck: include_raw
+                .then_some(stored.run.raw_json)
+                .flatten()
+                .map(|value| raw_json_preview(&value)),
         }))
     }
 
@@ -688,14 +695,14 @@ fn upgrade_validation_error(message: &str) -> HttpError {
 
 fn assessment_diagnostics(run: &hipcheck_runs::Model) -> AssessmentDiagnostics {
     AssessmentDiagnostics {
-        source_repository_url: run.source_repository_url.clone(),
-        stdout: run.stdout.clone(),
+        source_repository_url: run.source_repository_url.as_deref().map(url_label),
+        stdout: run.stdout.as_deref().map(diagnostic_text),
         stdout_truncated: run.stdout_truncated,
-        stderr: run.stderr.clone(),
+        stderr: run.stderr.as_deref().map(diagnostic_text),
         stderr_truncated: run.stderr_truncated,
         exit_status: run.exit_status,
         error_kind: run.error_kind.clone(),
-        error_message: run.error_message.clone(),
+        error_message: run.error_message.as_deref().map(summary_text),
         retryable: run.retryable,
     }
 }
@@ -1958,6 +1965,31 @@ mod tests {
                 .insert("repository".to_owned(), repository);
         }
         packument
+    }
+
+    #[test]
+    fn assessment_diagnostics_escape_hostile_external_content() {
+        let mut run = hipcheck_run();
+        run.source_repository_url = Some("https://user:password@example.com/source".to_owned());
+        run.stdout = Some("first\r\n<script>alert(1)</script>\u{001b}[31m".to_owned());
+        run.stderr = Some("second\u{202e}line".to_owned());
+        run.error_message = Some("bad\nrequest\u{0000}".to_owned());
+
+        let diagnostics = assessment_diagnostics(&run);
+
+        assert_eq!(
+            diagnostics.source_repository_url.as_deref(),
+            Some("https://%3Credacted%3E:%3Credacted%3E@example.com/source")
+        );
+        assert_eq!(
+            diagnostics.stdout.as_deref(),
+            Some("first\n<script>alert(1)</script>\\u{001b}[31m")
+        );
+        assert_eq!(diagnostics.stderr.as_deref(), Some("second\\u{202e}line"));
+        assert_eq!(
+            diagnostics.error_message.as_deref(),
+            Some("bad\\nrequest\\u{0000}")
+        );
     }
 
     fn source(
