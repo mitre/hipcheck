@@ -16,6 +16,7 @@ This is the internal documentation index for the Night Vision project.
 - [Issue Tracker Standards](./project/issue-tracker.md)
 - [Local Development Without Docker](./project/local-development-without-docker.md)
 - [MVP Roadmap](./project/mvp-roadmap.md)
+- [Open-Source Transition Guide](./project/oss-transition.md)
 
 ## System Info
 
