@@ -1,2 +1,6 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<svelte:head>
+	<title>Night Vision</title>
+</svelte:head>
+
+<h1>Night Vision</h1>
+<p>Upgrade-safety workflows will appear here as they are implemented.</p>

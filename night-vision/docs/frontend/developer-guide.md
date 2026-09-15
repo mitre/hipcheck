@@ -84,11 +84,61 @@ The local backend sample configuration binds `nv-server` to
 `127.0.0.1:8080`. The local Docker Compose override also publishes the backend
 on `127.0.0.1:8080` and the frontend on `127.0.0.1:3000`.
 
-The repository does not yet contain generated frontend API client code. Until
-that exists, keep API integration code small, typed, and isolated under
-`frontend/src/lib/` instead of spreading fetch calls throughout route
-components. When generated client code is added, document the generation
-command, source schema, output path, and review expectations in this guide.
+The repository contains generated frontend API code at
+`frontend/src/lib/api/generated/`. It is generated from the committed backend
+schema at `backend/openapi/nv-server-openapi.json` using
+`frontend/openapi-ts.config.js` and `@hey-api/openapi-ts`.
+
+Generated files are committed so a fresh clone can type-check without running
+the backend. Do not edit them manually. When the backend schema changes, run
+the following from `frontend/`, review the generated diff, and commit it with
+the backend change:
+
+```sh
+pnpm run generate:api
+pnpm run check:generated
+```
+
+### Supported API Boundary
+
+Routes must not create generated clients, choose API base URLs, or make raw
+`fetch` calls to Night Vision endpoints. Server-side routes import the typed
+helpers from `frontend/src/lib/server/night-vision-api.ts` instead. That module
+is the supported application-facing boundary for package-source and
+upgrade-assessment submissions and status reads.
+
+`frontend/src/lib/server/api-client.ts` is the single configuration path for
+the generated client. It reads `API_BASE_URL` from private server environment
+configuration, defaults to `http://127.0.0.1:8080` for local development, and
+accepts only absolute HTTP(S) URLs. Do not import this server-only module into
+browser code.
+
+The boundary returns either typed generated OpenAPI response data or a stable
+`ApiError`. UI callers may render its fixed `message` and use `kind` and
+`retryable` to decide presentation. They must not render raw API error bodies,
+exception strings, or backend diagnostics.
+
+### Polling Asynchronous Workflows
+
+Package-source and upgrade-assessment status endpoints are asynchronous. Use
+`pollUntilTerminal` from `frontend/src/lib/api/polling.ts` with the matching
+terminal-state helper exported by `night-vision-api.ts`. It requires a maximum
+attempt count and interval, stops as soon as a terminal status is observed,
+and returns a `timed-out` result at its bound.
+
+Routes or components that start client-visible polling own an
+`AbortController` and must call `abort()` during navigation or component
+teardown. Pass its `signal` to the polling utility so it clears its pending
+timer and returns `cancelled`; never leave a `setInterval` running after a
+route is abandoned.
+
+### Route Ownership
+
+Route files coordinate form input, navigation, and view data only. Keep
+generated-client configuration, endpoint requests, error normalization, and
+polling mechanics in the shared boundary modules. Keep a helper with a route
+only when it is genuinely specific to that route; move anything used by more
+than one route to `frontend/src/lib/`.
 
 Do not duplicate backend development guidance here. Frontend docs should point
 to backend docs for server setup, API behavior, status codes, and operational
@@ -130,6 +180,8 @@ between `frontend/package.json`, `.flox/env/manifest.toml`, and
 Run focused frontend checks from `frontend/` before opening an MR:
 
 ```sh
+pnpm run check:generated
+pnpm run test
 pnpm run check
 pnpm run build
 ```
@@ -141,8 +193,11 @@ pnpm run check:watch
 pnpm run preview
 ```
 
-`pnpm run check` runs `svelte-kit sync` and `svelte-check` with the project
-TypeScript config. `pnpm run build` creates the production SvelteKit build.
+`pnpm run check:generated` regenerates the client and fails if that would
+change committed generated files. `pnpm run test` exercises API-error and
+polling behavior with Node's built-in test runner. `pnpm run check` runs
+`svelte-kit sync` and `svelte-check` with the project TypeScript config.
+`pnpm run build` creates the production SvelteKit build.
 
 If dependencies are missing or stale, run `pnpm install` first. Keep
 `pnpm-lock.yaml` changes only when dependency inputs actually changed.
