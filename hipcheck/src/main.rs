@@ -114,8 +114,8 @@ fn main() -> ExitCode {
 					ExitCode::FAILURE
 				});
 		}
-		Some(FullCommands::ExplainTargetTriple) => return cmd_explain_target_triple(),
-		Some(FullCommands::ExplainSemVer(req)) => return cmd_explain_semver(&req),
+		Some(FullCommands::DebugTargetTriple) => return cmd_debug_target_triple(),
+		Some(FullCommands::DebugSemVer(req)) => return cmd_debug_semver(&req),
 		None => Shell::print_error(&hc_error!("missing subcommand"), Format::Human),
 	};
 
@@ -713,7 +713,7 @@ fn updater_command(command_name: &str, args: &UpdateArgs) -> Command {
 	command
 }
 
-fn cmd_explain_target_triple() -> ExitCode {
+fn cmd_debug_target_triple() -> ExitCode {
 	let current_arch = get_current_arch();
 
 	match &current_arch {
@@ -744,7 +744,7 @@ fn cmd_explain_target_triple() -> ExitCode {
 	ExitCode::SUCCESS
 }
 
-fn cmd_explain_semver(req: &str) -> ExitCode {
+fn cmd_debug_semver(req: &str) -> ExitCode {
 	// We do a custom check for a raw version to prepend '=' for backwards
 	// compatibility
 	let version = match plugin::validate_version_req(req) {

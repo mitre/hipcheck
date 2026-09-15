@@ -401,8 +401,8 @@ pub enum FullCommands {
 	Plugin(PluginArgs),
 	PrintCache,
 	Scoring,
-	ExplainTargetTriple,
-	ExplainSemVer(String),
+	DebugTargetTriple,
+	DebugSemVer(String),
 }
 
 impl From<&Commands> for FullCommands {
@@ -424,9 +424,9 @@ impl From<&Commands> for FullCommands {
 				}
 			},
 			Commands::Plugin(args) => FullCommands::Plugin(args.clone()),
-			Commands::Explain(args) => match &args.subcmd {
-				ExplainSubcmds::TargetTriple => FullCommands::ExplainTargetTriple,
-				ExplainSubcmds::Semver(s) => FullCommands::ExplainSemVer(s.version_req.clone()),
+			Commands::Debug(args) => match &args.subcmd {
+				DebugSubcmds::TargetTriple => FullCommands::DebugTargetTriple,
+				DebugSubcmds::Semver(s) => FullCommands::DebugSemVer(s.version_req.clone()),
 			},
 		}
 	}
@@ -450,7 +450,8 @@ pub enum Commands {
 	Cache(CacheArgs),
 	Plugin(PluginArgs),
 	/// View setup information to help debug
-	Explain(ExplainArgs),
+	#[clap(hide = true)]
+	Debug(DebugArgs),
 }
 
 // If no subcommand matched, default to use of '-t <TYPE> <TARGET' syntax. In
@@ -1293,13 +1294,13 @@ impl Format {
 // Help subcommand
 #[derive(Debug, Clone, clap::Parser)]
 #[command(arg_required_else_help = true)]
-pub struct ExplainArgs {
+pub struct DebugArgs {
 	#[clap(subcommand)]
-	pub subcmd: ExplainSubcmds,
+	pub subcmd: DebugSubcmds,
 }
 #[derive(Debug, Clone, clap::Subcommand)]
 #[command(arg_required_else_help = true)]
-pub enum ExplainSubcmds {
+pub enum DebugSubcmds {
 	/// Show the current and known architecture targets
 	TargetTriple,
 	/// Explain a given SemVer version requirement string
