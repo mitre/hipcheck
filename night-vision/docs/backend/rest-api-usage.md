@@ -277,8 +277,19 @@ Night Vision validates the candidate against locally known KEV data, runs
 Hipcheck, and uses normalized Hipcheck findings as supply-chain evidence for
 the verdict. Hipcheck's `PASS` or `INVESTIGATE` policy recommendation is shown
 as context; it does not replace vulnerability or upgrade-domain evidence.
-Requests without a candidate version remain `unknown` until candidate
-discovery is connected to this lifecycle.
+When `candidateVersion` is omitted, Night Vision fetches the NPM packument and
+evaluates every newer, published, non-prerelease and non-deprecated version in
+ascending SemVer order. It records each candidate's patch/minor/major distance,
+SemVer compatibility, verdict, and KEV-evidence caveat in the completed report.
+Candidates that still match a locally known active KEV vulnerability are
+`avoid`; candidates without such a match are `recommended` unless SemVer
+provides no compatibility guarantee. Major candidates, and candidates in the
+`0.y.z` or prerelease compatibility domain, are at least `caution` because
+Night Vision cannot establish application compatibility. Blocking KEV evidence
+continues to produce `avoid`. Pre-release and deprecated releases are excluded
+from automatic discovery. An explicit published newer patch, minor, or major
+version is preserved as the single assessment target and evaluated with the
+same compatibility verdict rules plus Hipcheck evidence.
 
 When Hipcheck analysis is available, the shipped MVP policy provides only the
 `mitre/binary` source-repository check. NPM release, artifact, maintainer,
@@ -297,16 +308,21 @@ or caveats; a missing finding does not mean an unavailable check passed.
       "ecosystem": "npm",
       "packageName": "example-package",
       "currentVersion": "1.2.3",
-      "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" },
-      "candidateVersion": "1.2.7"
+      "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" }
     },
-    "verdict": "unknown",
-    "candidateVersions": [{ "version": "1.2.7", "verdict": "unknown", "caveats": [] }],
-    "vulnerabilityContext": { "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" }, "kevLinked": null },
+    "verdict": "recommended",
+    "candidateVersions": [{
+      "version": "1.2.7",
+      "upgradeDistance": "patch",
+      "apiCompatibility": "compatible",
+      "verdict": "recommended",
+      "caveats": ["Candidate has no locally known active KEV vulnerability."]
+    }],
+    "vulnerabilityContext": { "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" }, "kevLinked": true },
     "dependencyDelta": { "added": [], "removed": [], "changed": [] },
     "supplyChainFindings": [],
-    "confidence": "unknown",
-    "caveats": ["Analysis sources have not yet been connected."],
+    "confidence": "medium",
+    "caveats": ["Candidates are ordered by ascending SemVer version. Pre-release and deprecated releases are excluded from automatic discovery."],
     "evidenceLinks": []
   }
 }

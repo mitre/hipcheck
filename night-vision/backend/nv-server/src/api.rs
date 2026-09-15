@@ -36,8 +36,9 @@ use nv_common::{
     },
     npm::{
         candidates::{
-            ApiCompatibility, CandidateStatus, UpgradeDistance, api_compatibility,
-            upgrade_distance, validate_explicit_candidate,
+            ApiCompatibility, CandidateStatus, UpgradeCandidate, UpgradeDistance,
+            api_compatibility, discover_upgrade_candidates, upgrade_distance,
+            validate_explicit_candidate,
         },
         elaboration::{
             NpmRegistryClient, PackageVersion, PackumentProvider as _, elaborate,
@@ -414,7 +415,7 @@ impl NvServerApi for RestApi {
                 })
             })
             .transpose()?;
-        let candidate = match input.candidate_version.as_deref() {
+        let work = match input.candidate_version.as_deref() {
             Some(candidate_version) => {
                 let package_name = NpmPackageName::parse(input.package_name.clone())
                     .map_err(invalid_upgrade_request)?;
@@ -424,15 +425,18 @@ impl NvServerApi for RestApi {
                 let target_purl =
                     validate_and_persist_upgrade_target(context, &affected_purl, &target_purl)
                         .await?;
-                Some((affected_purl, target_purl))
+                UpgradeAssessmentWork::Explicit((affected_purl, target_purl))
             }
-            None => None,
+            None => UpgradeAssessmentWork::Discovered(
+                discover_assessment_candidates(context, &input).await?,
+            ),
         };
         create_upgrade_assessment(context.db(), id, &input).await?;
-        let queued = match candidate.as_ref() {
-            Some((affected_purl, target_purl)) => {
-                match queue_assessment_with_id(context.db(), id, affected_purl, target_purl).await {
-                    Ok(queued) => Some(queued),
+        let work = match work {
+            UpgradeAssessmentWork::Explicit((affected_purl, target_purl)) => {
+                match queue_assessment_with_id(context.db(), id, &affected_purl, &target_purl).await
+                {
+                    Ok(queued) => UpgradeAssessmentWork::Queued(queued),
                     Err(error) => {
                         let response_error = assessment_http_error(error);
                         let _ = mark_upgrade_assessment_failed(
@@ -445,7 +449,12 @@ impl NvServerApi for RestApi {
                     }
                 }
             }
-            None => None,
+            UpgradeAssessmentWork::Discovered(candidates) => {
+                UpgradeAssessmentWork::Discovered(candidates)
+            }
+            UpgradeAssessmentWork::Queued(_) => {
+                unreachable!("only explicit input queues a Hipcheck assessment")
+            }
         };
 
         // The row is inserted before spawning work.  Therefore a client can always
@@ -453,8 +462,8 @@ impl NvServerApi for RestApi {
         let db = context.db().clone();
         let runner = context.hipcheck_runner_config();
         tokio::spawn(async move {
-            let result = match queued {
-                Some(queued) => {
+            let result = match work {
+                UpgradeAssessmentWork::Queued(queued) => {
                     let _admission = admission;
                     match execute_queued_assessment(&db, &queued, &runner).await {
                         Ok(()) => {
@@ -469,9 +478,11 @@ impl NvServerApi for RestApi {
                         Err(error) => Err(HttpError::for_internal_error(error.to_string())),
                     }
                 }
-                None => {
-                    complete_upgrade_assessment(&db, id, input, UpgradeAssessmentVerdict::Unknown)
-                        .await
+                UpgradeAssessmentWork::Discovered(candidates) => {
+                    complete_discovered_upgrade_assessment(&db, id, input, candidates).await
+                }
+                UpgradeAssessmentWork::Explicit(_) => {
+                    unreachable!("explicit input must be queued before work starts")
                 }
             };
             if let Err(error) = result {
@@ -728,6 +739,101 @@ fn upgrade_validation_error(message: &str) -> HttpError {
         Some("InvalidUpgradeAssessment".to_owned()),
         message.to_owned(),
     )
+}
+
+/// Work selected for an upgrade assessment after its request has been validated.
+///
+/// Explicit candidates retain the existing Hipcheck workflow. Discovery has no
+/// single target to hand to Hipcheck, so it evaluates every usable release
+/// against the locally ingested KEV data and persists that complete result.
+enum UpgradeAssessmentWork {
+    Explicit((String, String)),
+    Queued(nv_common::hipcheck::assessment::QueuedAssessment),
+    Discovered(Vec<DiscoveredAssessmentCandidate>),
+}
+
+/// A registry candidate together with the vulnerability evidence used to
+/// assign its initial verdict.
+#[derive(Debug)]
+struct DiscoveredAssessmentCandidate {
+    candidate: UpgradeCandidate,
+    base_verdict: UpgradeAssessmentVerdict,
+    caveats: Vec<String>,
+}
+
+/// Discover every usable release newer than the input version and evaluate its
+/// locally known KEV status. Pre-release and deprecated releases are omitted:
+/// they remain visible to the discovery library as excluded candidates, but
+/// are not applicable automatic upgrade targets.
+async fn discover_assessment_candidates(
+    context: &ApiCtx,
+    input: &UpgradeAssessmentInput,
+) -> Result<Vec<DiscoveredAssessmentCandidate>, HttpError> {
+    let package_name =
+        NpmPackageName::parse(input.package_name.clone()).map_err(invalid_upgrade_request)?;
+    let affected_purl = PackageVersion::from_npm(&package_name, &input.current_version).purl();
+    let affected = NpmPackagePurl::parse(&affected_purl).map_err(invalid_upgrade_request)?;
+    let baseline_matches = kev_affected_npm_package_version(
+        context.db(),
+        reachable_package(&affected, &affected_purl),
+    )
+    .await
+    .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+    if !baseline_matches
+        .iter()
+        .any(|matched| matched.status == KevNpmMatchStatus::Affected)
+    {
+        return Err(upgrade_validation_error(
+            "affected PURL has no locally known active KEV match",
+        ));
+    }
+
+    let client = NpmRegistryClient::new(
+        context.npm_registry_url().clone(),
+        context.package_elaboration_max_packument_bytes(),
+        context.package_elaboration_limits().request_timeout,
+    )
+    .map_err(|_| upgrade_validation_error("invalid NPM registry configuration"))?;
+    let packument = client.fetch(&package_name).await.map_err(|error| {
+        upgrade_validation_error(&format!("failed to fetch NPM package metadata: {error}"))
+    })?;
+    let candidates = discover_upgrade_candidates(&packument, &input.current_version)
+        .map_err(|error| upgrade_validation_error(&error.to_string()))?;
+
+    let mut evaluated = Vec::new();
+    for candidate in candidates {
+        if !matches!(candidate.status, CandidateStatus::Included) {
+            continue;
+        }
+        let target_purl = PackageVersion::from_npm(&package_name, &candidate.version).purl();
+        let target = NpmPackagePurl::parse(&target_purl).map_err(invalid_upgrade_request)?;
+        let target_matches = kev_affected_npm_package_version(
+            context.db(),
+            reachable_package(&target, &target_purl),
+        )
+        .await
+        .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
+        let affected = target_matches
+            .iter()
+            .any(|matched| matched.status == KevNpmMatchStatus::Affected);
+        let (base_verdict, caveat) = if affected {
+            (
+                UpgradeAssessmentVerdict::Avoid,
+                "Candidate matches a locally known active KEV vulnerability.".to_owned(),
+            )
+        } else {
+            (
+                UpgradeAssessmentVerdict::Recommended,
+                "Candidate has no locally known active KEV vulnerability.".to_owned(),
+            )
+        };
+        evaluated.push(DiscoveredAssessmentCandidate {
+            candidate,
+            base_verdict,
+            caveats: vec![caveat],
+        });
+    }
+    Ok(evaluated)
 }
 
 fn assessment_diagnostics(run: &hipcheck_runs::Model) -> AssessmentDiagnostics {
@@ -1155,6 +1261,23 @@ async fn complete_upgrade_assessment(
             None => initial_assessment_report(input),
         }
     };
+    persist_completed_upgrade_report(db, id, report).await
+}
+
+async fn complete_discovered_upgrade_assessment(
+    db: &DatabaseConnection,
+    id: Uuid,
+    input: UpgradeAssessmentInput,
+    candidates: Vec<DiscoveredAssessmentCandidate>,
+) -> Result<(), HttpError> {
+    persist_completed_upgrade_report(db, id, discovered_assessment_report(input, candidates)).await
+}
+
+async fn persist_completed_upgrade_report(
+    db: &DatabaseConnection,
+    id: Uuid,
+    report: UpgradeAssessmentReport,
+) -> Result<(), HttpError> {
     let report = serde_json::to_value(report).map_err(internal_error)?;
     upgrade_assessments::ActiveModel {
         id: Set(id.to_string()),
@@ -1190,6 +1313,96 @@ async fn mark_upgrade_assessment_failed(
 
 fn initial_assessment_report(input: UpgradeAssessmentInput) -> UpgradeAssessmentReport {
     assessment_report(input, UpgradeAssessmentVerdict::Unknown, Vec::new(), None)
+}
+
+fn discovered_assessment_report(
+    input: UpgradeAssessmentInput,
+    candidates: Vec<DiscoveredAssessmentCandidate>,
+) -> UpgradeAssessmentReport {
+    let candidate_versions: Vec<_> = candidates
+        .iter()
+        .map(discovered_assessment_candidate)
+        .collect();
+    let verdict = if candidate_versions
+        .iter()
+        .any(|candidate| matches!(candidate.verdict, UpgradeAssessmentVerdict::Recommended))
+    {
+        UpgradeAssessmentVerdict::Recommended
+    } else if candidate_versions
+        .iter()
+        .any(|candidate| matches!(candidate.verdict, UpgradeAssessmentVerdict::Caution))
+    {
+        UpgradeAssessmentVerdict::Caution
+    } else if candidate_versions
+        .iter()
+        .any(|candidate| matches!(candidate.verdict, UpgradeAssessmentVerdict::Avoid))
+    {
+        UpgradeAssessmentVerdict::Avoid
+    } else {
+        UpgradeAssessmentVerdict::Unknown
+    };
+    let mut caveats = vec![
+        "Candidates are ordered by ascending SemVer version. Pre-release and deprecated releases are excluded from automatic discovery."
+            .to_owned(),
+        "Candidate verdicts use locally ingested KEV matches; supply-chain analysis is only available for an explicitly requested candidate."
+            .to_owned(),
+    ];
+    if candidate_versions.is_empty() {
+        caveats.push("No applicable newer published NPM candidate was discovered.".to_owned());
+    }
+    UpgradeAssessmentReport {
+        vulnerability_context: UpgradeAssessmentVulnerabilityContext {
+            trigger: input.trigger.clone(),
+            kev_linked: Some(true),
+        },
+        input,
+        verdict: verdict.clone(),
+        candidate_versions,
+        dependency_delta: UpgradeAssessmentDependencyDelta {
+            added: Vec::new(),
+            removed: Vec::new(),
+            changed: Vec::new(),
+        },
+        supply_chain_findings: Vec::new(),
+        confidence: assessment_confidence(&verdict),
+        caveats,
+        evidence_links: Vec::new(),
+    }
+}
+
+fn discovered_assessment_candidate(
+    discovered: &DiscoveredAssessmentCandidate,
+) -> UpgradeAssessmentCandidate {
+    let candidate = &discovered.candidate;
+    let upgrade_distance = assessment_upgrade_distance(candidate.upgrade_distance);
+    let api_compatibility = assessment_api_compatibility(candidate.api_compatibility);
+    let requires_compatibility_review =
+        matches!(upgrade_distance, UpgradeAssessmentUpgradeDistance::Major)
+            || matches!(
+                api_compatibility,
+                UpgradeAssessmentApiCompatibility::NoGuarantee
+            );
+    let mut caveats = discovered.caveats.clone();
+    if requires_compatibility_review {
+        caveats.push(
+            "This upgrade requires application compatibility review; Night Vision cannot establish application compatibility."
+                .to_owned(),
+        );
+    }
+    let verdict = if matches!(discovered.base_verdict, UpgradeAssessmentVerdict::Avoid) {
+        UpgradeAssessmentVerdict::Avoid
+    } else if requires_compatibility_review {
+        UpgradeAssessmentVerdict::Caution
+    } else {
+        discovered.base_verdict.clone()
+    };
+    UpgradeAssessmentCandidate {
+        version: candidate.version.to_string(),
+        upgrade_distance,
+        api_compatibility,
+        verdict,
+        caveats,
+    }
 }
 
 fn report_from_hipcheck(
@@ -2105,6 +2318,113 @@ mod tests {
             summary: summary.to_owned(),
             evidence_links: vec!["/assessments/example/evidence".to_owned()],
         }
+    }
+
+    fn discovered_candidate(
+        version: &str,
+        distance: UpgradeDistance,
+        compatibility: ApiCompatibility,
+        verdict: UpgradeAssessmentVerdict,
+    ) -> DiscoveredAssessmentCandidate {
+        DiscoveredAssessmentCandidate {
+            candidate: UpgradeCandidate {
+                name: NpmPackageName::parse("example-package".to_owned()).unwrap(),
+                version: semver::Version::parse(version).unwrap(),
+                purl: format!("pkg:npm/example-package@{version}"),
+                published_at: None,
+                upgrade_distance: distance,
+                api_compatibility: compatibility,
+                status: CandidateStatus::Included,
+            },
+            base_verdict: verdict,
+            caveats: vec!["candidate KEV evidence".to_owned()],
+        }
+    }
+
+    #[test]
+    fn discovered_report_persists_patch_minor_and_major_candidates_in_order() {
+        let report = discovered_assessment_report(
+            UpgradeAssessmentInput {
+                candidate_version: None,
+                ..input()
+            },
+            vec![
+                discovered_candidate(
+                    "1.2.4",
+                    UpgradeDistance::Patch,
+                    ApiCompatibility::Compatible,
+                    UpgradeAssessmentVerdict::Recommended,
+                ),
+                discovered_candidate(
+                    "1.3.0",
+                    UpgradeDistance::Minor,
+                    ApiCompatibility::Compatible,
+                    UpgradeAssessmentVerdict::Recommended,
+                ),
+                discovered_candidate(
+                    "2.0.0",
+                    UpgradeDistance::Major,
+                    ApiCompatibility::Incompatible,
+                    UpgradeAssessmentVerdict::Recommended,
+                ),
+            ],
+        );
+
+        assert_eq!(
+            report
+                .candidate_versions
+                .iter()
+                .map(|candidate| candidate.version.as_str())
+                .collect::<Vec<_>>(),
+            ["1.2.4", "1.3.0", "2.0.0"]
+        );
+        assert_eq!(
+            report.candidate_versions[0].upgrade_distance,
+            UpgradeAssessmentUpgradeDistance::Patch
+        );
+        assert_eq!(
+            report.candidate_versions[1].upgrade_distance,
+            UpgradeAssessmentUpgradeDistance::Minor
+        );
+        assert_eq!(
+            report.candidate_versions[2].upgrade_distance,
+            UpgradeAssessmentUpgradeDistance::Major
+        );
+        assert_eq!(
+            report.candidate_versions[2].api_compatibility,
+            UpgradeAssessmentApiCompatibility::Incompatible
+        );
+        assert!(matches!(
+            report.candidate_versions[2].verdict,
+            UpgradeAssessmentVerdict::Caution
+        ));
+        assert!(
+            report.candidate_versions[2]
+                .caveats
+                .iter()
+                .any(|caveat| caveat.contains("compatibility review"))
+        );
+    }
+
+    #[test]
+    fn discovered_major_with_blocking_evidence_remains_avoid() {
+        let report = discovered_assessment_report(
+            UpgradeAssessmentInput {
+                candidate_version: None,
+                ..input()
+            },
+            vec![discovered_candidate(
+                "2.0.0",
+                UpgradeDistance::Major,
+                ApiCompatibility::Incompatible,
+                UpgradeAssessmentVerdict::Avoid,
+            )],
+        );
+
+        assert!(matches!(
+            report.candidate_versions[0].verdict,
+            UpgradeAssessmentVerdict::Avoid
+        ));
     }
 
     #[test]

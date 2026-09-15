@@ -657,6 +657,31 @@ mod tests {
     }
 
     #[test]
+    fn explicit_validation_preserves_newer_patch_minor_and_major_versions() {
+        let packument = packument(
+            "example",
+            vec![
+                version_entry("1.2.3", json!({})),
+                version_entry("1.2.4", json!({})),
+                version_entry("1.3.0", json!({})),
+                version_entry("2.0.0", json!({})),
+            ],
+        );
+
+        for (version, distance) in [
+            ("1.2.4", UpgradeDistance::Patch),
+            ("1.3.0", UpgradeDistance::Minor),
+            ("2.0.0", UpgradeDistance::Major),
+        ] {
+            let candidate =
+                validate_explicit_candidate(&packument, "example", "1.2.3", version).unwrap();
+
+            assert_eq!(candidate.version, Version::parse(version).unwrap());
+            assert_eq!(candidate.upgrade_distance, distance);
+        }
+    }
+
+    #[test]
     fn explicit_validation_rejects_same_or_older_versions() {
         let packument = packument(
             "example",
