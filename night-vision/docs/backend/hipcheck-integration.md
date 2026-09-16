@@ -120,6 +120,16 @@ is dispatched, and finishes as `completed` or `failed`. Every terminal attempt
 retains bounded stdout and stderr. Raw Hipcheck JSON is never returned by
 default.
 
+On every `nv-server` startup, before it accepts requests, Night Vision marks
+any persisted `queued` or `running` assessment as `failed`. These records have
+`error_kind` `server-restart`, the message "assessment was interrupted because
+the Night Vision server restarted", and `retryable: true`. This is an atomic
+compare-and-update: `completed` and already `failed` records are never changed,
+and repeating startup reconciliation is safe. Night Vision does not rerun the
+interrupted Hipcheck process automatically. API clients should treat this
+retryable terminal failure as a prompt to submit a new assessment; operators
+should expect the count of reconciled assessments in the server startup log.
+
 `nvdb assessment analyze <AFFECTED-PURL> <TARGET-PURL>` waits synchronously. `POST /assessments`
 returns `202` with an assessment ID and runs in the background; poll
 `GET /assessments/{id}`. Normalized evidence is available from

@@ -6,13 +6,19 @@ use crate::db::entities::{
 use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, ConnectionTrait, DbErr,
     EntityTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _, TransactionSession as _,
-    TransactionTrait,
+    TransactionTrait, sea_query::Expr,
 };
 use serde_json::json;
 use uuid::Uuid;
 
 /// Maximum bytes retained for each process diagnostic or raw report payload.
 pub const MAX_STORED_HIPCHECK_OUTPUT_BYTES: usize = 64 * 1024;
+
+/// Stable error reported when a server restart interrupts an in-process assessment.
+pub const ASSESSMENT_INTERRUPTED_ERROR_KIND: &str = "server-restart";
+/// Caller-safe explanation accompanying [`ASSESSMENT_INTERRUPTED_ERROR_KIND`].
+pub const ASSESSMENT_INTERRUPTED_ERROR_MESSAGE: &str =
+    "assessment was interrupted because the Night Vision server restarted";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HipcheckExecutionDiagnostics {
@@ -77,15 +83,14 @@ pub async fn create_queued_hipcheck_run<C: ConnectionTrait>(
 pub async fn mark_hipcheck_run_running<C: ConnectionTrait>(
     db: &C,
     run_id: i32,
-) -> Result<(), DbErr> {
-    hipcheck_runs::ActiveModel {
-        id: Set(run_id),
-        status: Set("running".to_owned()),
-        ..Default::default()
-    }
-    .update(db)
-    .await
-    .map(|_| ())
+) -> Result<bool, DbErr> {
+    hipcheck_runs::Entity::update_many()
+        .col_expr(hipcheck_runs::Column::Status, Expr::value("running"))
+        .filter(hipcheck_runs::Column::Id.eq(run_id))
+        .filter(hipcheck_runs::Column::Status.eq("queued"))
+        .exec(db)
+        .await
+        .map(|result| result.rows_affected == 1)
 }
 
 /// Record a terminal failure while preserving bounded diagnostics.
@@ -94,7 +99,7 @@ pub async fn fail_hipcheck_run<C: ConnectionTrait>(
     run_id: i32,
     diagnostics: &HipcheckExecutionDiagnostics,
     raw_json: Option<&str>,
-) -> Result<(), DbErr> {
+) -> Result<bool, DbErr> {
     let (stdout, stdout_truncated) = bound(&diagnostics.stdout);
     let (stderr, stderr_truncated) = bound(&diagnostics.stderr);
     let (raw_json, raw_json_truncated, raw_json_bytes) =
@@ -106,28 +111,89 @@ pub async fn fail_hipcheck_run<C: ConnectionTrait>(
                 i32::try_from(value.len()).unwrap_or(i32::MAX),
             )
         });
-    hipcheck_runs::ActiveModel {
-        id: Set(run_id),
-        status: Set("failed".to_owned()),
-        raw_json: Set(raw_json),
-        raw_json_bytes: Set(raw_json_bytes),
-        raw_json_truncated: Set(raw_json_truncated),
-        stdout: Set(Some(stdout)),
-        stdout_truncated: Set(stdout_truncated),
-        stderr: Set(Some(stderr)),
-        stderr_truncated: Set(stderr_truncated),
-        exit_status: Set(diagnostics.exit_status),
-        error_kind: Set(diagnostics.error_kind.clone()),
-        error_message: Set(diagnostics
-            .error_message
-            .as_deref()
-            .map(|value| bound(value).0)),
-        retryable: Set(diagnostics.retryable),
-        ..Default::default()
-    }
-    .update(db)
-    .await
-    .map(|_| ())
+    hipcheck_runs::Entity::update_many()
+        .col_expr(hipcheck_runs::Column::Status, Expr::value("failed"))
+        .col_expr(hipcheck_runs::Column::RawJson, Expr::value(raw_json))
+        .col_expr(
+            hipcheck_runs::Column::RawJsonBytes,
+            Expr::value(raw_json_bytes),
+        )
+        .col_expr(
+            hipcheck_runs::Column::RawJsonTruncated,
+            Expr::value(raw_json_truncated),
+        )
+        .col_expr(hipcheck_runs::Column::Stdout, Expr::value(Some(stdout)))
+        .col_expr(
+            hipcheck_runs::Column::StdoutTruncated,
+            Expr::value(stdout_truncated),
+        )
+        .col_expr(hipcheck_runs::Column::Stderr, Expr::value(Some(stderr)))
+        .col_expr(
+            hipcheck_runs::Column::StderrTruncated,
+            Expr::value(stderr_truncated),
+        )
+        .col_expr(
+            hipcheck_runs::Column::ExitStatus,
+            Expr::value(diagnostics.exit_status),
+        )
+        .col_expr(
+            hipcheck_runs::Column::ErrorKind,
+            Expr::value(diagnostics.error_kind.clone()),
+        )
+        .col_expr(
+            hipcheck_runs::Column::ErrorMessage,
+            Expr::value(
+                diagnostics
+                    .error_message
+                    .as_deref()
+                    .map(|value| bound(value).0),
+            ),
+        )
+        .col_expr(
+            hipcheck_runs::Column::Retryable,
+            Expr::value(diagnostics.retryable),
+        )
+        .filter(hipcheck_runs::Column::Id.eq(run_id))
+        .filter(hipcheck_runs::Column::Status.eq("running"))
+        .exec(db)
+        .await
+        .map(|result| result.rows_affected == 1)
+}
+
+/// Fail unfinished assessments left behind by a server that exited.
+///
+/// This is a single compare-and-update operation. It only claims `queued` or
+/// `running` rows, so it is idempotent and cannot replace a terminal result.
+pub async fn reconcile_abandoned_hipcheck_runs<C: ConnectionTrait>(db: &C) -> Result<u64, DbErr> {
+    hipcheck_runs::Entity::update_many()
+        .col_expr(hipcheck_runs::Column::Status, Expr::value("failed"))
+        .col_expr(hipcheck_runs::Column::RawJson, Expr::value(None::<String>))
+        .col_expr(hipcheck_runs::Column::RawJsonBytes, Expr::value(0))
+        .col_expr(hipcheck_runs::Column::RawJsonTruncated, Expr::value(false))
+        .col_expr(
+            hipcheck_runs::Column::Stdout,
+            Expr::value(Some(String::new())),
+        )
+        .col_expr(hipcheck_runs::Column::StdoutTruncated, Expr::value(false))
+        .col_expr(
+            hipcheck_runs::Column::Stderr,
+            Expr::value(Some(String::new())),
+        )
+        .col_expr(hipcheck_runs::Column::StderrTruncated, Expr::value(false))
+        .col_expr(hipcheck_runs::Column::ExitStatus, Expr::value(None::<i32>))
+        .col_expr(
+            hipcheck_runs::Column::ErrorKind,
+            Expr::value(ASSESSMENT_INTERRUPTED_ERROR_KIND),
+        )
+        .col_expr(
+            hipcheck_runs::Column::ErrorMessage,
+            Expr::value(ASSESSMENT_INTERRUPTED_ERROR_MESSAGE),
+        )
+        .col_expr(hipcheck_runs::Column::Retryable, Expr::value(true))
+        .filter(hipcheck_runs::Column::Status.is_in(["queued", "running"]))
+        .exec(db)
+        .await
+        .map(|result| result.rows_affected)
 }
 
 /// Complete an existing run and add normalized evidence atomically.
@@ -137,44 +203,101 @@ pub async fn complete_hipcheck_run<C: ConnectionTrait + TransactionTrait>(
     raw_json: &str,
     report: &HipcheckReport,
     diagnostics: &HipcheckExecutionDiagnostics,
-) -> Result<(), DbErr> {
+) -> Result<bool, DbErr> {
     let transaction = db.begin().await?;
     let raw_json_bytes = i32::try_from(raw_json.len()).unwrap_or(i32::MAX);
     let (raw_json, raw_json_truncated) = bound(raw_json);
     let (stdout, stdout_truncated) = bound(&diagnostics.stdout);
     let (stderr, stderr_truncated) = bound(&diagnostics.stderr);
-    hipcheck_runs::ActiveModel {
-        id: Set(run_id),
-        status: Set("completed".to_owned()),
-        raw_json: Set(Some(raw_json)),
-        raw_json_bytes: Set(raw_json_bytes),
-        raw_json_truncated: Set(raw_json_truncated),
-        stdout: Set(Some(stdout)),
-        stdout_truncated: Set(stdout_truncated),
-        stderr: Set(Some(stderr)),
-        stderr_truncated: Set(stderr_truncated),
-        exit_status: Set(diagnostics.exit_status),
-        error_kind: Set(None),
-        error_message: Set(None),
-        retryable: Set(Some(false)),
-        schema_version: Set(Some(report.schema_version.clone())),
-        hipcheck_version: Set(Some(report.hipcheck.version.clone())),
-        hipcheck_commit: Set(Some(report.hipcheck.commit.clone())),
-        target_kind: Set(Some(report.target.kind.clone())),
-        target_purl: Set(report.target.purl.clone()),
-        source_repository_url: Set(Some(report.target.source_repository_url.clone())),
-        policy_id: Set(Some(report.policy.id.clone())),
-        policy_version: Set(report.policy.version.clone()),
-        policy_source: Set(Some(report.policy.source.clone())),
-        policy_recommendation: Set(Some(recommendation(report))),
-        ..Default::default()
+    let updated = hipcheck_runs::Entity::update_many()
+        .col_expr(hipcheck_runs::Column::Status, Expr::value("completed"))
+        .col_expr(hipcheck_runs::Column::RawJson, Expr::value(Some(raw_json)))
+        .col_expr(
+            hipcheck_runs::Column::RawJsonBytes,
+            Expr::value(raw_json_bytes),
+        )
+        .col_expr(
+            hipcheck_runs::Column::RawJsonTruncated,
+            Expr::value(raw_json_truncated),
+        )
+        .col_expr(hipcheck_runs::Column::Stdout, Expr::value(Some(stdout)))
+        .col_expr(
+            hipcheck_runs::Column::StdoutTruncated,
+            Expr::value(stdout_truncated),
+        )
+        .col_expr(hipcheck_runs::Column::Stderr, Expr::value(Some(stderr)))
+        .col_expr(
+            hipcheck_runs::Column::StderrTruncated,
+            Expr::value(stderr_truncated),
+        )
+        .col_expr(
+            hipcheck_runs::Column::ExitStatus,
+            Expr::value(diagnostics.exit_status),
+        )
+        .col_expr(
+            hipcheck_runs::Column::ErrorKind,
+            Expr::value(None::<String>),
+        )
+        .col_expr(
+            hipcheck_runs::Column::ErrorMessage,
+            Expr::value(None::<String>),
+        )
+        .col_expr(hipcheck_runs::Column::Retryable, Expr::value(false))
+        .col_expr(
+            hipcheck_runs::Column::SchemaVersion,
+            Expr::value(Some(report.schema_version.clone())),
+        )
+        .col_expr(
+            hipcheck_runs::Column::HipcheckVersion,
+            Expr::value(Some(report.hipcheck.version.clone())),
+        )
+        .col_expr(
+            hipcheck_runs::Column::HipcheckCommit,
+            Expr::value(Some(report.hipcheck.commit.clone())),
+        )
+        .col_expr(
+            hipcheck_runs::Column::TargetKind,
+            Expr::value(Some(report.target.kind.clone())),
+        )
+        .col_expr(
+            hipcheck_runs::Column::TargetPurl,
+            Expr::value(report.target.purl.clone()),
+        )
+        .col_expr(
+            hipcheck_runs::Column::SourceRepositoryUrl,
+            Expr::value(Some(report.target.source_repository_url.clone())),
+        )
+        .col_expr(
+            hipcheck_runs::Column::PolicyId,
+            Expr::value(Some(report.policy.id.clone())),
+        )
+        .col_expr(
+            hipcheck_runs::Column::PolicyVersion,
+            Expr::value(report.policy.version.clone()),
+        )
+        .col_expr(
+            hipcheck_runs::Column::PolicySource,
+            Expr::value(Some(report.policy.source.clone())),
+        )
+        .col_expr(
+            hipcheck_runs::Column::PolicyRecommendation,
+            Expr::value(Some(recommendation(report))),
+        )
+        .filter(hipcheck_runs::Column::Id.eq(run_id))
+        .filter(hipcheck_runs::Column::Status.eq("running"))
+        .exec(&transaction)
+        .await?
+        .rows_affected
+        == 1;
+    if !updated {
+        transaction.rollback().await?;
+        return Ok(false);
     }
-    .update(&transaction)
-    .await?;
     for (ordinal, check) in report.checks.iter().enumerate() {
         store_check(&transaction, run_id, ordinal, check).await?;
     }
-    transaction.commit().await
+    transaction.commit().await?;
+    Ok(true)
 }
 
 /// List the newest persisted assessments for one resolved package version.
@@ -408,7 +531,11 @@ fn recommendation(report: &HipcheckReport) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_STORED_HIPCHECK_OUTPUT_BYTES, bound};
+    use super::{
+        ASSESSMENT_INTERRUPTED_ERROR_KIND, ASSESSMENT_INTERRUPTED_ERROR_MESSAGE,
+        MAX_STORED_HIPCHECK_OUTPUT_BYTES, bound, reconcile_abandoned_hipcheck_runs,
+    };
+    use sea_orm::{DbBackend, MockDatabase, MockExecResult, Value};
 
     #[test]
     fn output_bound_preserves_utf8_and_reports_truncation() {
@@ -417,5 +544,78 @@ mod tests {
         assert!(truncated);
         assert_eq!(stored.len(), MAX_STORED_HIPCHECK_OUTPUT_BYTES);
         assert!(stored.is_char_boundary(stored.len()));
+    }
+
+    #[tokio::test]
+    async fn reconciliation_claims_queued_and_running_records_with_one_compare_and_update() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 2,
+            }])
+            .into_connection();
+
+        assert_eq!(reconcile_abandoned_hipcheck_runs(&db).await.unwrap(), 2);
+
+        let transaction_log = db.into_transaction_log();
+        let sql = &transaction_log[0].statements()[0].sql;
+        assert!(sql.contains("UPDATE \"hipcheck_runs\""));
+        assert!(sql.contains("\"status\" IN"));
+        assert!(sql.contains("\"status\" ="));
+        let values = transaction_log[0].statements()[0]
+            .values
+            .as_ref()
+            .expect("reconciliation update has bound values");
+        assert!(values.iter().any(|value| matches!(
+            value,
+            Value::String(Some(value)) if value == ASSESSMENT_INTERRUPTED_ERROR_KIND
+        )));
+        assert!(values.iter().any(|value| matches!(
+            value,
+            Value::String(Some(value)) if value == ASSESSMENT_INTERRUPTED_ERROR_MESSAGE
+        )));
+        assert!(
+            values
+                .iter()
+                .any(|value| matches!(value, Value::Bool(Some(true))))
+        );
+    }
+
+    #[tokio::test]
+    async fn reconciliation_is_idempotent_and_excludes_completed_and_failed_records() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 2,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 0,
+                },
+            ])
+            .into_connection();
+
+        assert_eq!(reconcile_abandoned_hipcheck_runs(&db).await.unwrap(), 2);
+        assert_eq!(reconcile_abandoned_hipcheck_runs(&db).await.unwrap(), 0);
+
+        let transaction_log = db.into_transaction_log();
+        assert_eq!(transaction_log.len(), 2);
+        for entry in transaction_log {
+            let sql = &entry.statements()[0].sql;
+            assert!(sql.contains("\"status\" IN"));
+            let values = entry.statements()[0]
+                .values
+                .as_ref()
+                .expect("reconciliation update has bound values");
+            assert!(values.iter().any(|value| matches!(
+                value,
+                Value::String(Some(value)) if value == "queued"
+            )));
+            assert!(values.iter().any(|value| matches!(
+                value,
+                Value::String(Some(value)) if value == "running"
+            )));
+        }
     }
 }

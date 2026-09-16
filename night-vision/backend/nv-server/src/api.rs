@@ -35,7 +35,7 @@ use nv_common::{
     display_safety::{diagnostic_text, raw_json_preview, summary_text, url_label},
     hipcheck::{
         assessment::{execute_queued_assessment, queue_assessment, queue_assessment_with_id},
-        storage::load_hipcheck_run_by_assessment_id,
+        storage::{load_hipcheck_run_by_assessment_id, reconcile_abandoned_hipcheck_runs},
     },
     npm::{
         candidates::{
@@ -107,6 +107,12 @@ impl RestApi {
     pub async fn serve(self, config: &Config, log: Logger) -> Result<(), FatalError> {
         let api = self.0;
         let ctx = ApiCtx::init(config).await?;
+        let reconciled = reconcile_assessments_on_startup(ctx.db())
+            .await
+            .map_err(FatalError::FailedToReconcileAssessments)?;
+        if reconciled > 0 {
+            slog::info!(log, "reconciled assessments interrupted by a prior server process"; "count" => reconciled);
+        }
         let cve_list_worker_config = config.cve_list_worker_config();
         let _cve_list_worker = cve_worker::spawn_cve_list_worker(
             ctx.db().clone(),
@@ -154,6 +160,14 @@ impl RestApi {
             .map_err(|e| FatalError::FailedToWriteOpenApiDescFile(path, e))?;
         Ok(())
     }
+}
+
+/// Reconcile work owned by a process that exited before recording a result.
+///
+/// This runs before background workers and the HTTP listener are started, so
+/// every unfinished persisted assessment belongs to the preceding process.
+async fn reconcile_assessments_on_startup(db: &DatabaseConnection) -> Result<u64, sea_orm::DbErr> {
+    reconcile_abandoned_hipcheck_runs(db).await
 }
 
 /// Create the path to store an OpenAPI Description.
@@ -1756,6 +1770,23 @@ mod tests {
     };
     use sea_orm::{DbBackend, DbErr, MockDatabase, MockExecResult, Value};
     use slog::{Logger, o};
+
+    #[tokio::test]
+    async fn startup_reconciliation_runs_before_the_server_accepts_work() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 2,
+            }])
+            .into_connection();
+
+        assert_eq!(reconcile_assessments_on_startup(&db).await.unwrap(), 2);
+
+        let transaction_log = db.into_transaction_log();
+        let sql = &transaction_log[0].statements()[0].sql;
+        assert!(sql.contains("UPDATE \"hipcheck_runs\""));
+        assert!(sql.contains("\"status\" IN"));
+    }
 
     #[test]
     fn checked_in_openapi_matches_the_server_description() {

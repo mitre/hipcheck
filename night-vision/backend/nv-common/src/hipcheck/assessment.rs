@@ -99,9 +99,14 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
     config: &HipcheckRunnerConfig,
     executor: &E,
 ) -> Result<(), AssessmentError> {
-    mark_hipcheck_run_running(db, queued.run_id)
+    let claimed = mark_hipcheck_run_running(db, queued.run_id)
         .await
         .map_err(AssessmentError::Database)?;
+    if !claimed {
+        // Startup reconciliation or another terminal writer already claimed this
+        // run. Do not resurrect it or replace its durable outcome.
+        return Ok(());
+    }
     let version = package_versions::Entity::find_by_id(queued.package_version_id)
         .one(db)
         .await
@@ -221,6 +226,7 @@ async fn complete_output(
         ),
     )
     .await
+    .map(|_| ())
     .map_err(AssessmentError::Database)
 }
 
@@ -232,6 +238,7 @@ async fn persist_failure(
 ) -> Result<(), AssessmentError> {
     fail_hipcheck_run(db, id, &diagnostics, raw)
         .await
+        .map(|_| ())
         .map_err(AssessmentError::Database)
 }
 
