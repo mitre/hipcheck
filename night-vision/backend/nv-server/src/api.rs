@@ -22,7 +22,10 @@ use dropshot::{
 use http::{HeaderMap, HeaderValue, header::WWW_AUTHENTICATE};
 use nv_common::{
     config::Config,
-    cve::kev::{KevNpmMatchStatus, ReachableNpmPackageVersion, kev_affected_npm_package_version},
+    cve::kev::{
+        KevNpmMatchStatus, ReachableNpmPackageVersion, kev_affected_npm_package_version,
+        kev_affected_npm_package_versions,
+    },
     cve::storage::{
         has_cve_list_records, last_successful_cve_list_sync_commit, latest_cve_list_sync_run,
     },
@@ -41,8 +44,8 @@ use nv_common::{
             validate_explicit_candidate,
         },
         elaboration::{
-            NpmRegistryClient, PackageVersion, PackumentProvider as _, elaborate,
-            normalize_repository_url,
+            ElaborationLimits, NpmRegistryClient, PackageVersion, PackumentProvider as _,
+            elaborate, normalize_repository_url,
             storage::{
                 bounded_diagnostic, persist_assessment_target, persist_completed_elaboration,
                 persisted_package_versions, record_elaboration_failure,
@@ -76,7 +79,7 @@ use sea_orm::{
 };
 use secrecy::{ExposeSecret as _, SecretString};
 use slog::Logger;
-use std::{fs::File, time::Duration};
+use std::{collections::HashSet, fs::File, time::Duration};
 use subtle::ConstantTimeEq as _;
 use uuid::Uuid;
 
@@ -403,20 +406,14 @@ impl NvServerApi for RestApi {
         let id = Uuid::now_v7();
         let input = input_from_request(&body);
         let context = ctx.context();
-        let admission = input
-            .candidate_version
-            .as_ref()
-            .map(|_| {
-                context.try_admit_hipcheck().ok_or_else(|| {
+        let (work, admission) = match input.candidate_version.as_deref() {
+            Some(candidate_version) => {
+                let admission = context.try_admit_hipcheck().ok_or_else(|| {
                     HttpError::for_unavail(
                         Some("AssessmentCapacity".to_owned()),
                         "assessment capacity is exhausted".to_owned(),
                     )
-                })
-            })
-            .transpose()?;
-        let work = match input.candidate_version.as_deref() {
-            Some(candidate_version) => {
+                })?;
                 let package_name = NpmPackageName::parse(input.package_name.clone())
                     .map_err(invalid_upgrade_request)?;
                 let affected_purl =
@@ -425,11 +422,20 @@ impl NvServerApi for RestApi {
                 let target_purl =
                     validate_and_persist_upgrade_target(context, &affected_purl, &target_purl)
                         .await?;
-                UpgradeAssessmentWork::Explicit((affected_purl, target_purl))
+                (
+                    UpgradeAssessmentWork::Explicit((affected_purl, target_purl)),
+                    admission,
+                )
             }
-            None => UpgradeAssessmentWork::Discovered(
-                discover_assessment_candidates(context, &input).await?,
-            ),
+            None => {
+                let admission = context.try_admit_package_elaboration().ok_or_else(|| {
+                    HttpError::for_unavail(
+                        Some("CandidateDiscoveryCapacity".to_owned()),
+                        "candidate discovery capacity is exhausted".to_owned(),
+                    )
+                })?;
+                (UpgradeAssessmentWork::Discovered, admission)
+            }
         };
         create_upgrade_assessment(context.db(), id, &input).await?;
         let work = match work {
@@ -449,9 +455,7 @@ impl NvServerApi for RestApi {
                     }
                 }
             }
-            UpgradeAssessmentWork::Discovered(candidates) => {
-                UpgradeAssessmentWork::Discovered(candidates)
-            }
+            UpgradeAssessmentWork::Discovered => UpgradeAssessmentWork::Discovered,
             UpgradeAssessmentWork::Queued(_) => {
                 unreachable!("only explicit input queues a Hipcheck assessment")
             }
@@ -461,6 +465,9 @@ impl NvServerApi for RestApi {
         // poll the durable processing state, even when it races this task.
         let db = context.db().clone();
         let runner = context.hipcheck_runner_config();
+        let registry_url = context.npm_registry_url().clone();
+        let limits = context.package_elaboration_limits();
+        let max_packument_bytes = context.package_elaboration_max_packument_bytes();
         tokio::spawn(async move {
             let result = match work {
                 UpgradeAssessmentWork::Queued(queued) => {
@@ -478,8 +485,17 @@ impl NvServerApi for RestApi {
                         Err(error) => Err(HttpError::for_internal_error(error.to_string())),
                     }
                 }
-                UpgradeAssessmentWork::Discovered(candidates) => {
-                    complete_discovered_upgrade_assessment(&db, id, input, candidates).await
+                UpgradeAssessmentWork::Discovered => {
+                    let _admission = admission;
+                    complete_discovered_upgrade_assessment(
+                        &db,
+                        id,
+                        input,
+                        registry_url,
+                        limits,
+                        max_packument_bytes,
+                    )
+                    .await
                 }
                 UpgradeAssessmentWork::Explicit(_) => {
                     unreachable!("explicit input must be queued before work starts")
@@ -749,7 +765,7 @@ fn upgrade_validation_error(message: &str) -> HttpError {
 enum UpgradeAssessmentWork {
     Explicit((String, String)),
     Queued(nv_common::hipcheck::assessment::QueuedAssessment),
-    Discovered(Vec<DiscoveredAssessmentCandidate>),
+    Discovered,
 }
 
 /// A registry candidate together with the vulnerability evidence used to
@@ -766,56 +782,50 @@ struct DiscoveredAssessmentCandidate {
 /// they remain visible to the discovery library as excluded candidates, but
 /// are not applicable automatic upgrade targets.
 async fn discover_assessment_candidates(
-    context: &ApiCtx,
+    db: &DatabaseConnection,
     input: &UpgradeAssessmentInput,
+    registry_url: url::Url,
+    limits: &ElaborationLimits,
+    max_packument_bytes: usize,
 ) -> Result<Vec<DiscoveredAssessmentCandidate>, HttpError> {
     let package_name =
         NpmPackageName::parse(input.package_name.clone()).map_err(invalid_upgrade_request)?;
     let affected_purl = PackageVersion::from_npm(&package_name, &input.current_version).purl();
     let affected = NpmPackagePurl::parse(&affected_purl).map_err(invalid_upgrade_request)?;
-    let baseline_matches = kev_affected_npm_package_version(
-        context.db(),
-        reachable_package(&affected, &affected_purl),
-    )
-    .await
-    .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
-    if !baseline_matches
-        .iter()
-        .any(|matched| matched.status == KevNpmMatchStatus::Affected)
-    {
+    let client = NpmRegistryClient::new(registry_url, max_packument_bytes, limits.request_timeout)
+        .map_err(|_| upgrade_validation_error("invalid NPM registry configuration"))?;
+    let packument = client.fetch(&package_name).await.map_err(|error| {
+        upgrade_validation_error(&format!("failed to fetch NPM package metadata: {error}"))
+    })?;
+    validate_discovery_packument_identity(&package_name, &packument.name)?;
+    let candidates = discover_upgrade_candidates(&packument, &input.current_version)
+        .map_err(|error| upgrade_validation_error(&error.to_string()))?;
+
+    let candidates: Vec<_> = candidates
+        .into_iter()
+        .filter(|candidate| matches!(candidate.status, CandidateStatus::Included))
+        .collect();
+    let mut reachable = vec![reachable_package(&affected, &affected_purl)];
+    reachable.extend(candidates.iter().map(|candidate| {
+        let target_purl = PackageVersion::from_npm(&package_name, &candidate.version).purl();
+        reachable_package_for_validated_purl(&target_purl)
+    }));
+    let affected_versions: HashSet<_> = kev_affected_npm_package_versions(db, &reachable)
+        .await
+        .map_err(|error| HttpError::for_internal_error(error.to_string()))?
+        .into_iter()
+        .filter(|matched| matched.status == KevNpmMatchStatus::Affected)
+        .filter_map(|matched| matched.affected_version)
+        .collect();
+    if !affected_versions.contains(&input.current_version) {
         return Err(upgrade_validation_error(
             "affected PURL has no locally known active KEV match",
         ));
     }
 
-    let client = NpmRegistryClient::new(
-        context.npm_registry_url().clone(),
-        context.package_elaboration_max_packument_bytes(),
-        context.package_elaboration_limits().request_timeout,
-    )
-    .map_err(|_| upgrade_validation_error("invalid NPM registry configuration"))?;
-    let packument = client.fetch(&package_name).await.map_err(|error| {
-        upgrade_validation_error(&format!("failed to fetch NPM package metadata: {error}"))
-    })?;
-    let candidates = discover_upgrade_candidates(&packument, &input.current_version)
-        .map_err(|error| upgrade_validation_error(&error.to_string()))?;
-
     let mut evaluated = Vec::new();
     for candidate in candidates {
-        if !matches!(candidate.status, CandidateStatus::Included) {
-            continue;
-        }
-        let target_purl = PackageVersion::from_npm(&package_name, &candidate.version).purl();
-        let target = NpmPackagePurl::parse(&target_purl).map_err(invalid_upgrade_request)?;
-        let target_matches = kev_affected_npm_package_version(
-            context.db(),
-            reachable_package(&target, &target_purl),
-        )
-        .await
-        .map_err(|error| HttpError::for_internal_error(error.to_string()))?;
-        let affected = target_matches
-            .iter()
-            .any(|matched| matched.status == KevNpmMatchStatus::Affected);
+        let affected = affected_versions.contains(&candidate.version.to_string());
         let (base_verdict, caveat) = if affected {
             (
                 UpgradeAssessmentVerdict::Avoid,
@@ -834,6 +844,24 @@ async fn discover_assessment_candidates(
         });
     }
     Ok(evaluated)
+}
+
+fn reachable_package_for_validated_purl(purl: &str) -> ReachableNpmPackageVersion {
+    let package = NpmPackagePurl::parse(purl).expect("generated NPM PURL must be valid");
+    reachable_package(&package, purl)
+}
+
+fn validate_discovery_packument_identity(
+    requested: &NpmPackageName,
+    returned: &NpmPackageName,
+) -> Result<(), HttpError> {
+    if requested == returned {
+        Ok(())
+    } else {
+        Err(upgrade_validation_error(
+            "NPM registry metadata does not match the requested package",
+        ))
+    }
 }
 
 fn assessment_diagnostics(run: &hipcheck_runs::Model) -> AssessmentDiagnostics {
@@ -1268,8 +1296,16 @@ async fn complete_discovered_upgrade_assessment(
     db: &DatabaseConnection,
     id: Uuid,
     input: UpgradeAssessmentInput,
-    candidates: Vec<DiscoveredAssessmentCandidate>,
+    registry_url: url::Url,
+    limits: ElaborationLimits,
+    max_packument_bytes: usize,
 ) -> Result<(), HttpError> {
+    let candidates = tokio::time::timeout(
+        limits.total_run_timeout,
+        discover_assessment_candidates(db, &input, registry_url, &limits, max_packument_bytes),
+    )
+    .await
+    .map_err(|_| HttpError::for_internal_error("candidate discovery timed out".to_owned()))??;
     persist_completed_upgrade_report(db, id, discovered_assessment_report(input, candidates)).await
 }
 
@@ -1487,8 +1523,10 @@ fn assessment_report(
     UpgradeAssessmentReport {
         vulnerability_context: UpgradeAssessmentVulnerabilityContext {
             trigger: input.trigger.clone(),
-            kev_linked: matches!(base_verdict, UpgradeAssessmentVerdict::Recommended)
-                .then_some(true),
+            // Upgrade-assessment requests are admitted only after the affected
+            // baseline is confirmed to match an active KEV entry. Candidate
+            // verdicts must not change that vulnerability context.
+            kev_linked: Some(true),
         },
         input,
         verdict: verdict.clone(),
@@ -1914,6 +1952,81 @@ mod tests {
 
         assert_eq!(error.error_code.as_deref(), Some("AssessmentCapacity"));
         test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn upgrade_candidate_discovery_checks_capacity_before_persistence() {
+        let db = MockDatabase::new(DbBackend::Postgres).into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let _admission = context
+            .try_admit_package_elaboration()
+            .expect("test must occupy the only discovery slot");
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+        let request = Request::builder()
+            .method(http::Method::POST)
+            .uri(test_context.client_testctx.url("/upgrade-assessments"))
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                serde_json::json!({
+                    "packageName": "example-package",
+                    "currentVersion": "1.2.3",
+                    "trigger": {
+                        "kind": "cve",
+                        "cve_id": "CVE-2026-1234"
+                    }
+                })
+                .to_string(),
+            ))
+            .expect("upgrade request should build");
+
+        let error = test_context
+            .client_testctx
+            .make_request_with_request(request, StatusCode::SERVICE_UNAVAILABLE)
+            .await
+            .expect_err("exhausted discovery capacity must reject before persistence");
+
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("CandidateDiscoveryCapacity")
+        );
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn candidate_discovery_enforces_total_run_timeout() {
+        let server = MockServer::start();
+        let _registry = server.mock(|when, then| {
+            when.method(GET).path("/example-package");
+            then.status(200).delay(Duration::from_millis(50));
+        });
+        let db = MockDatabase::new(DbBackend::Postgres).into_connection();
+        let limits = ElaborationLimits {
+            request_timeout: Duration::from_secs(1),
+            total_run_timeout: Duration::from_millis(1),
+            ..ElaborationLimits::default()
+        };
+
+        let error = complete_discovered_upgrade_assessment(
+            &db,
+            Uuid::now_v7(),
+            UpgradeAssessmentInput {
+                candidate_version: None,
+                ..input()
+            },
+            url::Url::parse(&format!("{}/", server.base_url())).expect("valid mock URL"),
+            limits,
+            1024,
+        )
+        .await
+        .expect_err("total-run timeout must cancel candidate discovery");
+
+        assert_eq!(error.internal_message, "candidate discovery timed out");
     }
 
     #[test]
@@ -2407,6 +2520,20 @@ mod tests {
     }
 
     #[test]
+    fn discovery_rejects_mismatched_packument_identity() {
+        let requested = NpmPackageName::parse("requested-package".to_owned()).unwrap();
+        let returned = NpmPackageName::parse("returned-package".to_owned()).unwrap();
+
+        let error = validate_discovery_packument_identity(&requested, &returned)
+            .expect_err("mismatched registry metadata must be rejected");
+
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("InvalidUpgradeAssessment")
+        );
+    }
+
+    #[test]
     fn discovered_major_with_blocking_evidence_remains_avoid() {
         let report = discovered_assessment_report(
             UpgradeAssessmentInput {
@@ -2425,6 +2552,37 @@ mod tests {
             report.candidate_versions[0].verdict,
             UpgradeAssessmentVerdict::Avoid
         ));
+    }
+
+    #[test]
+    fn explicit_reports_keep_kev_context_independent_of_candidate_verdict() {
+        let cases = [
+            ("1.2.7", UpgradeAssessmentVerdict::Recommended),
+            ("1.2.7", UpgradeAssessmentVerdict::Avoid),
+            // A major candidate is cautioned even when its KEV result is
+            // otherwise recommended.
+            ("2.0.0", UpgradeAssessmentVerdict::Recommended),
+        ];
+
+        for (candidate_version, base_verdict) in cases {
+            let report = assessment_report(
+                UpgradeAssessmentInput {
+                    candidate_version: Some(candidate_version.to_owned()),
+                    ..input()
+                },
+                base_verdict,
+                Vec::new(),
+                None,
+            );
+
+            assert_eq!(report.vulnerability_context.kev_linked, Some(true));
+            if candidate_version == "2.0.0" {
+                assert!(matches!(
+                    report.candidate_versions[0].verdict,
+                    UpgradeAssessmentVerdict::Caution
+                ));
+            }
+        }
     }
 
     #[test]

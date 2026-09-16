@@ -277,6 +277,11 @@ Night Vision validates the candidate against locally known KEV data, runs
 Hipcheck, and uses normalized Hipcheck findings as supply-chain evidence for
 the verdict. Hipcheck's `PASS` or `INVESTIGATE` policy recommendation is shown
 as context; it does not replace vulnerability or upgrade-domain evidence.
+`vulnerabilityContext.kevLinked` describes whether the affected baseline
+package version is linked to an active KEV entry; it does not describe the
+candidate verdict. Every accepted upgrade assessment currently has
+`kevLinked: true`, because the baseline KEV match is required before work is
+started.
 When `candidateVersion` is omitted, Night Vision fetches the NPM packument and
 evaluates every newer, published, non-prerelease and non-deprecated version in
 ascending SemVer order. It records each candidate's patch/minor/major distance,

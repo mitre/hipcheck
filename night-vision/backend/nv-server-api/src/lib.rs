@@ -510,6 +510,9 @@ pub enum UpgradeAssessmentApiCompatibility {
 #[serde(rename_all = "camelCase")]
 pub struct UpgradeAssessmentVulnerabilityContext {
     pub trigger: UpgradeAssessmentTrigger,
+    /// Whether the affected baseline package version is linked to an active
+    /// CISA KEV entry. This describes the assessment trigger, not the selected
+    /// candidate's verdict.
     pub kev_linked: Option<bool>,
 }
 

@@ -1231,6 +1231,7 @@
         "properties": {
           "kevLinked": {
             "nullable": true,
+            "description": "Whether the affected baseline package version is linked to an active CISA KEV entry. This describes the assessment trigger, not the selected candidate's verdict.",
             "type": "boolean"
           },
           "trigger": {
