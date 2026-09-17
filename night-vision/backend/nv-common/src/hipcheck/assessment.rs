@@ -329,7 +329,10 @@ mod tests {
     fn terminal_persistence_requires_an_applied_transition() {
         let error = require_terminal_persistence_applied(Ok(false), 42).unwrap_err();
 
-        assert!(matches!(error, AssessmentError::TerminalOutcomeNotPersisted(42)));
+        assert!(matches!(
+            error,
+            AssessmentError::TerminalOutcomeNotPersisted(42)
+        ));
     }
 
     #[test]
@@ -340,6 +343,8 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(matches!(error, AssessmentError::Database(DbErr::Custom(message)) if message == "database unavailable"));
+        assert!(
+            matches!(error, AssessmentError::Database(DbErr::Custom(message)) if message == "database unavailable")
+        );
     }
 }

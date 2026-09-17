@@ -35,7 +35,10 @@ use nv_common::{
     display_safety::{diagnostic_text, raw_json_preview, summary_text, url_label},
     hipcheck::{
         assessment::{execute_queued_assessment, queue_assessment, queue_assessment_with_id},
-        storage::{load_hipcheck_run_by_assessment_id, reconcile_abandoned_hipcheck_runs},
+        storage::{
+            load_hipcheck_run_by_assessment_id, reconcile_abandoned_hipcheck_runs,
+            reconcile_abandoned_upgrade_assessments,
+        },
     },
     npm::{
         candidates::{
@@ -167,7 +170,8 @@ impl RestApi {
 /// This runs before background workers and the HTTP listener are started, so
 /// every unfinished persisted assessment belongs to the preceding process.
 async fn reconcile_assessments_on_startup(db: &DatabaseConnection) -> Result<u64, sea_orm::DbErr> {
-    reconcile_abandoned_hipcheck_runs(db).await
+    reconcile_abandoned_hipcheck_runs(db).await?;
+    reconcile_abandoned_upgrade_assessments(db).await
 }
 
 /// Create the path to store an OpenAPI Description.
@@ -1776,10 +1780,16 @@ mod tests {
     #[tokio::test]
     async fn startup_reconciliation_runs_before_the_server_accepts_work() {
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_exec_results([MockExecResult {
-                last_insert_id: 0,
-                rows_affected: 2,
-            }])
+            .append_exec_results([
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 2,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 2,
+                },
+            ])
             .into_connection();
 
         assert_eq!(reconcile_assessments_on_startup(&db).await.unwrap(), 2);

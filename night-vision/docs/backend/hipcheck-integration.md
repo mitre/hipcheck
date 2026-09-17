@@ -129,6 +129,11 @@ and repeating startup reconciliation is safe. Night Vision does not rerun the
 interrupted Hipcheck process automatically. API clients should treat this
 retryable terminal failure as a prompt to submit a new assessment; operators
 should expect the count of reconciled assessments in the server startup log.
+When the interrupted Hipcheck run belongs to an upgrade assessment, Night
+Vision also marks the corresponding `upgrade_assessments` row from `processing`
+to `failed` during the same startup reconciliation sequence, so the API-visible
+assessment lifecycle does not remain orphaned in `processing` after a server
+restart.
 
 `nvdb assessment analyze <AFFECTED-PURL> <TARGET-PURL>` waits synchronously. `POST /assessments`
 returns `202` with an assessment ID and runs in the background; poll

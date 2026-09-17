@@ -2,11 +2,14 @@
 use super::{HipcheckCheck, HipcheckReport};
 use crate::db::entities::{
     hipcheck_checks, hipcheck_concerns, hipcheck_findings, hipcheck_runs, package_versions,
+    upgrade_assessments,
 };
 use sea_orm::{
-    ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, ConnectionTrait, DbErr,
-    EntityTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _, TransactionSession as _,
-    TransactionTrait, sea_query::Expr,
+    ActiveModelTrait as _,
+    ActiveValue::Set,
+    ColumnTrait as _, ConnectionTrait, DbErr, EntityTrait as _, QueryFilter as _, QueryOrder as _,
+    QuerySelect as _, TransactionSession as _, TransactionTrait,
+    sea_query::{Expr, Query},
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -191,6 +194,38 @@ pub async fn reconcile_abandoned_hipcheck_runs<C: ConnectionTrait>(db: &C) -> Re
         )
         .col_expr(hipcheck_runs::Column::Retryable, Expr::value(true))
         .filter(hipcheck_runs::Column::Status.is_in(["queued", "running"]))
+        .exec(db)
+        .await
+        .map(|result| result.rows_affected)
+}
+
+/// Mark API-visible upgrade assessments failed after their Hipcheck run was
+/// claimed as interrupted during startup reconciliation.
+///
+/// This is a single compare-and-update operation over rows still marked
+/// `processing`, so it is idempotent and cannot overwrite a terminal result.
+pub async fn reconcile_abandoned_upgrade_assessments<C: ConnectionTrait>(
+    db: &C,
+) -> Result<u64, DbErr> {
+    let mut interrupted_assessment_ids = Query::select();
+    interrupted_assessment_ids
+        .column(hipcheck_runs::Column::AssessmentId)
+        .from(hipcheck_runs::Entity)
+        .and_where(hipcheck_runs::Column::Status.eq("failed"))
+        .and_where(hipcheck_runs::Column::ErrorKind.eq(ASSESSMENT_INTERRUPTED_ERROR_KIND));
+
+    upgrade_assessments::Entity::update_many()
+        .col_expr(upgrade_assessments::Column::Status, Expr::value("failed"))
+        .col_expr(
+            upgrade_assessments::Column::FinishedAt,
+            Expr::current_timestamp(),
+        )
+        .col_expr(
+            upgrade_assessments::Column::Error,
+            Expr::value(ASSESSMENT_INTERRUPTED_ERROR_MESSAGE),
+        )
+        .filter(upgrade_assessments::Column::Status.eq("processing"))
+        .filter(upgrade_assessments::Column::Id.in_subquery(interrupted_assessment_ids))
         .exec(db)
         .await
         .map(|result| result.rows_affected)
@@ -534,6 +569,7 @@ mod tests {
     use super::{
         ASSESSMENT_INTERRUPTED_ERROR_KIND, ASSESSMENT_INTERRUPTED_ERROR_MESSAGE,
         MAX_STORED_HIPCHECK_OUTPUT_BYTES, bound, reconcile_abandoned_hipcheck_runs,
+        reconcile_abandoned_upgrade_assessments,
     };
     use sea_orm::{DbBackend, MockDatabase, MockExecResult, Value};
 
@@ -615,6 +651,94 @@ mod tests {
             assert!(values.iter().any(|value| matches!(
                 value,
                 Value::String(Some(value)) if value == "running"
+            )));
+        }
+    }
+
+    #[tokio::test]
+    async fn assessment_reconciliation_claims_processing_rows_for_interrupted_runs() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 2,
+            }])
+            .into_connection();
+
+        assert_eq!(
+            reconcile_abandoned_upgrade_assessments(&db).await.unwrap(),
+            2
+        );
+
+        let transaction_log = db.into_transaction_log();
+        let sql = &transaction_log[0].statements()[0].sql;
+        assert!(sql.contains("UPDATE \"public\".\"upgrade_assessments\""));
+        assert!(sql.contains("\"status\" ="));
+        assert!(sql.contains("CURRENT_TIMESTAMP"));
+        assert!(sql.contains("IN (SELECT"));
+        assert!(sql.contains("FROM \"hipcheck_runs\""));
+        let values = transaction_log[0].statements()[0]
+            .values
+            .as_ref()
+            .expect("assessment reconciliation update has bound values");
+        assert!(values.iter().any(|value| matches!(
+            value,
+            Value::String(Some(value)) if value == "processing"
+        )));
+        assert!(values.iter().any(|value| matches!(
+            value,
+            Value::String(Some(value)) if value == "failed"
+        )));
+        assert!(values.iter().any(|value| matches!(
+            value,
+            Value::String(Some(value)) if value == ASSESSMENT_INTERRUPTED_ERROR_KIND
+        )));
+        assert!(values.iter().any(|value| matches!(
+            value,
+            Value::String(Some(value)) if value == ASSESSMENT_INTERRUPTED_ERROR_MESSAGE
+        )));
+    }
+
+    #[tokio::test]
+    async fn assessment_reconciliation_is_idempotent_and_leaves_terminal_rows_unchanged() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 2,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 0,
+                },
+            ])
+            .into_connection();
+
+        assert_eq!(
+            reconcile_abandoned_upgrade_assessments(&db).await.unwrap(),
+            2
+        );
+        assert_eq!(
+            reconcile_abandoned_upgrade_assessments(&db).await.unwrap(),
+            0
+        );
+
+        let transaction_log = db.into_transaction_log();
+        assert_eq!(transaction_log.len(), 2);
+        for entry in transaction_log {
+            let sql = &entry.statements()[0].sql;
+            assert!(sql.contains("UPDATE \"public\".\"upgrade_assessments\""));
+            assert!(sql.contains("IN (SELECT"));
+            let values = entry.statements()[0]
+                .values
+                .as_ref()
+                .expect("assessment reconciliation update has bound values");
+            assert!(values.iter().any(|value| matches!(
+                value,
+                Value::String(Some(value)) if value == "processing"
+            )));
+            assert!(values.iter().any(|value| matches!(
+                value,
+                Value::String(Some(value)) if value == ASSESSMENT_INTERRUPTED_ERROR_KIND
             )));
         }
     }
