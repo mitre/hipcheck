@@ -1413,11 +1413,7 @@ fn discovered_assessment_candidate(
     let upgrade_distance = assessment_upgrade_distance(candidate.upgrade_distance);
     let api_compatibility = assessment_api_compatibility(candidate.api_compatibility);
     let requires_compatibility_review =
-        matches!(upgrade_distance, UpgradeAssessmentUpgradeDistance::Major)
-            || matches!(
-                api_compatibility,
-                UpgradeAssessmentApiCompatibility::NoGuarantee
-            );
+        requires_compatibility_review(&upgrade_distance, &api_compatibility);
     let mut caveats = discovered.caveats.clone();
     if requires_compatibility_review {
         caveats.push(
@@ -1490,11 +1486,11 @@ fn assessment_report(
         .iter()
         .map(|version| {
             let mut candidate = assessment_candidate(&input.current_version, version);
-            let is_major = matches!(
-                candidate.upgrade_distance,
-                UpgradeAssessmentUpgradeDistance::Major
+            let requires_compatibility_review = requires_compatibility_review(
+                &candidate.upgrade_distance,
+                &candidate.api_compatibility,
             );
-            candidate.verdict = if is_major
+            candidate.verdict = if requires_compatibility_review
                 && (matches!(verdict, UpgradeAssessmentVerdict::Recommended)
                     || (matches!(verdict, UpgradeAssessmentVerdict::Unknown)
                         && supply_chain_findings.is_empty()))
@@ -1503,7 +1499,7 @@ fn assessment_report(
             } else {
                 verdict.clone()
             };
-            if is_major {
+            if requires_compatibility_review {
                 candidate.caveats.extend(candidate_caveats.clone());
             } else {
                 candidate.caveats = candidate_caveats.clone();
@@ -1599,25 +1595,37 @@ fn assessment_candidate(
             UpgradeAssessmentApiCompatibility::Unknown,
         ),
     };
-    let is_major = matches!(upgrade_distance, UpgradeAssessmentUpgradeDistance::Major);
+    let requires_compatibility_review =
+        requires_compatibility_review(&upgrade_distance, &api_compatibility);
     UpgradeAssessmentCandidate {
         version: candidate_version.to_owned(),
         upgrade_distance,
         api_compatibility,
-        verdict: if is_major {
+        verdict: if requires_compatibility_review {
             UpgradeAssessmentVerdict::Caution
         } else {
             UpgradeAssessmentVerdict::Unknown
         },
-        caveats: if is_major {
+        caveats: if requires_compatibility_review {
             vec![
-                "Major upgrades require application compatibility review and cannot be recommended by Night Vision."
+                "This upgrade requires application compatibility review; Night Vision cannot establish application compatibility."
                     .to_owned(),
             ]
         } else {
             vec!["Candidate analysis has not yet been populated from NPM metadata.".to_owned()]
         },
     }
+}
+
+fn requires_compatibility_review(
+    upgrade_distance: &UpgradeAssessmentUpgradeDistance,
+    api_compatibility: &UpgradeAssessmentApiCompatibility,
+) -> bool {
+    matches!(upgrade_distance, UpgradeAssessmentUpgradeDistance::Major)
+        || matches!(
+            api_compatibility,
+            UpgradeAssessmentApiCompatibility::NoGuarantee
+        )
 }
 
 fn assessment_upgrade_distance(value: UpgradeDistance) -> UpgradeAssessmentUpgradeDistance {
@@ -2586,6 +2594,39 @@ mod tests {
     }
 
     #[test]
+    fn explicit_no_guarantee_patch_candidate_is_cautioned_when_base_verdict_is_recommended() {
+        let report = assessment_report(
+            UpgradeAssessmentInput {
+                current_version: "0.5.0".to_owned(),
+                candidate_version: Some("0.5.1".to_owned()),
+                ..input()
+            },
+            UpgradeAssessmentVerdict::Recommended,
+            Vec::new(),
+            None,
+        );
+
+        assert_eq!(
+            report.candidate_versions[0].upgrade_distance,
+            UpgradeAssessmentUpgradeDistance::Patch
+        );
+        assert_eq!(
+            report.candidate_versions[0].api_compatibility,
+            UpgradeAssessmentApiCompatibility::NoGuarantee
+        );
+        assert!(matches!(
+            report.candidate_versions[0].verdict,
+            UpgradeAssessmentVerdict::Caution
+        ));
+        assert!(
+            report.candidate_versions[0]
+                .caveats
+                .iter()
+                .any(|caveat| caveat.contains("compatibility review"))
+        );
+    }
+
+    #[test]
     fn blocking_supply_chain_finding_moves_candidate_to_avoid() {
         let report = assessment_report(
             input(),
@@ -2737,6 +2778,34 @@ mod tests {
         assert_eq!(
             report.candidate_versions[0].api_compatibility,
             UpgradeAssessmentApiCompatibility::Incompatible
+        );
+        assert!(matches!(
+            report.candidate_versions[0].verdict,
+            UpgradeAssessmentVerdict::Caution
+        ));
+        assert!(
+            report.candidate_versions[0]
+                .caveats
+                .iter()
+                .any(|caveat| caveat.contains("compatibility review"))
+        );
+    }
+
+    #[test]
+    fn initial_report_marks_no_guarantee_minor_candidates_as_caution() {
+        let mut assessment_input = input();
+        assessment_input.current_version = "0.5.0".to_owned();
+        assessment_input.candidate_version = Some("0.6.0".to_owned());
+
+        let report = initial_assessment_report(assessment_input);
+
+        assert_eq!(
+            report.candidate_versions[0].upgrade_distance,
+            UpgradeAssessmentUpgradeDistance::Minor
+        );
+        assert_eq!(
+            report.candidate_versions[0].api_compatibility,
+            UpgradeAssessmentApiCompatibility::NoGuarantee
         );
         assert!(matches!(
             report.candidate_versions[0].verdict,
