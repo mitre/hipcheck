@@ -254,6 +254,9 @@ export type UpgradeAssessmentUpgradeDistance = 'patch' | 'minor' | 'major' | 'un
 export type UpgradeAssessmentVerdict = 'recommended' | 'caution' | 'avoid' | 'unknown';
 
 export type UpgradeAssessmentVulnerabilityContext = {
+    /**
+     * Whether the affected baseline package version is linked to an active CISA KEV entry. This describes the assessment trigger, not the selected candidate's verdict.
+     */
     kevLinked?: boolean | null;
     trigger: UpgradeAssessmentTrigger;
 };
