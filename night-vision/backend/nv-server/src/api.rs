@@ -319,14 +319,13 @@ impl NvServerApi for RestApi {
         let log = ctx.log.new(slog::o!("assessment_id" => id.to_string()));
         tokio::spawn(async move {
             let _admission = admission;
-            if execute_queued_assessment(&db, &queued, &runner)
-                .await
-                .is_err()
-            {
+            if let Err(error) = execute_queued_assessment(&db, &queued, &runner).await {
                 slog::error!(
                     log,
                     "assessment could not persist terminal state";
                     "failure_kind" => "terminal-state-persistence",
+                    "error" => %error,
+                    "error_debug" => ?error,
                 );
             }
         });
@@ -900,7 +899,10 @@ fn assessment_http_error(error: nv_common::hipcheck::assessment::AssessmentError
                 "PURL is not an elaborated package version".to_owned(),
             )
         }
-        nv_common::hipcheck::assessment::AssessmentError::Database(_) => internal_server_error(),
+        nv_common::hipcheck::assessment::AssessmentError::Database(_)
+        | nv_common::hipcheck::assessment::AssessmentError::TerminalOutcomeNotPersisted(_) => {
+            internal_server_error()
+        }
     }
 }
 

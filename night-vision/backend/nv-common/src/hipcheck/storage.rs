@@ -209,7 +209,7 @@ pub async fn complete_hipcheck_run<C: ConnectionTrait + TransactionTrait>(
     let (raw_json, raw_json_truncated) = bound(raw_json);
     let (stdout, stdout_truncated) = bound(&diagnostics.stdout);
     let (stderr, stderr_truncated) = bound(&diagnostics.stderr);
-    let updated = hipcheck_runs::Entity::update_many()
+    let completed_transition_applied = hipcheck_runs::Entity::update_many()
         .col_expr(hipcheck_runs::Column::Status, Expr::value("completed"))
         .col_expr(hipcheck_runs::Column::RawJson, Expr::value(Some(raw_json)))
         .col_expr(
@@ -289,7 +289,7 @@ pub async fn complete_hipcheck_run<C: ConnectionTrait + TransactionTrait>(
         .await?
         .rows_affected
         == 1;
-    if !updated {
+    if !completed_transition_applied {
         transaction.rollback().await?;
         return Ok(false);
     }

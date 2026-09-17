@@ -99,10 +99,10 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
     config: &HipcheckRunnerConfig,
     executor: &E,
 ) -> Result<(), AssessmentError> {
-    let claimed = mark_hipcheck_run_running(db, queued.run_id)
+    let running_transition_applied = mark_hipcheck_run_running(db, queued.run_id)
         .await
         .map_err(AssessmentError::Database)?;
-    if !claimed {
+    if !running_transition_applied {
         // Startup reconciliation or another terminal writer already claimed this
         // run. Do not resurrect it or replace its durable outcome.
         return Ok(());
@@ -211,7 +211,7 @@ async fn complete_output(
             .await;
         }
     };
-    complete_hipcheck_run(
+    let result = complete_hipcheck_run(
         db,
         id,
         &raw,
@@ -225,9 +225,8 @@ async fn complete_output(
             &output.stderr,
         ),
     )
-    .await
-    .map(|_| ())
-    .map_err(AssessmentError::Database)
+    .await;
+    require_terminal_persistence_applied(result, id)
 }
 
 async fn persist_failure(
@@ -236,10 +235,19 @@ async fn persist_failure(
     diagnostics: HipcheckExecutionDiagnostics,
     raw: Option<&str>,
 ) -> Result<(), AssessmentError> {
-    fail_hipcheck_run(db, id, &diagnostics, raw)
-        .await
-        .map(|_| ())
-        .map_err(AssessmentError::Database)
+    let result = fail_hipcheck_run(db, id, &diagnostics, raw).await;
+    require_terminal_persistence_applied(result, id)
+}
+
+fn require_terminal_persistence_applied(
+    result: Result<bool, sea_orm::DbErr>,
+    run_id: i32,
+) -> Result<(), AssessmentError> {
+    match result {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(AssessmentError::TerminalOutcomeNotPersisted(run_id)),
+        Err(error) => Err(AssessmentError::Database(error)),
+    }
 }
 
 fn diagnostics(
@@ -294,12 +302,15 @@ pub enum AssessmentError {
     UnknownPurl(String),
     #[error("assessment database operation failed")]
     Database(#[source] sea_orm::DbErr),
+    #[error("failed to persist terminal assessment outcome for run {0}")]
+    TerminalOutcomeNotPersisted(i32),
 }
 
 #[cfg(test)]
 mod tests {
-    use super::safe_error_message;
+    use super::{AssessmentError, require_terminal_persistence_applied, safe_error_message};
     use crate::hipcheck::HipcheckExecutionError;
+    use sea_orm::DbErr;
 
     #[test]
     fn execution_failure_diagnostic_does_not_include_source_error_text() {
@@ -312,5 +323,23 @@ mod tests {
         assert_eq!(diagnostic, "assessment analysis failed");
         assert!(!diagnostic.contains("correct-horse-battery-staple"));
         assert!(!diagnostic.contains("external tool stderr"));
+    }
+
+    #[test]
+    fn terminal_persistence_requires_an_applied_transition() {
+        let error = require_terminal_persistence_applied(Ok(false), 42).unwrap_err();
+
+        assert!(matches!(error, AssessmentError::TerminalOutcomeNotPersisted(42)));
+    }
+
+    #[test]
+    fn terminal_persistence_preserves_database_errors() {
+        let error = require_terminal_persistence_applied(
+            Err(DbErr::Custom("database unavailable".to_owned())),
+            42,
+        )
+        .unwrap_err();
+
+        assert!(matches!(error, AssessmentError::Database(DbErr::Custom(message)) if message == "database unavailable"));
     }
 }
