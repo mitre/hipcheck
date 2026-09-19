@@ -205,7 +205,7 @@ fn upgrade_assessment_full_tree_round_trips_through_postgres() {
             assert_eq!(stored_caveats.len(), 1);
 
             clear_assessment_test_data(&db).await;
-        })
+        });
     });
 }
 
@@ -260,7 +260,7 @@ fn upgrade_assessment_verdict_can_be_updated_after_creation() {
             assert_eq!(reloaded.evidence_quality, "high");
 
             clear_assessment_test_data(&db).await;
-        })
+        });
     });
 }
 
@@ -322,7 +322,7 @@ fn upgrade_assessment_finding_can_be_updated_after_creation() {
             );
 
             clear_assessment_test_data(&db).await;
-        })
+        });
     });
 }
 
@@ -373,7 +373,7 @@ fn deleting_package_version_sets_candidate_reference_null() {
             assert_eq!(reloaded.candidate_version, "1.2.7");
 
             clear_assessment_test_data(&db).await;
-        })
+        });
     });
 }
 
@@ -423,7 +423,7 @@ fn deleting_cve_list_record_sets_evidence_reference_null() {
             assert_eq!(reloaded.cve_id, None);
 
             clear_assessment_test_data(&db).await;
-        })
+        });
     });
 }
 
@@ -558,7 +558,7 @@ fn deleting_upgrade_assessment_cascades_to_children() {
             );
 
             clear_assessment_test_data(&db).await;
-        })
+        });
     });
 }
 
@@ -645,6 +645,10 @@ async fn insert_verdict(
         .expect("verdict should exist after insert")
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "integration-test helpers keep the stored finding shape flat"
+)]
 async fn insert_finding(
     db: &DatabaseConnection,
     assessment_id: &str,

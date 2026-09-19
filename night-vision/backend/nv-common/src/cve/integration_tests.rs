@@ -150,7 +150,7 @@ fn cve_list_sync_writes_records_and_metadata_to_postgres() {
             assert!(latest_run.error.is_none());
 
             clear_cve_list_tables(&db).await;
-        })
+        });
     });
 }
 

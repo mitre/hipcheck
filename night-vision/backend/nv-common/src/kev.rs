@@ -1686,7 +1686,7 @@ mod tests {
                     .exec(&db)
                     .await
                     .expect("KEV sync runs should clear");
-            })
+            });
         });
     }
 
@@ -2057,7 +2057,7 @@ mod tests {
                     .exec(&db)
                     .await
                     .expect("KEV entries should clear");
-            })
+            });
         });
     }
 
