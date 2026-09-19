@@ -22,5 +22,6 @@ pub mod upgrade_assessment_caveats;
 pub mod upgrade_assessment_evidence_sources;
 pub mod upgrade_assessment_finding_evidence;
 pub mod upgrade_assessment_findings;
+pub mod upgrade_assessment_verdict_evidence;
 pub mod upgrade_assessment_verdicts;
 pub mod upgrade_assessments;

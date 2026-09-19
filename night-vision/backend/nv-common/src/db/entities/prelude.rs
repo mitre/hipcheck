@@ -20,5 +20,6 @@ pub use super::upgrade_assessment_caveats::Entity as UpgradeAssessmentCaveats;
 pub use super::upgrade_assessment_evidence_sources::Entity as UpgradeAssessmentEvidenceSources;
 pub use super::upgrade_assessment_finding_evidence::Entity as UpgradeAssessmentFindingEvidence;
 pub use super::upgrade_assessment_findings::Entity as UpgradeAssessmentFindings;
+pub use super::upgrade_assessment_verdict_evidence::Entity as UpgradeAssessmentVerdictEvidence;
 pub use super::upgrade_assessment_verdicts::Entity as UpgradeAssessmentVerdicts;
 pub use super::upgrade_assessments::Entity as UpgradeAssessments;

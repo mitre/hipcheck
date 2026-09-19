@@ -10,7 +10,7 @@ use crate::{
             cve_list_records, package_versions, packages, upgrade_assessment_candidates,
             upgrade_assessment_caveats, upgrade_assessment_evidence_sources,
             upgrade_assessment_finding_evidence, upgrade_assessment_findings,
-            upgrade_assessment_verdicts, upgrade_assessments,
+            upgrade_assessment_verdict_evidence, upgrade_assessment_verdicts, upgrade_assessments,
         },
     },
 };
@@ -64,8 +64,8 @@ fn upgrade_assessment_full_tree_round_trips_through_postgres() {
             computed_at: Default::default(),
             ..Default::default()
         };
-        upgrade_assessment_verdicts::Entity::insert(verdict)
-            .exec(&db)
+        let verdict = upgrade_assessment_verdicts::Entity::insert(verdict)
+            .exec_with_returning(&db)
             .await
             .expect("verdict should insert");
 
@@ -110,6 +110,16 @@ fn upgrade_assessment_full_tree_round_trips_through_postgres() {
         .await
         .expect("finding/evidence join row should insert");
 
+        upgrade_assessment_verdict_evidence::Entity::insert(
+            upgrade_assessment_verdict_evidence::ActiveModel {
+                verdict_id: Set(verdict.id),
+                evidence_source_id: Set(evidence.id),
+            },
+        )
+        .exec(&db)
+        .await
+        .expect("verdict/evidence join row should insert");
+
         upgrade_assessment_caveats::Entity::insert(upgrade_assessment_caveats::ActiveModel {
             upgrade_assessment_id: Set(assessment_id.clone()),
             candidate_id: Set(Some(candidate.id)),
@@ -139,6 +149,14 @@ fn upgrade_assessment_full_tree_round_trips_through_postgres() {
             .expect("verdict lookup should succeed")
             .expect("verdict should be stored");
         assert_eq!(stored_verdict.verdict, "recommended");
+
+        let stored_verdict_join = upgrade_assessment_verdict_evidence::Entity::find()
+            .filter(upgrade_assessment_verdict_evidence::Column::VerdictId.eq(stored_verdict.id))
+            .all(&db)
+            .await
+            .expect("verdict/evidence join lookup should succeed");
+        assert_eq!(stored_verdict_join.len(), 1);
+        assert_eq!(stored_verdict_join[0].evidence_source_id, evidence.id);
 
         let stored_findings = upgrade_assessment_findings::Entity::find()
             .filter(
@@ -344,17 +362,18 @@ fn deleting_upgrade_assessment_cascades_to_children() {
             .await
             .expect("candidate should insert");
 
-        upgrade_assessment_verdicts::Entity::insert(upgrade_assessment_verdicts::ActiveModel {
-            candidate_id: Set(candidate.id),
-            verdict: Set("recommended".to_owned()),
-            rationale: Set("test rationale".to_owned()),
-            evidence_quality: Set("high".to_owned()),
-            computed_at: Default::default(),
-            ..Default::default()
-        })
-        .exec(&db)
-        .await
-        .expect("verdict should insert");
+        let verdict =
+            upgrade_assessment_verdicts::Entity::insert(upgrade_assessment_verdicts::ActiveModel {
+                candidate_id: Set(candidate.id),
+                verdict: Set("recommended".to_owned()),
+                rationale: Set("test rationale".to_owned()),
+                evidence_quality: Set("high".to_owned()),
+                computed_at: Default::default(),
+                ..Default::default()
+            })
+            .exec_with_returning(&db)
+            .await
+            .expect("verdict should insert");
 
         let finding = upgrade_assessment_findings::ActiveModel {
             upgrade_assessment_id: Set(assessment_id.clone()),
@@ -396,6 +415,16 @@ fn deleting_upgrade_assessment_cascades_to_children() {
         .exec(&db)
         .await
         .expect("join row should insert");
+
+        upgrade_assessment_verdict_evidence::Entity::insert(
+            upgrade_assessment_verdict_evidence::ActiveModel {
+                verdict_id: Set(verdict.id),
+                evidence_source_id: Set(evidence.id),
+            },
+        )
+        .exec(&db)
+        .await
+        .expect("verdict/evidence join row should insert");
 
         upgrade_assessment_caveats::Entity::insert(upgrade_assessment_caveats::ActiveModel {
             upgrade_assessment_id: Set(assessment_id.clone()),
@@ -439,6 +468,13 @@ fn deleting_upgrade_assessment_cascades_to_children() {
                 .one(&db)
                 .await
                 .expect("join lookup should succeed")
+                .is_none()
+        );
+        assert!(
+            upgrade_assessment_verdict_evidence::Entity::find_by_id((verdict.id, evidence.id))
+                .one(&db)
+                .await
+                .expect("verdict/evidence join lookup should succeed")
                 .is_none()
         );
         assert!(

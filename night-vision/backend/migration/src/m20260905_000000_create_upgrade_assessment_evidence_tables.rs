@@ -159,7 +159,8 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Normalized evidence (KEV/CVE/Hipcheck/etc.) backing findings and verdicts.
+        // Normalized evidence (KEV/CVE/Hipcheck/etc.) referenced by findings and
+        // verdicts through join tables.
         manager
             .create_table(
                 Table::create()
@@ -247,6 +248,48 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // Join table: a verdict may cite multiple evidence sources and an evidence
+        // source may support multiple verdicts.
+        manager
+            .create_table(
+                Table::create()
+                    .table(UpgradeAssessmentVerdictEvidence::Table)
+                    .if_not_exists()
+                    .col(integer(UpgradeAssessmentVerdictEvidence::VerdictId))
+                    .col(integer(UpgradeAssessmentVerdictEvidence::EvidenceSourceId))
+                    .primary_key(
+                        Index::create()
+                            .col(UpgradeAssessmentVerdictEvidence::VerdictId)
+                            .col(UpgradeAssessmentVerdictEvidence::EvidenceSourceId),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                UpgradeAssessmentVerdictEvidence::Table,
+                                UpgradeAssessmentVerdictEvidence::VerdictId,
+                            )
+                            .to(
+                                UpgradeAssessmentVerdicts::Table,
+                                UpgradeAssessmentVerdicts::Id,
+                            )
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                UpgradeAssessmentVerdictEvidence::Table,
+                                UpgradeAssessmentVerdictEvidence::EvidenceSourceId,
+                            )
+                            .to(
+                                UpgradeAssessmentEvidenceSources::Table,
+                                UpgradeAssessmentEvidenceSources::Id,
+                            )
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
         // Free-text caveats surfaced alongside an assessment or one of its candidates.
         manager
             .create_table(
@@ -294,6 +337,13 @@ impl MigrationTrait for Migration {
             .drop_table(
                 Table::drop()
                     .table(UpgradeAssessmentCaveats::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(UpgradeAssessmentVerdictEvidence::Table)
                     .to_owned(),
             )
             .await?;
@@ -388,6 +438,13 @@ enum UpgradeAssessmentEvidenceSources {
 enum UpgradeAssessmentFindingEvidence {
     Table,
     FindingId,
+    EvidenceSourceId,
+}
+
+#[derive(DeriveIden)]
+enum UpgradeAssessmentVerdictEvidence {
+    Table,
+    VerdictId,
     EvidenceSourceId,
 }
 
