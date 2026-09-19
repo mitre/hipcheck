@@ -931,7 +931,8 @@ fn kev_entry_upsert_statement(entries: &[KevEntry]) -> Statement {
          ELSE \"cisa_kev_entries\".\"updated_at\" END \
          RETURNING WITH (OLD AS old, NEW AS new) \
          old.\"cve_id\" IS NULL AS inserted, \
-         old.\"entry\" IS DISTINCT FROM new.\"entry\" AS updated",
+         old.\"cve_id\" IS NOT NULL \
+         AND old.\"entry\" IS DISTINCT FROM new.\"entry\" AS updated",
     );
 
     Statement::from_sql_and_values(DatabaseBackend::Postgres, sql, values)
@@ -1295,6 +1296,7 @@ fn generate_cache_headers(cache_metadata: &CacheMetadata) -> HeaderMap {
 mod tests {
     use super::*;
     use crate::config::Config;
+    use crate::test_util::with_integration_test_db_lock;
     use camino::Utf8PathBuf;
     use httpmock::prelude::*;
     use sea_orm::{DbBackend, MockDatabase, MockExecResult, Value};
@@ -1640,49 +1642,51 @@ mod tests {
     #[test]
     #[ignore = "requires a disposable Postgres test database"]
     fn failed_sync_run_commits_failure_details() {
-        run_async(async {
-            let db = connect_to_integration_database().await;
-            cisa_kev_sync_runs::Entity::delete_many()
-                .exec(&db)
-                .await
-                .expect("KEV sync runs should clear");
+        with_integration_test_db_lock(|| {
+            run_async(async {
+                let db = connect_to_integration_database().await;
+                cisa_kev_sync_runs::Entity::delete_many()
+                    .exec(&db)
+                    .await
+                    .expect("KEV sync runs should clear");
 
-            let transaction = db.begin().await.expect("transaction should begin");
-            let sync_run = create_sync_run(&transaction)
+                let transaction = db.begin().await.expect("transaction should begin");
+                let sync_run = create_sync_run(&transaction)
+                    .await
+                    .expect("sync run should be created");
+                finish_kev_sync_run(
+                    &transaction,
+                    sync_run.generation,
+                    FinishKevSyncRun::failed("upstream request timed out".to_owned()),
+                )
                 .await
-                .expect("sync run should be created");
-            finish_kev_sync_run(
-                &transaction,
-                sync_run.generation,
-                FinishKevSyncRun::failed("upstream request timed out".to_owned()),
-            )
-            .await
-            .expect("failure details should be stored");
-            transaction
-                .commit()
-                .await
-                .expect("transaction should commit");
+                .expect("failure details should be stored");
+                transaction
+                    .commit()
+                    .await
+                    .expect("transaction should commit");
 
-            let run = cisa_kev_sync_runs::Entity::find()
-                .one(&db)
-                .await
-                .expect("sync-run lookup should succeed")
-                .expect("sync run should be stored");
-            assert_eq!(run.status, "failed");
-            assert_eq!(run.error.as_deref(), Some("upstream request timed out"));
-            assert!(run.completed_at.is_some());
-            assert_eq!(run.catalog_version, None);
-            assert_eq!(run.catalog_date_released, None);
-            assert_eq!(run.catalog_count, None);
-            assert_eq!(run.content_sha256, None);
-            assert_eq!(run.records_seen, 0);
-            assert_eq!(run.records_inserted, 0);
-            assert_eq!(run.records_updated, 0);
+                let run = cisa_kev_sync_runs::Entity::find()
+                    .one(&db)
+                    .await
+                    .expect("sync-run lookup should succeed")
+                    .expect("sync run should be stored");
+                assert_eq!(run.status, "failed");
+                assert_eq!(run.error.as_deref(), Some("upstream request timed out"));
+                assert!(run.completed_at.is_some());
+                assert_eq!(run.catalog_version, None);
+                assert_eq!(run.catalog_date_released, None);
+                assert_eq!(run.catalog_count, None);
+                assert_eq!(run.content_sha256, None);
+                assert_eq!(run.records_seen, 0);
+                assert_eq!(run.records_inserted, 0);
+                assert_eq!(run.records_updated, 0);
 
-            cisa_kev_sync_runs::Entity::delete_many()
-                .exec(&db)
-                .await
-                .expect("KEV sync runs should clear");
+                cisa_kev_sync_runs::Entity::delete_many()
+                    .exec(&db)
+                    .await
+                    .expect("KEV sync runs should clear");
+            })
         });
     }
 
@@ -2009,47 +2013,51 @@ mod tests {
     #[test]
     #[ignore = "requires a disposable Postgres test database"]
     fn repeated_entries_refresh_payload_and_timestamps() {
-        run_async(async {
-            let db = connect_to_integration_database().await;
-            cisa_kev_entries::Entity::delete_many()
-                .exec(&db)
-                .await
-                .expect("KEV entries should clear");
+        with_integration_test_db_lock(|| {
+            run_async(async {
+                let db = connect_to_integration_database().await;
+                cisa_kev_entries::Entity::delete_many()
+                    .exec(&db)
+                    .await
+                    .expect("KEV entries should clear");
 
-            let initial_entry = kev_entry("initial description");
-            let initial_summary = write_entries(&db, std::slice::from_ref(&initial_entry)).await;
-            assert_eq!(initial_summary.records_seen, 1);
-            assert_eq!(initial_summary.records_inserted, 1);
-            assert_eq!(initial_summary.records_updated, 0);
-            let initial = read_entry(&db).await;
+                let initial_entry = kev_entry("initial description");
+                let initial_summary =
+                    write_entries(&db, std::slice::from_ref(&initial_entry)).await;
+                assert_eq!(initial_summary.records_seen, 1);
+                assert_eq!(initial_summary.records_inserted, 1);
+                assert_eq!(initial_summary.records_updated, 0);
+                let initial = read_entry(&db).await;
 
-            tokio::time::sleep(Duration::from_millis(5)).await;
-            let unchanged_summary = write_entries(&db, &[initial_entry]).await;
-            assert_eq!(unchanged_summary.records_seen, 1);
-            assert_eq!(unchanged_summary.records_inserted, 0);
-            assert_eq!(unchanged_summary.records_updated, 0);
-            let unchanged = read_entry(&db).await;
-            assert_eq!(unchanged.entry, initial.entry);
-            assert_eq!(unchanged.first_seen_at, initial.first_seen_at);
-            assert!(unchanged.last_seen_at > initial.last_seen_at);
-            assert_eq!(unchanged.updated_at, initial.updated_at);
+                tokio::time::sleep(Duration::from_millis(5)).await;
+                let unchanged_summary = write_entries(&db, &[initial_entry]).await;
+                assert_eq!(unchanged_summary.records_seen, 1);
+                assert_eq!(unchanged_summary.records_inserted, 0);
+                assert_eq!(unchanged_summary.records_updated, 0);
+                let unchanged = read_entry(&db).await;
+                assert_eq!(unchanged.entry, initial.entry);
+                assert_eq!(unchanged.first_seen_at, initial.first_seen_at);
+                assert!(unchanged.last_seen_at > initial.last_seen_at);
+                assert_eq!(unchanged.updated_at, initial.updated_at);
 
-            tokio::time::sleep(Duration::from_millis(5)).await;
-            let changed_entry = kev_entry("changed description");
-            let changed_summary = write_entries(&db, std::slice::from_ref(&changed_entry)).await;
-            assert_eq!(changed_summary.records_seen, 1);
-            assert_eq!(changed_summary.records_inserted, 0);
-            assert_eq!(changed_summary.records_updated, 1);
-            let changed = read_entry(&db).await;
-            assert_eq!(changed.entry, changed_entry);
-            assert_eq!(changed.first_seen_at, initial.first_seen_at);
-            assert!(changed.last_seen_at > unchanged.last_seen_at);
-            assert!(changed.updated_at > unchanged.updated_at);
+                tokio::time::sleep(Duration::from_millis(5)).await;
+                let changed_entry = kev_entry("changed description");
+                let changed_summary =
+                    write_entries(&db, std::slice::from_ref(&changed_entry)).await;
+                assert_eq!(changed_summary.records_seen, 1);
+                assert_eq!(changed_summary.records_inserted, 0);
+                assert_eq!(changed_summary.records_updated, 1);
+                let changed = read_entry(&db).await;
+                assert_eq!(changed.entry, changed_entry);
+                assert_eq!(changed.first_seen_at, initial.first_seen_at);
+                assert!(changed.last_seen_at > unchanged.last_seen_at);
+                assert!(changed.updated_at > unchanged.updated_at);
 
-            cisa_kev_entries::Entity::delete_many()
-                .exec(&db)
-                .await
-                .expect("KEV entries should clear");
+                cisa_kev_entries::Entity::delete_many()
+                    .exec(&db)
+                    .await
+                    .expect("KEV entries should clear");
+            })
         });
     }
 

@@ -5,6 +5,7 @@ use crate::{
         sync::sync_cve_list_once,
     },
     db::{connection, entities::cve_list_records, entities::cve_list_sync_runs},
+    test_util::with_integration_test_db_lock,
 };
 use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -23,131 +24,133 @@ const TEST_CVE_ID: &str = "CVE-2026-9000001";
 #[test]
 #[ignore = "requires a disposable Postgres test database"]
 fn cve_list_sync_writes_records_and_metadata_to_postgres() {
-    run_async(async {
-        let db = connect_to_integration_database().await;
-        clear_cve_list_tables(&db).await;
+    with_integration_test_db_lock(|| {
+        run_async(async {
+            let db = connect_to_integration_database().await;
+            clear_cve_list_tables(&db).await;
 
-        let path = cve_path(TEST_CVE_ID);
-        let repository_url =
-            Url::parse("https://example.test/night-vision/cvelistV5.git").expect("valid URL");
-        let repository_ref = GitRef::parse("main").expect("valid Git ref");
+            let path = cve_path(TEST_CVE_ID);
+            let repository_url =
+                Url::parse("https://example.test/night-vision/cvelistV5.git").expect("valid URL");
+            let repository_ref = GitRef::parse("main").expect("valid Git ref");
 
-        let first_git = MockCveListGit {
-            commit: CommitSha::parse(OLD_COMMIT_SHA).expect("valid commit SHA"),
-            all_paths: vec![path.clone()],
-            changed_paths: Vec::new(),
-            files: HashMap::from([(
-                path.clone(),
-                cve_record(TEST_CVE_ID, "5.2", "initial detail"),
-            )]),
-        };
+            let first_git = MockCveListGit {
+                commit: CommitSha::parse(OLD_COMMIT_SHA).expect("valid commit SHA"),
+                all_paths: vec![path.clone()],
+                changed_paths: Vec::new(),
+                files: HashMap::from([(
+                    path.clone(),
+                    cve_record(TEST_CVE_ID, "5.2", "initial detail"),
+                )]),
+            };
 
-        let first_summary =
-            sync_cve_list_once(&db, &first_git, &repository_url, &repository_ref, 50)
+            let first_summary =
+                sync_cve_list_once(&db, &first_git, &repository_url, &repository_ref, 50)
+                    .await
+                    .expect("initial sync should succeed");
+
+            assert_eq!(first_summary.records_seen, 1);
+            assert_eq!(first_summary.records_inserted, 1);
+            assert_eq!(first_summary.records_updated, 0);
+
+            let stored = cve_list_records::Entity::find_by_id(TEST_CVE_ID.to_owned())
+                .one(&db)
                 .await
-                .expect("initial sync should succeed");
+                .expect("record lookup should succeed")
+                .expect("record should be stored");
+            assert_eq!(stored.record_format_version, "5.2");
+            assert!(!stored.deleted);
+            assert_eq!(stored.record["cveMetadata"]["cveId"], TEST_CVE_ID);
+            assert_eq!(
+                stored.record["containers"]["cna"]["title"],
+                "initial detail"
+            );
+            assert_eq!(
+                stored.record["unknownFutureField"],
+                json!({
+                    "kept": true
+                })
+            );
 
-        assert_eq!(first_summary.records_seen, 1);
-        assert_eq!(first_summary.records_inserted, 1);
-        assert_eq!(first_summary.records_updated, 0);
-
-        let stored = cve_list_records::Entity::find_by_id(TEST_CVE_ID.to_owned())
-            .one(&db)
-            .await
-            .expect("record lookup should succeed")
-            .expect("record should be stored");
-        assert_eq!(stored.record_format_version, "5.2");
-        assert!(!stored.deleted);
-        assert_eq!(stored.record["cveMetadata"]["cveId"], TEST_CVE_ID);
-        assert_eq!(
-            stored.record["containers"]["cna"]["title"],
-            "initial detail"
-        );
-        assert_eq!(
-            stored.record["unknownFutureField"],
-            json!({
-                "kept": true
-            })
-        );
-
-        let invalid_record = cve_list_records::ActiveModel {
-            cve_id: Set("CVE-2026-9000002".to_owned()),
-            record_format_version: Set("5.2".to_owned()),
-            record: Set(json!({
-                "dataType": "CVE_RECORD",
-                "dataVersion": "5.2",
-                "cveMetadata": {
-                    "cveId": "CVE-2026-9000003"
-                }
-            })),
-            deleted: Set(false),
-            first_seen_at: Default::default(),
-            last_seen_at: Default::default(),
-            updated_at: Default::default(),
-        };
-        let constraint_error = cve_list_records::Entity::insert(invalid_record)
-            .exec(&db)
-            .await
-            .expect_err("mismatched CVE ID should fail the database check constraint");
-        assert!(
-            constraint_error.to_string().contains("check")
-                || constraint_error.to_string().contains("constraint"),
-            "expected check constraint failure, got {constraint_error}"
-        );
-
-        let second_git = MockCveListGit {
-            commit: CommitSha::parse(NEW_COMMIT_SHA).expect("valid commit SHA"),
-            all_paths: Vec::new(),
-            changed_paths: vec![path.clone()],
-            files: HashMap::from([(path, cve_record(TEST_CVE_ID, "5.3", "updated detail"))]),
-        };
-
-        let second_summary =
-            sync_cve_list_once(&db, &second_git, &repository_url, &repository_ref, 50)
+            let invalid_record = cve_list_records::ActiveModel {
+                cve_id: Set("CVE-2026-9000002".to_owned()),
+                record_format_version: Set("5.2".to_owned()),
+                record: Set(json!({
+                    "dataType": "CVE_RECORD",
+                    "dataVersion": "5.2",
+                    "cveMetadata": {
+                        "cveId": "CVE-2026-9000003"
+                    }
+                })),
+                deleted: Set(false),
+                first_seen_at: Default::default(),
+                last_seen_at: Default::default(),
+                updated_at: Default::default(),
+            };
+            let constraint_error = cve_list_records::Entity::insert(invalid_record)
+                .exec(&db)
                 .await
-                .expect("incremental sync should succeed");
+                .expect_err("mismatched CVE ID should fail the database check constraint");
+            assert!(
+                constraint_error.to_string().contains("check")
+                    || constraint_error.to_string().contains("constraint"),
+                "expected check constraint failure, got {constraint_error}"
+            );
 
-        assert_eq!(second_summary.records_seen, 1);
-        assert_eq!(second_summary.records_inserted, 0);
-        assert_eq!(second_summary.records_updated, 1);
+            let second_git = MockCveListGit {
+                commit: CommitSha::parse(NEW_COMMIT_SHA).expect("valid commit SHA"),
+                all_paths: Vec::new(),
+                changed_paths: vec![path.clone()],
+                files: HashMap::from([(path, cve_record(TEST_CVE_ID, "5.3", "updated detail"))]),
+            };
 
-        let updated = cve_list_records::Entity::find_by_id(TEST_CVE_ID.to_owned())
-            .one(&db)
-            .await
-            .expect("record lookup should succeed")
-            .expect("record should still be stored");
-        assert_eq!(updated.record_format_version, "5.3");
-        assert!(!updated.deleted);
-        assert_eq!(
-            updated.record["containers"]["cna"]["title"],
-            "updated detail"
-        );
-        assert_eq!(updated.first_seen_at, stored.first_seen_at);
-        assert!(updated.last_seen_at >= stored.last_seen_at);
+            let second_summary =
+                sync_cve_list_once(&db, &second_git, &repository_url, &repository_ref, 50)
+                    .await
+                    .expect("incremental sync should succeed");
 
-        let latest_run = cve_list_sync_runs::Entity::find()
-            .order_by_desc(cve_list_sync_runs::Column::Generation)
-            .one(&db)
-            .await
-            .expect("sync-run lookup should succeed")
-            .expect("sync run should be stored");
-        assert_eq!(latest_run.status, "success");
-        assert_eq!(
-            latest_run.repository_url.as_deref(),
-            Some(repository_url.as_str())
-        );
-        assert_eq!(
-            latest_run.repository_ref.as_deref(),
-            Some(repository_ref.as_str())
-        );
-        assert_eq!(latest_run.commit_sha.as_deref(), Some(NEW_COMMIT_SHA));
-        assert_eq!(latest_run.records_seen, 1);
-        assert_eq!(latest_run.records_inserted, 0);
-        assert_eq!(latest_run.records_updated, 1);
-        assert!(latest_run.completed_at.is_some());
-        assert!(latest_run.error.is_none());
+            assert_eq!(second_summary.records_seen, 1);
+            assert_eq!(second_summary.records_inserted, 0);
+            assert_eq!(second_summary.records_updated, 1);
 
-        clear_cve_list_tables(&db).await;
+            let updated = cve_list_records::Entity::find_by_id(TEST_CVE_ID.to_owned())
+                .one(&db)
+                .await
+                .expect("record lookup should succeed")
+                .expect("record should still be stored");
+            assert_eq!(updated.record_format_version, "5.3");
+            assert!(!updated.deleted);
+            assert_eq!(
+                updated.record["containers"]["cna"]["title"],
+                "updated detail"
+            );
+            assert_eq!(updated.first_seen_at, stored.first_seen_at);
+            assert!(updated.last_seen_at >= stored.last_seen_at);
+
+            let latest_run = cve_list_sync_runs::Entity::find()
+                .order_by_desc(cve_list_sync_runs::Column::Generation)
+                .one(&db)
+                .await
+                .expect("sync-run lookup should succeed")
+                .expect("sync run should be stored");
+            assert_eq!(latest_run.status, "success");
+            assert_eq!(
+                latest_run.repository_url.as_deref(),
+                Some(repository_url.as_str())
+            );
+            assert_eq!(
+                latest_run.repository_ref.as_deref(),
+                Some(repository_ref.as_str())
+            );
+            assert_eq!(latest_run.commit_sha.as_deref(), Some(NEW_COMMIT_SHA));
+            assert_eq!(latest_run.records_seen, 1);
+            assert_eq!(latest_run.records_inserted, 0);
+            assert_eq!(latest_run.records_updated, 1);
+            assert!(latest_run.completed_at.is_some());
+            assert!(latest_run.error.is_none());
+
+            clear_cve_list_tables(&db).await;
+        })
     });
 }
 

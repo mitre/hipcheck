@@ -1,9 +1,19 @@
 use camino::Utf8Path;
+use std::sync::{LazyLock, Mutex};
 
 #[cfg(unix)]
 use std::fs;
 #[cfg(windows)]
 use std::process::Command;
+
+static INTEGRATION_TEST_DB_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+pub(crate) fn with_integration_test_db_lock<T>(operation: impl FnOnce() -> T) -> T {
+    let _guard = INTEGRATION_TEST_DB_LOCK
+        .lock()
+        .expect("integration test DB lock should not be poisoned");
+    operation()
+}
 
 pub enum TestFilePermissions {
     #[cfg(unix)]
