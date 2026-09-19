@@ -204,12 +204,12 @@ fn upgrade_assessment_full_tree_round_trips_through_postgres() {
 
 #[test]
 #[ignore = "requires a disposable Postgres test database"]
-fn upgrade_assessment_verdict_and_finding_can_be_updated_after_creation() {
+fn upgrade_assessment_verdict_can_be_updated_after_creation() {
     run_async(async {
         let db = connect_to_integration_database().await;
         clear_assessment_test_data(&db).await;
 
-        let assessment_id = format!("{TEST_ASSESSMENT_ID_PREFIX}update");
+        let assessment_id = format!("{TEST_ASSESSMENT_ID_PREFIX}update-verdict");
         insert_upgrade_assessment(&db, &assessment_id, None).await;
 
         let candidate = upgrade_assessment_candidates::ActiveModel {
@@ -248,6 +248,81 @@ fn upgrade_assessment_verdict_and_finding_can_be_updated_after_creation() {
             .expect("verdict should update in place");
         assert_eq!(updated.verdict, "recommended");
         assert_eq!(updated.evidence_quality, "high");
+
+        let reloaded = upgrade_assessment_verdicts::Entity::find_by_id(updated.id)
+            .one(&db)
+            .await
+            .expect("verdict lookup should succeed")
+            .expect("updated verdict should still exist");
+        assert_eq!(reloaded.verdict, "recommended");
+        assert_eq!(reloaded.rationale, "re-scored once evidence arrived");
+        assert_eq!(reloaded.evidence_quality, "high");
+
+        clear_assessment_test_data(&db).await;
+    });
+}
+
+#[test]
+#[ignore = "requires a disposable Postgres test database"]
+fn upgrade_assessment_finding_can_be_updated_after_creation() {
+    run_async(async {
+        let db = connect_to_integration_database().await;
+        clear_assessment_test_data(&db).await;
+
+        let assessment_id = format!("{TEST_ASSESSMENT_ID_PREFIX}update-finding");
+        insert_upgrade_assessment(&db, &assessment_id, None).await;
+
+        let candidate = upgrade_assessment_candidates::ActiveModel {
+            upgrade_assessment_id: Set(assessment_id.clone()),
+            candidate_package_version_id: Set(None),
+            candidate_version: Set("1.2.7".to_owned()),
+            upgrade_distance: Set("patch".to_owned()),
+            created_at: Default::default(),
+            ..Default::default()
+        };
+        let candidate = upgrade_assessment_candidates::Entity::insert(candidate)
+            .exec_with_returning(&db)
+            .await
+            .expect("candidate should insert");
+
+        let finding = upgrade_assessment_findings::ActiveModel {
+            upgrade_assessment_id: Set(assessment_id.clone()),
+            candidate_id: Set(Some(candidate.id)),
+            source: Set("night-vision".to_owned()),
+            detection_kind: Set("vulnerability-status".to_owned()),
+            effect: Set("context".to_owned()),
+            severity: Set(None),
+            summary: Set("candidate removes the KEV-listed exposure".to_owned()),
+            created_at: Default::default(),
+            ..Default::default()
+        };
+        let finding = upgrade_assessment_findings::Entity::insert(finding)
+            .exec_with_returning(&db)
+            .await
+            .expect("finding should insert");
+
+        let mut updated = finding.into_active_model();
+        updated.effect = Set("risk".to_owned());
+        updated.severity = Set(Some("low".to_owned()));
+        updated.summary = Set("candidate introduces a low-severity compatibility risk".to_owned());
+        let updated = updated
+            .update(&db)
+            .await
+            .expect("finding should update in place");
+        assert_eq!(updated.effect, "risk");
+        assert_eq!(updated.severity.as_deref(), Some("low"));
+
+        let reloaded = upgrade_assessment_findings::Entity::find_by_id(updated.id)
+            .one(&db)
+            .await
+            .expect("finding lookup should succeed")
+            .expect("updated finding should still exist");
+        assert_eq!(reloaded.effect, "risk");
+        assert_eq!(reloaded.severity.as_deref(), Some("low"));
+        assert_eq!(
+            reloaded.summary,
+            "candidate introduces a low-severity compatibility risk"
+        );
 
         clear_assessment_test_data(&db).await;
     });
