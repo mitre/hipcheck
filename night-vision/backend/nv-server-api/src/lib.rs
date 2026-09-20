@@ -272,20 +272,20 @@ mod tests {
     #[test]
     fn upgrade_assessment_verdict_serializes_to_required_lowercase_values() {
         assert_eq!(
-            serde_json::to_string(&UpgradeAssessmentVerdict::Recommended).unwrap(),
-            "recommended"
+            serde_json::to_value(UpgradeAssessmentVerdict::Recommended).unwrap(),
+            serde_json::json!("recommended")
         );
         assert_eq!(
-            serde_json::to_string(&UpgradeAssessmentVerdict::Caution).unwrap(),
-            "caution"
+            serde_json::to_value(UpgradeAssessmentVerdict::Caution).unwrap(),
+            serde_json::json!("caution")
         );
         assert_eq!(
-            serde_json::to_string(&UpgradeAssessmentVerdict::Avoid).unwrap(),
-            "avoid"
+            serde_json::to_value(UpgradeAssessmentVerdict::Avoid).unwrap(),
+            serde_json::json!("avoid")
         );
         assert_eq!(
-            serde_json::to_string(&UpgradeAssessmentVerdict::Unknown).unwrap(),
-            "unknown"
+            serde_json::to_value(UpgradeAssessmentVerdict::Unknown).unwrap(),
+            serde_json::json!("unknown")
         );
     }
 
@@ -459,7 +459,7 @@ mod tests {
         };
 
         let value = serde_json::to_value(result).unwrap();
-        assert_eq!(value["findings"][0]["category"], "supply-chain");
+        assert_eq!(value["findings"][0]["category"], "supplyChain");
         assert_eq!(value["evidence"][0]["sourceType"], "hipcheck");
         assert_eq!(value["caveats"][0]["code"], "candidate-not-verified");
     }
