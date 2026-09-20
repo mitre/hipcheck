@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use dropshot::{HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, TypedBody};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use uuid::Uuid;
 
 /// Maximum encoded JSON request size for a package-source submission.
@@ -13,6 +14,12 @@ use uuid::Uuid;
 /// This accommodates a maximally escaped 1 MiB `package.json` document plus
 /// the JSON request envelope.
 pub const MAX_PACKAGE_SOURCE_REQUEST_BODY_BYTES: usize = 3 * 1024 * 1024;
+
+/// Maximum encoded JSON request size for an upgrade-assessment submission.
+///
+/// This accommodates a package source payload equivalent to a package-source
+/// upload plus the surrounding assessment-specific request envelope.
+pub const MAX_UPGRADE_ASSESSMENT_REQUEST_BODY_BYTES: usize = 3 * 1024 * 1024;
 
 #[dropshot::api_description]
 pub trait NvServerApi {
@@ -76,6 +83,8 @@ pub trait NvServerApi {
     #[endpoint {
         method = POST,
         path = "/upgrade-assessments",
+        content_type = "application/json",
+        request_body_max_bytes = MAX_UPGRADE_ASSESSMENT_REQUEST_BODY_BYTES,
     }]
     async fn post_upgrade_assessment(
         ctx: RequestContext<Self::Context>,
@@ -90,6 +99,15 @@ pub trait NvServerApi {
         ctx: RequestContext<Self::Context>,
         path_params: Path<UpgradeAssessmentPathParams>,
     ) -> Result<HttpResponseOk<UpgradeAssessmentStatus>, HttpError>;
+
+    #[endpoint {
+        method = GET,
+        path = "/upgrade-assessments/{id}/result",
+    }]
+    async fn get_upgrade_assessment_result(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<UpgradeAssessmentPathParams>,
+    ) -> Result<HttpResponseOk<UpgradeAssessmentResult>, HttpError>;
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -204,7 +222,16 @@ pub struct CveListSyncRunHealth {
 
 #[cfg(test)]
 mod tests {
-    use super::{CveIngestHealth, Health, HealthDiagnostics};
+    use super::{
+        CveIngestHealth, Health, HealthDiagnostics, PackageSourceEcosystem,
+        UpgradeAssessmentCandidateVersion, UpgradeAssessmentCaveat, UpgradeAssessmentError,
+        UpgradeAssessmentEvidence, UpgradeAssessmentEvidenceSourceType, UpgradeAssessmentFinding,
+        UpgradeAssessmentFindingCategory, UpgradeAssessmentFindingEffect, UpgradeAssessmentInput,
+        UpgradeAssessmentKevLinkage, UpgradeAssessmentPackageSourceInput, UpgradeAssessmentResult,
+        UpgradeAssessmentStatus, UpgradeAssessmentVerdict, UpgradeAssessmentVulnerablePackageInput,
+        UpgradeAssessmentWorkflowStatus,
+    };
+    use chrono::Utc;
 
     #[test]
     fn public_health_omits_operator_diagnostics() {
@@ -238,6 +265,216 @@ mod tests {
                     "latestSuccessfulCommit": "abc123",
                     "latestRun": null,
                 },
+            })
+        );
+    }
+
+    #[test]
+    fn upgrade_assessment_verdict_serializes_to_required_lowercase_values() {
+        assert_eq!(
+            serde_json::to_string(&UpgradeAssessmentVerdict::Recommended).unwrap(),
+            "recommended"
+        );
+        assert_eq!(
+            serde_json::to_string(&UpgradeAssessmentVerdict::Caution).unwrap(),
+            "caution"
+        );
+        assert_eq!(
+            serde_json::to_string(&UpgradeAssessmentVerdict::Avoid).unwrap(),
+            "avoid"
+        );
+        assert_eq!(
+            serde_json::to_string(&UpgradeAssessmentVerdict::Unknown).unwrap(),
+            "unknown"
+        );
+    }
+
+    #[test]
+    fn upgrade_assessment_status_shape_serializes_as_workflow_metadata_only() {
+        let timestamp = Utc::now();
+        let status = UpgradeAssessmentStatus {
+            id: uuid::Uuid::nil(),
+            status: UpgradeAssessmentWorkflowStatus::Pending,
+            created_at: timestamp,
+            updated_at: timestamp,
+            completed_at: None,
+            error: None,
+        };
+
+        assert_eq!(
+            serde_json::to_value(status).unwrap(),
+            serde_json::json!({
+                "id": uuid::Uuid::nil(),
+                "status": "pending",
+                "createdAt": timestamp,
+                "updatedAt": timestamp,
+            })
+        );
+    }
+
+    #[test]
+    fn upgrade_assessment_result_omits_optional_input_refinements_when_absent() {
+        let timestamp = Utc::now();
+        let result = UpgradeAssessmentResult {
+            id: uuid::Uuid::nil(),
+            status: UpgradeAssessmentWorkflowStatus::Completed,
+            input: UpgradeAssessmentInput {
+                package_source: UpgradeAssessmentPackageSourceInput {
+                    ecosystem: PackageSourceEcosystem::Npm,
+                    file_name: "package.json".to_owned(),
+                    contents: "{}".to_owned(),
+                },
+                vulnerable_package: None,
+                cve_linkage: None,
+                kev_linkage: None,
+                candidate_version: None,
+            },
+            verdict: UpgradeAssessmentVerdict::Unknown,
+            summary: "Assessment queued".to_owned(),
+            findings: Vec::new(),
+            evidence: Vec::new(),
+            caveats: Vec::new(),
+            candidate_versions: Vec::<UpgradeAssessmentCandidateVersion>::new(),
+            assessed_at: timestamp,
+        };
+
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            serde_json::json!({
+                "id": uuid::Uuid::nil(),
+                "status": "completed",
+                "input": {
+                    "packageSource": {
+                        "ecosystem": "npm",
+                        "fileName": "package.json",
+                        "contents": "{}",
+                    },
+                },
+                "verdict": "unknown",
+                "summary": "Assessment queued",
+                "findings": [],
+                "evidence": [],
+                "caveats": [],
+                "candidateVersions": [],
+                "assessedAt": timestamp,
+            })
+        );
+    }
+
+    #[test]
+    fn upgrade_assessment_cve_and_kev_linkage_serialize_distinctly() {
+        let input = UpgradeAssessmentInput {
+            package_source: UpgradeAssessmentPackageSourceInput {
+                ecosystem: PackageSourceEcosystem::Npm,
+                file_name: "package-lock.json".to_owned(),
+                contents: "{}".to_owned(),
+            },
+            vulnerable_package: Some(UpgradeAssessmentVulnerablePackageInput {
+                name: "left-pad".to_owned(),
+                ecosystem: PackageSourceEcosystem::Npm,
+                version: "1.2.3".to_owned(),
+                purl: Some("pkg:npm/left-pad@1.2.3".to_owned()),
+            }),
+            cve_linkage: Some(vec!["CVE-2026-1234".to_owned()]),
+            kev_linkage: Some(UpgradeAssessmentKevLinkage {
+                cve_ids: vec!["CVE-2026-1234".to_owned()],
+                known_exploited: Some(true),
+                references: vec![
+                    "https://www.cisa.gov/known-exploited-vulnerabilities-catalog".to_owned(),
+                ],
+            }),
+            candidate_version: Some("1.2.4".to_owned()),
+        };
+
+        assert_eq!(
+            serde_json::to_value(input).unwrap(),
+            serde_json::json!({
+                "packageSource": {
+                    "ecosystem": "npm",
+                    "fileName": "package-lock.json",
+                    "contents": "{}",
+                },
+                "vulnerablePackage": {
+                    "name": "left-pad",
+                    "ecosystem": "npm",
+                    "version": "1.2.3",
+                    "purl": "pkg:npm/left-pad@1.2.3",
+                },
+                "cveLinkage": ["CVE-2026-1234"],
+                "kevLinkage": {
+                    "cveIds": ["CVE-2026-1234"],
+                    "knownExploited": true,
+                    "references": ["https://www.cisa.gov/known-exploited-vulnerabilities-catalog"],
+                },
+                "candidateVersion": "1.2.4",
+            })
+        );
+    }
+
+    #[test]
+    fn upgrade_assessment_result_supports_domain_finding_and_evidence_shapes() {
+        let timestamp = Utc::now();
+        let result = UpgradeAssessmentResult {
+            id: uuid::Uuid::nil(),
+            status: UpgradeAssessmentWorkflowStatus::Completed,
+            input: UpgradeAssessmentInput {
+                package_source: UpgradeAssessmentPackageSourceInput {
+                    ecosystem: PackageSourceEcosystem::Npm,
+                    file_name: "package.json".to_owned(),
+                    contents: "{}".to_owned(),
+                },
+                vulnerable_package: None,
+                cve_linkage: None,
+                kev_linkage: None,
+                candidate_version: None,
+            },
+            verdict: UpgradeAssessmentVerdict::Caution,
+            summary: "Manual review is recommended.".to_owned(),
+            findings: vec![UpgradeAssessmentFinding {
+                id: "finding-1".to_owned(),
+                category: UpgradeAssessmentFindingCategory::SupplyChain,
+                effect: UpgradeAssessmentFindingEffect::Review,
+                title: "Release delta requires review".to_owned(),
+                summary: "The candidate upgrade crosses a major version boundary.".to_owned(),
+                severity: Some("medium".to_owned()),
+                confidence: Some("medium".to_owned()),
+                evidence_ids: vec!["evidence-1".to_owned()],
+            }],
+            evidence: vec![UpgradeAssessmentEvidence {
+                id: "evidence-1".to_owned(),
+                source_type: UpgradeAssessmentEvidenceSourceType::Hipcheck,
+                title: "Hipcheck assessment".to_owned(),
+                summary: "Hipcheck reported compatibility-related concerns.".to_owned(),
+                url: Some("/assessments/00000000-0000-0000-0000-000000000000/evidence".to_owned()),
+                details: Some(serde_json::json!({ "check": "review" })),
+                raw_source_identifiers: vec!["hipcheck-run-1".to_owned()],
+            }],
+            caveats: vec![UpgradeAssessmentCaveat {
+                code: "candidate-not-verified".to_owned(),
+                summary: "Candidate version was not directly verified as the fixing version."
+                    .to_owned(),
+            }],
+            candidate_versions: Vec::new(),
+            assessed_at: timestamp,
+        };
+
+        let value = serde_json::to_value(result).unwrap();
+        assert_eq!(value["findings"][0]["category"], "supply-chain");
+        assert_eq!(value["evidence"][0]["sourceType"], "hipcheck");
+        assert_eq!(value["caveats"][0]["code"], "candidate-not-verified");
+    }
+
+    #[test]
+    fn upgrade_assessment_error_omits_optional_code_when_absent() {
+        let error = UpgradeAssessmentError {
+            code: None,
+            message: "assessment failed".to_owned(),
+        };
+
+        assert_eq!(
+            serde_json::to_value(error).unwrap(),
+            serde_json::json!({
+                "message": "assessment failed",
             })
         );
     }
@@ -366,28 +603,35 @@ pub enum PackageSourceEcosystem {
     Npm,
 }
 
-/// Input for an asynchronous NPM upgrade-safety assessment.
-#[derive(Deserialize, JsonSchema, Debug, Clone)]
+#[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct PostUpgradeAssessmentBody {
-    pub package_name: String,
-    pub current_version: String,
-    pub trigger: UpgradeAssessmentTrigger,
+#[serde(deny_unknown_fields)]
+#[schemars(deny_unknown_fields)]
+pub struct UpgradeAssessmentInput {
+    pub package_source: UpgradeAssessmentPackageSourceInput,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vulnerable_package: Option<UpgradeAssessmentVulnerablePackageInput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cve_linkage: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kev_linkage: Option<UpgradeAssessmentKevLinkage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub candidate_version: Option<String>,
 }
 
-/// The vulnerability or previously-created exposure that caused this assessment.
-#[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-pub enum UpgradeAssessmentTrigger {
-    Cve { cve_id: String },
-    Exposure { exposure_id: String },
-}
+/// Request body for creating a new asynchronous upgrade assessment.
+pub type PostUpgradeAssessmentBody = UpgradeAssessmentInput;
 
 #[derive(Serialize, JsonSchema, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PostUpgradeAssessmentResponse {
     pub id: Uuid,
+    pub status: UpgradeAssessmentWorkflowStatus,
+    pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result_url: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema, Debug, Clone)]
@@ -396,67 +640,72 @@ pub struct UpgradeAssessmentPathParams {
     pub id: Uuid,
 }
 
-/// The durable lifecycle state of an upgrade assessment.
-#[derive(Serialize, JsonSchema, Debug, Clone)]
-#[serde(tag = "status", rename_all = "camelCase")]
-pub enum UpgradeAssessmentStatus {
-    Processing(UpgradeAssessmentProcessing),
-    Completed(UpgradeAssessmentCompleted),
-    Failed(UpgradeAssessmentFailed),
-}
-
-#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct UpgradeAssessmentProcessing {
-    pub id: Uuid,
-    pub created_at: DateTime<Utc>,
-    pub input: UpgradeAssessmentInput,
-}
-
-#[derive(Serialize, JsonSchema, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct UpgradeAssessmentCompleted {
-    pub id: Uuid,
-    pub created_at: DateTime<Utc>,
-    pub completed_at: DateTime<Utc>,
-    pub report: UpgradeAssessmentReport,
-}
-
-#[derive(Serialize, JsonSchema, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct UpgradeAssessmentFailed {
-    pub id: Uuid,
-    pub created_at: DateTime<Utc>,
-    pub failed_at: DateTime<Utc>,
-    pub input: UpgradeAssessmentInput,
-    pub error: String,
+pub enum UpgradeAssessmentWorkflowStatus {
+    Pending,
+    Completed,
+    Failed,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct UpgradeAssessmentInput {
-    pub ecosystem: PackageSourceEcosystem,
-    pub package_name: String,
-    pub current_version: String,
-    pub trigger: UpgradeAssessmentTrigger,
-    pub candidate_version: Option<String>,
+pub struct UpgradeAssessmentStatus {
+    pub id: Uuid,
+    pub status: UpgradeAssessmentWorkflowStatus,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<UpgradeAssessmentError>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct UpgradeAssessmentReport {
+pub struct UpgradeAssessmentResult {
+    pub id: Uuid,
+    pub status: UpgradeAssessmentWorkflowStatus,
     pub input: UpgradeAssessmentInput,
     pub verdict: UpgradeAssessmentVerdict,
-    pub candidate_versions: Vec<UpgradeAssessmentCandidate>,
-    pub vulnerability_context: UpgradeAssessmentVulnerabilityContext,
-    pub dependency_delta: UpgradeAssessmentDependencyDelta,
-    pub supply_chain_findings: Vec<UpgradeAssessmentFinding>,
-    pub confidence: UpgradeAssessmentConfidence,
-    pub caveats: Vec<String>,
-    pub evidence_links: Vec<String>,
+    pub summary: String,
+    pub findings: Vec<UpgradeAssessmentFinding>,
+    pub evidence: Vec<UpgradeAssessmentEvidence>,
+    pub caveats: Vec<UpgradeAssessmentCaveat>,
+    pub candidate_versions: Vec<UpgradeAssessmentCandidateVersion>,
+    pub assessed_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentPackageSourceInput {
+    pub ecosystem: PackageSourceEcosystem,
+    pub file_name: String,
+    pub contents: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentVulnerablePackageInput {
+    pub name: String,
+    pub ecosystem: PackageSourceEcosystem,
+    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purl: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentKevLinkage {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cve_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub known_exploited: Option<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub references: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum UpgradeAssessmentVerdict {
     Recommended,
@@ -465,69 +714,98 @@ pub enum UpgradeAssessmentVerdict {
     Unknown,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub enum UpgradeAssessmentConfidence {
-    High,
-    Medium,
-    Low,
-    Unknown,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct UpgradeAssessmentCandidate {
+pub struct UpgradeAssessmentCandidateVersion {
     pub version: String,
-    #[serde(default)]
-    pub upgrade_distance: UpgradeAssessmentUpgradeDistance,
-    #[serde(default)]
-    pub api_compatibility: UpgradeAssessmentApiCompatibility,
-    pub verdict: UpgradeAssessmentVerdict,
-    pub caveats: Vec<String>,
+    pub is_requested_candidate: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_timestamp: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upgrade_distance: Option<UpgradeAssessmentUpgradeDistance>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verdict: Option<UpgradeAssessmentVerdict>,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum UpgradeAssessmentUpgradeDistance {
     Patch,
     Minor,
     Major,
-    #[default]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Default, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum UpgradeAssessmentApiCompatibility {
-    Compatible,
-    Incompatible,
-    NoGuarantee,
-    #[default]
-    Unknown,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct UpgradeAssessmentVulnerabilityContext {
-    pub trigger: UpgradeAssessmentTrigger,
-    /// Whether the affected baseline package version is linked to an active
-    /// CISA KEV entry. This describes the assessment trigger, not the selected
-    /// candidate's verdict.
-    pub kev_linked: Option<bool>,
+pub enum UpgradeAssessmentFindingCategory {
+    Vulnerability,
+    SupplyChain,
+    MissingEvidence,
+    CaveatTrigger,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct UpgradeAssessmentDependencyDelta {
-    pub added: Vec<String>,
-    pub removed: Vec<String>,
-    pub changed: Vec<String>,
+pub enum UpgradeAssessmentFindingEffect {
+    Blocking,
+    Review,
+    Context,
+    MissingCheck,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UpgradeAssessmentFinding {
-    pub effect: String,
+    pub id: String,
+    pub category: UpgradeAssessmentFindingCategory,
+    pub effect: UpgradeAssessmentFindingEffect,
+    pub title: String,
     pub summary: String,
-    pub evidence_links: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub severity: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_ids: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum UpgradeAssessmentEvidenceSourceType {
+    VulnerabilityDatabase,
+    Kev,
+    Hipcheck,
+    PackageRegistry,
+    InternalAnalysis,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentEvidence {
+    pub id: String,
+    pub source_type: UpgradeAssessmentEvidenceSourceType,
+    pub title: String,
+    pub summary: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub raw_source_identifiers: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentCaveat {
+    pub code: String,
+    pub summary: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeAssessmentError {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    pub message: String,
 }

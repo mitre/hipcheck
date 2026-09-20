@@ -113,7 +113,7 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     }
     if let Some(upgrades) = matches.subcommand_matches("upgrade-assessments") {
         if let Some(submit) = upgrades.subcommand_matches("submit") {
-            let body: types::PostUpgradeAssessmentBody = read_json_file(
+            let body: types::UpgradeAssessmentInput = read_json_file(
                 required_path(submit, "request-json-file")?,
                 "upgrade assessment request",
             )?;
@@ -136,6 +136,20 @@ pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
                     .send()
                     .await
                     .map_err(|error| request_error("GET /upgrade-assessments/{id}", error))?;
+                print_json(response.into_inner())
+            });
+        }
+        if let Some(result) = upgrades.subcommand_matches("result") {
+            let id = required_uuid(result, "id")?;
+            return runtime.block_on(async {
+                let response = client(&base_url)?
+                    .get_upgrade_assessment_result()
+                    .id(id)
+                    .send()
+                    .await
+                    .map_err(|error| {
+                        request_error("GET /upgrade-assessments/{id}/result", error)
+                    })?;
                 print_json(response.into_inner())
             });
         }
@@ -262,7 +276,8 @@ pub fn command() -> clap::Command {
                     clap::Command::new("submit")
                         .arg(path_argument("request-json-file", "REQUEST_JSON_FILE")),
                 )
-                .subcommand(clap::Command::new("get").arg(uuid_argument())),
+                .subcommand(clap::Command::new("get").arg(uuid_argument()))
+                .subcommand(clap::Command::new("result").arg(uuid_argument())),
         )
 }
 
@@ -369,12 +384,54 @@ mod tests {
 
     fn upgrade_input() -> serde_json::Value {
         serde_json::json!({
-            "ecosystem": "npm",
-            "packageName": "example",
-            "currentVersion": "1.0.0",
-            "candidateVersion": "1.1.0",
-            "trigger": { "kind": "cve", "cve_id": "CVE-2026-0001" }
+            "packageSource": {
+                "ecosystem": "npm",
+                "fileName": "package-lock.json",
+                "contents": "{}"
+            },
+            "vulnerablePackage": {
+                "name": "example",
+                "ecosystem": "npm",
+                "version": "1.0.0",
+                "purl": "pkg:npm/example@1.0.0"
+            },
+            "cveLinkage": ["CVE-2026-0001"],
+            "kevLinkage": {
+                "cveIds": ["CVE-2026-0001"],
+                "knownExploited": true,
+                "references": ["https://www.cisa.gov/known-exploited-vulnerabilities-catalog"]
+            },
+            "candidateVersion": "1.1.0"
         })
+    }
+
+    fn upgrade_status() -> String {
+        format!(
+            r#"{{"id":"{UPGRADE_ASSESSMENT_ID}","status":"pending","createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:00:00Z"}}"#,
+        )
+    }
+
+    fn upgrade_result() -> String {
+        serde_json::json!({
+            "id": UPGRADE_ASSESSMENT_ID,
+            "status": "completed",
+            "input": upgrade_input(),
+            "verdict": "recommended",
+            "summary": "Night Vision identified a recommended upgrade candidate.",
+            "findings": [],
+            "evidence": [],
+            "caveats": [],
+            "candidateVersions": [
+                {
+                    "version": "1.1.0",
+                    "isRequestedCandidate": true,
+                    "upgradeDistance": "minor",
+                    "verdict": "recommended"
+                }
+            ],
+            "assessedAt": "2026-01-01T00:00:00Z"
+        })
+        .to_string()
     }
 
     #[test]
@@ -416,6 +473,12 @@ mod tests {
                 "api",
                 "upgrade-assessments",
                 "get",
+                "0198f30e-2bfa-7000-8000-000000000007",
+            ],
+            vec![
+                "api",
+                "upgrade-assessments",
+                "result",
                 "0198f30e-2bfa-7000-8000-000000000007",
             ],
         ] {
@@ -574,12 +637,7 @@ mod tests {
     #[test]
     fn upgrade_assessment_commands_deserialize_and_dispatch_requests() {
         let server = MockServer::start();
-        let request_body = serde_json::json!({
-            "packageName": "example",
-            "currentVersion": "1.0.0",
-            "candidateVersion": "1.1.0",
-            "trigger": { "kind": "cve", "cve_id": "CVE-2026-0001" }
-        });
+        let request_body = upgrade_input();
         let submit = server.mock(|when, then| {
             when.method(POST)
                 .path("/upgrade-assessments")
@@ -587,22 +645,24 @@ mod tests {
                 .json_body_obj(&request_body);
             then.status(202)
                 .header("content-type", "application/json")
-                .body(format!(r#"{{"id":"{UPGRADE_ASSESSMENT_ID}"}}"#));
+                .body(format!(
+                    r#"{{"id":"{UPGRADE_ASSESSMENT_ID}","status":"pending","createdAt":"2026-01-01T00:00:00Z","statusUrl":"/upgrade-assessments/{UPGRADE_ASSESSMENT_ID}","resultUrl":"/upgrade-assessments/{UPGRADE_ASSESSMENT_ID}/result"}}"#
+                ));
         });
         let get = server.mock(|when, then| {
             when.method(GET)
                 .path(format!("/upgrade-assessments/{UPGRADE_ASSESSMENT_ID}"));
             then.status(200)
                 .header("content-type", "application/json")
-                .body(
-                    serde_json::json!({
-                        "id": UPGRADE_ASSESSMENT_ID,
-                        "createdAt": "2026-01-01T00:00:00Z",
-                        "input": upgrade_input(),
-                        "status": "processing"
-                    })
-                    .to_string(),
-                );
+                .body(upgrade_status());
+        });
+        let result = server.mock(|when, then| {
+            when.method(GET).path(format!(
+                "/upgrade-assessments/{UPGRADE_ASSESSMENT_ID}/result"
+            ));
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(upgrade_result());
         });
         let (config, _config_files) = test_config(&server.base_url(), None);
         let mut files = TempFiles::default();
@@ -618,9 +678,20 @@ mod tests {
             &api_matches(&["api", "upgrade-assessments", "get", UPGRADE_ASSESSMENT_ID]),
         )
         .expect("upgrade assessment lookup succeeds");
+        run(
+            &config,
+            &api_matches(&[
+                "api",
+                "upgrade-assessments",
+                "result",
+                UPGRADE_ASSESSMENT_ID,
+            ]),
+        )
+        .expect("upgrade assessment result lookup succeeds");
 
         submit.assert();
         get.assert();
+        result.assert();
     }
 
     #[test]

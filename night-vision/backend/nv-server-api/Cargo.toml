@@ -16,8 +16,8 @@ chrono.workspace = true
 dropshot.workspace = true
 schemars.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 uuid.workspace = true
 workspace-hack.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true

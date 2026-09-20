@@ -67,13 +67,14 @@ use nv_server_api::{
     PackageSourceStatusCompleted, PackageSourceStatusCompletedWithWarnings,
     PackageSourceStatusFailed, PackageSourceStatusProcessing, PackageSourceWarning,
     PostAssessmentBody, PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
-    PostUpgradeAssessmentBody, PostUpgradeAssessmentResponse, UpgradeAssessmentApiCompatibility,
-    UpgradeAssessmentCandidate, UpgradeAssessmentCompleted, UpgradeAssessmentConfidence,
-    UpgradeAssessmentDependencyDelta, UpgradeAssessmentFailed, UpgradeAssessmentInput,
-    UpgradeAssessmentPathParams, UpgradeAssessmentProcessing, UpgradeAssessmentReport,
-    UpgradeAssessmentStatus, UpgradeAssessmentTrigger, UpgradeAssessmentUpgradeDistance,
-    UpgradeAssessmentVerdict, UpgradeAssessmentVulnerabilityContext, VersionedPackage,
-    nv_server_api_mod::api_description,
+    PostUpgradeAssessmentBody, PostUpgradeAssessmentResponse, UpgradeAssessmentCandidateVersion,
+    UpgradeAssessmentCaveat, UpgradeAssessmentError, UpgradeAssessmentEvidence,
+    UpgradeAssessmentEvidenceSourceType, UpgradeAssessmentFinding,
+    UpgradeAssessmentFindingCategory, UpgradeAssessmentFindingEffect, UpgradeAssessmentInput,
+    UpgradeAssessmentKevLinkage, UpgradeAssessmentPackageSourceInput, UpgradeAssessmentPathParams,
+    UpgradeAssessmentResult, UpgradeAssessmentStatus, UpgradeAssessmentUpgradeDistance,
+    UpgradeAssessmentVerdict, UpgradeAssessmentVulnerablePackageInput,
+    UpgradeAssessmentWorkflowStatus, VersionedPackage, nv_server_api_mod::api_description,
 };
 use percent_encoding::percent_decode_str;
 use sea_orm::{
@@ -423,6 +424,8 @@ impl NvServerApi for RestApi {
         let id = Uuid::now_v7();
         let input = input_from_request(&body);
         let context = ctx.context();
+        let status_url = format!("/upgrade-assessments/{id}");
+        let result_url = format!("/upgrade-assessments/{id}/result");
         let (work, admission) = match input.candidate_version.as_deref() {
             Some(candidate_version) => {
                 let admission = context.try_admit_hipcheck().ok_or_else(|| {
@@ -431,10 +434,16 @@ impl NvServerApi for RestApi {
                         "assessment capacity is exhausted".to_owned(),
                     )
                 })?;
-                let package_name = NpmPackageName::parse(input.package_name.clone())
+                let vulnerable_package = input.vulnerable_package.as_ref().ok_or_else(|| {
+                    upgrade_validation_error(
+                        "candidateVersion requires vulnerablePackage to identify the affected dependency",
+                    )
+                })?;
+                let package_name = NpmPackageName::parse(vulnerable_package.name.clone())
                     .map_err(invalid_upgrade_request)?;
-                let affected_purl =
-                    PackageVersion::from_npm(&package_name, &input.current_version).purl();
+                let affected_purl = vulnerable_package.purl.clone().unwrap_or_else(|| {
+                    PackageVersion::from_npm(&package_name, &vulnerable_package.version).purl()
+                });
                 let target_purl = PackageVersion::from_npm(&package_name, candidate_version).purl();
                 let target_purl =
                     validate_and_persist_upgrade_target(context, &affected_purl, &target_purl)
@@ -454,7 +463,7 @@ impl NvServerApi for RestApi {
                 (UpgradeAssessmentWork::Discovered, admission)
             }
         };
-        create_upgrade_assessment(context.db(), id, &input).await?;
+        let created_at = create_upgrade_assessment(context.db(), id, &input).await?;
         let work = match work {
             UpgradeAssessmentWork::Explicit((affected_purl, target_purl)) => {
                 match queue_assessment_with_id(context.db(), id, &affected_purl, &target_purl).await
@@ -525,7 +534,13 @@ impl NvServerApi for RestApi {
             }
         });
 
-        Ok(HttpResponseAccepted(PostUpgradeAssessmentResponse { id }))
+        Ok(HttpResponseAccepted(PostUpgradeAssessmentResponse {
+            id,
+            status: UpgradeAssessmentWorkflowStatus::Pending,
+            created_at,
+            status_url: Some(status_url),
+            result_url: Some(result_url),
+        }))
     }
 
     async fn get_upgrade_assessment(
@@ -533,14 +548,17 @@ impl NvServerApi for RestApi {
         path_params: Path<UpgradeAssessmentPathParams>,
     ) -> Result<HttpResponseOk<UpgradeAssessmentStatus>, HttpError> {
         let id = path_params.into_inner().id;
-        let assessment = upgrade_assessments::Entity::find_by_id(id.to_string())
-            .one(ctx.context().db())
-            .await
-            .map_err(internal_error)?
-            .ok_or_else(|| {
-                HttpError::for_not_found(None, format!("unknown upgrade assessment {id}"))
-            })?;
+        let assessment = load_upgrade_assessment(ctx.context().db(), id).await?;
         Ok(HttpResponseOk(assessment_status(assessment)?))
+    }
+
+    async fn get_upgrade_assessment_result(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<UpgradeAssessmentPathParams>,
+    ) -> Result<HttpResponseOk<UpgradeAssessmentResult>, HttpError> {
+        let id = path_params.into_inner().id;
+        let assessment = load_upgrade_assessment(ctx.context().db(), id).await?;
+        Ok(HttpResponseOk(assessment_result(assessment)?))
     }
 }
 
@@ -791,7 +809,6 @@ enum UpgradeAssessmentWork {
 struct DiscoveredAssessmentCandidate {
     candidate: UpgradeCandidate,
     base_verdict: UpgradeAssessmentVerdict,
-    caveats: Vec<String>,
 }
 
 /// Discover every usable release newer than the input version and evaluate its
@@ -805,9 +822,14 @@ async fn discover_assessment_candidates(
     limits: &ElaborationLimits,
     max_packument_bytes: usize,
 ) -> Result<Vec<DiscoveredAssessmentCandidate>, HttpError> {
+    let vulnerable_package = input.vulnerable_package.as_ref().ok_or_else(|| {
+        upgrade_validation_error(
+            "vulnerablePackage is required for automatic discovery so the affected dependency can be identified",
+        )
+    })?;
     let package_name =
-        NpmPackageName::parse(input.package_name.clone()).map_err(invalid_upgrade_request)?;
-    let affected_purl = PackageVersion::from_npm(&package_name, &input.current_version).purl();
+        NpmPackageName::parse(vulnerable_package.name.clone()).map_err(invalid_upgrade_request)?;
+    let affected_purl = PackageVersion::from_npm(&package_name, &vulnerable_package.version).purl();
     let affected = NpmPackagePurl::parse(&affected_purl).map_err(invalid_upgrade_request)?;
     let client = NpmRegistryClient::new(registry_url, max_packument_bytes, limits.request_timeout)
         .map_err(|_| upgrade_validation_error("invalid NPM registry configuration"))?;
@@ -815,7 +837,7 @@ async fn discover_assessment_candidates(
         upgrade_validation_error(&format!("failed to fetch NPM package metadata: {error}"))
     })?;
     validate_discovery_packument_identity(&package_name, &packument.name)?;
-    let candidates = discover_upgrade_candidates(&packument, &input.current_version)
+    let candidates = discover_upgrade_candidates(&packument, &vulnerable_package.version)
         .map_err(|error| upgrade_validation_error(&error.to_string()))?;
 
     let candidates: Vec<_> = candidates
@@ -834,7 +856,7 @@ async fn discover_assessment_candidates(
         .filter(|matched| matched.status == KevNpmMatchStatus::Affected)
         .filter_map(|matched| matched.affected_version)
         .collect();
-    if !affected_versions.contains(&input.current_version) {
+    if !affected_versions.contains(&vulnerable_package.version) {
         return Err(upgrade_validation_error(
             "affected PURL has no locally known active KEV match",
         ));
@@ -843,7 +865,7 @@ async fn discover_assessment_candidates(
     let mut evaluated = Vec::new();
     for candidate in candidates {
         let affected = affected_versions.contains(&candidate.version.to_string());
-        let (base_verdict, caveat) = if affected {
+        let (base_verdict, _caveat) = if affected {
             (
                 UpgradeAssessmentVerdict::Avoid,
                 "Candidate matches a locally known active KEV vulnerability.".to_owned(),
@@ -857,7 +879,6 @@ async fn discover_assessment_candidates(
         evaluated.push(DiscoveredAssessmentCandidate {
             candidate,
             base_verdict,
-            caveats: vec![caveat],
         });
     }
     Ok(evaluated)
@@ -1204,26 +1225,39 @@ fn cve_list_sync_run_health(run: CveListSyncRun) -> CveListSyncRunHealth {
 }
 
 fn validate_upgrade_assessment_request(body: &PostUpgradeAssessmentBody) -> Result<(), HttpError> {
-    if NpmPackageName::parse(body.package_name.clone()).is_err() {
-        return Err(HttpError::for_bad_request(
-            None,
-            "packageName must be a valid NPM package name".to_owned(),
+    validate_upgrade_assessment_package_source(&body.package_source)?;
+    if let Some(vulnerable_package) = &body.vulnerable_package {
+        validate_upgrade_assessment_vulnerable_package(vulnerable_package)?;
+    }
+    if request_has_package_specific_refinements(body) && body.vulnerable_package.is_none() {
+        return Err(upgrade_validation_error(
+            "vulnerablePackage must be provided when cveLinkage, kevLinkage, or candidateVersion is supplied",
         ));
     }
-    if semver::Version::parse(&body.current_version).is_err() {
-        return Err(HttpError::for_bad_request(
-            None,
-            "currentVersion must be a valid semantic version".to_owned(),
-        ));
+    if let Some(cve_linkage) = &body.cve_linkage {
+        if cve_linkage.is_empty() {
+            return Err(upgrade_validation_error(
+                "cveLinkage must contain at least one CVE identifier when supplied",
+            ));
+        }
+        for cve_id in cve_linkage {
+            if !is_cve_id(cve_id) {
+                return Err(upgrade_validation_error(
+                    "cveLinkage entries must be CVE identifiers",
+                ));
+            }
+        }
+    }
+    if let Some(kev_linkage) = &body.kev_linkage {
+        validate_upgrade_assessment_kev_linkage(kev_linkage)?;
     }
     if body
         .candidate_version
         .as_deref()
         .is_some_and(|version| version.trim().is_empty())
     {
-        return Err(HttpError::for_bad_request(
-            None,
-            "candidateVersion must not be empty when supplied".to_owned(),
+        return Err(upgrade_validation_error(
+            "candidateVersion must not be empty when supplied",
         ));
     }
     if body
@@ -1231,20 +1265,100 @@ fn validate_upgrade_assessment_request(body: &PostUpgradeAssessmentBody) -> Resu
         .as_deref()
         .is_some_and(|version| semver::Version::parse(version).is_err())
     {
-        return Err(HttpError::for_bad_request(
-            None,
-            "candidateVersion must be a valid semantic version when supplied".to_owned(),
+        return Err(upgrade_validation_error(
+            "candidateVersion must be a valid semantic version when supplied",
         ));
     }
-    match &body.trigger {
-        UpgradeAssessmentTrigger::Cve { cve_id } if !is_cve_id(cve_id) => Err(
-            HttpError::for_bad_request(None, "trigger.cve_id must be a CVE identifier".to_owned()),
-        ),
-        UpgradeAssessmentTrigger::Exposure { exposure_id } if exposure_id.trim().is_empty() => Err(
-            HttpError::for_bad_request(None, "trigger.exposure_id must not be empty".to_owned()),
-        ),
-        _ => Ok(()),
+    Ok(())
+}
+
+fn validate_upgrade_assessment_package_source(
+    package_source: &UpgradeAssessmentPackageSourceInput,
+) -> Result<(), HttpError> {
+    if package_source.file_name.trim().is_empty() {
+        return Err(upgrade_validation_error(
+            "packageSource.fileName must not be empty",
+        ));
     }
+    if package_source.contents.trim().is_empty() {
+        return Err(upgrade_validation_error(
+            "packageSource.contents must not be empty",
+        ));
+    }
+    NpmPackageJson::parse_package_json(package_source.contents.as_bytes()).map_err(|_| {
+        upgrade_validation_error("packageSource.contents must be a valid package source")
+    })?;
+    Ok(())
+}
+
+fn validate_upgrade_assessment_vulnerable_package(
+    vulnerable_package: &UpgradeAssessmentVulnerablePackageInput,
+) -> Result<(), HttpError> {
+    if vulnerable_package.name.trim().is_empty() {
+        return Err(upgrade_validation_error(
+            "vulnerablePackage.name must not be empty",
+        ));
+    }
+    NpmPackageName::parse(vulnerable_package.name.clone()).map_err(|_| {
+        upgrade_validation_error("vulnerablePackage.name must be a valid NPM package name")
+    })?;
+    if vulnerable_package.version.trim().is_empty() {
+        return Err(upgrade_validation_error(
+            "vulnerablePackage.version must not be empty",
+        ));
+    }
+    semver::Version::parse(&vulnerable_package.version).map_err(|_| {
+        upgrade_validation_error("vulnerablePackage.version must be a valid semantic version")
+    })?;
+    if let Some(purl) = &vulnerable_package.purl {
+        let purl = NpmPackagePurl::parse(purl).map_err(|_| {
+            upgrade_validation_error(
+                "vulnerablePackage.purl must be a valid NPM PURL when supplied",
+            )
+        })?;
+        if purl.name.as_str() != vulnerable_package.name
+            || purl.version != vulnerable_package.version
+        {
+            return Err(upgrade_validation_error(
+                "vulnerablePackage.purl must match vulnerablePackage.name and vulnerablePackage.version",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_upgrade_assessment_kev_linkage(
+    kev_linkage: &UpgradeAssessmentKevLinkage,
+) -> Result<(), HttpError> {
+    if kev_linkage.cve_ids.is_empty()
+        && kev_linkage.known_exploited.is_none()
+        && kev_linkage.references.is_empty()
+    {
+        return Err(upgrade_validation_error(
+            "kevLinkage must include at least one populated field when supplied",
+        ));
+    }
+    for cve_id in &kev_linkage.cve_ids {
+        if !is_cve_id(cve_id) {
+            return Err(upgrade_validation_error(
+                "kevLinkage.cveIds entries must be CVE identifiers",
+            ));
+        }
+    }
+    if kev_linkage
+        .references
+        .iter()
+        .any(|reference| reference.trim().is_empty())
+    {
+        return Err(upgrade_validation_error(
+            "kevLinkage.references must not contain empty values",
+        ));
+    }
+    Ok(())
+}
+
+fn request_has_package_specific_refinements(body: &PostUpgradeAssessmentBody) -> bool {
+    body.cve_linkage.is_some() || body.kev_linkage.is_some() || body.candidate_version.is_some()
 }
 
 fn is_cve_id(value: &str) -> bool {
@@ -1261,35 +1375,59 @@ fn is_cve_id(value: &str) -> bool {
 }
 
 fn input_from_request(body: &PostUpgradeAssessmentBody) -> UpgradeAssessmentInput {
-    UpgradeAssessmentInput {
-        ecosystem: PackageSourceEcosystem::Npm,
-        package_name: body.package_name.clone(),
-        current_version: body.current_version.clone(),
-        trigger: body.trigger.clone(),
-        candidate_version: body.candidate_version.clone(),
-    }
+    body.clone()
 }
 
 async fn create_upgrade_assessment(
     db: &DatabaseConnection,
     id: Uuid,
     input: &UpgradeAssessmentInput,
-) -> Result<(), HttpError> {
-    let (trigger_kind, trigger_reference) = trigger_parts(&input.trigger);
-    upgrade_assessments::ActiveModel {
+) -> Result<DateTime<Utc>, HttpError> {
+    let (package_name, current_version) = stored_assessment_package_fields(input);
+    let (trigger_kind, trigger_reference) = stored_assessment_trigger_fields(input);
+    let assessment = upgrade_assessments::ActiveModel {
         id: Set(id.to_string()),
-        package_name: Set(input.package_name.clone()),
-        current_version: Set(input.current_version.clone()),
-        trigger_kind: Set(trigger_kind.to_owned()),
-        trigger_reference: Set(trigger_reference.to_owned()),
+        package_name: Set(package_name),
+        current_version: Set(current_version),
+        trigger_kind: Set(trigger_kind),
+        trigger_reference: Set(trigger_reference),
         candidate_version: Set(input.candidate_version.clone()),
-        status: Set("processing".to_owned()),
+        status: Set("pending".to_owned()),
         ..Default::default()
     }
     .insert(db)
     .await
     .map_err(internal_error)?;
-    Ok(())
+    Ok(utc(assessment.created_at))
+}
+
+fn stored_assessment_package_fields(input: &UpgradeAssessmentInput) -> (String, String) {
+    input.vulnerable_package.as_ref().map_or_else(
+        || {
+            (
+                input.package_source.file_name.clone(),
+                "package-source".to_owned(),
+            )
+        },
+        |package| (package.name.clone(), package.version.clone()),
+    )
+}
+
+fn stored_assessment_trigger_fields(input: &UpgradeAssessmentInput) -> (String, String) {
+    if let Some(cve_id) = input.cve_linkage.as_ref().and_then(|ids| ids.first()) {
+        return ("cve".to_owned(), cve_id.clone());
+    }
+    if let Some(cve_id) = input
+        .kev_linkage
+        .as_ref()
+        .and_then(|kev_linkage| kev_linkage.cve_ids.first())
+    {
+        return ("cve".to_owned(), cve_id.clone());
+    }
+    (
+        "package-source".to_owned(),
+        input.package_source.file_name.clone(),
+    )
 }
 
 async fn complete_upgrade_assessment(
@@ -1332,7 +1470,7 @@ async fn complete_discovered_upgrade_assessment(
 async fn persist_completed_upgrade_report(
     db: &DatabaseConnection,
     id: Uuid,
-    report: UpgradeAssessmentReport,
+    report: UpgradeAssessmentResult,
 ) -> Result<(), HttpError> {
     let report = serde_json::to_value(report).map_err(internal_error)?;
     upgrade_assessments::ActiveModel {
@@ -1367,93 +1505,120 @@ async fn mark_upgrade_assessment_failed(
     Ok(())
 }
 
-fn initial_assessment_report(input: UpgradeAssessmentInput) -> UpgradeAssessmentReport {
-    assessment_report(input, UpgradeAssessmentVerdict::Unknown, Vec::new(), None)
+fn assessment_caveat(code: &str, summary: impl Into<String>) -> UpgradeAssessmentCaveat {
+    UpgradeAssessmentCaveat {
+        code: code.to_owned(),
+        summary: summary.into(),
+    }
+}
+
+fn initial_assessment_report(input: UpgradeAssessmentInput) -> UpgradeAssessmentResult {
+    assessment_report(
+        input,
+        UpgradeAssessmentVerdict::Unknown,
+        Vec::new(),
+        Vec::new(),
+        None,
+    )
 }
 
 fn discovered_assessment_report(
     input: UpgradeAssessmentInput,
     candidates: Vec<DiscoveredAssessmentCandidate>,
-) -> UpgradeAssessmentReport {
+) -> UpgradeAssessmentResult {
     let candidate_versions: Vec<_> = candidates
         .iter()
         .map(discovered_assessment_candidate)
         .collect();
-    let verdict = if candidate_versions
-        .iter()
-        .any(|candidate| matches!(candidate.verdict, UpgradeAssessmentVerdict::Recommended))
-    {
+    let verdict = if candidate_versions.iter().any(|candidate| {
+        matches!(
+            candidate.verdict.as_ref(),
+            Some(UpgradeAssessmentVerdict::Recommended)
+        )
+    }) {
         UpgradeAssessmentVerdict::Recommended
-    } else if candidate_versions
-        .iter()
-        .any(|candidate| matches!(candidate.verdict, UpgradeAssessmentVerdict::Caution))
-    {
+    } else if candidate_versions.iter().any(|candidate| {
+        matches!(
+            candidate.verdict.as_ref(),
+            Some(UpgradeAssessmentVerdict::Caution)
+        )
+    }) {
         UpgradeAssessmentVerdict::Caution
-    } else if candidate_versions
-        .iter()
-        .any(|candidate| matches!(candidate.verdict, UpgradeAssessmentVerdict::Avoid))
-    {
+    } else if candidate_versions.iter().any(|candidate| {
+        matches!(
+            candidate.verdict.as_ref(),
+            Some(UpgradeAssessmentVerdict::Avoid)
+        )
+    }) {
         UpgradeAssessmentVerdict::Avoid
     } else {
         UpgradeAssessmentVerdict::Unknown
     };
     let mut caveats = vec![
-        "Candidates are ordered by ascending SemVer version. Pre-release and deprecated releases are excluded from automatic discovery."
-            .to_owned(),
-        "Candidate verdicts use locally ingested KEV matches; supply-chain analysis is only available for an explicitly requested candidate."
-            .to_owned(),
+        assessment_caveat(
+            "automatic-discovery-ordering",
+            "Candidates are ordered by ascending SemVer version. Pre-release and deprecated releases are excluded from automatic discovery.",
+        ),
+        assessment_caveat(
+            "discovery-has-no-supply-chain-analysis",
+            "Candidate verdicts use locally ingested KEV matches; supply-chain analysis is only available for an explicitly requested candidate.",
+        ),
     ];
     if candidate_versions.is_empty() {
-        caveats.push("No applicable newer published NPM candidate was discovered.".to_owned());
+        caveats.push(assessment_caveat(
+            "no-discovered-candidates",
+            "No applicable newer published NPM candidate was discovered.",
+        ));
     }
-    UpgradeAssessmentReport {
-        vulnerability_context: UpgradeAssessmentVulnerabilityContext {
-            trigger: input.trigger.clone(),
-            kev_linked: Some(true),
-        },
+    let summary = match verdict {
+        UpgradeAssessmentVerdict::Recommended => {
+            "Night Vision discovered at least one recommended upgrade candidate.".to_owned()
+        }
+        UpgradeAssessmentVerdict::Caution => {
+            "Night Vision discovered upgrade candidates that require review before adoption."
+                .to_owned()
+        }
+        UpgradeAssessmentVerdict::Avoid => {
+            "Night Vision did not discover an automatically recommended candidate.".to_owned()
+        }
+        UpgradeAssessmentVerdict::Unknown => {
+            "Night Vision could not determine a discovered-candidate recommendation.".to_owned()
+        }
+    };
+    UpgradeAssessmentResult {
+        id: Uuid::nil(),
+        status: UpgradeAssessmentWorkflowStatus::Pending,
         input,
-        verdict: verdict.clone(),
-        candidate_versions,
-        dependency_delta: UpgradeAssessmentDependencyDelta {
-            added: Vec::new(),
-            removed: Vec::new(),
-            changed: Vec::new(),
-        },
-        supply_chain_findings: Vec::new(),
-        confidence: assessment_confidence(&verdict),
+        verdict,
+        summary,
+        findings: Vec::new(),
+        evidence: Vec::new(),
         caveats,
-        evidence_links: Vec::new(),
+        candidate_versions,
+        assessed_at: Utc::now(),
     }
 }
 
 fn discovered_assessment_candidate(
     discovered: &DiscoveredAssessmentCandidate,
-) -> UpgradeAssessmentCandidate {
+) -> UpgradeAssessmentCandidateVersion {
     let candidate = &discovered.candidate;
     let upgrade_distance = assessment_upgrade_distance(candidate.upgrade_distance);
-    let api_compatibility = assessment_api_compatibility(candidate.api_compatibility);
     let requires_compatibility_review =
-        requires_compatibility_review(&upgrade_distance, &api_compatibility);
-    let mut caveats = discovered.caveats.clone();
-    if requires_compatibility_review {
-        caveats.push(
-            "This upgrade requires application compatibility review; Night Vision cannot establish application compatibility."
-                .to_owned(),
-        );
-    }
+        requires_compatibility_review(Some(&upgrade_distance), &candidate.api_compatibility);
     let verdict = if matches!(discovered.base_verdict, UpgradeAssessmentVerdict::Avoid) {
-        UpgradeAssessmentVerdict::Avoid
+        Some(UpgradeAssessmentVerdict::Avoid)
     } else if requires_compatibility_review {
-        UpgradeAssessmentVerdict::Caution
+        Some(UpgradeAssessmentVerdict::Caution)
     } else {
-        discovered.base_verdict.clone()
+        Some(discovered.base_verdict.clone())
     };
-    UpgradeAssessmentCandidate {
+    UpgradeAssessmentCandidateVersion {
         version: candidate.version.to_string(),
-        upgrade_distance,
-        api_compatibility,
+        is_requested_candidate: false,
+        release_timestamp: None,
+        upgrade_distance: Some(upgrade_distance),
         verdict,
-        caveats,
     }
 }
 
@@ -1462,30 +1627,53 @@ fn report_from_hipcheck(
     assessment_id: Uuid,
     base_verdict: UpgradeAssessmentVerdict,
     stored: &nv_common::hipcheck::storage::StoredHipcheckRun,
-) -> UpgradeAssessmentReport {
+) -> UpgradeAssessmentResult {
+    let evidence_id = format!("hipcheck-run-{assessment_id}");
     let evidence_link = format!("/assessments/{assessment_id}/evidence");
     let mut findings: Vec<_> = stored
         .findings
         .iter()
-        .map(|finding| nv_server_api::UpgradeAssessmentFinding {
-            effect: finding.effect.clone(),
+        .zip(1_usize..)
+        .map(|(finding, finding_number)| UpgradeAssessmentFinding {
+            id: format!("hipcheck-finding-{finding_number}"),
+            category: UpgradeAssessmentFindingCategory::SupplyChain,
+            effect: hipcheck_finding_effect(&finding.effect),
+            title: "Hipcheck finding".to_owned(),
             summary: finding.summary.clone(),
-            evidence_links: vec![evidence_link.clone()],
+            severity: None,
+            confidence: None,
+            evidence_ids: vec![evidence_id.clone()],
         })
         .collect();
     if stored.run.status != "completed" {
         findings.push(nv_server_api::UpgradeAssessmentFinding {
-            effect: "missing-check".to_owned(),
+            id: "hipcheck-incomplete-run".to_owned(),
+            category: UpgradeAssessmentFindingCategory::MissingEvidence,
+            effect: UpgradeAssessmentFindingEffect::MissingCheck,
+            title: "Hipcheck did not complete".to_owned(),
             summary: stored.run.error_message.clone().unwrap_or_else(|| {
                 "Hipcheck did not produce complete supply-chain evidence.".to_owned()
             }),
-            evidence_links: vec![evidence_link],
+            severity: None,
+            confidence: None,
+            evidence_ids: vec![evidence_id.clone()],
         });
     }
     assessment_report(
         input,
         base_verdict,
         findings,
+        vec![UpgradeAssessmentEvidence {
+            id: evidence_id,
+            source_type: UpgradeAssessmentEvidenceSourceType::Hipcheck,
+            title: "Hipcheck supply-chain analysis".to_owned(),
+            summary:
+                "Supply-chain findings collected from the Hipcheck run associated with this assessment."
+                    .to_owned(),
+            url: Some(evidence_link),
+            details: None,
+            raw_source_identifiers: Vec::new(),
+        }],
         stored.run.policy_recommendation.clone(),
     )
 }
@@ -1494,71 +1682,78 @@ fn assessment_report(
     input: UpgradeAssessmentInput,
     base_verdict: UpgradeAssessmentVerdict,
     supply_chain_findings: Vec<nv_server_api::UpgradeAssessmentFinding>,
+    evidence: Vec<UpgradeAssessmentEvidence>,
     hipcheck_recommendation: Option<String>,
-) -> UpgradeAssessmentReport {
+) -> UpgradeAssessmentResult {
     let verdict = upgrade_assessment_verdict(&base_verdict, &supply_chain_findings);
-    let candidate_caveats: Vec<_> = supply_chain_findings
-        .iter()
-        .map(|finding| finding.summary.clone())
-        .collect();
+    let current_version = input
+        .vulnerable_package
+        .as_ref()
+        .map(|package| package.version.as_str());
     let candidate_versions = input
         .candidate_version
         .iter()
         .map(|version| {
-            let mut candidate = assessment_candidate(&input.current_version, version);
-            let requires_compatibility_review = requires_compatibility_review(
-                &candidate.upgrade_distance,
-                &candidate.api_compatibility,
+            let mut candidate = assessment_candidate(current_version, version);
+            let requires_compatibility_review = matches!(
+                candidate.verdict.as_ref(),
+                Some(UpgradeAssessmentVerdict::Caution)
             );
-            candidate.verdict = if requires_compatibility_review
-                && (matches!(verdict, UpgradeAssessmentVerdict::Recommended)
-                    || (matches!(verdict, UpgradeAssessmentVerdict::Unknown)
-                        && supply_chain_findings.is_empty()))
-            {
-                UpgradeAssessmentVerdict::Caution
-            } else {
-                verdict.clone()
-            };
-            if requires_compatibility_review {
-                candidate.caveats.extend(candidate_caveats.clone());
-            } else {
-                candidate.caveats = candidate_caveats.clone();
-            }
+            candidate.verdict = Some(
+                if requires_compatibility_review
+                    && (matches!(verdict, UpgradeAssessmentVerdict::Recommended)
+                        || (matches!(verdict, UpgradeAssessmentVerdict::Unknown)
+                            && supply_chain_findings.is_empty()))
+                {
+                    UpgradeAssessmentVerdict::Caution
+                } else {
+                    verdict.clone()
+                },
+            );
             candidate
         })
         .collect();
     let mut caveats = Vec::new();
     if supply_chain_findings.is_empty() {
-        caveats.push("Candidate analysis has not yet produced supply-chain findings.".to_owned());
-    }
-    if let Some(recommendation) = hipcheck_recommendation {
-        caveats.push(format!(
-            "Hipcheck policy recommendation was {recommendation}; Night Vision used the normalized findings above when determining this verdict."
+        caveats.push(assessment_caveat(
+            "analysis-pending",
+            "Candidate analysis has not yet produced supply-chain findings.",
         ));
     }
-    UpgradeAssessmentReport {
-        vulnerability_context: UpgradeAssessmentVulnerabilityContext {
-            trigger: input.trigger.clone(),
-            // Upgrade-assessment requests are admitted only after the affected
-            // baseline is confirmed to match an active KEV entry. Candidate
-            // verdicts must not change that vulnerability context.
-            kev_linked: Some(true),
-        },
+    if let Some(recommendation) = hipcheck_recommendation {
+        caveats.push(assessment_caveat(
+            "hipcheck-policy-recommendation",
+            format!(
+                "Hipcheck policy recommendation was {recommendation}; Night Vision used the normalized findings above when determining this verdict."
+            ),
+        ));
+    }
+    let summary = match verdict {
+        UpgradeAssessmentVerdict::Recommended => {
+            "Night Vision identified a recommended upgrade candidate.".to_owned()
+        }
+        UpgradeAssessmentVerdict::Caution => {
+            "Night Vision identified an upgrade candidate that requires review before adoption."
+                .to_owned()
+        }
+        UpgradeAssessmentVerdict::Avoid => {
+            "Night Vision found blocking issues for the assessed upgrade candidate.".to_owned()
+        }
+        UpgradeAssessmentVerdict::Unknown => {
+            "Night Vision could not determine a complete upgrade recommendation.".to_owned()
+        }
+    };
+    UpgradeAssessmentResult {
+        id: Uuid::nil(),
+        status: UpgradeAssessmentWorkflowStatus::Pending,
         input,
-        verdict: verdict.clone(),
-        candidate_versions,
-        dependency_delta: UpgradeAssessmentDependencyDelta {
-            added: Vec::new(),
-            removed: Vec::new(),
-            changed: Vec::new(),
-        },
-        evidence_links: supply_chain_findings
-            .iter()
-            .flat_map(|finding| finding.evidence_links.iter().cloned())
-            .collect(),
-        supply_chain_findings,
-        confidence: assessment_confidence(&verdict),
+        verdict,
+        summary,
+        findings: supply_chain_findings,
+        evidence,
         caveats,
+        candidate_versions,
+        assessed_at: Utc::now(),
     }
 }
 
@@ -1569,83 +1764,80 @@ fn upgrade_assessment_verdict(
     findings: &[nv_server_api::UpgradeAssessmentFinding],
 ) -> UpgradeAssessmentVerdict {
     if matches!(base_verdict, UpgradeAssessmentVerdict::Avoid)
-        || findings.iter().any(|finding| finding.effect == "blocking")
+        || findings
+            .iter()
+            .any(|finding| matches!(finding.effect, UpgradeAssessmentFindingEffect::Blocking))
     {
         return UpgradeAssessmentVerdict::Avoid;
     }
     if matches!(base_verdict, UpgradeAssessmentVerdict::Unknown)
         || findings
             .iter()
-            .any(|finding| finding.effect == "missing-check")
+            .any(|finding| matches!(finding.effect, UpgradeAssessmentFindingEffect::MissingCheck))
     {
         return UpgradeAssessmentVerdict::Unknown;
     }
     if matches!(base_verdict, UpgradeAssessmentVerdict::Caution)
-        || findings.iter().any(|finding| finding.effect == "review")
+        || findings
+            .iter()
+            .any(|finding| matches!(finding.effect, UpgradeAssessmentFindingEffect::Review))
     {
         return UpgradeAssessmentVerdict::Caution;
     }
     UpgradeAssessmentVerdict::Recommended
 }
 
-fn assessment_confidence(verdict: &UpgradeAssessmentVerdict) -> UpgradeAssessmentConfidence {
-    match verdict {
-        UpgradeAssessmentVerdict::Recommended => UpgradeAssessmentConfidence::Medium,
-        UpgradeAssessmentVerdict::Caution | UpgradeAssessmentVerdict::Avoid => {
-            UpgradeAssessmentConfidence::Medium
-        }
-        UpgradeAssessmentVerdict::Unknown => UpgradeAssessmentConfidence::Unknown,
+fn hipcheck_finding_effect(effect: &str) -> UpgradeAssessmentFindingEffect {
+    match effect {
+        "blocking" => UpgradeAssessmentFindingEffect::Blocking,
+        "context" => UpgradeAssessmentFindingEffect::Context,
+        "missing-check" => UpgradeAssessmentFindingEffect::MissingCheck,
+        _ => UpgradeAssessmentFindingEffect::Review,
     }
 }
 
 fn assessment_candidate(
-    current_version: &str,
+    current_version: Option<&str>,
     candidate_version: &str,
-) -> UpgradeAssessmentCandidate {
-    let (upgrade_distance, api_compatibility) = match (
-        semver::Version::parse(current_version),
-        semver::Version::parse(candidate_version),
-    ) {
-        (Ok(current), Ok(candidate)) => (
-            assessment_upgrade_distance(upgrade_distance(&current, &candidate)),
-            assessment_api_compatibility(api_compatibility(&current, &candidate)),
-        ),
-        _ => (
-            UpgradeAssessmentUpgradeDistance::Unknown,
-            UpgradeAssessmentApiCompatibility::Unknown,
-        ),
+) -> UpgradeAssessmentCandidateVersion {
+    let (upgrade_distance, requires_compatibility_review) = match current_version {
+        Some(current_version) => match (
+            semver::Version::parse(current_version),
+            semver::Version::parse(candidate_version),
+        ) {
+            (Ok(current), Ok(candidate)) => {
+                let upgrade_distance =
+                    assessment_upgrade_distance(upgrade_distance(&current, &candidate));
+                let api_compatibility = api_compatibility(&current, &candidate);
+                let requires_compatibility_review =
+                    requires_compatibility_review(Some(&upgrade_distance), &api_compatibility);
+                (Some(upgrade_distance), requires_compatibility_review)
+            }
+            _ => (Some(UpgradeAssessmentUpgradeDistance::Unknown), false),
+        },
+        None => (None, false),
     };
-    let requires_compatibility_review =
-        requires_compatibility_review(&upgrade_distance, &api_compatibility);
-    UpgradeAssessmentCandidate {
+    UpgradeAssessmentCandidateVersion {
         version: candidate_version.to_owned(),
+        is_requested_candidate: true,
+        release_timestamp: None,
         upgrade_distance,
-        api_compatibility,
-        verdict: if requires_compatibility_review {
+        verdict: Some(if requires_compatibility_review {
             UpgradeAssessmentVerdict::Caution
         } else {
             UpgradeAssessmentVerdict::Unknown
-        },
-        caveats: if requires_compatibility_review {
-            vec![
-                "This upgrade requires application compatibility review; Night Vision cannot establish application compatibility."
-                    .to_owned(),
-            ]
-        } else {
-            vec!["Candidate analysis has not yet been populated from NPM metadata.".to_owned()]
-        },
+        }),
     }
 }
 
 fn requires_compatibility_review(
-    upgrade_distance: &UpgradeAssessmentUpgradeDistance,
-    api_compatibility: &UpgradeAssessmentApiCompatibility,
+    upgrade_distance: Option<&UpgradeAssessmentUpgradeDistance>,
+    api_compatibility: &ApiCompatibility,
 ) -> bool {
-    matches!(upgrade_distance, UpgradeAssessmentUpgradeDistance::Major)
-        || matches!(
-            api_compatibility,
-            UpgradeAssessmentApiCompatibility::NoGuarantee
-        )
+    matches!(
+        upgrade_distance,
+        Some(UpgradeAssessmentUpgradeDistance::Major)
+    ) || matches!(api_compatibility, ApiCompatibility::NoGuarantee)
 }
 
 fn assessment_upgrade_distance(value: UpgradeDistance) -> UpgradeAssessmentUpgradeDistance {
@@ -1656,94 +1848,88 @@ fn assessment_upgrade_distance(value: UpgradeDistance) -> UpgradeAssessmentUpgra
     }
 }
 
-fn assessment_api_compatibility(value: ApiCompatibility) -> UpgradeAssessmentApiCompatibility {
-    match value {
-        ApiCompatibility::Compatible => UpgradeAssessmentApiCompatibility::Compatible,
-        ApiCompatibility::Incompatible => UpgradeAssessmentApiCompatibility::Incompatible,
-        ApiCompatibility::NoGuarantee => UpgradeAssessmentApiCompatibility::NoGuarantee,
-    }
-}
-
 fn assessment_status(
     assessment: upgrade_assessments::Model,
 ) -> Result<UpgradeAssessmentStatus, HttpError> {
     let id = Uuid::parse_str(&assessment.id).map_err(internal_error)?;
     let created_at = utc(assessment.created_at);
-    let input = input_from_model(&assessment)?;
-    match assessment.status.as_str() {
-        "processing" => Ok(UpgradeAssessmentStatus::Processing(
-            UpgradeAssessmentProcessing {
-                id,
-                created_at,
-                input,
-            },
-        )),
-        "completed" => {
-            let finished_at = assessment.finished_at.ok_or_else(|| {
-                internal_error("completed upgrade assessment has no completion time")
-            })?;
-            let report = assessment
-                .report
-                .ok_or_else(|| internal_error("completed upgrade assessment has no report"))?;
-            let report = serde_json::from_value(report).map_err(internal_error)?;
-            Ok(UpgradeAssessmentStatus::Completed(
-                UpgradeAssessmentCompleted {
-                    id,
-                    created_at,
-                    completed_at: utc(finished_at),
-                    report,
-                },
-            ))
-        }
-        "failed" => {
-            let finished_at = assessment
-                .finished_at
-                .ok_or_else(|| internal_error("failed upgrade assessment has no failure time"))?;
-            let error = assessment
-                .error
-                .ok_or_else(|| internal_error("failed upgrade assessment has no error"))?;
-            Ok(UpgradeAssessmentStatus::Failed(UpgradeAssessmentFailed {
-                id,
-                created_at,
-                failed_at: utc(finished_at),
-                input,
-                error,
-            }))
-        }
-        _ => Err(internal_error("upgrade assessment has an invalid status")),
-    }
-}
-
-fn input_from_model(
-    assessment: &upgrade_assessments::Model,
-) -> Result<UpgradeAssessmentInput, HttpError> {
-    let trigger = match assessment.trigger_kind.as_str() {
-        "cve" => UpgradeAssessmentTrigger::Cve {
-            cve_id: assessment.trigger_reference.clone(),
-        },
-        "exposure" => UpgradeAssessmentTrigger::Exposure {
-            exposure_id: assessment.trigger_reference.clone(),
-        },
-        _ => {
-            return Err(internal_error(
-                "upgrade assessment has an invalid trigger kind",
-            ));
-        }
+    let completed_at = assessment.finished_at.map(utc);
+    let status = match assessment.status.as_str() {
+        "pending" | "processing" => UpgradeAssessmentWorkflowStatus::Pending,
+        "completed" => UpgradeAssessmentWorkflowStatus::Completed,
+        "failed" => UpgradeAssessmentWorkflowStatus::Failed,
+        _ => return Err(internal_error("upgrade assessment has an invalid status")),
     };
-    Ok(UpgradeAssessmentInput {
-        ecosystem: PackageSourceEcosystem::Npm,
-        package_name: assessment.package_name.clone(),
-        current_version: assessment.current_version.clone(),
-        trigger,
-        candidate_version: assessment.candidate_version.clone(),
+    let error = if matches!(status, UpgradeAssessmentWorkflowStatus::Failed) {
+        Some(UpgradeAssessmentError {
+            code: None,
+            message: assessment
+                .error
+                .ok_or_else(|| internal_error("failed upgrade assessment has no error"))?,
+        })
+    } else {
+        None
+    };
+    Ok(UpgradeAssessmentStatus {
+        id,
+        status: status.clone(),
+        created_at,
+        updated_at: completed_at.unwrap_or(created_at),
+        completed_at: if matches!(status, UpgradeAssessmentWorkflowStatus::Completed) {
+            completed_at
+        } else {
+            None
+        },
+        error,
     })
 }
 
-fn trigger_parts(trigger: &UpgradeAssessmentTrigger) -> (&str, &str) {
-    match trigger {
-        UpgradeAssessmentTrigger::Cve { cve_id } => ("cve", cve_id),
-        UpgradeAssessmentTrigger::Exposure { exposure_id } => ("exposure", exposure_id),
+async fn load_upgrade_assessment(
+    db: &DatabaseConnection,
+    id: Uuid,
+) -> Result<upgrade_assessments::Model, HttpError> {
+    upgrade_assessments::Entity::find_by_id(id.to_string())
+        .one(db)
+        .await
+        .map_err(internal_error)?
+        .ok_or_else(|| HttpError::for_not_found(None, format!("unknown upgrade assessment {id}")))
+}
+
+fn assessment_result(
+    assessment: upgrade_assessments::Model,
+) -> Result<UpgradeAssessmentResult, HttpError> {
+    let id = Uuid::parse_str(&assessment.id).map_err(internal_error)?;
+    match assessment.status.as_str() {
+        "completed" => {}
+        "pending" | "processing" => {
+            return Err(upgrade_result_unavailable(
+                "upgrade assessment result is not available until processing completes",
+            ));
+        }
+        "failed" => {
+            return Err(upgrade_result_unavailable(
+                "upgrade assessment did not complete successfully",
+            ));
+        }
+        _ => return Err(internal_error("upgrade assessment has an invalid status")),
     }
+
+    let report = assessment
+        .report
+        .ok_or_else(|| internal_error("completed upgrade assessment has no report"))?;
+    let mut result: UpgradeAssessmentResult =
+        serde_json::from_value(report).map_err(internal_error)?;
+    result.id = id;
+    result.status = UpgradeAssessmentWorkflowStatus::Completed;
+    Ok(result)
+}
+
+fn upgrade_result_unavailable(message: &str) -> HttpError {
+    HttpError::for_client_error(
+        Some("UpgradeAssessmentResultUnavailable".to_owned()),
+        ClientErrorStatusCode::CONFLICT,
+        message.to_owned(),
+    )
 }
 
 fn utc(value: DateTime<chrono::FixedOffset>) -> DateTime<Utc> {
@@ -1983,13 +2169,19 @@ mod tests {
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(Body::from(
                 serde_json::json!({
-                    "packageName": "example-package",
-                    "currentVersion": "1.2.3",
+                    "packageSource": {
+                        "ecosystem": "npm",
+                        "fileName": "package.json",
+                        "contents": "{\"name\":\"example-app\",\"version\":\"1.0.0\",\"dependencies\":{\"example-package\":\"1.2.3\"}}"
+                    },
+                    "vulnerablePackage": {
+                        "name": "example-package",
+                        "ecosystem": "npm",
+                        "version": "1.2.3",
+                        "purl": "pkg:npm/example-package@1.2.3"
+                    },
+                    "cveLinkage": ["CVE-2026-1234"],
                     "candidateVersion": "1.2.4",
-                    "trigger": {
-                        "kind": "cve",
-                        "cve_id": "CVE-2026-1234"
-                    }
                 })
                 .to_string(),
             ))
@@ -2025,12 +2217,18 @@ mod tests {
             .header(http::header::CONTENT_TYPE, "application/json")
             .body(Body::from(
                 serde_json::json!({
-                    "packageName": "example-package",
-                    "currentVersion": "1.2.3",
-                    "trigger": {
-                        "kind": "cve",
-                        "cve_id": "CVE-2026-1234"
-                    }
+                    "packageSource": {
+                        "ecosystem": "npm",
+                        "fileName": "package.json",
+                        "contents": "{\"name\":\"example-app\",\"version\":\"1.0.0\",\"dependencies\":{\"example-package\":\"1.2.3\"}}"
+                    },
+                    "vulnerablePackage": {
+                        "name": "example-package",
+                        "ecosystem": "npm",
+                        "version": "1.2.3",
+                        "purl": "pkg:npm/example-package@1.2.3"
+                    },
+                    "cveLinkage": ["CVE-2026-1234"]
                 })
                 .to_string(),
             ))
@@ -2463,12 +2661,27 @@ mod tests {
 
     fn input() -> UpgradeAssessmentInput {
         UpgradeAssessmentInput {
+        package_source: UpgradeAssessmentPackageSourceInput {
             ecosystem: PackageSourceEcosystem::Npm,
-            package_name: "example-package".to_owned(),
-            current_version: "1.2.3".to_owned(),
-            trigger: UpgradeAssessmentTrigger::Cve {
-                cve_id: "CVE-2026-1234".to_owned(),
-            },
+            file_name: "package.json".to_owned(),
+            contents:
+                r#"{"name":"example-app","version":"1.0.0","dependencies":{"example-package":"1.2.3"}}"#
+                    .to_owned(),
+        },
+        vulnerable_package: Some(UpgradeAssessmentVulnerablePackageInput {
+            name: "example-package".to_owned(),
+            ecosystem: PackageSourceEcosystem::Npm,
+            version: "1.2.3".to_owned(),
+            purl: Some("pkg:npm/example-package@1.2.3".to_owned()),
+        }),
+        cve_linkage: Some(vec!["CVE-2026-1234".to_owned()]),
+        kev_linkage: Some(UpgradeAssessmentKevLinkage {
+            cve_ids: vec!["CVE-2026-1234".to_owned()],
+            known_exploited: Some(true),
+            references: vec![
+                "https://www.cisa.gov/known-exploited-vulnerabilities-catalog".to_owned(),
+            ],
+        }),
             candidate_version: Some("1.2.7".to_owned()),
         }
     }
@@ -2478,9 +2691,14 @@ mod tests {
         summary: &str,
     ) -> nv_server_api::UpgradeAssessmentFinding {
         nv_server_api::UpgradeAssessmentFinding {
-            effect: effect.to_owned(),
+            id: format!("finding-{effect}"),
+            category: UpgradeAssessmentFindingCategory::SupplyChain,
+            effect: hipcheck_finding_effect(effect),
+            title: "Test supply-chain finding".to_owned(),
             summary: summary.to_owned(),
-            evidence_links: vec!["/assessments/example/evidence".to_owned()],
+            severity: None,
+            confidence: None,
+            evidence_ids: vec!["evidence-1".to_owned()],
         }
     }
 
@@ -2501,7 +2719,6 @@ mod tests {
                 status: CandidateStatus::Included,
             },
             base_verdict: verdict,
-            caveats: vec!["candidate KEV evidence".to_owned()],
         }
     }
 
@@ -2544,29 +2761,28 @@ mod tests {
         );
         assert_eq!(
             report.candidate_versions[0].upgrade_distance,
-            UpgradeAssessmentUpgradeDistance::Patch
+            Some(UpgradeAssessmentUpgradeDistance::Patch)
         );
         assert_eq!(
             report.candidate_versions[1].upgrade_distance,
-            UpgradeAssessmentUpgradeDistance::Minor
+            Some(UpgradeAssessmentUpgradeDistance::Minor)
         );
         assert_eq!(
             report.candidate_versions[2].upgrade_distance,
-            UpgradeAssessmentUpgradeDistance::Major
+            Some(UpgradeAssessmentUpgradeDistance::Major)
+        );
+        assert!(!report.candidate_versions[0].is_requested_candidate);
+        assert!(matches!(
+            report.verdict,
+            UpgradeAssessmentVerdict::Recommended
+        ));
+        assert_eq!(
+            report.candidate_versions[0].verdict,
+            Some(UpgradeAssessmentVerdict::Recommended)
         );
         assert_eq!(
-            report.candidate_versions[2].api_compatibility,
-            UpgradeAssessmentApiCompatibility::Incompatible
-        );
-        assert!(matches!(
             report.candidate_versions[2].verdict,
-            UpgradeAssessmentVerdict::Caution
-        ));
-        assert!(
-            report.candidate_versions[2]
-                .caveats
-                .iter()
-                .any(|caveat| caveat.contains("compatibility review"))
+            Some(UpgradeAssessmentVerdict::Caution)
         );
     }
 
@@ -2601,7 +2817,7 @@ mod tests {
 
         assert!(matches!(
             report.candidate_versions[0].verdict,
-            UpgradeAssessmentVerdict::Avoid
+            Some(UpgradeAssessmentVerdict::Avoid)
         ));
     }
 
@@ -2623,14 +2839,26 @@ mod tests {
                 },
                 base_verdict,
                 Vec::new(),
+                Vec::new(),
                 None,
             );
 
-            assert_eq!(report.vulnerability_context.kev_linked, Some(true));
+            assert_eq!(
+                report
+                    .input
+                    .kev_linkage
+                    .as_ref()
+                    .and_then(|kev_linkage| kev_linkage.known_exploited),
+                Some(true)
+            );
             if candidate_version == "2.0.0" {
+                assert_eq!(
+                    report.candidate_versions[0].upgrade_distance,
+                    Some(UpgradeAssessmentUpgradeDistance::Major)
+                );
                 assert!(matches!(
                     report.candidate_versions[0].verdict,
-                    UpgradeAssessmentVerdict::Caution
+                    Some(UpgradeAssessmentVerdict::Caution)
                 ));
             }
         }
@@ -2640,33 +2868,34 @@ mod tests {
     fn explicit_no_guarantee_patch_candidate_is_cautioned_when_base_verdict_is_recommended() {
         let report = assessment_report(
             UpgradeAssessmentInput {
-                current_version: "0.5.0".to_owned(),
+                vulnerable_package: Some(UpgradeAssessmentVulnerablePackageInput {
+                    version: "0.5.0".to_owned(),
+                    ..input()
+                        .vulnerable_package
+                        .expect("test input includes package")
+                }),
                 candidate_version: Some("0.5.1".to_owned()),
                 ..input()
             },
             UpgradeAssessmentVerdict::Recommended,
+            Vec::new(),
             Vec::new(),
             None,
         );
 
         assert_eq!(
             report.candidate_versions[0].upgrade_distance,
-            UpgradeAssessmentUpgradeDistance::Patch
+            Some(UpgradeAssessmentUpgradeDistance::Patch)
         );
-        assert_eq!(
-            report.candidate_versions[0].api_compatibility,
-            UpgradeAssessmentApiCompatibility::NoGuarantee
-        );
+        assert!(report.candidate_versions[0].is_requested_candidate);
+        assert!(matches!(
+            report.verdict,
+            UpgradeAssessmentVerdict::Recommended
+        ));
         assert!(matches!(
             report.candidate_versions[0].verdict,
-            UpgradeAssessmentVerdict::Caution
+            Some(UpgradeAssessmentVerdict::Caution)
         ));
-        assert!(
-            report.candidate_versions[0]
-                .caveats
-                .iter()
-                .any(|caveat| caveat.contains("compatibility review"))
-        );
     }
 
     #[test]
@@ -2678,13 +2907,14 @@ mod tests {
                 "blocking",
                 "source and package contents differ",
             )],
+            Vec::new(),
             Some("INVESTIGATE".to_owned()),
         );
 
         assert!(matches!(report.verdict, UpgradeAssessmentVerdict::Avoid));
         assert!(matches!(
             report.candidate_versions[0].verdict,
-            UpgradeAssessmentVerdict::Avoid
+            Some(UpgradeAssessmentVerdict::Avoid)
         ));
     }
 
@@ -2694,13 +2924,15 @@ mod tests {
             input(),
             UpgradeAssessmentVerdict::Recommended,
             vec![supply_chain_finding("review", "release delta needs review")],
+            Vec::new(),
             Some("INVESTIGATE".to_owned()),
         );
 
         assert!(matches!(report.verdict, UpgradeAssessmentVerdict::Caution));
+        assert_eq!(report.findings[0].summary, "release delta needs review");
         assert_eq!(
-            report.candidate_versions[0].caveats,
-            vec!["release delta needs review"]
+            report.findings[0].effect,
+            UpgradeAssessmentFindingEffect::Review
         );
     }
 
@@ -2713,14 +2945,15 @@ mod tests {
                 "missing-check",
                 "source/tag comparison could not run",
             )],
+            Vec::new(),
             Some("INVESTIGATE".to_owned()),
         );
 
         assert!(matches!(report.verdict, UpgradeAssessmentVerdict::Unknown));
-        assert!(matches!(
-            report.confidence,
-            UpgradeAssessmentConfidence::Unknown
-        ));
+        assert_eq!(
+            report.findings[0].effect,
+            UpgradeAssessmentFindingEffect::MissingCheck
+        );
     }
 
     #[test]
@@ -2729,16 +2962,16 @@ mod tests {
             input(),
             UpgradeAssessmentVerdict::Avoid,
             Vec::new(),
+            Vec::new(),
             Some("PASS".to_owned()),
         );
 
         assert!(matches!(report.verdict, UpgradeAssessmentVerdict::Avoid));
-        assert!(
-            report
-                .caveats
-                .iter()
-                .any(|caveat| caveat.contains("Hipcheck policy recommendation was PASS"))
-        );
+        assert!(report.caveats.iter().any(|caveat| {
+            caveat
+                .summary
+                .contains("Hipcheck policy recommendation was PASS")
+        }));
     }
 
     #[test]
@@ -2750,35 +2983,41 @@ mod tests {
                 "review",
                 "new install script requires review",
             )],
+            vec![UpgradeAssessmentEvidence {
+                id: "evidence-1".to_owned(),
+                source_type: UpgradeAssessmentEvidenceSourceType::Hipcheck,
+                title: "Assessment evidence".to_owned(),
+                summary: "Evidence backing the supply-chain finding".to_owned(),
+                url: Some("/assessments/example/evidence".to_owned()),
+                details: None,
+                raw_source_identifiers: Vec::new(),
+            }],
             Some("INVESTIGATE".to_owned()),
         );
 
-        assert_eq!(report.supply_chain_findings[0].effect, "review");
         assert_eq!(
-            report.supply_chain_findings[0].summary,
-            "new install script requires review"
+            report.findings[0].effect,
+            UpgradeAssessmentFindingEffect::Review
         );
         assert_eq!(
-            report.supply_chain_findings[0].evidence_links,
-            vec!["/assessments/example/evidence"]
+            report.findings[0].summary,
+            "new install script requires review"
+        );
+        assert_eq!(report.findings[0].evidence_ids, vec!["evidence-1"]);
+        assert_eq!(
+            report.evidence[0].url.as_deref(),
+            Some("/assessments/example/evidence")
         );
     }
 
     #[test]
-    fn upgrade_assessment_trigger_uses_snake_case_fields() {
-        let value = serde_json::json!({
-            "kind": "cve",
-            "cve_id": "CVE-2026-1234",
-        });
-        let trigger = serde_json::from_value::<UpgradeAssessmentTrigger>(value.clone())
-            .expect("snake_case trigger fields must deserialize");
+    fn input_serializes_package_source_and_vulnerable_package_fields() {
+        let serialized = serde_json::to_value(input()).expect("input must serialize");
 
-        assert_eq!(serde_json::to_value(trigger).unwrap(), value);
-        serde_json::from_value::<UpgradeAssessmentTrigger>(serde_json::json!({
-            "kind": "cve",
-            "cveId": "CVE-2026-1234",
-        }))
-        .unwrap_err();
+        assert_eq!(serialized["packageSource"]["fileName"], "package.json");
+        assert_eq!(serialized["vulnerablePackage"]["name"], "example-package");
+        assert_eq!(serialized["cveLinkage"][0], "CVE-2026-1234");
+        assert_eq!(serialized["candidateVersion"], "1.2.7");
     }
 
     #[test]
@@ -2786,25 +3025,28 @@ mod tests {
         let report = initial_assessment_report(input());
         let serialized = serde_json::to_value(&report).expect("report must serialize");
 
-        assert_eq!(serialized["input"]["packageName"], "example-package");
+        assert_eq!(
+            serialized["input"]["vulnerablePackage"]["name"],
+            "example-package"
+        );
+        assert_eq!(
+            serialized["input"]["packageSource"]["fileName"],
+            "package.json"
+        );
         assert_eq!(serialized["verdict"], "unknown");
         assert_eq!(serialized["candidateVersions"][0]["version"], "1.2.7");
         assert_eq!(
             serialized["candidateVersions"][0]["upgradeDistance"],
             "patch"
         );
-        assert_eq!(
-            serialized["candidateVersions"][0]["apiCompatibility"],
-            "compatible"
-        );
+        assert_eq!(serialized["candidateVersions"][0]["verdict"], "unknown");
         assert!(
             serialized["caveats"]
                 .as_array()
                 .is_some_and(|caveats| !caveats.is_empty())
         );
-        assert!(serialized.get("dependencyDelta").is_some());
-        assert!(serialized.get("supplyChainFindings").is_some());
-        assert!(serialized.get("evidenceLinks").is_some());
+        assert!(serialized.get("findings").is_some());
+        assert!(serialized.get("evidence").is_some());
     }
 
     #[test]
@@ -2816,49 +3058,35 @@ mod tests {
 
         assert_eq!(
             report.candidate_versions[0].upgrade_distance,
-            UpgradeAssessmentUpgradeDistance::Major
+            Some(UpgradeAssessmentUpgradeDistance::Major)
         );
         assert_eq!(
-            report.candidate_versions[0].api_compatibility,
-            UpgradeAssessmentApiCompatibility::Incompatible
-        );
-        assert!(matches!(
             report.candidate_versions[0].verdict,
-            UpgradeAssessmentVerdict::Caution
-        ));
-        assert!(
-            report.candidate_versions[0]
-                .caveats
-                .iter()
-                .any(|caveat| caveat.contains("compatibility review"))
+            Some(UpgradeAssessmentVerdict::Caution)
         );
     }
 
     #[test]
     fn initial_report_marks_no_guarantee_minor_candidates_as_caution() {
         let mut assessment_input = input();
-        assessment_input.current_version = "0.5.0".to_owned();
+        assessment_input.vulnerable_package = Some(UpgradeAssessmentVulnerablePackageInput {
+            version: "0.5.0".to_owned(),
+            ..assessment_input
+                .vulnerable_package
+                .clone()
+                .expect("test input includes package")
+        });
         assessment_input.candidate_version = Some("0.6.0".to_owned());
 
         let report = initial_assessment_report(assessment_input);
 
         assert_eq!(
             report.candidate_versions[0].upgrade_distance,
-            UpgradeAssessmentUpgradeDistance::Minor
+            Some(UpgradeAssessmentUpgradeDistance::Minor)
         );
         assert_eq!(
-            report.candidate_versions[0].api_compatibility,
-            UpgradeAssessmentApiCompatibility::NoGuarantee
-        );
-        assert!(matches!(
             report.candidate_versions[0].verdict,
-            UpgradeAssessmentVerdict::Caution
-        ));
-        assert!(
-            report.candidate_versions[0]
-                .caveats
-                .iter()
-                .any(|caveat| caveat.contains("compatibility review"))
+            Some(UpgradeAssessmentVerdict::Caution)
         );
     }
 
@@ -2886,7 +3114,10 @@ mod tests {
         };
 
         let status = assessment_status(model).expect("stored report must be readable");
-        assert!(matches!(status, UpgradeAssessmentStatus::Completed(_)));
+        assert_eq!(status.id, id);
+        assert_eq!(status.status, UpgradeAssessmentWorkflowStatus::Completed);
+        assert_eq!(status.completed_at, Some(timestamp.with_timezone(&Utc)));
+        assert!(status.error.is_none());
     }
 
     #[test]
@@ -2905,27 +3136,518 @@ mod tests {
             candidate_version: None,
             status: "failed".to_owned(),
             created_at: timestamp,
-            finished_at: Some(timestamp),
+            finished_at: None,
             report: None,
             error: Some("analysis unavailable".to_owned()),
         };
 
         let status = assessment_status(model).expect("stored failure must be readable");
-        assert!(matches!(status, UpgradeAssessmentStatus::Failed(_)));
+        assert_eq!(status.id, id);
+        assert_eq!(status.status, UpgradeAssessmentWorkflowStatus::Failed);
+        assert_eq!(status.created_at, timestamp.with_timezone(&Utc));
+        assert_eq!(status.updated_at, timestamp.with_timezone(&Utc));
+        assert_eq!(status.completed_at, None);
+        assert_eq!(
+            status
+                .error
+                .as_ref()
+                .and_then(|error| error.code.as_deref()),
+            None
+        );
+        assert_eq!(
+            status.error.as_ref().map(|error| error.message.as_str()),
+            Some("analysis unavailable")
+        );
+    }
+
+    #[tokio::test]
+    async fn get_upgrade_assessment_returns_failed_status_with_error_payload() {
+        let id = Uuid::now_v7();
+        let timestamp = Utc
+            .with_ymd_and_hms(2026, 9, 1, 12, 0, 0)
+            .unwrap()
+            .fixed_offset();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![upgrade_assessments::Model {
+                id: id.to_string(),
+                package_name: "example-package".to_owned(),
+                current_version: "1.2.3".to_owned(),
+                trigger_kind: "cve".to_owned(),
+                trigger_reference: "CVE-2026-1234".to_owned(),
+                candidate_version: Some("1.2.7".to_owned()),
+                status: "failed".to_owned(),
+                created_at: timestamp,
+                finished_at: Some(timestamp),
+                report: None,
+                error: Some("analysis unavailable".to_owned()),
+            }]])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/upgrade-assessments/{id}"),
+                StatusCode::OK,
+            )
+            .await
+            .expect("failed persisted upgrade assessment should return its status payload");
+        let body: serde_json::Value = read_json(&mut response).await;
+
+        let expected_timestamp =
+            serde_json::to_value(timestamp.with_timezone(&Utc)).expect("timestamp must serialize");
+
+        assert_eq!(body["id"], id.to_string());
+        assert_eq!(body["status"], "failed");
+        assert_eq!(body["createdAt"], expected_timestamp);
+        assert_eq!(body["updatedAt"], expected_timestamp);
+        assert!(body["completedAt"].is_null());
+        assert!(body["error"]["code"].is_null());
+        assert_eq!(body["error"]["message"], "analysis unavailable");
+        test_context.teardown().await;
     }
 
     #[test]
-    fn invalid_requests_are_rejected_before_persistence() {
-        let invalid = PostUpgradeAssessmentBody {
+    fn pending_assessment_result_is_unavailable() {
+        let id = Uuid::now_v7();
+        let timestamp = Utc
+            .with_ymd_and_hms(2026, 9, 1, 12, 0, 0)
+            .unwrap()
+            .fixed_offset();
+        let model = upgrade_assessments::Model {
+            id: id.to_string(),
             package_name: "example-package".to_owned(),
             current_version: "1.2.3".to_owned(),
-            trigger: UpgradeAssessmentTrigger::Cve {
-                cve_id: "not-a-cve".to_owned(),
-            },
-            candidate_version: None,
+            trigger_kind: "cve".to_owned(),
+            trigger_reference: "CVE-2026-1234".to_owned(),
+            candidate_version: Some("1.2.7".to_owned()),
+            status: "pending".to_owned(),
+            created_at: timestamp,
+            finished_at: None,
+            report: None,
+            error: None,
         };
 
-        assert!(validate_upgrade_assessment_request(&invalid).is_err());
+        let error =
+            assessment_result(model).expect_err("pending assessments must not expose a result yet");
+
+        assert_eq!(error.status_code, ClientErrorStatusCode::CONFLICT);
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("UpgradeAssessmentResultUnavailable")
+        );
+        assert_eq!(
+            error.external_message,
+            "upgrade assessment result is not available until processing completes"
+        );
+    }
+
+    #[test]
+    fn failed_assessment_result_is_unavailable() {
+        let id = Uuid::now_v7();
+        let timestamp = Utc
+            .with_ymd_and_hms(2026, 9, 1, 12, 0, 0)
+            .unwrap()
+            .fixed_offset();
+        let model = upgrade_assessments::Model {
+            id: id.to_string(),
+            package_name: "example-package".to_owned(),
+            current_version: "1.2.3".to_owned(),
+            trigger_kind: "cve".to_owned(),
+            trigger_reference: "CVE-2026-1234".to_owned(),
+            candidate_version: Some("1.2.7".to_owned()),
+            status: "failed".to_owned(),
+            created_at: timestamp,
+            finished_at: Some(timestamp),
+            report: None,
+            error: Some("analysis unavailable".to_owned()),
+        };
+
+        let error = assessment_result(model)
+            .expect_err("failed assessments must not expose a result payload");
+
+        assert_eq!(error.status_code, ClientErrorStatusCode::CONFLICT);
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("UpgradeAssessmentResultUnavailable")
+        );
+        assert_eq!(
+            error.external_message,
+            "upgrade assessment did not complete successfully"
+        );
+    }
+
+    #[test]
+    fn completed_assessment_without_report_returns_internal_error() {
+        let id = Uuid::now_v7();
+        let timestamp = Utc
+            .with_ymd_and_hms(2026, 9, 1, 12, 0, 0)
+            .unwrap()
+            .fixed_offset();
+        let model = upgrade_assessments::Model {
+            id: id.to_string(),
+            package_name: "example-package".to_owned(),
+            current_version: "1.2.3".to_owned(),
+            trigger_kind: "cve".to_owned(),
+            trigger_reference: "CVE-2026-1234".to_owned(),
+            candidate_version: Some("1.2.7".to_owned()),
+            status: "completed".to_owned(),
+            created_at: timestamp,
+            finished_at: Some(timestamp),
+            report: None,
+            error: None,
+        };
+
+        let error = assessment_result(model)
+            .expect_err("completed assessments without a stored report must fail");
+
+        assert_eq!(error.status_code, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            error.internal_message,
+            "completed upgrade assessment has no report"
+        );
+    }
+
+    #[test]
+    fn assessment_result_rejects_invalid_persisted_status() {
+        let id = Uuid::now_v7();
+        let timestamp = Utc
+            .with_ymd_and_hms(2026, 9, 1, 12, 0, 0)
+            .unwrap()
+            .fixed_offset();
+        let model = upgrade_assessments::Model {
+            id: id.to_string(),
+            package_name: "example-package".to_owned(),
+            current_version: "1.2.3".to_owned(),
+            trigger_kind: "cve".to_owned(),
+            trigger_reference: "CVE-2026-1234".to_owned(),
+            candidate_version: Some("1.2.7".to_owned()),
+            status: "mystery".to_owned(),
+            created_at: timestamp,
+            finished_at: None,
+            report: None,
+            error: None,
+        };
+
+        let error =
+            assessment_result(model).expect_err("unknown persisted statuses must be rejected");
+
+        assert_eq!(error.status_code, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            error.internal_message,
+            "upgrade assessment has an invalid status"
+        );
+    }
+
+    #[tokio::test]
+    async fn get_upgrade_assessment_result_returns_not_found_for_unknown_id() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<upgrade_assessments::Model>::new()])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let error = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/upgrade-assessments/{id}/result"),
+                StatusCode::NOT_FOUND,
+            )
+            .await
+            .expect_err("unknown upgrade assessment should return 404");
+
+        assert_eq!(error.error_code, None);
+        assert_eq!(error.message, "Not Found");
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn get_upgrade_assessment_result_returns_conflict_until_completed() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![upgrade_assessments::Model {
+                id: id.to_string(),
+                package_name: "example-package".to_owned(),
+                current_version: "1.2.3".to_owned(),
+                trigger_kind: "cve".to_owned(),
+                trigger_reference: "CVE-2026-1234".to_owned(),
+                candidate_version: Some("1.2.7".to_owned()),
+                status: "processing".to_owned(),
+                created_at: Utc::now().fixed_offset(),
+                finished_at: None,
+                report: None,
+                error: None,
+            }]])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let error = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/upgrade-assessments/{id}/result"),
+                StatusCode::CONFLICT,
+            )
+            .await
+            .expect_err("incomplete upgrade assessment should return 409");
+
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("UpgradeAssessmentResultUnavailable")
+        );
+        assert!(
+            error
+                .message
+                .contains("upgrade assessment result is not available until processing completes")
+        );
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn get_upgrade_assessment_result_returns_conflict_for_failed_assessments() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![upgrade_assessments::Model {
+                id: id.to_string(),
+                package_name: "example-package".to_owned(),
+                current_version: "1.2.3".to_owned(),
+                trigger_kind: "cve".to_owned(),
+                trigger_reference: "CVE-2026-1234".to_owned(),
+                candidate_version: Some("1.2.7".to_owned()),
+                status: "failed".to_owned(),
+                created_at: Utc::now().fixed_offset(),
+                finished_at: Some(Utc::now().fixed_offset()),
+                report: None,
+                error: Some("analysis unavailable".to_owned()),
+            }]])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let error = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/upgrade-assessments/{id}/result"),
+                StatusCode::CONFLICT,
+            )
+            .await
+            .expect_err("failed upgrade assessment result should remain unavailable");
+
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("UpgradeAssessmentResultUnavailable")
+        );
+        assert!(
+            error
+                .message
+                .contains("upgrade assessment did not complete successfully")
+        );
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn get_upgrade_assessment_result_returns_completed_payload_when_available() {
+        let id = Uuid::now_v7();
+        let report = initial_assessment_report(input());
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![upgrade_assessments::Model {
+                id: id.to_string(),
+                package_name: "example-package".to_owned(),
+                current_version: "1.2.3".to_owned(),
+                trigger_kind: "cve".to_owned(),
+                trigger_reference: "CVE-2026-1234".to_owned(),
+                candidate_version: Some("1.2.7".to_owned()),
+                status: "completed".to_owned(),
+                created_at: Utc::now().fixed_offset(),
+                finished_at: Some(Utc::now().fixed_offset()),
+                report: Some(serde_json::to_value(&report).expect("report must serialize")),
+                error: None,
+            }]])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/upgrade-assessments/{id}/result"),
+                StatusCode::OK,
+            )
+            .await
+            .expect("completed upgrade assessment should return 200");
+        let body: serde_json::Value = read_json(&mut response).await;
+
+        assert_eq!(
+            body["input"]["vulnerablePackage"]["name"],
+            "example-package"
+        );
+        assert_eq!(body["input"]["candidateVersion"], "1.2.7");
+        assert_eq!(body["verdict"], "unknown");
+        assert_eq!(body["candidateVersions"][0]["version"], "1.2.7");
+        test_context.teardown().await;
+    }
+
+    #[test]
+    fn candidate_version_without_vulnerable_package_is_rejected() {
+        let mut request = input();
+        request.vulnerable_package = None;
+        request.cve_linkage = None;
+        request.kev_linkage = None;
+
+        let error = validate_upgrade_assessment_request(&request)
+            .expect_err("candidateVersion without vulnerablePackage must be rejected");
+
+        assert_eq!(error.status_code, ClientErrorStatusCode::BAD_REQUEST);
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("InvalidUpgradeAssessment")
+        );
+        assert_eq!(
+            error.external_message,
+            "vulnerablePackage must be provided when cveLinkage, kevLinkage, or candidateVersion is supplied"
+        );
+    }
+
+    #[test]
+    fn cve_linkage_without_vulnerable_package_is_rejected() {
+        let mut request = input();
+        request.vulnerable_package = None;
+        request.candidate_version = None;
+        request.kev_linkage = None;
+
+        let error = validate_upgrade_assessment_request(&request)
+            .expect_err("cveLinkage without vulnerablePackage must be rejected");
+
+        assert_eq!(error.status_code, ClientErrorStatusCode::BAD_REQUEST);
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("InvalidUpgradeAssessment")
+        );
+        assert_eq!(
+            error.external_message,
+            "vulnerablePackage must be provided when cveLinkage, kevLinkage, or candidateVersion is supplied"
+        );
+    }
+
+    #[test]
+    fn kev_linkage_without_vulnerable_package_is_rejected() {
+        let mut request = input();
+        request.vulnerable_package = None;
+        request.candidate_version = None;
+        request.cve_linkage = None;
+
+        let error = validate_upgrade_assessment_request(&request)
+            .expect_err("kevLinkage without vulnerablePackage must be rejected");
+
+        assert_eq!(error.status_code, ClientErrorStatusCode::BAD_REQUEST);
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("InvalidUpgradeAssessment")
+        );
+        assert_eq!(
+            error.external_message,
+            "vulnerablePackage must be provided when cveLinkage, kevLinkage, or candidateVersion is supplied"
+        );
+    }
+
+    #[test]
+    fn empty_candidate_version_is_rejected() {
+        let mut request = input();
+        request.candidate_version = Some("   ".to_owned());
+
+        let error = validate_upgrade_assessment_request(&request)
+            .expect_err("empty candidateVersion must be rejected");
+
+        assert_eq!(error.status_code, ClientErrorStatusCode::BAD_REQUEST);
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("InvalidUpgradeAssessment")
+        );
+        assert_eq!(
+            error.external_message,
+            "candidateVersion must not be empty when supplied"
+        );
+    }
+
+    #[test]
+    fn invalid_semver_candidate_version_is_rejected() {
+        let mut request = input();
+        request.candidate_version = Some("not-a-semver".to_owned());
+
+        let error = validate_upgrade_assessment_request(&request)
+            .expect_err("invalid candidateVersion semver must be rejected");
+
+        assert_eq!(error.status_code, ClientErrorStatusCode::BAD_REQUEST);
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("InvalidUpgradeAssessment")
+        );
+        assert_eq!(
+            error.external_message,
+            "candidateVersion must be a valid semantic version when supplied"
+        );
+    }
+
+    #[test]
+    fn mismatched_vulnerable_package_purl_is_rejected() {
+        let mut request = input();
+        request.vulnerable_package = Some(UpgradeAssessmentVulnerablePackageInput {
+            purl: Some("pkg:npm/other-package@9.9.9".to_owned()),
+            ..request
+                .vulnerable_package
+                .clone()
+                .expect("test input includes vulnerable package")
+        });
+
+        let error = validate_upgrade_assessment_request(&request)
+            .expect_err("mismatched vulnerablePackage.purl must be rejected");
+
+        assert_eq!(error.status_code, ClientErrorStatusCode::BAD_REQUEST);
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("InvalidUpgradeAssessment")
+        );
+        assert_eq!(
+            error.external_message,
+            "vulnerablePackage.purl must match vulnerablePackage.name and vulnerablePackage.version"
+        );
     }
 
     #[test]
