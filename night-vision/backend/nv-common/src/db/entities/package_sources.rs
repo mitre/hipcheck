@@ -16,6 +16,10 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub resolution_error: Option<String>,
     pub created_at: DateTimeWithTimeZone,
+    pub attempt_generation: i32,
+    pub cancellation_requested: bool,
+    pub terminal_at: Option<DateTimeWithTimeZone>,
+    pub deletion_reason: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -372,7 +372,7 @@ mod tests {
 
     fn processing_package_source() -> String {
         format!(
-            r#"{{"id":"{PACKAGE_SOURCE_ID}","createdAt":"2026-01-01T00:00:00Z","status":"processing"}}"#
+            r#"{{"id":"{PACKAGE_SOURCE_ID}","createdAt":"2026-01-01T00:00:00Z","attempt":1,"status":"processing"}}"#
         )
     }
 

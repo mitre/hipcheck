@@ -61,6 +61,18 @@ pub trait NvServerApi {
         path_params: Path<PackageSourcePathParams>,
     ) -> Result<HttpResponseOk<PackageSourceStatus>, HttpError>;
 
+    #[endpoint { method = POST, path = "/package-sources/{id}/cancel" }]
+    async fn cancel_package_source(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<PackageSourcePathParams>,
+    ) -> Result<HttpResponseAccepted<PackageSourceOperationResponse>, HttpError>;
+
+    #[endpoint { method = DELETE, path = "/package-sources/{id}" }]
+    async fn delete_package_source(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<PackageSourcePathParams>,
+    ) -> Result<HttpResponseAccepted<PackageSourceOperationResponse>, HttpError>;
+
     #[endpoint { method = POST, path = "/assessments", content_type = "application/json" }]
     async fn post_assessment(
         ctx: RequestContext<Self::Context>,
@@ -495,6 +507,20 @@ pub struct PostPackageSourceResponse {
     pub id: Uuid,
 }
 
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSourceOperationResponse {
+    pub id: Uuid,
+    pub status: PackageSourceOperationStatus,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub enum PackageSourceOperationStatus {
+    Cancelled,
+    Deleting,
+}
+
 #[derive(Deserialize, JsonSchema, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PackageSourcePathParams {
@@ -506,6 +532,7 @@ pub struct PackageSourcePathParams {
 #[serde(rename_all = "camelCase")]
 pub enum PackageSourceStatus {
     Processing(PackageSourceStatusProcessing),
+    Cancelled(PackageSourceStatusCancelled),
     Completed(PackageSourceStatusCompleted),
     #[serde(rename = "completed-with-warnings")]
     CompletedWithWarnings(PackageSourceStatusCompletedWithWarnings),
@@ -521,6 +548,16 @@ pub struct PackageSourceStatusProcessing {
     // can use a newer version of `schemars`, we should switch to using
     // `jiff`.
     pub created_at: DateTime<Utc>,
+    pub attempt: i32,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSourceStatusCancelled {
+    pub id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub cancelled_at: DateTime<Utc>,
+    pub attempt: i32,
 }
 
 #[derive(Serialize, JsonSchema, Debug, Clone)]
@@ -532,6 +569,8 @@ pub struct PackageSourceStatusCompleted {
     // can use a newer version of `schemars`, we should switch to using
     // `jiff`.
     pub created_at: DateTime<Utc>,
+    pub completed_at: DateTime<Utc>,
+    pub attempt: i32,
     pub source: PackageSource,
     pub versioned_packages: Vec<VersionedPackage>,
 }
@@ -545,6 +584,8 @@ pub struct PackageSourceStatusCompletedWithWarnings {
     // can use a newer version of `schemars`, we should switch to using
     // `jiff`.
     pub created_at: DateTime<Utc>,
+    pub completed_at: DateTime<Utc>,
+    pub attempt: i32,
     pub source: PackageSource,
     pub versioned_packages: Vec<VersionedPackage>,
     pub warnings: Vec<PackageSourceWarning>,
@@ -560,6 +601,8 @@ pub struct PackageSourceStatusFailed {
     // can use a newer version of `schemars`, we should switch to using
     // `jiff`.
     pub created_at: DateTime<Utc>,
+    pub finished_at: DateTime<Utc>,
+    pub attempt: i32,
     pub diagnostic: String,
     /// The last successfully published reachable-version snapshot, if any.
     ///

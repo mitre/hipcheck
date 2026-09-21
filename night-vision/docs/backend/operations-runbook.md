@@ -317,6 +317,47 @@ KEV cache and sync history. It refuses a live sync lock and stale `running`
 metadata; `--force` overrides only the stale-metadata guard and must not be
 used while a sync is live.
 
+## Package-Source Retention Cleanup
+
+Package sources in `completed`, `failed`, or `cancelled` state expire 30 days
+after their latest terminal transition. Minimal deletion audits expire after
+90 days. The MVP uses an operator-triggered command rather than an in-process
+scheduler, so arrange to run it periodically in the deployment's existing job
+runner.
+
+Preview one bounded batch without changing the database:
+
+```sh
+cd backend
+cargo nvdb package-source cleanup --batch-size 100 --dry-run --json
+```
+
+Apply the same bounded batch:
+
+```sh
+cd backend
+cargo nvdb package-source cleanup --batch-size 100 --json
+```
+
+`batch-size` defaults to 100 and must be between 1 and 1000. A run scans at
+most that many package sources and, independently, at most that many expired
+audit rows. The summary reports source rows scanned, deleted, recovered, and
+skipped plus audit rows scanned and purged. Dry-run leaves all rows unchanged;
+its audit scanned count shows the audit backlog while the purged count remains
+zero.
+
+Cleanup first completes sources already hidden in `deleting`, which safely
+recovers an interruption between the hide transition and transactional data
+removal. It then deletes expired terminal sources through the same path used by
+the API. Repeated execution is safe. Run additional batches until both scanned
+counts are zero when draining a backlog. A database error makes the command
+exit nonzero; correct the database issue and run the same command again.
+
+The command deletes submitted contents and source-scoped versions, edges, and
+warnings. It preserves canonical packages and package versions and does not
+touch upgrade assessments. It manages live database rows only; deployment
+backup and restore policy must enforce the same retention maximum separately.
+
 ## Common Failures
 
 ### Server Cannot Read Config

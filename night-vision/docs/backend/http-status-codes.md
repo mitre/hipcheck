@@ -204,6 +204,13 @@ the API surface changes.
 - `GET /package-sources/{id}` returns `200 OK` with the package source status
   when the ID is known.
 - `GET /package-sources/{id}` returns `404 NOT FOUND` when the ID is not known.
+- `POST /package-sources/{id}/cancel` returns `202 ACCEPTED` when pending or
+  processing work is cancelled and for a repeated cancellation. It returns
+  `409 CONFLICT` if a terminal result already won the race and `404 NOT FOUND`
+  for an unknown or deleting source.
+- `DELETE /package-sources/{id}` returns `202 ACCEPTED` after the source is
+  hidden and its source-scoped data is removed. Unknown, already removed, and
+  hidden resources return `404 NOT FOUND`.
 
 Endpoints that interact with CVE data must be prepared for an empty initial CVE
 store after startup. When CVE data is required but not yet available, return an

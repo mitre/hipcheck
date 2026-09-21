@@ -6,6 +6,7 @@ use nv_common::{
 use sea_orm::{ColumnTrait as _, DatabaseConnection, EntityTrait as _, QueryFilter as _};
 use serde::Serialize;
 
+pub mod cleanup;
 pub mod import;
 pub mod kevs;
 pub mod resolve;
@@ -16,6 +17,7 @@ pub fn command() -> clap::Command {
     clap::Command::new("package-source")
         .about("Manage package sources and their resolved versions")
         .arg_required_else_help(true)
+        .subcommand(cleanup::command())
         .subcommand(import::command())
         .subcommand(kevs::command())
         .subcommand(resolve::command())
@@ -26,6 +28,9 @@ pub fn command() -> clap::Command {
 pub fn run(config: &Config, matches: &clap::ArgMatches) -> Result<()> {
     if let Some(import_matches) = matches.subcommand_matches("import") {
         return import::run(config, import_matches);
+    }
+    if let Some(cleanup_matches) = matches.subcommand_matches("cleanup") {
+        return cleanup::run(config, cleanup_matches);
     }
 
     if let Some(kevs_matches) = matches.subcommand_matches("kevs") {
@@ -53,6 +58,7 @@ pub async fn source_by_id(
 ) -> Result<package_sources::Model> {
     package_sources::Entity::find()
         .filter(package_sources::Column::SourceId.eq(source_id))
+        .filter(package_sources::Column::ResolutionStatus.ne("deleting"))
         .one(db)
         .await?
         .ok_or_else(|| anyhow::anyhow!("unknown package source {source_id}"))

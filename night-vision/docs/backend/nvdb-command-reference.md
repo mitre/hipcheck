@@ -124,6 +124,7 @@ warnings.
 
 | Command | Purpose |
 | --- | --- |
+| `package-source cleanup [--batch-size <COUNT>] [--dry-run] [--json]` | Recover interrupted deletions and remove expired sources and deletion audits in bounded batches. |
 | `package-source import <FILE> [--json]` | Store a validated npm `package.json` source. |
 | `package-source resolve <SOURCE-ID> [--json] [--no-progress]` | Resolve and persist reachable package versions. |
 | `package-source show <SOURCE-ID> [--json]` | Show package-source metadata and state. |
@@ -144,6 +145,14 @@ step and to retry a failed resolution without resubmitting the source.
 default. Standard output remains the final text or JSON result, so `--json`
 remains safe for automation. Use `--no-progress` to suppress transient progress
 output.
+
+`package-source cleanup` enforces the selected 30-day terminal source and
+90-day deletion-audit retention periods. Its batch size defaults to 100 and is
+bounded to 1000. Each run reports source rows scanned, deleted, recovered, and
+skipped and audit rows scanned and purged. Use `--dry-run --json` to inspect a
+batch without changing the database. Repeated execution is safe; see the
+[operations runbook](./operations-runbook.md#package-source-retention-cleanup)
+for scheduling and recovery guidance.
 
 ## Package-version commands
 

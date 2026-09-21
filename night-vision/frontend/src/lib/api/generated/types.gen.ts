@@ -98,17 +98,35 @@ export type PackageSource = {
 
 export type PackageSourceEcosystem = 'npm';
 
+export type PackageSourceOperationResponse = {
+    id: string;
+    status: PackageSourceOperationStatus;
+};
+
+export type PackageSourceOperationStatus = 'cancelled' | 'deleting';
+
 export type PackageSourceStatus = {
+    attempt: number;
     createdAt: string;
     id: string;
     status: 'processing';
 } | {
+    attempt: number;
+    cancelledAt: string;
+    createdAt: string;
+    id: string;
+    status: 'cancelled';
+} | {
+    attempt: number;
+    completedAt: string;
     createdAt: string;
     id: string;
     source: PackageSource;
     status: 'completed';
     versionedPackages: Array<VersionedPackage>;
 } | {
+    attempt: number;
+    completedAt: string;
     createdAt: string;
     id: string;
     source: PackageSource;
@@ -117,8 +135,10 @@ export type PackageSourceStatus = {
     warnings: Array<PackageSourceWarning>;
     warningsTruncated: boolean;
 } | {
+    attempt: number;
     createdAt: string;
     diagnostic: string;
+    finishedAt: string;
     id: string;
     /**
      * The last successfully published reachable-version snapshot, if any.
@@ -454,6 +474,37 @@ export type PostPackageSourceResponses = {
 
 export type PostPackageSourceResponse2 = PostPackageSourceResponses[keyof PostPackageSourceResponses];
 
+export type DeletePackageSourceData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/package-sources/{id}';
+};
+
+export type DeletePackageSourceErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type DeletePackageSourceError = DeletePackageSourceErrors[keyof DeletePackageSourceErrors];
+
+export type DeletePackageSourceResponses = {
+    /**
+     * successfully enqueued operation
+     */
+    202: PackageSourceOperationResponse;
+};
+
+export type DeletePackageSourceResponse = DeletePackageSourceResponses[keyof DeletePackageSourceResponses];
+
 export type GetPackageSourceData = {
     body?: never;
     path: {
@@ -484,6 +535,37 @@ export type GetPackageSourceResponses = {
 };
 
 export type GetPackageSourceResponse = GetPackageSourceResponses[keyof GetPackageSourceResponses];
+
+export type CancelPackageSourceData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/package-sources/{id}/cancel';
+};
+
+export type CancelPackageSourceErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type CancelPackageSourceError = CancelPackageSourceErrors[keyof CancelPackageSourceErrors];
+
+export type CancelPackageSourceResponses = {
+    /**
+     * successfully enqueued operation
+     */
+    202: PackageSourceOperationResponse;
+};
+
+export type CancelPackageSourceResponse = CancelPackageSourceResponses[keyof CancelPackageSourceResponses];
 
 export type PostUpgradeAssessmentData = {
     body: UpgradeAssessmentInput;

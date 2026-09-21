@@ -5,6 +5,7 @@ use crate::db::entities::{
     package_source_edges, package_source_versions, package_source_warnings, package_sources,
     package_versions, packages,
 };
+use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, DatabaseConnection, DbErr,
     EntityTrait as _, QueryFilter as _, QueryOrder as _, TransactionTrait as _,
@@ -189,12 +190,24 @@ fn record_child_derivations(
 pub async fn persist_completed_elaboration(
     db: &DatabaseConnection,
     source_id: i32,
+    attempt_generation: i32,
     result: &ElaborationResult,
 ) -> Result<(), ElaborationStorageError> {
     let transaction = db
         .begin()
         .await
         .map_err(ElaborationStorageError::Database)?;
+
+    let active_attempt = package_sources::Entity::find_by_id(source_id)
+        .filter(package_sources::Column::ResolutionStatus.eq("processing"))
+        .filter(package_sources::Column::AttemptGeneration.eq(attempt_generation))
+        .filter(package_sources::Column::CancellationRequested.eq(false))
+        .one(&transaction)
+        .await
+        .map_err(ElaborationStorageError::Database)?;
+    if active_attempt.is_none() {
+        return Err(ElaborationStorageError::InactiveAttempt);
+    }
 
     package_source_edges::Entity::delete_many()
         .filter(package_source_edges::Column::SourceId.eq(source_id))
@@ -270,7 +283,7 @@ pub async fn persist_completed_elaboration(
         .map_err(ElaborationStorageError::Database)?;
     }
 
-    package_sources::Entity::update_many()
+    let publication = package_sources::Entity::update_many()
         .col_expr(
             package_sources::Column::ResolutionStatus,
             sea_orm::sea_query::Expr::value("completed"),
@@ -279,10 +292,20 @@ pub async fn persist_completed_elaboration(
             package_sources::Column::ResolutionError,
             sea_orm::sea_query::Expr::value(None::<String>),
         )
+        .col_expr(
+            package_sources::Column::TerminalAt,
+            sea_orm::sea_query::Expr::value(Some(Utc::now())),
+        )
         .filter(package_sources::Column::Id.eq(source_id))
+        .filter(package_sources::Column::ResolutionStatus.eq("processing"))
+        .filter(package_sources::Column::AttemptGeneration.eq(attempt_generation))
+        .filter(package_sources::Column::CancellationRequested.eq(false))
         .exec(&transaction)
         .await
         .map_err(ElaborationStorageError::Database)?;
+    if publication.rows_affected != 1 {
+        return Err(ElaborationStorageError::InactiveAttempt);
+    }
 
     transaction
         .commit()
@@ -325,10 +348,11 @@ pub async fn persist_assessment_target(
 pub async fn record_elaboration_failure(
     db: &DatabaseConnection,
     source_id: i32,
+    attempt_generation: i32,
     error: &str,
 ) -> Result<(), ElaborationStorageError> {
     let diagnostic = bounded_diagnostic(error);
-    package_sources::Entity::update_many()
+    let update = package_sources::Entity::update_many()
         .col_expr(
             package_sources::Column::ResolutionStatus,
             sea_orm::sea_query::Expr::value("failed"),
@@ -337,10 +361,20 @@ pub async fn record_elaboration_failure(
             package_sources::Column::ResolutionError,
             sea_orm::sea_query::Expr::value(diagnostic),
         )
+        .col_expr(
+            package_sources::Column::TerminalAt,
+            sea_orm::sea_query::Expr::value(Some(Utc::now())),
+        )
         .filter(package_sources::Column::Id.eq(source_id))
+        .filter(package_sources::Column::ResolutionStatus.eq("processing"))
+        .filter(package_sources::Column::AttemptGeneration.eq(attempt_generation))
+        .filter(package_sources::Column::CancellationRequested.eq(false))
         .exec(db)
         .await
         .map_err(ElaborationStorageError::Database)?;
+    if update.rows_affected != 1 {
+        return Err(ElaborationStorageError::InactiveAttempt);
+    }
     Ok(())
 }
 
@@ -514,22 +548,25 @@ pub enum ElaborationStorageError {
     MissingPackage(String),
     #[error("persisted elaboration graph refers to a version outside its source")]
     InvalidGraph,
+    #[error("package-source attempt is no longer active")]
+    InactiveAttempt,
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic, persist_completed_elaboration,
-        persisted_elaboration_warnings, persisted_package_versions, record_elaboration_failure,
-        update_repository_metadata, warning_kind,
+        ElaborationStorageError, MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic,
+        persist_completed_elaboration, persisted_elaboration_warnings, persisted_package_versions,
+        record_elaboration_failure, update_repository_metadata, warning_kind,
     };
     use crate::{
         db::entities::{
             package_source_edges, package_source_versions, package_source_warnings,
-            package_versions,
+            package_sources, package_versions,
         },
         npm::elaboration::{ElaborationResult, UnsupportedSpecificationKind},
     };
+    use chrono::Utc;
     use sea_orm::{DbBackend, MockDatabase, MockExecResult};
 
     #[test]
@@ -694,6 +731,20 @@ mod tests {
     #[tokio::test]
     async fn replaces_a_snapshot_in_one_transaction() {
         let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![package_sources::Model {
+                id: 7,
+                source_id: "source-7".to_owned(),
+                file_name: "package.json".to_owned(),
+                file_contents: "{}".to_owned(),
+                inferred_type: "npm-package-json".to_owned(),
+                resolution_status: "processing".to_owned(),
+                resolution_error: None,
+                created_at: Utc::now().fixed_offset(),
+                attempt_generation: 1,
+                cancellation_requested: false,
+                terminal_at: None,
+                deletion_reason: None,
+            }]])
             .append_exec_results(std::iter::repeat_n(
                 MockExecResult {
                     last_insert_id: 0,
@@ -706,6 +757,7 @@ mod tests {
         persist_completed_elaboration(
             &db,
             7,
+            1,
             &ElaborationResult {
                 packages: Vec::new(),
                 edges: Vec::new(),
@@ -745,6 +797,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn stale_attempt_cannot_replace_a_snapshot() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<package_sources::Model>::new()])
+            .into_connection();
+
+        let error = persist_completed_elaboration(
+            &db,
+            7,
+            3,
+            &ElaborationResult {
+                packages: Vec::new(),
+                edges: Vec::new(),
+                warnings: Vec::new(),
+            },
+        )
+        .await
+        .expect_err("a cancelled, deleted, or superseded attempt must not publish");
+        assert!(matches!(error, ElaborationStorageError::InactiveAttempt));
+        let statements = db
+            .into_transaction_log()
+            .into_iter()
+            .flat_map(|entry| entry.statements().to_vec())
+            .map(|statement| statement.sql)
+            .collect::<Vec<_>>();
+        assert!(!statements.iter().any(|sql| sql.contains("DELETE")));
+        assert_eq!(statements.first(), Some(&"BEGIN".to_owned()));
+        assert_eq!(statements.last(), Some(&"ROLLBACK".to_owned()));
+    }
+
+    #[tokio::test]
     async fn failure_preserves_the_published_snapshot() {
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_exec_results([MockExecResult {
@@ -753,7 +835,7 @@ mod tests {
             }])
             .into_connection();
 
-        record_elaboration_failure(&db, 7, "registry request failed")
+        record_elaboration_failure(&db, 7, 1, "registry request failed")
             .await
             .expect("failure is recorded");
 
@@ -765,6 +847,29 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(statements.len(), 1);
         assert!(statements[0].contains("package_sources"), "{statements:#?}");
+        assert!(statements[0].contains("attempt_generation"));
+        assert!(statements[0].contains("cancellation_requested"));
         assert!(!statements[0].contains("DELETE"));
+    }
+
+    #[tokio::test]
+    async fn stale_attempt_cannot_overwrite_cancellation_with_failure() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 0,
+            }])
+            .into_connection();
+
+        let error = record_elaboration_failure(&db, 7, 3, "registry request failed")
+            .await
+            .expect_err("a cancelled, deleted, or superseded attempt must not record failure");
+
+        assert!(matches!(error, ElaborationStorageError::InactiveAttempt));
+        let transaction_log = db.into_transaction_log();
+        let statement = &transaction_log[0].statements()[0].sql;
+        assert!(statement.contains("attempt_generation"));
+        assert!(statement.contains("cancellation_requested"));
+        assert!(statement.contains("resolution_status"));
     }
 }

@@ -5,6 +5,7 @@
 //! owns the result; workers only inspect one concrete package version and send
 //! one report through the one-shot channel attached to their work item.
 
+pub mod lifecycle;
 pub mod storage;
 
 use super::{

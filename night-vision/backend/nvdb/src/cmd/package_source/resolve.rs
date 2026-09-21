@@ -7,6 +7,7 @@ use nv_common::{
         elaboration::{
             ElaborationProgress, ElaborationProgressReporter, ElaborationProgressSnapshot,
             NpmRegistryClient, elaborate, elaborate_with_progress,
+            lifecycle::{AttemptKind, attempt_is_active, begin_attempt},
             storage::{
                 persist_completed_elaboration, persisted_elaboration_warnings,
                 record_elaboration_failure,
@@ -72,6 +73,10 @@ async fn resolve(
         .await
         .context("failed to connect to database")?;
     let source = super::source_by_id(&db, source_id).await?;
+    let attempt_generation = begin_attempt(&db, source.id, AttemptKind::Manual)
+        .await
+        .context("failed to claim package-source attempt")?
+        .context("package source is cancelled, deleting, or already being processed")?;
     let source_document = NpmPackageJson::parse_package_json(source.file_contents.as_bytes())
         .context("stored source is not a valid npm package.json")?;
     let client = NpmRegistryClient::new(
@@ -84,9 +89,26 @@ async fn resolve(
     let limits = config.package_elaboration_limits();
     let result = match &progress {
         Some(progress) => {
-            elaborate_with_progress(&source_document, provider, limits, progress.clone()).await
+            let elaboration =
+                elaborate_with_progress(&source_document, provider, limits, progress.clone());
+            tokio::pin!(elaboration);
+            tokio::select! {
+                result = &mut elaboration => result,
+                () = wait_for_inactive_attempt(&db, source.id, attempt_generation) => {
+                    anyhow::bail!("package source was cancelled or deleted while resolution was running");
+                }
+            }
         }
-        None => elaborate(&source_document, provider, limits).await,
+        None => {
+            let elaboration = elaborate(&source_document, provider, limits);
+            tokio::pin!(elaboration);
+            tokio::select! {
+                result = &mut elaboration => result,
+                () = wait_for_inactive_attempt(&db, source.id, attempt_generation) => {
+                    anyhow::bail!("package source was cancelled or deleted while resolution was running");
+                }
+            }
+        }
     };
     match result {
         Ok(result) => {
@@ -94,7 +116,7 @@ async fn resolve(
             if let Some(progress) = &progress {
                 progress.publishing_snapshot();
             }
-            persist_completed_elaboration(&db, source.id, &result)
+            persist_completed_elaboration(&db, source.id, attempt_generation, &result)
                 .await
                 .context("failed to persist elaboration result")?;
             let warnings = persisted_elaboration_warnings(&db, source.id)
@@ -109,10 +131,24 @@ async fn resolve(
             })
         }
         Err(error) => {
-            record_elaboration_failure(&db, source.id, &error.to_string())
+            record_elaboration_failure(&db, source.id, attempt_generation, &error.to_string())
                 .await
                 .context("failed to record elaboration failure")?;
             Err(error.into())
+        }
+    }
+}
+
+async fn wait_for_inactive_attempt(
+    db: &sea_orm::DatabaseConnection,
+    source_id: i32,
+    attempt_generation: i32,
+) {
+    loop {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        match attempt_is_active(db, source_id, attempt_generation).await {
+            Ok(true) | Err(_) => {}
+            Ok(false) => return,
         }
     }
 }

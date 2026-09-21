@@ -104,6 +104,14 @@ mod tests {
                 resolution_status: "failed".to_owned(),
                 resolution_error: Some("registry unavailable".to_owned()),
                 created_at: "2026-09-03T00:00:00Z".parse().expect("valid timestamp"),
+                attempt_generation: 1,
+                cancellation_requested: false,
+                terminal_at: Some(
+                    "2026-09-03T01:00:00Z"
+                        .parse()
+                        .expect("valid terminal timestamp"),
+                ),
+                deletion_reason: None,
             },
             warnings: Vec::new(),
         });

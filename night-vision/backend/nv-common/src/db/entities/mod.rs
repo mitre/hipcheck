@@ -11,6 +11,7 @@ pub mod hipcheck_checks;
 pub mod hipcheck_concerns;
 pub mod hipcheck_findings;
 pub mod hipcheck_runs;
+pub mod package_source_deletion_audits;
 pub mod package_source_edges;
 pub mod package_source_versions;
 pub mod package_source_warnings;

@@ -1,23 +1,26 @@
 # Package-Source Lifecycle
 
 This document defines the lifecycle contract for a submitted package source.
-It is the design contract for the persistence and API work that follows; it
-does not claim that every state or endpoint is implemented today. The current
+Cancellation, deletion, operator-triggered retention cleanup, deletion
+recovery, and generation-guarded publication are implemented. Durable queueing,
+automatic retry, and a public retry endpoint remain follow-on work. The current
 API surface is described in [REST API Usage](./rest-api-usage.md).
 
-Package-source content is untrusted user data. Every operation described here
-requires the resource authorization model called for by the
-[server threat model](./nv-server-threat-model.md). A caller that is not
-authorized to discover a resource receives `404 Not Found`, rather than an
-existence-revealing response.
+Package-source content is untrusted user data. The MVP currently has no user or
+tenant identity model, so every caller that can reach these endpoints has the
+same single-operator authority to cancel or delete any package source. Deploy
+the API only behind controls that restrict it to that trusted operator. Before
+multi-user or external deployment, add the resource authorization model called
+for by the [server threat model](./nv-server-threat-model.md); an unauthorized
+caller must then receive `404 Not Found` rather than an existence-revealing
+response.
 
 ## Resource and attempt model
 
 A package-source resource represents one submitted, immutable input. Its ID
-does not change. Processing may have one or more attempts, each with its own
-attempt number and timestamps. A retry never overwrites a published result: a
-new attempt either publishes a replacement snapshot atomically or leaves the
-last successful snapshot intact.
+does not change. A durable attempt generation increments whenever initial or
+operator-initiated processing starts. A new attempt either publishes a
+replacement snapshot atomically or leaves the last successful snapshot intact.
 
 The resource's public state is one of the following:
 
@@ -60,9 +63,9 @@ runs. After deletion, read operations treat the resource as unknown. A service
 restart must recover an in-progress deletion and complete it; it must not
 restore a deleted resource to a visible state.
 
-The current `processing` response remains a compatibility status until
-`pending` is implemented. Existing `completed`, `completed-with-warnings`,
-and `failed` responses remain terminal states under this model.
+The current API maps stored `pending` to the `processing` compatibility status.
+`completed-with-warnings` is an API view of a stored `completed` source with
+persisted warnings; both use the same terminal retention rule.
 
 ## Submission and publication
 
@@ -78,17 +81,20 @@ to be incomplete; it is not a substitute for `failed`.
 
 ## Failure and retry
 
-Every failed attempt records a stable failure `kind`, a caller-safe
-`diagnostic`, whether it is `retryable`, and its start and finish timestamps.
-It must not store or return raw registry, parser, plugin, or subprocess error
-text. Failure kinds are controlled vocabulary values, initially:
+The current implementation records the attempt generation, terminal timestamp,
+and a bounded caller-safe diagnostic when processing fails. It does not store
+or return raw registry, parser, plugin, or subprocess error text.
+
+The planned structured failure model will also record a stable failure `kind`,
+whether it is `retryable`, and attempt start and finish timestamps. Failure
+kinds will use controlled vocabulary values, initially:
 
 - `validation` for input that failed validation after acceptance;
 - `dependency-unavailable` for a transient dependency or capacity failure;
 - `resolution` for a non-transient resolution failure; and
 - `internal` for an unexpected service failure.
 
-The service may automatically retry only `dependency-unavailable` and
+The future automatic retry service may retry only `dependency-unavailable` and
 `internal` failures. It records the failed attempt, returns the resource to
 `pending` during bounded exponential backoff with jitter, and makes at most
 three attempts. Exhausting that limit leaves the resource `failed` with
@@ -105,7 +111,7 @@ replacement is published.
 
 ## Cancellation and deletion
 
-The future `POST /package-sources/{id}/cancel` endpoint requests cancellation
+`POST /package-sources/{id}/cancel` requests cancellation
 for a `pending` or `processing` resource. It returns `202 Accepted` and is
 idempotent. Queued work is removed before execution; a running worker must
 observe cancellation at bounded safe points and clean up its temporary data.
@@ -113,42 +119,54 @@ The state becomes `cancelled` only when no result was published. If publication
 won first, cancellation returns `409 Conflict` and leaves the terminal result
 unchanged.
 
-The future `DELETE /package-sources/{id}` endpoint is idempotent. It first
+`DELETE /package-sources/{id}` first
 requests cancellation when necessary, then atomically hides the resource and
 returns `202 Accepted`. It must prevent a racing worker from publishing after
 the delete request. Repeated requests, including requests for an unknown or
 hidden resource, return `404 Not Found`. An authorized repeat request while
 deletion is in progress returns `202 Accepted`; reads return `404 Not Found`
-once deletion is accepted. Only the resource owner or an authorized
-administrator may delete an existing resource.
+once deletion is accepted. Under the current single-operator MVP, every caller
+that can reach the endpoint has delete authority; ownership checks remain a
+deployment prerequisite, not an implicit security boundary.
 
 ## Retention
 
 The service retains a non-deleted package-source resource, its submitted
-contents, published snapshot, safe warnings, and safe attempt history for 30
-days after it reaches a terminal state. Each accepted retry resets that clock
-when its new attempt becomes terminal. The retention worker treats expiry as a
-deletion request and applies the same no-republication guarantee.
+contents, published snapshot, safe warnings, current attempt generation, and
+terminal timestamp for 30 days after it reaches a terminal state. Each new
+attempt resets that clock when it becomes terminal. The retention cleanup
+command treats expiry as a deletion request and applies the same
+no-republication guarantee.
 
 The service retains only a minimal deletion audit record for 90 days: resource
-ID, owner or tenant ID, deletion reason (`caller` or `retention`), and deletion
-timestamp. It excludes submitted contents, package names, results, diagnostics,
-and evidence. The audit record is operator-only and is not exposed by the
-package-source API. Backup retention and restoration procedures must preserve
-the same maximum retention period.
+ID, deletion reason (`caller` or `retention`), and deletion timestamp. The
+current single-operator data model has no owner or tenant identifier to record.
+The audit excludes submitted contents, package names, results, diagnostics,
+and evidence. It is operator-only and is not exposed by the package-source API.
+Backup retention and restoration procedures must preserve the same maximum
+retention period.
+
+Retention cleanup is deliberately operator-triggered in the MVP. Run
+`cargo nvdb package-source cleanup` periodically; each execution processes a
+bounded source batch, recovers previously interrupted `deleting` rows first,
+and independently purges a bounded batch of expired audit rows. `--dry-run`
+reports source candidates without mutating either data set. Repeated execution
+is safe and eventually drains a backlog.
 
 ## Caller-visible status
 
 `GET /package-sources/{id}` returns the resource ID, public state,
-`createdAt`, the current attempt number, and timestamps appropriate to that
-state. It returns the submitted source and published reachable-package snapshot
+`createdAt`, the current attempt number, and `cancelledAt`, `completedAt`, or
+`finishedAt` for terminal states. It returns the submitted source and
+published reachable-package snapshot
 only for `completed` and `completed-with-warnings`. The latter includes a
 bounded list of fixed warnings and `warningsTruncated`.
 
-For `failed`, the response includes the last attempt's stable `kind`, safe
-`diagnostic`, `retryable`, and `finishedAt`; it may include the prior published
-snapshot if one exists. It does not expose worker logs, raw error text, stack
-traces, retry schedules, or implementation-specific dependency details.
+For `failed`, the current response includes the attempt number, a safe
+`diagnostic`, and `finishedAt`; it may include the prior published snapshot if
+one exists. Structured failure kinds and retryability remain follow-on work. It
+does not expose worker logs, raw error text, stack traces, retry schedules, or
+implementation-specific dependency details.
 `pending`, `processing`, and `cancelled` responses do not include partial
 results. No state includes progress percentages until their meaning and
 stability are separately defined.
@@ -157,17 +175,14 @@ stability are separately defined.
 
 The following work should be tracked as separate implementation issues:
 
-1. Add package-source and package-source-attempt schema tables, ownership
-   constraints, state-transition guards, timestamps, retry metadata, and a
-   minimal deletion-audit table.
-2. Implement durable queueing, leased workers, transactional publication,
-   bounded automatic retry, and restart recovery for pending work and deletion.
-3. Add retry, cancellation, and deletion endpoints with authorization,
-   idempotency, race, and hidden-resource tests.
-4. Extend the OpenAPI types and API guide for `pending`, `cancelled`, safe
-   failure metadata, attempt information, and retention/deletion responses.
-5. Add retention scheduling, backup/restore retention procedures, and metrics
-   for state age, retry exhaustion, cancellation latency, and deletion lag.
+1. Add user or tenant ownership and authorize every lifecycle operation before
+   multi-user or external deployment.
+2. Implement durable queueing, leased workers, bounded automatic retry, and a
+   public retry endpoint with structured failure metadata.
+3. Add an automatic retention scheduler if product requirements move cleanup
+   ownership from operators to the service.
+4. Define backup/restore enforcement and metrics for state age, retry
+   exhaustion, cancellation latency, and deletion lag.
 
 Before beginning those issues, update the threat model's implementation roadmap
 and verification evidence as each control is implemented.

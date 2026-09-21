@@ -16,9 +16,9 @@ The local sample configuration in `backend/nv-server.spookey` binds
 curl http://127.0.0.1:8080/health
 ```
 
-The API currently has no documented authentication requirement. Do not assume
-production authentication, authorization, or deployment behavior from this
-local guide.
+The package-source API currently has no user or tenant identity model. Treat
+access to it as single-operator authority and do not assume production
+authentication, authorization, or deployment behavior from this local guide.
 
 For local startup, health checks, logs, and recovery steps, see the
 [backend operations runbook](./operations-runbook.md).
@@ -36,8 +36,8 @@ Current examples include:
 
 Package-source status responses are tagged by a `status` field. The current
 schemas include `processing`, `completed`, `completed-with-warnings`, and
-`failed`. The planned durable semantics for these states, and for future
-`pending` and `cancelled` states, are defined in the
+`failed`, and `cancelled`. Stored `pending` sources use the API's `processing`
+compatibility response. Their durable semantics are defined in the
 [package-source lifecycle](./package-source-lifecycle.md). The guide below
 describes only endpoints implemented today.
 
@@ -141,9 +141,10 @@ Content-Type: application/json
 
 The `202 Accepted` status means the server accepted work that may not be
 complete yet. Use the returned `id` with `GET /package-sources/{id}` to check
-the package-source status. Durable queueing, retries, cancellation, deletion,
-and retention are not yet implemented; their intended behavior is defined in
-the [package-source lifecycle](./package-source-lifecycle.md).
+the package-source status. Cancellation, deletion, and operator-triggered
+retention are described in the
+[package-source lifecycle](./package-source-lifecycle.md). Durable queueing and
+automatic retry are not yet implemented.
 
 ### `GET /package-sources/{id}`
 
@@ -166,7 +167,8 @@ Content-Type: application/json
 {
   "status": "processing",
   "id": "00000000-0000-0000-0000-000000000001",
-  "createdAt": "2000-01-01T00:00:00Z"
+  "createdAt": "2000-01-01T00:00:00Z",
+  "attempt": 1
 }
 ```
 
@@ -182,6 +184,8 @@ Content-Type: application/json
   "status": "completed",
   "id": "00000000-0000-0000-0000-000000000002",
   "createdAt": "2000-01-01T00:00:00Z",
+  "completedAt": "2000-01-01T00:01:00Z",
+  "attempt": 1,
   "source": {
     "ecosystem": "npm",
     "fileName": "package.json",
@@ -220,6 +224,51 @@ Content-Type: application/json
 ```
 
 Malformed UUID path values are rejected by Dropshot before the handler runs.
+
+### `POST /package-sources/{id}/cancel`
+
+Cancel a package source whose durable state is `pending` or `processing`:
+
+```sh
+curl -X POST http://127.0.0.1:8080/package-sources/00000000-0000-0000-0000-000000000001/cancel
+```
+
+An accepted or repeated cancellation returns `202 Accepted`:
+
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000001",
+  "status": "cancelled"
+}
+```
+
+`GET /package-sources/{id}` then returns a `cancelled` status with `createdAt`,
+`cancelledAt`, and the attempt number. Cancellation of a source that already
+published a terminal result returns `409 Conflict`. Unknown and deleting
+sources return `404 Not Found`. Running work polls durable state and stops at a
+bounded safe point; generation-guarded publication prevents late work from
+overwriting cancellation.
+
+### `DELETE /package-sources/{id}`
+
+Delete submitted source content and all source-scoped versions, edges, and
+warnings while preserving canonical package and package-version records:
+
+```sh
+curl -X DELETE http://127.0.0.1:8080/package-sources/00000000-0000-0000-0000-000000000001
+```
+
+The server first hides the resource in its internal `deleting` state, cancels
+publication from any in-flight generation, and completes transactional cleanup.
+It returns `202 Accepted` with `{"id":"...","status":"deleting"}`. Reads and
+subsequent requests after cleanup return `404 Not Found`. If cleanup was
+interrupted after the hide transition, the operator cleanup command recovers
+it.
+
+The current MVP has no user or tenant identity model. Every caller that can
+reach package-source routes has the same single-operator lifecycle authority;
+deployments must restrict route access accordingly. Per-resource authorization
+is required before multi-user or external exposure.
 
 ### `POST /upgrade-assessments`
 
@@ -344,12 +393,13 @@ The intended package-source workflow is asynchronous:
 1. Submit a package source with `POST /package-sources`.
 2. Store the returned `id`.
 3. Poll `GET /package-sources/{id}` until it reaches a terminal status:
-   `completed`, `completed-with-warnings`, or `failed`.
+   `completed`, `completed-with-warnings`, `failed`, or `cancelled`.
 4. Read `versionedPackages` from a completed response. A
    `completed-with-warnings` response also includes up to 100 structured
    warnings, each with a safe explanatory `message`, and sets
    `warningsTruncated` when more were recorded. A `failed`
-   response includes a diagnostic capped at 1024 UTF-8 bytes and retains the
+   response includes `finishedAt`, the attempt number, a diagnostic capped at
+   1024 UTF-8 bytes, and retains the
    last successful graph in `previousVersionedPackages`, when one exists.
 
 At the API boundary, package sources currently support the `npm` ecosystem and

@@ -48,10 +48,16 @@ use nv_common::{
         },
         elaboration::{
             ElaborationLimits, NpmRegistryClient, PackageVersion, PackumentProvider as _,
-            elaborate, normalize_repository_url,
+            elaborate,
+            lifecycle::{
+                AttemptKind, CancellationOutcome, DeletionOutcome, attempt_is_active,
+                begin_attempt, delete_by_public_id, request_cancellation,
+            },
+            normalize_repository_url,
             storage::{
-                bounded_diagnostic, persist_assessment_target, persist_completed_elaboration,
-                persisted_package_versions, record_elaboration_failure,
+                ElaborationStorageError, bounded_diagnostic, persist_assessment_target,
+                persist_completed_elaboration, persisted_package_versions,
+                record_elaboration_failure,
             },
         },
         package_json::NpmPackageJson,
@@ -63,7 +69,8 @@ use nv_server_api::{
     AssessmentCheck, AssessmentDiagnostics, AssessmentEvidence, AssessmentEvidenceQuery,
     AssessmentFinding, AssessmentPathParams, AssessmentStatus, CveIngestHealth,
     CveListSyncRunHealth, Health, HealthDiagnostics, NvServerApi, PackageSource,
-    PackageSourceEcosystem, PackageSourcePathParams, PackageSourceStatus,
+    PackageSourceEcosystem, PackageSourceOperationResponse, PackageSourceOperationStatus,
+    PackageSourcePathParams, PackageSourceStatus, PackageSourceStatusCancelled,
     PackageSourceStatusCompleted, PackageSourceStatusCompletedWithWarnings,
     PackageSourceStatusFailed, PackageSourceStatusProcessing, PackageSourceWarning,
     PostAssessmentBody, PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
@@ -294,6 +301,53 @@ impl NvServerApi for RestApi {
         match pkg_src {
             Some(status) => Ok(HttpResponseOk(status)),
             None => Err(HttpError::for_not_found(
+                None,
+                format!("unknown package source {id}"),
+            )),
+        }
+    }
+
+    async fn cancel_package_source(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<PackageSourcePathParams>,
+    ) -> Result<HttpResponseAccepted<PackageSourceOperationResponse>, HttpError> {
+        let id = path_params.into_inner().id;
+        match request_cancellation(ctx.context().db(), &id.to_string(), Utc::now())
+            .await
+            .map_err(|_| internal_server_error())?
+        {
+            CancellationOutcome::Accepted => {
+                Ok(HttpResponseAccepted(PackageSourceOperationResponse {
+                    id,
+                    status: PackageSourceOperationStatus::Cancelled,
+                }))
+            }
+            CancellationOutcome::Conflict => Err(HttpError::for_client_error(
+                None,
+                ClientErrorStatusCode::CONFLICT,
+                "package source already reached a terminal result".to_owned(),
+            )),
+            CancellationOutcome::NotFound => Err(HttpError::for_not_found(
+                None,
+                format!("unknown package source {id}"),
+            )),
+        }
+    }
+
+    async fn delete_package_source(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<PackageSourcePathParams>,
+    ) -> Result<HttpResponseAccepted<PackageSourceOperationResponse>, HttpError> {
+        let id = path_params.into_inner().id;
+        match delete_by_public_id(ctx.context().db(), &id.to_string(), "caller")
+            .await
+            .map_err(|_| internal_server_error())?
+        {
+            DeletionOutcome::Accepted => Ok(HttpResponseAccepted(PackageSourceOperationResponse {
+                id,
+                status: PackageSourceOperationStatus::Deleting,
+            })),
+            DeletionOutcome::NotFound => Err(HttpError::for_not_found(
                 None,
                 format!("unknown package source {id}"),
             )),
@@ -981,6 +1035,16 @@ async fn run_package_source_elaboration(
     limits: nv_common::npm::elaboration::ElaborationLimits,
     max_packument_bytes: usize,
 ) -> Result<(), String> {
+    let Some(attempt_generation) = begin_attempt(&db, source_id, AttemptKind::Initial)
+        .await
+        .map_err(|_| {
+            ExternalOperation::PackageSourcePersistence
+                .diagnostic()
+                .to_owned()
+        })?
+    else {
+        return Ok(());
+    };
     let result = NpmPackageJson::parse_package_json(contents.as_bytes())
         .map_err(|_| {
             ExternalOperation::PackageSourceElaboration
@@ -997,37 +1061,66 @@ async fn run_package_source_elaboration(
                 })
         });
     let result = match result {
-        Ok((source, client)) => elaborate(&source, std::sync::Arc::new(client), limits)
-            .await
-            .map_err(|_| {
-                ExternalOperation::PackageSourceElaboration
-                    .diagnostic()
-                    .to_owned()
-            }),
+        Ok((source, client)) => {
+            let elaboration = elaborate(&source, std::sync::Arc::new(client), limits);
+            tokio::pin!(elaboration);
+            tokio::select! {
+                result = &mut elaboration => result.map_err(|_| {
+                    ExternalOperation::PackageSourceElaboration.diagnostic().to_owned()
+                }),
+                () = wait_for_inactive_attempt(&db, source_id, attempt_generation) => {
+                    return Ok(());
+                }
+            }
+        }
         Err(error) => Err(error),
     };
-    finalize_package_source_elaboration(&db, source_id, result).await
+    finalize_package_source_elaboration(&db, source_id, attempt_generation, result).await
+}
+
+async fn wait_for_inactive_attempt(
+    db: &DatabaseConnection,
+    source_id: i32,
+    attempt_generation: i32,
+) {
+    loop {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        match attempt_is_active(db, source_id, attempt_generation).await {
+            Ok(true) | Err(_) => {}
+            Ok(false) => return,
+        }
+    }
 }
 
 async fn finalize_package_source_elaboration(
     db: &DatabaseConnection,
     source_id: i32,
+    attempt_generation: i32,
     result: Result<nv_common::npm::elaboration::ElaborationResult, String>,
 ) -> Result<(), String> {
     match result {
-        Ok(result) => match persist_completed_elaboration(db, source_id, &result).await {
-            Ok(()) => Ok(()),
-            Err(_) => {
-                let diagnostic = ExternalOperation::PackageSourcePersistence.diagnostic();
-                record_terminal_failure_with_retry(db, source_id, diagnostic)
+        Ok(result) => {
+            match persist_completed_elaboration(db, source_id, attempt_generation, &result).await {
+                Ok(()) => Ok(()),
+                Err(ElaborationStorageError::InactiveAttempt) => Ok(()),
+                Err(_) => {
+                    let diagnostic = ExternalOperation::PackageSourcePersistence.diagnostic();
+                    record_terminal_failure_with_retry(
+                        db,
+                        source_id,
+                        attempt_generation,
+                        diagnostic,
+                    )
                     .await
                     .map_err(|_| diagnostic.to_owned())
+                }
             }
-        },
+        }
         Err(_) => {
             record_terminal_failure_with_retry(
                 db,
                 source_id,
+                attempt_generation,
                 ExternalOperation::PackageSourceElaboration.diagnostic(),
             )
             .await
@@ -1038,12 +1131,14 @@ async fn finalize_package_source_elaboration(
 async fn record_terminal_failure_with_retry(
     db: &DatabaseConnection,
     source_id: i32,
+    attempt_generation: i32,
     diagnostic: &str,
 ) -> Result<(), String> {
     let mut last_error = None;
     for attempt in 1..=TERMINAL_PERSISTENCE_ATTEMPTS {
-        match record_elaboration_failure(db, source_id, diagnostic).await {
+        match record_elaboration_failure(db, source_id, attempt_generation, diagnostic).await {
             Ok(()) => return Ok(()),
+            Err(ElaborationStorageError::InactiveAttempt) => return Ok(()),
             Err(_) => last_error = Some(()),
         }
         if attempt < TERMINAL_PERSISTENCE_ATTEMPTS {
@@ -1072,12 +1167,35 @@ async fn lookup_package_source(
         return Ok(None);
     };
     let created_at = source.created_at.with_timezone(&Utc);
+    let terminal_at = source
+        .terminal_at
+        .unwrap_or(source.created_at)
+        .with_timezone(&Utc);
     let failure_diagnostic = match source.resolution_status.as_str() {
-        "pending" => {
+        "pending" | "processing" => {
             return Ok(Some(PackageSourceStatus::Processing(
-                PackageSourceStatusProcessing { id, created_at },
+                PackageSourceStatusProcessing {
+                    id,
+                    created_at,
+                    attempt: source.attempt_generation,
+                },
             )));
         }
+        "cancelled" => {
+            let cancelled_at = source
+                .terminal_at
+                .unwrap_or(source.created_at)
+                .with_timezone(&Utc);
+            return Ok(Some(PackageSourceStatus::Cancelled(
+                PackageSourceStatusCancelled {
+                    id,
+                    created_at,
+                    cancelled_at,
+                    attempt: source.attempt_generation,
+                },
+            )));
+        }
+        "deleting" => return Ok(None),
         "failed" => Some(bounded_diagnostic(
             source
                 .resolution_error
@@ -1122,6 +1240,8 @@ async fn lookup_package_source(
             PackageSourceStatusFailed {
                 id,
                 created_at,
+                finished_at: terminal_at,
+                attempt: source.attempt_generation,
                 diagnostic,
                 previous_versioned_packages: versioned_packages,
             },
@@ -1140,6 +1260,8 @@ async fn lookup_package_source(
             PackageSourceStatusCompleted {
                 id,
                 created_at,
+                completed_at: terminal_at,
+                attempt: source.attempt_generation,
                 source: package_source(source.file_name, source.file_contents),
                 versioned_packages,
             },
@@ -1163,6 +1285,8 @@ async fn lookup_package_source(
         PackageSourceStatusCompletedWithWarnings {
             id,
             created_at,
+            completed_at: terminal_at,
+            attempt: source.attempt_generation,
             source: package_source(source.file_name, source.file_contents),
             versioned_packages,
             warnings,
@@ -2044,6 +2168,70 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn package_source_cancel_returns_a_visible_cancelled_outcome() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::POST,
+                &format!("/package-sources/{id}/cancel"),
+                StatusCode::ACCEPTED,
+            )
+            .await
+            .expect("eligible cancellation should be accepted");
+        let body: serde_json::Value = read_json(&mut response).await;
+        assert_eq!(body, serde_json::json!({ "id": id, "status": "cancelled" }));
+
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn deleting_package_source_is_hidden_from_reads() {
+        let id = Uuid::now_v7();
+        let mut deleting = source(id, "deleting", None);
+        deleting.cancellation_requested = true;
+        deleting.deletion_reason = Some("caller".to_owned());
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![deleting]])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/package-sources/{id}"),
+                StatusCode::NOT_FOUND,
+            )
+            .await
+            .expect_err("deleting resources are not visible");
+
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
     async fn health_routes_serve_public_and_operator_responses() {
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([
@@ -2656,6 +2844,11 @@ mod tests {
             resolution_status: resolution_status.to_owned(),
             resolution_error,
             created_at: Utc::now().fixed_offset(),
+            attempt_generation: 1,
+            cancellation_requested: matches!(resolution_status, "cancelled" | "deleting"),
+            terminal_at: matches!(resolution_status, "completed" | "failed" | "cancelled")
+                .then(|| Utc::now().fixed_offset()),
+            deletion_reason: None,
         }
     }
 
@@ -3822,6 +4015,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn lookup_returns_cancelled_state_with_attempt_and_timestamp() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(id, "cancelled", None)]])
+            .into_connection();
+
+        let status = lookup_package_source(&db, id).await.unwrap().unwrap();
+
+        let PackageSourceStatus::Cancelled(cancelled) = status else {
+            panic!("expected cancelled package source status");
+        };
+        assert_eq!(cancelled.attempt, 1);
+        assert!(cancelled.cancelled_at >= cancelled.created_at);
+    }
+
+    #[tokio::test]
     async fn lookup_keeps_the_prior_snapshot_visible_after_a_failure() {
         let id = Uuid::now_v7();
         let db = MockDatabase::new(DbBackend::Postgres)
@@ -3928,6 +4137,7 @@ mod tests {
     #[tokio::test]
     async fn background_completion_publishes_a_snapshot() {
         let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(Uuid::now_v7(), "processing", None)]])
             .append_exec_results(std::iter::repeat_n(
                 MockExecResult {
                     last_insert_id: 0,
@@ -3939,6 +4149,7 @@ mod tests {
 
         finalize_package_source_elaboration(
             &db,
+            1,
             1,
             Ok(nv_common::npm::elaboration::ElaborationResult {
                 packages: Vec::new(),
@@ -3973,7 +4184,7 @@ mod tests {
                 }])
                 .into_connection();
 
-            finalize_package_source_elaboration(&db, 1, Err(unsafe_error.to_owned()))
+            finalize_package_source_elaboration(&db, 1, 1, Err(unsafe_error.to_owned()))
                 .await
                 .expect("failed elaboration records its terminal state");
 
@@ -4012,6 +4223,7 @@ mod tests {
 
         let error = finalize_package_source_elaboration(
             &db,
+            1,
             1,
             Err("password=correct-horse-battery-staple".to_owned()),
         )
