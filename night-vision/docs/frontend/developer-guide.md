@@ -122,9 +122,11 @@ exception strings, or backend diagnostics.
 
 Package-source and upgrade-assessment status endpoints are asynchronous. Use
 `pollUntilTerminal` from `frontend/src/lib/api/polling.ts` with the matching
-terminal-state helper exported by `night-vision-api.ts`. It requires a maximum
-attempt count and interval, stops as soon as a terminal status is observed,
-and returns a `timed-out` result at its bound.
+terminal-state helper exported by `night-vision-api.ts`. Pass the status
+reader directly as `getStatus`; the matching helper accepts the full
+`ApiResult` returned by the server boundary, not only the success payload. The
+poll stops as soon as the helper observes either a terminal backend status or
+an API error result, and it returns a `timed-out` result at its bound.
 
 Routes or components that start client-visible polling own an
 `AbortController` and must call `abort()` during navigation or component

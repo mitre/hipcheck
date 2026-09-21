@@ -22,6 +22,9 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiError 
 
 type ClientResult<T> = { data?: T; error?: unknown; response?: Response };
 
+const isApiResultTerminal = <T>(result: ApiResult<T>, isTerminalStatus: (value: T) => boolean): boolean =>
+	!result.ok || isTerminalStatus(result.data);
+
 const toApiResult = <T>({ data, error, response }: ClientResult<T>): ApiResult<T> => {
 	if (error !== undefined || data === undefined) return { ok: false, error: normalizeApiError(response) };
 
@@ -67,8 +70,8 @@ export const createNightVisionApi = (client: Client = nightVisionClient) => ({
 
 export const nightVisionApi = createNightVisionApi();
 
-export const isPackageSourceTerminal = (status: GetPackageSourceResponse): boolean =>
-	status.status !== 'processing';
+export const isPackageSourceTerminal = (status: ApiResult<GetPackageSourceResponse>): boolean =>
+	isApiResultTerminal(status, (value) => value.status !== 'processing');
 
-export const isUpgradeAssessmentTerminal = (status: GetUpgradeAssessmentResponse): boolean =>
-	status.status !== 'pending';
+export const isUpgradeAssessmentTerminal = (status: ApiResult<GetUpgradeAssessmentResponse>): boolean =>
+	isApiResultTerminal(status, (value) => value.status !== 'pending');
