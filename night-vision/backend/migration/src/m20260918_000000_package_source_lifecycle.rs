@@ -30,7 +30,7 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute_unprepared(
                 "UPDATE package_sources SET terminal_at = created_at \
-                 WHERE resolution_status IN ('completed', 'failed')",
+                 WHERE resolution_status IN ('completed', 'failed', 'cancelled')",
             )
             .await?;
         manager
