@@ -9,7 +9,7 @@ import type {
 	PostPackageSourceErrors,
 	PostPackageSourceResponse,
 	PostPackageSourceResponses,
-	PostUpgradeAssessmentBody,
+	PostUpgradeAssessmentData,
 	PostUpgradeAssessmentErrors,
 	PostUpgradeAssessmentResponse,
 	PostUpgradeAssessmentResponses
@@ -47,7 +47,7 @@ export const createNightVisionApi = (client: Client = nightVisionClient) => ({
 		),
 
 	submitUpgradeAssessment: async (
-		body: PostUpgradeAssessmentBody
+		body: PostUpgradeAssessmentData['body']
 	): Promise<ApiResult<PostUpgradeAssessmentResponse>> =>
 		toApiResult(
 			await client.post<PostUpgradeAssessmentResponses, PostUpgradeAssessmentErrors>({
@@ -71,4 +71,4 @@ export const isPackageSourceTerminal = (status: GetPackageSourceResponse): boole
 	status.status !== 'processing';
 
 export const isUpgradeAssessmentTerminal = (status: GetUpgradeAssessmentResponse): boolean =>
-	status.status !== 'processing';
+	status.status !== 'pending';
