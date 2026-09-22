@@ -73,6 +73,12 @@ pub trait NvServerApi {
         path_params: Path<PackageSourcePathParams>,
     ) -> Result<HttpResponseAccepted<PackageSourceOperationResponse>, HttpError>;
 
+    #[endpoint { method = GET, path = "/package-sources/{id}/exposures", }]
+    async fn get_package_source_exposures(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<PackageSourcePathParams>,
+    ) -> Result<HttpResponseOk<PackageSourceExposures>, HttpError>;
+
     #[endpoint { method = POST, path = "/assessments", content_type = "application/json" }]
     async fn post_assessment(
         ctx: RequestContext<Self::Context>,
@@ -235,13 +241,14 @@ pub struct CveListSyncRunHealth {
 #[cfg(test)]
 mod tests {
     use super::{
-        CveIngestHealth, Health, HealthDiagnostics, PackageSourceEcosystem,
+        CveIngestHealth, Health, HealthDiagnostics, PackageSourceEcosystem, PackageSourceExposure,
+        PackageSourceExposureKevContext, PackageSourceExposures, PackageSourceExposuresStatus,
         UpgradeAssessmentCandidateVersion, UpgradeAssessmentCaveat, UpgradeAssessmentError,
         UpgradeAssessmentEvidence, UpgradeAssessmentEvidenceSourceType, UpgradeAssessmentFinding,
         UpgradeAssessmentFindingCategory, UpgradeAssessmentFindingEffect, UpgradeAssessmentInput,
         UpgradeAssessmentKevLinkage, UpgradeAssessmentPackageSourceInput, UpgradeAssessmentResult,
         UpgradeAssessmentStatus, UpgradeAssessmentVerdict, UpgradeAssessmentVulnerablePackageInput,
-        UpgradeAssessmentWorkflowStatus,
+        UpgradeAssessmentWorkflowStatus, VersionedPackage,
     };
     use chrono::Utc;
 
@@ -490,6 +497,83 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn package_source_exposures_completed_response_serializes_empty_results() {
+        let response = PackageSourceExposures {
+            id: uuid::Uuid::nil(),
+            status: PackageSourceExposuresStatus::Completed,
+            exposures: Vec::new(),
+        };
+
+        assert_eq!(
+            serde_json::to_value(response).unwrap(),
+            serde_json::json!({
+                "id": uuid::Uuid::nil(),
+                "status": "completed",
+                "exposures": [],
+            })
+        );
+    }
+
+    #[test]
+    fn package_source_exposures_include_reachable_package_cve_and_kev_context() {
+        let response = PackageSourceExposures {
+            id: uuid::Uuid::nil(),
+            status: PackageSourceExposuresStatus::CompletedWithWarnings,
+            exposures: vec![PackageSourceExposure {
+                package: VersionedPackage {
+                    id: uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001")
+                        .expect("valid UUID"),
+                    name: "left-pad".to_owned(),
+                    version: "1.2.3".to_owned(),
+                    ecosystem: PackageSourceEcosystem::Npm,
+                    purl: "pkg:npm/left-pad@1.2.3".to_owned(),
+                    derivations: vec![vec![
+                        "pkg:npm/example-app@1.0.0".to_owned(),
+                        "pkg:npm/left-pad@1.2.3".to_owned(),
+                    ]],
+                },
+                cve_id: "CVE-2026-1234".to_owned(),
+                kev: PackageSourceExposureKevContext {
+                    vendor_project: Some("Example Vendor".to_owned()),
+                    product: Some("left-pad".to_owned()),
+                    vulnerability_name: Some("Example vulnerability".to_owned()),
+                    date_added: Some("2026-08-03".to_owned()),
+                },
+            }],
+        };
+
+        assert_eq!(
+            serde_json::to_value(response).unwrap(),
+            serde_json::json!({
+                "id": uuid::Uuid::nil(),
+                "status": "completed-with-warnings",
+                "exposures": [
+                    {
+                        "package": {
+                            "id": "00000000-0000-0000-0000-000000000001",
+                            "name": "left-pad",
+                            "version": "1.2.3",
+                            "ecosystem": "npm",
+                            "purl": "pkg:npm/left-pad@1.2.3",
+                            "derivations": [[
+                                "pkg:npm/example-app@1.0.0",
+                                "pkg:npm/left-pad@1.2.3"
+                            ]]
+                        },
+                        "cveId": "CVE-2026-1234",
+                        "kev": {
+                            "vendorProject": "Example Vendor",
+                            "product": "left-pad",
+                            "vulnerabilityName": "Example vulnerability",
+                            "dateAdded": "2026-08-03"
+                        }
+                    }
+                ]
+            })
+        );
+    }
 }
 
 #[derive(Deserialize, JsonSchema, Debug, Clone)]
@@ -638,6 +722,43 @@ pub struct VersionedPackage {
     pub ecosystem: PackageSourceEcosystem,
     pub purl: String,
     pub derivations: Vec<Vec<String>>,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum PackageSourceExposuresStatus {
+    Completed,
+    CompletedWithWarnings,
+    Failed,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSourceExposures {
+    pub id: Uuid,
+    pub status: PackageSourceExposuresStatus,
+    pub exposures: Vec<PackageSourceExposure>,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSourceExposure {
+    pub package: VersionedPackage,
+    pub cve_id: String,
+    pub kev: PackageSourceExposureKevContext,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSourceExposureKevContext {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vendor_project: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub product: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vulnerability_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_added: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone)]

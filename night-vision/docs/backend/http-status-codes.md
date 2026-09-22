@@ -107,7 +107,8 @@ Use more specific `4xx` codes when they clearly communicate a distinct client
 action:
 
 - Use `409 CONFLICT` when the request conflicts with current resource state,
-  such as trying to start something already running.
+  such as trying to start something already running or reading a derived view
+  that is defined only after asynchronous processing completes.
 - Use `412 PRECONDITION FAILED` when a conditional request fails, such as an
   `If-Match` or equivalent version precondition.
 - Use `415 UNSUPPORTED MEDIA TYPE` when the request body content type is not
@@ -211,6 +212,20 @@ the API surface changes.
 - `DELETE /package-sources/{id}` returns `202 ACCEPTED` after the source is
   hidden and its source-scoped data is removed. Unknown, already removed, and
   hidden resources return `404 NOT FOUND`.
+- `GET /package-sources/{id}/exposures` returns `200 OK` when the package
+  source ID is known and exposures can be reported. A completed or
+  completed-with-warnings source may return either a non-empty or empty
+  `exposures` array. A failed source also returns `200 OK` with an empty
+  `exposures` array because no completed exposure snapshot exists.
+- `GET /package-sources/{id}/exposures` returns `409 CONFLICT` with
+  `PackageSourceExposuresUnavailable` while the package source is still
+  processing, because the requested derived exposure view is not available yet
+  for that resource state.
+- `GET /package-sources/{id}/exposures` returns `404 NOT FOUND` when the ID is
+  not known.
+- `GET /package-sources/{id}/exposures` returns `503 SERVICE UNAVAILABLE` with
+  `VulnerabilityDataUnavailable` when package resolution is complete but the
+  service does not yet have the CVE/KEV data required to compute exposures.
 
 Endpoints that interact with CVE data must be prepared for an empty initial CVE
 store after startup. When CVE data is required but not yet available, return an

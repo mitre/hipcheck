@@ -23,11 +23,12 @@ use http::{HeaderMap, HeaderValue, header::WWW_AUTHENTICATE};
 use nv_common::{
     config::Config,
     cve::kev::{
-        KevNpmMatchStatus, ReachableNpmPackageVersion, kev_affected_npm_package_version,
-        kev_affected_npm_package_versions,
+        KevContext, KevNpmMatchStatus, ReachableNpmPackageVersion,
+        kev_affected_npm_package_version, kev_affected_npm_package_versions,
     },
     cve::storage::{
-        has_cve_list_records, last_successful_cve_list_sync_commit, latest_cve_list_sync_run,
+        has_active_kev_records, has_cve_list_records, last_successful_cve_list_sync_commit,
+        latest_cve_list_sync_run,
     },
     db::entities::{
         cve_list_sync_runs::Model as CveListSyncRun, hipcheck_runs, upgrade_assessments,
@@ -69,11 +70,13 @@ use nv_server_api::{
     AssessmentCheck, AssessmentDiagnostics, AssessmentEvidence, AssessmentEvidenceQuery,
     AssessmentFinding, AssessmentPathParams, AssessmentStatus, CveIngestHealth,
     CveListSyncRunHealth, Health, HealthDiagnostics, NvServerApi, PackageSource,
-    PackageSourceEcosystem, PackageSourceOperationResponse, PackageSourceOperationStatus,
-    PackageSourcePathParams, PackageSourceStatus, PackageSourceStatusCancelled,
-    PackageSourceStatusCompleted, PackageSourceStatusCompletedWithWarnings,
-    PackageSourceStatusFailed, PackageSourceStatusProcessing, PackageSourceWarning,
-    PostAssessmentBody, PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
+    PackageSourceEcosystem, PackageSourceExposure, PackageSourceExposureKevContext,
+    PackageSourceExposures, PackageSourceExposuresStatus, PackageSourceOperationResponse,
+    PackageSourceOperationStatus, PackageSourcePathParams, PackageSourceStatus,
+    PackageSourceStatusCancelled, PackageSourceStatusCompleted,
+    PackageSourceStatusCompletedWithWarnings, PackageSourceStatusFailed,
+    PackageSourceStatusProcessing, PackageSourceWarning, PostAssessmentBody,
+    PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
     PostUpgradeAssessmentBody, PostUpgradeAssessmentResponse, UpgradeAssessmentCandidateVersion,
     UpgradeAssessmentCaveat, UpgradeAssessmentError, UpgradeAssessmentEvidence,
     UpgradeAssessmentEvidenceSourceType, UpgradeAssessmentFinding,
@@ -352,6 +355,40 @@ impl NvServerApi for RestApi {
                 format!("unknown package source {id}"),
             )),
         }
+    }
+
+    async fn get_package_source_exposures(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<PackageSourcePathParams>,
+    ) -> Result<HttpResponseOk<PackageSourceExposures>, HttpError> {
+        let db = ctx.context().db();
+        let id = path_params.into_inner().id;
+        let package_source = lookup_package_source(db, id).await?;
+        let Some(package_source) = package_source else {
+            return Err(HttpError::for_not_found(
+                None,
+                format!("unknown package source {id}"),
+            ));
+        };
+
+        let status = package_source_exposures_status(db, &package_source).await?;
+        let exposures = match &package_source {
+            PackageSourceStatus::Completed(completed) => {
+                package_source_exposures(db, &completed.versioned_packages).await?
+            }
+            PackageSourceStatus::CompletedWithWarnings(completed) => {
+                package_source_exposures(db, &completed.versioned_packages).await?
+            }
+            PackageSourceStatus::Failed(_) => Vec::new(),
+            PackageSourceStatus::Cancelled(_) => Vec::new(),
+            PackageSourceStatus::Processing(_) => Vec::new(),
+        };
+
+        Ok(HttpResponseOk(PackageSourceExposures {
+            id,
+            status,
+            exposures,
+        }))
     }
 
     async fn post_assessment(
@@ -1303,6 +1340,146 @@ fn package_source(file_name: String, contents: String) -> PackageSource {
     }
 }
 
+async fn package_source_exposures_status(
+    db: &DatabaseConnection,
+    status: &PackageSourceStatus,
+) -> Result<PackageSourceExposuresStatus, HttpError> {
+    match status {
+        PackageSourceStatus::Processing(_) => Err(package_source_exposures_unavailable(
+            "package source exposures are not available until processing completes",
+        )),
+        PackageSourceStatus::Cancelled(_) => Err(package_source_exposures_unavailable(
+            "package source exposures are not available for cancelled package sources",
+        )),
+        PackageSourceStatus::Failed(_) => Ok(PackageSourceExposuresStatus::Failed),
+        PackageSourceStatus::Completed(_) => {
+            ensure_package_source_exposure_data_available(db).await?;
+            Ok(PackageSourceExposuresStatus::Completed)
+        }
+        PackageSourceStatus::CompletedWithWarnings(_) => {
+            ensure_package_source_exposure_data_available(db).await?;
+            Ok(PackageSourceExposuresStatus::CompletedWithWarnings)
+        }
+    }
+}
+
+async fn ensure_package_source_exposure_data_available(
+    db: &DatabaseConnection,
+) -> Result<(), HttpError> {
+    let cve_records_available = has_cve_list_records(db).await.map_err(internal_error)?;
+    let active_kev_entry_available = has_active_kev_records(db).await.map_err(internal_error)?;
+
+    if cve_records_available && active_kev_entry_available {
+        Ok(())
+    } else {
+        Err(HttpError::for_unavail(
+            Some("VulnerabilityDataUnavailable".to_owned()),
+            "vulnerability data is not yet available for package source exposures".to_owned(),
+        ))
+    }
+}
+
+fn package_source_exposures_unavailable(message: &str) -> HttpError {
+    HttpError::for_client_error(
+        Some("PackageSourceExposuresUnavailable".to_owned()),
+        ClientErrorStatusCode::CONFLICT,
+        message.to_owned(),
+    )
+}
+
+fn package_source_exposure_from_versioned_package(
+    package: VersionedPackage,
+    cve_id: String,
+    kev: PackageSourceExposureKevContext,
+) -> PackageSourceExposure {
+    PackageSourceExposure {
+        package,
+        cve_id,
+        kev,
+    }
+}
+
+async fn package_source_exposures(
+    db: &DatabaseConnection,
+    versioned_packages: &[VersionedPackage],
+) -> Result<Vec<PackageSourceExposure>, HttpError> {
+    let reachable = versioned_packages
+        .iter()
+        .map(|package| ReachableNpmPackageVersion {
+            package_name: package.name.clone(),
+            version: package.version.clone(),
+            source_evidence: package.purl.clone(),
+        })
+        .collect::<Vec<_>>();
+    let kev_matches = kev_affected_npm_package_versions(db, &reachable)
+        .await
+        .map_err(internal_error)?;
+
+    Ok(package_source_exposures_from_kev_matches(
+        versioned_packages,
+        kev_matches,
+    ))
+}
+
+fn package_source_exposures_from_kev_matches(
+    versioned_packages: &[VersionedPackage],
+    kev_matches: impl IntoIterator<Item = nv_common::cve::kev::KevAffectedNpmPackageVersion>,
+) -> Vec<PackageSourceExposure> {
+    let mut seen = HashSet::new();
+
+    kev_matches
+        .into_iter()
+        .filter_map(|kev_match| {
+            let exposure = package_source_exposure_from_kev_match(versioned_packages, kev_match)?;
+            let dedup_key = (
+                exposure.package.name.clone(),
+                exposure.package.version.clone(),
+                exposure.cve_id.clone(),
+            );
+
+            seen.insert(dedup_key).then_some(exposure)
+        })
+        .collect()
+}
+
+fn package_source_exposure_kev_context(kev: KevContext) -> PackageSourceExposureKevContext {
+    PackageSourceExposureKevContext {
+        vendor_project: kev.vendor_project,
+        product: kev.product,
+        vulnerability_name: kev.vulnerability_name,
+        date_added: kev.date_added,
+    }
+}
+
+fn package_source_exposure_from_kev_match(
+    versioned_packages: &[VersionedPackage],
+    kev_match: nv_common::cve::kev::KevAffectedNpmPackageVersion,
+) -> Option<PackageSourceExposure> {
+    if kev_match.status != KevNpmMatchStatus::Affected {
+        return None;
+    }
+
+    let package_name = kev_match.package_name.as_deref()?;
+    let affected_version = kev_match.affected_version.as_deref()?;
+    let package = versioned_packages
+        .iter()
+        .find(|package| package.name == package_name && package.version == affected_version)
+        .map(|package| VersionedPackage {
+            id: package.id,
+            name: package.name.clone(),
+            version: package.version.clone(),
+            ecosystem: package.ecosystem.clone(),
+            purl: package.purl.clone(),
+            derivations: package.derivations.clone(),
+        })?;
+
+    Some(package_source_exposure_from_versioned_package(
+        package,
+        kev_match.cve_id,
+        package_source_exposure_kev_context(kev_match.kev_context),
+    ))
+}
+
 fn npm_package_name_from_purl(package_url: &str) -> String {
     let encoded_name = package_url
         .strip_prefix("pkg:npm/")
@@ -2078,9 +2255,10 @@ mod tests {
     };
     use httpmock::prelude::*;
     use nv_common::{
+        cve::kev::{KevAffectedNpmPackageVersion, KevNpmMatchConfidence},
         db::entities::{
-            package_source_edges, package_source_versions, package_source_warnings,
-            package_sources, package_versions,
+            cisa_kev_entries, cve_list_records, package_source_edges, package_source_versions,
+            package_source_warnings, package_sources, package_versions,
         },
         npm::elaboration::storage::MAX_FAILURE_DIAGNOSTIC_BYTES,
     };
@@ -2803,6 +2981,692 @@ mod tests {
                 .insert("repository".to_owned(), repository);
         }
         packument
+    }
+
+    #[test]
+    fn package_source_exposure_from_kev_match_maps_affected_match_to_api_exposure() {
+        let package = VersionedPackage {
+            id: Uuid::from_u64_pair(11, 22),
+            name: "systeminformation".to_owned(),
+            version: "5.3.1".to_owned(),
+            ecosystem: PackageSourceEcosystem::Npm,
+            purl: "pkg:npm/systeminformation@5.3.1".to_owned(),
+            derivations: vec![vec!["systeminformation".to_owned()]],
+        };
+        let kev_match = KevAffectedNpmPackageVersion {
+            cve_id: "CVE-2024-1234".to_owned(),
+            kev_context: KevContext {
+                cve_id: "CVE-2024-1234".to_owned(),
+                vendor_project: Some("Acme".to_owned()),
+                product: Some("systeminformation".to_owned()),
+                vulnerability_name: Some("Remote code execution".to_owned()),
+                date_added: Some("2024-02-03".to_owned()),
+            },
+            package_name: Some("systeminformation".to_owned()),
+            affected_version: Some("5.3.1".to_owned()),
+            source_evidence: vec!["dependencies > systeminformation@5.3.1".to_owned()],
+            confidence: KevNpmMatchConfidence::High,
+            caveats: Vec::new(),
+            status: KevNpmMatchStatus::Affected,
+        };
+
+        let exposure =
+            package_source_exposure_from_kev_match(std::slice::from_ref(&package), kev_match)
+                .expect("affected KEV match should map to an API exposure");
+
+        assert_eq!(exposure.package.id, package.id);
+        assert_eq!(exposure.package.name, package.name);
+        assert_eq!(exposure.package.version, package.version);
+        assert_eq!(exposure.package.purl, package.purl);
+        assert_eq!(exposure.package.derivations, package.derivations);
+        assert_eq!(
+            serde_json::to_value(&exposure.package.ecosystem).expect("ecosystem serializes"),
+            serde_json::to_value(&package.ecosystem).expect("ecosystem serializes")
+        );
+        assert_eq!(exposure.cve_id, "CVE-2024-1234");
+        assert_eq!(exposure.kev.vendor_project.as_deref(), Some("Acme"));
+        assert_eq!(exposure.kev.product.as_deref(), Some("systeminformation"));
+        assert_eq!(
+            exposure.kev.vulnerability_name.as_deref(),
+            Some("Remote code execution")
+        );
+        assert_eq!(exposure.kev.date_added.as_deref(), Some("2024-02-03"));
+    }
+
+    #[test]
+    fn package_source_exposures_from_kev_matches_deduplicates_same_package_version_and_cve() {
+        let package = VersionedPackage {
+            id: Uuid::new_v4(),
+            name: "left-pad".to_owned(),
+            version: "1.2.3".to_owned(),
+            ecosystem: PackageSourceEcosystem::Npm,
+            purl: "pkg:npm/left-pad@1.2.3".to_owned(),
+            derivations: vec![vec!["<root>".to_owned(), "left-pad".to_owned()]],
+        };
+        let kev_context = KevContext {
+            cve_id: "CVE-2026-1234".to_owned(),
+            vendor_project: Some("Example Vendor".to_owned()),
+            product: Some("left-pad".to_owned()),
+            vulnerability_name: Some("Example vulnerability".to_owned()),
+            date_added: Some("2026-01-15".to_owned()),
+        };
+        let kev_matches = vec![
+            nv_common::cve::kev::KevAffectedNpmPackageVersion {
+                package_name: Some("left-pad".to_owned()),
+                affected_version: Some("1.2.3".to_owned()),
+                cve_id: "CVE-2026-1234".to_owned(),
+                source_evidence: vec!["dependencies > left-pad@1.2.3".to_owned()],
+                confidence: KevNpmMatchConfidence::High,
+                caveats: Vec::new(),
+                status: KevNpmMatchStatus::Affected,
+                kev_context: kev_context.clone(),
+            },
+            nv_common::cve::kev::KevAffectedNpmPackageVersion {
+                package_name: Some("left-pad".to_owned()),
+                affected_version: Some("1.2.3".to_owned()),
+                cve_id: "CVE-2026-1234".to_owned(),
+                source_evidence: vec!["dependencies > left-pad@1.2.3".to_owned()],
+                confidence: KevNpmMatchConfidence::High,
+                caveats: Vec::new(),
+                status: KevNpmMatchStatus::Affected,
+                kev_context,
+            },
+        ];
+
+        let exposures =
+            package_source_exposures_from_kev_matches(std::slice::from_ref(&package), kev_matches);
+
+        assert_eq!(exposures.len(), 1);
+        assert_eq!(exposures[0].package.id, package.id);
+        assert_eq!(exposures[0].package.name, package.name);
+        assert_eq!(exposures[0].package.version, package.version);
+        assert_eq!(
+            serde_json::to_value(&exposures[0].package.ecosystem).expect("ecosystem serializes"),
+            serde_json::to_value(&package.ecosystem).expect("ecosystem serializes")
+        );
+        assert_eq!(exposures[0].package.purl, package.purl);
+        assert_eq!(exposures[0].package.derivations, package.derivations);
+        assert_eq!(exposures[0].cve_id, "CVE-2026-1234");
+    }
+
+    #[test]
+    fn package_source_exposures_from_kev_matches_ignores_unaffected_or_unmatched_rows() {
+        let package = VersionedPackage {
+            id: Uuid::new_v4(),
+            name: "left-pad".to_owned(),
+            version: "1.2.3".to_owned(),
+            ecosystem: PackageSourceEcosystem::Npm,
+            purl: "pkg:npm/left-pad@1.2.3".to_owned(),
+            derivations: vec![vec!["<root>".to_owned(), "left-pad".to_owned()]],
+        };
+        let kept_kev_context = KevContext {
+            cve_id: "CVE-2026-1234".to_owned(),
+            vendor_project: Some("Example Vendor".to_owned()),
+            product: Some("left-pad".to_owned()),
+            vulnerability_name: Some("Reachable vulnerability".to_owned()),
+            date_added: Some("2026-01-15".to_owned()),
+        };
+        let ignored_kev_context = KevContext {
+            cve_id: "CVE-2026-9999".to_owned(),
+            vendor_project: Some("Other Vendor".to_owned()),
+            product: Some("other-package".to_owned()),
+            vulnerability_name: Some("Ignored vulnerability".to_owned()),
+            date_added: Some("2026-02-01".to_owned()),
+        };
+        let kev_matches = vec![
+            nv_common::cve::kev::KevAffectedNpmPackageVersion {
+                package_name: Some("left-pad".to_owned()),
+                affected_version: Some("1.2.3".to_owned()),
+                cve_id: "CVE-2026-1234".to_owned(),
+                source_evidence: vec!["dependencies > left-pad@1.2.3".to_owned()],
+                confidence: KevNpmMatchConfidence::High,
+                caveats: Vec::new(),
+                status: KevNpmMatchStatus::Affected,
+                kev_context: kept_kev_context,
+            },
+            nv_common::cve::kev::KevAffectedNpmPackageVersion {
+                package_name: Some("left-pad".to_owned()),
+                affected_version: Some("1.2.3".to_owned()),
+                cve_id: "CVE-2026-9999".to_owned(),
+                source_evidence: vec!["dependencies > left-pad@1.2.3".to_owned()],
+                confidence: KevNpmMatchConfidence::Unknown,
+                caveats: vec!["package metadata was ambiguous".to_owned()],
+                status: KevNpmMatchStatus::Unknown,
+                kev_context: ignored_kev_context.clone(),
+            },
+            nv_common::cve::kev::KevAffectedNpmPackageVersion {
+                package_name: Some("other-package".to_owned()),
+                affected_version: Some("9.9.9".to_owned()),
+                cve_id: "CVE-2026-0001".to_owned(),
+                source_evidence: vec!["dependencies > other-package@9.9.9".to_owned()],
+                confidence: KevNpmMatchConfidence::High,
+                caveats: Vec::new(),
+                status: KevNpmMatchStatus::Affected,
+                kev_context: ignored_kev_context,
+            },
+        ];
+
+        let exposures =
+            package_source_exposures_from_kev_matches(std::slice::from_ref(&package), kev_matches);
+
+        assert_eq!(exposures.len(), 1);
+        assert_eq!(exposures[0].package.id, package.id);
+        assert_eq!(exposures[0].package.name, package.name);
+        assert_eq!(exposures[0].package.version, package.version);
+        assert_eq!(
+            serde_json::to_value(&exposures[0].package.ecosystem).expect("ecosystem serializes"),
+            serde_json::to_value(&package.ecosystem).expect("ecosystem serializes")
+        );
+        assert_eq!(exposures[0].package.purl, package.purl);
+        assert_eq!(exposures[0].package.derivations, package.derivations);
+        assert_eq!(exposures[0].cve_id, "CVE-2026-1234");
+        assert_eq!(
+            exposures[0].kev.vulnerability_name.as_deref(),
+            Some("Reachable vulnerability")
+        );
+    }
+
+    #[tokio::test]
+    async fn get_package_source_exposures_returns_not_found_for_unknown_source() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<package_sources::Model>::new()])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let error = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/package-sources/{id}/exposures"),
+                StatusCode::NOT_FOUND,
+            )
+            .await
+            .expect_err("unknown package source exposures should return 404");
+
+        assert_eq!(error.error_code, None);
+        assert_eq!(error.message, "Not Found");
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn get_package_source_exposures_returns_conflict_while_processing() {
+        let id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(id, "pending", None)]])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let error = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/package-sources/{id}/exposures"),
+                StatusCode::CONFLICT,
+            )
+            .await
+            .expect_err("processing package source exposures should return 409");
+
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("PackageSourceExposuresUnavailable")
+        );
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn get_package_source_exposures_returns_completed_with_exposures() {
+        let id = Uuid::now_v7();
+        let now = Utc::now().fixed_offset();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(id, "completed", None)]])
+            .append_query_results([vec![package_source_versions::Model {
+                id: 1,
+                source_id: 1,
+                package_version_id: 1,
+            }]])
+            .append_query_results([vec![package_versions::Model {
+                id: 1,
+                package_id: 1,
+                version: "1.2.3".to_owned(),
+                package_url: "pkg:npm/left-pad@1.2.3".to_owned(),
+                source_repository: None,
+                source_repository_tag: None,
+            }]])
+            .append_query_results([vec![package_source_edges::Model {
+                id: 1,
+                source_id: 1,
+                parent_package_version_id: None,
+                child_package_version_id: 1,
+                root_dependency_kind: Some("dependencies".to_owned()),
+                declared_dependency: Some("left-pad".to_owned()),
+                declared_specification: Some("1.2.3".to_owned()),
+            }]])
+            .append_query_results([Vec::<package_source_warnings::Model>::new()])
+            .append_query_results([vec![cve_list_records::Model {
+                cve_id: "CVE-2026-1234".to_owned(),
+                record_format_version: "5.1".to_owned(),
+                record: serde_json::json!({
+                    "containers": {
+                        "cna": {
+                            "affected": [{
+                                "vendor": "Example Vendor",
+                                "product": "left-pad",
+                                "packageName": "left-pad",
+                                "collectionURL": "https://registry.npmjs.org",
+                                "versions": [{
+                                    "version": "1.2.3",
+                                    "status": "affected"
+                                }]
+                            }]
+                        }
+                    }
+                }),
+                deleted: false,
+                first_seen_at: now,
+                last_seen_at: now,
+                updated_at: now,
+            }]])
+            .append_query_results([vec![std::collections::BTreeMap::from([(
+                "cve_id".to_owned(),
+                "CVE-2026-1234".into(),
+            )])]])
+            .append_query_results([vec![cisa_kev_entries::Model {
+                cve_id: "CVE-2026-1234".to_owned(),
+                entry: serde_json::json!({
+                    "cveID": "CVE-2026-1234",
+                    "vendorProject": "Example Vendor",
+                    "product": "left-pad",
+                    "vulnerabilityName": "Example vulnerability",
+                    "dateAdded": "2026-08-03"
+                }),
+                removed_at: None,
+                first_seen_at: now,
+                last_seen_at: now,
+                updated_at: now,
+            }]])
+            .append_query_results([vec![cve_list_records::Model {
+                cve_id: "CVE-2026-1234".to_owned(),
+                record_format_version: "5.1".to_owned(),
+                record: serde_json::json!({
+                    "containers": {
+                        "cna": {
+                            "affected": [{
+                                "vendor": "Example Vendor",
+                                "product": "left-pad",
+                                "packageName": "left-pad",
+                                "collectionURL": "https://registry.npmjs.org",
+                                "versions": [{
+                                    "version": "1.2.3",
+                                    "status": "affected"
+                                }]
+                            }]
+                        }
+                    }
+                }),
+                deleted: false,
+                first_seen_at: now,
+                last_seen_at: now,
+                updated_at: now,
+            }]])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/package-sources/{id}/exposures"),
+                StatusCode::OK,
+            )
+            .await
+            .expect("completed package source exposures should return 200");
+
+        let body: serde_json::Value = read_json(&mut response).await;
+
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "id": id,
+                "status": "completed",
+                "exposures": [{
+                    "package": {
+                        "id": Uuid::from_u64_pair(1, 1),
+                        "name": "left-pad",
+                        "version": "1.2.3",
+                        "ecosystem": "npm",
+                        "purl": "pkg:npm/left-pad@1.2.3",
+                        "derivations": [[
+                            "<root>",
+                            "pkg:npm/left-pad@1.2.3"
+                        ]]
+                    },
+                    "cveId": "CVE-2026-1234",
+                    "kev": {
+                        "vendorProject": "Example Vendor",
+                        "product": "left-pad",
+                        "vulnerabilityName": "Example vulnerability",
+                        "dateAdded": "2026-08-03"
+                    }
+                }]
+            })
+        );
+
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn get_package_source_exposures_returns_completed_with_no_exposures() {
+        let id = Uuid::now_v7();
+        let now = Utc::now().fixed_offset();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(id, "completed", None)]])
+            .append_query_results([vec![package_source_versions::Model {
+                id: 1,
+                source_id: 1,
+                package_version_id: 1,
+            }]])
+            .append_query_results([vec![package_versions::Model {
+                id: 1,
+                package_id: 1,
+                version: "1.2.3".to_owned(),
+                package_url: "pkg:npm/left-pad@1.2.3".to_owned(),
+                source_repository: None,
+                source_repository_tag: None,
+            }]])
+            .append_query_results([vec![package_source_edges::Model {
+                id: 1,
+                source_id: 1,
+                parent_package_version_id: None,
+                child_package_version_id: 1,
+                root_dependency_kind: Some("dependencies".to_owned()),
+                declared_dependency: Some("left-pad".to_owned()),
+                declared_specification: Some("1.2.3".to_owned()),
+            }]])
+            .append_query_results([Vec::<package_source_warnings::Model>::new()])
+            .append_query_results([vec![cve_list_records::Model {
+                cve_id: "CVE-2026-9999".to_owned(),
+                record_format_version: "5.1".to_owned(),
+                record: serde_json::json!({
+                    "containers": {
+                        "cna": {
+                            "affected": [{
+                                "vendor": "Example Vendor",
+                                "product": "different-package",
+                                "packageName": "different-package",
+                                "collectionURL": "https://registry.npmjs.org",
+                                "versions": [{
+                                    "version": "9.9.9",
+                                    "status": "affected"
+                                }]
+                            }]
+                        }
+                    }
+                }),
+                deleted: false,
+                first_seen_at: now,
+                last_seen_at: now,
+                updated_at: now,
+            }]])
+            .append_query_results([vec![std::collections::BTreeMap::from([(
+                "cve_id".to_owned(),
+                "CVE-2026-9999".into(),
+            )])]])
+            .append_query_results([vec![cisa_kev_entries::Model {
+                cve_id: "CVE-2026-9999".to_owned(),
+                entry: serde_json::json!({
+                    "cveID": "CVE-2026-9999",
+                    "vendorProject": "Example Vendor",
+                    "product": "different-package",
+                    "vulnerabilityName": "Unrelated vulnerability",
+                    "dateAdded": "2026-08-03"
+                }),
+                removed_at: None,
+                first_seen_at: now,
+                last_seen_at: now,
+                updated_at: now,
+            }]])
+            .append_query_results([vec![cve_list_records::Model {
+                cve_id: "CVE-2026-9999".to_owned(),
+                record_format_version: "5.1".to_owned(),
+                record: serde_json::json!({
+                    "containers": {
+                        "cna": {
+                            "affected": [{
+                                "vendor": "Example Vendor",
+                                "product": "different-package",
+                                "packageName": "different-package",
+                                "collectionURL": "https://registry.npmjs.org",
+                                "versions": [{
+                                    "version": "9.9.9",
+                                    "status": "affected"
+                                }]
+                            }]
+                        }
+                    }
+                }),
+                deleted: false,
+                first_seen_at: now,
+                last_seen_at: now,
+                updated_at: now,
+            }]])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/package-sources/{id}/exposures"),
+                StatusCode::OK,
+            )
+            .await
+            .expect("completed package source exposures with no matches should return 200");
+
+        let body: serde_json::Value = read_json(&mut response).await;
+
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "id": id,
+                "status": "completed",
+                "exposures": []
+            })
+        );
+
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn get_package_source_exposures_when_vulnerability_data_is_incomplete() {
+        let id = Uuid::now_v7();
+        let now = Utc::now().fixed_offset();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(id, "completed", None)]])
+            .append_query_results([vec![package_source_versions::Model {
+                id: 1,
+                source_id: 1,
+                package_version_id: 1,
+            }]])
+            .append_query_results([vec![package_versions::Model {
+                id: 1,
+                package_id: 1,
+                version: "1.2.3".to_owned(),
+                package_url: "pkg:npm/left-pad@1.2.3".to_owned(),
+                source_repository: None,
+                source_repository_tag: None,
+            }]])
+            .append_query_results([vec![package_source_edges::Model {
+                id: 1,
+                source_id: 1,
+                parent_package_version_id: None,
+                child_package_version_id: 1,
+                root_dependency_kind: Some("dependencies".to_owned()),
+                declared_dependency: Some("left-pad".to_owned()),
+                declared_specification: Some("1.2.3".to_owned()),
+            }]])
+            .append_query_results([Vec::<package_source_warnings::Model>::new()])
+            .append_query_results([vec![cve_list_records::Model {
+                cve_id: "CVE-2026-1234".to_owned(),
+                record_format_version: "5.1".to_owned(),
+                record: serde_json::json!({
+                    "containers": {
+                        "cna": {
+                            "affected": [{
+                                "vendor": "Example Vendor",
+                                "product": "left-pad",
+                                "packageName": "left-pad",
+                                "collectionURL": "https://registry.npmjs.org",
+                                "versions": [{
+                                    "version": "1.2.3",
+                                    "status": "affected"
+                                }]
+                            }]
+                        }
+                    }
+                }),
+                deleted: false,
+                first_seen_at: now,
+                last_seen_at: now,
+                updated_at: now,
+            }]])
+            .append_query_results([Vec::<std::collections::BTreeMap<String, Value>>::new()])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let error = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/package-sources/{id}/exposures"),
+                StatusCode::SERVICE_UNAVAILABLE,
+            )
+            .await
+            .expect_err("missing vulnerability data should return 503");
+
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("VulnerabilityDataUnavailable")
+        );
+
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn get_package_source_exposures_when_kev_data_is_missing_for_present_cve() {
+        let id = Uuid::now_v7();
+        let now = Utc::now().fixed_offset();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(id, "completed", None)]])
+            .append_query_results([vec![package_source_versions::Model {
+                id: 1,
+                source_id: 1,
+                package_version_id: 1,
+            }]])
+            .append_query_results([vec![package_versions::Model {
+                id: 1,
+                package_id: 1,
+                version: "1.2.3".to_owned(),
+                package_url: "pkg:npm/left-pad@1.2.3".to_owned(),
+                source_repository: None,
+                source_repository_tag: None,
+            }]])
+            .append_query_results([vec![package_source_edges::Model {
+                id: 1,
+                source_id: 1,
+                parent_package_version_id: None,
+                child_package_version_id: 1,
+                root_dependency_kind: Some("dependencies".to_owned()),
+                declared_dependency: Some("left-pad".to_owned()),
+                declared_specification: Some("1.2.3".to_owned()),
+            }]])
+            .append_query_results([Vec::<package_source_warnings::Model>::new()])
+            .append_query_results([vec![cve_list_records::Model {
+                cve_id: "CVE-2026-1234".to_owned(),
+                record_format_version: "5.1".to_owned(),
+                record: serde_json::json!({
+                    "containers": {
+                        "cna": {
+                            "affected": [{
+                                "vendor": "Example Vendor",
+                                "product": "left-pad",
+                                "packageName": "left-pad",
+                                "collectionURL": "https://registry.npmjs.org",
+                                "versions": [{
+                                    "version": "1.2.3",
+                                    "status": "affected"
+                                }]
+                            }]
+                        }
+                    }
+                }),
+                deleted: false,
+                first_seen_at: now,
+                last_seen_at: now,
+                updated_at: now,
+            }]])
+            .append_query_results([Vec::<std::collections::BTreeMap<String, Value>>::new()])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let error = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/package-sources/{id}/exposures"),
+                StatusCode::SERVICE_UNAVAILABLE,
+            )
+            .await
+            .expect_err("missing KEV data for a present CVE should return 503");
+
+        assert_eq!(
+            error.error_code.as_deref(),
+            Some("VulnerabilityDataUnavailable")
+        );
+
+        test_context.teardown().await;
     }
 
     #[test]

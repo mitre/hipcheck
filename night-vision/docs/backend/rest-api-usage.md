@@ -270,6 +270,110 @@ reach package-source routes has the same single-operator lifecycle authority;
 deployments must restrict route access accordingly. Per-resource authorization
 is required before multi-user or external exposure.
 
+### `GET /package-sources/{id}/exposures`
+
+Fetch the KEV-linked reachable exposures for one resolved package source. This
+endpoint bridges a completed package-source resolution to Night Vision's
+assessment workflow: clients receive each reachable affected package version,
+its stored derivation path, the matching CVE identifier, and the linked KEV
+context without parsing raw CVE List records.
+
+Request:
+
+```sh
+curl http://127.0.0.1:8080/package-sources/00000000-0000-0000-0000-000000000001/exposures
+```
+
+Completed response with exposures:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+```
+
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000001",
+  "status": "completed",
+  "exposures": [
+    {
+      "package": {
+        "id": "00000000-0000-0000-0000-000000000003",
+        "name": "left-pad",
+        "version": "1.2.3",
+        "ecosystem": "npm",
+        "purl": "pkg:npm/left-pad@1.2.3",
+        "derivations": [
+          [
+            "<root>",
+            "pkg:npm/left-pad@1.2.3"
+          ]
+        ]
+      },
+      "cveId": "CVE-2026-1234",
+      "kev": {
+        "vendorProject": "Example Vendor",
+        "product": "left-pad",
+        "vulnerabilityName": "Example vulnerability",
+        "dateAdded": "2026-08-03"
+      }
+    }
+  ]
+}
+```
+
+Completed sources that have no reachable KEV-linked exposures still return
+`200 OK` with an empty `exposures` array:
+
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000001",
+  "status": "completed",
+  "exposures": []
+}
+```
+
+`completed-with-warnings` sources behave the same way, but return
+`"status": "completed-with-warnings"`.
+
+`failed` sources return `200 OK` with `"status": "failed"` and an empty
+`exposures` array because no completed exposure snapshot is available.
+
+Processing sources do not yet have a stable exposure result and return
+`409 Conflict` with the `PackageSourceExposuresUnavailable` error code.
+
+```http
+HTTP/1.1 409 Conflict
+Content-Type: application/json
+```
+
+```json
+{
+  "message": "package source exposures are not available until processing completes",
+  "error_code": "PackageSourceExposuresUnavailable",
+  "request_id": "example-request-id"
+}
+```
+
+Unknown package-source IDs return `404 Not Found`.
+
+If package resolution is complete but CVE/KEV ingest data is not yet available,
+the endpoint returns `503 Service Unavailable` with the
+`VulnerabilityDataUnavailable` error code.
+
+```http
+HTTP/1.1 503 Service Unavailable
+Content-Type: application/json
+```
+
+```json
+{
+  "message": "vulnerability data is not yet available for package source exposures",
+  "error_code": "VulnerabilityDataUnavailable",
+  "request_id": "example-request-id"
+}
+```
+
 ### `POST /upgrade-assessments`
 
 Request an asynchronous assessment of an NPM package version. A trigger is
@@ -401,6 +505,11 @@ The intended package-source workflow is asynchronous:
    response includes `finishedAt`, the attempt number, a diagnostic capped at
    1024 UTF-8 bytes, and retains the
    last successful graph in `previousVersionedPackages`, when one exists.
+5. Read `GET /package-sources/{id}/exposures` to retrieve the KEV-linked
+   exposure view for that resolved source. A completed source may return
+   either exposure entries or an empty `exposures` array; a processing source
+   returns `409`, and a completed source returns `503` when local
+   vulnerability ingest data is not yet available.
 
 At the API boundary, package sources currently support the `npm` ecosystem and
 the `package.json` style of input described in
@@ -437,6 +546,13 @@ Dropshot rejects a body exceeding that limit before the handler runs with a
 `400 Bad Request`. The process-local concurrency limit protects server capacity;
 production ingress must still provide caller-aware rate limiting before the API
 is exposed outside a trusted environment.
+
+For `GET /package-sources/{id}/exposures`, unknown IDs return `404 Not Found`.
+Processing sources return `409 Conflict` with
+`PackageSourceExposuresUnavailable`. Completed sources return `503 Service
+Unavailable` with `VulnerabilityDataUnavailable` when the server has not yet
+ingested the vulnerability data needed to compute exposure matches. Completed,
+completed-with-warnings, and failed package sources otherwise return `200 OK`.
 
 ## OpenAPI
 

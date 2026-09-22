@@ -293,6 +293,40 @@
         }
       }
     },
+    "/package-sources/{id}/exposures": {
+      "get": {
+        "operationId": "get_package_source_exposures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageSourceExposures"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/upgrade-assessments": {
       "post": {
         "operationId": "post_upgrade_assessment",
@@ -713,6 +747,77 @@
         "type": "string",
         "enum": [
           "npm"
+        ]
+      },
+      "PackageSourceExposure": {
+        "type": "object",
+        "properties": {
+          "cveId": {
+            "type": "string"
+          },
+          "kev": {
+            "$ref": "#/components/schemas/PackageSourceExposureKevContext"
+          },
+          "package": {
+            "$ref": "#/components/schemas/VersionedPackage"
+          }
+        },
+        "required": [
+          "cveId",
+          "kev",
+          "package"
+        ]
+      },
+      "PackageSourceExposureKevContext": {
+        "type": "object",
+        "properties": {
+          "dateAdded": {
+            "nullable": true,
+            "type": "string"
+          },
+          "product": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vendorProject": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vulnerabilityName": {
+            "nullable": true,
+            "type": "string"
+          }
+        }
+      },
+      "PackageSourceExposures": {
+        "type": "object",
+        "properties": {
+          "exposures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackageSourceExposure"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PackageSourceExposuresStatus"
+          }
+        },
+        "required": [
+          "exposures",
+          "id",
+          "status"
+        ]
+      },
+      "PackageSourceExposuresStatus": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "completed-with-warnings",
+          "failed"
         ]
       },
       "PackageSourceOperationResponse": {

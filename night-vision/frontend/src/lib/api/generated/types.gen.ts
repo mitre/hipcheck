@@ -98,6 +98,27 @@ export type PackageSource = {
 
 export type PackageSourceEcosystem = 'npm';
 
+export type PackageSourceExposure = {
+    cveId: string;
+    kev: PackageSourceExposureKevContext;
+    package: VersionedPackage;
+};
+
+export type PackageSourceExposureKevContext = {
+    dateAdded?: string | null;
+    product?: string | null;
+    vendorProject?: string | null;
+    vulnerabilityName?: string | null;
+};
+
+export type PackageSourceExposures = {
+    exposures: Array<PackageSourceExposure>;
+    id: string;
+    status: PackageSourceExposuresStatus;
+};
+
+export type PackageSourceExposuresStatus = 'completed' | 'completed-with-warnings' | 'failed';
+
 export type PackageSourceOperationResponse = {
     id: string;
     status: PackageSourceOperationStatus;
@@ -566,6 +587,37 @@ export type CancelPackageSourceResponses = {
 };
 
 export type CancelPackageSourceResponse = CancelPackageSourceResponses[keyof CancelPackageSourceResponses];
+
+export type GetPackageSourceExposuresData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/package-sources/{id}/exposures';
+};
+
+export type GetPackageSourceExposuresErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type GetPackageSourceExposuresError = GetPackageSourceExposuresErrors[keyof GetPackageSourceExposuresErrors];
+
+export type GetPackageSourceExposuresResponses = {
+    /**
+     * successful operation
+     */
+    200: PackageSourceExposures;
+};
+
+export type GetPackageSourceExposuresResponse = GetPackageSourceExposuresResponses[keyof GetPackageSourceExposuresResponses];
 
 export type PostUpgradeAssessmentData = {
     body: UpgradeAssessmentInput;

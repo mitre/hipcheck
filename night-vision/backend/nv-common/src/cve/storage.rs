@@ -6,11 +6,13 @@ use crate::{
         progress::{CveListSyncProgress, CveListSyncProgressReporter, NoopCveListSyncProgress},
         repository::ParsedCveListFile,
     },
-    db::entities::{cve_list_record_staging, cve_list_records, cve_list_sync_runs},
+    db::entities::{
+        cisa_kev_entries, cve_list_record_staging, cve_list_records, cve_list_sync_runs,
+    },
 };
 use sea_orm::{
     ActiveValue::{NotSet, Set},
-    ColumnTrait as _, ConnectionTrait, DatabaseBackend, DeriveIden, EntityTrait as _,
+    ColumnTrait as _, ConnectionTrait, DatabaseBackend, DbErr, DeriveIden, EntityTrait as _,
     PaginatorTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _, Statement,
     sea_query::{Expr, ExprTrait as _, OnConflict, Query},
 };
@@ -612,6 +614,23 @@ where
         .one(db)
         .await
         .map_err(CveListRecordLookupError::Db)?;
+
+    Ok(cve_id.is_some())
+}
+
+/// Return whether any active KEV records are already stored.
+pub async fn has_active_kev_records<C>(db: &C) -> Result<bool, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let cve_id = cisa_kev_entries::Entity::find()
+        .select_only()
+        .column(cisa_kev_entries::Column::CveId)
+        .filter(cisa_kev_entries::Column::RemovedAt.is_null())
+        .limit(1)
+        .into_tuple::<String>()
+        .one(db)
+        .await?;
 
     Ok(cve_id.is_some())
 }
