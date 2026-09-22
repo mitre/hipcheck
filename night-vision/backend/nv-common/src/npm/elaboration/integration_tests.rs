@@ -147,6 +147,93 @@ fn database_rejects_invalid_failure_details() {
     });
 }
 
+#[test]
+#[ignore = "requires a disposable Postgres test database"]
+fn legacy_backfill_migration_fixes_stuck_processing_and_unclassified_failed_rows() {
+    use migration::{
+        MigrationTrait as _, SchemaManager, m20260922_000000_package_source_legacy_backfill,
+    };
+
+    run_async(async {
+        let db = integration_database().await;
+
+        // A `processing` row from before `lease_expires_at` existed: no
+        // lease, so `recover_expired_leases` can never reclaim it.
+        let stuck_processing = insert_source(&db, "{}").await;
+        begin_attempt(
+            &db,
+            stuck_processing.id,
+            AttemptKind::Initial,
+            Duration::from_mins(1),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        execute(
+            &db,
+            &format!(
+                "UPDATE package_sources SET lease_expires_at = NULL WHERE id = {}",
+                stuck_processing.id
+            ),
+        )
+        .await
+        .unwrap();
+
+        // A `failed` row from before `failure_kind` existed: unclassifiable,
+        // so the status endpoint would fail closed with a 500.
+        let unclassified_failed = insert_source(&db, "{}").await;
+        begin_attempt(
+            &db,
+            unclassified_failed.id,
+            AttemptKind::Initial,
+            Duration::from_mins(1),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        record_elaboration_failure(&db, unclassified_failed.id, 1, FailureKind::Internal)
+            .await
+            .unwrap();
+        execute(
+            &db,
+            &format!(
+                "UPDATE package_sources SET failure_kind = NULL, resolution_error = 'raw legacy text', retryable = false WHERE id = {}",
+                unclassified_failed.id
+            ),
+        )
+        .await
+        .unwrap();
+
+        m20260922_000000_package_source_legacy_backfill::Migration
+            .up(&SchemaManager::new(&db))
+            .await
+            .expect("legacy backfill re-applies cleanly to already-migrated rows");
+
+        let recovered = reload(&db, stuck_processing.id).await;
+        assert_eq!(recovered.resolution_status, "pending");
+        assert!(recovered.lease_expires_at.is_none());
+
+        let reclassified = reload(&db, unclassified_failed.id).await;
+        assert_eq!(reclassified.resolution_status, "failed");
+        assert_eq!(reclassified.failure_kind.as_deref(), Some("internal"));
+        assert_eq!(
+            reclassified.resolution_error.as_deref(),
+            Some("Package-source processing failed.")
+        );
+        assert!(!reclassified.retryable);
+
+        // Rows already in the current shape are untouched (the backfill's
+        // WHERE clauses only target rows with legacy-null columns).
+        let current = insert_source(&db, "{}").await;
+        m20260922_000000_package_source_legacy_backfill::Migration
+            .up(&SchemaManager::new(&db))
+            .await
+            .expect("backfill is a no-op for already-current rows");
+        let untouched = reload(&db, current.id).await;
+        assert_eq!(untouched.resolution_status, "pending");
+    });
+}
+
 async fn insert_source(db: &DatabaseConnection, contents: &str) -> package_sources::Model {
     package_sources::ActiveModel {
         source_id: Set(uuid::Uuid::now_v7().to_string()),
