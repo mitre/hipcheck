@@ -119,6 +119,8 @@ export type PackageSourceExposures = {
 
 export type PackageSourceExposuresStatus = 'completed' | 'completed-with-warnings' | 'failed';
 
+export type PackageSourceFailureKind = 'validation' | 'dependency-unavailable' | 'resolution' | 'internal';
+
 export type PackageSourceOperationResponse = {
     id: string;
     status: PackageSourceOperationStatus;
@@ -127,6 +129,11 @@ export type PackageSourceOperationResponse = {
 export type PackageSourceOperationStatus = 'cancelled' | 'deleting';
 
 export type PackageSourceStatus = {
+    attempt: number;
+    createdAt: string;
+    id: string;
+    status: 'pending';
+} | {
     attempt: number;
     createdAt: string;
     id: string;
@@ -161,12 +168,17 @@ export type PackageSourceStatus = {
     diagnostic: string;
     finishedAt: string;
     id: string;
+    kind: PackageSourceFailureKind;
     /**
      * The last successfully published reachable-version snapshot, if any.
      *
      * A failed re-elaboration does not replace the prior snapshot, so callers can continue to inspect it while acting on `diagnostic`.
      */
     previousVersionedPackages: Array<VersionedPackage>;
+    /**
+     * Whether the automatic-retry service would still retry a failure of this kind; does not by itself mean an automatic retry is scheduled, since the automatic-attempt budget may already be exhausted.
+     */
+    retryable: boolean;
     status: 'failed';
 };
 
