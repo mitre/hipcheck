@@ -68,6 +68,13 @@ impl ApiCtx {
     pub fn try_admit_package_elaboration(&self) -> Option<OwnedSemaphorePermit> {
         self.package_elaboration_admission.try_acquire()
     }
+
+    /// A cloneable handle to the elaboration admission semaphore, for a
+    /// worker that claims permits over time rather than once per request.
+    pub(super) fn package_elaboration_admission(&self) -> PackageElaborationAdmission {
+        self.package_elaboration_admission.clone()
+    }
+
     pub fn hipcheck_runner_config(&self) -> HipcheckRunnerConfig {
         self.hipcheck_runner_config.clone()
     }
@@ -106,14 +113,14 @@ impl ApiCtx {
 }
 
 #[derive(Clone)]
-struct PackageElaborationAdmission(Arc<Semaphore>);
+pub(super) struct PackageElaborationAdmission(Arc<Semaphore>);
 
 impl PackageElaborationAdmission {
     fn new(max_concurrent_runs: usize) -> Self {
         Self(Arc::new(Semaphore::new(max_concurrent_runs)))
     }
 
-    fn try_acquire(&self) -> Option<OwnedSemaphorePermit> {
+    pub(super) fn try_acquire(&self) -> Option<OwnedSemaphorePermit> {
         self.0.clone().try_acquire_owned().ok()
     }
 }

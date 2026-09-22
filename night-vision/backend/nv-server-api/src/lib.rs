@@ -615,12 +615,22 @@ pub struct PackageSourcePathParams {
 #[serde(tag = "status")]
 #[serde(rename_all = "camelCase")]
 pub enum PackageSourceStatus {
+    Pending(PackageSourceStatusProcessing),
     Processing(PackageSourceStatusProcessing),
     Cancelled(PackageSourceStatusCancelled),
     Completed(PackageSourceStatusCompleted),
     #[serde(rename = "completed-with-warnings")]
     CompletedWithWarnings(PackageSourceStatusCompletedWithWarnings),
     Failed(PackageSourceStatusFailed),
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum PackageSourceFailureKind {
+    Validation,
+    DependencyUnavailable,
+    Resolution,
+    Internal,
 }
 
 #[derive(Serialize, JsonSchema, Debug, Clone)]
@@ -688,6 +698,11 @@ pub struct PackageSourceStatusFailed {
     pub finished_at: DateTime<Utc>,
     pub attempt: i32,
     pub diagnostic: String,
+    pub kind: PackageSourceFailureKind,
+    /// Whether the automatic-retry service would still retry a failure of
+    /// this kind; does not by itself mean an automatic retry is scheduled,
+    /// since the automatic-attempt budget may already be exhausted.
+    pub retryable: bool,
     /// The last successfully published reachable-version snapshot, if any.
     ///
     /// A failed re-elaboration does not replace the prior snapshot, so callers

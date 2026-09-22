@@ -112,6 +112,11 @@ mod tests {
                         .expect("valid terminal timestamp"),
                 ),
                 deletion_reason: None,
+                next_attempt_at: "2026-09-03T00:00:00Z".parse().expect("valid timestamp"),
+                lease_expires_at: None,
+                failure_kind: Some("internal".to_owned()),
+                retryable: true,
+                automatic_attempt_count: 3,
             },
             warnings: Vec::new(),
         });

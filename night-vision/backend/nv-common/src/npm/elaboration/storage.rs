@@ -1,26 +1,23 @@
 //! Atomic persistence for completed package-source elaboration runs.
 
-use super::{ElaborationResult, PackageVersion, UnsupportedSpecificationKind};
+use super::{
+    ElaborationResult, PackageVersion, UnsupportedSpecificationKind,
+    lifecycle::{FailureKind, retry_delay},
+};
 use crate::db::entities::{
     package_source_edges, package_source_versions, package_source_warnings, package_sources,
     package_versions, packages,
 };
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, DatabaseConnection, DbErr,
-    EntityTrait as _, QueryFilter as _, QueryOrder as _, TransactionTrait as _,
-    sea_query::OnConflict,
+    ActiveModelTrait as _,
+    ActiveValue::Set,
+    ColumnTrait as _, DatabaseConnection, DbErr, EntityTrait as _, QueryFilter as _,
+    QueryOrder as _, TransactionTrait as _,
+    sea_query::{Expr, OnConflict},
 };
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
-
-/// Maximum UTF-8 byte length retained for a source elaboration failure.
-///
-/// This bounds durable diagnostics and, in turn, the API response that exposes
-/// them. The diagnostic is deliberately short because it may contain text from
-/// an external registry.
-pub const MAX_FAILURE_DIAGNOSTIC_BYTES: usize = 1024;
-const DIAGNOSTIC_TRUNCATION_SUFFIX: &str = "...";
 
 /// A resolved package version together with every acyclic path reaching it.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -344,56 +341,85 @@ pub async fn persist_assessment_target(
     Ok(stored_version)
 }
 
-/// Record a terminal elaboration failure without changing the last published snapshot.
+/// Record a terminal or automatically-retryable elaboration failure without
+/// changing the last published snapshot.
+///
+/// A `dependency-unavailable` or `internal` failure is rescheduled to
+/// `pending` with a bounded exponential backoff as long as the source's
+/// automatic-attempt budget ([`crate::npm::elaboration::lifecycle::MAX_AUTOMATIC_ATTEMPTS`])
+/// is not yet exhausted; every other case leaves the source `failed`.
 pub async fn record_elaboration_failure(
     db: &DatabaseConnection,
     source_id: i32,
     attempt_generation: i32,
-    error: &str,
+    kind: FailureKind,
 ) -> Result<(), ElaborationStorageError> {
-    let diagnostic = bounded_diagnostic(error);
-    let update = package_sources::Entity::update_many()
+    let active_attempt = package_sources::Entity::find_by_id(source_id)
+        .filter(package_sources::Column::ResolutionStatus.eq("processing"))
+        .filter(package_sources::Column::AttemptGeneration.eq(attempt_generation))
+        .filter(package_sources::Column::CancellationRequested.eq(false))
+        .one(db)
+        .await
+        .map_err(ElaborationStorageError::Database)?;
+    let Some(source) = active_attempt else {
+        return Err(ElaborationStorageError::InactiveAttempt);
+    };
+    let reschedule = kind.retries_automatically(source.automatic_attempt_count);
+    let mut update = package_sources::Entity::update_many()
         .col_expr(
-            package_sources::Column::ResolutionStatus,
-            sea_orm::sea_query::Expr::value("failed"),
+            package_sources::Column::FailureKind,
+            Expr::value(kind.as_str()),
         )
         .col_expr(
             package_sources::Column::ResolutionError,
-            sea_orm::sea_query::Expr::value(diagnostic),
+            Expr::value(kind.diagnostic()),
         )
         .col_expr(
-            package_sources::Column::TerminalAt,
-            sea_orm::sea_query::Expr::value(Some(Utc::now())),
+            package_sources::Column::Retryable,
+            Expr::value(kind.retryable()),
+        )
+        .col_expr(
+            package_sources::Column::LeaseExpiresAt,
+            Expr::value(None::<chrono::DateTime<Utc>>),
         )
         .filter(package_sources::Column::Id.eq(source_id))
         .filter(package_sources::Column::ResolutionStatus.eq("processing"))
         .filter(package_sources::Column::AttemptGeneration.eq(attempt_generation))
-        .filter(package_sources::Column::CancellationRequested.eq(false))
+        .filter(package_sources::Column::CancellationRequested.eq(false));
+    update = if reschedule {
+        let delay = chrono::Duration::from_std(retry_delay(source.automatic_attempt_count))
+            .expect("retry backoff fits a chrono duration");
+        let next_attempt_at = Utc::now()
+            .checked_add_signed(delay)
+            .expect("next-attempt deadline is representable");
+        update
+            .col_expr(
+                package_sources::Column::ResolutionStatus,
+                Expr::value("pending"),
+            )
+            .col_expr(
+                package_sources::Column::NextAttemptAt,
+                Expr::value(next_attempt_at),
+            )
+    } else {
+        update
+            .col_expr(
+                package_sources::Column::ResolutionStatus,
+                Expr::value("failed"),
+            )
+            .col_expr(
+                package_sources::Column::TerminalAt,
+                Expr::value(Some(Utc::now())),
+            )
+    };
+    let result = update
         .exec(db)
         .await
         .map_err(ElaborationStorageError::Database)?;
-    if update.rows_affected != 1 {
+    if result.rows_affected != 1 {
         return Err(ElaborationStorageError::InactiveAttempt);
     }
     Ok(())
-}
-
-/// Return a diagnostic that is safe to persist or expose under the API's
-/// bounded diagnostic contract.
-pub fn bounded_diagnostic(error: &str) -> String {
-    if error.len() <= MAX_FAILURE_DIAGNOSTIC_BYTES {
-        return error.to_owned();
-    }
-
-    let mut end = MAX_FAILURE_DIAGNOSTIC_BYTES
-        .checked_sub(DIAGNOSTIC_TRUNCATION_SUFFIX.len())
-        .expect("diagnostic limit must exceed the truncation suffix length");
-    while !error.is_char_boundary(end) {
-        end = end
-            .checked_sub(1)
-            .expect("diagnostic must contain a character boundary");
-    }
-    format!("{}{DIAGNOSTIC_TRUNCATION_SUFFIX}", &error[..end])
 }
 
 async fn find_or_insert_package(
@@ -555,28 +581,22 @@ pub enum ElaborationStorageError {
 #[cfg(test)]
 mod tests {
     use super::{
-        ElaborationStorageError, MAX_FAILURE_DIAGNOSTIC_BYTES, bounded_diagnostic,
-        persist_completed_elaboration, persisted_elaboration_warnings, persisted_package_versions,
-        record_elaboration_failure, update_repository_metadata, warning_kind,
+        ElaborationStorageError, persist_completed_elaboration, persisted_elaboration_warnings,
+        persisted_package_versions, record_elaboration_failure, update_repository_metadata,
+        warning_kind,
     };
     use crate::{
         db::entities::{
             package_source_edges, package_source_versions, package_source_warnings,
             package_sources, package_versions,
         },
-        npm::elaboration::{ElaborationResult, UnsupportedSpecificationKind},
+        npm::elaboration::{
+            ElaborationResult, UnsupportedSpecificationKind,
+            lifecycle::{FailureKind, MAX_AUTOMATIC_ATTEMPTS},
+        },
     };
     use chrono::Utc;
     use sea_orm::{DbBackend, MockDatabase, MockExecResult};
-
-    #[test]
-    fn bounds_failure_diagnostics_at_a_utf8_boundary() {
-        let diagnostic = bounded_diagnostic(&"🦀".repeat(MAX_FAILURE_DIAGNOSTIC_BYTES));
-
-        assert!(diagnostic.len() <= MAX_FAILURE_DIAGNOSTIC_BYTES);
-        assert!(diagnostic.ends_with("..."));
-        assert!(diagnostic.is_char_boundary(diagnostic.len()));
-    }
 
     #[test]
     fn persists_historic_names_with_a_stable_warning_kind() {
@@ -744,6 +764,11 @@ mod tests {
                 cancellation_requested: false,
                 terminal_at: None,
                 deletion_reason: None,
+                next_attempt_at: Utc::now().fixed_offset(),
+                lease_expires_at: None,
+                failure_kind: None,
+                retryable: false,
+                automatic_attempt_count: 0,
             }]])
             .append_exec_results(std::iter::repeat_n(
                 MockExecResult {
@@ -826,16 +851,39 @@ mod tests {
         assert_eq!(statements.last(), Some(&"ROLLBACK".to_owned()));
     }
 
+    fn processing_source(automatic_attempt_count: i32) -> package_sources::Model {
+        package_sources::Model {
+            id: 7,
+            source_id: "source-7".to_owned(),
+            file_name: "package.json".to_owned(),
+            file_contents: "{}".to_owned(),
+            inferred_type: "npm-package-json".to_owned(),
+            resolution_status: "processing".to_owned(),
+            resolution_error: None,
+            created_at: Utc::now().fixed_offset(),
+            attempt_generation: 1,
+            cancellation_requested: false,
+            terminal_at: None,
+            deletion_reason: None,
+            next_attempt_at: Utc::now().fixed_offset(),
+            lease_expires_at: Some(Utc::now().fixed_offset()),
+            failure_kind: None,
+            retryable: false,
+            automatic_attempt_count,
+        }
+    }
+
     #[tokio::test]
-    async fn failure_preserves_the_published_snapshot() {
+    async fn failure_preserves_the_published_snapshot_and_terminates_when_exhausted() {
         let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![processing_source(MAX_AUTOMATIC_ATTEMPTS)]])
             .append_exec_results([MockExecResult {
                 last_insert_id: 0,
                 rows_affected: 1,
             }])
             .into_connection();
 
-        record_elaboration_failure(&db, 7, 1, "registry request failed")
+        record_elaboration_failure(&db, 7, 1, FailureKind::DependencyUnavailable)
             .await
             .expect("failure is recorded");
 
@@ -845,31 +893,53 @@ mod tests {
             .flat_map(|entry| entry.statements().to_vec())
             .map(|statement| statement.sql)
             .collect::<Vec<_>>();
-        assert_eq!(statements.len(), 1);
-        assert!(statements[0].contains("package_sources"), "{statements:#?}");
-        assert!(statements[0].contains("attempt_generation"));
-        assert!(statements[0].contains("cancellation_requested"));
-        assert!(!statements[0].contains("DELETE"));
+        let update = statements
+            .iter()
+            .find(|sql| sql.starts_with("UPDATE"))
+            .expect("failure recording issues an update");
+        assert!(update.contains("attempt_generation"));
+        assert!(update.contains("cancellation_requested"));
+        assert!(update.contains("failure_kind"));
+        assert!(!statements.iter().any(|sql| sql.contains("DELETE")));
+    }
+
+    #[tokio::test]
+    async fn a_retryable_failure_under_budget_reschedules_to_pending() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![processing_source(1)]])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        record_elaboration_failure(&db, 7, 1, FailureKind::Internal)
+            .await
+            .expect("failure is recorded");
+
+        let statements = db
+            .into_transaction_log()
+            .into_iter()
+            .flat_map(|entry| entry.statements().to_vec())
+            .map(|statement| statement.sql)
+            .collect::<Vec<_>>();
+        let update = statements
+            .iter()
+            .find(|sql| sql.starts_with("UPDATE"))
+            .expect("failure recording issues an update");
+        assert!(update.contains("next_attempt_at"), "{update}");
     }
 
     #[tokio::test]
     async fn stale_attempt_cannot_overwrite_cancellation_with_failure() {
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_exec_results([MockExecResult {
-                last_insert_id: 0,
-                rows_affected: 0,
-            }])
+            .append_query_results([Vec::<package_sources::Model>::new()])
             .into_connection();
 
-        let error = record_elaboration_failure(&db, 7, 3, "registry request failed")
+        let error = record_elaboration_failure(&db, 7, 3, FailureKind::Internal)
             .await
             .expect_err("a cancelled, deleted, or superseded attempt must not record failure");
 
         assert!(matches!(error, ElaborationStorageError::InactiveAttempt));
-        let transaction_log = db.into_transaction_log();
-        let statement = &transaction_log[0].statements()[0].sql;
-        assert!(statement.contains("attempt_generation"));
-        assert!(statement.contains("cancellation_requested"));
-        assert!(statement.contains("resolution_status"));
     }
 }

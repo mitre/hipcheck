@@ -7,7 +7,9 @@ use nv_common::{
         elaboration::{
             ElaborationProgress, ElaborationProgressReporter, ElaborationProgressSnapshot,
             NpmRegistryClient, elaborate, elaborate_with_progress,
-            lifecycle::{AttemptKind, attempt_is_active, begin_attempt},
+            lifecycle::{
+                AttemptKind, FailureKind, attempt_is_active, begin_attempt, lease_duration,
+            },
             storage::{
                 persist_completed_elaboration, persisted_elaboration_warnings,
                 record_elaboration_failure,
@@ -73,20 +75,25 @@ async fn resolve(
         .await
         .context("failed to connect to database")?;
     let source = super::source_by_id(&db, source_id).await?;
-    let attempt_generation = begin_attempt(&db, source.id, AttemptKind::Manual)
-        .await
-        .context("failed to claim package-source attempt")?
-        .context("package source is cancelled, deleting, or already being processed")?;
+    let limits = config.package_elaboration_limits();
+    let attempt_generation = begin_attempt(
+        &db,
+        source.id,
+        AttemptKind::Manual,
+        lease_duration(limits.total_run_timeout),
+    )
+    .await
+    .context("failed to claim package-source attempt")?
+    .context("package source is cancelled, deleting, or already being processed")?;
     let source_document = NpmPackageJson::parse_package_json(source.file_contents.as_bytes())
         .context("stored source is not a valid npm package.json")?;
     let client = NpmRegistryClient::new(
         config.npm_registry_url.clone(),
         config.package_elaboration_max_packument_bytes,
-        config.package_elaboration_limits().request_timeout,
+        limits.request_timeout,
     )
     .context("invalid NPM registry configuration")?;
     let provider = Arc::new(client);
-    let limits = config.package_elaboration_limits();
     let result = match &progress {
         Some(progress) => {
             let elaboration =
@@ -131,9 +138,14 @@ async fn resolve(
             })
         }
         Err(error) => {
-            record_elaboration_failure(&db, source.id, attempt_generation, &error.to_string())
-                .await
-                .context("failed to record elaboration failure")?;
+            record_elaboration_failure(
+                &db,
+                source.id,
+                attempt_generation,
+                FailureKind::from(&error),
+            )
+            .await
+            .context("failed to record elaboration failure")?;
             Err(error.into())
         }
     }

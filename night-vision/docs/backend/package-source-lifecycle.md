@@ -2,9 +2,10 @@
 
 This document defines the lifecycle contract for a submitted package source.
 Cancellation, deletion, operator-triggered retention cleanup, deletion
-recovery, and generation-guarded publication are implemented. Durable queueing,
-automatic retry, and a public retry endpoint remain follow-on work. The current
-API surface is described in [REST API Usage](./rest-api-usage.md).
+recovery, generation-guarded publication, durable queueing, leased-worker
+crash recovery, and bounded automatic retry are implemented. A public retry
+endpoint remains follow-on work. The current API surface is described in
+[REST API Usage](./rest-api-usage.md).
 
 Package-source content is untrusted user data. The MVP currently has no user or
 tenant identity model, so every caller that can reach these endpoints has the
@@ -63,7 +64,6 @@ runs. After deletion, read operations treat the resource as unknown. A service
 restart must recover an in-progress deletion and complete it; it must not
 restore a deleted resource to a visible state.
 
-The current API maps stored `pending` to the `processing` compatibility status.
 `completed-with-warnings` is an API view of a stored `completed` source with
 persisted warnings; both use the same terminal retention rule.
 
@@ -71,8 +71,16 @@ persisted warnings; both use the same terminal retention rule.
 
 `POST /package-sources` must persist the resource and its initial `pending`
 state before returning `202 Accepted`. It returns the resource ID; it does not
-promise that processing started. A worker moves the resource to `processing`
-with an attempt number. Both transitions must be durable.
+promise that processing started, and submission is never rejected for lack of
+active-resolution capacity. A background dispatcher claims durably `pending`
+sources whose `nextAttemptAt` is due, in generation order, and moves each to
+`processing` with a fenced attempt generation. Both transitions must be
+durable.
+
+Each `processing` attempt holds a lease. If a worker process crashes or is
+killed mid-attempt, the lease expires and a periodic recovery sweep reclaims
+the source as an `internal` failure, so it re-enters the same automatic-retry
+path described below rather than staying stuck in `processing` forever.
 
 A worker may publish only one complete snapshot in a transaction. A partial
 result, warning list, or error must never replace the last published snapshot.
@@ -81,25 +89,27 @@ to be incomplete; it is not a substitute for `failed`.
 
 ## Failure and retry
 
-The current implementation records the attempt generation, terminal timestamp,
-and a bounded caller-safe diagnostic when processing fails. It does not store
-or return raw registry, parser, plugin, or subprocess error text.
-
-The planned structured failure model will also record a stable failure `kind`,
-whether it is `retryable`, and attempt start and finish timestamps. Failure
-kinds will use controlled vocabulary values, initially:
+The implementation records the attempt generation, a terminal timestamp, and a
+structured failure when processing fails: a stable failure `kind` and whether
+it is `retryable`. The diagnostic returned to callers is a fixed string per
+`kind`, not derived from the underlying error; it never stores or returns raw
+registry, parser, plugin, or subprocess error text. Failure kinds use a
+controlled vocabulary:
 
 - `validation` for input that failed validation after acceptance;
 - `dependency-unavailable` for a transient dependency or capacity failure;
 - `resolution` for a non-transient resolution failure; and
 - `internal` for an unexpected service failure.
 
-The future automatic retry service may retry only `dependency-unavailable` and
+The automatic retry mechanism retries only `dependency-unavailable` and
 `internal` failures. It records the failed attempt, returns the resource to
 `pending` during bounded exponential backoff with jitter, and makes at most
-three attempts. Exhausting that limit leaves the resource `failed` with
-`retryable: true`; it does not loop indefinitely. Validation and resolution
-failures are not retried automatically.
+three automatic attempts. Exhausting that limit leaves the resource `failed`
+with `retryable: true`; it does not loop indefinitely. Validation and
+resolution failures are not retried automatically. A manually triggered
+attempt (currently only via `cargo nvdb package-source resolve`) resets the
+automatic-attempt budget, so a failure of that attempt is still eligible for
+up to three further automatic retries.
 
 The future `POST /package-sources/{id}/retry` endpoint is idempotent for a
 given failed attempt: concurrent or repeated requests schedule at most one
@@ -162,10 +172,13 @@ published reachable-package snapshot
 only for `completed` and `completed-with-warnings`. The latter includes a
 bounded list of fixed warnings and `warningsTruncated`.
 
-For `failed`, the current response includes the attempt number, a safe
-`diagnostic`, and `finishedAt`; it may include the prior published snapshot if
-one exists. Structured failure kinds and retryability remain follow-on work. It
-does not expose worker logs, raw error text, stack traces, retry schedules, or
+For `failed`, the response includes the attempt number, a safe `diagnostic`,
+a structured failure `kind`, whether the failure `retryable`, and
+`finishedAt`; it may include the prior published snapshot if one exists.
+`retryable` reflects whether the automatic-retry service would still retry a
+failure of that kind — it does not by itself mean a retry is scheduled, since
+the automatic-attempt budget may already be exhausted. The response does not
+expose worker logs, raw error text, stack traces, retry schedules, or
 implementation-specific dependency details.
 `pending`, `processing`, and `cancelled` responses do not include partial
 results. No state includes progress percentages until their meaning and
@@ -177,8 +190,8 @@ The following work should be tracked as separate implementation issues:
 
 1. Add user or tenant ownership and authorize every lifecycle operation before
    multi-user or external deployment.
-2. Implement durable queueing, leased workers, bounded automatic retry, and a
-   public retry endpoint with structured failure metadata.
+2. Implement a public `POST /package-sources/{id}/retry` endpoint with
+   structured failure metadata in its response.
 3. Add an automatic retention scheduler if product requirements move cleanup
    ownership from operators to the service.
 4. Define backup/restore enforcement and metrics for state age, retry

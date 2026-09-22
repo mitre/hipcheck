@@ -3,11 +3,9 @@
 pub mod ctx;
 
 mod cve_worker;
+mod package_source_worker;
 
-use crate::{
-    api::ctx::ApiCtx,
-    error::{ExternalOperation, FatalError},
-};
+use crate::{api::ctx::ApiCtx, error::FatalError};
 use camino::{Utf8Path, Utf8PathBuf};
 // We'd prefer to use `jiff` over `chrono`, but `dropshot` depends on
 // an old version of `schemars` that doesn't support `jiff`. When we
@@ -49,17 +47,12 @@ use nv_common::{
         },
         elaboration::{
             ElaborationLimits, NpmRegistryClient, PackageVersion, PackumentProvider as _,
-            elaborate,
             lifecycle::{
-                AttemptKind, CancellationOutcome, DeletionOutcome, attempt_is_active,
-                begin_attempt, delete_by_public_id, request_cancellation,
+                CancellationOutcome, DeletionOutcome, FailureKind, delete_by_public_id,
+                request_cancellation,
             },
             normalize_repository_url,
-            storage::{
-                ElaborationStorageError, bounded_diagnostic, persist_assessment_target,
-                persist_completed_elaboration, persisted_package_versions,
-                record_elaboration_failure,
-            },
+            storage::{persist_assessment_target, persisted_package_versions},
         },
         package_json::NpmPackageJson,
         purl::NpmPackagePurl,
@@ -71,9 +64,9 @@ use nv_server_api::{
     AssessmentFinding, AssessmentPathParams, AssessmentStatus, CveIngestHealth,
     CveListSyncRunHealth, Health, HealthDiagnostics, NvServerApi, PackageSource,
     PackageSourceEcosystem, PackageSourceExposure, PackageSourceExposureKevContext,
-    PackageSourceExposures, PackageSourceExposuresStatus, PackageSourceOperationResponse,
-    PackageSourceOperationStatus, PackageSourcePathParams, PackageSourceStatus,
-    PackageSourceStatusCancelled, PackageSourceStatusCompleted,
+    PackageSourceExposures, PackageSourceExposuresStatus, PackageSourceFailureKind,
+    PackageSourceOperationResponse, PackageSourceOperationStatus, PackageSourcePathParams,
+    PackageSourceStatus, PackageSourceStatusCancelled, PackageSourceStatusCompleted,
     PackageSourceStatusCompletedWithWarnings, PackageSourceStatusFailed,
     PackageSourceStatusProcessing, PackageSourceWarning, PostAssessmentBody,
     PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
@@ -93,12 +86,9 @@ use sea_orm::{
 };
 use secrecy::{ExposeSecret as _, SecretString};
 use slog::Logger;
-use std::{collections::HashSet, fs::File, time::Duration};
+use std::{collections::HashSet, fs::File};
 use subtle::ConstantTimeEq as _;
 use uuid::Uuid;
-
-const TERMINAL_PERSISTENCE_ATTEMPTS: usize = 3;
-const TERMINAL_PERSISTENCE_RETRY_DELAY: Duration = Duration::from_millis(100);
 
 /// The REST API interface.
 ///
@@ -135,6 +125,7 @@ impl RestApi {
         );
         let _kev_worker =
             nv_common::kev::spawn_kev_sync_worker(config, ctx.db().clone(), log.clone());
+        let _package_source_worker = package_source_worker::spawn(&ctx, log.clone());
 
         ServerBuilder::new(api, ctx, log)
             .config(config.dropshot_config()?)
@@ -255,43 +246,14 @@ impl NvServerApi for RestApi {
         NpmPackageJson::parse_package_json(contents.as_bytes())
             .map_err(|_| invalid_package_source_contents())?;
 
-        let admission = context.try_admit_package_elaboration().ok_or_else(|| {
-            HttpError::for_unavail(
-                Some("PackageElaborationCapacity".to_owned()),
-                "package-source elaboration capacity is exhausted".to_owned(),
-            )
-        })?;
+        // A successful submission is durable even when every active-resolution
+        // slot is occupied: the source is persisted `pending` unconditionally,
+        // and the background worker claims it once capacity allows. This does
+        // not promise that processing has started.
         let stored = store_validated_package_source(db, file_name, contents).await?;
-        let worker_db = db.clone();
-        let registry_url = context.npm_registry_url().clone();
-        let limits = context.package_elaboration_limits();
-        let max_packument_bytes = context.package_elaboration_max_packument_bytes();
-        let log = ctx
-            .log
-            .new(slog::o!("package_source_id" => stored.id.to_string()));
-        tokio::spawn(async move {
-            let _admission = admission;
-            if let Err(error) = run_package_source_elaboration(
-                worker_db,
-                stored.database_id,
-                stored.contents,
-                registry_url,
-                limits,
-                max_packument_bytes,
-            )
-            .await
-            {
-                slog::error!(
-                    log,
-                    "package-source elaboration could not record its terminal state";
-                    "failure_kind" => error,
-                );
-            }
-        });
-        let uuid = stored.id;
-        let resp = HttpResponseAccepted(PostPackageSourceResponse { id: uuid });
-
-        Ok(resp)
+        Ok(HttpResponseAccepted(PostPackageSourceResponse {
+            id: stored.id,
+        }))
     }
 
     async fn get_package_source(
@@ -381,7 +343,7 @@ impl NvServerApi for RestApi {
             }
             PackageSourceStatus::Failed(_) => Vec::new(),
             PackageSourceStatus::Cancelled(_) => Vec::new(),
-            PackageSourceStatus::Processing(_) => Vec::new(),
+            PackageSourceStatus::Pending(_) | PackageSourceStatus::Processing(_) => Vec::new(),
         };
 
         Ok(HttpResponseOk(PackageSourceExposures {
@@ -1051,141 +1013,12 @@ async fn store_validated_package_source(
     .insert(db)
     .await
     .map_err(|_| internal_server_error())?;
-    Ok(StoredPackageSource {
-        id,
-        database_id: source.id,
-        contents: source.file_contents,
-    })
+    let _ = source;
+    Ok(StoredPackageSource { id })
 }
 
 struct StoredPackageSource {
     id: Uuid,
-    database_id: i32,
-    contents: String,
-}
-
-async fn run_package_source_elaboration(
-    db: DatabaseConnection,
-    source_id: i32,
-    contents: String,
-    registry_url: url::Url,
-    limits: nv_common::npm::elaboration::ElaborationLimits,
-    max_packument_bytes: usize,
-) -> Result<(), String> {
-    let Some(attempt_generation) = begin_attempt(&db, source_id, AttemptKind::Initial)
-        .await
-        .map_err(|_| {
-            ExternalOperation::PackageSourcePersistence
-                .diagnostic()
-                .to_owned()
-        })?
-    else {
-        return Ok(());
-    };
-    let result = NpmPackageJson::parse_package_json(contents.as_bytes())
-        .map_err(|_| {
-            ExternalOperation::PackageSourceElaboration
-                .diagnostic()
-                .to_owned()
-        })
-        .and_then(|source| {
-            NpmRegistryClient::new(registry_url, max_packument_bytes, limits.request_timeout)
-                .map(|client| (source, client))
-                .map_err(|_| {
-                    ExternalOperation::PackageSourceElaboration
-                        .diagnostic()
-                        .to_owned()
-                })
-        });
-    let result = match result {
-        Ok((source, client)) => {
-            let elaboration = elaborate(&source, std::sync::Arc::new(client), limits);
-            tokio::pin!(elaboration);
-            tokio::select! {
-                result = &mut elaboration => result.map_err(|_| {
-                    ExternalOperation::PackageSourceElaboration.diagnostic().to_owned()
-                }),
-                () = wait_for_inactive_attempt(&db, source_id, attempt_generation) => {
-                    return Ok(());
-                }
-            }
-        }
-        Err(error) => Err(error),
-    };
-    finalize_package_source_elaboration(&db, source_id, attempt_generation, result).await
-}
-
-async fn wait_for_inactive_attempt(
-    db: &DatabaseConnection,
-    source_id: i32,
-    attempt_generation: i32,
-) {
-    loop {
-        tokio::time::sleep(Duration::from_millis(250)).await;
-        match attempt_is_active(db, source_id, attempt_generation).await {
-            Ok(true) | Err(_) => {}
-            Ok(false) => return,
-        }
-    }
-}
-
-async fn finalize_package_source_elaboration(
-    db: &DatabaseConnection,
-    source_id: i32,
-    attempt_generation: i32,
-    result: Result<nv_common::npm::elaboration::ElaborationResult, String>,
-) -> Result<(), String> {
-    match result {
-        Ok(result) => {
-            match persist_completed_elaboration(db, source_id, attempt_generation, &result).await {
-                Ok(()) => Ok(()),
-                Err(ElaborationStorageError::InactiveAttempt) => Ok(()),
-                Err(_) => {
-                    let diagnostic = ExternalOperation::PackageSourcePersistence.diagnostic();
-                    record_terminal_failure_with_retry(
-                        db,
-                        source_id,
-                        attempt_generation,
-                        diagnostic,
-                    )
-                    .await
-                    .map_err(|_| diagnostic.to_owned())
-                }
-            }
-        }
-        Err(_) => {
-            record_terminal_failure_with_retry(
-                db,
-                source_id,
-                attempt_generation,
-                ExternalOperation::PackageSourceElaboration.diagnostic(),
-            )
-            .await
-        }
-    }
-}
-
-async fn record_terminal_failure_with_retry(
-    db: &DatabaseConnection,
-    source_id: i32,
-    attempt_generation: i32,
-    diagnostic: &str,
-) -> Result<(), String> {
-    let mut last_error = None;
-    for attempt in 1..=TERMINAL_PERSISTENCE_ATTEMPTS {
-        match record_elaboration_failure(db, source_id, attempt_generation, diagnostic).await {
-            Ok(()) => return Ok(()),
-            Err(ElaborationStorageError::InactiveAttempt) => return Ok(()),
-            Err(_) => last_error = Some(()),
-        }
-        if attempt < TERMINAL_PERSISTENCE_ATTEMPTS {
-            tokio::time::sleep(TERMINAL_PERSISTENCE_RETRY_DELAY).await;
-        }
-    }
-    last_error.expect("at least one terminal persistence attempt was made");
-    Err(ExternalOperation::PackageSourcePersistence
-        .diagnostic()
-        .to_owned())
 }
 
 async fn lookup_package_source(
@@ -1208,8 +1041,17 @@ async fn lookup_package_source(
         .terminal_at
         .unwrap_or(source.created_at)
         .with_timezone(&Utc);
-    let failure_diagnostic = match source.resolution_status.as_str() {
-        "pending" | "processing" => {
+    let failure = match source.resolution_status.as_str() {
+        "pending" => {
+            return Ok(Some(PackageSourceStatus::Pending(
+                PackageSourceStatusProcessing {
+                    id,
+                    created_at,
+                    attempt: source.attempt_generation,
+                },
+            )));
+        }
+        "processing" => {
             return Ok(Some(PackageSourceStatus::Processing(
                 PackageSourceStatusProcessing {
                     id,
@@ -1233,12 +1075,15 @@ async fn lookup_package_source(
             )));
         }
         "deleting" => return Ok(None),
-        "failed" => Some(bounded_diagnostic(
-            source
-                .resolution_error
-                .as_deref()
-                .unwrap_or("Elaboration failed."),
-        )),
+        "failed" => Some(
+            FailureKind::from_stored(
+                source
+                    .failure_kind
+                    .as_deref()
+                    .ok_or_else(internal_server_error)?,
+            )
+            .ok_or_else(internal_server_error)?,
+        ),
         "completed" => None,
         status => {
             return Err(HttpError::for_internal_error(format!(
@@ -1272,14 +1117,23 @@ async fn lookup_package_source(
         })
         .collect();
 
-    if let Some(diagnostic) = failure_diagnostic {
+    if let Some(kind) = failure {
         return Ok(Some(PackageSourceStatus::Failed(
             PackageSourceStatusFailed {
                 id,
                 created_at,
                 finished_at: terminal_at,
                 attempt: source.attempt_generation,
-                diagnostic,
+                diagnostic: kind.diagnostic().to_owned(),
+                kind: match kind {
+                    FailureKind::Validation => PackageSourceFailureKind::Validation,
+                    FailureKind::DependencyUnavailable => {
+                        PackageSourceFailureKind::DependencyUnavailable
+                    }
+                    FailureKind::Resolution => PackageSourceFailureKind::Resolution,
+                    FailureKind::Internal => PackageSourceFailureKind::Internal,
+                },
+                retryable: source.retryable && kind.retryable(),
                 previous_versioned_packages: versioned_packages,
             },
         )));
@@ -1345,9 +1199,11 @@ async fn package_source_exposures_status(
     status: &PackageSourceStatus,
 ) -> Result<PackageSourceExposuresStatus, HttpError> {
     match status {
-        PackageSourceStatus::Processing(_) => Err(package_source_exposures_unavailable(
-            "package source exposures are not available until processing completes",
-        )),
+        PackageSourceStatus::Pending(_) | PackageSourceStatus::Processing(_) => {
+            Err(package_source_exposures_unavailable(
+                "package source exposures are not available until processing completes",
+            ))
+        }
         PackageSourceStatus::Cancelled(_) => Err(package_source_exposures_unavailable(
             "package source exposures are not available for cancelled package sources",
         )),
@@ -2260,10 +2116,11 @@ mod tests {
             cisa_kev_entries, cve_list_records, package_source_edges, package_source_versions,
             package_source_warnings, package_sources, package_versions,
         },
-        npm::elaboration::storage::MAX_FAILURE_DIAGNOSTIC_BYTES,
+        npm::elaboration::lifecycle::FailureKind,
     };
-    use sea_orm::{DbBackend, DbErr, MockDatabase, MockExecResult, Value};
+    use sea_orm::{DbBackend, MockDatabase, MockExecResult, Value};
     use slog::{Logger, o};
+    use std::time::Duration;
 
     #[tokio::test]
     async fn startup_reconciliation_runs_before_the_server_accepts_work() {
@@ -3713,6 +3570,11 @@ mod tests {
             terminal_at: matches!(resolution_status, "completed" | "failed" | "cancelled")
                 .then(|| Utc::now().fixed_offset()),
             deletion_reason: None,
+            next_attempt_at: Utc::now().fixed_offset(),
+            lease_expires_at: None,
+            failure_kind: None,
+            retryable: false,
+            automatic_attempt_count: 0,
         }
     }
 
@@ -4859,10 +4721,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn lookup_returns_bounded_failed_diagnostic() {
+    async fn lookup_returns_a_safe_fixed_diagnostic_never_the_raw_error() {
         let id = Uuid::now_v7();
+        let mut row = source(id, "failed", Some("x".repeat(2048)));
+        row.failure_kind = Some("dependency-unavailable".to_owned());
+        row.retryable = true;
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([vec![source(id, "failed", Some("x".repeat(2048)))]])
+            .append_query_results([vec![row]])
             .append_query_results([Vec::<package_source_versions::Model>::new()])
             .append_query_results([Vec::<package_versions::Model>::new()])
             .append_query_results([Vec::<package_source_edges::Model>::new()])
@@ -4873,9 +4738,28 @@ mod tests {
         let PackageSourceStatus::Failed(failed) = status else {
             panic!("expected failed package source status");
         };
-        assert!(failed.diagnostic.len() <= MAX_FAILURE_DIAGNOSTIC_BYTES);
-        assert!(failed.diagnostic.ends_with("..."));
+        assert_eq!(
+            failed.diagnostic,
+            FailureKind::DependencyUnavailable.diagnostic()
+        );
+        assert!(!failed.diagnostic.contains('x'), "raw error text leaked");
+        assert_eq!(failed.kind, PackageSourceFailureKind::DependencyUnavailable);
+        assert!(failed.retryable);
         assert!(failed.previous_versioned_packages.is_empty());
+    }
+
+    #[tokio::test]
+    async fn lookup_fails_closed_on_an_unrecognized_failure_kind() {
+        let id = Uuid::now_v7();
+        let mut row = source(id, "failed", None);
+        row.failure_kind = Some("not-a-real-kind".to_owned());
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![row]])
+            .into_connection();
+
+        lookup_package_source(&db, id)
+            .await
+            .expect_err("an unrecognized stored failure kind must not be published");
     }
 
     #[tokio::test]
@@ -4897,12 +4781,10 @@ mod tests {
     #[tokio::test]
     async fn lookup_keeps_the_prior_snapshot_visible_after_a_failure() {
         let id = Uuid::now_v7();
+        let mut row = source(id, "failed", Some("registry request failed".to_owned()));
+        row.failure_kind = Some("dependency-unavailable".to_owned());
         let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([vec![source(
-                id,
-                "failed",
-                Some("registry request failed".to_owned()),
-            )]])
+            .append_query_results([vec![row]])
             .append_query_results([vec![package_source_versions::Model {
                 id: 1,
                 source_id: 1,
@@ -4932,7 +4814,10 @@ mod tests {
         let PackageSourceStatus::Failed(failed) = status else {
             panic!("expected failed package source status");
         };
-        assert_eq!(failed.diagnostic, "registry request failed");
+        assert_eq!(
+            failed.diagnostic,
+            FailureKind::DependencyUnavailable.diagnostic()
+        );
         assert_eq!(
             failed.previous_versioned_packages[0].derivations,
             vec![vec!["<root>".to_owned(), "pkg:npm/root@1.0.0".to_owned()]]
@@ -4996,108 +4881,5 @@ mod tests {
                 "pkg:npm/%40scope/root@1.0.0".to_owned(),
             ]]
         );
-    }
-
-    #[tokio::test]
-    async fn background_completion_publishes_a_snapshot() {
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([vec![source(Uuid::now_v7(), "processing", None)]])
-            .append_exec_results(std::iter::repeat_n(
-                MockExecResult {
-                    last_insert_id: 0,
-                    rows_affected: 1,
-                },
-                4,
-            ))
-            .into_connection();
-
-        finalize_package_source_elaboration(
-            &db,
-            1,
-            1,
-            Ok(nv_common::npm::elaboration::ElaborationResult {
-                packages: Vec::new(),
-                edges: Vec::new(),
-                warnings: Vec::new(),
-            }),
-        )
-        .await
-        .expect("successful elaboration publishes its terminal state");
-
-        let statements = db
-            .into_transaction_log()
-            .into_iter()
-            .flat_map(|entry| entry.statements().to_vec())
-            .map(|statement| statement.sql)
-            .collect::<Vec<_>>();
-        assert!(statements.iter().any(|sql| sql.contains("package_sources")));
-        assert_eq!(statements.first(), Some(&"BEGIN".to_owned()));
-        assert_eq!(statements.last(), Some(&"COMMIT".to_owned()));
-    }
-
-    #[tokio::test]
-    async fn background_failures_record_a_stable_redacted_diagnostic() {
-        for unsafe_error in [
-            "failed to retrieve packument for root: registry request failed",
-            "password=correct-horse-battery-staple",
-        ] {
-            let db = MockDatabase::new(DbBackend::Postgres)
-                .append_exec_results([MockExecResult {
-                    last_insert_id: 0,
-                    rows_affected: 1,
-                }])
-                .into_connection();
-
-            finalize_package_source_elaboration(&db, 1, 1, Err(unsafe_error.to_owned()))
-                .await
-                .expect("failed elaboration records its terminal state");
-
-            let statements = db
-                .into_transaction_log()
-                .into_iter()
-                .flat_map(|entry| entry.statements().to_vec())
-                .collect::<Vec<_>>();
-            assert_eq!(statements.len(), 1);
-            assert!(statements[0].sql.contains("package_sources"));
-            assert!(!statements[0].sql.contains("DELETE"));
-            let values = statements[0]
-                .values
-                .as_ref()
-                .expect("failure update must have bound values");
-            assert!(values.iter().any(|value| matches!(
-                value,
-                Value::String(Some(message))
-                    if message == ExternalOperation::PackageSourceElaboration.diagnostic()
-            )));
-            assert!(!values.iter().any(|value| matches!(
-                value,
-                Value::String(Some(message)) if message == unsafe_error
-            )));
-        }
-    }
-
-    #[tokio::test]
-    async fn background_failure_reports_exhausted_terminal_persistence_retries() {
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_exec_errors(std::iter::repeat_n(
-                DbErr::Custom("database unavailable".to_owned()),
-                TERMINAL_PERSISTENCE_ATTEMPTS,
-            ))
-            .into_connection();
-
-        let error = finalize_package_source_elaboration(
-            &db,
-            1,
-            1,
-            Err("password=correct-horse-battery-staple".to_owned()),
-        )
-        .await
-        .expect_err("unrecorded terminal failure is returned to the task");
-
-        assert_eq!(
-            error,
-            ExternalOperation::PackageSourcePersistence.diagnostic()
-        );
-        assert!(!error.contains("correct-horse-battery-staple"));
     }
 }

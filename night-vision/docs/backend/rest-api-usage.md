@@ -35,9 +35,8 @@ Current examples include:
 - `versionedPackages`
 
 Package-source status responses are tagged by a `status` field. The current
-schemas include `processing`, `completed`, `completed-with-warnings`, and
-`failed`, and `cancelled`. Stored `pending` sources use the API's `processing`
-compatibility response. Their durable semantics are defined in the
+schemas include `pending`, `processing`, `completed`, `completed-with-warnings`,
+`failed`, and `cancelled`. Their durable semantics are defined in the
 [package-source lifecycle](./package-source-lifecycle.md). The guide below
 describes only endpoints implemented today.
 
@@ -139,12 +138,14 @@ Content-Type: application/json
 }
 ```
 
-The `202 Accepted` status means the server accepted work that may not be
-complete yet. Use the returned `id` with `GET /package-sources/{id}` to check
-the package-source status. Cancellation, deletion, and operator-triggered
-retention are described in the
-[package-source lifecycle](./package-source-lifecycle.md). Durable queueing and
-automatic retry are not yet implemented.
+The `202 Accepted` status means the server persisted the source and accepted
+it for processing; it does not promise that processing has started, and
+submission is never rejected for lack of active-resolution capacity. A
+background dispatcher claims durably `pending` sources and retries eligible
+failures automatically. Use the returned `id` with `GET /package-sources/{id}`
+to check the package-source status. Cancellation, deletion, retry, and
+operator-triggered retention are described in the
+[package-source lifecycle](./package-source-lifecycle.md).
 
 ### `GET /package-sources/{id}`
 
@@ -154,6 +155,22 @@ Request:
 
 ```sh
 curl http://127.0.0.1:8080/package-sources/00000000-0000-0000-0000-000000000001
+```
+
+Pending response (durably accepted, awaiting a worker):
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+```
+
+```json
+{
+  "status": "pending",
+  "id": "00000000-0000-0000-0000-000000000001",
+  "createdAt": "2000-01-01T00:00:00Z",
+  "attempt": 0
+}
 ```
 
 Processing response:
@@ -171,6 +188,34 @@ Content-Type: application/json
   "attempt": 1
 }
 ```
+
+Failed response:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+```
+
+```json
+{
+  "status": "failed",
+  "id": "00000000-0000-0000-0000-000000000004",
+  "createdAt": "2000-01-01T00:00:00Z",
+  "finishedAt": "2000-01-01T00:00:30Z",
+  "attempt": 3,
+  "diagnostic": "A dependency needed for package-source processing is unavailable.",
+  "kind": "dependency-unavailable",
+  "retryable": true
+}
+```
+
+`diagnostic` is always one of a small set of fixed, caller-safe strings keyed
+by `kind`; it never contains raw registry, parser, or subprocess error text.
+`retryable` reflects whether the automatic-retry service retries failures of
+that `kind` at all — it does not mean a retry is currently scheduled, since
+the automatic-attempt budget may already be exhausted. See
+[Failure and retry](./package-source-lifecycle.md#failure-and-retry) for the
+full failure-kind vocabulary and retry rules.
 
 Completed response:
 
@@ -502,9 +547,10 @@ The intended package-source workflow is asynchronous:
    `completed-with-warnings` response also includes up to 100 structured
    warnings, each with a safe explanatory `message`, and sets
    `warningsTruncated` when more were recorded. A `failed`
-   response includes `finishedAt`, the attempt number, a diagnostic capped at
-   1024 UTF-8 bytes, and retains the
-   last successful graph in `previousVersionedPackages`, when one exists.
+   response includes `finishedAt`, the attempt number, a fixed safe
+   `diagnostic` string keyed by a structured `kind`, whether that `kind` is
+   `retryable`, and retains the last successful graph in
+   `previousVersionedPackages`, when one exists.
 5. Read `GET /package-sources/{id}/exposures` to retrieve the KEV-linked
    exposure view for that resolved source. A completed source may return
    either exposure entries or an empty `exposures` array; a processing source
@@ -515,11 +561,13 @@ At the API boundary, package sources currently support the `npm` ecosystem and
 the `package.json` style of input described in
 [Resolving Packages](./resolving-packages.md).
 
-The server persists the submitted source before returning `202 Accepted` and
-runs elaboration in a background task. `GET /package-sources/{id}` reports the
-persisted lifecycle state and stored result snapshot.
+The server persists the submitted source before returning `202 Accepted`. A
+durable background dispatcher claims `pending` sources and runs elaboration,
+retrying eligible failures automatically with bounded backoff.
+`GET /package-sources/{id}` reports the persisted lifecycle state and stored
+result snapshot.
 
-For the durable lifecycle planned for retries, cancellation, deletion, and
+For the durable lifecycle covering retries, cancellation, deletion, and
 retention, see [Package-Source Lifecycle](./package-source-lifecycle.md).
 
 ## Error Responses

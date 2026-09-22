@@ -20,6 +20,11 @@ pub struct Model {
     pub cancellation_requested: bool,
     pub terminal_at: Option<DateTimeWithTimeZone>,
     pub deletion_reason: Option<String>,
+    pub next_attempt_at: DateTimeWithTimeZone,
+    pub lease_expires_at: Option<DateTimeWithTimeZone>,
+    pub failure_kind: Option<String>,
+    pub retryable: bool,
+    pub automatic_attempt_count: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

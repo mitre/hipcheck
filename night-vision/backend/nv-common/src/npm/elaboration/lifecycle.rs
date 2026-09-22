@@ -1,8 +1,11 @@
 //! Durable package-source lifecycle transitions shared by the API and operator tools.
 
-use crate::db::entities::{
-    package_source_deletion_audits, package_source_edges, package_source_versions,
-    package_source_warnings, package_sources,
+use crate::{
+    db::entities::{
+        package_source_deletion_audits, package_source_edges, package_source_versions,
+        package_source_warnings, package_sources,
+    },
+    npm::elaboration::{ElaborationError, PackumentProviderError},
 };
 use chrono::{DateTime, Duration, Utc};
 use sea_orm::{
@@ -11,6 +14,7 @@ use sea_orm::{
     QueryOrder as _, QuerySelect as _, TransactionTrait as _,
     sea_query::{Expr, OnConflict},
 };
+use std::time::Duration as StdDuration;
 use thiserror::Error;
 
 pub const PACKAGE_SOURCE_RETENTION_DAYS: i64 = 30;
@@ -18,10 +22,109 @@ pub const DELETION_AUDIT_RETENTION_DAYS: i64 = 90;
 pub const DEFAULT_CLEANUP_BATCH_SIZE: u64 = 100;
 pub const MAX_CLEANUP_BATCH_SIZE: u64 = 1_000;
 
+/// Automatic processing is bounded independently of registry-request retries.
+pub const MAX_AUTOMATIC_ATTEMPTS: i32 = 3;
+
+/// How many due `pending` rows a single dispatch call inspects before giving up.
+const DISPATCH_CANDIDATE_BATCH: u64 = 8;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AttemptKind {
     Initial,
     Manual,
+}
+
+/// Controlled failure vocabulary. Raw external errors are never durable diagnostics.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FailureKind {
+    Validation,
+    DependencyUnavailable,
+    Resolution,
+    Internal,
+}
+
+impl FailureKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Validation => "validation",
+            Self::DependencyUnavailable => "dependency-unavailable",
+            Self::Resolution => "resolution",
+            Self::Internal => "internal",
+        }
+    }
+
+    pub fn from_stored(value: &str) -> Option<Self> {
+        match value {
+            "validation" => Some(Self::Validation),
+            "dependency-unavailable" => Some(Self::DependencyUnavailable),
+            "resolution" => Some(Self::Resolution),
+            "internal" => Some(Self::Internal),
+            _ => None,
+        }
+    }
+
+    /// A stable, caller-safe diagnostic. Never derived from request data,
+    /// dependency errors, or external-tool output.
+    pub fn diagnostic(self) -> &'static str {
+        match self {
+            Self::Validation => "Stored package-source contents are invalid.",
+            Self::DependencyUnavailable => {
+                "A dependency needed for package-source processing is unavailable."
+            }
+            Self::Resolution => {
+                "Package-source dependencies could not be resolved within the supported limits."
+            }
+            Self::Internal => "Package-source processing failed.",
+        }
+    }
+
+    pub fn retryable(self) -> bool {
+        matches!(self, Self::DependencyUnavailable | Self::Internal)
+    }
+
+    /// Whether a failure at `automatic_attempt_count` (the count covering the
+    /// attempt that just failed) should be rescheduled automatically.
+    pub fn retries_automatically(self, automatic_attempt_count: i32) -> bool {
+        self.retryable() && automatic_attempt_count < MAX_AUTOMATIC_ATTEMPTS
+    }
+}
+
+impl From<&ElaborationError> for FailureKind {
+    fn from(error: &ElaborationError) -> Self {
+        match error {
+            ElaborationError::InvalidLimits | ElaborationError::WorkerStopped => Self::Internal,
+            ElaborationError::Packument { source, .. } => match source {
+                PackumentProviderError::Connection
+                | PackumentProviderError::Request
+                | PackumentProviderError::Timeout
+                | PackumentProviderError::ResponseBody => Self::DependencyUnavailable,
+                PackumentProviderError::HttpStatus { status }
+                    if *status == 408 || *status == 429 || (500..600).contains(status) =>
+                {
+                    Self::DependencyUnavailable
+                }
+                _ => Self::Resolution,
+            },
+            // Repeating deterministic input/size/total-runtime failures cannot
+            // make the same immutable source fit the configured limits.
+            _ => Self::Resolution,
+        }
+    }
+}
+
+/// Exponential delay plus bounded jitter; callers persist the resulting deadline.
+pub fn retry_delay(automatic_attempt_count: i32) -> StdDuration {
+    let base_ms: u64 = if automatic_attempt_count <= 1 {
+        1_000
+    } else {
+        2_000
+    };
+    StdDuration::from_millis(base_ms.saturating_add(fastrand::u64(0..=base_ms)))
+}
+
+/// A lease includes publication grace beyond the resolver's total-runtime bound.
+pub fn lease_duration(total_run_timeout: StdDuration) -> StdDuration {
+    total_run_timeout.saturating_add(StdDuration::from_mins(1))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -74,10 +177,18 @@ pub enum PackageSourceLifecycleError {
     MissingDeletionReason,
 }
 
+/// Claims a source for processing, fenced by `attempt_generation`.
+///
+/// `lease` bounds how long the caller may hold the attempt before
+/// [`recover_expired_leases`] treats it as abandoned. A `Manual` attempt does
+/// not count against the automatic-retry budget: it resets
+/// `automatic_attempt_count` to zero, so a failure of this attempt is still
+/// eligible for up to [`MAX_AUTOMATIC_ATTEMPTS`] further automatic retries.
 pub async fn begin_attempt(
     db: &DatabaseConnection,
     source_id: i32,
     kind: AttemptKind,
+    lease: StdDuration,
 ) -> Result<Option<i32>, PackageSourceLifecycleError> {
     let transaction = db
         .begin()
@@ -104,6 +215,15 @@ pub async fn begin_attempt(
         .attempt_generation
         .checked_add(1)
         .ok_or(PackageSourceLifecycleError::AttemptGenerationOverflow)?;
+    let automatic_attempt_count = match kind {
+        AttemptKind::Initial => source.automatic_attempt_count.saturating_add(1),
+        AttemptKind::Manual => 0,
+    };
+    let lease_expires_at = Utc::now()
+        .checked_add_signed(
+            Duration::from_std(lease).expect("configured elaboration lease fits a chrono duration"),
+        )
+        .expect("lease deadline is representable");
     let updated = package_sources::Entity::update_many()
         .col_expr(
             package_sources::Column::ResolutionStatus,
@@ -125,6 +245,19 @@ pub async fn begin_attempt(
             package_sources::Column::ResolutionError,
             Expr::value(None::<String>),
         )
+        .col_expr(
+            package_sources::Column::FailureKind,
+            Expr::value(None::<String>),
+        )
+        .col_expr(package_sources::Column::Retryable, Expr::value(false))
+        .col_expr(
+            package_sources::Column::LeaseExpiresAt,
+            Expr::value(Some(lease_expires_at)),
+        )
+        .col_expr(
+            package_sources::Column::AutomaticAttemptCount,
+            Expr::value(automatic_attempt_count),
+        )
         .filter(package_sources::Column::Id.eq(source_id))
         .filter(package_sources::Column::AttemptGeneration.eq(source.attempt_generation))
         .filter(package_sources::Column::ResolutionStatus.eq(source.resolution_status))
@@ -140,6 +273,74 @@ pub async fn begin_attempt(
         .await
         .map_err(PackageSourceLifecycleError::Database)?;
     Ok(Some(generation))
+}
+
+/// Claims the earliest due `pending` source for automatic processing,
+/// skipping candidates another dispatcher already claimed.
+pub async fn claim_next_due(
+    db: &DatabaseConnection,
+    lease: StdDuration,
+) -> Result<Option<package_sources::Model>, PackageSourceLifecycleError> {
+    let candidates = package_sources::Entity::find()
+        .filter(package_sources::Column::ResolutionStatus.eq("pending"))
+        .filter(package_sources::Column::NextAttemptAt.lte(Utc::now()))
+        .order_by_asc(package_sources::Column::NextAttemptAt)
+        .order_by_asc(package_sources::Column::Id)
+        .limit(DISPATCH_CANDIDATE_BATCH)
+        .all(db)
+        .await
+        .map_err(PackageSourceLifecycleError::Database)?;
+    for candidate in candidates {
+        if begin_attempt(db, candidate.id, AttemptKind::Initial, lease)
+            .await?
+            .is_some()
+        {
+            return package_sources::Entity::find_by_id(candidate.id)
+                .one(db)
+                .await
+                .map_err(PackageSourceLifecycleError::Database);
+        }
+    }
+    Ok(None)
+}
+
+/// Recovers a bounded batch of processing attempts whose lease has expired.
+///
+/// Each is treated as an internal failure so the automatic-retry budget
+/// still applies. The database clock determines expiry even when server
+/// clocks disagree.
+///
+/// A single row that cannot be finalized is logged and skipped rather than
+/// aborting the whole batch: otherwise one bad row would starve recovery of
+/// every other expired source.
+pub async fn recover_expired_leases(
+    db: &DatabaseConnection,
+    limit: u64,
+    log: &slog::Logger,
+) -> Result<(), PackageSourceLifecycleError> {
+    let candidates = package_sources::Entity::find()
+        .filter(package_sources::Column::ResolutionStatus.eq("processing"))
+        .filter(package_sources::Column::LeaseExpiresAt.lte(Utc::now()))
+        .order_by_asc(package_sources::Column::LeaseExpiresAt)
+        .order_by_asc(package_sources::Column::Id)
+        .limit(limit)
+        .all(db)
+        .await
+        .map_err(PackageSourceLifecycleError::Database)?;
+    for candidate in candidates {
+        if let Err(error) = super::storage::record_elaboration_failure(
+            db,
+            candidate.id,
+            candidate.attempt_generation,
+            FailureKind::Internal,
+        )
+        .await
+        {
+            slog::warn!(log, "package-source lease recovery could not finalize an expired attempt; leaving it for a later pass";
+                "source_id" => candidate.id, "error" => %error);
+        }
+    }
+    Ok(())
 }
 
 pub async fn attempt_is_active(
@@ -422,6 +623,11 @@ mod tests {
             cancellation_requested: status == "cancelled" || status == "deleting",
             terminal_at: terminal_at.map(Into::into),
             deletion_reason: (status == "deleting").then(|| "caller".to_owned()),
+            next_attempt_at: Utc::now().fixed_offset(),
+            lease_expires_at: (status == "processing").then(|| Utc::now().fixed_offset()),
+            failure_kind: None,
+            retryable: false,
+            automatic_attempt_count: 0,
         }
     }
 
@@ -525,7 +731,9 @@ mod tests {
             .into_connection();
 
         assert_eq!(
-            begin_attempt(&db, 7, AttemptKind::Initial).await.unwrap(),
+            begin_attempt(&db, 7, AttemptKind::Initial, StdDuration::from_mins(1))
+                .await
+                .unwrap(),
             Some(2)
         );
         let statements = db
@@ -538,6 +746,10 @@ mod tests {
             statements
                 .iter()
                 .any(|sql| sql.contains("attempt_generation")),
+            "{statements:#?}"
+        );
+        assert!(
+            statements.iter().any(|sql| sql.contains("lease_expires")),
             "{statements:#?}"
         );
     }
@@ -553,8 +765,51 @@ mod tests {
             .into_connection();
 
         assert_eq!(
-            begin_attempt(&db, 7, AttemptKind::Initial).await.unwrap(),
+            begin_attempt(&db, 7, AttemptKind::Initial, StdDuration::from_mins(1))
+                .await
+                .unwrap(),
             None
+        );
+    }
+
+    #[tokio::test]
+    async fn manual_attempt_resets_the_automatic_attempt_budget() {
+        let mut exhausted = source("failed", Some(Utc::now()));
+        exhausted.automatic_attempt_count = MAX_AUTOMATIC_ATTEMPTS;
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![exhausted]])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        assert_eq!(
+            begin_attempt(&db, 7, AttemptKind::Manual, StdDuration::from_mins(1))
+                .await
+                .unwrap(),
+            Some(2)
+        );
+        let statements = db
+            .into_transaction_log()
+            .into_iter()
+            .flat_map(|entry| entry.statements().to_vec())
+            .collect::<Vec<_>>();
+        let update = statements
+            .iter()
+            .find(|statement| {
+                statement.sql.starts_with("UPDATE")
+                    && statement.sql.contains("automatic_attempt_count")
+            })
+            .expect("attempt claim resets automatic_attempt_count");
+        assert!(
+            update
+                .values
+                .as_ref()
+                .expect("update binds values")
+                .iter()
+                .any(|value| matches!(value, Value::Int(Some(0)))),
+            "{update:#?}"
         );
     }
 
@@ -798,5 +1053,129 @@ mod tests {
             cleanup_expired(&db, Utc::now(), MAX_CLEANUP_BATCH_SIZE + 1, false).await,
             Err(PackageSourceLifecycleError::InvalidBatchSize)
         ));
+    }
+
+    #[test]
+    fn only_transient_failures_receive_at_most_three_automatic_attempts() {
+        for kind in [FailureKind::Validation, FailureKind::Resolution] {
+            assert!(!kind.retryable());
+            assert!(!kind.retries_automatically(1));
+        }
+        for kind in [FailureKind::Internal, FailureKind::DependencyUnavailable] {
+            assert!(kind.retries_automatically(1));
+            assert!(kind.retries_automatically(2));
+            assert!(!kind.retries_automatically(MAX_AUTOMATIC_ATTEMPTS));
+            assert!(
+                kind.retryable(),
+                "exhaustion does not change failure eligibility"
+            );
+            assert!(kind.retries_automatically(0));
+        }
+    }
+
+    #[test]
+    fn classifies_registry_failures_without_retaining_external_text() {
+        use crate::npm::elaboration::{ElaborationError, PackumentProviderError};
+
+        for (status, expected) in [
+            (404, FailureKind::Resolution),
+            (403, FailureKind::Resolution),
+            (429, FailureKind::DependencyUnavailable),
+            (503, FailureKind::DependencyUnavailable),
+        ] {
+            let error = ElaborationError::Packument {
+                package: "untrusted-package-contents".into(),
+                source: PackumentProviderError::HttpStatus { status },
+            };
+            let kind = FailureKind::from(&error);
+            assert_eq!(kind, expected);
+            assert!(!kind.diagnostic().contains("untrusted"));
+            assert_eq!(FailureKind::from_stored(kind.as_str()), Some(kind));
+        }
+        assert_eq!(
+            FailureKind::from(&ElaborationError::TotalRunTimeout),
+            FailureKind::Resolution
+        );
+        assert_eq!(
+            FailureKind::from(&ElaborationError::WorkerStopped),
+            FailureKind::Internal
+        );
+    }
+
+    #[test]
+    fn retry_backoff_is_bounded() {
+        for count in [1, 2] {
+            let base = StdDuration::from_secs(u64::try_from(count).unwrap());
+            let delay = retry_delay(count);
+            assert!(delay >= base && delay <= base * 2);
+        }
+    }
+
+    #[tokio::test]
+    async fn claim_next_due_skips_a_candidate_another_dispatcher_already_claimed() {
+        let lost_race = source("pending", None);
+        let mut won_race = source("pending", None);
+        won_race.id = 8;
+        let claimed = source("processing", None);
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![lost_race, won_race]])
+            .append_query_results([vec![source("pending", None)]])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 0,
+            }])
+            .append_query_results([vec![source("pending", None)]])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .append_query_results([vec![claimed]])
+            .into_connection();
+
+        let claim = claim_next_due(&db, StdDuration::from_mins(1))
+            .await
+            .unwrap()
+            .expect("the second candidate is claimed after the first loses its race");
+        assert_eq!(claim.resolution_status, "processing");
+    }
+
+    #[tokio::test]
+    async fn claim_next_due_finds_nothing_when_no_source_is_due() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<package_sources::Model>::new()])
+            .into_connection();
+
+        assert!(
+            claim_next_due(&db, StdDuration::from_mins(1))
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn recovery_skips_a_row_it_cannot_finalize_and_still_recovers_others() {
+        let mut unfinalizable = source("processing", None);
+        unfinalizable.id = 1;
+        let mut recoverable = source("processing", None);
+        recoverable.id = 2;
+        let db = MockDatabase::new(DbBackend::Postgres)
+            // recover_expired_leases's own expired-lease candidate query.
+            .append_query_results([vec![unfinalizable, recoverable.clone()]])
+            // record_elaboration_failure's SELECT for the first candidate:
+            // no longer an active attempt (lost a race, or was cancelled).
+            .append_query_results([Vec::<package_sources::Model>::new()])
+            // record_elaboration_failure's SELECT and UPDATE for the second
+            // candidate, which finalizes successfully.
+            .append_query_results([vec![recoverable]])
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        recover_expired_leases(&db, 32, &slog::Logger::root(slog::Discard, slog::o!()))
+            .await
+            .expect("one row that cannot be finalized must not abort recovery of the rest");
     }
 }

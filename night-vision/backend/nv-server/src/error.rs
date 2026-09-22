@@ -10,29 +10,6 @@ use std::{
     fmt::{Debug, Display, Write as _},
 };
 
-/// A stable, caller-safe diagnostic for an operation that crosses an
-/// untrusted boundary.
-///
-/// Do not derive these messages from request data, secrets, dependency errors,
-/// or external-tool output. Those values must never be reflected through
-/// normal API errors, package-source status, or structured log fields.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ExternalOperation {
-    PackageSourceElaboration,
-    PackageSourcePersistence,
-}
-
-impl ExternalOperation {
-    /// Returns the stable diagnostic suitable for normal callers and durable
-    /// status records.
-    pub(crate) const fn diagnostic(self) -> &'static str {
-        match self {
-            Self::PackageSourceElaboration => "package-source elaboration failed",
-            Self::PackageSourcePersistence => "package-source elaboration could not be recorded",
-        }
-    }
-}
-
 /// Fatal errors that stop the server from starting or force it to exit.
 pub enum FatalError {
     FailedToBuildDropshotServer(dropshot::ApiDescriptionBuildErrors),
@@ -130,30 +107,5 @@ impl From<DatabaseConnectionError> for FatalError {
 impl From<RuntimeBuildError> for FatalError {
     fn from(error: RuntimeBuildError) -> Self {
         Self::FailedToBuildTokioRuntime(error)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::ExternalOperation;
-
-    #[test]
-    fn external_operation_diagnostics_are_stable_and_secret_safe() {
-        let unsafe_values = [
-            "password=correct-horse-battery-staple",
-            "Bearer secret-token",
-            r#"{\"dependencies\":{\"private-package\":\"1.0.0\"}}"#,
-            "external tool stderr",
-        ];
-
-        for operation in [
-            ExternalOperation::PackageSourceElaboration,
-            ExternalOperation::PackageSourcePersistence,
-        ] {
-            let diagnostic = operation.diagnostic();
-            for unsafe_value in unsafe_values {
-                assert!(!diagnostic.contains(unsafe_value));
-            }
-        }
     }
 }
