@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import "tw-animate-css";
+@import "shadcn/tailwind.css";
 @import "shadcn-svelte/tailwind.css";
 @import "@fontsource-variable/inter";
 
@@ -128,3 +129,29 @@
 		@apply font-sans;
 	}
 }
+
+h1 {
+    color: darkslategrey;
+    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans';
+    font-size: 33px;
+}
+
+h2 {
+    color: lightgrey;
+    font-family:'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+    font-size: 16px;
+
+}
+
+h3 {
+    color: darkolivegreen;
+    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+    font-size: 25px;
+}
+
+h4 {
+    color: rgb(218, 212, 177);
+    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+    font-size: 30px;
+}
+
