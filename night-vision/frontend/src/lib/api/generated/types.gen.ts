@@ -53,6 +53,8 @@ export type AssessmentStatus = {
 };
 
 export type CveIngestHealth = {
+    freshness: string;
+    lastSuccessfulSyncAt?: string | null;
     latestRun?: CveListSyncRunHealth | null;
     latestSuccessfulCommit?: string | null;
     recordsAvailable: boolean;
@@ -66,6 +68,32 @@ export type CveListSyncRunHealth = {
     recordsInserted: number;
     recordsSeen: number;
     recordsUpdated: number;
+    status: string;
+};
+
+/**
+ * Bounded data-freshness information intended for browser users.
+ */
+export type DataStatus = {
+    cisaKev: DatasetDataStatus;
+    cveList: DatasetDataStatus;
+};
+
+export type DatasetDataStatus = {
+    assessmentImpact: string;
+    availability: string;
+    freshness: string;
+    lastSuccessfulSyncAt?: string | null;
+    latestAttempt?: DatasetSyncAttempt | null;
+};
+
+export type DatasetSyncAttempt = {
+    completedAt?: string | null;
+    /**
+     * A stable, bounded message rather than upstream diagnostic output.
+     */
+    failureMessage?: string | null;
+    startedAt: string;
     status: string;
 };
 
@@ -87,6 +115,25 @@ export type Health = {
  */
 export type HealthDiagnostics = {
     cveIngest: CveIngestHealth;
+    kevIngest: KevIngestHealth;
+    status: string;
+};
+
+export type KevIngestHealth = {
+    freshness: string;
+    lastSuccessfulSyncAt?: string | null;
+    latestRun?: KevSyncRunHealth | null;
+    recordsAvailable: boolean;
+};
+
+export type KevSyncRunHealth = {
+    checkedAt: string;
+    completedAt?: string | null;
+    error?: string | null;
+    generation: number;
+    recordsInserted: number;
+    recordsSeen: number;
+    recordsUpdated: number;
     status: string;
 };
 
@@ -419,6 +466,35 @@ export type GetAssessmentEvidenceResponses = {
 };
 
 export type GetAssessmentEvidenceResponse = GetAssessmentEvidenceResponses[keyof GetAssessmentEvidenceResponses];
+
+export type DataStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/data-status';
+};
+
+export type DataStatusErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type DataStatusError = DataStatusErrors[keyof DataStatusErrors];
+
+export type DataStatusResponses = {
+    /**
+     * successful operation
+     */
+    200: DataStatus;
+};
+
+export type DataStatusResponse = DataStatusResponses[keyof DataStatusResponses];
 
 export type HealthData = {
     body?: never;
