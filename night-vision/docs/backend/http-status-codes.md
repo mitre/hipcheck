@@ -149,6 +149,11 @@ operators toward capacity, quota, or reservation state.
 Do not use `500 INTERNAL SERVER ERROR` for known dependency unavailability. Use
 `503 SERVICE UNAVAILABLE`.
 
+Freshness is response state, not an HTTP failure: `GET /data-status` returns
+`200 OK` for current, stale, initial, and failed synchronization states when it
+can read its stored summary. `GET /health` likewise remains `200 OK` when the
+process is live, regardless of vulnerability-data freshness.
+
 Note that `500 INTERNAL SERVER ERROR` is different from the `FatalError` type in
 `nv-server`. `FatalError` is only used for errors which either occur during
 startup, or which are completely unrecoverable such that the server cannot

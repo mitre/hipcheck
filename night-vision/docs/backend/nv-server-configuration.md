@@ -44,6 +44,7 @@ SeaORM, or Tokio setting at its default unless noted below.
 | `health-diagnostics-token-file` | File-backed bearer token for operator diagnostics and raw Hipcheck evidence. | Path | Diagnostics and raw evidence are disabled. `GET /health/diagnostics` and raw-evidence requests return `404 Not Found`. The file must meet the secret-file rules below. |
 | `kev-url` | Source URL for the CISA Known Exploited Vulnerabilities catalog. | URL | CISA's published KEV catalog URL. |
 | `kev-refresh-interval` | Delay between recurring KEV catalog sync attempts. | Milliseconds | 3600000 milliseconds. Values must be greater than 0. |
+| `kev-freshness-threshold` | Maximum age of a confirmed KEV snapshot before it is reported stale. | Milliseconds | Twice `kev-refresh-interval`. Values must be greater than 0. |
 | `kev-response-body-max-bytes` | Maximum size of a KEV catalog response body. | Bytes | 16777216 bytes (16 MiB). Values must be greater than 0. The limit applies while streaming, even when the response has no `Content-Length`. |
 | `http-request-body-max-bytes` | Maximum request body size. | Bytes | Dropshot default, currently 1024 bytes in project comments and sample config. |
 | `http-early-disconnect-behavior` | `continue` or `cancel`. | Enum | Dropshot default, which matches `continue`: handlers are detached and run to completion after early disconnect. |
@@ -62,6 +63,7 @@ SeaORM, or Tokio setting at its default unless noted below.
 | `cve-list-repository-url` | CVE List Git repository URL. | URL | `https://github.com/CVEProject/cvelistV5.git`. Usernames and passwords are rejected. |
 | `cve-list-repository-ref` | CVE List Git ref to fetch. | Git ref | `main`. |
 | `cve-list-sync-interval` | Delay between recurring CVE List sync attempts. | Milliseconds | 420000 milliseconds. |
+| `cve-list-freshness-threshold` | Maximum age of a confirmed CVE List snapshot before it is reported stale. | Milliseconds | Twice `cve-list-sync-interval`. Values must be greater than 0. |
 | `cve-list-sync-timeout` | Timeout for a sync after a successful baseline exists. | Milliseconds | 3600000 milliseconds. |
 | `cve-list-first-sync-timeout` | Timeout for the initial clone and full sync. | Milliseconds | 14400000 milliseconds. |
 | `cve-list-checkout-path` | Persistent local CVE List checkout path. | Path | Required. The local sample uses `target/cve-list/cvelistV5`; containers use a writable cache mount. |

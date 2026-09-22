@@ -42,6 +42,14 @@ pub trait NvServerApi {
     ) -> Result<HttpResponseOk<HealthDiagnostics>, HttpError>;
 
     #[endpoint {
+        method = GET,
+        path = "/data-status",
+    }]
+    async fn data_status(
+        ctx: RequestContext<Self::Context>,
+    ) -> Result<HttpResponseOk<DataStatus>, HttpError>;
+
+    #[endpoint {
         method = POST,
         path = "/package-sources",
         content_type = "application/json",
@@ -215,14 +223,26 @@ pub struct Health {
 pub struct HealthDiagnostics {
     pub status: String,
     pub cve_ingest: CveIngestHealth,
+    pub kev_ingest: KevIngestHealth,
 }
 
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CveIngestHealth {
     pub records_available: bool,
+    pub freshness: String,
+    pub last_successful_sync_at: Option<DateTime<Utc>>,
     pub latest_successful_commit: Option<String>,
     pub latest_run: Option<CveListSyncRunHealth>,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KevIngestHealth {
+    pub records_available: bool,
+    pub freshness: String,
+    pub last_successful_sync_at: Option<DateTime<Utc>>,
+    pub latest_run: Option<KevSyncRunHealth>,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -238,10 +258,52 @@ pub struct CveListSyncRunHealth {
     pub error: Option<String>,
 }
 
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KevSyncRunHealth {
+    pub generation: i64,
+    pub status: String,
+    pub checked_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub records_seen: i32,
+    pub records_inserted: i32,
+    pub records_updated: i32,
+    pub error: Option<String>,
+}
+
+/// Bounded data-freshness information intended for browser users.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DataStatus {
+    pub cve_list: DatasetDataStatus,
+    pub cisa_kev: DatasetDataStatus,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DatasetDataStatus {
+    pub availability: String,
+    pub freshness: String,
+    pub last_successful_sync_at: Option<DateTime<Utc>>,
+    pub latest_attempt: Option<DatasetSyncAttempt>,
+    pub assessment_impact: String,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DatasetSyncAttempt {
+    pub status: String,
+    pub started_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    /// A stable, bounded message rather than upstream diagnostic output.
+    pub failure_message: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        CveIngestHealth, Health, HealthDiagnostics, PackageSourceEcosystem, PackageSourceExposure,
+        CveIngestHealth, DataStatus, DatasetDataStatus, DatasetSyncAttempt, Health,
+        HealthDiagnostics, KevIngestHealth, PackageSourceEcosystem, PackageSourceExposure,
         PackageSourceExposureKevContext, PackageSourceExposures, PackageSourceExposuresStatus,
         UpgradeAssessmentCandidateVersion, UpgradeAssessmentCaveat, UpgradeAssessmentError,
         UpgradeAssessmentEvidence, UpgradeAssessmentEvidenceSourceType, UpgradeAssessmentFinding,
@@ -270,7 +332,15 @@ mod tests {
             status: "ok".to_owned(),
             cve_ingest: CveIngestHealth {
                 records_available: true,
+                freshness: "current".to_owned(),
+                last_successful_sync_at: None,
                 latest_successful_commit: Some("abc123".to_owned()),
+                latest_run: None,
+            },
+            kev_ingest: KevIngestHealth {
+                records_available: true,
+                freshness: "current".to_owned(),
+                last_successful_sync_at: None,
                 latest_run: None,
             },
         };
@@ -281,11 +351,54 @@ mod tests {
                 "status": "ok",
                 "cveIngest": {
                     "recordsAvailable": true,
+                    "freshness": "current",
+                    "lastSuccessfulSyncAt": null,
                     "latestSuccessfulCommit": "abc123",
+                    "latestRun": null,
+                },
+                "kevIngest": {
+                    "recordsAvailable": true,
+                    "freshness": "current",
+                    "lastSuccessfulSyncAt": null,
                     "latestRun": null,
                 },
             })
         );
+    }
+
+    #[test]
+    fn data_status_omits_operator_run_details() {
+        let now = Utc::now();
+        let status = DataStatus {
+            cve_list: DatasetDataStatus {
+                availability: "available".to_owned(),
+                freshness: "current".to_owned(),
+                last_successful_sync_at: Some(now),
+                latest_attempt: Some(DatasetSyncAttempt {
+                    status: "failed".to_owned(),
+                    started_at: now,
+                    completed_at: Some(now),
+                    failure_message: Some(
+                        "The most recent synchronization attempt failed.".to_owned(),
+                    ),
+                }),
+                assessment_impact: "CVE List data affects vulnerability information used by assessments."
+                    .to_owned(),
+            },
+            cisa_kev: DatasetDataStatus {
+                availability: "unavailable".to_owned(),
+                freshness: "unknown".to_owned(),
+                last_successful_sync_at: None,
+                latest_attempt: None,
+                assessment_impact: "CISA KEV data affects whether newly added known exploited vulnerabilities appear in assessments."
+                    .to_owned(),
+            },
+        };
+
+        let encoded = serde_json::to_value(status).unwrap();
+        assert!(encoded["cveList"].get("generation").is_none());
+        assert!(encoded["cveList"].get("error").is_none());
+        assert_eq!(encoded["cveList"]["latestAttempt"]["status"], "failed");
     }
 
     #[test]

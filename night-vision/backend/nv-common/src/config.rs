@@ -146,6 +146,9 @@ pub struct Config {
     /// The interval in milliseconds between refreshes of KEV data from its source URL.
     pub kev_refresh_interval: Option<u64>,
 
+    /// Maximum age in milliseconds for a confirmed KEV snapshot to be current.
+    pub kev_freshness_threshold: u64,
+
     /// The maximum size in bytes of a KEV catalog response body.
     pub kev_response_body_max_bytes: Option<usize>,
 
@@ -233,6 +236,9 @@ pub struct Config {
 
     /// The interval in milliseconds between CVE List sync attempts.
     pub cve_list_sync_interval: u64,
+
+    /// Maximum age in milliseconds for a confirmed CVE List snapshot to be current.
+    pub cve_list_freshness_threshold: u64,
 
     /// The timeout in milliseconds for one CVE List sync attempt.
     pub cve_list_sync_timeout: u64,
@@ -438,6 +444,7 @@ impl Config {
                     "openapi-dest-path",
                     "kev-url",
                     "kev-refresh-interval",
+                    "kev-freshness-threshold",
                     "kev-response-body-max-bytes",
                     "http-request-body-max-bytes",
                     "http-early-disconnect-behavior",
@@ -459,6 +466,7 @@ impl Config {
                     "cve-list-repository-url",
                     "cve-list-repository-ref",
                     "cve-list-sync-interval",
+                    "cve-list-freshness-threshold",
                     "cve-list-sync-timeout",
                     "cve-list-first-sync-timeout",
                     "cve-list-parse-concurrency",
@@ -518,6 +526,12 @@ impl Config {
         let kev_url: Option<reqwest::Url> = parse_value(&parsed, "kev-url", &mut errors);
         let kev_refresh_interval =
             parse_kev_refresh_interval(&parsed, "kev-refresh-interval", &mut errors);
+        let kev_freshness_threshold = parse_positive_u64(
+            &parsed,
+            "kev-freshness-threshold",
+            freshness_threshold_default(kev_refresh_interval.unwrap_or(3_600_000)),
+            &mut errors,
+        );
         let kev_response_body_max_bytes =
             parse_positive_usize_option(&parsed, "kev-response-body-max-bytes", &mut errors);
         let http_request_body_max_bytes =
@@ -552,6 +566,12 @@ impl Config {
             &parsed,
             "cve-list-sync-interval",
             DEFAULT_CVE_LIST_SYNC_INTERVAL,
+            &mut errors,
+        );
+        let cve_list_freshness_threshold = parse_positive_u64(
+            &parsed,
+            "cve-list-freshness-threshold",
+            freshness_threshold_default(cve_list_sync_interval),
             &mut errors,
         );
         let cve_list_sync_timeout = parse_positive_u64(
@@ -717,6 +737,7 @@ impl Config {
             openapi_dest_path,
             kev_url,
             kev_refresh_interval,
+            kev_freshness_threshold,
             kev_response_body_max_bytes,
             http_request_body_max_bytes,
             http_early_disconnect_behavior,
@@ -738,6 +759,7 @@ impl Config {
             cve_list_repository_url,
             cve_list_repository_ref,
             cve_list_sync_interval,
+            cve_list_freshness_threshold,
             cve_list_sync_timeout,
             cve_list_first_sync_timeout,
             cve_list_checkout_path,
@@ -956,6 +978,8 @@ impl Display for Config {
             write_report_line!(f, "kev-refresh-interval", kev_refresh_interval)?;
         }
 
+        write_report_line!(f, "kev-freshness-threshold", &self.kev_freshness_threshold)?;
+
         if let Some(max_bytes) = self.kev_response_body_max_bytes {
             write_report_line!(f, "kev-response-body-max-bytes", &max_bytes)?;
         }
@@ -1039,6 +1063,12 @@ impl Display for Config {
         if self.cve_list_sync_interval != DEFAULT_CVE_LIST_SYNC_INTERVAL {
             write_report_line!(f, "cve-list-sync-interval", &self.cve_list_sync_interval)?;
         }
+
+        write_report_line!(
+            f,
+            "cve-list-freshness-threshold",
+            &self.cve_list_freshness_threshold
+        )?;
 
         if self.cve_list_sync_timeout != DEFAULT_CVE_LIST_SYNC_TIMEOUT {
             write_report_line!(f, "cve-list-sync-timeout", &self.cve_list_sync_timeout)?;
@@ -1478,6 +1508,11 @@ fn parse_positive_u64(
     parse_positive_u64_option(parsed, key, errors).unwrap_or(default)
 }
 
+/// Allow one missed scheduled attempt before presenting a snapshot as stale.
+fn freshness_threshold_default(sync_interval: u64) -> u64 {
+    sync_interval.saturating_mul(2)
+}
+
 fn parse_kev_refresh_interval(
     parsed: &spookey::ParseResult,
     key: &'static str,
@@ -1891,6 +1926,13 @@ mod tests {
                 },
             ),
             ConfigFieldParseCase::new(
+                "kev_freshness_threshold",
+                "kev-freshness-threshold = 1800000",
+                |config, _| {
+                    assert_eq!(config.kev_freshness_threshold, 1_800_000);
+                },
+            ),
+            ConfigFieldParseCase::new(
                 "kev_response_body_max_bytes",
                 "kev-response-body-max-bytes = 2048",
                 |config, _| {
@@ -2031,6 +2073,13 @@ mod tests {
                 "cve-list-sync-interval = 900000",
                 |config, _| {
                     assert_eq!(config.cve_list_sync_interval, 900_000);
+                },
+            ),
+            ConfigFieldParseCase::new(
+                "cve_list_freshness_threshold",
+                "cve-list-freshness-threshold = 1800000",
+                |config, _| {
+                    assert_eq!(config.cve_list_freshness_threshold, 1_800_000);
                 },
             ),
             ConfigFieldParseCase::new(

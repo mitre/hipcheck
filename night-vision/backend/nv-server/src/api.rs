@@ -26,10 +26,11 @@ use nv_common::{
     },
     cve::storage::{
         has_active_kev_records, has_cve_list_records, last_successful_cve_list_sync_commit,
-        latest_cve_list_sync_run,
+        latest_cve_list_sync_run, latest_successful_cve_list_sync_run,
     },
     db::entities::{
-        cve_list_sync_runs::Model as CveListSyncRun, hipcheck_runs, upgrade_assessments,
+        cisa_kev_sync_runs::Model as KevSyncRun, cve_list_sync_runs::Model as CveListSyncRun,
+        hipcheck_runs, upgrade_assessments,
     },
     display_safety::{diagnostic_text, raw_json_preview, summary_text, url_label},
     hipcheck::{
@@ -39,6 +40,7 @@ use nv_common::{
             reconcile_abandoned_upgrade_assessments,
         },
     },
+    kev::{latest_kev_sync_run, latest_successful_kev_sync_run},
     npm::{
         candidates::{
             ApiCompatibility, CandidateStatus, UpgradeCandidate, UpgradeDistance,
@@ -62,7 +64,8 @@ use nv_common::{
 use nv_server_api::{
     AssessmentCheck, AssessmentDiagnostics, AssessmentEvidence, AssessmentEvidenceQuery,
     AssessmentFinding, AssessmentPathParams, AssessmentStatus, CveIngestHealth,
-    CveListSyncRunHealth, Health, HealthDiagnostics, NvServerApi, PackageSource,
+    CveListSyncRunHealth, DataStatus, DatasetDataStatus, DatasetSyncAttempt, Health,
+    HealthDiagnostics, KevIngestHealth, KevSyncRunHealth, NvServerApi, PackageSource,
     PackageSourceEcosystem, PackageSourceExposure, PackageSourceExposureKevContext,
     PackageSourceExposures, PackageSourceExposuresStatus, PackageSourceFailureKind,
     PackageSourceOperationResponse, PackageSourceOperationStatus, PackageSourcePathParams,
@@ -226,12 +229,33 @@ impl NvServerApi for RestApi {
                 return Err(health_diagnostics_unauthorized());
             }
         }
-        let cve_ingest = cve_ingest_health(ctx.context().db()).await?;
+        let cve_ingest = cve_ingest_health(
+            ctx.context().db(),
+            ctx.context().cve_list_freshness_threshold(),
+        )
+        .await?;
+        let kev_ingest =
+            kev_ingest_health(ctx.context().db(), ctx.context().kev_freshness_threshold()).await?;
 
         Ok(HttpResponseOk(HealthDiagnostics {
             status: "ok".to_owned(),
             cve_ingest,
+            kev_ingest,
         }))
+    }
+
+    async fn data_status(
+        ctx: RequestContext<Self::Context>,
+    ) -> Result<HttpResponseOk<DataStatus>, HttpError> {
+        Ok(HttpResponseOk(
+            data_status(
+                ctx.context().db(),
+                ctx.context().cve_list_freshness_threshold(),
+                ctx.context().kev_freshness_threshold(),
+                Utc::now(),
+            )
+            .await?,
+        ))
     }
 
     async fn post_package_source(
@@ -1346,8 +1370,14 @@ fn npm_package_name_from_purl(package_url: &str) -> String {
         .into_owned()
 }
 
-async fn cve_ingest_health(db: &DatabaseConnection) -> Result<CveIngestHealth, HttpError> {
+async fn cve_ingest_health(
+    db: &DatabaseConnection,
+    freshness_threshold: Duration,
+) -> Result<CveIngestHealth, HttpError> {
     let records_available = has_cve_list_records(db)
+        .await
+        .map_err(|_| internal_server_error())?;
+    let latest_successful_run = latest_successful_cve_list_sync_run(db)
         .await
         .map_err(|_| internal_server_error())?;
     let latest_successful_commit = last_successful_cve_list_sync_commit(db)
@@ -1361,9 +1391,162 @@ async fn cve_ingest_health(db: &DatabaseConnection) -> Result<CveIngestHealth, H
 
     Ok(CveIngestHealth {
         records_available,
+        freshness: freshness_from_snapshot(
+            records_available,
+            latest_successful_run.as_ref().and_then(sync_completed_at),
+            freshness_threshold,
+            Utc::now(),
+        )
+        .to_owned(),
+        last_successful_sync_at: latest_successful_run.as_ref().and_then(sync_completed_at),
         latest_successful_commit,
         latest_run,
     })
+}
+
+async fn kev_ingest_health(
+    db: &DatabaseConnection,
+    freshness_threshold: Duration,
+) -> Result<KevIngestHealth, HttpError> {
+    let records_available = has_active_kev_records(db)
+        .await
+        .map_err(|_| internal_server_error())?;
+    let latest_successful_run = latest_successful_kev_sync_run(db)
+        .await
+        .map_err(|_| internal_server_error())?;
+    let latest_run = latest_kev_sync_run(db)
+        .await
+        .map_err(|_| internal_server_error())?
+        .map(kev_sync_run_health);
+
+    Ok(KevIngestHealth {
+        records_available,
+        freshness: freshness_from_snapshot(
+            records_available,
+            latest_successful_run.as_ref().and_then(sync_completed_at),
+            freshness_threshold,
+            Utc::now(),
+        )
+        .to_owned(),
+        last_successful_sync_at: latest_successful_run.as_ref().and_then(sync_completed_at),
+        latest_run,
+    })
+}
+
+async fn data_status(
+    db: &DatabaseConnection,
+    cve_freshness_threshold: Duration,
+    kev_freshness_threshold: Duration,
+    now: DateTime<Utc>,
+) -> Result<DataStatus, HttpError> {
+    let cve_records_available = has_cve_list_records(db)
+        .await
+        .map_err(|_| internal_server_error())?;
+    let cve_latest_successful = latest_successful_cve_list_sync_run(db)
+        .await
+        .map_err(|_| internal_server_error())?;
+    let cve_latest_run = latest_cve_list_sync_run(db)
+        .await
+        .map_err(|_| internal_server_error())?;
+    let kev_records_available = has_active_kev_records(db)
+        .await
+        .map_err(|_| internal_server_error())?;
+    let kev_latest_successful = latest_successful_kev_sync_run(db)
+        .await
+        .map_err(|_| internal_server_error())?;
+    let kev_latest_run = latest_kev_sync_run(db)
+        .await
+        .map_err(|_| internal_server_error())?;
+
+    Ok(DataStatus {
+        cve_list: dataset_data_status(
+            cve_records_available,
+            cve_latest_successful.as_ref().and_then(sync_completed_at),
+            cve_latest_run.as_ref().map(cve_sync_attempt),
+            cve_freshness_threshold,
+            now,
+            "CVE List data affects vulnerability information used by assessments.",
+        ),
+        cisa_kev: dataset_data_status(
+            kev_records_available,
+            kev_latest_successful.as_ref().and_then(sync_completed_at),
+            kev_latest_run.as_ref().map(kev_sync_attempt),
+            kev_freshness_threshold,
+            now,
+            "CISA KEV data affects whether newly added known exploited vulnerabilities appear in assessments.",
+        ),
+    })
+}
+
+fn dataset_data_status(
+    records_available: bool,
+    last_successful_sync_at: Option<DateTime<Utc>>,
+    latest_attempt: Option<DatasetSyncAttempt>,
+    freshness_threshold: Duration,
+    now: DateTime<Utc>,
+    assessment_impact: &str,
+) -> DatasetDataStatus {
+    DatasetDataStatus {
+        availability: if records_available {
+            "available"
+        } else {
+            "unavailable"
+        }
+        .to_owned(),
+        freshness: freshness_from_snapshot(
+            records_available,
+            last_successful_sync_at,
+            freshness_threshold,
+            now,
+        )
+        .to_owned(),
+        last_successful_sync_at,
+        latest_attempt,
+        assessment_impact: assessment_impact.to_owned(),
+    }
+}
+
+fn freshness_from_snapshot(
+    records_available: bool,
+    last_successful_sync_at: Option<DateTime<Utc>>,
+    freshness_threshold: Duration,
+    now: DateTime<Utc>,
+) -> &'static str {
+    let Some(last_successful_sync_at) = last_successful_sync_at else {
+        return "unknown";
+    };
+    if !records_available {
+        return "unknown";
+    }
+    match chrono::Duration::from_std(freshness_threshold) {
+        Ok(threshold) if now.signed_duration_since(last_successful_sync_at) <= threshold => {
+            "current"
+        }
+        _ => "stale",
+    }
+}
+
+fn sync_completed_at<T>(run: &T) -> Option<DateTime<Utc>>
+where
+    T: SyncRunTimestamps,
+{
+    run.completed_at().map(|value| value.with_timezone(&Utc))
+}
+
+trait SyncRunTimestamps {
+    fn completed_at(&self) -> Option<sea_orm::prelude::DateTimeWithTimeZone>;
+}
+
+impl SyncRunTimestamps for CveListSyncRun {
+    fn completed_at(&self) -> Option<sea_orm::prelude::DateTimeWithTimeZone> {
+        self.completed_at
+    }
+}
+
+impl SyncRunTimestamps for KevSyncRun {
+    fn completed_at(&self) -> Option<sea_orm::prelude::DateTimeWithTimeZone> {
+        self.completed_at
+    }
 }
 
 fn cve_list_sync_run_health(run: CveListSyncRun) -> CveListSyncRunHealth {
@@ -1379,6 +1562,43 @@ fn cve_list_sync_run_health(run: CveListSyncRun) -> CveListSyncRunHealth {
         records_updated: run.records_updated,
         error: run.error,
     }
+}
+
+fn kev_sync_run_health(run: KevSyncRun) -> KevSyncRunHealth {
+    KevSyncRunHealth {
+        generation: run.generation,
+        status: run.status,
+        checked_at: run.checked_at.with_timezone(&Utc),
+        completed_at: run
+            .completed_at
+            .map(|completed_at| completed_at.with_timezone(&Utc)),
+        records_seen: run.records_seen,
+        records_inserted: run.records_inserted,
+        records_updated: run.records_updated,
+        error: run.error,
+    }
+}
+
+fn cve_sync_attempt(run: &CveListSyncRun) -> DatasetSyncAttempt {
+    DatasetSyncAttempt {
+        status: run.status.clone(),
+        started_at: run.checked_at.with_timezone(&Utc),
+        completed_at: sync_completed_at(run),
+        failure_message: failed_sync_message(&run.status),
+    }
+}
+
+fn kev_sync_attempt(run: &KevSyncRun) -> DatasetSyncAttempt {
+    DatasetSyncAttempt {
+        status: run.status.clone(),
+        started_at: run.checked_at.with_timezone(&Utc),
+        completed_at: sync_completed_at(run),
+        failure_message: failed_sync_message(&run.status),
+    }
+}
+
+fn failed_sync_message(status: &str) -> Option<String> {
+    (status == "failed").then(|| "The most recent synchronization attempt failed.".to_owned())
 }
 
 fn validate_upgrade_assessment_request(body: &PostUpgradeAssessmentBody) -> Result<(), HttpError> {
@@ -2273,6 +2493,10 @@ mod tests {
                 Vec::<std::collections::BTreeMap<String, Value>>::new(),
                 Vec::<std::collections::BTreeMap<String, Value>>::new(),
                 Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
             ])
             .into_connection();
         let context = ApiCtx::for_test(db, Some(SecretString::from("operator-token")));
@@ -2310,11 +2534,55 @@ mod tests {
                 "status": "ok",
                 "cveIngest": {
                     "recordsAvailable": false,
+                    "freshness": "unknown",
+                    "lastSuccessfulSyncAt": null,
                     "latestSuccessfulCommit": null,
+                    "latestRun": null,
+                },
+                "kevIngest": {
+                    "recordsAvailable": false,
+                    "freshness": "unknown",
+                    "lastSuccessfulSyncAt": null,
                     "latestRun": null,
                 },
             })
         );
+
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn data_status_returns_a_bounded_public_summary() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+            ])
+            .into_connection();
+        let context = ApiCtx::for_test(db, None);
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            context,
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(http::Method::GET, "/data-status", StatusCode::OK)
+            .await
+            .expect("data status request should succeed");
+        let body: serde_json::Value = read_json(&mut response).await;
+        assert_eq!(body["cveList"]["availability"], "unavailable");
+        assert_eq!(body["cveList"]["freshness"], "unknown");
+        assert_eq!(body["cisaKev"]["availability"], "unavailable");
+        assert!(body["cveList"].get("generation").is_none());
+        assert!(body["cisaKev"].get("error").is_none());
 
         test_context.teardown().await;
     }
@@ -2369,6 +2637,48 @@ mod tests {
         assert_eq!(
             health_diagnostics_authorization(Some(&token), [Some("Bearer operator-token")]),
             HealthDiagnosticsAuthorization::Authorized
+        );
+    }
+
+    #[test]
+    fn dataset_status_distinguishes_initial_current_stale_and_failed_attempts() {
+        let now = Utc.with_ymd_and_hms(2026, 9, 22, 12, 0, 0).unwrap();
+        let threshold = Duration::from_mins(1);
+
+        let initial = dataset_data_status(false, None, None, threshold, now, "impact");
+        assert_eq!(initial.availability, "unavailable");
+        assert_eq!(initial.freshness, "unknown");
+
+        let current = dataset_data_status(
+            true,
+            Some(now - chrono::Duration::seconds(60)),
+            None,
+            threshold,
+            now,
+            "impact",
+        );
+        assert_eq!(current.freshness, "current");
+
+        let failed_attempt = DatasetSyncAttempt {
+            status: "failed".to_owned(),
+            started_at: now,
+            completed_at: Some(now),
+            failure_message: failed_sync_message("failed"),
+        };
+        let stale = dataset_data_status(
+            true,
+            Some(now - chrono::Duration::seconds(61)),
+            Some(failed_attempt),
+            threshold,
+            now,
+            "impact",
+        );
+        assert_eq!(stale.freshness, "stale");
+        assert_eq!(
+            stale
+                .latest_attempt
+                .and_then(|attempt| attempt.failure_message),
+            Some("The most recent synchronization attempt failed.".to_owned())
         );
     }
 

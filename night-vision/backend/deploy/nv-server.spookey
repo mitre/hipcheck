@@ -92,6 +92,10 @@ cve-list-repository-ref =
 # Default: 420000
 cve-list-sync-interval =
 
+# The maximum age in milliseconds for a confirmed CVE List snapshot to be current.
+# Default: twice cve-list-sync-interval.
+cve-list-freshness-threshold =
+
 # The timeout in milliseconds for one CVE List sync attempt.
 #
 # Default: 3600000

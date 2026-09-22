@@ -91,7 +91,7 @@ The public liveness response body is:
 It does not query or report database, CVE, or KEV state. Use it for container
 and load-balancer liveness checks.
 
-For CVE ingest diagnostics, operators can use the bearer-token-protected
+For CVE List and KEV ingest diagnostics, operators can use the bearer-token-protected
 endpoint. The local setup script creates the token file with restrictive
 permissions:
 
@@ -100,13 +100,22 @@ curl --fail --silent --show-error http://127.0.0.1:8080/health/diagnostics \
   -H "Authorization: Bearer $(<.secrets/health-diagnostics-token)"
 ```
 
-Its `cveIngest` object reports whether active CVE records are available and,
-when present, the latest successful commit and sync attempt. A new server can
-return `200 OK` with `recordsAvailable: false` while its first CVE List sync is
-still running. Missing or invalid tokens return `401 Unauthorized`; absent
+Its independent `cveIngest` and `kevIngest` objects report availability,
+freshness, the last successful synchronization, and the latest attempt. A new
+server can return `200 OK` with `recordsAvailable: false` while its first sync
+is still running. A `stale` snapshot remains available but is older than its
+configured freshness threshold; a failed latest attempt does not make a prior
+snapshot current. Missing or invalid tokens return `401 Unauthorized`; absent
 `health-diagnostics-token-file` configuration disables the endpoint with `404
 Not Found`. Rotate the token by replacing its secret file and restarting
 `nv-server`; do not print or commit token values.
+
+Browser users must use `GET /data-status`, not the diagnostics endpoint. It
+returns separate bounded CVE List and CISA KEV summaries without raw error
+chains or other operator-only details. A stale KEV summary means newer KEV
+records might not appear in assessments; it does not establish that existing
+assessment evidence is wrong or that a package is safe. Neither stale nor
+unavailable vulnerability data changes the `/health` liveness result.
 
 For Compose, inspect container health and recent logs:
 

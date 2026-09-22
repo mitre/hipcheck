@@ -600,6 +600,28 @@ where
         .map_err(CveListSyncRunError::Db)
 }
 
+/// Return the most recent CVE List run that confirmed the stored snapshot.
+///
+/// A `not_modified` result confirms that the configured ref still matches the
+/// stored snapshot and therefore refreshes its freshness timestamp.
+pub async fn latest_successful_cve_list_sync_run<C>(
+    db: &C,
+) -> Result<Option<cve_list_sync_runs::Model>, CveListSyncRunError>
+where
+    C: ConnectionTrait,
+{
+    cve_list_sync_runs::Entity::find()
+        .filter(cve_list_sync_runs::Column::Status.is_in([
+            CveListSyncRunStatus::Success.to_string(),
+            CveListSyncRunStatus::NotModified.to_string(),
+        ]))
+        .order_by_desc(cve_list_sync_runs::Column::Generation)
+        .limit(1)
+        .one(db)
+        .await
+        .map_err(CveListSyncRunError::Db)
+}
+
 /// Return whether any active CVE List records are already stored.
 pub async fn has_cve_list_records<C>(db: &C) -> Result<bool, CveListRecordLookupError>
 where
@@ -2014,6 +2036,23 @@ mod tests {
         let transaction_log = db.into_transaction_log();
         let select_sql = &transaction_log[0].statements()[0].sql;
         assert!(select_sql.contains(r#"ORDER BY "cve_list_sync_runs"."generation" DESC"#));
+        assert!(select_sql.contains("LIMIT $"));
+    }
+
+    #[test]
+    fn latest_successful_cve_list_sync_run_accepts_not_modified() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![mock_sync_run(42, "not_modified")]])
+            .into_connection();
+
+        let run = run_async(latest_successful_cve_list_sync_run(&db))
+            .expect("lookup should succeed")
+            .expect("run should exist");
+
+        assert_eq!(run.status, "not_modified");
+        let transaction_log = db.into_transaction_log();
+        let select_sql = &transaction_log[0].statements()[0].sql;
+        assert!(select_sql.contains(r#""status" IN"#));
         assert!(select_sql.contains("LIMIT $"));
     }
 

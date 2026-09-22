@@ -36,8 +36,10 @@ Out of scope:
 
 The current API has no documented general authentication requirement.
 `GET /health` is the intentionally public, dependency-free liveness surface.
-Operators may read `GET /health/diagnostics`, which reports CVE ingest state,
-only with its configured bearer token. Package-source storage and lookup are
+Operators may read `GET /health/diagnostics`, which reports CVE List and KEV
+ingest state, only with its configured bearer token. Browser callers may read
+`GET /data-status`, a bounded, public CVE List and KEV freshness projection
+that contains no operator diagnostics. Package-source storage and lookup are
 placeholders. This document does not treat either fact as a production security
 decision.
 
@@ -188,7 +190,7 @@ trusted local network.
 | API transport | Credentials or package-source data travel over an unencrypted or incorrectly trusted connection. | Spoofing, information disclosure, tampering | P0 | Specify TLS termination, accepted proxy headers, certificate ownership, and the allowed network path. Do not infer these from local Compose. |
 | API input | Large, malformed, or adversarial package-source bodies consume memory, CPU, database capacity, or parser capacity. | Denial of service | P1 | Package-source requests use endpoint-specific body limits, validation, timeout, and concurrency controls. Configure caller-aware ingress rate limits before external exposure. Return documented `400`, `413`, `415`, or `503` responses as applicable. |
 | Future package processing | Submitted file names or contents escape their intended interpretation, cause path traversal, or lead to process execution. | Tampering, elevation of privilege | P0 before implementation | Treat every submission as untrusted data. Avoid shell evaluation and filesystem paths derived from client strings; use an allowlisted parser and isolated work directory if files are required. |
-| Health endpoint | CVE sync error text, commit IDs, or run timing reveals operational details to untrusted callers. | Information disclosure | P1 | `GET /health` is public liveness only. Disable `/health/diagnostics` unless a file-backed bearer token is configured; require that token before querying or returning diagnostics. |
+| Health endpoint | CVE or KEV sync error text, commit IDs, or run timing reveals operational details to untrusted callers. | Information disclosure | P1 | `GET /health` is public liveness only. `/data-status` exposes only bounded user-safe freshness data. Disable `/health/diagnostics` unless a file-backed bearer token is configured; require that token before querying or returning diagnostics. |
 | Database credentials | A connection string appears in logs, process arguments, images, configuration output, or permissive files. | Information disclosure | P0 | Continue file-permission and redaction checks; document rotation; use a least-privilege database role; test failure paths for secret leakage. |
 | Database availability | API or worker activity exhausts pooled connections or makes PostgreSQL unavailable. | Denial of service | P1 | Establish connection-pool and query-timeout budgets shared with PostgreSQL. Apply request backpressure and ensure client-visible dependency failures are safe. |
 | Database integrity | Future persistence mixes callers' data, uses unsafe query construction, or publishes partial package/CVE state. | Tampering, elevation of privilege | P0 before persistence | Enforce ownership in schema and queries; use parameterized ORM/query interfaces; preserve transactional publish semantics; add authorization and rollback tests. |
@@ -220,10 +222,11 @@ storage or processing:
 5. **Availability budget:** Set API request limits and worker resource budgets
    against concrete host and PostgreSQL capacity. Define expected behavior when
    a limit is reached.
-6. **Operational audience:** The public audience may read `/health` only.
-   Operators may read `/health/diagnostics` with its bearer token, and may read
-   sync history, logs, and database debugging tools through their deployment's
-   access controls. Rotate the diagnostics token when its exposure is suspected.
+6. **Operational audience:** The public audience may read `/health` and the
+   bounded `/data-status` freshness summary only. Operators may read
+   `/health/diagnostics` with its bearer token, and may read sync history, logs,
+   and database debugging tools through their deployment's access controls.
+   Rotate the diagnostics token when its exposure is suspected.
 
 ## Implementation Roadmap
 

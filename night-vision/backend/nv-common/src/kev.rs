@@ -10,7 +10,8 @@ use reqwest::header::{
 use reqwest::{Client, Response, StatusCode, Url};
 use sea_orm::{
     ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait, EntityTrait as _,
-    PaginatorTrait as _, QueryFilter as _, QueryOrder as _, TransactionTrait as _, Value,
+    PaginatorTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _,
+    TransactionTrait as _, Value,
 };
 use sea_orm::{
     DatabaseBackend, DatabaseConnection, DatabaseTransaction, Set, Statement, sea_query::Expr,
@@ -31,6 +32,35 @@ pub const DEFAULT_KEV_URL: &str =
     "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
 pub const DEFAULT_KEV_REFRESH_INTERVAL_MILLISECONDS: u64 = 3_600_000;
 pub const DEFAULT_KEV_RESPONSE_BODY_MAX_BYTES: usize = 16 * 1024 * 1024;
+
+/// Return the most recent KEV synchronization attempt.
+pub async fn latest_kev_sync_run<C>(
+    db: &C,
+) -> Result<Option<cisa_kev_sync_runs::Model>, sea_orm::DbErr>
+where
+    C: ConnectionTrait,
+{
+    cisa_kev_sync_runs::Entity::find()
+        .order_by_desc(cisa_kev_sync_runs::Column::Generation)
+        .limit(1)
+        .one(db)
+        .await
+}
+
+/// Return the most recent KEV synchronization that confirmed the cached catalog.
+pub async fn latest_successful_kev_sync_run<C>(
+    db: &C,
+) -> Result<Option<cisa_kev_sync_runs::Model>, sea_orm::DbErr>
+where
+    C: ConnectionTrait,
+{
+    cisa_kev_sync_runs::Entity::find()
+        .filter(cisa_kev_sync_runs::Column::Status.is_in(["success", "not_modified"]))
+        .order_by_desc(cisa_kev_sync_runs::Column::Generation)
+        .limit(1)
+        .one(db)
+        .await
+}
 
 /// PostgreSQL advisory lock key used to serialize KEV sync work.
 /// ASCII text: "KEV_SYNC"
@@ -1413,6 +1443,63 @@ mod tests {
                 no_proxy_configured: true,
             }
         );
+    }
+
+    #[test]
+    fn latest_kev_sync_run_returns_latest_attempt() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![test_sync_run("failed")]])
+            .into_connection();
+
+        let run = run_async(latest_kev_sync_run(&db))
+            .expect("lookup should succeed")
+            .expect("run should exist");
+
+        assert_eq!(run.status, "failed");
+        let transaction_log = db.into_transaction_log();
+        assert!(
+            transaction_log[0].statements()[0]
+                .sql
+                .contains(r#"ORDER BY "cisa_kev_sync_runs"."generation" DESC"#)
+        );
+    }
+
+    #[test]
+    fn latest_successful_kev_sync_run_accepts_not_modified() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![test_sync_run("not_modified")]])
+            .into_connection();
+
+        let run = run_async(latest_successful_kev_sync_run(&db))
+            .expect("lookup should succeed")
+            .expect("run should exist");
+
+        assert_eq!(run.status, "not_modified");
+        let transaction_log = db.into_transaction_log();
+        assert!(
+            transaction_log[0].statements()[0]
+                .sql
+                .contains(r#""status" IN"#)
+        );
+    }
+
+    fn test_sync_run(status: &str) -> cisa_kev_sync_runs::Model {
+        cisa_kev_sync_runs::Model {
+            generation: 1,
+            checked_at: chrono::Utc::now().into(),
+            completed_at: Some(chrono::Utc::now().into()),
+            status: status.to_owned(),
+            catalog_version: None,
+            catalog_date_released: None,
+            catalog_count: None,
+            etag: None,
+            last_modified: None,
+            content_sha256: None,
+            records_seen: 0,
+            records_inserted: 0,
+            records_updated: 0,
+            error: None,
+        }
     }
 
     #[test]

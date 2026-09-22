@@ -114,6 +114,29 @@
         }
       }
     },
+    "/data-status": {
+      "get": {
+        "operationId": "data_status",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataStatus"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "operationId": "health",
@@ -613,6 +636,14 @@
       "CveIngestHealth": {
         "type": "object",
         "properties": {
+          "freshness": {
+            "type": "string"
+          },
+          "lastSuccessfulSyncAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
           "latestRun": {
             "nullable": true,
             "allOf": [
@@ -630,6 +661,7 @@
           }
         },
         "required": [
+          "freshness",
           "recordsAvailable"
         ]
       },
@@ -678,6 +710,80 @@
           "status"
         ]
       },
+      "DataStatus": {
+        "description": "Bounded data-freshness information intended for browser users.",
+        "type": "object",
+        "properties": {
+          "cisaKev": {
+            "$ref": "#/components/schemas/DatasetDataStatus"
+          },
+          "cveList": {
+            "$ref": "#/components/schemas/DatasetDataStatus"
+          }
+        },
+        "required": [
+          "cisaKev",
+          "cveList"
+        ]
+      },
+      "DatasetDataStatus": {
+        "type": "object",
+        "properties": {
+          "assessmentImpact": {
+            "type": "string"
+          },
+          "availability": {
+            "type": "string"
+          },
+          "freshness": {
+            "type": "string"
+          },
+          "lastSuccessfulSyncAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "latestAttempt": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DatasetSyncAttempt"
+              }
+            ]
+          }
+        },
+        "required": [
+          "assessmentImpact",
+          "availability",
+          "freshness"
+        ]
+      },
+      "DatasetSyncAttempt": {
+        "type": "object",
+        "properties": {
+          "completedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "failureMessage": {
+            "nullable": true,
+            "description": "A stable, bounded message rather than upstream diagnostic output.",
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "startedAt",
+          "status"
+        ]
+      },
       "Error": {
         "description": "Error information from a response.",
         "type": "object",
@@ -715,12 +821,89 @@
           "cveIngest": {
             "$ref": "#/components/schemas/CveIngestHealth"
           },
+          "kevIngest": {
+            "$ref": "#/components/schemas/KevIngestHealth"
+          },
           "status": {
             "type": "string"
           }
         },
         "required": [
           "cveIngest",
+          "kevIngest",
+          "status"
+        ]
+      },
+      "KevIngestHealth": {
+        "type": "object",
+        "properties": {
+          "freshness": {
+            "type": "string"
+          },
+          "lastSuccessfulSyncAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "latestRun": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/KevSyncRunHealth"
+              }
+            ]
+          },
+          "recordsAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "freshness",
+          "recordsAvailable"
+        ]
+      },
+      "KevSyncRunHealth": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "nullable": true,
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recordsInserted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recordsSeen": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recordsUpdated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkedAt",
+          "generation",
+          "recordsInserted",
+          "recordsSeen",
+          "recordsUpdated",
           "status"
         ]
       },

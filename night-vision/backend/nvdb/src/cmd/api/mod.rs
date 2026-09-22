@@ -534,7 +534,7 @@ mod tests {
                 .header("authorization", "Bearer test-operator-token");
             then.status(200)
                 .header("content-type", "application/json")
-                .body(r#"{"status":"ok","cveIngest":{"recordsAvailable":false,"latestSuccessfulCommit":null,"latestRun":null}}"#);
+                .body(r#"{"status":"ok","cveIngest":{"recordsAvailable":false,"freshness":"unknown","lastSuccessfulSyncAt":null,"latestSuccessfulCommit":null,"latestRun":null},"kevIngest":{"recordsAvailable":false,"freshness":"unknown","lastSuccessfulSyncAt":null,"latestRun":null}}"#);
         });
         let (config, _files) = test_config(&server.base_url(), Some("test-operator-token"));
 
@@ -701,7 +701,7 @@ mod tests {
             when.method(GET).path("/health/diagnostics");
             then.status(200)
                 .header("content-type", "application/json")
-                .body(r#"{"status":"ok","cveIngest":{"recordsAvailable":false,"latestSuccessfulCommit":null,"latestRun":null}}"#);
+                .body(r#"{"status":"ok","cveIngest":{"recordsAvailable":false,"freshness":"unknown","lastSuccessfulSyncAt":null,"latestSuccessfulCommit":null,"latestRun":null},"kevIngest":{"recordsAvailable":false,"freshness":"unknown","lastSuccessfulSyncAt":null,"latestRun":null}}"#);
         });
         let (config, _files) = test_config(&server.base_url(), None);
 

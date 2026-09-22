@@ -15,6 +15,8 @@ pub struct ApiCtx {
     /// Handle to the database.
     db: DatabaseConnection,
     health_diagnostics_token: Option<SecretString>,
+    cve_list_freshness_threshold: std::time::Duration,
+    kev_freshness_threshold: std::time::Duration,
     npm_registry_url: Url,
     package_elaboration_limits: ElaborationLimits,
     package_elaboration_max_packument_bytes: usize,
@@ -30,6 +32,12 @@ impl ApiCtx {
         Ok(Self {
             db,
             health_diagnostics_token: config.health_diagnostics_token().cloned(),
+            cve_list_freshness_threshold: std::time::Duration::from_millis(
+                config.cve_list_freshness_threshold,
+            ),
+            kev_freshness_threshold: std::time::Duration::from_millis(
+                config.kev_freshness_threshold,
+            ),
             npm_registry_url: config.npm_registry_url.clone(),
             package_elaboration_limits: config.package_elaboration_limits(),
             package_elaboration_max_packument_bytes: config.package_elaboration_max_packument_bytes,
@@ -50,6 +58,14 @@ impl ApiCtx {
 
     pub fn health_diagnostics_token(&self) -> Option<&SecretString> {
         self.health_diagnostics_token.as_ref()
+    }
+
+    pub fn cve_list_freshness_threshold(&self) -> std::time::Duration {
+        self.cve_list_freshness_threshold
+    }
+
+    pub fn kev_freshness_threshold(&self) -> std::time::Duration {
+        self.kev_freshness_threshold
     }
 
     pub fn npm_registry_url(&self) -> &Url {
@@ -90,6 +106,8 @@ impl ApiCtx {
         Self {
             db,
             health_diagnostics_token,
+            cve_list_freshness_threshold: std::time::Duration::from_secs(1),
+            kev_freshness_threshold: std::time::Duration::from_secs(1),
             npm_registry_url: Url::parse("https://registry.example.test/")
                 .expect("test registry URL should be valid"),
             package_elaboration_limits: ElaborationLimits::default(),

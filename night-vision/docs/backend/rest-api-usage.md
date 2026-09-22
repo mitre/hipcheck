@@ -76,7 +76,7 @@ completed.
 
 ### `GET /health/diagnostics`
 
-Read CVE ingest state for operators. The endpoint is disabled unless
+Read CVE List and KEV ingest state for operators. The endpoint is disabled unless
 `health-diagnostics-token-file` is configured. When enabled, callers must send
 the configured bearer token. Missing, malformed, duplicated, or incorrect
 credentials receive the same `401 Unauthorized` response and a
@@ -92,18 +92,55 @@ curl http://127.0.0.1:8080/health/diagnostics \
   "status": "ok",
   "cveIngest": {
     "recordsAvailable": false,
+    "freshness": "unknown",
+    "lastSuccessfulSyncAt": null,
     "latestSuccessfulCommit": null,
+    "latestRun": null
+  },
+  "kevIngest": {
+    "recordsAvailable": false,
+    "freshness": "unknown",
+    "lastSuccessfulSyncAt": null,
     "latestRun": null
   }
 }
 ```
 
 `200 OK` means the handler read its diagnostic state; it does not mean the
-initial CVE List sync has completed. `cveIngest.recordsAvailable` is `true`
-when active CVE records are available. `latestSuccessfulCommit` and `latestRun`
-describe the most recent successful commit and attempted sync, when present.
-When diagnostics are disabled, the endpoint returns `404 Not Found` without
-querying the database.
+initial synchronization has completed. Each dataset is independent.
+`recordsAvailable` is `true` when its active records are available; `freshness`
+is `current`, `stale`, or `unknown`; and `lastSuccessfulSyncAt` is the most
+recent successful or not-modified completion. `latestRun` contains operator
+diagnostic detail for the most recent attempt. When diagnostics are disabled,
+the endpoint returns `404 Not Found` without querying the database.
+
+### `GET /data-status`
+
+Read the bounded data-freshness summary intended for browser users. This public
+endpoint is not a liveness check and does not expose operator diagnostics, raw
+errors, source artifacts, commit identifiers, or run counters.
+
+```sh
+curl http://127.0.0.1:8080/data-status
+```
+
+Each `cveList` and `cisaKev` object independently reports availability,
+freshness, the last successful synchronization time, and the latest attempt.
+Freshness is `current` when an available snapshot was confirmed within its
+configured threshold, `stale` when that snapshot is older, and `unknown` when
+no successful snapshot exists. A failed latest attempt is represented by its
+attempt status and a fixed safe message; it never refreshes the successful
+timestamp. Initial synchronization is identifiable when data is unavailable
+and the latest attempt is absent, running, or failed. Stale KEV data means new
+KEV records may not yet appear in assessments; it does not make existing
+assessment evidence incorrect or establish that a package is safe.
+
+The `assessmentImpact` text is guidance for the data-status trust page planned
+by issue #96. It must be rendered as text, not markup. This endpoint provides
+no manual synchronization control.
+
+`GET /health` remains the only public liveness endpoint. It never fails merely
+because either vulnerability dataset is stale or unavailable.
 
 ### `POST /package-sources`
 
