@@ -55,9 +55,10 @@ pub struct HipcheckExecutionOutput {
     pub stdout: Vec<u8>,
     /// Raw bounded standard error.
     pub stderr: Vec<u8>,
-    /// Raw bounded JSON report bytes for a successful check.
+    /// Raw bounded JSON report candidate bytes, including nonzero exits.
     ///
-    /// This layer deliberately does not parse the report.
+    /// This layer deliberately does not parse the report. Downstream mapping
+    /// decides whether a complete report can be trusted.
     pub json: Option<Vec<u8>>,
 }
 
@@ -123,7 +124,10 @@ pub enum HipcheckExecutionError {
 impl HipcheckExecutionError {
     /// Whether rerunning the same check may succeed.
     pub fn retryable(&self) -> bool {
-        matches!(self, Self::TimedOut { .. })
+        matches!(
+            self,
+            Self::Read { .. } | Self::TimedOut { .. } | Self::Wait(_) | Self::ReaderEnded { .. }
+        )
     }
 }
 
@@ -252,7 +256,11 @@ pub async fn run_hipcheck_check(
             stderr: stderr.bytes,
         });
     }
-    let json = status.success().then(|| stdout.bytes.clone());
+    let json = stdout
+        .bytes
+        .iter()
+        .any(|byte| !byte.is_ascii_whitespace())
+        .then(|| stdout.bytes.clone());
     Ok(HipcheckExecutionOutput {
         status,
         stdout: stdout.bytes,
@@ -420,6 +428,23 @@ printf '{"report":"ok"}'
                 ]
             );
             assert!(!fixture.working_directory.join("should-not-run").exists());
+        });
+    }
+
+    #[test]
+    fn nonzero_exit_preserves_complete_json_candidate() {
+        run_async(async {
+            let fixture = TestFixture::new("printf '{\"recommendation\":\"INVESTIGATE\"}'\nexit 7");
+            let output = run_hipcheck_check(
+                &fixture.config(),
+                &HipcheckCheckRequest { arguments: vec![] },
+            )
+            .await
+            .expect("a completed process should return bounded output");
+
+            assert!(!output.status.success());
+            assert_eq!(output.status.code(), Some(7));
+            assert_eq!(output.json.as_deref(), Some(output.stdout.as_slice()));
         });
     }
 

@@ -4186,6 +4186,31 @@ mod tests {
     }
 
     #[test]
+    fn failed_hipcheck_run_produces_missing_check_and_unknown_verdict() {
+        let stored = nv_common::hipcheck::storage::StoredHipcheckRun {
+            run: hipcheck_run(),
+            checks: Vec::new(),
+            concerns: Vec::new(),
+            findings: Vec::new(),
+        };
+
+        let report = report_from_hipcheck(
+            input(),
+            Uuid::now_v7(),
+            UpgradeAssessmentVerdict::Recommended,
+            &stored,
+        );
+
+        assert!(matches!(report.verdict, UpgradeAssessmentVerdict::Unknown));
+        assert_eq!(report.findings.len(), 1);
+        assert_eq!(report.findings[0].id, "hipcheck-incomplete-run");
+        assert_eq!(
+            report.findings[0].effect,
+            UpgradeAssessmentFindingEffect::MissingCheck
+        );
+    }
+
+    #[test]
     fn hipcheck_pass_does_not_override_upgrade_domain_blocker() {
         let report = assessment_report(
             input(),

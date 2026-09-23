@@ -64,8 +64,12 @@ fn hipcheck_evidence_round_trips_through_postgres() {
         assert_eq!(stored.run.hipcheck_commit.as_deref(), Some("unknown"));
         assert_eq!(stored.checks.len(), 2);
         assert_eq!(stored.concerns.len(), 2);
-        assert_eq!(stored.findings.len(), 2);
-        assert_eq!(stored.findings[1].kind, "check-error");
+        assert_eq!(stored.findings.len(), 4);
+        assert_eq!(stored.findings[0].kind, "check-result");
+        assert_eq!(stored.findings[1].kind, "missing-evidence");
+        assert_eq!(stored.findings[2].kind, "check-error");
+        assert_eq!(stored.findings[2].effect, "missing-check");
+        assert_eq!(stored.findings[3].kind, "missing-evidence");
     });
 }
 

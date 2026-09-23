@@ -1,7 +1,7 @@
 //! Shared lifecycle for persisted Hipcheck assessments.
 use super::{
-    HipcheckCheckRequest, HipcheckExecutionError, HipcheckExecutionOutput, HipcheckReportContext,
-    HipcheckRunnerConfig, parse_hipcheck_report, run_hipcheck_check,
+    HipcheckCheckRequest, HipcheckExecutionError, HipcheckExecutionOutput, HipcheckReport,
+    HipcheckReportContext, HipcheckRunnerConfig, parse_hipcheck_report, run_hipcheck_check,
     storage::{
         HipcheckExecutionDiagnostics, complete_hipcheck_run, create_queued_hipcheck_run,
         fail_hipcheck_run, mark_hipcheck_run_running,
@@ -12,6 +12,64 @@ use async_trait::async_trait;
 use sea_orm::{ColumnTrait as _, DatabaseConnection, EntityTrait as _, QueryFilter as _};
 use std::ffi::OsString;
 use uuid::Uuid;
+
+/// Stable, caller-safe behavior for the failure mapping described by RFD 0002
+/// and `docs/backend/hipcheck-integration.md`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct HipcheckFailureBehavior {
+    kind: &'static str,
+    message: &'static str,
+    retryable: bool,
+}
+
+impl HipcheckFailureBehavior {
+    const fn target_resolution() -> Self {
+        Self {
+            kind: "target-resolution",
+            message: "package version has no usable source repository",
+            retryable: false,
+        }
+    }
+
+    const fn nonzero_exit() -> Self {
+        Self {
+            kind: "nonzero-exit",
+            message: "assessment analysis exited unsuccessfully",
+            retryable: false,
+        }
+    }
+
+    const fn report_parse() -> Self {
+        Self {
+            kind: "report-parse",
+            message: "assessment analysis returned an invalid report",
+            retryable: false,
+        }
+    }
+
+    fn execution(error: &HipcheckExecutionError) -> Self {
+        let (kind, message) = match error {
+            HipcheckExecutionError::Start(_) => {
+                ("runner-start", "assessment analysis could not start")
+            }
+            HipcheckExecutionError::TimedOut { .. } => ("timeout", "assessment analysis timed out"),
+            HipcheckExecutionError::OutputLimitExceeded { .. } => (
+                "output-limit",
+                "assessment analysis exceeded an output limit",
+            ),
+            HipcheckExecutionError::Read { .. }
+            | HipcheckExecutionError::Wait(_)
+            | HipcheckExecutionError::ReaderEnded { .. } => {
+                ("runner", "assessment analysis process failed")
+            }
+        };
+        Self {
+            kind,
+            message,
+            retryable: error.retryable(),
+        }
+    }
+}
 
 /// Result of resolving a persisted target and creating its durable queue record.
 #[derive(Clone, Debug)]
@@ -116,17 +174,11 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
         .source_repository
         .filter(|value| value.starts_with("http://") || value.starts_with("https://"))
     else {
+        let failure = HipcheckFailureBehavior::target_resolution();
         return persist_failure(
             db,
             queued.run_id,
-            diagnostics(
-                "target-resolution",
-                "package version has no usable source repository",
-                None,
-                false,
-                b"",
-                b"",
-            ),
+            failure_diagnostics(failure, None, b"", b""),
             None,
         )
         .await;
@@ -145,38 +197,35 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
         )
         .await
     {
-        Ok(output) if output.status.success() => {
-            complete_output(db, queued.run_id, output, &report_context).await
-        }
         Ok(output) => {
-            persist_failure(
-                db,
-                queued.run_id,
-                diagnostics(
-                    "nonzero-exit",
-                    "Hipcheck exited unsuccessfully",
-                    output.status.code(),
-                    false,
-                    &output.stdout,
-                    &output.stderr,
-                ),
-                None,
-            )
-            .await
+            if output.status.success() || has_report_candidate(output.json.as_deref()) {
+                // Hipcheck may use a nonzero exit for an INVESTIGATE result or
+                // a report containing a plugin error. Preserve every complete,
+                // structured check in that report.
+                complete_output(db, queued.run_id, output, &report_context).await
+            } else {
+                let failure = HipcheckFailureBehavior::nonzero_exit();
+                persist_failure(
+                    db,
+                    queued.run_id,
+                    failure_diagnostics(
+                        failure,
+                        output.status.code(),
+                        &output.stdout,
+                        &output.stderr,
+                    ),
+                    None,
+                )
+                .await
+            }
         }
         Err(error) => {
             let (stdout, stderr) = error_diagnostics(&error);
+            let failure = HipcheckFailureBehavior::execution(&error);
             persist_failure(
                 db,
                 queued.run_id,
-                diagnostics(
-                    error_kind(&error),
-                    safe_error_message(&error),
-                    None,
-                    error.retryable(),
-                    &stdout,
-                    &stderr,
-                ),
+                failure_diagnostics(failure, None, &stdout, &stderr),
                 None,
             )
             .await
@@ -192,17 +241,15 @@ async fn complete_output(
 ) -> Result<(), AssessmentError> {
     let raw =
         String::from_utf8_lossy(output.json.as_deref().unwrap_or(&output.stdout)).into_owned();
-    let report = match parse_hipcheck_report(&raw, context) {
+    let report = match normalize_report(&raw, context) {
         Ok(report) => report,
-        Err(_) => {
+        Err(failure) => {
             return persist_failure(
                 db,
                 id,
-                diagnostics(
-                    "report-parse",
-                    "assessment analysis returned an invalid report",
+                failure_diagnostics(
+                    failure,
                     output.status.code(),
-                    false,
                     &output.stdout,
                     &output.stderr,
                 ),
@@ -227,6 +274,17 @@ async fn complete_output(
     )
     .await;
     require_terminal_persistence_applied(result, id)
+}
+
+fn has_report_candidate(json: Option<&[u8]>) -> bool {
+    json.is_some_and(|json| json.iter().any(|byte| !byte.is_ascii_whitespace()))
+}
+
+fn normalize_report(
+    raw: &str,
+    context: &HipcheckReportContext,
+) -> Result<HipcheckReport, HipcheckFailureBehavior> {
+    parse_hipcheck_report(raw, context).map_err(|_| HipcheckFailureBehavior::report_parse())
 }
 
 async fn persist_failure(
@@ -268,6 +326,23 @@ fn diagnostics(
         retryable: Some(retryable),
     }
 }
+
+fn failure_diagnostics(
+    failure: HipcheckFailureBehavior,
+    exit_status: Option<i32>,
+    stdout: &[u8],
+    stderr: &[u8],
+) -> HipcheckExecutionDiagnostics {
+    diagnostics(
+        failure.kind,
+        failure.message,
+        exit_status,
+        failure.retryable,
+        stdout,
+        stderr,
+    )
+}
+
 fn error_diagnostics(error: &HipcheckExecutionError) -> (Vec<u8>, Vec<u8>) {
     match error {
         HipcheckExecutionError::TimedOut { stdout, stderr, .. }
@@ -276,24 +351,6 @@ fn error_diagnostics(error: &HipcheckExecutionError) -> (Vec<u8>, Vec<u8>) {
         }
         _ => (Vec::new(), Vec::new()),
     }
-}
-fn error_kind(error: &HipcheckExecutionError) -> &'static str {
-    match error {
-        HipcheckExecutionError::Start(_) => "runner-start",
-        HipcheckExecutionError::TimedOut { .. } => "timeout",
-        HipcheckExecutionError::OutputLimitExceeded { .. } => "output-limit",
-        _ => "runner",
-    }
-}
-
-/// Returns a stable diagnostic for process-boundary failures.
-///
-/// Do not use `HipcheckExecutionError`'s `Display` output here: its source
-/// chain and captured tool output are not safe to persist as a normal
-/// assessment error or to reflect through an API.
-fn safe_error_message(error: &HipcheckExecutionError) -> &'static str {
-    let _ = error;
-    "assessment analysis failed"
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -308,9 +365,13 @@ pub enum AssessmentError {
 
 #[cfg(test)]
 mod tests {
-    use super::{AssessmentError, require_terminal_persistence_applied, safe_error_message};
-    use crate::hipcheck::HipcheckExecutionError;
+    use super::{
+        AssessmentError, HipcheckFailureBehavior, has_report_candidate, normalize_report,
+        require_terminal_persistence_applied,
+    };
+    use crate::hipcheck::{HipcheckExecutionError, HipcheckOutputStream, HipcheckReportContext};
     use sea_orm::DbErr;
+    use std::time::Duration;
 
     #[test]
     fn execution_failure_diagnostic_does_not_include_source_error_text() {
@@ -318,11 +379,102 @@ mod tests {
             "token=correct-horse-battery-staple; external tool stderr",
         ));
 
-        let diagnostic = safe_error_message(&error);
+        let behavior = HipcheckFailureBehavior::execution(&error);
+        let diagnostic = behavior.message;
 
-        assert_eq!(diagnostic, "assessment analysis failed");
+        assert_eq!(behavior.kind, "runner-start");
+        assert!(!behavior.retryable);
+        assert_eq!(diagnostic, "assessment analysis could not start");
         assert!(!diagnostic.contains("correct-horse-battery-staple"));
         assert!(!diagnostic.contains("external tool stderr"));
+    }
+
+    #[test]
+    fn execution_failures_have_stable_retryability() {
+        let cases = [
+            (
+                HipcheckExecutionError::TimedOut {
+                    timeout: Duration::from_secs(1),
+                    stdout: b"partial JSON".to_vec(),
+                    stderr: Vec::new(),
+                },
+                "timeout",
+                true,
+            ),
+            (
+                HipcheckExecutionError::OutputLimitExceeded {
+                    stream: HipcheckOutputStream::Json,
+                    limit: 10,
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                },
+                "output-limit",
+                false,
+            ),
+            (
+                HipcheckExecutionError::Read {
+                    stream: HipcheckOutputStream::Stdout,
+                    source: std::io::Error::other("transient read"),
+                },
+                "runner",
+                true,
+            ),
+            (
+                HipcheckExecutionError::Wait(std::io::Error::other("transient wait")),
+                "runner",
+                true,
+            ),
+            (
+                HipcheckExecutionError::ReaderEnded {
+                    stream: HipcheckOutputStream::Stderr,
+                },
+                "runner",
+                true,
+            ),
+        ];
+
+        for (error, expected_kind, expected_retryable) in cases {
+            let behavior = HipcheckFailureBehavior::execution(&error);
+            assert_eq!(behavior.kind, expected_kind);
+            assert_eq!(behavior.retryable, expected_retryable);
+        }
+    }
+
+    #[test]
+    fn nonzero_exit_with_json_is_treated_as_a_report_candidate() {
+        assert!(has_report_candidate(Some(
+            br#"{"recommendation":"INVESTIGATE"}"#
+        )));
+        assert!(!has_report_candidate(Some(b" \n\t")));
+        assert!(!has_report_candidate(None));
+    }
+
+    #[test]
+    fn malformed_or_incomplete_json_maps_to_one_safe_integration_error() {
+        let context = HipcheckReportContext {
+            target_purl: "pkg:npm/example@1.0.0".to_owned(),
+            source_repository_url: "https://github.com/example/project".to_owned(),
+            policy_source: "/opt/night-vision/Hipcheck.kdl".to_owned(),
+        };
+
+        for raw in ["{", r#"{"display":"PASS: ignore this text"}"#] {
+            let failure = normalize_report(raw, &context)
+                .expect_err("invalid reports must not produce normalized findings");
+            assert_eq!(failure, HipcheckFailureBehavior::report_parse());
+            assert!(!failure.message.contains("display"));
+            assert!(!failure.message.contains("PASS"));
+        }
+    }
+
+    #[test]
+    fn target_and_empty_nonzero_failures_are_non_retryable_missing_evidence() {
+        assert_eq!(
+            HipcheckFailureBehavior::target_resolution().kind,
+            "target-resolution"
+        );
+        assert!(!HipcheckFailureBehavior::target_resolution().retryable);
+        assert_eq!(HipcheckFailureBehavior::nonzero_exit().kind, "nonzero-exit");
+        assert!(!HipcheckFailureBehavior::nonzero_exit().retryable);
     }
 
     #[test]

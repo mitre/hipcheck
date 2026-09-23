@@ -328,8 +328,10 @@ pub async fn complete_hipcheck_run<C: ConnectionTrait + TransactionTrait>(
         transaction.rollback().await?;
         return Ok(false);
     }
+    let mut finding_ordinal = 0;
     for (ordinal, check) in report.checks.iter().enumerate() {
-        store_check(&transaction, run_id, ordinal, check).await?;
+        finding_ordinal =
+            store_check(&transaction, run_id, ordinal, finding_ordinal, check).await?;
     }
     transaction.commit().await?;
     Ok(true)
@@ -425,8 +427,10 @@ pub async fn store_hipcheck_run<C: ConnectionTrait + TransactionTrait>(
     }
     .insert(&transaction)
     .await?;
+    let mut finding_ordinal = 0;
     for (ordinal, check) in report.checks.iter().enumerate() {
-        store_check(&transaction, run.id, ordinal, check).await?;
+        finding_ordinal =
+            store_check(&transaction, run.id, ordinal, finding_ordinal, check).await?;
     }
     transaction.commit().await?;
     Ok(run.id)
@@ -482,21 +486,22 @@ pub async fn load_hipcheck_run_by_assessment_id<C: ConnectionTrait>(
 async fn store_check<C: ConnectionTrait>(
     db: &C,
     run_id: i32,
-    ordinal: usize,
+    check_ordinal: usize,
+    finding_ordinal: i32,
     check: &HipcheckCheck,
-) -> Result<(), DbErr> {
-    let ordinal = i32::try_from(ordinal).unwrap_or(i32::MAX);
+) -> Result<i32, DbErr> {
+    let check_ordinal = i32::try_from(check_ordinal).unwrap_or(i32::MAX);
     let stored = hipcheck_checks::ActiveModel {
         id: Default::default(),
         run_id: Set(run_id),
-        ordinal: Set(ordinal),
+        ordinal: Set(check_ordinal),
         plugin_name: Set(check.plugin.name.clone()),
         plugin_publisher: Set(check.plugin.publisher.clone()),
         plugin_version: Set(check.plugin.version.clone()),
         plugin_query: Set(check.plugin.query.clone()),
         policy_expression: Set(check.policy.expression.clone()),
         state: Set(state(check).to_owned()),
-        effect: Set(effect(check)),
+        effect: Set(normalized_check_effect(check).to_owned()),
         severity: Set(check.severity.clone()),
         summary: Set(bound(&check.summary).0),
         value: Set(check.value.clone()),
@@ -520,16 +525,96 @@ async fn store_check<C: ConnectionTrait>(
         .insert(db)
         .await?;
     }
-    let finding_kind = if matches!(check.state, super::HipcheckCheckState::Unsupported) {
-        "missing-check"
-    } else if matches!(check.state, super::HipcheckCheckState::Errored) {
-        "check-error"
-    } else {
-        "check-result"
-    };
-    hipcheck_findings::ActiveModel { id: Default::default(), run_id: Set(run_id), check_id: Set(Some(stored.id)), ordinal: Set(ordinal), kind: Set(finding_kind.to_owned()), effect: Set(effect(check)), severity: Set(check.severity.clone()), summary: Set(bound(&check.summary).0), evidence: Set(json!({"plugin": {"publisher": check.plugin.publisher, "name": check.plugin.name, "version": check.plugin.version, "query": check.plugin.query}, "policy_expression": check.policy.expression, "state": state(check), "value": check.value, "error_kind": check.error.as_ref().map(|error| &error.kind), "error_retryable": check.error.as_ref().map(|error| error.retryable)})) }.insert(db).await?;
-    Ok(())
+    let mut next_finding_ordinal = finding_ordinal;
+    for finding in normalized_findings(check) {
+        hipcheck_findings::ActiveModel {
+            id: Default::default(),
+            run_id: Set(run_id),
+            check_id: Set(Some(stored.id)),
+            ordinal: Set(next_finding_ordinal),
+            kind: Set(finding.kind.to_owned()),
+            effect: Set(finding.effect.to_owned()),
+            severity: Set(finding.severity),
+            summary: Set(bound(&finding.summary).0),
+            evidence: Set(finding.evidence),
+        }
+        .insert(db)
+        .await?;
+        next_finding_ordinal = next_finding_ordinal.saturating_add(1);
+    }
+    Ok(next_finding_ordinal)
 }
+
+#[derive(Debug, PartialEq)]
+struct NormalizedFinding {
+    kind: &'static str,
+    effect: &'static str,
+    severity: Option<String>,
+    summary: String,
+    evidence: serde_json::Value,
+}
+
+fn normalized_findings(check: &HipcheckCheck) -> Vec<NormalizedFinding> {
+    let finding_kind = match check.state {
+        super::HipcheckCheckState::Skipped | super::HipcheckCheckState::Unsupported => {
+            "missing-check"
+        }
+        super::HipcheckCheckState::Errored => "check-error",
+        super::HipcheckCheckState::Passed | super::HipcheckCheckState::Failed => "check-result",
+    };
+    let mut findings = vec![NormalizedFinding {
+        kind: finding_kind,
+        effect: normalized_check_effect(check),
+        severity: check.severity.clone(),
+        summary: check.summary.clone(),
+        evidence: json!({
+            "plugin": {
+                "publisher": check.plugin.publisher,
+                "name": check.plugin.name,
+                "version": check.plugin.version,
+                "query": check.plugin.query,
+            },
+            "policy_expression": check.policy.expression,
+            "state": state(check),
+            "value": check.value,
+            "error_kind": check.error.as_ref().map(|error| &error.kind),
+            "error_retryable": check.error.as_ref().map(|error| error.retryable),
+        }),
+    }];
+    findings.extend(
+        check
+            .concerns
+            .iter()
+            .filter(|concern| concern.kind == "missing-data")
+            .map(|concern| NormalizedFinding {
+                kind: "missing-evidence",
+                effect: "review",
+                severity: None,
+                summary: concern.message.clone(),
+                evidence: json!({
+                    "plugin": {
+                        "publisher": check.plugin.publisher,
+                        "name": check.plugin.name,
+                        "version": check.plugin.version,
+                        "query": check.plugin.query,
+                    },
+                    "concern_kind": concern.kind,
+                    "details": concern.details,
+                }),
+            }),
+    );
+    findings
+}
+
+fn normalized_check_effect(check: &HipcheckCheck) -> &'static str {
+    match check.state {
+        super::HipcheckCheckState::Skipped
+        | super::HipcheckCheckState::Unsupported
+        | super::HipcheckCheckState::Errored => "missing-check",
+        super::HipcheckCheckState::Passed | super::HipcheckCheckState::Failed => effect(check),
+    }
+}
+
 fn bound(value: &str) -> (String, bool) {
     if value.len() <= MAX_STORED_HIPCHECK_OUTPUT_BYTES {
         return (value.to_owned(), false);
@@ -542,14 +627,13 @@ fn bound(value: &str) -> (String, bool) {
     }
     (value[..end].to_owned(), true)
 }
-fn effect(check: &HipcheckCheck) -> String {
+fn effect(check: &HipcheckCheck) -> &'static str {
     match check.effect {
         super::HipcheckEffect::Blocking => "blocking",
         super::HipcheckEffect::Review => "review",
         super::HipcheckEffect::Context => "context",
         super::HipcheckEffect::MissingCheck => "missing-check",
     }
-    .to_owned()
 }
 fn state(check: &HipcheckCheck) -> &'static str {
     match check.state {
@@ -568,10 +652,15 @@ fn recommendation(report: &HipcheckReport) -> String {
 mod tests {
     use super::{
         ASSESSMENT_INTERRUPTED_ERROR_KIND, ASSESSMENT_INTERRUPTED_ERROR_MESSAGE,
-        MAX_STORED_HIPCHECK_OUTPUT_BYTES, bound, reconcile_abandoned_hipcheck_runs,
-        reconcile_abandoned_upgrade_assessments,
+        MAX_STORED_HIPCHECK_OUTPUT_BYTES, bound, normalized_findings,
+        reconcile_abandoned_hipcheck_runs, reconcile_abandoned_upgrade_assessments,
+    };
+    use crate::hipcheck::{
+        HipcheckCheck, HipcheckCheckPolicy, HipcheckCheckState, HipcheckConcern, HipcheckEffect,
+        HipcheckError, HipcheckPluginIdentity,
     };
     use sea_orm::{DbBackend, MockDatabase, MockExecResult, Value};
+    use serde_json::json;
 
     #[test]
     fn output_bound_preserves_utf8_and_reports_truncation() {
@@ -580,6 +669,79 @@ mod tests {
         assert!(truncated);
         assert_eq!(stored.len(), MAX_STORED_HIPCHECK_OUTPUT_BYTES);
         assert!(stored.is_char_boundary(stored.len()));
+    }
+
+    #[test]
+    fn unsupported_and_plugin_errors_become_missing_check_inputs() {
+        let unsupported = normalized_findings(&check(
+            HipcheckCheckState::Unsupported,
+            HipcheckEffect::Review,
+            None,
+        ));
+        assert_eq!(unsupported[0].kind, "missing-check");
+        assert_eq!(unsupported[0].effect, "missing-check");
+
+        let completed = normalized_findings(&check(
+            HipcheckCheckState::Passed,
+            HipcheckEffect::Context,
+            None,
+        ));
+        let plugin_error = normalized_findings(&check(
+            HipcheckCheckState::Errored,
+            HipcheckEffect::Review,
+            Some(HipcheckError {
+                kind: "plugin".to_owned(),
+                message: "plugin process exited".to_owned(),
+                retryable: true,
+            }),
+        ));
+        assert_eq!(completed[0].effect, "context");
+        assert_eq!(plugin_error[0].kind, "check-error");
+        assert_eq!(plugin_error[0].effect, "missing-check");
+        assert_eq!(plugin_error[0].evidence["error_retryable"], true);
+    }
+
+    #[test]
+    fn missing_optional_evidence_becomes_a_review_finding() {
+        let mut check = check(HipcheckCheckState::Passed, HipcheckEffect::Context, None);
+        check.concerns.push(HipcheckConcern {
+            kind: "missing-data".to_owned(),
+            message: "plugin version was not reported".to_owned(),
+            details: None,
+        });
+
+        let findings = normalized_findings(&check);
+
+        assert_eq!(findings.len(), 2);
+        assert_eq!(findings[1].kind, "missing-evidence");
+        assert_eq!(findings[1].effect, "review");
+    }
+
+    fn check(
+        state: HipcheckCheckState,
+        effect: HipcheckEffect,
+        error: Option<HipcheckError>,
+    ) -> HipcheckCheck {
+        HipcheckCheck {
+            plugin: HipcheckPluginIdentity {
+                name: "binary".to_owned(),
+                publisher: "mitre".to_owned(),
+                version: "1.0.0".to_owned(),
+                query: "binary".to_owned(),
+            },
+            policy: HipcheckCheckPolicy {
+                expression: "(lte $ 0)".to_owned(),
+            },
+            state,
+            effect,
+            severity: None,
+            summary: "structured summary".to_owned(),
+            value: json!({"count": 0}),
+            concerns: Vec::new(),
+            started_at: None,
+            ended_at: None,
+            error,
+        }
     }
 
     #[tokio::test]
