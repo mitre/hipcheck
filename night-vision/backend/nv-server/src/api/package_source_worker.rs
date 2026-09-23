@@ -164,6 +164,7 @@ mod tests {
     async fn insert(db: &DatabaseConnection, contents: &str) -> package_sources::Model {
         package_sources::ActiveModel {
             source_id: Set(uuid::Uuid::now_v7().to_string()),
+            display_name: Set("test package source".to_owned()),
             file_name: Set("package.json".to_owned()),
             file_contents: Set(contents.to_owned()),
             inferred_type: Set("npm-package-json".to_owned()),

@@ -30,7 +30,8 @@ use nv_common::{
     },
     db::entities::{
         cisa_kev_sync_runs::Model as KevSyncRun, cve_list_sync_runs::Model as CveListSyncRun,
-        hipcheck_runs, upgrade_assessments,
+        hipcheck_runs, package_source_versions, package_source_warnings, package_sources,
+        package_versions, upgrade_assessments,
     },
     display_safety::{diagnostic_text, raw_json_preview, summary_text, url_label},
     hipcheck::{
@@ -66,16 +67,18 @@ use nv_server_api::{
     AssessmentFinding, AssessmentPathParams, AssessmentStatus, CveIngestHealth,
     CveListSyncRunHealth, DataStatus, DatasetDataStatus, DatasetSyncAttempt, Health,
     HealthDiagnostics, KevIngestHealth, KevSyncRunHealth, NvServerApi, PackageSource,
-    PackageSourceEcosystem, PackageSourceExposure, PackageSourceExposureKevContext,
-    PackageSourceExposures, PackageSourceExposuresStatus, PackageSourceFailureKind,
-    PackageSourceOperationResponse, PackageSourceOperationStatus, PackageSourcePathParams,
-    PackageSourceStatus, PackageSourceStatusCancelled, PackageSourceStatusCompleted,
-    PackageSourceStatusCompletedWithWarnings, PackageSourceStatusFailed,
-    PackageSourceStatusProcessing, PackageSourceWarning, PostAssessmentBody,
-    PostAssessmentResponse, PostPackageSourceBody, PostPackageSourceResponse,
-    PostUpgradeAssessmentBody, PostUpgradeAssessmentResponse, UpgradeAssessmentCandidateVersion,
-    UpgradeAssessmentCaveat, UpgradeAssessmentError, UpgradeAssessmentEvidence,
-    UpgradeAssessmentEvidenceSourceType, UpgradeAssessmentFinding,
+    PackageSourceAttention, PackageSourceEcosystem, PackageSourceExposure,
+    PackageSourceExposureKevContext, PackageSourceExposureSummaryStatus, PackageSourceExposures,
+    PackageSourceExposuresStatus, PackageSourceFailureKind, PackageSourceLifecycle,
+    PackageSourceList, PackageSourceListDirection, PackageSourceListFilter, PackageSourceListQuery,
+    PackageSourceListSort, PackageSourceOperationResponse, PackageSourceOperationStatus,
+    PackageSourcePathParams, PackageSourceStatus, PackageSourceStatusCancelled,
+    PackageSourceStatusCompleted, PackageSourceStatusCompletedWithWarnings,
+    PackageSourceStatusFailed, PackageSourceStatusProcessing, PackageSourceSummary,
+    PackageSourceWarning, PostAssessmentBody, PostAssessmentResponse, PostPackageSourceBody,
+    PostPackageSourceResponse, PostUpgradeAssessmentBody, PostUpgradeAssessmentResponse,
+    UpgradeAssessmentCandidateVersion, UpgradeAssessmentCaveat, UpgradeAssessmentError,
+    UpgradeAssessmentEvidence, UpgradeAssessmentEvidenceSourceType, UpgradeAssessmentFinding,
     UpgradeAssessmentFindingCategory, UpgradeAssessmentFindingEffect, UpgradeAssessmentInput,
     UpgradeAssessmentKevLinkage, UpgradeAssessmentPackageSourceInput, UpgradeAssessmentPathParams,
     UpgradeAssessmentResult, UpgradeAssessmentStatus, UpgradeAssessmentUpgradeDistance,
@@ -89,7 +92,11 @@ use sea_orm::{
 };
 use secrecy::{ExposeSecret as _, SecretString};
 use slog::Logger;
-use std::{collections::HashSet, fs::File, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashSet},
+    fs::File,
+    time::Duration,
+};
 use subtle::ConstantTimeEq as _;
 use uuid::Uuid;
 
@@ -265,6 +272,7 @@ impl NvServerApi for RestApi {
         let context = ctx.context();
         let db = context.db();
         let body = body_param.into_inner();
+        let display_name = validated_package_source_display_name(body.display_name)?;
         let file_name = body.file_name;
         let contents = body.contents;
         NpmPackageJson::parse_package_json(contents.as_bytes())
@@ -274,10 +282,19 @@ impl NvServerApi for RestApi {
         // slot is occupied: the source is persisted `pending` unconditionally,
         // and the background worker claims it once capacity allows. This does
         // not promise that processing has started.
-        let stored = store_validated_package_source(db, file_name, contents).await?;
+        let stored = store_validated_package_source(db, display_name, file_name, contents).await?;
         Ok(HttpResponseAccepted(PostPackageSourceResponse {
             id: stored.id,
         }))
+    }
+
+    async fn list_package_sources(
+        ctx: RequestContext<Self::Context>,
+        query_params: Query<PackageSourceListQuery>,
+    ) -> Result<HttpResponseOk<PackageSourceList>, HttpError> {
+        Ok(HttpResponseOk(
+            package_source_list(ctx.context().db(), query_params.into_inner()).await?,
+        ))
     }
 
     async fn get_package_source(
@@ -1021,12 +1038,14 @@ fn invalid_package_source_contents() -> HttpError {
 
 async fn store_validated_package_source(
     db: &DatabaseConnection,
+    display_name: String,
     file_name: String,
     contents: String,
 ) -> Result<StoredPackageSource, HttpError> {
     let id = Uuid::now_v7();
     let source = nv_common::db::entities::package_sources::ActiveModel {
         source_id: Set(id.to_string()),
+        display_name: Set(display_name),
         file_name: Set(file_name),
         file_contents: Set(contents),
         inferred_type: Set("npm-package-json".to_owned()),
@@ -1039,6 +1058,98 @@ async fn store_validated_package_source(
     .map_err(|_| internal_server_error())?;
     let _ = source;
     Ok(StoredPackageSource { id })
+}
+
+const MAX_PACKAGE_SOURCE_DISPLAY_NAME_CHARS: usize = 120;
+const DEFAULT_PACKAGE_SOURCE_LIST_LIMIT: u32 = 25;
+const MAX_PACKAGE_SOURCE_LIST_LIMIT: u32 = 100;
+const MAX_PACKAGE_SOURCE_LIST_CURSOR: usize = 10_000;
+const MAX_PACKAGE_SOURCE_LIST_QUERY_CHARS: usize = 100;
+
+fn validated_package_source_display_name(value: String) -> Result<String, HttpError> {
+    let value = value.trim();
+    if value.is_empty() || value.chars().count() > MAX_PACKAGE_SOURCE_DISPLAY_NAME_CHARS {
+        return Err(HttpError::for_bad_request(
+            Some("InvalidPackageSourceRequest".to_owned()),
+            "package-source display name is invalid".to_owned(),
+        ));
+    }
+    Ok(value.to_owned())
+}
+
+/// Build bounded package-source summaries.
+async fn package_source_list(
+    db: &DatabaseConnection,
+    query: PackageSourceListQuery,
+) -> Result<PackageSourceList, HttpError> {
+    let limit = query.limit.unwrap_or(DEFAULT_PACKAGE_SOURCE_LIST_LIMIT);
+    if limit == 0 || limit > MAX_PACKAGE_SOURCE_LIST_LIMIT {
+        return Err(HttpError::for_bad_request(
+            Some("InvalidPackageSourceListQuery".to_owned()),
+            "package-source list limit must be between 1 and 100".to_owned(),
+        ));
+    }
+    let cursor = parse_package_source_list_cursor(query.cursor.as_deref())?;
+    let source_query = query
+        .query
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if source_query.is_some_and(|value| value.chars().count() > MAX_PACKAGE_SOURCE_LIST_QUERY_CHARS)
+    {
+        return Err(HttpError::for_bad_request(
+            Some("InvalidPackageSourceListQuery".to_owned()),
+            "package-source list query is too long".to_owned(),
+        ));
+    }
+
+    // Cap candidates while aggregate counts are not materialized.
+    let candidate_limit = MAX_PACKAGE_SOURCE_LIST_CURSOR
+        .checked_add(usize::try_from(limit).expect("u32 limit fits usize"))
+        .and_then(|value| u64::try_from(value).ok())
+        .expect("package-source list candidate cap fits u64");
+    let mut sources = package_sources::Entity::find()
+        .filter(package_sources::Column::ResolutionStatus.ne("deleting"))
+        .limit(candidate_limit)
+        .all(db)
+        .await
+        .map_err(internal_error)?;
+    if let Some(source_query) = source_query {
+        let source_query = source_query.to_lowercase();
+        sources.retain(|source| source.display_name.to_lowercase().contains(&source_query));
+    }
+
+    let summaries = package_source_summaries(db, sources).await?;
+    let filter = query.filter.unwrap_or(PackageSourceListFilter::All);
+    let mut summaries = summaries
+        .into_iter()
+        .filter(|summary| package_source_summary_matches_filter(summary, filter))
+        .collect::<Vec<_>>();
+    sort_package_source_summaries(
+        &mut summaries,
+        query.sort.unwrap_or(PackageSourceListSort::Activity),
+        query.direction.unwrap_or(PackageSourceListDirection::Desc),
+    );
+
+    let cursor = cursor.min(summaries.len());
+    let end = cursor.saturating_add(usize::try_from(limit).expect("u32 limit fits usize"));
+    let items = summaries[cursor..summaries.len().min(end)].to_vec();
+    let next_cursor = (end < summaries.len()).then(|| end.to_string());
+    Ok(PackageSourceList { items, next_cursor })
+}
+
+fn parse_package_source_list_cursor(value: Option<&str>) -> Result<usize, HttpError> {
+    let Some(value) = value else { return Ok(0) };
+    let cursor = value
+        .parse::<usize>()
+        .ok()
+        .filter(|value| *value <= MAX_PACKAGE_SOURCE_LIST_CURSOR);
+    cursor.ok_or_else(|| {
+        HttpError::for_bad_request(
+            Some("InvalidPackageSourceListQuery".to_owned()),
+            "package-source list cursor is invalid".to_owned(),
+        )
+    })
 }
 
 struct StoredPackageSource {
@@ -1177,7 +1288,7 @@ async fn lookup_package_source(
                 created_at,
                 completed_at: terminal_at,
                 attempt: source.attempt_generation,
-                source: package_source(source.file_name, source.file_contents),
+                source: package_source(source.display_name, source.file_name, source.file_contents),
                 versioned_packages,
             },
         )));
@@ -1202,7 +1313,7 @@ async fn lookup_package_source(
             created_at,
             completed_at: terminal_at,
             attempt: source.attempt_generation,
-            source: package_source(source.file_name, source.file_contents),
+            source: package_source(source.display_name, source.file_name, source.file_contents),
             versioned_packages,
             warnings,
             warnings_truncated,
@@ -1210,12 +1321,229 @@ async fn lookup_package_source(
     )))
 }
 
-fn package_source(file_name: String, contents: String) -> PackageSource {
+fn package_source(display_name: String, file_name: String, contents: String) -> PackageSource {
     PackageSource {
+        display_name,
         ecosystem: PackageSourceEcosystem::Npm,
         file_name,
         contents,
     }
+}
+
+async fn package_source_summaries(
+    db: &DatabaseConnection,
+    sources: Vec<package_sources::Model>,
+) -> Result<Vec<PackageSourceSummary>, HttpError> {
+    if sources.is_empty() {
+        return Ok(Vec::new());
+    }
+    let source_ids = sources.iter().map(|source| source.id).collect::<Vec<_>>();
+    let warning_source_ids = package_source_warnings::Entity::find()
+        .filter(package_source_warnings::Column::SourceId.is_in(source_ids.clone()))
+        .all(db)
+        .await
+        .map_err(internal_error)?
+        .into_iter()
+        .map(|warning| warning.source_id)
+        .collect::<HashSet<_>>();
+    let associations = package_source_versions::Entity::find()
+        .filter(package_source_versions::Column::SourceId.is_in(source_ids.clone()))
+        .all(db)
+        .await
+        .map_err(internal_error)?;
+    let package_version_ids = associations
+        .iter()
+        .map(|association| association.package_version_id)
+        .collect::<Vec<_>>();
+    let package_versions_by_id = package_versions::Entity::find()
+        .filter(package_versions::Column::Id.is_in(package_version_ids))
+        .all(db)
+        .await
+        .map_err(internal_error)?
+        .into_iter()
+        .map(|version| (version.id, version))
+        .collect::<BTreeMap<_, _>>();
+    let mut reachable_by_source = BTreeMap::<i32, BTreeSet<(String, String)>>::new();
+    for association in associations {
+        if let Some(version) = package_versions_by_id.get(&association.package_version_id) {
+            reachable_by_source
+                .entry(association.source_id)
+                .or_default()
+                .insert((
+                    npm_package_name_from_purl(&version.package_url),
+                    version.version.clone(),
+                ));
+        }
+    }
+
+    let completed_source_ids = sources
+        .iter()
+        .filter(|source| source.resolution_status == "completed")
+        .map(|source| source.id)
+        .collect::<HashSet<_>>();
+    let exposure_data_available = has_cve_list_records(db).await.map_err(internal_error)?
+        && has_active_kev_records(db).await.map_err(internal_error)?;
+    let all_reachable = reachable_by_source
+        .values()
+        .flatten()
+        .map(|(name, version)| ReachableNpmPackageVersion {
+            package_name: name.clone(),
+            version: version.clone(),
+            source_evidence: format!("pkg:npm/{name}@{version}"),
+        })
+        .collect::<Vec<_>>();
+    let affected = if exposure_data_available && !all_reachable.is_empty() {
+        kev_affected_npm_package_versions(db, &all_reachable)
+            .await
+            .map_err(internal_error)?
+            .into_iter()
+            .filter(|matched| matched.status == KevNpmMatchStatus::Affected)
+            .filter_map(|matched| {
+                Some((
+                    matched.package_name?,
+                    matched.affected_version?,
+                    matched.cve_id,
+                ))
+            })
+            .collect::<HashSet<_>>()
+    } else {
+        HashSet::new()
+    };
+
+    sources
+        .into_iter()
+        .map(|source| {
+            let id = Uuid::parse_str(&source.source_id).map_err(internal_error)?;
+            let mut lifecycle = package_source_lifecycle(&source.resolution_status)?;
+            if lifecycle == PackageSourceLifecycle::Completed
+                && warning_source_ids.contains(&source.id)
+            {
+                lifecycle = PackageSourceLifecycle::CompletedWithWarnings;
+            }
+            let completed = completed_source_ids.contains(&source.id);
+            let reachable = reachable_by_source.get(&source.id);
+            let reachable_package_count = matches!(
+                lifecycle,
+                PackageSourceLifecycle::Completed
+                    | PackageSourceLifecycle::CompletedWithWarnings
+                    | PackageSourceLifecycle::Failed
+            )
+            .then(|| reachable.map_or(0, BTreeSet::len) as u64);
+            let exposure_status = match lifecycle {
+                PackageSourceLifecycle::Pending | PackageSourceLifecycle::Processing => {
+                    PackageSourceExposureSummaryStatus::Processing
+                }
+                PackageSourceLifecycle::Failed => PackageSourceExposureSummaryStatus::Failed,
+                PackageSourceLifecycle::Cancelled => PackageSourceExposureSummaryStatus::Cancelled,
+                PackageSourceLifecycle::Completed
+                | PackageSourceLifecycle::CompletedWithWarnings
+                    if exposure_data_available =>
+                {
+                    PackageSourceExposureSummaryStatus::Available
+                }
+                PackageSourceLifecycle::Completed
+                | PackageSourceLifecycle::CompletedWithWarnings => {
+                    PackageSourceExposureSummaryStatus::Unavailable
+                }
+            };
+            let exposure_count = (completed && exposure_data_available).then(|| {
+                reachable.map_or(0, |versions| {
+                    versions
+                        .iter()
+                        .flat_map(|(name, version)| {
+                            affected
+                                .iter()
+                                .filter(move |(affected_name, affected_version, _)| {
+                                    affected_name == name && affected_version == version
+                                })
+                        })
+                        .count() as u64
+                })
+            });
+            let attention = if lifecycle == PackageSourceLifecycle::Failed {
+                PackageSourceAttention::Failed
+            } else if warning_source_ids.contains(&source.id) {
+                PackageSourceAttention::Warnings
+            } else if matches!(
+                exposure_status,
+                PackageSourceExposureSummaryStatus::Unavailable
+            ) {
+                PackageSourceAttention::ExposureDataUnavailable
+            } else {
+                PackageSourceAttention::None
+            };
+            let created_at = utc(source.created_at);
+            let resolution_at = source.terminal_at.map(utc);
+            Ok(PackageSourceSummary {
+                id,
+                display_name: source.display_name,
+                ecosystem: PackageSourceEcosystem::Npm,
+                lifecycle,
+                created_at,
+                activity_at: resolution_at.unwrap_or(created_at),
+                resolution_at,
+                reachable_package_count,
+                exposure_count,
+                exposure_status,
+                attention,
+            })
+        })
+        .collect()
+}
+
+fn package_source_lifecycle(value: &str) -> Result<PackageSourceLifecycle, HttpError> {
+    match value {
+        "pending" => Ok(PackageSourceLifecycle::Pending),
+        "processing" => Ok(PackageSourceLifecycle::Processing),
+        "completed" => Ok(PackageSourceLifecycle::Completed),
+        "failed" => Ok(PackageSourceLifecycle::Failed),
+        "cancelled" => Ok(PackageSourceLifecycle::Cancelled),
+        "deleting" => Err(internal_server_error()),
+        _ => Err(internal_server_error()),
+    }
+}
+
+fn package_source_summary_matches_filter(
+    summary: &PackageSourceSummary,
+    filter: PackageSourceListFilter,
+) -> bool {
+    match filter {
+        PackageSourceListFilter::All => true,
+        PackageSourceListFilter::NeedsAttention => {
+            summary.attention != PackageSourceAttention::None
+        }
+        PackageSourceListFilter::Processing => matches!(
+            summary.lifecycle,
+            PackageSourceLifecycle::Pending | PackageSourceLifecycle::Processing
+        ),
+        PackageSourceListFilter::Failed => summary.lifecycle == PackageSourceLifecycle::Failed,
+    }
+}
+
+fn sort_package_source_summaries(
+    summaries: &mut [PackageSourceSummary],
+    sort: PackageSourceListSort,
+    direction: PackageSourceListDirection,
+) {
+    summaries.sort_by(|left, right| {
+        let order = match sort {
+            PackageSourceListSort::Activity => left.activity_at.cmp(&right.activity_at),
+            PackageSourceListSort::Identity => left.display_name.cmp(&right.display_name),
+            PackageSourceListSort::Lifecycle => {
+                format!("{:?}", left.lifecycle).cmp(&format!("{:?}", right.lifecycle))
+            }
+            PackageSourceListSort::ResolutionTime => left.resolution_at.cmp(&right.resolution_at),
+            PackageSourceListSort::ReachablePackages => left
+                .reachable_package_count
+                .cmp(&right.reachable_package_count),
+            PackageSourceListSort::Exposures => left.exposure_count.cmp(&right.exposure_count),
+        }
+        .then_with(|| left.id.cmp(&right.id));
+        match direction {
+            PackageSourceListDirection::Asc => order,
+            PackageSourceListDirection::Desc => order.reverse(),
+        }
+    });
 }
 
 async fn package_source_exposures_status(
@@ -2406,7 +2734,7 @@ mod tests {
             .uri(test_context.client_testctx.url("/package-sources"))
             .header(CONTENT_TYPE, "application/json")
             .body(Body::from(
-                r#"{"fileName":"package.json","contents":"not JSON"}"#,
+                r#"{"displayName":"test package source","fileName":"package.json","contents":"not JSON"}"#,
             ))
             .expect("request should build");
 
@@ -3861,6 +4189,88 @@ mod tests {
         );
     }
 
+    fn package_source_summary(
+        name: &str,
+        lifecycle: PackageSourceLifecycle,
+        attention: PackageSourceAttention,
+    ) -> PackageSourceSummary {
+        PackageSourceSummary {
+            id: Uuid::now_v7(),
+            display_name: name.to_owned(),
+            ecosystem: PackageSourceEcosystem::Npm,
+            lifecycle,
+            created_at: Utc::now(),
+            activity_at: Utc::now(),
+            resolution_at: None,
+            reachable_package_count: None,
+            exposure_count: None,
+            exposure_status: PackageSourceExposureSummaryStatus::Processing,
+            attention,
+        }
+    }
+
+    #[test]
+    fn package_source_list_filters_and_sorts_summary_rows() {
+        let failed = package_source_summary(
+            "Zulu",
+            PackageSourceLifecycle::Failed,
+            PackageSourceAttention::Failed,
+        );
+        let processing = package_source_summary(
+            "alpha",
+            PackageSourceLifecycle::Processing,
+            PackageSourceAttention::None,
+        );
+        let warning = package_source_summary(
+            "Bravo",
+            PackageSourceLifecycle::CompletedWithWarnings,
+            PackageSourceAttention::Warnings,
+        );
+        assert!(package_source_summary_matches_filter(
+            &failed,
+            PackageSourceListFilter::NeedsAttention
+        ));
+        assert!(package_source_summary_matches_filter(
+            &warning,
+            PackageSourceListFilter::NeedsAttention
+        ));
+        assert!(!package_source_summary_matches_filter(
+            &processing,
+            PackageSourceListFilter::NeedsAttention
+        ));
+        assert!(package_source_summary_matches_filter(
+            &processing,
+            PackageSourceListFilter::Processing
+        ));
+
+        let mut summaries = vec![failed, processing, warning];
+        sort_package_source_summaries(
+            &mut summaries,
+            PackageSourceListSort::Identity,
+            PackageSourceListDirection::Asc,
+        );
+        assert_eq!(
+            summaries
+                .iter()
+                .map(|summary| summary.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Bravo", "Zulu", "alpha"]
+        );
+    }
+
+    #[test]
+    fn package_source_list_validation_bounds_cursors_and_display_names() {
+        assert_eq!(parse_package_source_list_cursor(None).unwrap(), 0);
+        assert_eq!(parse_package_source_list_cursor(Some("10")).unwrap(), 10);
+        parse_package_source_list_cursor(Some("invalid")).unwrap_err();
+        parse_package_source_list_cursor(Some("10001")).unwrap_err();
+        assert_eq!(
+            validated_package_source_display_name("  Example  ".to_owned()).unwrap(),
+            "Example"
+        );
+        validated_package_source_display_name(" ".to_owned()).unwrap_err();
+    }
+
     fn source(
         id: Uuid,
         resolution_status: &str,
@@ -3869,6 +4279,7 @@ mod tests {
         package_sources::Model {
             id: 1,
             source_id: id.to_string(),
+            display_name: "test package source".to_owned(),
             file_name: "package.json".to_owned(),
             file_contents: "{}".to_owned(),
             inferred_type: "npm-package-json".to_owned(),

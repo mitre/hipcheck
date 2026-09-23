@@ -754,6 +754,7 @@ mod tests {
             .append_query_results([vec![package_sources::Model {
                 id: 7,
                 source_id: "source-7".to_owned(),
+                display_name: "test package source".to_owned(),
                 file_name: "package.json".to_owned(),
                 file_contents: "{}".to_owned(),
                 inferred_type: "npm-package-json".to_owned(),
@@ -855,6 +856,7 @@ mod tests {
         package_sources::Model {
             id: 7,
             source_id: "source-7".to_owned(),
+            display_name: "test package source".to_owned(),
             file_name: "package.json".to_owned(),
             file_contents: "{}".to_owned(),
             inferred_type: "npm-package-json".to_owned(),

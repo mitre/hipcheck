@@ -98,6 +98,7 @@ mod tests {
             source: package_sources::Model {
                 id: 1,
                 source_id: "source-1".to_owned(),
+                display_name: "test package source".to_owned(),
                 file_name: "package.json".to_owned(),
                 file_contents: "{}".to_owned(),
                 inferred_type: "npm-package-json".to_owned(),

@@ -50,6 +50,7 @@ async fn store(config: &Config, path: &Utf8PathBuf, contents: String) -> Result<
     let id = Uuid::now_v7().to_string();
     package_sources::ActiveModel {
         source_id: Set(id.clone()),
+        display_name: Set("imported package source".to_owned()),
         file_name: Set(path.file_name().unwrap_or("package.json").to_owned()),
         file_contents: Set(contents),
         inferred_type: Set("npm-package-json".to_owned()),

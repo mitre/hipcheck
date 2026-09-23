@@ -30,6 +30,7 @@ OpenAPI schema generated from `backend/nv-server-api/src/lib.rs`.
 
 Current examples include:
 
+- `displayName`
 - `fileName`
 - `createdAt`
 - `versionedPackages`
@@ -145,7 +146,11 @@ because either vulnerability dataset is stale or unavailable.
 ### `POST /package-sources`
 
 Submit a package source for processing. The endpoint accepts only
-`application/json` requests with exactly the `fileName` and `contents` fields.
+`application/json` requests with exactly the `displayName`, `fileName`, and
+`contents` fields. `displayName` is required, trimmed before storage, and
+limited to 120 Unicode characters. It is the user-facing identity used in
+package-source lists. Legacy sources receive a stable
+`package.json — <source ID prefix>` label during migration.
 `fileName` must be exactly `package.json`; paths, alternative file names, and
 additional fields are rejected. `contents` must be a valid npm `package.json`
 document and must not exceed `package-source-contents-max-bytes` (1 MiB by
@@ -157,6 +162,7 @@ Request:
 curl -X POST http://127.0.0.1:8080/package-sources \
   -H 'Content-Type: application/json' \
   -d '{
+    "displayName": "Example application",
     "fileName": "package.json",
     "contents": "{\"dependencies\":{\"react\":\"18.2.0\"}}"
   }'
@@ -183,6 +189,58 @@ failures automatically. Use the returned `id` with `GET /package-sources/{id}`
 to check the package-source status. Cancellation, deletion, retry, and
 operator-triggered retention are described in the
 [package-source lifecycle](./package-source-lifecycle.md).
+
+### `GET /package-sources`
+
+Read a bounded package-source work list for the browser. Index rows never
+include manifests, dependency graphs, warning details, or diagnostics.
+
+`limit` is 1 through 100 (default 25); `cursor` is the decimal `nextCursor`
+returned by the prior page. The server rejects malformed cursors and bounds
+traversal to 10,000 summary candidates. `filter` is `all` (default),
+`needs-attention`, `processing`, or `failed`; processing includes pending and
+processing states. Needs attention includes failures, completed sources with
+warnings, and completed sources whose CVE or KEV data is unavailable.
+
+`query` is an optional case-insensitive source-identity substring of at most
+100 characters. Supported `sort` keys are `activity` (default), `identity`,
+`lifecycle`, `resolution-time`, `reachable-packages`, and `exposures`.
+`direction` is `desc` (default) or `asc`; source ID is the stable tie-breaker.
+
+```json
+{
+  "items": [{
+    "id": "00000000-0000-0000-0000-000000000001",
+    "displayName": "Example application",
+    "ecosystem": "npm",
+    "lifecycle": "completed",
+    "createdAt": "2000-01-01T00:00:00Z",
+    "activityAt": "2000-01-01T00:01:00Z",
+    "resolutionAt": "2000-01-01T00:01:00Z",
+    "reachablePackageCount": 42,
+    "exposureCount": 0,
+    "exposureStatus": "available",
+    "attention": "none"
+  }],
+  "nextCursor": null
+}
+```
+
+`activityAt` is the terminal lifecycle timestamp when present, otherwise the
+submission timestamp. `resolutionAt` is populated only for terminal outcomes.
+`reachablePackageCount` is available for completed, completed-with-warnings,
+and failed sources that retain a prior snapshot.
+
+`exposureCount: 0` with `exposureStatus: "available"` explicitly means a
+completed source has no current KEV-linked exposures. Completed sources with
+unavailable CVE or KEV data return a null count and `unavailable`. Pending and
+processing sources return `processing`, failed sources return `failed`, and
+cancelled sources return `cancelled`; each has a null exposure count. Counts
+reflect current vulnerability datasets, not a persisted vulnerability snapshot.
+
+`attention` is `none`, `warnings`, `failed`, or `exposure-data-unavailable`.
+A completed-with-warnings source retains usable counts and has `warnings`,
+rather than being reported as failed.
 
 ### `GET /package-sources/{id}`
 
@@ -269,6 +327,7 @@ Content-Type: application/json
   "completedAt": "2000-01-01T00:01:00Z",
   "attempt": 1,
   "source": {
+    "displayName": "Example application",
     "ecosystem": "npm",
     "fileName": "package.json",
     "contents": "{}"

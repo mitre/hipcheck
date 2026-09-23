@@ -226,6 +226,7 @@ fn package_source_body(path: &Utf8PathBuf) -> Result<types::PostPackageSourceBod
     let contents = fs::read_to_string(path)
         .with_context(|| format!("failed to read package source file {path} as UTF-8"))?;
     Ok(types::PostPackageSourceBody {
+        display_name: file_name.clone(),
         file_name,
         contents,
     })
@@ -499,6 +500,7 @@ mod tests {
                 .header("content-type", "application/json")
                 .header("user-agent", "nvdb")
                 .json_body_obj(&serde_json::json!({
+                    "displayName": package.file_name().expect("fixture filename"),
                     "fileName": package.file_name().expect("fixture filename"),
                     "contents": "{\"name\":\"example\"}"
                 }));

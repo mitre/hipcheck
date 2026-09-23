@@ -184,6 +184,76 @@
       }
     },
     "/package-sources": {
+      "get": {
+        "operationId": "list_package_sources",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "$ref": "#/components/schemas/PackageSourceListDirection"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "schema": {
+              "$ref": "#/components/schemas/PackageSourceListFilter"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "nullable": true,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "$ref": "#/components/schemas/PackageSourceListSort"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageSourceList"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
       "post": {
         "operationId": "post_package_source",
         "requestBody": {
@@ -913,6 +983,9 @@
           "contents": {
             "type": "string"
           },
+          "displayName": {
+            "type": "string"
+          },
           "ecosystem": {
             "$ref": "#/components/schemas/PackageSourceEcosystem"
           },
@@ -922,8 +995,18 @@
         },
         "required": [
           "contents",
+          "displayName",
           "ecosystem",
           "fileName"
+        ]
+      },
+      "PackageSourceAttention": {
+        "type": "string",
+        "enum": [
+          "none",
+          "warnings",
+          "failed",
+          "exposure-data-unavailable"
         ]
       },
       "PackageSourceEcosystem": {
@@ -972,6 +1055,16 @@
           }
         }
       },
+      "PackageSourceExposureSummaryStatus": {
+        "type": "string",
+        "enum": [
+          "available",
+          "unavailable",
+          "processing",
+          "failed",
+          "cancelled"
+        ]
+      },
       "PackageSourceExposures": {
         "type": "object",
         "properties": {
@@ -1010,6 +1103,35 @@
           "dependency-unavailable",
           "resolution",
           "internal"
+        ]
+      },
+      "PackageSourceLifecycle": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "processing",
+          "completed",
+          "completed-with-warnings",
+          "failed",
+          "cancelled"
+        ]
+      },
+      "PackageSourceList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackageSourceSummary"
+            }
+          },
+          "nextCursor": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
         ]
       },
       "PackageSourceOperationResponse": {
@@ -1287,6 +1409,65 @@
           }
         ]
       },
+      "PackageSourceSummary": {
+        "type": "object",
+        "properties": {
+          "activityAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attention": {
+            "$ref": "#/components/schemas/PackageSourceAttention"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "$ref": "#/components/schemas/PackageSourceEcosystem"
+          },
+          "exposureCount": {
+            "nullable": true,
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "exposureStatus": {
+            "$ref": "#/components/schemas/PackageSourceExposureSummaryStatus"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/PackageSourceLifecycle"
+          },
+          "reachablePackageCount": {
+            "nullable": true,
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "resolutionAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "activityAt",
+          "attention",
+          "createdAt",
+          "displayName",
+          "ecosystem",
+          "exposureStatus",
+          "id",
+          "lifecycle"
+        ]
+      },
       "PackageSourceWarning": {
         "type": "object",
         "properties": {
@@ -1345,12 +1526,16 @@
           "contents": {
             "type": "string"
           },
+          "displayName": {
+            "type": "string"
+          },
           "fileName": {
             "type": "string"
           }
         },
         "required": [
           "contents",
+          "displayName",
           "fileName"
         ],
         "additionalProperties": false
@@ -1831,6 +2016,33 @@
           "name",
           "purl",
           "version"
+        ]
+      },
+      "PackageSourceListDirection": {
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "PackageSourceListFilter": {
+        "type": "string",
+        "enum": [
+          "all",
+          "needs-attention",
+          "processing",
+          "failed"
+        ]
+      },
+      "PackageSourceListSort": {
+        "type": "string",
+        "enum": [
+          "activity",
+          "identity",
+          "lifecycle",
+          "resolution-time",
+          "reachable-packages",
+          "exposures"
         ]
       }
     },

@@ -3,7 +3,9 @@
 // can use a newer version of `schemars`, we should switch to using
 // `jiff`.
 use chrono::{DateTime, Utc};
-use dropshot::{HttpError, HttpResponseAccepted, HttpResponseOk, Path, RequestContext, TypedBody};
+use dropshot::{
+    HttpError, HttpResponseAccepted, HttpResponseOk, Path, Query, RequestContext, TypedBody,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -59,6 +61,15 @@ pub trait NvServerApi {
         ctx: RequestContext<Self::Context>,
         body_param: TypedBody<PostPackageSourceBody>,
     ) -> Result<HttpResponseAccepted<PostPackageSourceResponse>, HttpError>;
+
+    #[endpoint {
+        method = GET,
+        path = "/package-sources",
+    }]
+    async fn list_package_sources(
+        ctx: RequestContext<Self::Context>,
+        query_params: Query<PackageSourceListQuery>,
+    ) -> Result<HttpResponseOk<PackageSourceList>, HttpError>;
 
     #[endpoint {
         method = GET,
@@ -694,6 +705,7 @@ mod tests {
 #[serde(deny_unknown_fields)]
 #[schemars(deny_unknown_fields)]
 pub struct PostPackageSourceBody {
+    pub display_name: String,
     pub file_name: String,
     pub contents: String,
 }
@@ -722,6 +734,99 @@ pub enum PackageSourceOperationStatus {
 #[serde(rename_all = "camelCase")]
 pub struct PackageSourcePathParams {
     pub id: Uuid,
+}
+
+/// Bounded collection controls for the package-source work list.
+#[derive(Deserialize, JsonSchema, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct PackageSourceListQuery {
+    pub cursor: Option<String>,
+    pub limit: Option<u32>,
+    pub filter: Option<PackageSourceListFilter>,
+    pub query: Option<String>,
+    pub sort: Option<PackageSourceListSort>,
+    pub direction: Option<PackageSourceListDirection>,
+}
+
+#[derive(Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum PackageSourceListFilter {
+    All,
+    NeedsAttention,
+    Processing,
+    Failed,
+}
+
+#[derive(Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum PackageSourceListSort {
+    Activity,
+    Identity,
+    Lifecycle,
+    ResolutionTime,
+    ReachablePackages,
+    Exposures,
+}
+
+#[derive(Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PackageSourceListDirection {
+    Asc,
+    Desc,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSourceList {
+    pub items: Vec<PackageSourceSummary>,
+    pub next_cursor: Option<String>,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSourceSummary {
+    pub id: Uuid,
+    pub display_name: String,
+    pub ecosystem: PackageSourceEcosystem,
+    pub lifecycle: PackageSourceLifecycle,
+    pub created_at: DateTime<Utc>,
+    pub activity_at: DateTime<Utc>,
+    pub resolution_at: Option<DateTime<Utc>>,
+    pub reachable_package_count: Option<u64>,
+    pub exposure_count: Option<u64>,
+    pub exposure_status: PackageSourceExposureSummaryStatus,
+    pub attention: PackageSourceAttention,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum PackageSourceLifecycle {
+    Pending,
+    Processing,
+    Completed,
+    CompletedWithWarnings,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum PackageSourceExposureSummaryStatus {
+    Available,
+    Unavailable,
+    Processing,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Serialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum PackageSourceAttention {
+    None,
+    Warnings,
+    Failed,
+    ExposureDataUnavailable,
 }
 
 #[derive(Serialize, JsonSchema, Debug, Clone)]
@@ -836,6 +941,7 @@ pub struct PackageSourceWarning {
 #[derive(Serialize, JsonSchema, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PackageSource {
+    pub display_name: String,
     pub ecosystem: PackageSourceEcosystem,
     pub file_name: String,
     pub contents: String,

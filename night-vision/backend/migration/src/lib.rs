@@ -26,6 +26,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260918_000000_package_source_lifecycle::Migration),
             Box::new(m20260921_000000_package_source_automatic_retry::Migration),
             Box::new(m20260922_000000_package_source_legacy_backfill::Migration),
+            Box::new(m20260923_000000_add_package_source_display_name::Migration),
         ]
     }
 }
@@ -50,3 +51,4 @@ mod m20260905_000000_create_upgrade_assessment_evidence_tables;
 mod m20260918_000000_package_source_lifecycle;
 mod m20260921_000000_package_source_automatic_retry;
 pub mod m20260922_000000_package_source_legacy_backfill;
+mod m20260923_000000_add_package_source_display_name;
