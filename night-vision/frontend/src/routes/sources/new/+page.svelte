@@ -9,8 +9,7 @@
     import * as Alert from "$lib/components/ui/alert/index.js";
     import Info from "@lucide/svelte/icons/info";
 
-
-        let files = [];
+    let files = [];
 
     // Optional: preview file names before upload
     function handleFileChange(event) {

@@ -8,7 +8,7 @@
 	// Menu Items - Name, Path, and Icons
 	const menuItems = [
 		{ name: 'Assessments', path: '/assessments' , icon: "fa fa-cube" },
-		{ name: 'Package Sources', path: '/packagesources', icon: "fa fa-archive" },
+		//{ name: 'Package Sources', path: '/packagesources', icon: "fa fa-archive" },
 		{ name: 'Sources', path: '/sources', icon: "fa fa-archive" },
 	];
 

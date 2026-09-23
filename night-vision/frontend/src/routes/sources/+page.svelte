@@ -2,41 +2,6 @@
   import * as Table from "$lib/components/ui/table/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Badge, badgeVariants } from "$lib/components/ui/badge/index.js";
- 
-  type AssessmentsData = {
-    id: string;
-    exposure: string;
-    package_source: string;
-    patch_candidate: string;
-    verdict: "Recommended" | "In Progress" | "Caution" | "Failed";
-    // updated: Date;
-    // action: Button;
-    };
-  export const data2: AssessmentsData[] = [
-    {
-    id: "2345678",
-    exposure: "loadsh@4.17.20",
-    package_source: "agency-web",
-    patch_candidate: "4.17.20",
-    verdict: "Recommended",
-    },
-    {
-    id: "34567890",
-    exposure: "minimist@1.2.5",
-    package_source: "partner-portal",
-    patch_candidate: "1.2.8",
-    verdict: "Caution",
-    },
-    {
-    id: "765432",
-    exposure: "axios@0.21.1",
-    package_source: "claims-service",
-    patch_candidate: "Analysis running",
-    verdict: "In Progress",
-    },
-    // ...
-    ];
-  // let { id2 }: { id2: string } = $props();
 
   const packages = [
     {
@@ -71,22 +36,11 @@
     },
     // ...
   ];
-  
-
 </script>
-<!-- <script lang="ts">
-// import Table from './Table.svelte';
-// import { Table } from 'shadcn-svelte';
-  import * as Table from '$lib/components/ui/table';
-
-  
-
-</script> -->
 
 <main>
 <h1>Package Sources</h1>
 <p style="display:flex; float:left">Submitted NPM manifests and their resolution status.</p>
-
 
 <Button href="/sources/new" style="display:flex; float:right" class="rounded-full bg-cyan-900 text-gray-200 dark:bg-gray-600 dark:text-gray-50">
     + Add Package Source
@@ -138,16 +92,5 @@
   </Table.Row>
  </Table.Footer>
 </Table.Root>
- 
-
-
 
 </main>
-
-<style>
-textarea {
-width: 100%;
-height: 100px;
-margin-top: 10px;
-}
-</style>

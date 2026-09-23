@@ -1,51 +1,7 @@
 <script lang="ts">
   import * as Table from "$lib/components/ui/table/index.js";
-  import * as Card from "$lib/components/ui/card/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
-  import * as Alert from "$lib/components/ui/alert/index.js";
   import { Badge, badgeVariants } from "$lib/components/ui/badge/index.js";
-  import * as Accordion from "$lib/components/ui/accordion/index.js";
-  import DataTable from "./data-table.svelte";
-  import { columns } from "./columns.js";
-  import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
-  import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
-
- 
-  //let { data } = $props();
-//   import { Badge, Table, Card } from "$lib/components/ui";
-
-  let message = 'Hello is this working';
-  
-
-  // type Payment = {
-  //   id: string;
-  //   amount: number;
-  //   status: "pending" | "processing" | "success" | "failed";
-  //   email: string;
-  //   };
-    
-  //   export const data: Payment[] = [
-  //   {
-  //   id: "728ed52f",
-  //   amount: 100,
-  //   status: "pending",
-  //   email: "m@example.com",
-  //   },
-  //   {
-  //   id: "489e1d42",
-  //   amount: 125,
-  //   status: "processing",
-  //   email: "example@gmail.com",
-  //   },    
-  //   {
-  //   id: "43763565",
-  //   amount: 124367545,
-  //   status: "success",
-  //   email: "retyui@gmail.com",
-  //   },
-  //   // ...
-  //   ];
-  // let { id }: { id: string } = $props();
 
   type AssessmentsData = {
     id: string;
@@ -80,7 +36,6 @@
     },
     // ...
     ];
-  // let { id2 }: { id2: string } = $props();
 
   const assessments = [
     {
@@ -129,60 +84,8 @@
     },
     // ...
   ];
- 
-  const invoices = [
-    {
-    invoice: "INV001",
-    paymentStatus: "Paid",
-    totalAmount: "$250.00",
-    paymentMethod: "Credit Card"
-    },
-    {
-    invoice: "INV002",
-    paymentStatus: "Pending",
-    totalAmount: "$150.00",
-    paymentMethod: "PayPal"
-    },
-    {
-    invoice: "INV003",
-    paymentStatus: "Unpaid",
-    totalAmount: "$350.00",
-    paymentMethod: "Bank Transfer"
-    },
-    {
-    invoice: "INV004",
-    paymentStatus: "Paid",
-    totalAmount: "$450.00",
-    paymentMethod: "Credit Card"
-    },
-    {
-    invoice: "INV005",
-    paymentStatus: "Paid",
-    totalAmount: "$550.00",
-    paymentMethod: "PayPal"
-    },
-    {
-    invoice: "INV006",
-    paymentStatus: "Pending",
-    totalAmount: "$200.00",
-    paymentMethod: "Bank Transfer"
-    },
-    {
-    invoice: "INV007",
-    paymentStatus: "Unpaid",
-    totalAmount: "$300.00",
-    paymentMethod: "Credit Card"
-    }
-  ];
+
 </script>
-<!-- <script lang="ts">
-// import Table from './Table.svelte';
-// import { Table } from 'shadcn-svelte';
-  import * as Table from '$lib/components/ui/table';
-
-  
-
-</script> -->
 
 <main>
 <h1> Assessments </h1>
@@ -231,7 +134,7 @@
     </Table.Cell>
     <Table.Cell>{assessment.updated}</Table.Cell>
     <Table.Cell class="text-end">
-      <Button variant="outline">{assessment.action}</Button>
+      <Button href="/assessments/assessmentsId" variant="outline">{assessment.action}</Button>
     </Table.Cell>
    </Table.Row>
   {/each}
@@ -243,105 +146,5 @@
   </Table.Row>
  </Table.Footer>
 </Table.Root>
- 
- 
-<!-- <DropdownMenu.Root>
-  <DropdownMenu.Trigger>
-    {#snippet child({ props })}
-      <Button
-        {...props}
-        variant="ghost"
-        size="icon"
-        class="relative size-8 p-0"
-      >
-        <span class="sr-only">Open menu</span>
-        <EllipsisIcon />
-      </Button>
-    {/snippet}
-  </DropdownMenu.Trigger>
-  <DropdownMenu.Content>
-    <DropdownMenu.Group>
-      <DropdownMenu.Label>Actions</DropdownMenu.Label>
-      <DropdownMenu.Item onclick={() => navigator.clipboard.writeText(id)}>
-        Copy payment ID
-      </DropdownMenu.Item>
-    </DropdownMenu.Group>
-    <DropdownMenu.Separator />
-    <DropdownMenu.Item>View customer</DropdownMenu.Item>
-    <DropdownMenu.Item>View payment details</DropdownMenu.Item>
-  </DropdownMenu.Content>
-</DropdownMenu.Root> -->
-
-<!-- <textarea bind:value={message} placeholder="Write your message"></textarea>
-<p>Your message: {message}</p> -->
-
-<!-- <DataTable data={data} {columns} /> -->
-
-<!-- <Accordion.Root type="single">
- <Accordion.Item value="item-1">
-  <Accordion.Trigger>Is it accessible?</Accordion.Trigger>
-  <Accordion.Content>
-   Yes. It adheres to the WAI-ARIA design pattern.
-  </Accordion.Content>
- </Accordion.Item>
-</Accordion.Root> -->
-
-<!-- <Table.Root>
-  <Table.Caption>A list of your recent invoices.</Table.Caption>
-  <Table.Header>
-    <Table.Row>
-      <Table.Head class="w-[100px]">Invoice</Table.Head>
-      <Table.Head>Status</Table.Head>
-      <Table.Head>Method</Table.Head>
-      <Table.Head class="text-end">Amount</Table.Head>
-    </Table.Row>
-  </Table.Header>
-  <Table.Body>
-    <Table.Row>
-      <Table.Cell class="font-medium">INV001</Table.Cell>
-      <Table.Cell>Paid</Table.Cell>
-      <Table.Cell>Credit Card</Table.Cell>
-      <Table.Cell class="text-end">$250.00</Table.Cell>
-    </Table.Row>
-  </Table.Body>
-</Table.Root> -->
-
-
-<!-- <Alert.Root>
- <Alert.Title>Heads up!</Alert.Title>
- <Alert.Description>
-  You can add components to your app using the cli.
- </Alert.Description>
-</Alert.Root>
-
-
-<Card.Root>
-  <Card.Header>
-    <Card.Title>Card Title</Card.Title>
-    <Card.Description>Card Description</Card.Description>
-  </Card.Header>
-  <Card.Content>
-    <p>Card Content</p>
-  </Card.Content>
-  <Card.Footer>
-    <p>Card Footer</p>
-  </Card.Footer>
-</Card.Root>
-
-
-<Badge variant="outline">Badge</Badge>
-
-
-<a href="/dashboard" class={badgeVariants({ variant: "outline" })}>Badge</a> -->
-
-
 
 </main>
-
-<style>
-textarea {
-width: 100%;
-height: 100px;
-margin-top: 10px;
-}
-</style>
