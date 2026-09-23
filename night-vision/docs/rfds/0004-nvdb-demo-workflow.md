@@ -242,22 +242,28 @@ second direct dependency with no KEV-linked match, which can demonstrate the
 no-match caveat. Reconfirm results during preflight because catalog data can
 change.
 
-1. Run `package-source import` and point out the returned source ID.
-2. Run `package-source resolve` and explain that Night Vision expands version
-   ranges into the reachable version collection rather than assuming a
-   lockfile is the only source of truth.
-3. Run `package-source versions` and select a PURL from the result.
-4. Run `package-source kevs <SOURCE-ID>` and explain the
-   `systeminformation@5.3.0` match for `CVE-2021-21315`. Point out that the
-   result is limited to locally available data and does not declare the
-   resolved versions safe when it contains no matches.
-5. Run `package-version candidates pkg:npm/systeminformation@5.3.0`, select
-   `pkg:npm/systeminformation@5.3.1`, then run `assessment analyze
-   pkg:npm/systeminformation@5.3.0 pkg:npm/systeminformation@5.3.1` and copy
-   the persisted UUID v7 assessment ID. Hipcheck assesses `5.3.1`, never the
-   KEV-affected `5.3.0` baseline.
-6. Run `assessment show <ASSESSMENT-UUID>`. Use `assessment evidence` only when
-   inspection of the underlying Hipcheck output is needed.
+1. Run `package-source import <PACKAGE-FILE>` to submit an npm package source
+   and point out the returned source ID.
+2. Run `package-source resolve <SOURCE-ID>` to resolve reachable pacakge
+   versions for the package source and explain that Night Vision expands version
+   ranges into the reachable version collection rather than assuming a lockfile
+   is the only source of truth.
+3. Run `package-source versions <SOURCE-ID>` to list versions resolved from a
+   source and select a PURL from the result.
+4. Run `package-source kevs <SOURCE-ID>` to list KEVs affecting versions resolved
+   from a source and explain the `systeminformation@5.3.0` match for
+   `CVE-2021-21315`. Point out that the result is limited to locally available 
+   data and does not declare the resolved versions safe when it contains no matches.
+5. Run `package-version candidates pkg:npm/systeminformation@5.3.0` to list
+   eligible upgrades for the KEV-affected package, select
+   `pkg:npm/systeminformation@5.3.1`.
+6. Run `assessment analyze pkg:npm/systeminformation@5.3.0
+   pkg:npm/systeminformation@5.3.1` to analyze the candidate upgrade version.
+   Copy the persisted UUID v7 assessment ID. Hipcheck assesses `5.3.1`, never
+   the KEV-affected `5.3.0` baseline.
+7. Run `assessment show <ASSESSMENT-UUID>` to display the findings of the
+   assessment. Use `assessment evidence <ASSESSMENT-UUID>` only when inspection
+   of the underlying Hipcheck output is needed.
 
 Use a preflight script or checklist before the demo to confirm database
 connectivity, CVE/KEV freshness, the configured Hipcheck binary and policy,
