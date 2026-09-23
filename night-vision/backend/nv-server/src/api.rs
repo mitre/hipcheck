@@ -2664,7 +2664,7 @@ fn assessment_candidate(
                     requires_compatibility_review(Some(&upgrade_distance), &api_compatibility);
                 (Some(upgrade_distance), requires_compatibility_review)
             }
-            _ => (Some(UpgradeAssessmentUpgradeDistance::Unknown), false),
+            _ => (Some(UpgradeAssessmentUpgradeDistance::Unknown), true),
         },
         None => (None, false),
     };
@@ -4869,6 +4869,35 @@ mod tests {
             report.candidate_versions[0].verdict,
             Some(UpgradeAssessmentVerdict::Caution)
         ));
+    }
+
+    #[test]
+    fn explicit_unparsable_versions_require_compatibility_review() {
+        let report = assessment_report(
+            UpgradeAssessmentInput {
+                vulnerable_package: Some(UpgradeAssessmentVulnerablePackageInput {
+                    version: "latest".to_owned(),
+                    ..input()
+                        .vulnerable_package
+                        .expect("test input includes package")
+                }),
+                candidate_version: Some("next".to_owned()),
+                ..input()
+            },
+            UpgradeAssessmentVerdict::Recommended,
+            Vec::new(),
+            Vec::new(),
+            None,
+        );
+
+        assert_eq!(
+            report.candidate_versions[0].upgrade_distance,
+            Some(UpgradeAssessmentUpgradeDistance::Unknown)
+        );
+        assert_eq!(
+            report.candidate_versions[0].verdict,
+            Some(UpgradeAssessmentVerdict::Caution)
+        );
     }
 
     #[test]
