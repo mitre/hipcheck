@@ -198,7 +198,7 @@ pub async fn execute_queued_assessment_with_executor<E: HipcheckExecutor>(
         .await
     {
         Ok(output) => {
-            if output.status.success() || has_report_candidate(output.json.as_deref()) {
+            if output.status.success() || has_structured_report_candidate(output.json.as_deref()) {
                 // Hipcheck may use a nonzero exit for an INVESTIGATE result or
                 // a report containing a plugin error. Preserve every complete,
                 // structured check in that report.
@@ -276,8 +276,16 @@ async fn complete_output(
     require_terminal_persistence_applied(result, id)
 }
 
-fn has_report_candidate(json: Option<&[u8]>) -> bool {
-    json.is_some_and(|json| json.iter().any(|byte| !byte.is_ascii_whitespace()))
+fn has_structured_report_candidate(json: Option<&[u8]>) -> bool {
+    let Some(json) = json else {
+        return false;
+    };
+    matches!(
+        json.iter()
+            .copied()
+            .find(|byte| !byte.is_ascii_whitespace()),
+        Some(b'{')
+    )
 }
 
 fn normalize_report(
@@ -366,8 +374,8 @@ pub enum AssessmentError {
 #[cfg(test)]
 mod tests {
     use super::{
-        AssessmentError, HipcheckFailureBehavior, has_report_candidate, normalize_report,
-        require_terminal_persistence_applied,
+        AssessmentError, HipcheckFailureBehavior, has_structured_report_candidate,
+        normalize_report, require_terminal_persistence_applied,
     };
     use crate::hipcheck::{HipcheckExecutionError, HipcheckOutputStream, HipcheckReportContext};
     use sea_orm::DbErr;
@@ -441,12 +449,21 @@ mod tests {
     }
 
     #[test]
-    fn nonzero_exit_with_json_is_treated_as_a_report_candidate() {
-        assert!(has_report_candidate(Some(
+    fn nonzero_exit_only_treats_json_objects_as_report_candidates() {
+        assert!(has_structured_report_candidate(Some(
             br#"{"recommendation":"INVESTIGATE"}"#
         )));
-        assert!(!has_report_candidate(Some(b" \n\t")));
-        assert!(!has_report_candidate(None));
+        assert!(has_structured_report_candidate(Some(
+            b"  \n\t {\"recommendation\":\"INVESTIGATE\"}"
+        )));
+        assert!(!has_structured_report_candidate(Some(
+            b"fatal: repo not found"
+        )));
+        assert!(!has_structured_report_candidate(Some(
+            b" \n\tfatal: repo not found"
+        )));
+        assert!(!has_structured_report_candidate(Some(b" \n\t")));
+        assert!(!has_structured_report_candidate(None));
     }
 
     #[test]
