@@ -139,9 +139,12 @@ export type KevSyncRunHealth = {
 
 export type PackageSource = {
     contents: string;
+    displayName: string;
     ecosystem: PackageSourceEcosystem;
     fileName: string;
 };
+
+export type PackageSourceAttention = 'none' | 'warnings' | 'failed' | 'exposure-data-unavailable';
 
 export type PackageSourceEcosystem = 'npm';
 
@@ -158,6 +161,8 @@ export type PackageSourceExposureKevContext = {
     vulnerabilityName?: string | null;
 };
 
+export type PackageSourceExposureSummaryStatus = 'available' | 'unavailable' | 'processing' | 'failed' | 'cancelled';
+
 export type PackageSourceExposures = {
     exposures: Array<PackageSourceExposure>;
     id: string;
@@ -167,6 +172,13 @@ export type PackageSourceExposures = {
 export type PackageSourceExposuresStatus = 'completed' | 'completed-with-warnings' | 'failed';
 
 export type PackageSourceFailureKind = 'validation' | 'dependency-unavailable' | 'resolution' | 'internal';
+
+export type PackageSourceLifecycle = 'pending' | 'processing' | 'completed' | 'completed-with-warnings' | 'failed' | 'cancelled';
+
+export type PackageSourceList = {
+    items: Array<PackageSourceSummary>;
+    nextCursor?: string | null;
+};
 
 export type PackageSourceOperationResponse = {
     id: string;
@@ -229,6 +241,20 @@ export type PackageSourceStatus = {
     status: 'failed';
 };
 
+export type PackageSourceSummary = {
+    activityAt: string;
+    attention: PackageSourceAttention;
+    createdAt: string;
+    displayName: string;
+    ecosystem: PackageSourceEcosystem;
+    exposureCount?: number | null;
+    exposureStatus: PackageSourceExposureSummaryStatus;
+    id: string;
+    lifecycle: PackageSourceLifecycle;
+    reachablePackageCount?: number | null;
+    resolutionAt?: string | null;
+};
+
 export type PackageSourceWarning = {
     declaredByPurl?: string | null;
     dependencyName: string;
@@ -250,6 +276,7 @@ export type PostAssessmentResponse = {
 
 export type PostPackageSourceBody = {
     contents: string;
+    displayName: string;
     fileName: string;
 };
 
@@ -373,6 +400,12 @@ export type VersionedPackage = {
     purl: string;
     version: string;
 };
+
+export type PackageSourceListDirection = 'asc' | 'desc';
+
+export type PackageSourceListFilter = 'all' | 'needs-attention' | 'processing' | 'failed';
+
+export type PackageSourceListSort = 'activity' | 'identity' | 'lifecycle' | 'resolution-time' | 'reachable-packages' | 'exposures';
 
 export type PostAssessmentData = {
     body: PostAssessmentBody;
@@ -553,6 +586,42 @@ export type HealthDiagnosticsResponses = {
 };
 
 export type HealthDiagnosticsResponse = HealthDiagnosticsResponses[keyof HealthDiagnosticsResponses];
+
+export type ListPackageSourcesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        cursor?: string | null;
+        direction?: PackageSourceListDirection;
+        filter?: PackageSourceListFilter;
+        limit?: number | null;
+        query?: string | null;
+        sort?: PackageSourceListSort;
+    };
+    url: '/package-sources';
+};
+
+export type ListPackageSourcesErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type ListPackageSourcesError = ListPackageSourcesErrors[keyof ListPackageSourcesErrors];
+
+export type ListPackageSourcesResponses = {
+    /**
+     * successful operation
+     */
+    200: PackageSourceList;
+};
+
+export type ListPackageSourcesResponse = ListPackageSourcesResponses[keyof ListPackageSourcesResponses];
 
 export type PostPackageSourceData = {
     body: PostPackageSourceBody;
