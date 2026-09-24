@@ -407,6 +407,7 @@ server address. These commands do not poll asynchronous work; use
 | `api assessments evidence <ID> [--include-raw-hipcheck]` | Get assessment evidence. |
 | `api upgrade-assessments submit <REQUEST_JSON_FILE>` | Submit a JSON upgrade assessment request. |
 | `api upgrade-assessments get <ID>` | Get upgrade-assessment status. |
+| `api upgrade-assessments result <ID>` | Get an upgrade-assessment result. |
 
 `api health diagnostics` requires `health-diagnostics-token-file` in the
 selected configuration. The token is read as a secret and is never printed.

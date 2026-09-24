@@ -16,9 +16,11 @@ The local sample configuration in `backend/nv-server.spookey` binds
 curl http://127.0.0.1:8080/health
 ```
 
-The package-source API currently has no user or tenant identity model. Treat
-access to it as single-operator authority and do not assume production
-authentication, authorization, or deployment behavior from this local guide.
+The package-source and assessment endpoints in this local guide have no user
+or tenant identity model. Treat access to them as single-operator authority;
+do not assume production authentication, authorization, or deployment behavior.
+Operator diagnostics and optional raw Hipcheck evidence require a configured
+diagnostics bearer token.
 
 For local startup, health checks, logs, and recovery steps, see the
 [backend operations runbook](./operations-runbook.md).
@@ -44,6 +46,10 @@ describes only endpoints implemented today.
 Upgrade-assessment status responses use `pending`, `completed`, and `failed`.
 The exposure read models use `not-assessed`, `processing`, `completed`, `failed`,
 and `unavailable` to describe what a browser can currently show.
+
+`GET /assessments/{id}` reports the assessment run state in a `state` field
+(for example, `queued`). Package-source and upgrade-assessment responses use a
+`status` field.
 
 ## Endpoints
 
@@ -515,6 +521,125 @@ Content-Type: application/json
   "request_id": "example-request-id"
 }
 ```
+
+### `POST /assessments`
+
+Submit a package-version assessment. Supply the affected package version and
+the target version as package URLs (PURLs). The server queues the assessment
+and returns an ID; the assessment may still be running.
+
+Request:
+
+```sh
+curl -X POST http://127.0.0.1:8080/assessments \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "affectedPurl": "pkg:npm/example-package@1.2.3",
+    "targetPurl": "pkg:npm/example-package@1.2.4"
+  }'
+```
+
+Successful response:
+
+```http
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+```
+
+```json
+{
+  "id": "01990e55-6bae-7aa7-8760-ff4ac5e9d9a8"
+}
+```
+
+This request is illustrative. A real submission requires the affected PURL to
+have a locally known active KEV match, and the target must pass validation
+against NPM registry data. Otherwise, the server rejects the request rather
+than returning `202 Accepted`.
+
+Use the returned `id` to request the assessment status and evidence. The UUID
+above is illustrative; the server generates one for each accepted assessment.
+
+### `GET /assessments/{id}`
+
+Get the current state of an assessment using the ID returned by
+`POST /assessments`.
+
+Request:
+
+```sh
+curl http://127.0.0.1:8080/assessments/01990e55-6bae-7aa7-8760-ff4ac5e9d9a8
+```
+
+Example queued response:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+```
+
+```json
+{
+  "id": "01990e55-6bae-7aa7-8760-ff4ac5e9d9a8",
+  "state": "queued",
+  "affectedPurl": "pkg:npm/example-package@1.2.3",
+  "target": null,
+  "sourceRepositoryUrl": null,
+  "recommendation": null,
+  "findingCount": 0,
+  "exitStatus": null,
+  "errorKind": null,
+  "errorMessage": null,
+  "retryable": null
+}
+```
+
+The `state` changes as assessment work progresses. An unknown ID returns
+`404 Not Found`.
+
+### `GET /assessments/{id}/evidence`
+
+Get the checks, findings, and diagnostics recorded for an assessment. Evidence
+may be empty while the assessment is queued or running.
+
+Request:
+
+```sh
+curl http://127.0.0.1:8080/assessments/01990e55-6bae-7aa7-8760-ff4ac5e9d9a8/evidence
+```
+
+Example queued response:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+```
+
+```json
+{
+  "id": "01990e55-6bae-7aa7-8760-ff4ac5e9d9a8",
+  "affectedPurl": "pkg:npm/example-package@1.2.3",
+  "diagnostics": {
+    "sourceRepositoryUrl": null,
+    "stdout": null,
+    "stdoutTruncated": false,
+    "stderr": null,
+    "stderrTruncated": false,
+    "exitStatus": null,
+    "errorKind": null,
+    "errorMessage": null,
+    "retryable": null
+  },
+  "checks": [],
+  "findings": [],
+  "rawHipcheck": null
+}
+```
+
+An unknown ID returns `404 Not Found`. The optional
+`includeRawHipcheck=true` query requests raw Hipcheck output. It requires a
+configured diagnostics token and a matching bearer token; without the
+configuration, raw access is disabled.
 
 ### `POST /upgrade-assessments`
 

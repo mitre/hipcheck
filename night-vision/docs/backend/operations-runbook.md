@@ -249,9 +249,11 @@ that access and change are explicitly approved. The `--destructive` flag is an
 acknowledgement that a command may modify database state; it is not a dry-run
 or safety mode.
 
-The current `nvdb` binary lists an `api` placeholder, but REST API helpers are
-not implemented there yet. Use [REST API Usage](./rest-api-usage.md) for API
-examples.
+`nvdb api` provides helpers for health checks, package-source submission and
+status, assessment submission, status, and evidence, and upgrade-assessment
+submission, status, and results. The helpers use the configured server address and do not
+wait for asynchronous work to finish. See [REST API Usage](./rest-api-usage.md)
+for endpoint examples.
 
 For full command syntax, expected output, and dependencies such as `pg_dump` and
 `sea-orm-cli`, see [`nvdb` Command Reference](./nvdb-command-reference.md).
