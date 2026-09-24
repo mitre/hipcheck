@@ -2592,9 +2592,7 @@ fn assessment_report(
         UpgradeAssessmentVerdict::Avoid => {
             "Night Vision found blocking issues for the assessed upgrade candidate.".to_owned()
         }
-        UpgradeAssessmentVerdict::Unknown => {
-            "Night Vision could not determine a complete upgrade recommendation.".to_owned()
-        }
+        UpgradeAssessmentVerdict::Unknown => "Not enough evidence for a recommendation.".to_owned(),
     };
     UpgradeAssessmentResult {
         id: Uuid::nil(),
