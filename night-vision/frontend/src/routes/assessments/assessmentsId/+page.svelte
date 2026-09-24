@@ -129,7 +129,7 @@
       <div class="flex h-5 items-center gap-4 text-sm">
         <div>
             <p style="font-size: 10px;">VULNERABILITY STATUS</p>
-            <p>✓ Ouside affected range</p>
+            <p>✓ Outside affected range</p>
         </div>
       <Separator orientation="vertical" />
         <div>

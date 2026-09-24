@@ -42,7 +42,7 @@
 
 </script>
 <h1>Add Package Source</h1>
-<p>Submit a NPM package.json to resolve reachable dependencies and find KEV-linked exposures.</p>
+<p>Submit an NPM package.json to resolve reachable dependencies and find KEV-linked exposures.</p>
 <br>
 
 <Card.Root>

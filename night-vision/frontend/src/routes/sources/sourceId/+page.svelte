@@ -8,7 +8,7 @@
     const assessments = [
     {
     id: "2345678",
-    affected_package: "loadsh@4.17.20",
+    affected_package: "lodash@4.17.20",
     details: "CVE-2021-23337",
     reachability: "through api-client",
     package_source: "agency-web",
@@ -52,7 +52,7 @@
       <div class="flex h-5 items-center gap-4 text-sm">
         <div>
             <p style="font-weight: bold;"><Badge class="bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-300">Completed</Badge>Dependency resolution finished</p>
-            <p>Night Vision found KEV-linked exposures that need an upgrade assesment.</p>
+            <p>Night Vision found KEV-linked exposures that need an upgrade assessment.</p>
             <p style="font-weight: bold; color: green;" ><a href="/sources">View resolution details</a></p>
         </div>
       <Separator orientation="vertical" />

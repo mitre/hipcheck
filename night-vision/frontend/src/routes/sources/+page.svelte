@@ -87,7 +87,7 @@
  </Table.Body>
  <Table.Footer>
   <Table.Row>
-   <Table.Cell colspan={3}>Showing 2 assessments</Table.Cell>
+   <Table.Cell colspan={3}>Showing {packages.length} package sources</Table.Cell>
    <Table.Cell class="text-end">Sorted by highest concern</Table.Cell>
   </Table.Row>
  </Table.Footer>

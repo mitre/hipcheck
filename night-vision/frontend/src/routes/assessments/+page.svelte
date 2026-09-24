@@ -15,9 +15,9 @@
   export const data2: AssessmentsData[] = [
     {
     id: "2345678",
-    exposure: "loadsh@4.17.20",
+    exposure: "lodash@4.17.20",
     package_source: "agency-web",
-    patch_candidate: "4.17.20",
+    patch_candidate: "4.17.21",
     verdict: "Recommended",
     },
     {
@@ -40,11 +40,11 @@
   const assessments = [
     {
     id: "2345678",
-    exposure: "loadsh@4.17.20",
+    exposure: "lodash@4.17.20",
     details: "CVE-2021-23337",
     package_source: "agency-web",
     source_details: "through api-client",
-    patch_candidate: "4.17.20",
+    patch_candidate: "4.17.21",
     verdict: "Recommended",
     updated: "Today, 9:42 AM",
     action: "Open",
@@ -73,7 +73,7 @@
     },
     {
     id: "3345678",
-    exposure: "axios@2.21.1",
+    exposure: "axios@0.21.0",
     details: "CVE-2021-3749",
     package_source: "claims-service",
     source_details: "direct dependency",
@@ -141,7 +141,7 @@
  </Table.Body>
  <Table.Footer>
   <Table.Row>
-   <Table.Cell colspan={3}>Showing 2 assessments</Table.Cell>
+   <Table.Cell colspan={3}>Showing {assessments.length} assessments</Table.Cell>
    <Table.Cell class="text-end">Sorted by highest concern</Table.Cell>
   </Table.Row>
  </Table.Footer>
