@@ -23,7 +23,7 @@
 	});
 </script>
 
-<h2 style="color: grey;"><a href="/packagesources">Package sources</a> / {source.title}</h2>
+<h2 style="color: grey;"><a href="/sources">Package sources</a> / {source.title}</h2>
 <div class="flex items-center gap-3">
 	<h1>{source.title}</h1>
 	<StatusBadge status={source.status} />

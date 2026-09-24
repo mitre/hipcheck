@@ -28,6 +28,6 @@ export const actions: Actions = {
 			return fail(502, { message: result.error.message, manifest });
 		}
 
-		redirect(303, `/packagesources/${result.data.id}`);
+		redirect(303, `/sources/${result.data.id}`);
 	}
 };

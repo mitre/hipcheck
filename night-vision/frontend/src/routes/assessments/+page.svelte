@@ -49,7 +49,7 @@
 					</Table.Cell>
 					<Table.Cell>
 						{#if assessment.sourceId}
-							<a class="font-medium underline" href="/packagesources/{assessment.sourceId}">{assessment.sourceName}</a>
+							<a class="font-medium underline" href="/sources/{assessment.sourceId}">{assessment.sourceName}</a>
 						{:else}
 							{assessment.sourceName}
 						{/if}

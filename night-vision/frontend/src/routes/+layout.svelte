@@ -10,7 +10,7 @@
 
 	// Menu Items - Name, Path, and Icons
 	const menuItems = [
-		{ name: 'Package Sources', path: '/packagesources', icon: "fa fa-archive" },
+		{ name: 'Package Sources', path: '/sources', icon: "fa fa-archive" },
 		{ name: 'Assessments', path: '/assessments' , icon: "fa fa-cube" },
 	];
 
@@ -124,7 +124,8 @@
     {#each menuItems as item}
       <a
         href={item.path}
-        class:active={$page.url.pathname === item.path}
+        class:active={$page.url.pathname === item.path || $page.url.pathname.startsWith(`${item.path}/`)}
+        aria-current={$page.url.pathname === item.path || $page.url.pathname.startsWith(`${item.path}/`) ? 'page' : undefined}
         onclick={() => (menuOpen = false)}
       >
 	  	<i class={item.icon}></i>
