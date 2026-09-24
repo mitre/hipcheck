@@ -7,7 +7,7 @@ use nv_common::npm::packument::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt::Write as _,
     fs::{self, File},
     process::Command,
@@ -304,12 +304,7 @@ fn inspect_packument(packument: &NpmPackument, limit: Option<usize>) -> Packumen
                     version
                         .engines
                         .iter()
-                        .map(|(name, range)| {
-                            (
-                                bounded_inspection_value(name),
-                                bounded_inspection_value(range),
-                            )
-                        })
+                        .map(|(name, range)| (name.to_owned(), bounded_inspection_value(range)))
                         .collect(),
                     limit,
                 ),
@@ -339,10 +334,7 @@ fn inspect_packument(packument: &NpmPackument, limit: Option<usize>) -> Packumen
                 .iter()
                 .map(|(tag, version)| {
                     let version = version.to_string();
-                    (
-                        bounded_inspection_value(tag),
-                        bounded_inspection_value(&version),
-                    )
+                    (tag.to_owned(), bounded_inspection_value(&version))
                 })
                 .collect(),
             limit,
@@ -357,25 +349,23 @@ fn inspected_dependency_map(
     dependencies: &PackumentDependencyMap,
     limit: Option<usize>,
 ) -> InspectedDependencyMap {
-    let entries = dependencies
+    let mut entries = dependencies
         .iter()
         .map(|(name, specification)| {
             let rendered_specification = specification.as_str();
             (
-                bounded_inspection_value(name.as_str()),
+                name.as_str().to_owned(),
                 InspectedDependency {
                     specification: bounded_inspection_value(&rendered_specification),
                     resolution: dependency_resolution(name, specification),
                 },
             )
         })
-        .collect::<BTreeMap<_, _>>();
+        .collect::<Vec<_>>();
+    entries.sort_by(|(left_name, _), (right_name, _)| left_name.cmp(right_name));
     let omitted = limit.map_or(0, |limit| entries.len().saturating_sub(limit));
     InspectedDependencyMap {
-        entries: entries
-            .into_iter()
-            .take(limit.unwrap_or(usize::MAX))
-            .collect(),
+        entries: render_inspection_keyed_entries(entries, limit),
         omitted,
     }
 }
@@ -408,10 +398,7 @@ fn inspected_string_map(
 ) -> InspectedStringMap {
     let omitted = limit.map_or(0, |limit| entries.len().saturating_sub(limit));
     InspectedStringMap {
-        entries: entries
-            .into_iter()
-            .take(limit.unwrap_or(usize::MAX))
-            .collect(),
+        entries: render_inspection_keyed_entries(entries, limit),
         omitted,
     }
 }
@@ -424,6 +411,37 @@ fn inspected_string_list(entries: Vec<String>, limit: Option<usize>) -> Inspecte
             .take(limit.unwrap_or(usize::MAX))
             .collect(),
         omitted,
+    }
+}
+
+fn render_inspection_keyed_entries<T>(
+    entries: impl IntoIterator<Item = (String, T)>,
+    limit: Option<usize>,
+) -> BTreeMap<String, T> {
+    let mut used_keys = BTreeSet::new();
+    let mut rendered = BTreeMap::new();
+
+    for (raw_key, value) in entries.into_iter().take(limit.unwrap_or(usize::MAX)) {
+        let rendered_key = unique_inspection_key(&raw_key, &mut used_keys);
+        rendered.insert(rendered_key, value);
+    }
+
+    rendered
+}
+
+fn unique_inspection_key(raw_key: &str, used_keys: &mut BTreeSet<String>) -> String {
+    let bounded_key = bounded_inspection_value(raw_key);
+    if used_keys.insert(bounded_key.clone()) {
+        return bounded_key;
+    }
+
+    let mut collision_index: i32 = 2;
+    loop {
+        let candidate = format!("{bounded_key} [collision {collision_index}]");
+        if used_keys.insert(candidate.clone()) {
+            return candidate;
+        }
+        collision_index = collision_index.saturating_add(1);
     }
 }
 
@@ -928,7 +946,8 @@ enum CorpusStatus {
 mod tests {
     use super::{
         DEFAULT_INSPECTION_LIMIT, MAX_INSPECTION_VALUE_CHARS, command, corpus_refresh_state_path,
-        fixture_stem, format_inspection, inspect_packument, load_catalog,
+        dependency_resolution_label, fixture_stem, format_inspection, inspect_packument,
+        load_catalog,
     };
     use camino::Utf8PathBuf;
     use nv_common::npm::packument::parse_packument;
@@ -1190,6 +1209,150 @@ mod tests {
         assert!(format_inspection(&inspection).contains(&format!("deprecated: {expected}")));
         let json = serde_json::to_value(&inspection).expect("inspection should serialize");
         assert_eq!(json["versions"][0]["deprecated"], expected);
+    }
+
+    #[test]
+    fn inspect_preserves_dist_tags_with_colliding_truncated_keys() {
+        let shared_prefix = "x".repeat(MAX_INSPECTION_VALUE_CHARS);
+        let first_tag = format!("{shared_prefix}1");
+        let second_tag = format!("{shared_prefix}2");
+        let rendered_tag = format!("{shared_prefix}… [1 characters omitted]");
+        let fixture = serde_json::json!({
+            "name": "example",
+            "dist-tags": {
+                first_tag: "1.0.0",
+                second_tag: "2.0.0"
+            },
+            "versions": {
+                "1.0.0": {
+                    "name": "example",
+                    "version": "1.0.0",
+                    "dist": {
+                        "tarball": "https://example.test/1.0.0.tgz",
+                        "shasum": "0123456789abcdef0123456789abcdef01234567"
+                    }
+                },
+                "2.0.0": {
+                    "name": "example",
+                    "version": "2.0.0",
+                    "dist": {
+                        "tarball": "https://example.test/2.0.0.tgz",
+                        "shasum": "0123456789abcdef0123456789abcdef01234567"
+                    }
+                }
+            }
+        });
+        let fixture = serde_json::to_vec(&fixture).expect("fixture should serialize");
+        let packument = parse_packument(fixture.as_slice()).expect("fixture should parse");
+
+        let inspection = inspect_packument(&packument, None);
+
+        assert_eq!(inspection.dist_tags.omitted, 0);
+        assert_eq!(inspection.dist_tags.entries.len(), 2);
+        assert_eq!(
+            inspection
+                .dist_tags
+                .entries
+                .get(&rendered_tag)
+                .map(String::as_str),
+            Some("1.0.0")
+        );
+        assert_eq!(
+            inspection
+                .dist_tags
+                .entries
+                .get(&format!("{rendered_tag} [collision 2]"))
+                .map(String::as_str),
+            Some("2.0.0")
+        );
+    }
+
+    #[test]
+    fn inspect_counts_omitted_dependencies_before_truncated_key_collisions() {
+        let shared_prefix = "y".repeat(MAX_INSPECTION_VALUE_CHARS);
+        let first_name = format!("{shared_prefix}!1");
+        let second_name = format!("{shared_prefix}!2");
+        let rendered_name = format!("{shared_prefix}… [2 characters omitted]");
+        let fixture = serde_json::json!({
+            "name": "example",
+            "dist-tags": { "latest": "1.0.0" },
+            "versions": {
+                "1.0.0": {
+                    "name": "example",
+                    "version": "1.0.0",
+                    "dependencies": {
+                        first_name: "^1.0.0",
+                        second_name: "^2.0.0"
+                    },
+                    "dist": {
+                        "tarball": "https://example.test/1.0.0.tgz",
+                        "shasum": "0123456789abcdef0123456789abcdef01234567"
+                    }
+                }
+            }
+        });
+        let fixture = serde_json::to_vec(&fixture).expect("fixture should serialize");
+        let packument = parse_packument(fixture.as_slice()).expect("fixture should parse");
+
+        let inspection = inspect_packument(&packument, Some(1));
+        let dependencies = &inspection.versions[0].dependencies.dependencies;
+
+        assert_eq!(dependencies.omitted, 1);
+        assert_eq!(dependencies.entries.len(), 1);
+        assert_eq!(
+            dependencies.entries.get(&rendered_name).map(|dependency| {
+                (
+                    dependency.specification.as_str(),
+                    dependency_resolution_label(&dependency.resolution),
+                )
+            }),
+            Some(("^1.0.0", "invalid-name"))
+        );
+    }
+
+    #[test]
+    fn inspect_preserves_engines_with_colliding_truncated_keys() {
+        let shared_prefix = "z".repeat(MAX_INSPECTION_VALUE_CHARS);
+        let first_engine = format!("{shared_prefix}1");
+        let second_engine = format!("{shared_prefix}2");
+        let rendered_engine = format!("{shared_prefix}… [1 characters omitted]");
+        let fixture = serde_json::json!({
+            "name": "example",
+            "dist-tags": { "latest": "1.0.0" },
+            "versions": {
+                "1.0.0": {
+                    "name": "example",
+                    "version": "1.0.0",
+                    "engines": {
+                        first_engine: ">=18",
+                        second_engine: ">=20"
+                    },
+                    "dist": {
+                        "tarball": "https://example.test/1.0.0.tgz",
+                        "shasum": "0123456789abcdef0123456789abcdef01234567"
+                    }
+                }
+            }
+        });
+        let fixture = serde_json::to_vec(&fixture).expect("fixture should serialize");
+        let packument = parse_packument(fixture.as_slice()).expect("fixture should parse");
+
+        let inspection = inspect_packument(&packument, None);
+        let engines = &inspection.versions[0].engines;
+
+        assert_eq!(engines.omitted, 0);
+        assert_eq!(engines.entries.len(), 2);
+        assert_eq!(
+            engines.entries.get(&rendered_engine).map(String::as_str),
+            Some(">=18")
+        );
+        assert_eq!(
+            engines
+                .entries
+                .get(&format!("{rendered_engine} [collision 2]"))
+                .map(String::as_str),
+            Some(">=20")
+        );
     }
 
     #[test]
