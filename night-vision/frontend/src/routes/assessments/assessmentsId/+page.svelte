@@ -7,12 +7,12 @@
 
   const candidates = [
     {
-    candidate: "4.17.21",
+    candidate: "5.3.1",
     known_exposure: "No longer affected",
     action: "Selected",
     },
     {
-    candidate: "4.17.22",
+    candidate: "5.3.2",
     known_exposure: "Evidence unavailable",
     action: "Choose",
     }
@@ -53,8 +53,8 @@
     </Card.Title>
   </Card.Header>
     <Card.Content>
-      <p style="font-weight: bold; font-size:20px;">lodash@4.17.20 <Badge variant="destructive">KEV affected</Badge></p>
-      <p>Reachable through api-client · CVE-2021-23337 is a CISA Known Exploited Vulnerability.</p>
+      <p style="font-weight: bold; font-size:20px;">systeminformation@5.3.0 <Badge variant="destructive">KEV affected</Badge></p>
+      <p>Direct dependency · CVE-2021-21315 is a CISA Known Exploited Vulnerability.</p>
   </Card.Content>
 </Card.Root>
 <br>
@@ -121,7 +121,7 @@
           Check the selected release
         </p>
         <p style="color: black; font-size: 13px; display:flex; float:right">
-          Candidate 4.17.21
+          Candidate 5.3.1
         </p>
     </Card.Title>
   </Card.Header>
@@ -161,7 +161,7 @@
   </Card.Header>
     <Card.Content>
       <p style="font-weight: bold; font-size:20px;">Recommended</p>
-      <p>4.17.21 appears to remove the KEV-linked exposure; completed checks found no serious signal.</p>
+      <p>5.3.1 appears to remove the KEV-linked exposure; completed checks found no serious signal.</p>
       <p>
         <Badge class="bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-300">✓ Issue appears fixed</Badge>
         <Badge class="bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-300">✓ No blocking signal</Badge>
