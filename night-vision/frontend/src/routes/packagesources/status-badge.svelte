@@ -11,7 +11,7 @@
   processing: { label: "Resolving", class: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
   completed: { label: "Completed", class: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300" },
   "completed-with-warnings": {
-   label: "Completed with warnings",
+   label: "Warnings",
    class: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
   },
   cancelled: { label: "Cancelled", class: neutral },

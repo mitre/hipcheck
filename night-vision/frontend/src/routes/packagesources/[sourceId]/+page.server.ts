@@ -23,6 +23,16 @@ const formatKevDate = (value: string | null | undefined): string =>
 			})
 		: '—';
 
+// The manifest's own "name" identifies the project better than "package.json".
+const manifestName = (contents: string): string | null => {
+	try {
+		const name: unknown = JSON.parse(contents)?.name;
+		return typeof name === 'string' && name.trim() ? name.trim() : null;
+	} catch {
+		return null;
+	}
+};
+
 const toExposureRow = (exposure: PackageSourceExposure) => ({
 	package: formatPurl(exposure.package.purl),
 	cveId: exposure.cveId,
@@ -49,14 +59,18 @@ export const load: PageServerLoad = async ({ params }) => {
 		else exposuresError = result.error.message;
 	}
 
+	const fileName =
+		(list.ok ? list.data.items.find((item) => item.id === source.id)?.fileName : undefined) ??
+		(completed ? source.source.fileName : 'Package source');
+
 	// Only counts and small fields go to the browser: versioned packages can carry
 	// tens of thousands of derivation paths.
 	return {
 		source: {
 			id: source.id,
-			fileName:
-				(list.ok ? list.data.items.find((item) => item.id === source.id)?.fileName : undefined) ??
-				(completed ? source.source.fileName : 'Package source'),
+			fileName,
+			// The manifest is only returned once resolution completes; until then, use the file name.
+			title: (completed ? manifestName(source.source.contents) : null) ?? fileName,
 			status: source.status,
 			createdAt: source.createdAt,
 			finishedAt: completed

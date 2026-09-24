@@ -20,11 +20,14 @@
 	});
 </script>
 
-<h2 style="color: grey;"><a href="/packagesources">Package sources</a> / {source.fileName}</h2>
+<h2 style="color: grey;"><a href="/packagesources">Package sources</a> / {source.title}</h2>
 <div class="flex items-center gap-3">
-	<h1>{source.fileName}</h1>
+	<h1>{source.title}</h1>
 	<StatusBadge status={source.status} />
 </div>
+{#if source.title !== source.fileName}
+	<p class="text-sm text-muted-foreground">{source.fileName}</p>
+{/if}
 
 <Card.Root class="mt-4">
 	<Card.Content>

@@ -3,40 +3,6 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Badge, badgeVariants } from "$lib/components/ui/badge/index.js";
 
-  type AssessmentsData = {
-    id: string;
-    exposure: string;
-    package_source: string;
-    patch_candidate: string;
-    verdict: "Recommended" | "In Progress" | "Caution" | "Failed" | "Unknown" | "Avoid";
-    // updated: Date;
-    // action: Button;
-    };
-  export const data2: AssessmentsData[] = [
-    {
-    id: "2345678",
-    exposure: "systeminformation@5.3.0",
-    package_source: "agency-web",
-    patch_candidate: "5.3.1",
-    verdict: "Recommended",
-    },
-    {
-    id: "34567890",
-    exposure: "systeminformation@5.2.0",
-    package_source: "partner-portal",
-    patch_candidate: "5.3.1",
-    verdict: "Caution",
-    },
-    {
-    id: "765432",
-    exposure: "systeminformation@5.1.0",
-    package_source: "claims-service",
-    patch_candidate: "Analysis running",
-    verdict: "In Progress",
-    },
-    // ...
-    ];
-
   const assessments = [
     {
     id: "2345678",

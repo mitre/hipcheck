@@ -21,7 +21,9 @@
   get data() {
    return data;
   },
-  columns,
+  get columns() {
+   return columns;
+  },
  });
 
  const pagination = $derived(table.atoms.pagination.get());
