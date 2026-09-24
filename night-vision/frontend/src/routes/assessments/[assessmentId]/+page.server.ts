@@ -42,6 +42,7 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 			cves: input?.cveLinkage ?? (remembered?.cve ? [remembered.cve] : []),
 			requestedCandidate: input ? (input.candidateVersion ?? null) : (remembered?.candidate ?? null),
 			manifestName: input ? manifestName(input.packageSource.contents) : null,
+			fileName: input?.packageSource.fileName ?? remembered?.fileName ?? null,
 			sourceId: remembered?.sourceId ?? null,
 			verdict: result?.verdict ?? null,
 			summary: result?.summary ?? null,

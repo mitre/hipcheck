@@ -29,6 +29,7 @@
 		<Table.Header>
 			<Table.Row>
 				<Table.Head>EXPOSURE</Table.Head>
+				<Table.Head>SOURCE</Table.Head>
 				<Table.Head>CANDIDATE</Table.Head>
 				<Table.Head>VERDICT</Table.Head>
 				<Table.Head>SUMMARY</Table.Head>
@@ -44,6 +45,16 @@
 						{#if assessment.cve}
 							<Badge variant="destructive">KEV affected</Badge>
 							{assessment.cve}
+						{/if}
+					</Table.Cell>
+					<Table.Cell>
+						{#if assessment.sourceId}
+							<a class="font-medium underline" href="/packagesources/{assessment.sourceId}">{assessment.sourceName}</a>
+						{:else}
+							{assessment.sourceName}
+						{/if}
+						{#if assessment.fileName !== assessment.sourceName}
+							<p class="text-xs text-muted-foreground">{assessment.fileName}</p>
 						{/if}
 					</Table.Cell>
 					<Table.Cell>{assessment.candidate ?? 'Discovered automatically'}</Table.Cell>

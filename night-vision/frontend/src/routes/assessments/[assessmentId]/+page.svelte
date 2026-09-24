@@ -33,9 +33,12 @@
 		<Badge variant="destructive" class="ml-1">KEV affected</Badge> {cve}
 	{/each}
 	{#if assessment.sourceId}
-		· from <a href="/packagesources/{assessment.sourceId}">{assessment.manifestName ?? 'its package source'}</a>
-	{:else if assessment.manifestName}
-		· from {assessment.manifestName}
+		· from <a href="/packagesources/{assessment.sourceId}">{assessment.manifestName ?? assessment.fileName ?? 'its package source'}</a>
+	{:else if assessment.manifestName ?? assessment.fileName}
+		· from {assessment.manifestName ?? assessment.fileName}
+	{/if}
+	{#if assessment.manifestName && assessment.fileName}
+		<span class="text-muted-foreground">({assessment.fileName})</span>
 	{/if}
 </p>
 

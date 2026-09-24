@@ -1,5 +1,6 @@
 import type { Cookies } from '@sveltejs/kit';
 import type { UpgradeAssessmentInput } from '$lib/api/generated';
+import { manifestName } from '$lib/format';
 import { nightVisionApi } from './night-vision-api';
 
 // The API has no endpoint for listing upgrade assessments yet, so the Assessments
@@ -11,6 +12,10 @@ const MAX_REMEMBERED = 15;
 export type RecentAssessment = {
 	id: string;
 	sourceId: string | null;
+	/** The manifest's name, so rows can name their source even while running. */
+	sourceName?: string | null;
+	/** The source's file name, such as package.json. */
+	fileName?: string;
 	/** "name@version" of the vulnerable package, for labelling rows before a result exists. */
 	pkg: string;
 	cve: string | null;
@@ -47,6 +52,8 @@ export const startAssessment = async (
 		const entry: RecentAssessment = {
 			id: result.data.id,
 			sourceId,
+			sourceName: manifestName(input.packageSource.contents),
+			fileName: input.packageSource.fileName,
 			pkg: input.vulnerablePackage
 				? `${input.vulnerablePackage.name}@${input.vulnerablePackage.version}`
 				: input.packageSource.fileName,
