@@ -30,13 +30,13 @@ import { nightVisionClient } from './api-client';
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiError };
 
-type ClientResult<T> = { data?: T; error?: unknown; response?: Response };
+type ClientResult<T> = { data?: T; error?: unknown; request?: Request; response?: Response };
 
 const isApiResultTerminal = <T>(result: ApiResult<T>, isTerminalStatus: (value: T) => boolean): boolean =>
 	result.ok ? isTerminalStatus(result.data) : !result.error.retryable;
 
-const toApiResult = <T>({ data, error, response }: ClientResult<T>): ApiResult<T> => {
-	if (error !== undefined || data === undefined) return { ok: false, error: normalizeApiError(response) };
+const toApiResult = <T>({ data, error, request, response }: ClientResult<T>): ApiResult<T> => {
+	if (error !== undefined || data === undefined) return { ok: false, error: normalizeApiError({ error, request, response }) };
 
 	return { ok: true, data };
 };

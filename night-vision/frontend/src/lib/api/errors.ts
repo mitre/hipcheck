@@ -12,6 +12,14 @@ export type ApiError = {
 	status?: number;
 };
 
+type ClientFailure = { error?: unknown; request?: Request; response?: Response };
+
+const unexpectedError = (): ApiError => ({
+	kind: 'unexpected',
+	message: 'The request could not be completed.',
+	retryable: false
+});
+
 const statusError = (status: number): ApiError => {
 	if (status === 400 || status === 422) {
 		return { kind: 'request', message: 'The request could not be processed.', retryable: false, status };
@@ -33,12 +41,29 @@ const statusError = (status: number): ApiError => {
 };
 
 /** Convert generated-client failures into a stable UI contract. */
-export const normalizeApiError = (response?: Response): ApiError => {
-	if (response) return statusError(response.status);
+export const normalizeApiError = ({ error, request, response }: ClientFailure): ApiError => {
+	if (response && !response.ok) return statusError(response.status);
 
-	return {
-		kind: 'network',
-		message: 'Unable to reach Night Vision. Check your connection and try again.',
-		retryable: true
-	};
+	if (response) {
+		// A successful HTTP status can still carry malformed JSON. Other failures
+		// while handling a response may come from client-side processing.
+		return error instanceof SyntaxError
+			? {
+					kind: 'server',
+					message: 'Night Vision returned an invalid response. Please try again.',
+					retryable: true,
+					status: response.status
+				}
+			: { ...unexpectedError(), status: response.status };
+	}
+
+	if (request && (error instanceof TypeError || (error instanceof DOMException && error.name === 'NetworkError'))) {
+		return {
+			kind: 'network',
+			message: 'Unable to reach Night Vision. Check your connection and try again.',
+			retryable: true
+		};
+	}
+
+	return unexpectedError();
 };
