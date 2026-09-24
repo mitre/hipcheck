@@ -1,9 +1,10 @@
-import { error } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { PackageSourceExposure, VersionedPackage } from '$lib/api/generated';
+import { startAssessment } from '$lib/server/assessments';
 import { nightVisionApi } from '$lib/server/night-vision-api';
-import { formatPurl } from '../format';
-import { pageErrorStatus } from '../page-errors';
-import type { PageServerLoad } from './$types';
+import { formatPurl, manifestName } from '$lib/format';
+import { pageErrorStatus } from '$lib/server/page-errors';
+import type { Actions, PageServerLoad } from './$types';
 
 // Every derivation starts at "<root>", so a two-step path is a direct dependency.
 const reachability = ({ derivations }: VersionedPackage): string => {
@@ -23,17 +24,9 @@ const formatKevDate = (value: string | null | undefined): string =>
 			})
 		: '—';
 
-// The manifest's own "name" identifies the project better than "package.json".
-const manifestName = (contents: string): string | null => {
-	try {
-		const name: unknown = JSON.parse(contents)?.name;
-		return typeof name === 'string' && name.trim() ? name.trim() : null;
-	} catch {
-		return null;
-	}
-};
-
 const toExposureRow = (exposure: PackageSourceExposure) => ({
+	name: exposure.package.name,
+	version: exposure.package.version,
 	package: formatPurl(exposure.package.purl),
 	cveId: exposure.cveId,
 	vulnerabilityName: exposure.kev.vulnerabilityName ?? null,
@@ -91,4 +84,45 @@ export const load: PageServerLoad = async ({ params }) => {
 		exposures,
 		exposuresError
 	};
+};
+
+export const actions: Actions = {
+	// Runs an upgrade assessment for one KEV exposure, letting Night Vision discover the candidates.
+	assess: async ({ params, request, cookies, url }) => {
+		const form = await request.formData();
+		const name = form.get('name');
+		const version = form.get('version');
+		const cve = form.get('cve');
+		if (typeof name !== 'string' || typeof version !== 'string' || !name || !version) {
+			return fail(400, { assessError: 'Choose an exposure to assess.' });
+		}
+
+		// Use the stored manifest rather than anything the browser sends.
+		const detail = await nightVisionApi.getPackageSourceStatus(params.sourceId);
+		if (!detail.ok) return fail(502, { assessError: detail.error.message });
+		const source = detail.data;
+		if (source.status !== 'completed' && source.status !== 'completed-with-warnings') {
+			return fail(409, { assessError: 'Assessments need a package source that finished resolving.' });
+		}
+
+		const result = await startAssessment(
+			{
+				packageSource: source.source,
+				vulnerablePackage: { ecosystem: 'npm', name, version },
+				cveLinkage: typeof cve === 'string' && cve ? [cve] : null
+			},
+			params.sourceId,
+			cookies,
+			url
+		);
+		if (!result.ok) {
+			return fail(result.error.status === 400 ? 400 : 502, {
+				assessError:
+					result.error.status === 400
+						? 'Night Vision could not start an assessment for this exposure.'
+						: result.error.message
+			});
+		}
+		redirect(303, `/assessments/${result.data.id}`);
+	}
 };

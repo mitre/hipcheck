@@ -1,7 +1,7 @@
 import { createColumnHelper, renderComponent } from "@tanstack/svelte-table";
 import type { PackageSourceSummary } from "$lib/api/generated";
 import type { DataTableFeatures } from "./data-table-features.js";
-import { formatFailureKind, formatTimestamp } from "./format";
+import { formatFailureKind, formatTimestamp } from "$lib/format";
 import StatusBadge from "./status-badge.svelte";
 import ViewSourceLink from "./view-source-link.svelte";
 

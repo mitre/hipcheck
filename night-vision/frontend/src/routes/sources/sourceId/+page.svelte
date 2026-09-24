@@ -118,7 +118,7 @@
                 {/if}
             </Table.Cell>
             <Table.Cell class="text-end">
-            <Button href="/assessments/assessmentsId" variant="outline">{assessment.action}</Button>
+            <Button href="/example-assessments/assessmentsId" variant="outline">{assessment.action}</Button>
             </Table.Cell>
         </Table.Row>
         {/each}

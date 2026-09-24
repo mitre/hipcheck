@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { nightVisionApi } from '$lib/server/night-vision-api';
 import type { PackageSourceRow } from './columns';
-import { pageErrorStatus } from './page-errors';
+import { pageErrorStatus } from '$lib/server/page-errors';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {

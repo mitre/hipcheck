@@ -8,6 +8,9 @@ import type {
 	GetUpgradeAssessmentErrors,
 	GetUpgradeAssessmentResponse,
 	GetUpgradeAssessmentResponses,
+	GetUpgradeAssessmentResultErrors,
+	GetUpgradeAssessmentResultResponse,
+	GetUpgradeAssessmentResultResponses,
 	ListPackageSourcesData,
 	ListPackageSourcesErrors,
 	ListPackageSourcesResponse,
@@ -88,6 +91,14 @@ export const createNightVisionApi = (client: Client = nightVisionClient) => ({
 		toApiResult(
 			await client.get<GetUpgradeAssessmentResponses, GetUpgradeAssessmentErrors>({
 				url: '/upgrade-assessments/{id}',
+				path: { id }
+			})
+		),
+
+	getUpgradeAssessmentResult: async (id: string): Promise<ApiResult<GetUpgradeAssessmentResultResponse>> =>
+		toApiResult(
+			await client.get<GetUpgradeAssessmentResultResponses, GetUpgradeAssessmentResultErrors>({
+				url: '/upgrade-assessments/{id}/result',
 				path: { id }
 			})
 		)

@@ -5,10 +5,13 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import StatusBadge from '../status-badge.svelte';
-	import { formatFailureKind, formatTimestamp } from '../format';
+	import { formatFailureKind, formatTimestamp } from '$lib/format';
 	import { invalidateAll } from '$app/navigation';
+	import { enhance } from '$app/forms';
+	import * as Alert from '$lib/components/ui/alert/index.js';
 
-	let { data } = $props();
+	let { data, form } = $props();
+	let assessing = $state<string | null>(null);
 	const source = $derived(data.source);
 	const resolving = $derived(source.status === 'pending' || source.status === 'processing');
 
@@ -121,7 +124,24 @@
 							<Table.Cell>{exposure.reachability}</Table.Cell>
 							<Table.Cell>{exposure.kevDateAdded}</Table.Cell>
 							<Table.Cell class="text-end">
-								<Button href="/assessments/assessmentsId" variant="outline" size="sm">Example assessment</Button>
+								<form
+									method="POST"
+									action="?/assess"
+									use:enhance={() => {
+										assessing = exposure.package;
+										return async ({ update }) => {
+											await update();
+											assessing = null;
+										};
+									}}
+								>
+									<input type="hidden" name="name" value={exposure.name} />
+									<input type="hidden" name="version" value={exposure.version} />
+									<input type="hidden" name="cve" value={exposure.cveId} />
+									<Button type="submit" variant="outline" size="sm" disabled={assessing !== null}>
+										{assessing === exposure.package ? 'Starting…' : 'Run assessment'}
+									</Button>
+								</form>
 							</Table.Cell>
 						</Table.Row>
 					{/each}
@@ -129,7 +149,9 @@
 			</Table.Root>
 		</Card.Content>
 	</Card.Root>
-	<p class="mt-2 text-xs text-muted-foreground">
-		Upgrade assessments aren't on the website yet, so "Example assessment" opens the example assessment page.
-	</p>
+	{#if form?.assessError}
+		<Alert.Root variant="destructive" class="mt-2">
+			<Alert.Description>{form.assessError}</Alert.Description>
+		</Alert.Root>
+	{/if}
 {/if}

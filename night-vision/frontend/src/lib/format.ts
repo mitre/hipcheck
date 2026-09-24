@@ -29,3 +29,13 @@ export const formatFailureKind = (value: string | null | undefined): string =>
 // "pkg:npm/%40scope/name@1.2.3" -> "@scope/name@1.2.3"
 export const formatPurl = (purl: string): string =>
  decodeURIComponent(purl.replace(/^pkg:npm\//, ""));
+
+// The manifest's own "name" identifies the project better than "package.json".
+export const manifestName = (contents: string): string | null => {
+ try {
+  const name: unknown = JSON.parse(contents)?.name;
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+ } catch {
+  return null;
+ }
+};

@@ -9,8 +9,9 @@
 	const menuItems = [
 		{ name: 'Package Sources', path: '/packagesources', icon: "fa fa-archive" },
 		{ name: 'Assessments', path: '/assessments' , icon: "fa fa-cube" },
-		// Example pages for the demo; comment out this line to hide them from the sidebar.
+		// Example pages for the demo; comment out these two lines to hide them from the sidebar.
 		{ name: 'Example Sources', path: '/sources', icon: "fa fa-folder-open" },
+		{ name: 'Example Assessments', path: '/example-assessments', icon: "fa fa-folder-open" },
 	];
 
 </script>
