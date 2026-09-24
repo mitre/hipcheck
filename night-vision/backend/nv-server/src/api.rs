@@ -88,7 +88,7 @@ use nv_server_api::{
 use percent_encoding::percent_decode_str;
 use sea_orm::{
     ActiveModelTrait as _, ActiveValue::Set, ColumnTrait as _, DatabaseConnection,
-    EntityTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _,
+    EntityTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _, sea_query::Expr,
 };
 use secrecy::{ExposeSecret as _, SecretString};
 use slog::Logger;
@@ -1103,14 +1103,37 @@ async fn package_source_list(
         ));
     }
 
-    // Cap candidates while aggregate counts are not materialized.
-    let candidate_limit = MAX_PACKAGE_SOURCE_LIST_CURSOR
-        .checked_add(usize::try_from(limit).expect("u32 limit fits usize"))
-        .and_then(|value| u64::try_from(value).ok())
-        .expect("package-source list candidate cap fits u64");
+    let filter = query.filter.unwrap_or(PackageSourceListFilter::All);
+    let sort = query.sort.unwrap_or(PackageSourceListSort::Activity);
+    let direction = query.direction.unwrap_or(PackageSourceListDirection::Desc);
+
+    if package_source_list_uses_database_path(filter, sort) {
+        return package_source_list_sql_backed(
+            db,
+            cursor,
+            limit,
+            source_query,
+            filter,
+            sort,
+            direction,
+        )
+        .await;
+    }
+
+    package_source_list_in_memory(db, cursor, limit, source_query, filter, sort, direction).await
+}
+
+async fn package_source_list_in_memory(
+    db: &DatabaseConnection,
+    cursor: usize,
+    limit: u32,
+    source_query: Option<&str>,
+    filter: PackageSourceListFilter,
+    sort: PackageSourceListSort,
+    direction: PackageSourceListDirection,
+) -> Result<PackageSourceList, HttpError> {
     let mut sources = package_sources::Entity::find()
         .filter(package_sources::Column::ResolutionStatus.ne("deleting"))
-        .limit(candidate_limit)
         .all(db)
         .await
         .map_err(internal_error)?;
@@ -1120,22 +1143,137 @@ async fn package_source_list(
     }
 
     let summaries = package_source_summaries(db, sources).await?;
-    let filter = query.filter.unwrap_or(PackageSourceListFilter::All);
     let mut summaries = summaries
         .into_iter()
         .filter(|summary| package_source_summary_matches_filter(summary, filter))
         .collect::<Vec<_>>();
-    sort_package_source_summaries(
-        &mut summaries,
-        query.sort.unwrap_or(PackageSourceListSort::Activity),
-        query.direction.unwrap_or(PackageSourceListDirection::Desc),
-    );
+    sort_package_source_summaries(&mut summaries, sort, direction);
 
     let cursor = cursor.min(summaries.len());
     let end = cursor.saturating_add(usize::try_from(limit).expect("u32 limit fits usize"));
     let items = summaries[cursor..summaries.len().min(end)].to_vec();
     let next_cursor = (end < summaries.len()).then(|| end.to_string());
     Ok(PackageSourceList { items, next_cursor })
+}
+
+fn package_source_list_uses_database_path(
+    filter: PackageSourceListFilter,
+    sort: PackageSourceListSort,
+) -> bool {
+    matches!(
+        (filter, sort),
+        (
+            PackageSourceListFilter::All
+                | PackageSourceListFilter::Processing
+                | PackageSourceListFilter::Failed,
+            PackageSourceListSort::Activity
+                | PackageSourceListSort::Identity
+                | PackageSourceListSort::ResolutionTime
+        )
+    )
+}
+
+async fn package_source_list_sql_backed(
+    db: &DatabaseConnection,
+    cursor: usize,
+    limit: u32,
+    source_query: Option<&str>,
+    filter: PackageSourceListFilter,
+    sort: PackageSourceListSort,
+    direction: PackageSourceListDirection,
+) -> Result<PackageSourceList, HttpError> {
+    let mut query = package_sources::Entity::find();
+    query = query.filter(package_sources::Column::ResolutionStatus.ne("deleting"));
+
+    if let Some(source_query) = source_query {
+        let source_query = format!("%{}%", source_query.to_lowercase());
+        query = query.filter(Expr::cust_with_values(
+            r#"LOWER("package_sources"."display_name") LIKE ?"#,
+            [source_query],
+        ));
+    }
+
+    query = match filter {
+        PackageSourceListFilter::All => query,
+        PackageSourceListFilter::Processing => {
+            query.filter(package_sources::Column::ResolutionStatus.is_in(["pending", "processing"]))
+        }
+        PackageSourceListFilter::Failed => {
+            query.filter(package_sources::Column::ResolutionStatus.eq("failed"))
+        }
+        PackageSourceListFilter::NeedsAttention => {
+            unreachable!(
+                "package_source_list_uses_database_path must keep aggregate-heavy filters on the in-memory path"
+            )
+        }
+    };
+
+    query = order_package_source_list_query(query, sort, direction);
+
+    let page_size = u64::from(limit);
+    let mut sources = query
+        .offset(u64::try_from(cursor).expect("cursor fits u64"))
+        .limit(page_size + 1)
+        .all(db)
+        .await
+        .map_err(internal_error)?;
+    let has_more = sources.len() > usize::try_from(limit).expect("u32 limit fits usize");
+    sources.truncate(usize::try_from(limit).expect("u32 limit fits usize"));
+
+    let items = package_source_summaries(db, sources).await?;
+    let next_cursor = has_more.then(|| {
+        cursor
+            .saturating_add(usize::try_from(limit).expect("u32 limit fits usize"))
+            .to_string()
+    });
+    Ok(PackageSourceList { items, next_cursor })
+}
+
+fn order_package_source_list_query(
+    mut query: sea_orm::Select<package_sources::Entity>,
+    sort: PackageSourceListSort,
+    direction: PackageSourceListDirection,
+) -> sea_orm::Select<package_sources::Entity> {
+    match (sort, direction) {
+        (PackageSourceListSort::Identity, PackageSourceListDirection::Asc) => {
+            query = query
+                .order_by_asc(package_sources::Column::DisplayName)
+                .order_by_asc(package_sources::Column::SourceId);
+        }
+        (PackageSourceListSort::Identity, PackageSourceListDirection::Desc) => {
+            query = query
+                .order_by_desc(package_sources::Column::DisplayName)
+                .order_by_desc(package_sources::Column::SourceId);
+        }
+        (PackageSourceListSort::Activity, PackageSourceListDirection::Asc) => {
+            query = query
+                .order_by_asc(Expr::cust(
+                    r#"COALESCE("package_sources"."terminal_at", "package_sources"."created_at")"#,
+                ))
+                .order_by_asc(package_sources::Column::SourceId);
+        }
+        (PackageSourceListSort::Activity, PackageSourceListDirection::Desc) => {
+            query = query
+                .order_by_desc(Expr::cust(
+                    r#"COALESCE("package_sources"."terminal_at", "package_sources"."created_at")"#,
+                ))
+                .order_by_desc(package_sources::Column::SourceId);
+        }
+        (PackageSourceListSort::ResolutionTime, PackageSourceListDirection::Asc) => {
+            query = query
+                .order_by_asc(Expr::cust(r#""package_sources"."terminal_at" IS NOT NULL"#))
+                .order_by_asc(package_sources::Column::TerminalAt)
+                .order_by_asc(package_sources::Column::SourceId);
+        }
+        (PackageSourceListSort::ResolutionTime, PackageSourceListDirection::Desc) => {
+            query = query
+                .order_by_desc(Expr::cust(r#""package_sources"."terminal_at" IS NOT NULL"#))
+                .order_by_desc(package_sources::Column::TerminalAt)
+                .order_by_desc(package_sources::Column::SourceId);
+        }
+        _ => {}
+    }
+    query
 }
 
 fn parse_package_source_list_cursor(value: Option<&str>) -> Result<usize, HttpError> {
@@ -4258,6 +4396,177 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn order_package_source_list_query_adds_source_id_tiebreak_for_identity_sort() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<package_sources::Model>::new()])
+            .into_connection();
+
+        order_package_source_list_query(
+            package_sources::Entity::find(),
+            PackageSourceListSort::Identity,
+            PackageSourceListDirection::Asc,
+        )
+        .all(&db)
+        .await
+        .expect("identity query should execute against the mock database");
+
+        let transaction_log = db.into_transaction_log();
+        let sql = &transaction_log[0].statements()[0].sql;
+        let primary = sql
+            .find(r#""package_sources"."display_name" ASC"#)
+            .expect("identity sort should order by display_name");
+        let tie_break = sql
+            .find(r#""package_sources"."source_id" ASC"#)
+            .expect("identity sort should add source_id as a tie-break");
+
+        assert!(
+            tie_break > primary,
+            "source_id tie-break should appear after display_name ordering: {sql}"
+        );
+    }
+
+    #[tokio::test]
+    async fn order_package_source_list_query_adds_source_id_tiebreak_for_activity_sort() {
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([Vec::<package_sources::Model>::new()])
+            .into_connection();
+
+        order_package_source_list_query(
+            package_sources::Entity::find(),
+            PackageSourceListSort::Activity,
+            PackageSourceListDirection::Asc,
+        )
+        .all(&db)
+        .await
+        .expect("activity query should execute against the mock database");
+
+        let transaction_log = db.into_transaction_log();
+        let sql = &transaction_log[0].statements()[0].sql;
+        let primary = sql
+            .find(
+                r#"COALESCE("package_sources"."terminal_at", "package_sources"."created_at") ASC"#,
+            )
+            .expect("activity sort should order by terminal_at/created_at coalesce");
+        let tie_break = sql
+            .find(r#""package_sources"."source_id" ASC"#)
+            .expect("activity sort should add source_id as a tie-break");
+
+        assert!(
+            tie_break > primary,
+            "source_id tie-break should appear after activity ordering: {sql}"
+        );
+    }
+
+    #[tokio::test]
+    async fn package_source_list_sql_backed_sets_next_cursor_when_more_rows_exist() {
+        let first_id = Uuid::now_v7();
+        let second_id = Uuid::now_v7();
+        let third_id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![
+                listed_source(1, first_id, "alpha", "completed"),
+                listed_source(2, second_id, "bravo", "completed"),
+                listed_source(3, third_id, "charlie", "completed"),
+            ]])
+            .append_query_results([Vec::<package_source_warnings::Model>::new()])
+            .append_query_results([Vec::<package_source_versions::Model>::new()])
+            .append_query_results([Vec::<package_versions::Model>::new()])
+            .append_query_results([empty_scalar_rows()])
+            .append_query_results([empty_scalar_rows()])
+            .into_connection();
+
+        let page = package_source_list_sql_backed(
+            &db,
+            0,
+            2,
+            None,
+            PackageSourceListFilter::All,
+            PackageSourceListSort::Identity,
+            PackageSourceListDirection::Asc,
+        )
+        .await
+        .expect("sql-backed listing should succeed");
+
+        assert_eq!(page.items.len(), 2);
+        assert_eq!(page.next_cursor, Some("2".to_owned()));
+        assert_eq!(page.items[0].id, first_id);
+        assert_eq!(page.items[1].id, second_id);
+    }
+
+    #[tokio::test]
+    async fn package_source_list_sql_backed_omits_next_cursor_when_page_is_exhausted() {
+        let first_id = Uuid::now_v7();
+        let second_id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![
+                listed_source(1, first_id, "alpha", "completed"),
+                listed_source(2, second_id, "bravo", "completed"),
+            ]])
+            .append_query_results([Vec::<package_source_warnings::Model>::new()])
+            .append_query_results([Vec::<package_source_versions::Model>::new()])
+            .append_query_results([Vec::<package_versions::Model>::new()])
+            .append_query_results([empty_scalar_rows()])
+            .append_query_results([empty_scalar_rows()])
+            .into_connection();
+
+        let page = package_source_list_sql_backed(
+            &db,
+            0,
+            2,
+            None,
+            PackageSourceListFilter::All,
+            PackageSourceListSort::Identity,
+            PackageSourceListDirection::Asc,
+        )
+        .await
+        .expect("sql-backed listing should succeed");
+
+        assert_eq!(page.items.len(), 2);
+        assert_eq!(page.next_cursor, None);
+        assert_eq!(page.items[0].id, first_id);
+        assert_eq!(page.items[1].id, second_id);
+    }
+
+    #[tokio::test]
+    async fn package_source_list_uses_in_memory_fallback_for_needs_attention_or_exposures() {
+        let attention_id = Uuid::now_v7();
+        let normal_id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![
+                listed_source(1, attention_id, "attention", "completed"),
+                listed_source(2, normal_id, "normal", "processing"),
+            ]])
+            .append_query_results([Vec::<package_source_warnings::Model>::new()])
+            .append_query_results([Vec::<package_source_versions::Model>::new()])
+            .append_query_results([Vec::<package_versions::Model>::new()])
+            .append_query_results([empty_scalar_rows()])
+            .append_query_results([empty_scalar_rows()])
+            .into_connection();
+
+        let page = package_source_list(
+            &db,
+            PackageSourceListQuery {
+                cursor: None,
+                limit: Some(10),
+                query: None,
+                filter: Some(PackageSourceListFilter::NeedsAttention),
+                sort: Some(PackageSourceListSort::Identity),
+                direction: Some(PackageSourceListDirection::Asc),
+            },
+        )
+        .await
+        .expect("needs-attention listing should stay on the in-memory fallback path");
+
+        assert_eq!(page.next_cursor, None);
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].id, attention_id);
+        assert_eq!(
+            page.items[0].attention,
+            PackageSourceAttention::ExposureDataUnavailable
+        );
+    }
+
     #[test]
     fn package_source_list_validation_bounds_cursors_and_display_names() {
         assert_eq!(parse_package_source_list_cursor(None).unwrap(), 0);
@@ -4297,6 +4606,22 @@ mod tests {
             retryable: false,
             automatic_attempt_count: 0,
         }
+    }
+
+    fn listed_source(
+        row_id: i32,
+        id: Uuid,
+        display_name: &str,
+        resolution_status: &str,
+    ) -> package_sources::Model {
+        let mut row = source(id, resolution_status, None);
+        row.id = row_id;
+        row.display_name = display_name.to_owned();
+        row
+    }
+
+    fn empty_scalar_rows() -> Vec<std::collections::BTreeMap<String, Value>> {
+        Vec::new()
     }
 
     fn input() -> UpgradeAssessmentInput {
