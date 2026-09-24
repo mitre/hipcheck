@@ -15,4 +15,4 @@
 </Button>
 
 
-<DataTable data={data.payments} {columns} />
+<DataTable data={data.packageSources} {columns} />

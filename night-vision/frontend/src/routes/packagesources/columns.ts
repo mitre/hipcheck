@@ -1,26 +1,33 @@
 import { createColumnHelper } from "@tanstack/svelte-table";
+import type { PackageSourceSummary } from "$lib/api/generated";
 import type { DataTableFeatures } from "./data-table-features.js";
- 
-// This type is used to define the shape of our data.
-// You can use a Zod schema here if you want.
-export type Payment = {
- id: string;
- amount: number;
- status: "pending" | "processing" | "success" | "failed";
- email: string;
-};
- 
+
+const formatTimestamp = (value: string | null | undefined): string =>
+ value ? new Date(value).toLocaleString() : "—";
+
 // Use `accessor` for data columns and `display` for columns without one.
-const columnHelper = createColumnHelper<DataTableFeatures, Payment>();
- 
+const columnHelper = createColumnHelper<DataTableFeatures, PackageSourceSummary>();
+
 export const columns = columnHelper.columns([
+ columnHelper.accessor("fileName", {
+  header: "File",
+ }),
  columnHelper.accessor("status", {
   header: "Status",
  }),
- columnHelper.accessor("email", {
-  header: "Email",
+ columnHelper.accessor("createdAt", {
+  header: "Submitted",
+  cell: (info) => formatTimestamp(info.getValue()),
  }),
- columnHelper.accessor("amount", {
-  header: "Amount",
+ columnHelper.accessor("finishedAt", {
+  header: "Finished",
+  cell: (info) => formatTimestamp(info.getValue()),
+ }),
+ columnHelper.accessor("attempt", {
+  header: "Attempt",
+ }),
+ columnHelper.accessor("failureKind", {
+  header: "Failure",
+  cell: (info) => info.getValue() ?? "—",
  }),
 ]);

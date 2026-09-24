@@ -5,6 +5,10 @@ import type {
 	GetUpgradeAssessmentErrors,
 	GetUpgradeAssessmentResponse,
 	GetUpgradeAssessmentResponses,
+	ListPackageSourcesData,
+	ListPackageSourcesErrors,
+	ListPackageSourcesResponse,
+	ListPackageSourcesResponses,
 	PostPackageSourceBody,
 	PostPackageSourceErrors,
 	PostPackageSourceResponse,
@@ -38,6 +42,16 @@ export const createNightVisionApi = (client: Client = nightVisionClient) => ({
 			await client.post<PostPackageSourceResponses, PostPackageSourceErrors>({
 				url: '/package-sources',
 				body
+			})
+		),
+
+	listPackageSources: async (
+		query?: ListPackageSourcesData['query']
+	): Promise<ApiResult<ListPackageSourcesResponse>> =>
+		toApiResult(
+			await client.get<ListPackageSourcesResponses, ListPackageSourcesErrors>({
+				url: '/package-sources',
+				query
 			})
 		),
 
