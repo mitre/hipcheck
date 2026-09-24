@@ -1,6 +1,5 @@
 <script lang="ts">
   import * as Table from "$lib/components/ui/table/index.js";
-  import { Button } from "$lib/components/ui/button/index.js";
   import * as Card from "$lib/components/ui/card/index.js";
   import { Badge, badgeVariants } from "$lib/components/ui/badge/index.js";
   import { Separator } from "$lib/components/ui/separator/index.js";
@@ -14,7 +13,7 @@
     {
     candidate: "5.3.2",
     known_exposure: "Evidence unavailable",
-    action: "Choose",
+    action: "Not selected",
     }
   ]
  </script>
@@ -79,7 +78,7 @@
         <Table.Row style="font-size: 13px; color:slategrey;">
         <Table.Head>CANDIDATE</Table.Head>
         <Table.Head>KNOWN EXPOSURE</Table.Head>
-        <Table.Head class="text-end">SELECT</Table.Head>
+        <Table.Head class="text-end">SELECTION</Table.Head>
         </Table.Row>
         </Table.Header>
         <Table.Body>
@@ -99,9 +98,9 @@
             </Table.Cell>
             <Table.Cell class="text-end">
                 {#if candidate.action == "Selected"}
-                <Button variant="secondary">{candidate.action}</Button>
+                <Badge variant="secondary" class="min-w-24">{candidate.action}</Badge>
                 {:else}
-                <Button variant="outline">{candidate.action}</Button>
+                <Badge variant="outline" class="min-w-24 text-muted-foreground">{candidate.action}</Badge>
                 {/if}
             </Table.Cell>
         </Table.Row>
