@@ -12,9 +12,10 @@ use super::types::{
     parse_packument_dependency_map, parse_packument_peer_dependency_meta_map,
 };
 pub use super::types::{
-    DependencyPackageName, DependencySpec, NpmPackageName, NpmVersionRange,
-    PackumentBundleDependencies, PackumentDependencyMap, PackumentPeerDependencyMetaMap,
-    ParsedDependencyPackageName, ParsedDependencySpec, PeerDependencyMeta,
+    DependencyPackageName, DependencyRegistrySupport, DependencySpec, NpmPackageName,
+    NpmVersionRange, PackumentBundleDependencies, PackumentDependencyMap,
+    PackumentPeerDependencyMetaMap, ParsedDependencyPackageName, ParsedDependencySpec,
+    PeerDependencyMeta, dependency_registry_support,
 };
 
 mod raw;
@@ -274,6 +275,13 @@ pub struct NpmDist {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Sha1Digest(String);
+
+impl Sha1Digest {
+    /// Returns the digest as hexadecimal text.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 /*
     A human requires either a name or an email.

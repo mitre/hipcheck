@@ -16,7 +16,10 @@ use super::{
         NpmPackument, NpmVersion, PackumentBundleDependencies, PackumentDependencyMap,
         PackumentParseError,
     },
-    types::{DependencyPackageName, DependencySpec, NpmPackageName},
+    types::{
+        DependencyPackageName, DependencyRegistrySupport, DependencySpec, NpmPackageName,
+        dependency_registry_support, unaliased_dependency,
+    },
 };
 use crate::npm_semver::{NpmVersion as RangeVersion, elaborate_npm_version_bounds, parse_range};
 use async_channel::{Receiver, TrySendError};
@@ -1181,29 +1184,18 @@ async fn resolve_specification(
     declared_by: Option<&PackageVersion>,
     warnings: &mut Vec<ElaborationWarning>,
 ) -> Result<Vec<PackageVersion>, ElaborationError> {
-    let mut name = name;
-    let mut specification = specification;
-    while let DependencySpec::NpmAlias {
-        package,
-        specification: target_specification,
-    } = specification
-    {
-        name = package;
-        specification = target_specification;
-    }
+    let (name, specification) = unaliased_dependency(name, specification);
 
-    if matches!(name, DependencyPackageName::Historic(_)) {
-        warnings.push(ElaborationWarning {
-            declared_by: declared_by.cloned(),
-            dependency_name: name.as_str().into(),
-            specification_kind: UnsupportedSpecificationKind::HistoricName,
-        });
-        return Ok(Vec::new());
-    }
-
-    match specification {
-        DependencySpec::NpmAlias { .. } => unreachable!("aliases were unwrapped above"),
-        DependencySpec::File(_) => {
+    match dependency_registry_support(name, specification) {
+        DependencyRegistrySupport::UnsupportedHistoricName => {
+            warnings.push(ElaborationWarning {
+                declared_by: declared_by.cloned(),
+                dependency_name: name.as_str().into(),
+                specification_kind: UnsupportedSpecificationKind::HistoricName,
+            });
+            Ok(Vec::new())
+        }
+        DependencyRegistrySupport::UnsupportedFile => {
             warnings.push(ElaborationWarning {
                 declared_by: declared_by.cloned(),
                 dependency_name: name.as_str().into(),
@@ -1211,7 +1203,7 @@ async fn resolve_specification(
             });
             Ok(Vec::new())
         }
-        DependencySpec::Git(_) => {
+        DependencyRegistrySupport::UnsupportedGit => {
             warnings.push(ElaborationWarning {
                 declared_by: declared_by.cloned(),
                 dependency_name: name.as_str().into(),
@@ -1219,7 +1211,7 @@ async fn resolve_specification(
             });
             Ok(Vec::new())
         }
-        DependencySpec::Url(_) => {
+        DependencyRegistrySupport::UnsupportedUrl => {
             warnings.push(ElaborationWarning {
                 declared_by: declared_by.cloned(),
                 dependency_name: name.as_str().into(),
@@ -1227,7 +1219,7 @@ async fn resolve_specification(
             });
             Ok(Vec::new())
         }
-        DependencySpec::Registry(_) | DependencySpec::Tag(_) => {
+        DependencyRegistrySupport::Resolvable => {
             let package = NpmPackageName::parse(name.as_str().to_owned()).map_err(|_| {
                 ElaborationError::InvalidRange {
                     package: name.as_str().into(),

@@ -1,9 +1,14 @@
 use anyhow::{Context as _, Result, bail};
 use camino::Utf8PathBuf;
 use chrono::Utc;
-use nv_common::npm::packument::parse_packument;
+use nv_common::npm::packument::{
+    DependencyRegistrySupport, NpmPackument, PackumentDependencyMap, ParsedDependencyPackageName,
+    ParsedDependencySpec, dependency_registry_support, parse_packument,
+};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
+    fmt::Write as _,
     fs::{self, File},
     process::Command,
 };
@@ -16,11 +21,45 @@ const CORPUS_CATALOG_FILE: &str = "../nv-common/testdata/npm/packument/corpus.js
 const CORPUS_REAL_DIRECTORY: &str = "../nv-common/testdata/npm/packument/real";
 const CORPUS_CACHE_DIRECTORY: &str = "../nv-common/testdata/npm/packument/cache";
 const MAX_PACKUMENT_BYTES: &str = "67108864";
+const DEFAULT_INSPECTION_LIMIT: u64 = 100;
+const MAX_INSPECTION_VALUE_CHARS: usize = 1024;
 
 pub fn command() -> clap::Command {
     clap::Command::new("packument")
         .about("Inspect npm packument parser compatibility")
         .arg_required_else_help(true)
+        .subcommand(
+            clap::Command::new("inspect")
+                .about("Print normalized metadata from a local npm packument")
+                .arg(
+                    clap::Arg::new("file")
+                        .required(true)
+                        .value_name("FILE")
+                        .value_parser(clap::value_parser!(Utf8PathBuf))
+                        .help("Local full or abbreviated packument JSON file"),
+                )
+                .arg(
+                    clap::Arg::new("json")
+                        .long("json")
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Print the normalized packument summary as JSON"),
+                )
+                .arg(
+                    clap::Arg::new("limit")
+                        .long("limit")
+                        .default_value(DEFAULT_INSPECTION_LIMIT.to_string())
+                        .value_name("COUNT")
+                        .value_parser(clap::value_parser!(u64).range(1..))
+                        .help("Maximum versions and metadata entries to display; individual values remain capped"),
+                )
+                .arg(
+                    clap::Arg::new("no-limit")
+                        .long("no-limit")
+                        .action(clap::ArgAction::SetTrue)
+                        .conflicts_with("limit")
+                        .help("Display all versions and metadata entries; individual values remain capped"),
+                ),
+        )
         .subcommand(
             clap::Command::new("corpus-add")
                 .about("Fetch, validate, and add a reviewed packument fixture")
@@ -65,6 +104,36 @@ fn registry_argument() -> clap::Arg {
 }
 
 pub fn run(matches: &clap::ArgMatches) -> Result<()> {
+    if let Some(inspect_matches) = matches.subcommand_matches("inspect") {
+        let path = inspect_matches
+            .get_one::<Utf8PathBuf>("file")
+            .expect("file is required by clap");
+        let packument = parse_packument(
+            File::open(path).with_context(|| format!("failed to read packument at {path}"))?,
+        )
+        .with_context(|| format!("failed to parse packument at {path}"))?;
+        let limit = (!inspect_matches.get_flag("no-limit"))
+            .then(|| {
+                *inspect_matches
+                    .get_one::<u64>("limit")
+                    .expect("limit has a clap default")
+            })
+            .map(|limit| usize::try_from(limit).context("--limit is too large"))
+            .transpose()?;
+        let inspection = inspect_packument(&packument, limit);
+
+        if inspect_matches.get_flag("json") {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&inspection)
+                    .expect("packument inspection is always serializable")
+            );
+        } else {
+            print_inspection(&inspection);
+        }
+        return Ok(());
+    }
+
     if let Some(add_matches) = matches.subcommand_matches("corpus-add") {
         let token = DestructiveOperationToken::new(add_matches);
         let package = add_matches
@@ -85,6 +154,468 @@ pub fn run(matches: &clap::ArgMatches) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PackumentInspection {
+    name: String,
+    dist_tags: InspectedStringMap,
+    available_versions: usize,
+    versions: Vec<InspectedVersion>,
+    #[serde(skip_serializing_if = "is_zero")]
+    omitted_versions: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InspectedVersion {
+    version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    published_at: Option<String>,
+    dependencies: InspectedDependencies,
+    dist: InspectedDist,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deprecated: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    has_install_script: Option<bool>,
+    engines: InspectedStringMap,
+    cpu: InspectedStringList,
+    os: InspectedStringList,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InspectedDependencies {
+    dependencies: InspectedDependencyMap,
+    dev_dependencies: InspectedDependencyMap,
+    peer_dependencies: InspectedDependencyMap,
+    optional_dependencies: InspectedDependencyMap,
+    bundle_dependencies: InspectedStringList,
+}
+
+#[derive(Serialize)]
+struct InspectedDependencyMap {
+    entries: BTreeMap<String, InspectedDependency>,
+    #[serde(skip_serializing_if = "is_zero")]
+    omitted: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InspectedDependency {
+    specification: String,
+    resolution: DependencyResolution,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum DependencyResolution {
+    Resolvable,
+    InvalidName,
+    InvalidSpecification,
+    UnsupportedHistoricName,
+    UnsupportedFile,
+    UnsupportedGit,
+    UnsupportedUrl,
+}
+
+#[derive(Serialize)]
+struct InspectedStringMap {
+    entries: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "is_zero")]
+    omitted: usize,
+}
+
+#[derive(Serialize)]
+struct InspectedStringList {
+    entries: Vec<String>,
+    #[serde(skip_serializing_if = "is_zero")]
+    omitted: usize,
+}
+
+#[derive(Serialize)]
+struct InspectedDist {
+    tarball: String,
+    shasum: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    integrity: Option<String>,
+}
+
+fn inspect_packument(packument: &NpmPackument, limit: Option<usize>) -> PackumentInspection {
+    let published_at = packument
+        .time
+        .as_ref()
+        .map(|times| {
+            times
+                .versions
+                .iter()
+                .map(|(version, timestamp)| (version.as_str(), timestamp.to_string()))
+                .collect::<BTreeMap<_, _>>()
+        })
+        .unwrap_or_default();
+    let mut parsed_versions = packument.versions.iter().collect::<Vec<_>>();
+    parsed_versions.sort_by_key(|(version, _)| *version);
+    let available_versions = parsed_versions.len();
+    let omitted_versions = limit.map_or(0, |limit| parsed_versions.len().saturating_sub(limit));
+    let versions = parsed_versions
+        .into_iter()
+        .take(limit.unwrap_or(usize::MAX))
+        .map(|(key, version)| {
+            let package_version = key.to_string();
+            InspectedVersion {
+                version: bounded_inspection_value(&package_version),
+                published_at: published_at.get(package_version.as_str()).cloned(),
+                dependencies: InspectedDependencies {
+                    dependencies: inspected_dependency_map(&version.dependencies, limit),
+                    dev_dependencies: inspected_dependency_map(&version.dev_dependencies, limit),
+                    peer_dependencies: inspected_dependency_map(&version.peer_dependencies, limit),
+                    optional_dependencies: inspected_dependency_map(
+                        &version.optional_dependencies,
+                        limit,
+                    ),
+                    bundle_dependencies: inspected_string_list(
+                        {
+                            let mut names = version
+                                .bundle_dependencies
+                                .as_slice()
+                                .iter()
+                                .map(|name| bounded_inspection_value(name.as_str()))
+                                .collect::<Vec<_>>();
+                            names.sort();
+                            names
+                        },
+                        limit,
+                    ),
+                },
+                dist: InspectedDist {
+                    tarball: bounded_inspection_value(version.dist.tarball.as_str()),
+                    shasum: bounded_inspection_value(version.dist.shasum.as_str()),
+                    integrity: version
+                        .dist
+                        .integrity
+                        .as_deref()
+                        .map(bounded_inspection_value),
+                },
+                deprecated: version.deprecated.as_deref().map(bounded_inspection_value),
+                has_install_script: version.has_install_script,
+                engines: inspected_string_map(
+                    version
+                        .engines
+                        .iter()
+                        .map(|(name, range)| {
+                            (
+                                bounded_inspection_value(name),
+                                bounded_inspection_value(range),
+                            )
+                        })
+                        .collect(),
+                    limit,
+                ),
+                cpu: inspected_string_list(
+                    sorted_strings(&version.cpu)
+                        .iter()
+                        .map(|value| bounded_inspection_value(value))
+                        .collect(),
+                    limit,
+                ),
+                os: inspected_string_list(
+                    sorted_strings(&version.os)
+                        .iter()
+                        .map(|value| bounded_inspection_value(value))
+                        .collect(),
+                    limit,
+                ),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    PackumentInspection {
+        name: packument.name.to_string(),
+        dist_tags: inspected_string_map(
+            packument
+                .dist_tags
+                .iter()
+                .map(|(tag, version)| {
+                    let version = version.to_string();
+                    (
+                        bounded_inspection_value(tag),
+                        bounded_inspection_value(&version),
+                    )
+                })
+                .collect(),
+            limit,
+        ),
+        available_versions,
+        versions,
+        omitted_versions,
+    }
+}
+
+fn inspected_dependency_map(
+    dependencies: &PackumentDependencyMap,
+    limit: Option<usize>,
+) -> InspectedDependencyMap {
+    let entries = dependencies
+        .iter()
+        .map(|(name, specification)| {
+            let rendered_specification = specification.as_str();
+            (
+                bounded_inspection_value(name.as_str()),
+                InspectedDependency {
+                    specification: bounded_inspection_value(&rendered_specification),
+                    resolution: dependency_resolution(name, specification),
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let omitted = limit.map_or(0, |limit| entries.len().saturating_sub(limit));
+    InspectedDependencyMap {
+        entries: entries
+            .into_iter()
+            .take(limit.unwrap_or(usize::MAX))
+            .collect(),
+        omitted,
+    }
+}
+
+fn dependency_resolution(
+    name: &ParsedDependencyPackageName,
+    specification: &ParsedDependencySpec,
+) -> DependencyResolution {
+    let Some(name) = name.valid() else {
+        return DependencyResolution::InvalidName;
+    };
+    let Some(specification) = specification.valid() else {
+        return DependencyResolution::InvalidSpecification;
+    };
+
+    match dependency_registry_support(name, specification) {
+        DependencyRegistrySupport::Resolvable => DependencyResolution::Resolvable,
+        DependencyRegistrySupport::UnsupportedFile => DependencyResolution::UnsupportedFile,
+        DependencyRegistrySupport::UnsupportedGit => DependencyResolution::UnsupportedGit,
+        DependencyRegistrySupport::UnsupportedUrl => DependencyResolution::UnsupportedUrl,
+        DependencyRegistrySupport::UnsupportedHistoricName => {
+            DependencyResolution::UnsupportedHistoricName
+        }
+    }
+}
+
+fn inspected_string_map(
+    entries: BTreeMap<String, String>,
+    limit: Option<usize>,
+) -> InspectedStringMap {
+    let omitted = limit.map_or(0, |limit| entries.len().saturating_sub(limit));
+    InspectedStringMap {
+        entries: entries
+            .into_iter()
+            .take(limit.unwrap_or(usize::MAX))
+            .collect(),
+        omitted,
+    }
+}
+
+fn inspected_string_list(entries: Vec<String>, limit: Option<usize>) -> InspectedStringList {
+    let omitted = limit.map_or(0, |limit| entries.len().saturating_sub(limit));
+    InspectedStringList {
+        entries: entries
+            .into_iter()
+            .take(limit.unwrap_or(usize::MAX))
+            .collect(),
+        omitted,
+    }
+}
+
+fn is_zero(value: &usize) -> bool {
+    *value == 0
+}
+
+fn sorted_strings(values: &[String]) -> Vec<String> {
+    let mut sorted = values.to_vec();
+    sorted.sort();
+    sorted
+}
+
+fn bounded_inspection_value(value: &str) -> String {
+    let Some((end, _)) = value.char_indices().nth(MAX_INSPECTION_VALUE_CHARS) else {
+        return value.to_owned();
+    };
+    let omitted = value[end..].chars().count();
+    format!("{}… [{omitted} characters omitted]", &value[..end])
+}
+
+fn print_inspection(inspection: &PackumentInspection) {
+    print!("{}", format_inspection(inspection));
+}
+
+fn format_inspection(inspection: &PackumentInspection) -> String {
+    let mut output = String::new();
+    writeln!(output, "name: {}", inspection.name).expect("writing to a string cannot fail");
+    writeln!(output, "dist-tags:").expect("writing to a string cannot fail");
+    for (tag, version) in &inspection.dist_tags.entries {
+        writeln!(output, "  {}: {}", text_value(tag), text_value(version))
+            .expect("writing to a string cannot fail");
+    }
+    write_omitted(&mut output, 2, inspection.dist_tags.omitted);
+    writeln!(
+        output,
+        "available versions: {}",
+        inspection.available_versions
+    )
+    .expect("writing to a string cannot fail");
+    write_omitted(&mut output, 0, inspection.omitted_versions);
+    for version in &inspection.versions {
+        writeln!(output, "version: {}", version.version).expect("writing to a string cannot fail");
+        if let Some(published_at) = &version.published_at {
+            writeln!(output, "  published-at: {published_at}")
+                .expect("writing to a string cannot fail");
+        }
+        write_inspection_map(
+            &mut output,
+            "dependencies",
+            &version.dependencies.dependencies,
+        );
+        write_inspection_map(
+            &mut output,
+            "dev-dependencies",
+            &version.dependencies.dev_dependencies,
+        );
+        write_inspection_map(
+            &mut output,
+            "peer-dependencies",
+            &version.dependencies.peer_dependencies,
+        );
+        write_inspection_map(
+            &mut output,
+            "optional-dependencies",
+            &version.dependencies.optional_dependencies,
+        );
+        if !version.dependencies.bundle_dependencies.entries.is_empty() {
+            writeln!(
+                output,
+                "  bundle-dependencies: {}",
+                version
+                    .dependencies
+                    .bundle_dependencies
+                    .entries
+                    .iter()
+                    .map(|name| text_value(name))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+            .expect("writing to a string cannot fail");
+        }
+        write_omitted(
+            &mut output,
+            2,
+            version.dependencies.bundle_dependencies.omitted,
+        );
+        writeln!(output, "  tarball: {}", version.dist.tarball)
+            .expect("writing to a string cannot fail");
+        writeln!(output, "  shasum: {}", version.dist.shasum)
+            .expect("writing to a string cannot fail");
+        if let Some(integrity) = &version.dist.integrity {
+            writeln!(output, "  integrity: {}", text_value(integrity))
+                .expect("writing to a string cannot fail");
+        }
+        if let Some(deprecated) = &version.deprecated {
+            writeln!(output, "  deprecated: {}", text_value(deprecated))
+                .expect("writing to a string cannot fail");
+        }
+        if let Some(has_install_script) = version.has_install_script {
+            writeln!(output, "  has-install-script: {has_install_script}")
+                .expect("writing to a string cannot fail");
+        }
+        write_string_map(&mut output, "engines", &version.engines);
+        if !version.cpu.entries.is_empty() {
+            writeln!(
+                output,
+                "  cpu: {}",
+                version
+                    .cpu
+                    .entries
+                    .iter()
+                    .map(|value| text_value(value))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+            .expect("writing to a string cannot fail");
+        }
+        write_omitted(&mut output, 2, version.cpu.omitted);
+        if !version.os.entries.is_empty() {
+            writeln!(
+                output,
+                "  os: {}",
+                version
+                    .os
+                    .entries
+                    .iter()
+                    .map(|value| text_value(value))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+            .expect("writing to a string cannot fail");
+        }
+        write_omitted(&mut output, 2, version.os.omitted);
+    }
+    output
+}
+
+fn write_inspection_map(output: &mut String, label: &str, values: &InspectedDependencyMap) {
+    if !values.entries.is_empty() {
+        writeln!(output, "  {label}:").expect("writing to a string cannot fail");
+        for (name, dependency) in &values.entries {
+            writeln!(
+                output,
+                "    {}: {} ({})",
+                text_value(name),
+                text_value(&dependency.specification),
+                dependency_resolution_label(&dependency.resolution),
+            )
+            .expect("writing to a string cannot fail");
+        }
+    }
+    write_omitted(output, 4, values.omitted);
+}
+
+fn write_string_map(output: &mut String, label: &str, values: &InspectedStringMap) {
+    if !values.entries.is_empty() {
+        writeln!(output, "  {label}:").expect("writing to a string cannot fail");
+        for (name, value) in &values.entries {
+            writeln!(output, "    {}: {}", text_value(name), text_value(value))
+                .expect("writing to a string cannot fail");
+        }
+    }
+    write_omitted(output, 4, values.omitted);
+}
+
+fn write_omitted(output: &mut String, indentation: usize, omitted: usize) {
+    if omitted > 0 {
+        writeln!(output, "{}… {omitted} omitted", " ".repeat(indentation))
+            .expect("writing to a string cannot fail");
+    }
+}
+
+fn text_value(value: &str) -> std::borrow::Cow<'_, str> {
+    if value.chars().any(char::is_control) {
+        serde_json::to_string(value)
+            .expect("strings always serialize")
+            .into()
+    } else {
+        value.into()
+    }
+}
+
+fn dependency_resolution_label(resolution: &DependencyResolution) -> &'static str {
+    match resolution {
+        DependencyResolution::Resolvable => "resolvable",
+        DependencyResolution::InvalidName => "invalid-name",
+        DependencyResolution::InvalidSpecification => "invalid-specification",
+        DependencyResolution::UnsupportedHistoricName => "unsupported-historic-name",
+        DependencyResolution::UnsupportedFile => "unsupported-file",
+        DependencyResolution::UnsupportedGit => "unsupported-git",
+        DependencyResolution::UnsupportedUrl => "unsupported-url",
+    }
 }
 
 fn refresh_corpus(registry: &Url, _token: DestructiveOperationToken) -> Result<()> {
@@ -394,8 +925,223 @@ enum CorpusStatus {
 
 #[cfg(test)]
 mod tests {
-    use super::{command, corpus_refresh_state_path, fixture_stem, load_catalog};
+    use super::{
+        MAX_INSPECTION_VALUE_CHARS, command, corpus_refresh_state_path, fixture_stem,
+        format_inspection, inspect_packument, load_catalog,
+    };
     use camino::Utf8PathBuf;
+    use nv_common::npm::packument::parse_packument;
+
+    const FULL_PACKUMENT: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../nv-common/testdata/npm/packument/full-packument.json"
+    ));
+    const ABBREVIATED_PACKUMENT: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../nv-common/testdata/npm/packument/abbreviated-packument.json"
+    ));
+
+    #[test]
+    fn inspect_accepts_a_file_and_json_output() {
+        command()
+            .try_get_matches_from(["packument", "inspect", "fixture.json", "--json"])
+            .expect("packument inspect should parse");
+    }
+
+    #[test]
+    fn inspect_accepts_limit_options_and_rejects_invalid_combinations() {
+        command()
+            .try_get_matches_from(["packument", "inspect", "fixture.json", "--limit", "25"])
+            .expect("packument inspect limit should parse");
+        command()
+            .try_get_matches_from(["packument", "inspect", "fixture.json", "--no-limit"])
+            .expect("packument inspect no-limit should parse");
+        command()
+            .try_get_matches_from(["packument", "inspect", "fixture.json", "--limit", "0"])
+            .expect_err("zero inspection limit should fail");
+        command()
+            .try_get_matches_from([
+                "packument",
+                "inspect",
+                "fixture.json",
+                "--limit",
+                "25",
+                "--no-limit",
+            ])
+            .expect_err("inspection limit options should conflict");
+    }
+
+    #[test]
+    fn inspect_full_packument_prints_normalized_dependency_and_dist_metadata() {
+        let packument = parse_packument(FULL_PACKUMENT.as_bytes()).expect("fixture should parse");
+
+        assert_eq!(
+            format_inspection(&inspect_packument(&packument, None)),
+            concat!(
+                "name: example\n",
+                "dist-tags:\n",
+                "  latest: 1.0.0\n",
+                "available versions: 1\n",
+                "version: 1.0.0\n",
+                "  dependencies:\n",
+                "    serde: ^1.0.0 (resolvable)\n",
+                "  dev-dependencies:\n",
+                "    serde_json: ^1.0.0 (resolvable)\n",
+                "  peer-dependencies:\n",
+                "    tokio: ^1.0.0 (resolvable)\n",
+                "  optional-dependencies:\n",
+                "    bytes: ^1.0.0 (resolvable)\n",
+                "  tarball: https://registry.npmjs.org/example/-/example-1.0.0.tgz\n",
+                "  shasum: 0123456789abcdef0123456789abcdef01234567\n",
+                "  integrity: sha512-example\n",
+                "  engines:\n",
+                "    node: >=18\n",
+            )
+        );
+    }
+
+    #[test]
+    fn inspect_abbreviated_packument_omits_unavailable_metadata() {
+        let packument =
+            parse_packument(ABBREVIATED_PACKUMENT.as_bytes()).expect("fixture should parse");
+
+        assert_eq!(
+            format_inspection(&inspect_packument(&packument, None)),
+            concat!(
+                "name: minimal-package\n",
+                "dist-tags:\n",
+                "  latest: 2.0.0\n",
+                "available versions: 1\n",
+                "version: 2.0.0\n",
+                "  tarball: https://registry.npmjs.org/minimal-package/-/minimal-package-2.0.0.tgz\n",
+                "  shasum: 0123456789abcdef0123456789abcdef01234567\n",
+            )
+        );
+    }
+
+    #[test]
+    fn inspect_sorts_map_derived_output_and_versions() {
+        let packument = parse_packument(
+            &br#"{
+                "name": "example",
+                "dist-tags": { "zeta": "2.0.0", "alpha": "1.0.0" },
+                "versions": {
+                    "2.0.0": {
+                        "name": "example", "version": "2.0.0",
+                        "dependencies": { "zeta": "^2.0.0", "alpha": "^1.0.0" },
+                        "dist": {
+                            "tarball": "https://example.test/example-2.0.0.tgz",
+                            "shasum": "0123456789abcdef0123456789abcdef01234567"
+                        }
+                    },
+                    "1.0.0": {
+                        "name": "example", "version": "1.0.0",
+                        "dist": {
+                            "tarball": "https://example.test/example-1.0.0.tgz",
+                            "shasum": "0123456789abcdef0123456789abcdef01234567"
+                        }
+                    }
+                }
+            }"#[..],
+        )
+        .expect("fixture should parse");
+
+        let output = format_inspection(&inspect_packument(&packument, None));
+        assert!(output.contains("  alpha: 1.0.0\n  zeta: 2.0.0\n"));
+        assert!(output.contains("version: 1.0.0\n"));
+        assert!(output.contains("    alpha: ^1.0.0 (resolvable)\n    zeta: ^2.0.0 (resolvable)\n"));
+        assert!(
+            output.find("version: 1.0.0").expect("first version")
+                < output.find("version: 2.0.0").expect("second version")
+        );
+    }
+
+    #[test]
+    fn inspect_limits_versions_and_entries() {
+        let packument = parse_packument(
+            &br#"{
+                "name": "example",
+                "dist-tags": { "latest": "2.0.0", "previous": "1.0.0" },
+                "versions": {
+                    "1.0.0": {
+                        "name": "example", "version": "1.0.0",
+                        "dependencies": { "alpha": "^1.0.0", "beta": "^1.0.0" },
+                        "dist": { "tarball": "https://example.test/1.0.0.tgz", "shasum": "0123456789abcdef0123456789abcdef01234567" }
+                    },
+                    "2.0.0": {
+                        "name": "example", "version": "2.0.0",
+                        "dist": { "tarball": "https://example.test/2.0.0.tgz", "shasum": "0123456789abcdef0123456789abcdef01234567" }
+                    }
+                }
+            }"#[..],
+        )
+        .expect("fixture should parse");
+
+        let output = format_inspection(&inspect_packument(&packument, Some(1)));
+        assert!(output.contains("available versions: 2\n… 1 omitted\nversion: 1.0.0\n"));
+        assert!(output.contains("  latest: 2.0.0\n  … 1 omitted\n"));
+        assert!(output.contains("    alpha: ^1.0.0 (resolvable)\n    … 1 omitted\n"));
+        assert!(!output.contains("version: 2.0.0"));
+    }
+
+    #[test]
+    fn inspect_escapes_control_characters_and_marks_unusable_dependencies() {
+        let packument = parse_packument(
+            &br#"{
+                "name": "example",
+                "dist-tags": { "latest": "1.0.0" },
+                "versions": {
+                    "1.0.0": {
+                        "name": "example", "version": "1.0.0",
+                        "dependencies": { "bad\nname": "not a spec" },
+                        "deprecated": "unsafe\u001b[2J",
+                        "dist": { "tarball": "https://example.test/1.0.0.tgz", "shasum": "0123456789abcdef0123456789abcdef01234567" }
+                    }
+                }
+            }"#[..],
+        )
+        .expect("fixture should parse");
+
+        let output = format_inspection(&inspect_packument(&packument, None));
+        assert!(output.contains("\"bad\\nname\": not a spec (invalid-name)"));
+        assert!(output.contains("deprecated: \"unsafe\\u001b[2J\""));
+        assert!(!output.contains("bad\nname: not a spec"));
+    }
+
+    #[test]
+    fn inspect_truncates_oversized_external_values_in_text_and_json() {
+        let oversized = "x".repeat(MAX_INSPECTION_VALUE_CHARS + 7);
+        let fixture = serde_json::json!({
+            "name": "example",
+            "dist-tags": { "latest": "1.0.0" },
+            "versions": {
+                "1.0.0": {
+                    "name": "example",
+                    "version": "1.0.0",
+                    "deprecated": oversized,
+                    "dist": {
+                        "tarball": "https://example.test/1.0.0.tgz",
+                        "shasum": "0123456789abcdef0123456789abcdef01234567"
+                    }
+                }
+            }
+        });
+        let fixture = serde_json::to_vec(&fixture).expect("fixture should serialize");
+        let packument = parse_packument(fixture.as_slice()).expect("fixture should parse");
+        let inspection = inspect_packument(&packument, None);
+        let expected = format!(
+            "{}… [7 characters omitted]",
+            "x".repeat(MAX_INSPECTION_VALUE_CHARS)
+        );
+
+        assert_eq!(
+            inspection.versions[0].deprecated.as_deref(),
+            Some(expected.as_str())
+        );
+        assert!(format_inspection(&inspection).contains(&format!("deprecated: {expected}")));
+        let json = serde_json::to_value(&inspection).expect("inspection should serialize");
+        assert_eq!(json["versions"][0]["deprecated"], expected);
+    }
 
     #[test]
     fn corpus_refresh_requires_destructive_flag() {

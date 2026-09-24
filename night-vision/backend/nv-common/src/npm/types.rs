@@ -1,7 +1,7 @@
 //! Reusable types for npm package and dependency identifiers.
 
 use std::collections::HashMap;
-use std::{fmt, str::FromStr};
+use std::{borrow::Cow, fmt, str::FromStr};
 use url::Url;
 
 /// A reason that a current npm package name is invalid.
@@ -223,6 +223,56 @@ pub enum DependencySpec {
     },
 }
 
+/// Whether an npm dependency can be resolved through the configured registry.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DependencyRegistrySupport {
+    Resolvable,
+    UnsupportedFile,
+    UnsupportedGit,
+    UnsupportedUrl,
+    UnsupportedHistoricName,
+}
+
+/// Classifies whether a dependency can be resolved through an npm registry.
+///
+/// Npm aliases are evaluated using their target package and specification,
+/// matching package elaboration behavior.
+pub fn dependency_registry_support(
+    name: &DependencyPackageName,
+    specification: &DependencySpec,
+) -> DependencyRegistrySupport {
+    let (name, specification) = unaliased_dependency(name, specification);
+    if matches!(name, DependencyPackageName::Historic(_)) {
+        return DependencyRegistrySupport::UnsupportedHistoricName;
+    }
+
+    match specification {
+        DependencySpec::Registry(_) | DependencySpec::Tag(_) => {
+            DependencyRegistrySupport::Resolvable
+        }
+        DependencySpec::File(_) => DependencyRegistrySupport::UnsupportedFile,
+        DependencySpec::Git(_) => DependencyRegistrySupport::UnsupportedGit,
+        DependencySpec::Url(_) => DependencyRegistrySupport::UnsupportedUrl,
+        DependencySpec::NpmAlias { .. } => unreachable!("aliases are unwrapped above"),
+    }
+}
+
+/// Returns the package and specification after recursively unwrapping npm aliases.
+pub fn unaliased_dependency<'a>(
+    mut name: &'a DependencyPackageName,
+    mut specification: &'a DependencySpec,
+) -> (&'a DependencyPackageName, &'a DependencySpec) {
+    while let DependencySpec::NpmAlias {
+        package,
+        specification: target_specification,
+    } = specification
+    {
+        name = package;
+        specification = target_specification;
+    }
+    (name, specification)
+}
+
 /// A dependency specification parsed from upstream registry metadata.
 ///
 /// Registry packuments can contain malformed dependency specifications. Those
@@ -248,6 +298,36 @@ impl ParsedDependencySpec {
         match self {
             Self::Valid(specification) => Some(specification),
             Self::Invalid(_) => None,
+        }
+    }
+
+    /// Returns the dependency specification in a stable, human-readable form.
+    ///
+    /// Valid specifications are rendered from their normalized representation;
+    /// invalid specifications are retained exactly as supplied by the registry.
+    pub fn as_str(&self) -> Cow<'_, str> {
+        match self {
+            Self::Valid(specification) => specification.as_str(),
+            Self::Invalid(value) => Cow::Borrowed(value),
+        }
+    }
+}
+
+impl DependencySpec {
+    /// Returns the dependency specification in a stable, human-readable form.
+    pub fn as_str(&self) -> Cow<'_, str> {
+        match self {
+            Self::Registry(range) => Cow::Borrowed(range.as_str()),
+            Self::Tag(tag) | Self::File(tag) | Self::Git(tag) => Cow::Borrowed(tag),
+            Self::Url(url) => Cow::Borrowed(url.as_str()),
+            Self::NpmAlias {
+                package,
+                specification,
+            } => Cow::Owned(format!(
+                "npm:{}@{}",
+                package.as_str(),
+                specification.as_str()
+            )),
         }
     }
 }

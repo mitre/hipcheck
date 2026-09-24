@@ -327,6 +327,23 @@ Reset also acquires the advisory lock. It refuses stale `running` metadata by
 default; `--force` bypasses that stale-row guard only and must never be used
 while a sync is live.
 
+## `npm packument inspect`
+
+Print a stable summary of normalized metadata from a local full or abbreviated
+npm packument. The command does not fetch registry data or require database
+configuration.
+
+```sh
+cargo nvdb npm packument inspect path/to/packument.json
+```
+
+Use `--json` for structured output. By default, the command displays at most
+100 versions and 100 entries from each metadata collection, reporting omitted
+entries in the output. Individual externally supplied values are capped at 1024
+characters and include an omission marker when truncated. Use `--limit COUNT`
+to choose another positive entry limit or `--no-limit` to display every entry;
+the per-value cap still applies.
+
 ## `npm packument corpus-refresh`
 
 Fetch the fixed public npm packument corpus and write a JSON acceptance
