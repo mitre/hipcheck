@@ -218,6 +218,9 @@ mod tests {
             )])
             .into_connection();
         let attempt = ClaimedElaboration::new(&unavailable, 1, 1);
-        assert!(attempt.finalize(Err(FailureKind::Internal)).await.is_err());
+        attempt
+            .finalize(Err(FailureKind::Internal))
+            .await
+            .unwrap_err();
     }
 }
