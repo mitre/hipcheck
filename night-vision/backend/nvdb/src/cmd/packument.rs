@@ -1,9 +1,12 @@
 use anyhow::{Context as _, Result, bail};
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use chrono::Utc;
 use nv_common::npm::packument::{
     DependencyRegistrySupport, NpmPackument, PackumentDependencyMap, ParsedDependencyPackageName,
     ParsedDependencySpec, dependency_registry_support, parse_packument,
+};
+use nv_common::npm_semver::{
+    NpmVersion as RangeVersion, elaborate_npm_version_bounds, parse_range,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -58,6 +61,23 @@ pub fn command() -> clap::Command {
                         .action(clap::ArgAction::SetTrue)
                         .conflicts_with("limit")
                         .help("Display all versions and metadata entries; individual values remain capped"),
+                ),
+        )
+        .subcommand(
+            clap::Command::new("resolve")
+                .about("List published versions in a local packument that satisfy an npm range")
+                .arg(
+                    clap::Arg::new("file")
+                        .required(true)
+                        .value_name("FILE")
+                        .value_parser(clap::value_parser!(Utf8PathBuf))
+                        .help("Path to a local npm packument JSON file"),
+                )
+                .arg(
+                    clap::Arg::new("range")
+                        .required(true)
+                        .value_name("RANGE")
+                        .help("Npm version range to resolve"),
                 ),
         )
         .subcommand(
@@ -130,6 +150,20 @@ pub fn run(matches: &clap::ArgMatches) -> Result<()> {
             );
         } else {
             print_inspection(&inspection);
+        }
+        return Ok(());
+    }
+
+    if let Some(resolve_matches) = matches.subcommand_matches("resolve") {
+        let file = resolve_matches
+            .get_one::<Utf8PathBuf>("file")
+            .expect("file is required by clap");
+        let raw_range = resolve_matches
+            .get_one::<String>("range")
+            .expect("range is required by clap");
+
+        for version in resolve_packument_versions(file, raw_range)? {
+            println!("{version}");
         }
         return Ok(());
     }
@@ -637,6 +671,34 @@ fn dependency_resolution_label(resolution: &DependencyResolution) -> &'static st
     }
 }
 
+/// Resolve an NPM range against published versions in a local, parsed packument.
+///
+/// This deliberately mirrors production package elaboration: parse the range with
+/// node-semver, convert packument version keys to node-semver versions, sort them,
+/// then filter with the shared range elaborator. An empty result is successful and
+/// means that no published version satisfies the range.
+fn resolve_packument_versions(file: &Utf8Path, raw_range: &str) -> Result<Vec<RangeVersion>> {
+    let range = parse_range(raw_range).context("invalid npm version range")?;
+    let input =
+        File::open(file).with_context(|| format!("failed to read packument file {file}"))?;
+    let packument =
+        parse_packument(input).with_context(|| format!("failed to parse packument file {file}"))?;
+    let mut versions = packument
+        .versions
+        .keys()
+        .map(|version| {
+            RangeVersion::parse(version.to_string()).expect("packument versions are valid SemVer")
+        })
+        .collect::<Vec<_>>();
+    versions.sort();
+
+    Ok(elaborate_npm_version_bounds(&versions, &range)
+        .expect("versions were sorted")
+        .into_iter()
+        .cloned()
+        .collect())
+}
+
 fn refresh_corpus(registry: &Url, _token: DestructiveOperationToken) -> Result<()> {
     let catalog = load_catalog()?;
     let results = catalog
@@ -947,7 +1009,7 @@ mod tests {
     use super::{
         DEFAULT_INSPECTION_LIMIT, MAX_INSPECTION_VALUE_CHARS, command, corpus_refresh_state_path,
         dependency_resolution_label, fixture_stem, format_inspection, inspect_packument,
-        load_catalog,
+        load_catalog, resolve_packument_versions,
     };
     use camino::Utf8PathBuf;
     use nv_common::npm::packument::parse_packument;
@@ -1407,5 +1469,52 @@ mod tests {
         assert!(names.contains(&"express"));
         assert!(names.contains(&"@babel/core"));
         assert!(names.contains(&"@types/node"));
+    }
+
+    #[test]
+    fn resolve_uses_shared_caret_range_semantics_and_sorts_versions() {
+        let fixture =
+            Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/packument-resolve.json");
+
+        let versions = resolve_packument_versions(&fixture, "^1.2.3")
+            .expect("fixture and range should resolve")
+            .into_iter()
+            .map(|version| version.to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(versions, ["1.2.3", "1.5.0"]);
+    }
+
+    #[test]
+    fn resolve_rejects_invalid_ranges() {
+        let fixture =
+            Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/packument-resolve.json");
+
+        let error = resolve_packument_versions(&fixture, "^1.2.3.4")
+            .expect_err("invalid ranges must not resolve");
+
+        assert!(error.to_string().contains("invalid npm version range"));
+    }
+
+    #[test]
+    fn resolve_rejects_malformed_packuments() {
+        let malformed_packument = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../nv-common/testdata/npm/packument/corpus.json");
+
+        let error = resolve_packument_versions(&malformed_packument, "^1.2.3")
+            .expect_err("a corpus catalog is not a packument");
+
+        assert!(error.to_string().contains("failed to parse packument file"));
+    }
+
+    #[test]
+    fn resolve_succeeds_with_no_output_versions_when_range_has_no_matches() {
+        let fixture =
+            Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/packument-resolve.json");
+
+        let versions = resolve_packument_versions(&fixture, "^3.0.0")
+            .expect("a range without matches is still a successful resolution");
+
+        assert!(versions.is_empty());
     }
 }

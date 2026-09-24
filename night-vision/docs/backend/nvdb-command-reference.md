@@ -344,6 +344,21 @@ characters and include an omission marker when truncated. Use `--limit COUNT`
 to choose another positive entry limit or `--no-limit` to display every entry;
 the per-value cap still applies.
 
+## `npm packument resolve`
+
+Resolve a requested NPM range against the published versions in a local
+packument JSON file, without contacting a registry:
+
+```sh
+cargo nvdb npm packument resolve backend/nvdb/testdata/packument-resolve.json '^1.2.3'
+```
+
+Each matching version is printed on its own line in increasing semantic-version
+order. The command uses the same NPM range parser and filtering behavior as
+package resolution. A range with no matching published versions succeeds with
+no output. Invalid ranges, unreadable files, and malformed packuments print a
+clear error and exit non-zero.
+
 ## `npm packument corpus-refresh`
 
 Fetch the fixed public npm packument corpus and write a JSON acceptance

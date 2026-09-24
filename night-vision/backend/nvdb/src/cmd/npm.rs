@@ -34,4 +34,11 @@ mod tests {
             .try_get_matches_from(["npm", "packument", "corpus-add", "example", "--destructive"])
             .expect("packument corpus add should parse");
     }
+
+    #[test]
+    fn npm_command_accepts_packument_resolve() {
+        command()
+            .try_get_matches_from(["npm", "packument", "resolve", "packument.json", "^1.2.3"])
+            .expect("packument resolve should parse");
+    }
 }
