@@ -1,50 +1,40 @@
 <script lang="ts">
+    import { enhance } from "$app/forms";
     import { Button } from "$lib/components/ui/button/index.js";
     import * as Card from "$lib/components/ui/card/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
-    import { Input } from "$lib/components/ui/input/index.js";
     import { Separator } from "$lib/components/ui/separator/index.js";
     import { Textarea } from "$lib/components/ui/textarea/index.js";
     import * as Tabs from "$lib/components/ui/tabs/index.js";
     import * as Alert from "$lib/components/ui/alert/index.js";
     import Info from "@lucide/svelte/icons/info";
+    import CircleAlert from "@lucide/svelte/icons/circle-alert";
+    import type { ActionData } from "./$types";
 
-    let files = $state<File[]>([]);
+    let { form }: { form: ActionData } = $props();
 
-    // Optional: preview file names before upload
+    let selectedFile = $state<File | null>(null);
+    let submitting = $state(false);
+
     function handleFileChange(event: Event & { currentTarget: HTMLInputElement }) {
-        files = Array.from(event.currentTarget.files ?? []);
+        selectedFile = event.currentTarget.files?.[0] ?? null;
     }
-
-    async function uploadFiles() {
-        if (!files.length) {
-            alert("Please select at least one file.");
-            return;
-        }
-
-        const formData = new FormData();
-        files.forEach(file => formData.append("files", file));
-
-        try {
-            const res = await fetch("/upload", {
-                method: "POST",
-                body: formData
-            });
-
-            if (!res.ok) throw new Error(await res.text());
-            const data = await res.json();
-            alert(`Uploaded: ${data.uploaded.join(", ")}`);
-        } catch (err) {
-            console.error(err);
-            alert("Upload failed.");
-        }
-    }
-
 </script>
 <h1>Add Package Source</h1>
 <p>Submit an NPM package.json to resolve reachable dependencies and find KEV-linked exposures.</p>
 <br>
 
+<form
+    method="POST"
+    enctype="multipart/form-data"
+    use:enhance={() => {
+        submitting = true;
+        return async ({ update }) => {
+            await update({ reset: false });
+            submitting = false;
+        };
+    }}
+>
 <Card.Root>
   <Card.Header>
     <Card.Title>Source Details</Card.Title>
@@ -54,44 +44,33 @@
     <div class="w-full max-w-md">
     <Field.Set>
         <Field.Group>
-        <Field.Field>
-            <Field.Label for="source_name">SOURCE NAME</Field.Label>
-            <Input id="username" type="text" placeholder="Input source name here"/>
-            <Field.Description>
-                Use a short name that identifies this application or repository.
-            </Field.Description>
-        </Field.Field>
-
         <Tabs.Root value="paste_manifest" class="w-[400px]">
         <Tabs.List>
         <Tabs.Trigger value="paste_manifest">Paste manifest</Tabs.Trigger>
         <Tabs.Trigger value="upload_package.json">Upload package.json</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="paste_manifest">
-            <Field.Label for="feedback">PACKAGE.JSON</Field.Label>
-        <Textarea id="feedback" placeholder="Paste package source here..." rows={8}/>
+            <Field.Label for="manifest">PACKAGE.JSON</Field.Label>
+            <Textarea id="manifest" name="manifest" placeholder="Paste package source here..." rows={8} value={form?.manifest ?? ""} />
         </Tabs.Content>
-        <Tabs.Content value="upload_package.json">Upload json files:
-        <input type="file" multiple onchange={handleFileChange} />
-        <button onclick={uploadFiles}>Upload</button>
-        <ul>
-            {#each files as file}
-                <li>{file.name}</li>
-            {/each}
-        </ul>
-        {#if files}
-            <p>Selected files:</p>
-            {#each Array.from(files) as file}
-                <p>{file.name} ({file.size} bytes)</p>
-            {/each}
-        {/if}
+        <Tabs.Content value="upload_package.json">
+            <Field.Label for="file">PACKAGE.JSON FILE</Field.Label>
+            <input id="file" name="file" type="file" accept=".json,application/json" onchange={handleFileChange} />
+            {#if selectedFile}
+                <p class="mt-2 text-sm">Selected: {selectedFile.name} ({selectedFile.size} bytes)</p>
+            {/if}
         </Tabs.Content>
         </Tabs.Root>
-        
         </Field.Group>
     </Field.Set>
     </div>
     <p>Night Vision accepts a valid NPM package manifest. Lockfiles and other ecosystems are outside the MVP. </p>
+    {#if form?.message}
+        <Alert.Root variant="destructive" class="mt-4">
+            <CircleAlert />
+            <Alert.Description>{form.message}</Alert.Description>
+        </Alert.Root>
+    {/if}
   </Card.Content>
   <Card.Footer>
     <br>
@@ -109,8 +88,8 @@
   <Button href="/packagesources" variant="outline" class="rounded-full">
     Cancel
   </Button>
-  <Button href="/packagesources" class="rounded-full bg-cyan-900 text-gray-200 dark:bg-gray-600 dark:text-gray-50">
-    Validate and Submit
+  <Button type="submit" disabled={submitting} class="rounded-full bg-cyan-900 text-gray-200 dark:bg-gray-600 dark:text-gray-50">
+    {submitting ? "Submitting…" : "Validate and Submit"}
   </Button>
 </div>
-
+</form>

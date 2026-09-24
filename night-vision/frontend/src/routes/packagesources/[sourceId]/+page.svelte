@@ -6,9 +6,18 @@
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import StatusBadge from '../status-badge.svelte';
 	import { formatFailureKind, formatTimestamp } from '../format';
+	import { invalidateAll } from '$app/navigation';
 
 	let { data } = $props();
 	const source = $derived(data.source);
+	const resolving = $derived(source.status === 'pending' || source.status === 'processing');
+
+	// Reload every two seconds until resolution finishes, so the page follows it live.
+	$effect(() => {
+		if (!resolving) return;
+		const timer = setInterval(() => invalidateAll(), 2000);
+		return () => clearInterval(timer);
+	});
 </script>
 
 <h2 style="color: grey;"><a href="/packagesources">Package sources</a> / {source.fileName}</h2>
