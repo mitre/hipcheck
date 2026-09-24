@@ -11,7 +11,7 @@
 <h1>Package Sources</h1>
 <div class="flex items-center justify-between gap-4">
     <p>Submitted NPM manifests and their resolution status.</p>
-    <Button href="/sources/new" class="rounded-full bg-cyan-900 text-gray-200 dark:bg-gray-600 dark:text-gray-50">
+    <Button href="/packagesources/new" class="rounded-full bg-cyan-900 text-gray-200 dark:bg-gray-600 dark:text-gray-50">
         <Plus data-icon="inline-start" />
         Add Package Source
     </Button>

@@ -9,11 +9,6 @@
 	const menuItems = [
 		{ name: 'Package Sources', path: '/packagesources', icon: "fa fa-archive" },
 		{ name: 'Assessments', path: '/assessments' , icon: "fa fa-cube" },
-		// DEMO ONLY: Example Sources and Example Assessments show made-up example data.
-		// If you don't want them in the demo, comment out the two lines below to hide
-		// them from the sidebar. The pages still exist and open by URL.
-		{ name: 'Example Sources', path: '/sources', icon: "fa fa-folder-open" },
-		{ name: 'Example Assessments', path: '/example-assessments', icon: "fa fa-folder-open" },
 	];
 
 </script>
