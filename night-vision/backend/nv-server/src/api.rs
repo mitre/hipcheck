@@ -2245,7 +2245,9 @@ async fn create_upgrade_assessment(
         trigger_kind: Set(trigger_kind),
         trigger_reference: Set(trigger_reference),
         candidate_version: Set(input.candidate_version.clone()),
-        status: Set("pending".to_owned()),
+        // The table's check constraint allows only processing, completed, and
+        // failed; reads still report a processing row as pending.
+        status: Set("processing".to_owned()),
         ..Default::default()
     }
     .insert(db)
