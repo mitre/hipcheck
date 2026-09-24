@@ -92,7 +92,14 @@ export const actions: Actions = {
 		const name = form.get('name');
 		const version = form.get('version');
 		const cve = form.get('cve');
-		if (typeof name !== 'string' || typeof version !== 'string' || !name || !version) {
+		if (
+			typeof name !== 'string' ||
+			typeof version !== 'string' ||
+			typeof cve !== 'string' ||
+			!name ||
+			!version ||
+			!cve
+		) {
 			return fail(400, { assessError: 'Choose an exposure to assess.' });
 		}
 
@@ -104,11 +111,24 @@ export const actions: Actions = {
 			return fail(409, { assessError: 'Assessments need a package source that finished resolving.' });
 		}
 
+		const exposures = await nightVisionApi.getPackageSourceExposures(source.id);
+		if (!exposures.ok) return fail(502, { assessError: exposures.error.message });
+
+		const selectedExposure = exposures.data.exposures.find(
+			(exposure) =>
+				exposure.package.name === name &&
+				exposure.package.version === version &&
+				exposure.cveId === cve
+		);
+		if (!selectedExposure) {
+			return fail(400, { assessError: 'Choose a valid exposure from this package source.' });
+		}
+
 		const result = await startAssessment(
 			{
 				packageSource: source.source,
 				vulnerablePackage: { ecosystem: 'npm', name, version },
-				cveLinkage: typeof cve === 'string' && cve ? [cve] : null
+				cveLinkage: [cve]
 			},
 			params.sourceId,
 			cookies,
