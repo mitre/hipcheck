@@ -3,6 +3,7 @@ import type { PackageSourceSummary } from "$lib/api/generated";
 import type { DataTableFeatures } from "./data-table-features.js";
 import { formatTimestamp } from "$lib/format";
 import StatusBadge from "./status-badge.svelte";
+import SourceNameLink from "./source-name-link.svelte";
 import ViewSourceLink from "./view-source-link.svelte";
 
 // Use `accessor` for data columns and `display` for columns without one.
@@ -11,6 +12,8 @@ const columnHelper = createColumnHelper<DataTableFeatures, PackageSourceSummary>
 export const columns = columnHelper.columns([
  columnHelper.accessor("displayName", {
   header: "SOURCE",
+  cell: (info) =>
+   renderComponent(SourceNameLink, { name: info.getValue(), href: `/packagesources/${info.row.original.id}` }),
  }),
  columnHelper.accessor("lifecycle", {
   header: "STATUS",
