@@ -1,108 +1,120 @@
-
 # Architecture
 
-This document describes the high-level architecture of Night Vision, meaning
-how it's decomposed into separately-deployed components and how those
-components interact.
+This page describes Night Vision's current MVP system boundaries and the flow
+that produces an upgrade assessment. The frontend, `nv-server`, and PostgreSQL
+are the deployed application components. The server also runs background tasks
+and invokes Hipcheck as a subprocess; those are not separately deployed services.
 
 ## Table of Contents
 
 [[_TOC_]]
 
-## Goals
+## MVP Purpose and Boundaries
 
-The architecture of Night Vision is purposefully simple for the purposes of
-our Minimum Viable Product (MVP).
+Night Vision helps a user decide whether a newer NPM package version is a
+reasonable lower-risk upgrade when a reachable version is associated with a
+CISA Known Exploited Vulnerability (KEV). It does not prove that an upgrade is
+safe or calculate an agency's BOD 26-04 deadline. The [MVP roadmap] describes
+the end-to-end workstreams, and [RFD 0001] defines the assessment decision.
 
-The MVP product goal is upgrade safety assessment: helping users decide whether
-moving from a known-insecure package version to a newer package version is
-reasonable. This is explicitly motivated by supporting Federal Civilian
-Executive Branch (FCEB) compliance with CISA's BOD 26-04. The MVP focuses on
-noticing when reachable package versions enter the Known Exploited
-Vulnerabilities (KEV) catalog and identifying safer versions to upgrade to. See
-[RFD 0001](../rfds/0001-mvp-upgrade-safety-assessments.md) for the product and
-domain-model discussion.
+The current application accepts NPM `package.json` sources. SvelteKit renders
+the frontend and calls the `nv-server` REST API through server-side route loads
+and actions. `nv-server` owns source resolution, vulnerability correlation,
+candidate assessment, and report persistence. PostgreSQL stores submitted
+sources and their resolved dependency graphs, CVE and KEV data and sync state,
+and assessment results and evidence.
 
-In the future, assuming Night Vision achieves adoption, deployment, and scale,
-it's very likely this architecture would need to evolve to meet growing needs;
-but we've very purposefully decided not to prematurely design for scale that
-may or may not happen.
+![Night Vision MVP architecture showing the browser and SvelteKit frontend,
+the REST API and in-process tasks in nv-server, PostgreSQL, the CVE List and
+KEV sources, the NPM registry, and the Hipcheck subprocess.](./architecture.png)
 
-## Visualized
+The editable diagram is [architecture.dot](./architecture.dot). From the
+repository root in the Flox environment, regenerate the image with
+`dot -Tpng -Gdpi=160 docs/system/architecture.dot -o docs/system/architecture.png`.
 
-!["Night Vision Architecture diagram, showing the frontend connecting to the
-REST API, and the REST API connecting to the PostgreSQL database](./architecture.png)
+Arrows show where data moves. The frontend does not fetch vulnerability feeds,
+NPM metadata, or Hipcheck results directly; `nv-server` initiates the external
+data requests shown above.
 
-<details>
-<summary>The Mermaid text for the architecture diagram</summary>
+Hipcheck is an analysis engine called by Night Vision, not a public API or the
+owner of the final verdict; [RFD 0002] explains that boundary.
 
-```
-architecture-beta
-    group backend(cloud)[Backend]
-    group frontend(cloud)[Frontend]
+## Assessment Data Flow
 
-    service db(database)["PostgreSQL"] in backend
-    service server(server)["REST API"] in backend
-    service static(server)["Night Vision App"] in frontend
+1. A user submits a `package.json` through the frontend. The REST API validates
+   and stores the source as `pending` before responding. An in-process worker
+   claims pending work, fetches NPM registry metadata, resolves direct and
+   transitive package versions, and persists the reachable graph and source
+   lifecycle state. The source can be processing or failed; neither state
+   implies that it has zero exposures.
+2. Independently, in-process sync tasks fetch CVE List records from a Git
+   repository and CISA's KEV catalog over HTTP. They persist the data and sync
+   outcomes in PostgreSQL. The API exposes dataset availability and freshness
+   through `/data-status`.
+3. For a completed source, the API correlates its stored reachable versions
+   with locally stored CVE and KEV records when exposure results are requested.
+   A KEV-linked exposure identifies the affected package version, CVE, and
+   reachability path. Exposure results depend on both datasets being available;
+   the MVP does not use a separate re-analysis queue to create them.
+4. A user starts an upgrade assessment from a selected exposure. The API
+   persists a pending assessment before starting an in-process task. Discovery
+   fetches newer NPM versions and evaluates their locally known KEV status.
+   When a specific candidate is requested, the task invokes `hc check` for
+   that candidate, normalizes the available Hipcheck findings, and combines
+   them with vulnerability evidence and caveats. Hipcheck does not run for
+   every discovered version. The shipped policy has limited signal coverage,
+   as described in [RFD 0002].
+5. The task stores the assessment outcome and evidence in PostgreSQL. The
+   frontend reads status and completed results through the REST API, then
+   renders the affected version, candidates, verdict, supporting findings, and
+   limits. A failed or unfinished assessment remains distinguishable from a
+   completed recommendation.
 
-    db:L -- R:server
-    static:R -- L:server
-```
+Source resolution has persisted pending work and lease recovery inside
+`nv-server`. Assessment execution uses a spawned task after its pending row is
+stored; startup reconciliation marks interrupted assessments failed. These
+mechanisms provide observable lifecycle state without a separate message
+broker or worker deployment.
 
-</details>
+## Frontend Information Architecture
 
-## Likely Future Changes
+The frontend boundary is SvelteKit's server-side API client: route loads read
+API data, and form actions submit sources or assessments. The browser receives
+rendered view data rather than directly accessing PostgreSQL or external
+feeds. [RFD 0006] defines the intended MVP navigation around
+Assessments, Package sources, and Data status. The implemented routes and
+remaining RFD direction are distinct:
 
-This is a rough collection of likely improvements we'll need to make in the
-future, particularly if/when Night Vision begins to scale.
+| Area | Current frontend | RFD 0006 direction |
+| --- | --- | --- |
+| Entry point | `/` is a placeholder; the sidebar links to Package Sources and Assessments. | Make Assessments the default landing area and include Data status in navigation. |
+| Package sources | `/packagesources`, `/packagesources/new`, and `/packagesources/[sourceId]` submit sources, show lifecycle state, and show KEV-linked exposures. | `/sources`, `/sources/new`, and `/sources/:sourceId` organize the same source journey. |
+| Assessments | `/assessments` lists assessments remembered by the current browser; `/assessments/[assessmentId]` reads status and completed results from the API. | Make Assessments the default exposure work queue and connect source, exposure, candidate, evidence, and verdict in the detail flow. |
+| Data status | The REST API provides `/data-status`; there is no frontend data-status route yet. | `/data-status` explains CVE and KEV freshness, failures, and assessment impact. |
 
-### Message Queues and Worker Tasks
+This page identifies routes and data ownership only. [RFD 0006] contains the
+page-level interaction and presentation decisions; the [REST API documentation]
+contains endpoint contracts.
 
-A central part of Night Vision's design are two queues: the "re-analysis check
-queue" and the "re-analysis queue." The re-analysis check queue is a queue for
-tracked packages to be checked for potential updates which would require
-re-analysis. The "re-analysis queue" is a queue for actually re-analyzing
-packages which have been found to have relevant updates.
+## Post-MVP Scaling
 
-In the current design of Night Vision, both queues will be handled in-memory
-within `nv-server`. While this is architecturally simple, it has obvious
-limitations. The system will be constrained by the resources of a single
-instance of `nv-server` (memory, IO bandwidth, etc.), and any scaling would be
-done vertically by sizing up in the host on which `nv-server` is running,
-rather than horizontally (by deploying more instances of `nv-server`). While
-this works for a Minimum Viable Product, it does not work for a production
-service at scale.
+The current background work runs within `nv-server`, with concurrency and
+durable state managed there. This keeps the MVP deployment small, but server
+capacity bounds the work it can perform. If load or reliability requirements
+justify it later, dedicated queues and separately deployed workers could
+distribute source resolution, synchronization, or assessment execution. That
+infrastructure is not part of the current architecture, and no queue product
+or worker topology is selected here.
 
-The obvious change would be split out these queues into an independent queue
-system, using software such as RabbitMQ or Apache Kafka, and to introduce new
-"workers" which can pull tasks off of these queues, and enqueue new tasks as
-needed. In this architecture, scaling the system would mean standing up more
-instances of the workers or addressing any bottlenecks arising in the message
-queues themselves, which is more tractable than the solutions available today.
+## Design References
 
-The tradeoff with such a system is complexity: complexity in deployment and
-complexity in operation. In today's architecture, Night Vision has only three
-"components" which need to be deployed and sustained in production: the
-front-end application which serves the user interface, the backend server which
-receives and responds to API requests, and the PostgreSQL database which
-interacts with the backend server. With the introduction of separate queueing
-infrastructure and worker tasks, we'd have multiple new "kinds" of things to
-deploy. We'd need to solve more complex operational problems about how we
-sustain a live application, and would likely reach for orchestration software
-such as Kubernetes.
+- [MVP roadmap] describes the product flow and workstreams.
+- [RFD 0001] defines the upgrade-safety assessment goal and verdicts.
+- [RFD 0002] defines Night Vision's use of Hipcheck and its limited MVP policy.
+- [RFD 0006] defines the intended frontend information architecture.
 
-In the prior MIP effort on Night Vision, we pursued this kind of complexity
-immediately, building around a microservice architecture from the start, and
-trying to configure and deploy Kubernetes immediately. This was a mistake. We
-had a small team, and were still actively defining and building the system
-while we also attempted to wrangle a complex deployment story. In the end, the
-burdens we took on from this approach were a key part of why we failed to
-deliver a successful MVP by the end of the MIP period of performance. The
-choice to delay this architectural change in the current Night Vision one is
-purposeful, and based on lessons learned from that prior effort.
-
-That said, it's almost certain that in the future, whether under the current
-task or a subsequent task, we will need to decompose the Night Vision backend
-monolith, split off workers to handle re-analysis checks and re-analysis
-itself, and introduce distinct queueing infrastructure. We'll leave specific
-choices about _how_ to handle that transition to when it is prudent to pursue.
+[MVP roadmap]: ../project/mvp-roadmap.md
+[RFD 0001]: ../rfds/0001-mvp-upgrade-safety-assessments.md
+[RFD 0002]: ../rfds/0002-use-hipcheck-for-supply-chain-analysis.md
+[RFD 0006]: ../rfds/0006-mvp-frontend-assessment-flow.md
+[REST API documentation]: ../backend/rest-api-usage.md
