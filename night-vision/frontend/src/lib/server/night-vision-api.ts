@@ -2,6 +2,9 @@ import type {
 	GetPackageSourceErrors,
 	GetPackageSourceResponse,
 	GetPackageSourceResponses,
+	GetPackageSourceExposuresErrors,
+	GetPackageSourceExposuresResponse,
+	GetPackageSourceExposuresResponses,
 	GetUpgradeAssessmentErrors,
 	GetUpgradeAssessmentResponse,
 	GetUpgradeAssessmentResponses,
@@ -59,6 +62,14 @@ export const createNightVisionApi = (client: Client = nightVisionClient) => ({
 		toApiResult(
 			await client.get<GetPackageSourceResponses, GetPackageSourceErrors>({
 				url: '/package-sources/{id}',
+				path: { id }
+			})
+		),
+
+	getPackageSourceExposures: async (id: string): Promise<ApiResult<GetPackageSourceExposuresResponse>> =>
+		toApiResult(
+			await client.get<GetPackageSourceExposuresResponses, GetPackageSourceExposuresErrors>({
+				url: '/package-sources/{id}/exposures',
 				path: { id }
 			})
 		),

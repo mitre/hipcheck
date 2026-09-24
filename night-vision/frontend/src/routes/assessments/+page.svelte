@@ -50,6 +50,17 @@
     action: "Open",
     },
     {
+    id: "4567890",
+    exposure: "qs@6.5.1",
+    details: "CVE-2022-24999",
+    package_source: "agency-web",
+    source_details: "through body-parser",
+    patch_candidate: "6.5.3",
+    verdict: "Avoid",
+    updated: "Today, 9:38 AM",
+    action: "Open",
+    },
+    {
     id: "34567890",
     exposure: "minimist@1.2.5",
     details: "CVE-2021-44906",
@@ -88,7 +99,7 @@
 </script>
 
 <main>
-<h1> Assessments </h1>
+<h1> Assessments <Badge variant="outline" class="ml-2 align-middle">Example data</Badge></h1>
 <p> KEV-linked exposures and their upgrade decisions</p>
 <!-- Needs review, processing, completed -->
 <!-- Filter the table search bar -->

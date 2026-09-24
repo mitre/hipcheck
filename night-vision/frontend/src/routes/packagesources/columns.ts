@@ -1,33 +1,46 @@
-import { createColumnHelper } from "@tanstack/svelte-table";
+import { createColumnHelper, renderComponent } from "@tanstack/svelte-table";
 import type { PackageSourceSummary } from "$lib/api/generated";
 import type { DataTableFeatures } from "./data-table-features.js";
+import { formatFailureKind, formatTimestamp } from "./format";
+import StatusBadge from "./status-badge.svelte";
+import ViewSourceLink from "./view-source-link.svelte";
 
-const formatTimestamp = (value: string | null | undefined): string =>
- value ? new Date(value).toLocaleString() : "—";
+/** A list row plus its KEV exposure count; null when not known (not completed, or lookup failed). */
+export type PackageSourceRow = PackageSourceSummary & { kevExposures: number | null };
 
 // Use `accessor` for data columns and `display` for columns without one.
-const columnHelper = createColumnHelper<DataTableFeatures, PackageSourceSummary>();
+const columnHelper = createColumnHelper<DataTableFeatures, PackageSourceRow>();
 
 export const columns = columnHelper.columns([
  columnHelper.accessor("fileName", {
-  header: "File",
+  header: "FILE",
  }),
  columnHelper.accessor("status", {
-  header: "Status",
+  header: "STATUS",
+  cell: (info) => renderComponent(StatusBadge, { status: info.getValue() }),
  }),
  columnHelper.accessor("createdAt", {
-  header: "Submitted",
+  header: "SUBMITTED",
   cell: (info) => formatTimestamp(info.getValue()),
  }),
  columnHelper.accessor("finishedAt", {
-  header: "Finished",
+  header: "FINISHED",
   cell: (info) => formatTimestamp(info.getValue()),
  }),
+ columnHelper.accessor("kevExposures", {
+  header: "KEV EXPOSURES",
+  cell: (info) => info.getValue() ?? "—",
+ }),
  columnHelper.accessor("attempt", {
-  header: "Attempt",
+  header: "ATTEMPT",
  }),
  columnHelper.accessor("failureKind", {
-  header: "Failure",
-  cell: (info) => info.getValue() ?? "—",
+  header: "FAILURE",
+  cell: (info) => formatFailureKind(info.getValue()),
+ }),
+ columnHelper.display({
+  id: "action",
+  header: "ACTION",
+  cell: ({ row }) => renderComponent(ViewSourceLink, { href: `/packagesources/${row.original.id}` }),
  }),
 ]);

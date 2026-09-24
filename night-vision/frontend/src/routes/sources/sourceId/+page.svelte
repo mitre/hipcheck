@@ -31,8 +31,8 @@
  </script>
 
 <main>
-  <h2 style="color:grey;"><a href="/sources">Package sources</a> / agency-web</h2>
-  <h1 style="float:left">agency-web</h1>
+  <h2 style="color:grey;"><a href="/sources">Example sources</a> / agency-web</h2>
+  <h1 style="float:left">agency-web <Badge variant="outline" class="ml-2 align-middle">Example data</Badge></h1>
 
   <Button href="/sources/new" style="float:right" class="rounded-full bg-cyan-900 text-gray-200 dark:bg-gray-600 dark:text-gray-50">
     View submitted manifest
@@ -118,7 +118,7 @@
                 {/if}
             </Table.Cell>
             <Table.Cell class="text-end">
-            <Button variant="outline">{assessment.action}</Button>
+            <Button href="/assessments/assessmentsId" variant="outline">{assessment.action}</Button>
             </Table.Cell>
         </Table.Row>
         {/each}

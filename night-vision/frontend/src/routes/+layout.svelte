@@ -7,9 +7,10 @@
 
 	// Menu Items - Name, Path, and Icons
 	const menuItems = [
+		{ name: 'Package Sources', path: '/packagesources', icon: "fa fa-archive" },
 		{ name: 'Assessments', path: '/assessments' , icon: "fa fa-cube" },
-		//{ name: 'Package Sources', path: '/packagesources', icon: "fa fa-archive" },
-		{ name: 'Sources', path: '/sources', icon: "fa fa-archive" },
+		// Example pages for the demo; comment out this line to hide them from the sidebar.
+		{ name: 'Example Sources', path: '/sources', icon: "fa fa-folder-open" },
 	];
 
 </script>
@@ -23,6 +24,9 @@
 	  flex: 1;
   }
   .header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
     background: #1d5b6d;
     color: white;

@@ -21,7 +21,7 @@
 
 <main>
 <h2 style="color:grey;"><a href="/assessments">Assessments</a> / NV-2026-0142</h2>
-<h1 style="font-weight:bold;">Is this patch a reasonable upgrade?</h1>
+<h1 style="font-weight:bold;">Is this patch a reasonable upgrade? <Badge variant="outline" class="ml-2 align-middle">Example data</Badge></h1>
 <p>Follow the evidence from a KEV-linked dependency to a cautious recommendation. </p>
 <br>
 <br>

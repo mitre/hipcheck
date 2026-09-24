@@ -2,6 +2,7 @@
   import * as Table from "$lib/components/ui/table/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Badge, badgeVariants } from "$lib/components/ui/badge/index.js";
+  import Plus from "@lucide/svelte/icons/plus";
 
   const packages = [
     {
@@ -18,20 +19,40 @@
     id: "12345678",
     package_source: "claims-service",
     details: "package.json - submitted Sep 4",
-    status: "Resolving",
-    last_resolved: "In progress",
-    reachable: "—",
-    kev_exposures: "—", 
-    action: "View status",
+    status: "Completed",
+    last_resolved: "Today, 9:01 AM",
+    reachable: 96,
+    kev_exposures: 2,
+    action: "View source",
     },
     {
     id: "90987654",
     package_source: "partner-portal",
     details: "package.json - submitted Sep 3",
+    status: "Completed",
+    last_resolved: "Today, 8:58 AM",
+    reachable: 58,
+    kev_exposures: 1,
+    action: "View source",
+    },
+    {
+    id: "45678901",
+    package_source: "billing-api",
+    details: "package.json - submitted Sep 5",
+    status: "Resolving",
+    last_resolved: "In progress",
+    reachable: "—",
+    kev_exposures: "—",
+    action: "View status",
+    },
+    {
+    id: "56789012",
+    package_source: "reports-worker",
+    details: "package.json - submitted Sep 3",
     status: "Failed",
     last_resolved: "Yesterday",
     reachable: "—",
-    kev_exposures: "—", 
+    kev_exposures: "—",
     action: "View error",
     },
     // ...
@@ -39,11 +60,12 @@
 </script>
 
 <main>
-<h1>Package Sources</h1>
+<h1>Example Sources <Badge variant="outline" class="ml-2 align-middle">Example data</Badge></h1>
 <p style="display:flex; float:left">Submitted NPM manifests and their resolution status.</p>
 
 <Button href="/sources/new" style="display:flex; float:right" class="rounded-full bg-cyan-900 text-gray-200 dark:bg-gray-600 dark:text-gray-50">
-    + Add Package Source
+    <Plus data-icon="inline-start" />
+    Add Package Source
 </Button>
 
 <!-- Needs all, needs attention, processing, failed -->
@@ -69,11 +91,11 @@
     </Table.Cell>
     <Table.Cell>
         {#if pack.status == "Completed"}
-        <Badge class="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">Completed</Badge>
+        <Badge class="min-w-24 bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">Completed</Badge>
         {:else if pack.status == "Resolving"}
-        <Badge class="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">Resolving</Badge>
+        <Badge class="min-w-24 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">Resolving</Badge>
         {:else}
-        <Badge variant="destructive">Failed</Badge>
+        <Badge variant="destructive" class="min-w-24">Failed</Badge>
         {/if}
     </Table.Cell>
     <Table.Cell>{pack.last_resolved}</Table.Cell>

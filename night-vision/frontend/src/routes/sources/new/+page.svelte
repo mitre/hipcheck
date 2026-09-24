@@ -106,10 +106,10 @@
 
 <br>
 <div style="display:flex; float:right">
-  <Button href="/sources" variant="outline" class="rounded-full">
+  <Button href="/packagesources" variant="outline" class="rounded-full">
     Cancel
   </Button>
-  <Button href="/sources" class="rounded-full bg-cyan-900 text-gray-200 dark:bg-gray-600 dark:text-gray-50">
+  <Button href="/packagesources" class="rounded-full bg-cyan-900 text-gray-200 dark:bg-gray-600 dark:text-gray-50">
     Validate and Submit
   </Button>
 </div>

@@ -30,8 +30,8 @@
  const lastShown = $derived(Math.min((pagination.pageIndex + 1) * pagination.pageSize, rowCount));
 </script>
  
-<div class="rounded-md border">
- <Table.Root class="min-w-[1100px] table-fixed">
+<div>
+ <Table.Root class="min-w-[1400px] table-fixed">
   <Table.Header>
    {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
     <Table.Row>
