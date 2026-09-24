@@ -43,6 +43,12 @@
     background: #1e293b;
     color: white;
     padding: 1rem;
+    /* Keep the navigation in view while the page content scrolls. */
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    overflow-y: auto;
   }
   .sidebar a {
     display: block;
