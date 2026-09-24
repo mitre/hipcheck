@@ -705,7 +705,6 @@ mod tests {
 #[serde(deny_unknown_fields)]
 #[schemars(deny_unknown_fields)]
 pub struct PostPackageSourceBody {
-    pub display_name: String,
     pub file_name: String,
     pub contents: String,
 }

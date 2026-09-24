@@ -1526,16 +1526,12 @@
           "contents": {
             "type": "string"
           },
-          "displayName": {
-            "type": "string"
-          },
           "fileName": {
             "type": "string"
           }
         },
         "required": [
           "contents",
-          "displayName",
           "fileName"
         ],
         "additionalProperties": false

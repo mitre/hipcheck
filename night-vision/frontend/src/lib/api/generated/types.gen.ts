@@ -276,7 +276,6 @@ export type PostAssessmentResponse = {
 
 export type PostPackageSourceBody = {
     contents: string;
-    displayName: string;
     fileName: string;
 };
 

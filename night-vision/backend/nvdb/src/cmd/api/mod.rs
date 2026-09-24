@@ -2,7 +2,7 @@
 
 use anyhow::{Context as _, Result, anyhow, bail};
 use camino::Utf8PathBuf;
-use nv_common::{config::Config, npm::package_json::NpmPackageJson, rt::AsyncRuntime};
+use nv_common::{config::Config, rt::AsyncRuntime};
 use nv_server_client::{Client, types};
 use secrecy::ExposeSecret as _;
 use serde::{Serialize, de::DeserializeOwned};
@@ -225,12 +225,7 @@ fn package_source_body(path: &Utf8PathBuf) -> Result<types::PostPackageSourceBod
         .to_owned();
     let contents = fs::read_to_string(path)
         .with_context(|| format!("failed to read package source file {path} as UTF-8"))?;
-    let display_name = NpmPackageJson::parse_package_json(contents.as_bytes())
-        .context("invalid npm package.json")?
-        .name
-        .map_or_else(|| file_name.clone(), |name| name.to_string());
     Ok(types::PostPackageSourceBody {
-        display_name,
         file_name,
         contents,
     })
@@ -504,7 +499,6 @@ mod tests {
                 .header("content-type", "application/json")
                 .header("user-agent", "nvdb")
                 .json_body_obj(&serde_json::json!({
-                    "displayName": package.file_name().expect("fixture filename"),
                     "fileName": package.file_name().expect("fixture filename"),
                     "contents": "{\"name\":\"example\"}"
                 }));
@@ -819,7 +813,7 @@ mod tests {
     }
 
     #[test]
-    fn package_source_body_uses_package_name_for_display_name() {
+    fn package_source_body_reads_utf8_package_source_file() {
         let path = camino::Utf8PathBuf::from_path_buf(std::env::temp_dir())
             .expect("temporary directory path is UTF-8")
             .join(format!(
@@ -831,13 +825,12 @@ mod tests {
         let body = package_source_body(&path).expect("read package source");
 
         fs::remove_file(&path).expect("remove fixture");
-        assert_eq!(body.display_name, "example-package");
         assert_eq!(body.file_name, path.file_name().expect("fixture filename"));
         assert_eq!(body.contents, r#"{"name":"example-package"}"#);
     }
 
     #[test]
-    fn package_source_body_falls_back_to_input_basename_without_a_package_name() {
+    fn package_source_body_preserves_file_name_when_package_name_missing() {
         let path = camino::Utf8PathBuf::from_path_buf(std::env::temp_dir())
             .expect("temporary directory path is UTF-8")
             .join(format!(
@@ -849,10 +842,6 @@ mod tests {
         let body = package_source_body(&path).expect("read package source");
 
         fs::remove_file(&path).expect("remove fixture");
-        assert_eq!(
-            body.display_name,
-            path.file_name().expect("fixture filename")
-        );
         assert_eq!(body.file_name, path.file_name().expect("fixture filename"));
         assert_eq!(body.contents, r#"{"private":true}"#);
     }
@@ -891,21 +880,5 @@ mod tests {
                 .to_string()
                 .contains("failed to read package source file")
         );
-    }
-
-    #[test]
-    fn package_source_body_rejects_invalid_package_json() {
-        let path = camino::Utf8PathBuf::from_path_buf(std::env::temp_dir())
-            .expect("temporary directory path is UTF-8")
-            .join(format!(
-                "night-vision-invalid-package-source-{}.json",
-                uuid::Uuid::now_v7()
-            ));
-        fs::write(&path, "{").expect("write invalid fixture");
-
-        let error = package_source_body(&path).expect_err("invalid package json is rejected");
-
-        fs::remove_file(&path).expect("remove invalid fixture");
-        assert!(error.to_string().contains("invalid npm package.json"));
     }
 }

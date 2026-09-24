@@ -272,11 +272,9 @@ impl NvServerApi for RestApi {
         let context = ctx.context();
         let db = context.db();
         let body = body_param.into_inner();
-        let display_name = validated_package_source_display_name(body.display_name)?;
         let file_name = body.file_name;
         let contents = body.contents;
-        NpmPackageJson::parse_package_json(contents.as_bytes())
-            .map_err(|_| invalid_package_source_contents())?;
+        let display_name = derive_package_source_display_name(&file_name, &contents)?;
 
         // A successful submission is durable even when every active-resolution
         // slot is occupied: the source is persisted `pending` unconditionally,
@@ -1034,6 +1032,18 @@ fn invalid_package_source_contents() -> HttpError {
         Some("InvalidPackageSourceRequest".to_owned()),
         "package-source contents are invalid".to_owned(),
     )
+}
+
+fn derive_package_source_display_name(
+    file_name: &str,
+    contents: &str,
+) -> Result<String, HttpError> {
+    let package_json = NpmPackageJson::parse_package_json(contents.as_bytes())
+        .map_err(|_| invalid_package_source_contents())?;
+    let display_name = package_json
+        .name
+        .map_or_else(|| file_name.to_owned(), |name| name.to_string());
+    validated_package_source_display_name(display_name)
 }
 
 async fn store_validated_package_source(
@@ -2872,7 +2882,7 @@ mod tests {
             .uri(test_context.client_testctx.url("/package-sources"))
             .header(CONTENT_TYPE, "application/json")
             .body(Body::from(
-                r#"{"displayName":"test package source","fileName":"package.json","contents":"not JSON"}"#,
+                r#"{"fileName":"package.json","contents":"not JSON"}"#,
             ))
             .expect("request should build");
 
