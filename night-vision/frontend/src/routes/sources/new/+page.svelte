@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
     import * as Card from "$lib/components/ui/card/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
@@ -9,11 +9,11 @@
     import * as Alert from "$lib/components/ui/alert/index.js";
     import Info from "@lucide/svelte/icons/info";
 
-    let files = [];
+    let files = $state<File[]>([]);
 
     // Optional: preview file names before upload
-    function handleFileChange(event) {
-        files = Array.from(event.target.files);
+    function handleFileChange(event: Event & { currentTarget: HTMLInputElement }) {
+        files = Array.from(event.currentTarget.files ?? []);
     }
 
     async function uploadFiles() {
@@ -72,8 +72,8 @@
         <Textarea id="feedback" placeholder="Paste package source here..." rows={8}/>
         </Tabs.Content>
         <Tabs.Content value="upload_package.json">Upload json files:
-        <input type="file" multiple on:change={handleFileChange} />
-        <button on:click={uploadFiles}>Upload</button>
+        <input type="file" multiple onchange={handleFileChange} />
+        <button onclick={uploadFiles}>Upload</button>
         <ul>
             {#each files as file}
                 <li>{file.name}</li>
