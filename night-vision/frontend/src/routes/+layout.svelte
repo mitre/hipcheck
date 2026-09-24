@@ -4,6 +4,9 @@
 	import favicon from '$lib/assets/favicon.svg';
   import { page } from '$app/stores';
 
+	// Below 768px the sidebar is hidden behind a menu button in the header.
+	let menuOpen = $state(false);
+
 
 	// Menu Items - Name, Path, and Icons
 	const menuItems = [
@@ -20,8 +23,11 @@
 <style>
   .wrapper {
 	  flex: 1;
+	  /* Let the content shrink so wide tables scroll inside their own container. */
+	  min-width: 0;
   }
   .header {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -40,6 +46,7 @@
     background: #1e293b;
     color: white;
     padding: 1rem;
+    flex-shrink: 0;
     /* Keep the navigation in view while the page content scrolls. */
     position: sticky;
     top: 0;
@@ -63,6 +70,40 @@
     display: flex;
     gap: 20px;
   }
+  .menu-button,
+  .menu-backdrop {
+    display: none;
+  }
+  @media (max-width: 767px) {
+    .menu-button {
+      display: block;
+      position: absolute;
+      left: 1rem;
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    .sidebar {
+      position: fixed;
+      left: 0;
+      z-index: 50;
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+    }
+    .sidebar.open {
+      transform: none;
+    }
+    .menu-backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgb(0 0 0 / 0.4);
+      border: none;
+    }
+  }
   .container {
     width: 80%;
     margin: auto;
@@ -78,12 +119,13 @@
 <div class="layout">
 
   <!-- Sidebar Code -->
-  <nav class="sidebar">
+  <nav id="sidebar-nav" class="sidebar" class:open={menuOpen}>
     <h2>WORKSPACE</h2>
     {#each menuItems as item}
       <a
         href={item.path}
         class:active={$page.url.pathname === item.path}
+        onclick={() => (menuOpen = false)}
       >
 	  	<i class={item.icon}></i>
     	{item.name}
@@ -92,10 +134,22 @@
     <!-- <h2>SYSTEM</h2>
     <h2> Data Status</h2> -->
   </nav>
+  {#if menuOpen}
+    <button class="menu-backdrop" aria-label="Close menu" onclick={() => (menuOpen = false)}></button>
+  {/if}
 
   <div class="wrapper">
   <!-- Header Code -->
   <div class="header">
+	<button
+		class="menu-button"
+		aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+		aria-expanded={menuOpen}
+		aria-controls="sidebar-nav"
+		onclick={() => (menuOpen = !menuOpen)}
+	>
+		<i class="fa fa-bars"></i>
+	</button>
 	<h4> NIGHT VISION </h4>
   </div>
 
