@@ -2,7 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import type { PackageSourceExposure, VersionedPackage } from '$lib/api/generated';
 import { startAssessment } from '$lib/server/assessments';
 import { nightVisionApi } from '$lib/server/night-vision-api';
-import { formatPurl, manifestName } from '$lib/format';
+import { formatPurl } from '$lib/format';
 import { pageErrorStatus } from '$lib/server/page-errors';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -37,8 +37,8 @@ const toExposureRow = (exposure: PackageSourceExposure) => ({
 export const load: PageServerLoad = async ({ params }) => {
 	const [detail, list] = await Promise.all([
 		nightVisionApi.getPackageSourceStatus(params.sourceId),
-		// The detail response carries the file name only once resolution completes.
-		nightVisionApi.listPackageSources({ limit: 500 })
+		// The detail response carries the source's name only once resolution completes.
+		nightVisionApi.listPackageSources({ limit: 100 })
 	]);
 	if (!detail.ok) error(pageErrorStatus(detail.error), detail.error.message);
 	const source = detail.data;
@@ -52,9 +52,9 @@ export const load: PageServerLoad = async ({ params }) => {
 		else exposuresError = result.error.message;
 	}
 
-	const fileName =
-		(list.ok ? list.data.items.find((item) => item.id === source.id)?.fileName : undefined) ??
-		(completed ? source.source.fileName : 'Package source');
+	const listed = list.ok ? list.data.items.find((item) => item.id === source.id) : undefined;
+	const title = (completed ? source.source.displayName : listed?.displayName) ?? 'Package source';
+	const fileName = completed ? source.source.fileName : null;
 
 	// Only counts and small fields go to the browser: versioned packages can carry
 	// tens of thousands of derivation paths.
@@ -62,8 +62,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		source: {
 			id: source.id,
 			fileName,
-			// The manifest is only returned once resolution completes; until then, use the file name.
-			title: (completed ? manifestName(source.source.contents) : null) ?? fileName,
+			title,
 			status: source.status,
 			createdAt: source.createdAt,
 			finishedAt: completed

@@ -1,25 +1,22 @@
 import { error } from '@sveltejs/kit';
+import type { PackageSourceSummary } from '$lib/api/generated';
 import { nightVisionApi } from '$lib/server/night-vision-api';
-import type { PackageSourceRow } from './columns';
 import { pageErrorStatus } from '$lib/server/page-errors';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async () => {
-	const result = await nightVisionApi.listPackageSources();
-	if (!result.ok) error(pageErrorStatus(result.error), result.error.message);
+// The table pages through rows in the browser, so read the API's pages up front,
+// most recent activity first. The API returns at most 100 rows per page.
+const MAX_ROWS = 500;
 
-	// The list endpoint has no exposure counts yet, so look them up for each
-	// completed source. Fine at demo scale; a count on the list endpoint would
-	// avoid one request per row.
-	const packageSources: PackageSourceRow[] = await Promise.all(
-		result.data.items.map(async (source) => {
-			if (source.status !== 'completed' && source.status !== 'completed-with-warnings') {
-				return { ...source, kevExposures: null };
-			}
-			const exposures = await nightVisionApi.getPackageSourceExposures(source.id);
-			return { ...source, kevExposures: exposures.ok ? exposures.data.exposures.length : null };
-		})
-	);
+export const load: PageServerLoad = async () => {
+	const packageSources: PackageSourceSummary[] = [];
+	let cursor: string | null | undefined;
+	do {
+		const result = await nightVisionApi.listPackageSources({ limit: 100, cursor });
+		if (!result.ok) error(pageErrorStatus(result.error), result.error.message);
+		packageSources.push(...result.data.items);
+		cursor = result.data.nextCursor;
+	} while (cursor && packageSources.length < MAX_ROWS);
 
 	return { packageSources };
 };

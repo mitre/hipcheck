@@ -5,7 +5,9 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ cookies }) => {
 	// Only link sources that still exist; a removed source is shown by name alone.
-	const sources = await nightVisionApi.listPackageSources({ limit: 500 });
+	// The API returns at most 100 sources per page, so a source outside the 100 most
+	// recently active is also shown by name alone.
+	const sources = await nightVisionApi.listPackageSources({ limit: 100 });
 	const liveSourceIds = new Set(sources.ok ? sources.data.items.map((source) => source.id) : []);
 
 	const rows = await Promise.all(

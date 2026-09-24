@@ -28,7 +28,7 @@
 	<h1>{source.title}</h1>
 	<StatusBadge status={source.status} />
 </div>
-{#if source.title !== source.fileName}
+{#if source.fileName && source.fileName !== source.title}
 	<p class="text-sm text-muted-foreground">{source.fileName}</p>
 {/if}
 
