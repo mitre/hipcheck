@@ -5,10 +5,13 @@
 //! owns the result; workers only inspect one concrete package version and send
 //! one report through the one-shot channel attached to their work item.
 
+pub mod attempt;
 #[cfg(test)]
 mod integration_tests;
 pub mod lifecycle;
 pub mod storage;
+
+pub use attempt::{ClaimedElaboration, Finalization};
 
 use super::{
     package_json::{DependencyKind, NpmPackageJson, RootDependency},

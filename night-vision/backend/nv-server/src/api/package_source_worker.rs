@@ -4,18 +4,11 @@
 use super::ctx::ApiCtx;
 use nv_common::{
     db::entities::package_sources,
-    npm::{
-        elaboration::{
-            ElaborationLimits, ElaborationResult, NpmRegistryClient, elaborate,
-            lifecycle::{
-                FailureKind, attempt_is_active, claim_next_due, lease_duration,
-                recover_expired_leases,
-            },
-            storage::{
-                ElaborationStorageError, persist_completed_elaboration, record_elaboration_failure,
-            },
+    npm::elaboration::{
+        ClaimedElaboration, ElaborationLimits, elaborate,
+        lifecycle::{
+            FailureKind, attempt_is_active, claim_next_due, lease_duration, recover_expired_leases,
         },
-        package_json::NpmPackageJson,
     },
 };
 use sea_orm::DatabaseConnection;
@@ -90,13 +83,15 @@ async fn run_claim(
     limits: ElaborationLimits,
     max_bytes: usize,
 ) -> Result<(), &'static str> {
-    let setup = NpmPackageJson::parse_package_json(claim.file_contents.as_bytes())
-        .map_err(|_| FailureKind::Validation)
-        .and_then(|source| {
-            NpmRegistryClient::new(registry_url, max_bytes, limits.request_timeout)
-                .map(|client| (source, client))
-                .map_err(|_| FailureKind::Internal)
-        });
+    // Keep worker setup and finalization identical to manual CLI attempts.
+    let attempt = ClaimedElaboration::new(db, claim.id, claim.attempt_generation);
+    let setup = ClaimedElaboration::prepare(
+        claim.file_contents.as_bytes(),
+        registry_url,
+        &limits,
+        max_bytes,
+    )
+    .map_err(|error| error.failure_kind());
     let result = match setup {
         Ok((source, client)) => {
             let elaboration = elaborate(&source, Arc::new(client), limits);
@@ -110,7 +105,11 @@ async fn run_claim(
         }
         Err(kind) => Err(kind),
     };
-    finalize(db, claim.id, claim.attempt_generation, result).await
+    attempt
+        .finalize(result)
+        .await
+        .map(|_| ())
+        .map_err(|_| "internal")
 }
 
 /// Races elaboration against cancellation so a running worker observes it at
@@ -126,29 +125,6 @@ async fn wait_for_inactive_attempt(
             Ok(true) | Err(_) => {}
             Ok(false) => return,
         }
-    }
-}
-
-async fn finalize(
-    db: &DatabaseConnection,
-    source_id: i32,
-    attempt_generation: i32,
-    result: Result<ElaborationResult, FailureKind>,
-) -> Result<(), &'static str> {
-    let failure = match result {
-        Ok(result) => {
-            match persist_completed_elaboration(db, source_id, attempt_generation, &result).await {
-                Ok(()) | Err(ElaborationStorageError::InactiveAttempt) => return Ok(()),
-                Err(_) => FailureKind::Internal,
-            }
-        }
-        Err(kind) => kind,
-    };
-    // A failed write here does not strand the source: its lease will expire
-    // and `recover_expired_leases` retries recording the failure later.
-    match record_elaboration_failure(db, source_id, attempt_generation, failure).await {
-        Ok(()) | Err(ElaborationStorageError::InactiveAttempt) => Ok(()),
-        Err(_) => Err("internal"),
     }
 }
 
@@ -241,9 +217,7 @@ mod tests {
                 "private database details".to_owned(),
             )])
             .into_connection();
-        assert_eq!(
-            finalize(&unavailable, 1, 1, Err(FailureKind::Internal)).await,
-            Err("internal")
-        );
+        let attempt = ClaimedElaboration::new(&unavailable, 1, 1);
+        assert!(attempt.finalize(Err(FailureKind::Internal)).await.is_err());
     }
 }

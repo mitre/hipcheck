@@ -3,19 +3,11 @@ use indicatif::{ProgressBar, ProgressStyle};
 use nv_common::{
     config::Config,
     db,
-    npm::{
-        elaboration::{
-            ElaborationProgress, ElaborationProgressReporter, ElaborationProgressSnapshot,
-            NpmRegistryClient, elaborate, elaborate_with_progress,
-            lifecycle::{
-                AttemptKind, FailureKind, attempt_is_active, begin_attempt, lease_duration,
-            },
-            storage::{
-                persist_completed_elaboration, persisted_elaboration_warnings,
-                record_elaboration_failure,
-            },
-        },
-        package_json::NpmPackageJson,
+    npm::elaboration::{
+        ClaimedElaboration, ElaborationProgress, ElaborationProgressReporter,
+        ElaborationProgressSnapshot, Finalization, elaborate, elaborate_with_progress,
+        lifecycle::{AttemptKind, FailureKind, attempt_is_active, begin_attempt, lease_duration},
+        storage::persisted_elaboration_warnings,
     },
     rt,
 };
@@ -85,36 +77,48 @@ async fn resolve(
     .await
     .context("failed to claim package-source attempt")?
     .context("package source is cancelled, deleting, or already being processed")?;
-    let source_document = NpmPackageJson::parse_package_json(source.file_contents.as_bytes())
-        .context("stored source is not a valid npm package.json")?;
-    let client = NpmRegistryClient::new(
+    let attempt = ClaimedElaboration::new(&db, source.id, attempt_generation);
+    let setup = ClaimedElaboration::prepare(
+        source.file_contents.as_bytes(),
         config.npm_registry_url.clone(),
+        &limits,
         config.package_elaboration_max_packument_bytes,
-        limits.request_timeout,
-    )
-    .context("invalid NPM registry configuration")?;
-    let provider = Arc::new(client);
-    let result = match &progress {
-        Some(progress) => {
-            let elaboration =
-                elaborate_with_progress(&source_document, provider, limits, progress.clone());
-            tokio::pin!(elaboration);
-            tokio::select! {
-                result = &mut elaboration => result,
-                () = wait_for_inactive_attempt(&db, source.id, attempt_generation) => {
-                    anyhow::bail!("package source was cancelled or deleted while resolution was running");
+    );
+    let result = match setup {
+        Ok((source_document, client)) => match &progress {
+            Some(progress) => {
+                let provider = Arc::new(client);
+                let elaboration =
+                    elaborate_with_progress(&source_document, provider, limits, progress.clone());
+                tokio::pin!(elaboration);
+                tokio::select! {
+                    result = &mut elaboration => result,
+                    () = wait_for_inactive_attempt(&db, source.id, attempt_generation) => {
+                        anyhow::bail!("package source was cancelled or deleted while resolution was running");
+                    }
                 }
             }
-        }
-        None => {
-            let elaboration = elaborate(&source_document, provider, limits);
-            tokio::pin!(elaboration);
-            tokio::select! {
-                result = &mut elaboration => result,
-                () = wait_for_inactive_attempt(&db, source.id, attempt_generation) => {
-                    anyhow::bail!("package source was cancelled or deleted while resolution was running");
+            None => {
+                let provider = Arc::new(client);
+                let elaboration = elaborate(&source_document, provider, limits);
+                tokio::pin!(elaboration);
+                tokio::select! {
+                    result = &mut elaboration => result,
+                    () = wait_for_inactive_attempt(&db, source.id, attempt_generation) => {
+                        anyhow::bail!("package source was cancelled or deleted while resolution was running");
+                    }
                 }
             }
+        },
+        Err(error) => {
+            // The claim is already durable; setup failures must release its
+            // lease and record their classification before returning to CLI.
+            let failure_kind = error.failure_kind();
+            return match attempt.finalize(Err(failure_kind)).await {
+                Ok(_) => Err(anyhow::Error::new(error)),
+                Err(finalize_error) => Err(anyhow::Error::new(finalize_error)
+                    .context("failed to record elaboration failure")),
+            };
         }
     };
     match result {
@@ -123,9 +127,19 @@ async fn resolve(
             if let Some(progress) = &progress {
                 progress.publishing_snapshot();
             }
-            persist_completed_elaboration(&db, source.id, attempt_generation, &result)
+            match attempt
+                .finalize(Ok(result))
                 .await
-                .context("failed to persist elaboration result")?;
+                .context("failed to persist elaboration result")?
+            {
+                Finalization::Completed => {}
+                Finalization::Failed(_) => anyhow::bail!("failed to persist elaboration result"),
+                Finalization::Inactive => {
+                    anyhow::bail!(
+                        "package source was cancelled or deleted while resolution was running"
+                    );
+                }
+            }
             let warnings = persisted_elaboration_warnings(&db, source.id)
                 .await
                 .context("failed to read persisted elaboration warnings")?
@@ -138,14 +152,10 @@ async fn resolve(
             })
         }
         Err(error) => {
-            record_elaboration_failure(
-                &db,
-                source.id,
-                attempt_generation,
-                FailureKind::from(&error),
-            )
-            .await
-            .context("failed to record elaboration failure")?;
+            attempt
+                .finalize(Err(FailureKind::from(&error)))
+                .await
+                .context("failed to record elaboration failure")?;
             Err(error.into())
         }
     }

@@ -4,6 +4,8 @@
 //! constraints added by `m20260921_000000_package_source_automatic_retry`.
 
 use super::{
+    ElaborationLimits,
+    attempt::ClaimedElaboration,
     lifecycle::{AttemptKind, FailureKind, begin_attempt, claim_next_due, recover_expired_leases},
     storage::record_elaboration_failure,
 };
@@ -14,6 +16,7 @@ use sea_orm::{
     EntityTrait as _,
 };
 use std::time::Duration;
+use url::Url;
 
 const CONFIG_PATH_ENV: &str = "NV_POSTGRES_INTEGRATION_CONFIG_PATH";
 const DEFAULT_CONFIG_PATH: &str = "src/cve/testdata/nv-server.integration.spookey";
@@ -101,6 +104,73 @@ fn automatic_retry_and_lease_recovery_round_trip_through_postgres() {
             after_manual_retry.automatic_attempt_count, 0,
             "the manual attempt did not consume any of the automatic-attempt budget"
         );
+    });
+}
+
+#[test]
+#[ignore = "requires a disposable Postgres test database"]
+fn claimed_attempt_setup_failures_are_durably_finalized() {
+    run_async(async {
+        // Setup fails after the claim, so both paths must clear its lease.
+        let db = integration_database().await;
+        let limits = ElaborationLimits::default();
+        let registry_url = Url::parse("https://registry.npmjs.org/").unwrap();
+
+        let invalid_source = insert_source(&db, "not valid JSON").await;
+        let generation = begin_attempt(
+            &db,
+            invalid_source.id,
+            AttemptKind::Manual,
+            Duration::from_mins(1),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let attempt = ClaimedElaboration::new(&db, invalid_source.id, generation);
+        let error = match ClaimedElaboration::prepare(
+            invalid_source.file_contents.as_bytes(),
+            registry_url.clone(),
+            &limits,
+            1,
+        ) {
+            Ok(_) => panic!("invalid source preparation should fail"),
+            Err(error) => error,
+        };
+        assert_eq!(error.failure_kind(), FailureKind::Validation);
+        attempt.finalize(Err(error.failure_kind())).await.unwrap();
+        let finalized = reload(&db, invalid_source.id).await;
+        assert_eq!(finalized.resolution_status, "failed");
+        assert_eq!(finalized.failure_kind.as_deref(), Some("validation"));
+        assert!(!finalized.retryable);
+        assert!(finalized.lease_expires_at.is_none());
+
+        let invalid_client = insert_source(&db, "{}").await;
+        let generation = begin_attempt(
+            &db,
+            invalid_client.id,
+            AttemptKind::Manual,
+            Duration::from_mins(1),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let attempt = ClaimedElaboration::new(&db, invalid_client.id, generation);
+        let error = match ClaimedElaboration::prepare(
+            invalid_client.file_contents.as_bytes(),
+            registry_url,
+            &limits,
+            0,
+        ) {
+            Ok(_) => panic!("invalid registry-client preparation should fail"),
+            Err(error) => error,
+        };
+        assert_eq!(error.failure_kind(), FailureKind::Internal);
+        attempt.finalize(Err(error.failure_kind())).await.unwrap();
+        let finalized = reload(&db, invalid_client.id).await;
+        assert_eq!(finalized.resolution_status, "pending");
+        assert_eq!(finalized.failure_kind.as_deref(), Some("internal"));
+        assert!(finalized.retryable);
+        assert!(finalized.lease_expires_at.is_none());
     });
 }
 
