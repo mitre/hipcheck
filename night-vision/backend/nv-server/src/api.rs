@@ -2366,13 +2366,18 @@ fn assessment_caveat(code: &str, summary: impl Into<String>) -> UpgradeAssessmen
 }
 
 fn initial_assessment_report(input: UpgradeAssessmentInput) -> UpgradeAssessmentResult {
-    assessment_report(
+    let mut report = assessment_report(
         input,
         UpgradeAssessmentVerdict::Unknown,
         Vec::new(),
         Vec::new(),
         None,
-    )
+    );
+    report.caveats.push(assessment_caveat(
+        "analysis-pending",
+        "Candidate analysis has not yet produced supply-chain findings.",
+    ));
+    report
 }
 
 fn discovered_assessment_report(
@@ -2567,12 +2572,6 @@ fn assessment_report(
         })
         .collect();
     let mut caveats = Vec::new();
-    if supply_chain_findings.is_empty() {
-        caveats.push(assessment_caveat(
-            "analysis-pending",
-            "Candidate analysis has not yet produced supply-chain findings.",
-        ));
-    }
     if let Some(recommendation) = hipcheck_recommendation {
         caveats.push(assessment_caveat(
             "hipcheck-policy-recommendation",
@@ -5052,6 +5051,12 @@ mod tests {
         let report = initial_assessment_report(input());
         let serialized = serde_json::to_value(&report).expect("report must serialize");
 
+        assert!(
+            report
+                .caveats
+                .iter()
+                .any(|caveat| caveat.code == "analysis-pending")
+        );
         assert_eq!(
             serialized["input"]["vulnerablePackage"]["name"],
             "example-package"
@@ -5074,6 +5079,35 @@ mod tests {
         );
         assert!(serialized.get("findings").is_some());
         assert!(serialized.get("evidence").is_some());
+    }
+
+    #[test]
+    fn completed_hipcheck_without_findings_does_not_claim_analysis_is_pending() {
+        let mut run = hipcheck_run();
+        run.status = "completed".to_owned();
+        run.error_message = None;
+        let stored = nv_common::hipcheck::storage::StoredHipcheckRun {
+            run,
+            checks: Vec::new(),
+            concerns: Vec::new(),
+            findings: Vec::new(),
+        };
+
+        let report = report_from_hipcheck(
+            input(),
+            Uuid::now_v7(),
+            UpgradeAssessmentVerdict::Recommended,
+            &stored,
+        );
+
+        assert!(report.findings.is_empty());
+        assert_eq!(report.evidence.len(), 1);
+        assert!(
+            report
+                .caveats
+                .iter()
+                .all(|caveat| caveat.code != "analysis-pending")
+        );
     }
 
     #[test]
