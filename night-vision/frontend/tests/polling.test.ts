@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { pollUntilTerminal } from '../src/lib/api/polling.ts';
-import { isPackageSourceTerminal, type ApiResult } from '../src/lib/server/night-vision-api.ts';
+
+type ApiResult<T> = { ok: true; data: T } | { ok: false; error: unknown };
 
 test('stops immediately after a terminal status', async () => {
 	let calls = 0;
@@ -40,6 +41,28 @@ test('stops waiting when route cleanup aborts the poll', async () => {
 	assert.equal(calls, 1);
 });
 
+test('cancels an in-flight status request when route cleanup aborts the poll', async () => {
+	const controller = new AbortController();
+	let receivedSignal: AbortSignal | undefined;
+
+	const polling = pollUntilTerminal({
+		getStatus: (signal) =>
+			new Promise<string>((_resolve, reject) => {
+				receivedSignal = signal;
+				signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+			}),
+		isTerminal: () => false,
+		intervalMs: 100,
+		maxAttempts: 3,
+		signal: controller.signal
+	});
+
+	controller.abort(new DOMException('Route cleanup', 'AbortError'));
+
+	assert.equal(receivedSignal, controller.signal);
+	assert.deepEqual(await polling, { kind: 'cancelled', attempts: 1 });
+});
+
 test('returns a bounded timeout after the maximum number of attempts', async () => {
 	let calls = 0;
 	const result = await pollUntilTerminal({
@@ -69,7 +92,7 @@ test('composes with ApiResult-based package-source status polling', async () => 
 			calls += 1;
 			return status;
 		},
-		isTerminal: isPackageSourceTerminal,
+		isTerminal: (status) => !status.ok || status.data.status !== 'processing',
 		intervalMs: 0,
 		maxAttempts: 3
 	});
@@ -98,7 +121,7 @@ test('treats ApiResult errors as terminal polling outcomes', async () => {
 			calls += 1;
 			return errorResult;
 		},
-		isTerminal: isPackageSourceTerminal,
+		isTerminal: (status) => !status.ok || status.data.status !== 'processing',
 		intervalMs: 0,
 		maxAttempts: 3
 	});

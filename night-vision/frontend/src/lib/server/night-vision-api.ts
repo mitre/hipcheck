@@ -61,11 +61,15 @@ export const createNightVisionApi = (client: Client = nightVisionClient) => ({
 			})
 		),
 
-	getPackageSourceStatus: async (id: string): Promise<ApiResult<GetPackageSourceResponse>> =>
+	getPackageSourceStatus: async (
+		id: string,
+		requestOptions?: Pick<RequestInit, 'signal'>
+	): Promise<ApiResult<GetPackageSourceResponse>> =>
 		toApiResult(
 			await client.get<GetPackageSourceResponses, GetPackageSourceErrors>({
 				url: '/package-sources/{id}',
-				path: { id }
+				path: { id },
+				...requestOptions
 			})
 		),
 
@@ -87,11 +91,15 @@ export const createNightVisionApi = (client: Client = nightVisionClient) => ({
 			})
 		),
 
-	getUpgradeAssessmentStatus: async (id: string): Promise<ApiResult<GetUpgradeAssessmentResponse>> =>
+	getUpgradeAssessmentStatus: async (
+		id: string,
+		requestOptions?: Pick<RequestInit, 'signal'>
+	): Promise<ApiResult<GetUpgradeAssessmentResponse>> =>
 		toApiResult(
 			await client.get<GetUpgradeAssessmentResponses, GetUpgradeAssessmentErrors>({
 				url: '/upgrade-assessments/{id}',
-				path: { id }
+				path: { id },
+				...requestOptions
 			})
 		),
 

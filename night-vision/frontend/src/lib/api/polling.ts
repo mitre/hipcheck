@@ -6,7 +6,7 @@ export type PollResult<T> =
 
 export type PollOptions<T> = {
 	/** Fetch the current asynchronous-workflow status. */
-	getStatus: () => Promise<T>;
+	getStatus: (signal?: AbortSignal) => Promise<T>;
 	/** Return true once no additional status request is needed. */
 	isTerminal: (value: T) => boolean;
 	/** The delay between requests after the initial request. */
@@ -61,8 +61,16 @@ export const pollUntilTerminal = async <T>({
 	while (attempts < maxAttempts) {
 		if (signal?.aborted) return { kind: 'cancelled', attempts };
 
-		const value = await getStatus();
 		attempts += 1;
+		let value: T;
+		try {
+			value = await getStatus(signal);
+		} catch (error) {
+			if (signal?.aborted) return { kind: 'cancelled', attempts };
+			throw error;
+		}
+
+		if (signal?.aborted) return { kind: 'cancelled', attempts };
 
 		if (isTerminal(value)) return { kind: 'completed', value, attempts };
 		if (attempts === maxAttempts) return { kind: 'timed-out', attempts };
