@@ -257,10 +257,11 @@ fn inspect_packument(packument: &NpmPackument, limit: Option<usize>) -> Packumen
     let mut parsed_versions = packument.versions.iter().collect::<Vec<_>>();
     parsed_versions.sort_by_key(|(version, _)| *version);
     let available_versions = parsed_versions.len();
-    let omitted_versions = limit.map_or(0, |limit| parsed_versions.len().saturating_sub(limit));
+    let start = limit.map_or(0, |limit| available_versions.saturating_sub(limit));
+    let omitted_versions = start;
     let versions = parsed_versions
         .into_iter()
-        .take(limit.unwrap_or(usize::MAX))
+        .skip(start)
         .map(|(key, version)| {
             let package_version = key.to_string();
             InspectedVersion {
@@ -926,8 +927,8 @@ enum CorpusStatus {
 #[cfg(test)]
 mod tests {
     use super::{
-        MAX_INSPECTION_VALUE_CHARS, command, corpus_refresh_state_path, fixture_stem,
-        format_inspection, inspect_packument, load_catalog,
+        DEFAULT_INSPECTION_LIMIT, MAX_INSPECTION_VALUE_CHARS, command, corpus_refresh_state_path,
+        fixture_stem, format_inspection, inspect_packument, load_catalog,
     };
     use camino::Utf8PathBuf;
     use nv_common::npm::packument::parse_packument;
@@ -1070,6 +1071,7 @@ mod tests {
                     },
                     "2.0.0": {
                         "name": "example", "version": "2.0.0",
+                        "dependencies": { "alpha": "^2.0.0", "beta": "^2.0.0" },
                         "dist": { "tarball": "https://example.test/2.0.0.tgz", "shasum": "0123456789abcdef0123456789abcdef01234567" }
                     }
                 }
@@ -1078,10 +1080,57 @@ mod tests {
         .expect("fixture should parse");
 
         let output = format_inspection(&inspect_packument(&packument, Some(1)));
-        assert!(output.contains("available versions: 2\n… 1 omitted\nversion: 1.0.0\n"));
+        assert!(output.contains("available versions: 2\n… 1 omitted\nversion: 2.0.0\n"));
         assert!(output.contains("  latest: 2.0.0\n  … 1 omitted\n"));
-        assert!(output.contains("    alpha: ^1.0.0 (resolvable)\n    … 1 omitted\n"));
-        assert!(!output.contains("version: 2.0.0"));
+        assert!(output.contains("    alpha: ^2.0.0 (resolvable)\n    … 1 omitted\n"));
+        assert!(!output.contains("version: 1.0.0"));
+    }
+
+    #[test]
+    fn inspect_default_limit_keeps_latest_versions() {
+        let default_limit = usize::try_from(DEFAULT_INSPECTION_LIMIT)
+            .expect("default inspection limit should fit in usize");
+        let versions = (0..=DEFAULT_INSPECTION_LIMIT)
+            .map(|patch| {
+                let version = format!("1.0.{patch}");
+                let metadata = serde_json::json!({
+                    "name": "example",
+                    "version": version,
+                    "dist": {
+                        "tarball": format!("https://example.test/{patch}.tgz"),
+                        "shasum": "0123456789abcdef0123456789abcdef01234567"
+                    }
+                });
+                (version, metadata)
+            })
+            .collect::<serde_json::Map<_, _>>();
+        let fixture = serde_json::json!({
+            "name": "example",
+            "dist-tags": { "latest": format!("1.0.{DEFAULT_INSPECTION_LIMIT}") },
+            "versions": versions,
+        });
+        let fixture = serde_json::to_vec(&fixture).expect("fixture should serialize");
+        let packument = parse_packument(fixture.as_slice()).expect("fixture should parse");
+
+        let inspection = inspect_packument(&packument, Some(default_limit));
+
+        assert_eq!(inspection.available_versions, default_limit + 1);
+        assert_eq!(inspection.omitted_versions, 1);
+        assert_eq!(inspection.versions.len(), default_limit);
+        assert_eq!(
+            inspection
+                .versions
+                .first()
+                .map(|version| version.version.as_str()),
+            Some("1.0.1")
+        );
+        assert_eq!(
+            inspection
+                .versions
+                .last()
+                .map(|version| version.version.as_str()),
+            Some("1.0.100")
+        );
     }
 
     #[test]
