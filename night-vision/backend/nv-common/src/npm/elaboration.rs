@@ -941,16 +941,19 @@ impl ResolvedDependencyExpansion {
 
 struct PackumentCache {
     entries: Arc<Mutex<HashMap<PkgName, CachedNpmPackument>>>,
+    sorted_versions: Arc<Mutex<HashMap<PkgName, SortedVersions>>>,
     progress: Arc<dyn ElaborationProgressReporter>,
 }
 
 type PkgName = Box<str>;
 type CachedNpmPackument = Arc<OnceCell<Arc<NpmPackument>>>;
+type SortedVersions = Arc<[RangeVersion]>;
 
 impl Clone for PackumentCache {
     fn clone(&self) -> Self {
         Self {
             entries: self.entries.clone(),
+            sorted_versions: self.sorted_versions.clone(),
             progress: self.progress.clone(),
         }
     }
@@ -960,8 +963,38 @@ impl PackumentCache {
     fn with_progress(progress: Arc<dyn ElaborationProgressReporter>) -> Self {
         Self {
             entries: Arc::new(Mutex::new(HashMap::new())),
+            sorted_versions: Arc::new(Mutex::new(HashMap::new())),
             progress,
         }
+    }
+
+    /// Returns a package's published versions in node-semver order.
+    ///
+    /// Every declaration of a registry range re-resolves against the same
+    /// packument, so the versions are parsed and sorted once per package
+    /// rather than once per declaration.
+    async fn sorted_versions(
+        &self,
+        package: &NpmPackageName,
+        packument: &NpmPackument,
+    ) -> SortedVersions {
+        self.sorted_versions
+            .lock()
+            .await
+            .entry(package.as_str().into())
+            .or_insert_with(|| {
+                let mut versions = packument
+                    .versions
+                    .keys()
+                    .map(|version| {
+                        RangeVersion::parse(version.to_string())
+                            .expect("packument versions are valid SemVer")
+                    })
+                    .collect::<Vec<_>>();
+                versions.sort();
+                versions.into()
+            })
+            .clone()
     }
 
     async fn get(
@@ -1109,10 +1142,17 @@ async fn inspect_package(
     })
 }
 
+/// Returns the dependencies npm could install for a published package version.
+///
+/// `devDependencies` are deliberately excluded: npm installs them only for the
+/// project being worked on (the package source's own manifest, handled by
+/// `NpmPackageJson::root_dependencies`), never for the packages it depends on.
+/// Following them transitively pulls in each dependency's test and build
+/// tooling, and wildcard ranges there (`"tape": "*"`) fan out across most of
+/// the registry.
 fn declared_dependencies(version: &NpmVersion) -> Vec<DeclaredDependency> {
     let mut dependencies = Vec::new();
     append_dependencies(&mut dependencies, &version.dependencies);
-    append_dependencies(&mut dependencies, &version.dev_dependencies);
     append_dependencies(&mut dependencies, &version.peer_dependencies);
     append_dependencies(&mut dependencies, &version.optional_dependencies);
     append_bundled_dependencies(
@@ -1236,15 +1276,7 @@ async fn resolve_specification(
                             package: package.as_str().into(),
                         }
                     })?;
-                    let mut versions = packument
-                        .versions
-                        .keys()
-                        .map(|version| {
-                            RangeVersion::parse(version.to_string())
-                                .expect("packument versions are valid SemVer")
-                        })
-                        .collect::<Vec<_>>();
-                    versions.sort();
+                    let versions = cache.sorted_versions(&package, &packument).await;
                     Ok(elaborate_npm_version_bounds(&versions, &range)
                         .expect("versions were sorted")
                         .into_iter()
@@ -1617,14 +1649,13 @@ mod tests {
     }
 
     #[test]
-    fn records_historic_transitive_dev_dependency_names_as_warnings() {
+    fn records_historic_transitive_dependency_names_as_warnings() {
         let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
-        let mut root =
-            serde_json::from_str::<serde_json::Value>(&packument("root", "1.0.0", json!({})))
-                .expect("valid packument fixture");
-        root["versions"]["1.0.0"]["devDependencies"] = json!({ "Deferred": "~0.1.1" });
         let registry = MockRegistry {
-            packuments: BTreeMap::from([("root".to_owned(), root.to_string())]),
+            packuments: BTreeMap::from([(
+                "root".to_owned(),
+                packument("root", "1.0.0", json!({ "Deferred": "~0.1.1" })),
+            )]),
         };
 
         let result = run(&source, registry).expect("historic name is nonfatal");
@@ -1653,6 +1684,146 @@ mod tests {
         assert_eq!(
             result.warnings[0].specification_kind.safe_message(),
             "Historic mixed-case NPM package names cannot be resolved through the configured NPM registry."
+        );
+    }
+
+    #[test]
+    fn does_not_follow_dev_dependencies_of_dependencies() {
+        // Shaped like left-pad@1.3.0: no runtime dependencies of note, but a
+        // wildcard devDependency. `tooling` is absent from the registry, so
+        // following it would fail the whole run.
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let mut root = serde_json::from_str::<serde_json::Value>(&packument(
+            "root",
+            "1.0.0",
+            json!({ "runtime": "1.0.0" }),
+        ))
+        .expect("valid packument fixture");
+        root["versions"]["1.0.0"]["devDependencies"] = json!({ "tooling": "*" });
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([
+                ("root".to_owned(), root.to_string()),
+                (
+                    "runtime".to_owned(),
+                    packument("runtime", "1.0.0", json!({})),
+                ),
+            ]),
+        };
+
+        let result = run(&source, registry).expect("dependency devDependencies are not fetched");
+
+        assert_eq!(
+            result
+                .packages
+                .iter()
+                .map(|package| package.package.purl())
+                .collect::<Vec<_>>(),
+            ["pkg:npm/root@1.0.0", "pkg:npm/runtime@1.0.0"]
+        );
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn follows_peer_and_optional_dependencies_of_dependencies() {
+        let source = source(json!({ "dependencies": { "root": "1.0.0" } }));
+        let mut root =
+            serde_json::from_str::<serde_json::Value>(&packument("root", "1.0.0", json!({})))
+                .expect("valid packument fixture");
+        root["versions"]["1.0.0"]["peerDependencies"] = json!({ "peer": "1.0.0" });
+        root["versions"]["1.0.0"]["optionalDependencies"] = json!({ "optional": "1.0.0" });
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([
+                ("root".to_owned(), root.to_string()),
+                ("peer".to_owned(), packument("peer", "1.0.0", json!({}))),
+                (
+                    "optional".to_owned(),
+                    packument("optional", "1.0.0", json!({})),
+                ),
+            ]),
+        };
+
+        let result = run(&source, registry).expect("installable dependencies resolve");
+
+        assert_eq!(
+            result
+                .packages
+                .iter()
+                .map(|package| package.package.purl())
+                .collect::<Vec<_>>(),
+            [
+                "pkg:npm/optional@1.0.0",
+                "pkg:npm/peer@1.0.0",
+                "pkg:npm/root@1.0.0"
+            ]
+        );
+    }
+
+    #[test]
+    fn follows_the_package_sources_own_dev_dependencies() {
+        let source = source(json!({ "devDependencies": { "tool": "1.0.0" } }));
+        let registry = MockRegistry {
+            packuments: BTreeMap::from([
+                (
+                    "tool".to_owned(),
+                    packument("tool", "1.0.0", json!({ "helper": "1.0.0" })),
+                ),
+                ("helper".to_owned(), packument("helper", "1.0.0", json!({}))),
+            ]),
+        };
+
+        let result = run(&source, registry).expect("root devDependencies resolve");
+
+        assert_eq!(
+            result
+                .packages
+                .iter()
+                .map(|package| package.package.purl())
+                .collect::<Vec<_>>(),
+            ["pkg:npm/helper@1.0.0", "pkg:npm/tool@1.0.0"]
+        );
+        assert!(result.edges.iter().any(|edge| {
+            edge.root_dependency_kind == Some(DependencyKind::DevDependencies)
+                && edge.child.purl() == "pkg:npm/tool@1.0.0"
+        }));
+    }
+
+    #[test]
+    fn sorts_each_packages_versions_once() {
+        let dist = json!({
+            "tarball": "https://registry.example/multi.tgz",
+            "shasum": "0123456789012345678901234567890123456789"
+        });
+        let packument = parse_packument(
+            json!({
+                "name": "multi",
+                "dist-tags": { "latest": "2.0.0" },
+                "versions": {
+                    "2.0.0": { "name": "multi", "version": "2.0.0", "dist": dist },
+                    "1.0.0": { "name": "multi", "version": "1.0.0", "dist": dist },
+                    "1.0.0-beta.1": { "name": "multi", "version": "1.0.0-beta.1", "dist": dist },
+                    "1.2.0": { "name": "multi", "version": "1.2.0", "dist": dist }
+                }
+            })
+            .to_string()
+            .as_bytes(),
+        )
+        .expect("valid packument fixture");
+        let name = NpmPackageName::parse("multi".to_owned()).expect("valid package name");
+        let cache = PackumentCache::with_progress(Arc::new(NoopElaborationProgress));
+
+        let (first, second) = tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(async {
+                (
+                    cache.sorted_versions(&name, &packument).await,
+                    cache.sorted_versions(&name, &packument).await,
+                )
+            });
+
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(
+            first.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            ["1.0.0-beta.1", "1.0.0", "1.2.0", "2.0.0"]
         );
     }
 

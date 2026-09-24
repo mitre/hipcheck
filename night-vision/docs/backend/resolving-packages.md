@@ -173,6 +173,16 @@ over-approximation, especially in uncommon cases where packages use constraints
 such as wildcard versions which may permit a large number of versions which are
 not used practically.
 
+Which dependencies count follows the ecosystem's install rules. For npm, the
+package source's own manifest contributes every kind of dependency, including
+`devDependencies`, because the project's developers install those. A published
+package contributes only what npm can install on a consumer's behalf:
+`dependencies`, `peerDependencies`, `optionalDependencies`, and
+`bundleDependencies`. Its `devDependencies` are skipped, since npm installs them
+only when working on that package itself. Following them would pull in each
+dependency's test and build tooling, where wildcard ranges fan out across much
+of the registry.
+
 At each step, if a package/version combination is already present in the set
 of packages to track, it is skipped over to avoid duplicate entries, though
 any new known parent package/version combinations for that package are still
