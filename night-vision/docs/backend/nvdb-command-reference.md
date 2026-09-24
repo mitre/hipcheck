@@ -112,9 +112,7 @@ Commands:
   help             Print this message or the help of the given subcommand(s)
 ```
 
-The `api` command is listed in help output, but it is not implemented yet.
-Running it currently reaches a placeholder in the binary. Use the
-[REST API Usage](./rest-api-usage.md) guide for current API examples.
+Use the [REST API Usage](./rest-api-usage.md) guide for current API examples.
 
 ## Package-source commands
 
