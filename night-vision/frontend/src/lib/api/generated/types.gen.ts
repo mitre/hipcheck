@@ -4,10 +4,45 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type AssessmentCandidate = {
+    caveats: Array<UpgradeAssessmentCaveat>;
+    caveatsTruncated: boolean;
+    evidence: Array<UpgradeAssessmentEvidence>;
+    evidenceState: AssessmentEvidenceState;
+    evidenceTruncated: boolean;
+    findings: Array<UpgradeAssessmentFinding>;
+    findingsTruncated: boolean;
+    /**
+     * Canonical NPM package URL when the package name is known; otherwise an assessment-scoped version key.
+     */
+    id: string;
+    majorUpgradeCaution?: string | null;
+    selectionState: AssessmentSelectionState;
+    /**
+     * SemVer's API guarantee; it does not prove application compatibility.
+     */
+    semverCompatibility: AssessmentSemverCompatibility;
+    upgradeDistance: UpgradeAssessmentUpgradeDistance;
+    verdict?: UpgradeAssessmentVerdict | null;
+    version: string;
+};
+
+export type AssessmentCandidateState = 'available' | 'no-candidate' | 'processing' | 'failed' | 'unavailable';
+
 export type AssessmentCheck = {
     effect: string;
     state: string;
     summary: string;
+};
+
+export type AssessmentCoverage = {
+    complete: boolean;
+    exposureCount: number;
+    message: string;
+    processingSourceCount: number;
+    scope: string;
+    unassessedCount: number;
+    unavailableSourceCount: number;
 };
 
 export type AssessmentDiagnostics = {
@@ -31,11 +66,72 @@ export type AssessmentEvidence = {
     rawHipcheck?: string | null;
 };
 
+export type AssessmentEvidenceState = 'available' | 'missing' | 'processing' | 'failed' | 'unavailable';
+
+export type AssessmentExposureDetail = {
+    assessmentId?: string | null;
+    candidateState: AssessmentCandidateState;
+    candidates: Array<AssessmentCandidate>;
+    caveats: Array<UpgradeAssessmentCaveat>;
+    caveatsTruncated: boolean;
+    dataStatus: DataStatus;
+    exposure?: PackageSourceExposure | null;
+    failureMessage?: string | null;
+    nextCandidateCursor?: number | null;
+    reachabilityTruncated: boolean;
+    selectedCandidateId?: string | null;
+    source: AssessmentSourceIdentity;
+    state: AssessmentReadState;
+    summary?: string | null;
+    verdict?: UpgradeAssessmentVerdict | null;
+};
+
+/**
+ * Identifies one CVE-linked reachable package version in a submitted source.
+ */
+export type AssessmentExposureReference = {
+    cveId: string;
+    packageId: string;
+    sourceId: string;
+};
+
 export type AssessmentFinding = {
     effect: string;
     kind: string;
     severity?: string | null;
     summary: string;
+};
+
+export type AssessmentQueueItem = {
+    assessmentId?: string | null;
+    candidate?: AssessmentCandidate | null;
+    candidateState: AssessmentCandidateState;
+    detailUrl: string;
+    exposure?: PackageSourceExposure | null;
+    /**
+     * Stable source/package/CVE key, or source key while resolution is incomplete.
+     */
+    id: string;
+    reachabilityTruncated: boolean;
+    source: AssessmentSourceIdentity;
+    state: AssessmentReadState;
+    updatedAt: string;
+    verdict?: UpgradeAssessmentVerdict | null;
+};
+
+export type AssessmentQueueView = 'needs-review' | 'processing' | 'completed';
+
+export type AssessmentReadState = 'not-assessed' | 'processing' | 'completed' | 'failed' | 'unavailable';
+
+export type AssessmentSelectionState = 'selected' | 'available';
+
+export type AssessmentSemverCompatibility = 'compatible' | 'incompatible' | 'no-guarantee' | 'unknown';
+
+export type AssessmentSourceIdentity = {
+    fileName: string;
+    id: string;
+    lifecycle: string;
+    name?: string | null;
 };
 
 export type AssessmentStatus = {
@@ -50,6 +146,17 @@ export type AssessmentStatus = {
     sourceRepositoryUrl?: string | null;
     state: string;
     target?: string | null;
+};
+
+export type AssessmentWorkQueue = {
+    /**
+     * Counts refer only to the returned page. An unavailable dataset or an incomplete source means the full exposure count is unknown.
+     */
+    coverage: AssessmentCoverage;
+    dataStatus: DataStatus;
+    items: Array<AssessmentQueueItem>;
+    nextCursor?: string | null;
+    view: AssessmentQueueView;
 };
 
 export type CveIngestHealth = {
@@ -339,6 +446,7 @@ export type UpgradeAssessmentFindingEffect = 'blocking' | 'review' | 'context' |
 export type UpgradeAssessmentInput = {
     candidateVersion?: string | null;
     cveLinkage?: Array<string> | null;
+    exposure?: AssessmentExposureReference | null;
     kevLinkage?: UpgradeAssessmentKevLinkage | null;
     packageSource: UpgradeAssessmentPackageSourceInput;
     vulnerablePackage?: UpgradeAssessmentVulnerablePackageInput | null;
@@ -405,6 +513,76 @@ export type PackageSourceListDirection = 'asc' | 'desc';
 export type PackageSourceListFilter = 'all' | 'needs-attention' | 'processing' | 'failed';
 
 export type PackageSourceListSort = 'activity' | 'identity' | 'lifecycle' | 'resolution-time' | 'reachable-packages' | 'exposures';
+
+export type GetAssessmentExposureDetailData = {
+    body?: never;
+    path: {
+        cve_id: string;
+        package_id: string;
+        source_id: string;
+    };
+    query?: {
+        candidateCursor?: number | null;
+        candidateLimit?: number | null;
+    };
+    url: '/assessment-exposures/{source_id}/{package_id}/{cve_id}';
+};
+
+export type GetAssessmentExposureDetailErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type GetAssessmentExposureDetailError = GetAssessmentExposureDetailErrors[keyof GetAssessmentExposureDetailErrors];
+
+export type GetAssessmentExposureDetailResponses = {
+    /**
+     * successful operation
+     */
+    200: AssessmentExposureDetail;
+};
+
+export type GetAssessmentExposureDetailResponse = GetAssessmentExposureDetailResponses[keyof GetAssessmentExposureDetailResponses];
+
+export type GetAssessmentWorkQueueData = {
+    body?: never;
+    path?: never;
+    query?: {
+        cursor?: string | null;
+        limit?: number | null;
+        search?: string | null;
+        view?: AssessmentQueueView;
+    };
+    url: '/assessment-work-queue';
+};
+
+export type GetAssessmentWorkQueueErrors = {
+    /**
+     * Error
+     */
+    '4XX': Error;
+    /**
+     * Error
+     */
+    '5XX': Error;
+};
+
+export type GetAssessmentWorkQueueError = GetAssessmentWorkQueueErrors[keyof GetAssessmentWorkQueueErrors];
+
+export type GetAssessmentWorkQueueResponses = {
+    /**
+     * successful operation
+     */
+    200: AssessmentWorkQueue;
+};
+
+export type GetAssessmentWorkQueueResponse = GetAssessmentWorkQueueResponses[keyof GetAssessmentWorkQueueResponses];
 
 export type PostAssessmentData = {
     body: PostAssessmentBody;

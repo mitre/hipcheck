@@ -41,8 +41,9 @@ schemas include `pending`, `processing`, `completed`, `completed-with-warnings`,
 [package-source lifecycle](./package-source-lifecycle.md). The guide below
 describes only endpoints implemented today.
 
-Upgrade-assessment status responses are also tagged by `status`. Their values
-are `processing`, `completed`, and `failed`.
+Upgrade-assessment status responses use `pending`, `completed`, and `failed`.
+The exposure read models use `not-assessed`, `processing`, `completed`, `failed`,
+and `unavailable` to describe what a browser can currently show.
 
 ## Endpoints
 
@@ -517,119 +518,142 @@ Content-Type: application/json
 
 ### `POST /upgrade-assessments`
 
-Request an asynchronous assessment of an NPM package version. A trigger is
-either the CVE that prompted the assessment or a previously-created exposure
-identifier. `candidateVersion` is optional: clients can use it to request a
-specific upgrade candidate.
-
-```sh
-curl -X POST http://127.0.0.1:8080/upgrade-assessments \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "packageName": "example-package",
-    "currentVersion": "1.2.3",
-    "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" },
-    "candidateVersion": "1.2.7"
-  }'
-```
-
-The successful `202 Accepted` response returns a unique assessment ID. The
-request is persisted before in-process evaluation begins, so clients may poll
-it immediately.
-
-```json
-{ "id": "01990e55-6bae-7aa7-8760-ff4ac5e9d9a8" }
-```
-
-Empty package names, versions, or trigger references return `400 Bad Request`.
-CVE triggers must use a `CVE-YYYY-NNNN`-style identifier in `trigger.cve_id`.
-
-### `GET /upgrade-assessments/{id}`
-
-Retrieve a persisted assessment. While work is pending, the response includes
-the normalized NPM input:
+Submit an asynchronous NPM upgrade assessment. The existing request supports
+standalone assessments. To connect an assessment to a reachable KEV-linked
+exposure in the work queue, include `exposure` with the source ID, reachable
+package ID, and CVE ID returned by the queue or exposure endpoint:
 
 ```json
 {
-  "status": "processing",
-  "id": "01990e55-6bae-7aa7-8760-ff4ac5e9d9a8",
-  "createdAt": "2026-09-01T12:00:00Z",
-  "input": {
+  "packageSource": {
     "ecosystem": "npm",
-    "packageName": "example-package",
-    "currentVersion": "1.2.3",
-    "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" },
-    "candidateVersion": "1.2.7"
+    "fileName": "package.json",
+    "contents": "{\"name\":\"example-app\",\"version\":\"1.0.0\",\"dependencies\":{\"example-package\":\"1.2.3\"}}"
+  },
+  "vulnerablePackage": {
+    "name": "example-package",
+    "ecosystem": "npm",
+    "version": "1.2.3"
+  },
+  "cveLinkage": ["CVE-2026-1234"],
+  "candidateVersion": "1.2.7",
+  "exposure": {
+    "sourceId": "01990e55-6bae-7aa7-8760-ff4ac5e9d9a8",
+    "packageId": "00000000-0000-0007-0000-00000000002a",
+    "cveId": "CVE-2026-1234"
   }
 }
 ```
 
-A completed report includes the input, verdict, candidate versions,
-vulnerability/KEV context, dependency delta, supply-chain findings,
-confidence, caveats, and evidence links. When `candidateVersion` is supplied,
-Night Vision validates the candidate against locally known KEV data, runs
-Hipcheck, and uses normalized Hipcheck findings as supply-chain evidence for
-the verdict. Hipcheck's `PASS` or `INVESTIGATE` policy recommendation is shown
-as context; it does not replace vulnerability or upgrade-domain evidence.
-`vulnerabilityContext.kevLinked` describes whether the affected baseline
-package version is linked to an active KEV entry; it does not describe the
-candidate verdict. Every accepted upgrade assessment currently has
-`kevLinked: true`, because the baseline KEV match is required before work is
-started.
-When `candidateVersion` is omitted, Night Vision fetches the NPM packument and
-evaluates every newer, published, non-prerelease and non-deprecated version in
-ascending SemVer order. It records each candidate's patch/minor/major distance,
-SemVer compatibility, verdict, and KEV-evidence caveat in the completed report.
-Candidates that still match a locally known active KEV vulnerability are
-`avoid`; candidates without such a match are `recommended` unless SemVer
-provides no compatibility guarantee. Major candidates, and candidates in the
-`0.y.z` or prerelease compatibility domain, are at least `caution` because
-Night Vision cannot establish application compatibility. Blocking KEV evidence
-continues to produce `avoid`. Pre-release and deprecated releases are excluded
-from automatic discovery. An explicit published newer patch, minor, or major
-version is preserved as the single assessment target and evaluated with the
-same compatibility verdict rules plus Hipcheck evidence.
+The source must have completed resolution. The submitted package-source
+contents, vulnerable package name and version, and CVE linkage must match the
+referenced exposure. A mismatch returns `400 Bad Request`; unavailable CVE or
+KEV data returns an availability error. Accepted submissions return `202` with
+`id`, `status`, `createdAt`, and links to the status and result endpoints.
+The reference is persisted before analysis starts, so a pending assessment can
+appear in the queue. A later assessment for the same exposure becomes its
+current linked assessment. Standalone and legacy assessments remain accessible
+by ID but cannot be attributed to a submitted source without a validated link.
 
-When Hipcheck analysis is available, the shipped MVP policy provides only the
-`mitre/binary` source-repository check. NPM release, artifact, maintainer,
-provenance, manifest, publication, and dependency signal classes remain
-unavailable. Clients must read those limitations from missing-evidence findings
-or caveats; a missing finding does not mean an unavailable check passed.
+When `candidateVersion` is omitted, discovery evaluates newer published NPM
+versions. Prerelease and deprecated versions are excluded from automatic
+discovery. Supplying `candidateVersion` explicitly selects that newer published
+version and runs the available candidate analysis. Discovery-only candidates
+are available for selection in the frontend; none is server-selected.
 
-```json
-{
-  "status": "completed",
-  "id": "01990e55-6bae-7aa7-8760-ff4ac5e9d9a8",
-  "createdAt": "2026-09-01T12:00:00Z",
-  "completedAt": "2026-09-01T12:00:01Z",
-  "report": {
-    "input": {
-      "ecosystem": "npm",
-      "packageName": "example-package",
-      "currentVersion": "1.2.3",
-      "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" }
-    },
-    "verdict": "recommended",
-    "candidateVersions": [{
-      "version": "1.2.7",
-      "upgradeDistance": "patch",
-      "apiCompatibility": "compatible",
-      "verdict": "recommended",
-      "caveats": ["Candidate has no locally known active KEV vulnerability."]
-    }],
-    "vulnerabilityContext": { "trigger": { "kind": "cve", "cve_id": "CVE-2026-1234" }, "kevLinked": true },
-    "dependencyDelta": { "added": [], "removed": [], "changed": [] },
-    "supplyChainFindings": [],
-    "confidence": "medium",
-    "caveats": ["Candidates are ordered by ascending SemVer version. Pre-release and deprecated releases are excluded from automatic discovery."],
-    "evidenceLinks": []
-  }
-}
-```
+### `GET /upgrade-assessments/{id}` and `GET /upgrade-assessments/{id}/result`
 
-If evaluation fails after acceptance, `status` is `failed` and the response
-contains `failedAt`, the original input, and a non-secret error message. An
-unknown ID returns `404 Not Found`.
+The status endpoint returns workflow metadata: `id`, `status`, `createdAt`,
+`updatedAt`, and, when applicable, `completedAt` or a bounded error. Status is
+`pending`, `completed`, or `failed`. The result endpoint returns the stored
+report only after completion; pending or failed results return `409 Conflict`.
+The result contains the original input, candidate versions, verdict, findings,
+evidence, and caveats. The exposure detail endpoint below is the browser-facing
+joined view and omits raw package-source contents.
+
+### `GET /assessment-work-queue`
+
+Read the exposure-backed MVP work queue. Query parameters are `view`
+(`needs-review` by default, `processing`, or `completed`), `limit` (default 25,
+maximum 50), `cursor`, and `search` (package or source text, maximum 128 bytes).
+Rows are traversed in stable internal source order; `nextCursor` is an opaque
+continuation value. Continue while it is present, including after a page with no rows for
+the selected view or text filter.
+
+Each row identifies its source and, when known, its reachable KEV-linked
+package/CVE exposure. A row with `not-assessed` has no assessment ID, candidate,
+or verdict and links to its exposure detail. Pending assessments show
+`processing`; completed assessments show a selected candidate when one was
+explicitly requested, or a candidate preview when discovery produced options.
+The preview's `selectionState` remains `available`. Failed assessments and
+sources with incomplete resolution or unavailable vulnerability data show
+bounded `failed` or `unavailable` states and never a provisional verdict.
+Source-status rows link to `/package-sources/{id}`.
+Discovery previews prefer `recommended`, then `caution`, `unknown`, and
+`avoid`; ties prefer the shorter upgrade distance and then discovery order.
+
+`needs-review` includes unassessed exposures, failed or unavailable rows, and
+completed assessments with no candidate, missing candidate evidence, or a
+`caution`, `avoid`, or `unknown` candidate verdict. `processing` includes
+unfinished source and assessment work. `completed` includes all successfully
+finished assessments, so it can overlap with `needs-review`. There is no
+reviewed/acknowledged state in this API.
+
+The `coverage` object counts exposures, unassessed exposures, processing
+sources, and unavailable sources in the scanned sources for this response. It
+is **not a global count** while `nextCursor` is present. `complete` is false
+when more sources remain, a source has not finished, or CVE/KEV data is
+unavailable. In those cases a zero exposure count must not be interpreted as
+proof that no exposures exist. The response includes the same public
+`dataStatus` fields as `GET /data-status`, including each dataset's assessment
+impact and freshness.
+
+### `GET /assessment-exposures/{source_id}/{package_id}/{cve_id}`
+
+Read one source-scoped exposure and its latest linked assessment. The stable
+path key comes from a work-queue exposure row. When data is available, the
+response provides source identity, reachable package and dependency paths, CVE
+and KEV context, candidates, selected candidate ID, verdict, evidence,
+caveats, and data freshness. An exposure with no linked assessment returns
+`not-assessed`, an empty candidate list, and no verdict. If source processing
+or vulnerability-data availability prevents confirmation, it returns
+`unavailable` with an absent exposure instead of implying zero exposure.
+Unknown exposures return `404` once the source and vulnerability datasets are
+available.
+
+Candidates are paged with `candidateCursor` (zero-based, default 0) and
+`candidateLimit` (default 50, maximum 100). Follow `nextCandidateCursor` until
+it is absent. The selected candidate ID and top-level verdict describe the
+complete assessment even when its candidate is outside the current page.
+Reachability is capped at 20 paths of 20 nodes each; `reachabilityTruncated`
+marks an omitted path or tail. Candidate findings, evidence, and caveats are
+capped at 50 entries each, with corresponding `*Truncated` fields. These caps
+keep detail and queue previews bounded without implying that omitted evidence
+was absent.
+
+Every candidate has a stable `id` (a canonical NPM PURL when package identity
+is known, or an assessment-scoped version key otherwise), version, `upgradeDistance`
+(`patch`, `minor`, `major`, or `unknown`),
+`semverCompatibility` (`compatible`, `incompatible`, `no-guarantee`, or
+`unknown`), `selectionState` (`selected` or `available`), verdict,
+`evidenceState`, findings, evidence, caveats, and `majorUpgradeCaution` when
+applicable. Only an explicitly requested candidate is selected. Selecting an
+available discovery candidate in the frontend changes that page's local
+selection; submitting it for analysis creates a new linked assessment.
+Candidate-specific findings and evidence appear only for the explicitly
+assessed candidate. A discovery candidate without those checks reports
+`evidenceState: missing`, even if a vulnerability-based verdict exists.
+A major candidate remains selectable but carries the explanation that Night
+Vision cannot establish application compatibility. Blocking evidence can still
+make its verdict `avoid`. The top-level verdict belongs only to the selected
+candidate; it is absent when none is selected.
+
+`candidateState` distinguishes `available`, `no-candidate`, `processing`,
+`failed`, and `unavailable`. A completed no-candidate response does not present
+an empty recommendation. `dataStatus` explains when stale or unavailable CVE
+or KEV data can affect interpretation; stale data does not invalidate recorded
+evidence or establish that a package is safe. Night Vision does not prove
+application compatibility or calculate BOD 26-04 deadlines.
 
 ## Current Package-Source Workflow
 

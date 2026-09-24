@@ -11,6 +11,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+pub mod assessment_views;
+pub use assessment_views::*;
+
 /// Maximum encoded JSON request size for a package-source submission.
 ///
 /// This accommodates a maximally escaped 1 MiB `package.json` document plus
@@ -145,6 +148,19 @@ pub trait NvServerApi {
         ctx: RequestContext<Self::Context>,
         path_params: Path<UpgradeAssessmentPathParams>,
     ) -> Result<HttpResponseOk<UpgradeAssessmentResult>, HttpError>;
+
+    #[endpoint { method = GET, path = "/assessment-work-queue" }]
+    async fn get_assessment_work_queue(
+        ctx: RequestContext<Self::Context>,
+        query: dropshot::Query<AssessmentWorkQueueQuery>,
+    ) -> Result<HttpResponseOk<AssessmentWorkQueue>, HttpError>;
+
+    #[endpoint { method = GET, path = "/assessment-exposures/{source_id}/{package_id}/{cve_id}" }]
+    async fn get_assessment_exposure_detail(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<AssessmentExposurePathParams>,
+        query: dropshot::Query<AssessmentExposureDetailQuery>,
+    ) -> Result<HttpResponseOk<AssessmentExposureDetail>, HttpError>;
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -462,6 +478,7 @@ mod tests {
             id: uuid::Uuid::nil(),
             status: UpgradeAssessmentWorkflowStatus::Completed,
             input: UpgradeAssessmentInput {
+                exposure: None,
                 package_source: UpgradeAssessmentPackageSourceInput {
                     ecosystem: PackageSourceEcosystem::Npm,
                     file_name: "package.json".to_owned(),
@@ -507,6 +524,7 @@ mod tests {
     #[test]
     fn upgrade_assessment_cve_and_kev_linkage_serialize_distinctly() {
         let input = UpgradeAssessmentInput {
+            exposure: None,
             package_source: UpgradeAssessmentPackageSourceInput {
                 ecosystem: PackageSourceEcosystem::Npm,
                 file_name: "package-lock.json".to_owned(),
@@ -561,6 +579,7 @@ mod tests {
             id: uuid::Uuid::nil(),
             status: UpgradeAssessmentWorkflowStatus::Completed,
             input: UpgradeAssessmentInput {
+                exposure: None,
                 package_source: UpgradeAssessmentPackageSourceInput {
                     ecosystem: PackageSourceEcosystem::Npm,
                     file_name: "package.json".to_owned(),
@@ -1006,6 +1025,8 @@ pub enum PackageSourceEcosystem {
 #[schemars(deny_unknown_fields)]
 pub struct UpgradeAssessmentInput {
     pub package_source: UpgradeAssessmentPackageSourceInput,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exposure: Option<AssessmentExposureReference>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vulnerable_package: Option<UpgradeAssessmentVulnerablePackageInput>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -2,6 +2,7 @@
 
 pub mod ctx;
 
+mod assessment_views;
 mod cve_worker;
 mod package_source_worker;
 
@@ -61,6 +62,10 @@ use nv_common::{
         purl::NpmPackagePurl,
         types::NpmPackageName,
     },
+};
+use nv_server_api::assessment_views::{
+    AssessmentExposureDetail, AssessmentExposureDetailQuery, AssessmentExposurePathParams,
+    AssessmentWorkQueue, AssessmentWorkQueueQuery,
 };
 use nv_server_api::{
     AssessmentCheck, AssessmentDiagnostics, AssessmentEvidence, AssessmentEvidenceQuery,
@@ -513,6 +518,7 @@ impl NvServerApi for RestApi {
     ) -> Result<HttpResponseAccepted<PostUpgradeAssessmentResponse>, HttpError> {
         let body = body_param.into_inner();
         validate_upgrade_assessment_request(&body)?;
+        assessment_views::validate_exposure_reference(ctx.context().db(), &body).await?;
         let id = Uuid::now_v7();
         let input = input_from_request(&body);
         let context = ctx.context();
@@ -651,6 +657,30 @@ impl NvServerApi for RestApi {
         let id = path_params.into_inner().id;
         let assessment = load_upgrade_assessment(ctx.context().db(), id).await?;
         Ok(HttpResponseOk(assessment_result(assessment)?))
+    }
+
+    async fn get_assessment_work_queue(
+        ctx: RequestContext<Self::Context>,
+        query: Query<AssessmentWorkQueueQuery>,
+    ) -> Result<HttpResponseOk<AssessmentWorkQueue>, HttpError> {
+        Ok(HttpResponseOk(
+            assessment_views::work_queue(ctx.context(), query.into_inner()).await?,
+        ))
+    }
+
+    async fn get_assessment_exposure_detail(
+        ctx: RequestContext<Self::Context>,
+        path_params: Path<AssessmentExposurePathParams>,
+        query: Query<AssessmentExposureDetailQuery>,
+    ) -> Result<HttpResponseOk<AssessmentExposureDetail>, HttpError> {
+        Ok(HttpResponseOk(
+            assessment_views::exposure_detail(
+                ctx.context(),
+                path_params.into_inner(),
+                query.into_inner(),
+            )
+            .await?,
+        ))
     }
 }
 
@@ -2269,6 +2299,12 @@ fn stored_assessment_package_fields(input: &UpgradeAssessmentInput) -> (String, 
 }
 
 fn stored_assessment_trigger_fields(input: &UpgradeAssessmentInput) -> (String, String) {
+    if let Some(exposure) = &input.exposure {
+        return (
+            "exposure".to_owned(),
+            assessment_views::exposure_key(exposure),
+        );
+    }
     if let Some(cve_id) = input.cve_linkage.as_ref().and_then(|ids| ids.first()) {
         return ("cve".to_owned(), cve_id.clone());
     }
@@ -3059,6 +3095,349 @@ mod tests {
         assert!(body["cveList"].get("generation").is_none());
         assert!(body["cisaKev"].get("error").is_none());
 
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn assessment_queue_exposes_processing_source_without_claiming_zero_exposures() {
+        let source_id = Uuid::now_v7();
+        let mut second_source = source(Uuid::now_v7(), "processing", None);
+        second_source.id = 2;
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results(std::iter::repeat_n(
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                6,
+            ))
+            .append_query_results([vec![source(source_id, "processing", None), second_source]])
+            .into_connection();
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            ApiCtx::for_test(db, None),
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                "/assessment-work-queue?view=processing&limit=1",
+                StatusCode::OK,
+            )
+            .await
+            .expect("processing queue should succeed");
+        let body: serde_json::Value = read_json(&mut response).await;
+        assert_eq!(body["items"][0]["state"], "processing");
+        assert_eq!(body["items"].as_array().unwrap().len(), 1);
+        assert_eq!(body["nextCursor"], "1:1");
+        assert_eq!(body["items"][0]["source"]["id"], source_id.to_string());
+        assert!(body["items"][0]["exposure"].is_null());
+        assert_eq!(body["coverage"]["processingSourceCount"], 1);
+        assert_eq!(body["coverage"]["complete"], false);
+        assert_eq!(body["dataStatus"]["cisaKev"]["availability"], "unavailable");
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn assessment_queue_reports_failed_source_without_exposing_raw_error() {
+        let source_id = Uuid::now_v7();
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results(std::iter::repeat_n(
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                6,
+            ))
+            .append_query_results([vec![source(
+                source_id,
+                "failed",
+                Some("internal registry error: sensitive detail".to_owned()),
+            )]])
+            .into_connection();
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            ApiCtx::for_test(db, None),
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(http::Method::GET, "/assessment-work-queue", StatusCode::OK)
+            .await
+            .expect("failed source should be visible");
+        let body: serde_json::Value = read_json(&mut response).await;
+        assert_eq!(body["items"][0]["state"], "failed");
+        assert!(body["items"][0]["verdict"].is_null());
+        assert_eq!(body["coverage"]["unavailableSourceCount"], 1);
+        assert!(!body.to_string().contains("sensitive detail"));
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn assessment_queue_includes_reachable_exposure_without_an_assessment() {
+        let source_id = Uuid::now_v7();
+        let now = Utc::now().fixed_offset();
+        let cve_record = cve_list_records::Model {
+            cve_id: "CVE-2026-1234".to_owned(),
+            record_format_version: "5.1".to_owned(),
+            record: serde_json::json!({
+                "containers": { "cna": { "affected": [{
+                    "vendor": "Example Vendor",
+                    "product": "left-pad",
+                    "packageName": "left-pad",
+                    "collectionURL": "https://registry.npmjs.org",
+                    "versions": [{ "version": "1.2.3", "status": "affected" }]
+                }] } }
+            }),
+            deleted: false,
+            first_seen_at: now,
+            last_seen_at: now,
+            updated_at: now,
+        };
+        let kev_entry = cisa_kev_entries::Model {
+            cve_id: "CVE-2026-1234".to_owned(),
+            entry: serde_json::json!({
+                "cveID": "CVE-2026-1234",
+                "vendorProject": "Example Vendor",
+                "product": "left-pad",
+                "vulnerabilityName": "Example vulnerability",
+                "dateAdded": "2026-08-03"
+            }),
+            removed_at: None,
+            first_seen_at: now,
+            last_seen_at: now,
+            updated_at: now,
+        };
+        let available_record =
+            std::collections::BTreeMap::from([("cve_id".to_owned(), Value::from("CVE-2026-1234"))]);
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![available_record.clone()]])
+            .append_query_results(std::iter::repeat_n(
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                2,
+            ))
+            .append_query_results([vec![available_record]])
+            .append_query_results(std::iter::repeat_n(
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                2,
+            ))
+            .append_query_results([vec![source(source_id, "completed", None)]])
+            .append_query_results([vec![source(source_id, "completed", None)]])
+            .append_query_results([vec![package_source_versions::Model {
+                id: 1,
+                source_id: 1,
+                package_version_id: 1,
+            }]])
+            .append_query_results([vec![package_versions::Model {
+                id: 1,
+                package_id: 1,
+                version: "1.2.3".to_owned(),
+                package_url: "pkg:npm/left-pad@1.2.3".to_owned(),
+                source_repository: None,
+                source_repository_tag: None,
+            }]])
+            .append_query_results([vec![package_source_edges::Model {
+                id: 1,
+                source_id: 1,
+                parent_package_version_id: None,
+                child_package_version_id: 1,
+                root_dependency_kind: Some("dependencies".to_owned()),
+                declared_dependency: Some("left-pad".to_owned()),
+                declared_specification: Some("1.2.3".to_owned()),
+            }]])
+            .append_query_results([Vec::<package_source_warnings::Model>::new()])
+            .append_query_results([vec![kev_entry]])
+            .append_query_results([vec![cve_record]])
+            .append_query_results([Vec::<upgrade_assessments::Model>::new()])
+            .into_connection();
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            ApiCtx::for_test(db, None),
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(http::Method::GET, "/assessment-work-queue", StatusCode::OK)
+            .await
+            .expect("unassessed exposure should be listed");
+        let body: serde_json::Value = read_json(&mut response).await;
+        assert_eq!(body["items"][0]["state"], "not-assessed");
+        assert_eq!(body["items"][0]["exposure"]["cveId"], "CVE-2026-1234");
+        assert_eq!(body["items"][0]["exposure"]["package"]["name"], "left-pad");
+        assert!(body["items"][0]["assessmentId"].is_null());
+        assert_eq!(body["coverage"]["unassessedCount"], 1);
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn exposure_detail_reports_unavailable_data_without_a_verdict() {
+        let source_id = Uuid::now_v7();
+        let package_id = Uuid::from_u64_pair(1, 2);
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(source_id, "completed", None)]])
+            .append_query_results(std::iter::repeat_n(
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                6,
+            ))
+            .append_query_results([Vec::<upgrade_assessments::Model>::new()])
+            .into_connection();
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            ApiCtx::for_test(db, None),
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/assessment-exposures/{source_id}/{package_id}/CVE-2026-1234"),
+                StatusCode::OK,
+            )
+            .await
+            .expect("unavailable exposure detail should remain readable");
+        let body: serde_json::Value = read_json(&mut response).await;
+        assert_eq!(body["state"], "unavailable");
+        assert_eq!(body["candidateState"], "unavailable");
+        assert!(body["exposure"].is_null());
+        assert!(body["verdict"].is_null());
+        test_context.teardown().await;
+    }
+
+    #[tokio::test]
+    async fn exposure_detail_connects_selected_candidate_to_verdict() {
+        let source_id = Uuid::now_v7();
+        let package_id = Uuid::from_u64_pair(1, 1);
+        let assessment_id = Uuid::now_v7();
+        let now = Utc::now().fixed_offset();
+        let available_record =
+            std::collections::BTreeMap::from([("cve_id".to_owned(), Value::from("CVE-2026-1234"))]);
+        let mut assessment_input = input();
+        assessment_input.vulnerable_package = Some(UpgradeAssessmentVulnerablePackageInput {
+            name: "left-pad".to_owned(),
+            ecosystem: PackageSourceEcosystem::Npm,
+            version: "1.2.3".to_owned(),
+            purl: None,
+        });
+        assessment_input.candidate_version = Some("1.2.7".to_owned());
+        let report = assessment_report(
+            assessment_input,
+            UpgradeAssessmentVerdict::Recommended,
+            Vec::new(),
+            Vec::new(),
+            None,
+        );
+        let assessment = upgrade_assessments::Model {
+            id: assessment_id.to_string(),
+            package_name: "left-pad".to_owned(),
+            current_version: "1.2.3".to_owned(),
+            trigger_kind: "exposure".to_owned(),
+            trigger_reference: format!("{source_id}:{package_id}:CVE-2026-1234"),
+            candidate_version: Some("1.2.7".to_owned()),
+            status: "completed".to_owned(),
+            created_at: now,
+            finished_at: Some(now),
+            report: Some(serde_json::to_value(report).unwrap()),
+            error: None,
+        };
+        let cve_record = cve_list_records::Model {
+            cve_id: "CVE-2026-1234".to_owned(),
+            record_format_version: "5.1".to_owned(),
+            record: serde_json::json!({
+                "containers": { "cna": { "affected": [{
+                    "vendor": "Example Vendor", "product": "left-pad",
+                    "packageName": "left-pad", "collectionURL": "https://registry.npmjs.org",
+                    "versions": [{ "version": "1.2.3", "status": "affected" }]
+                }] } }
+            }),
+            deleted: false,
+            first_seen_at: now,
+            last_seen_at: now,
+            updated_at: now,
+        };
+        let kev_entry = cisa_kev_entries::Model {
+            cve_id: "CVE-2026-1234".to_owned(),
+            entry: serde_json::json!({
+                "cveID": "CVE-2026-1234", "vendorProject": "Example Vendor",
+                "product": "left-pad", "vulnerabilityName": "Example vulnerability",
+                "dateAdded": "2026-08-03"
+            }),
+            removed_at: None,
+            first_seen_at: now,
+            last_seen_at: now,
+            updated_at: now,
+        };
+        let db = MockDatabase::new(DbBackend::Postgres)
+            .append_query_results([vec![source(source_id, "completed", None)]])
+            .append_query_results([vec![available_record.clone()]])
+            .append_query_results(std::iter::repeat_n(
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                2,
+            ))
+            .append_query_results([vec![available_record]])
+            .append_query_results(std::iter::repeat_n(
+                Vec::<std::collections::BTreeMap<String, Value>>::new(),
+                2,
+            ))
+            .append_query_results([vec![assessment]])
+            .append_query_results([vec![source(source_id, "completed", None)]])
+            .append_query_results([vec![package_source_versions::Model {
+                id: 1,
+                source_id: 1,
+                package_version_id: 1,
+            }]])
+            .append_query_results([vec![package_versions::Model {
+                id: 1,
+                package_id: 1,
+                version: "1.2.3".to_owned(),
+                package_url: "pkg:npm/left-pad@1.2.3".to_owned(),
+                source_repository: None,
+                source_repository_tag: None,
+            }]])
+            .append_query_results([vec![package_source_edges::Model {
+                id: 1,
+                source_id: 1,
+                parent_package_version_id: None,
+                child_package_version_id: 1,
+                root_dependency_kind: Some("dependencies".to_owned()),
+                declared_dependency: Some("left-pad".to_owned()),
+                declared_specification: Some("1.2.3".to_owned()),
+            }]])
+            .append_query_results([Vec::<package_source_warnings::Model>::new()])
+            .append_query_results([vec![kev_entry]])
+            .append_query_results([vec![cve_record]])
+            .into_connection();
+        let test_context = TestContext::new(
+            RestApi::new().expect("API description should build").0,
+            ApiCtx::for_test(db, None),
+            &ConfigDropshot::default(),
+            None,
+            Logger::root(slog::Discard, o!()),
+        );
+        let mut response = test_context
+            .client_testctx
+            .make_request_no_body(
+                http::Method::GET,
+                &format!("/assessment-exposures/{source_id}/{package_id}/CVE-2026-1234"),
+                StatusCode::OK,
+            )
+            .await
+            .expect("completed exposure detail should succeed");
+        let body: serde_json::Value = read_json(&mut response).await;
+        assert_eq!(body["state"], "completed");
+        assert_eq!(body["assessmentId"], assessment_id.to_string());
+        assert_eq!(body["exposure"]["package"]["name"], "left-pad");
+        assert_eq!(body["candidates"][0]["version"], "1.2.7");
+        assert_eq!(body["candidates"][0]["semverCompatibility"], "compatible");
+        assert_eq!(body["candidates"][0]["selectionState"], "selected");
+        assert_eq!(body["candidates"][0]["evidenceState"], "missing");
+        assert!(body["nextCandidateCursor"].is_null());
+        assert_eq!(body["selectedCandidateId"], body["candidates"][0]["id"]);
+        assert_eq!(body["verdict"], "recommended");
         test_context.teardown().await;
     }
 
@@ -4635,6 +5014,7 @@ mod tests {
 
     fn input() -> UpgradeAssessmentInput {
         UpgradeAssessmentInput {
+        exposure: None,
         package_source: UpgradeAssessmentPackageSourceInput {
             ecosystem: PackageSourceEcosystem::Npm,
             file_name: "package.json".to_owned(),
