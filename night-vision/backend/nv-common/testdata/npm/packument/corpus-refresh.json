@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-07-29T22:51:04.477843+00:00",
+  "registry": "https://registry.npmjs.org/",
+  "packages": [
+    {
+      "name": "express",
+      "status": "accepted",
+      "versions": 288
+    },
+    {
+      "name": "@babel/core",
+      "status": "accepted",
+      "versions": 229
+    },
+    {
+      "name": "node-sass",
+      "status": "accepted",
+      "versions": 148
+    },
+    {
+      "name": "request",
+      "status": "accepted",
+      "versions": 126
+    },
+    {
+      "name": "@types/node",
+      "status": "accepted",
+      "versions": 2355
+    },
+    {
+      "name": "istanbul",
+      "status": "accepted",
+      "versions": 95
+    },
+    {
+      "name": "@angular/core",
+      "status": "accepted",
+      "versions": 1088
+    },
+    {
+      "name": "react",
+      "status": "accepted",
+      "versions": 2890
+    },
+    {
+      "name": "npm",
+      "status": "accepted",
+      "versions": 604
+    }
+  ]
+}

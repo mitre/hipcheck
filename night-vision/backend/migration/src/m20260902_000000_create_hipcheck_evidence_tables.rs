@@ -1,0 +1,271 @@
+use crate::m20260708_150958_create_package_version_table::PackageVersion;
+use sea_orm_migration::{
+    prelude::*,
+    schema::{integer, pk_auto, string, text},
+};
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(HipcheckRuns::Table)
+                    .if_not_exists()
+                    .col(pk_auto(HipcheckRuns::Id))
+                    .col(integer(HipcheckRuns::PackageVersionId))
+                    .col(string(HipcheckRuns::Status))
+                    .col(text(HipcheckRuns::RawJson).null())
+                    .col(integer(HipcheckRuns::RawJsonBytes).not_null())
+                    .col(
+                        ColumnDef::new(HipcheckRuns::RawJsonTruncated)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(text(HipcheckRuns::Stdout).null())
+                    .col(
+                        ColumnDef::new(HipcheckRuns::StdoutTruncated)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(text(HipcheckRuns::Stderr).null())
+                    .col(
+                        ColumnDef::new(HipcheckRuns::StderrTruncated)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(integer(HipcheckRuns::ExitStatus).null())
+                    .col(string(HipcheckRuns::ErrorKind).null())
+                    .col(text(HipcheckRuns::ErrorMessage).null())
+                    .col(ColumnDef::new(HipcheckRuns::Retryable).boolean().null())
+                    .col(string(HipcheckRuns::SchemaVersion).null())
+                    .col(string(HipcheckRuns::HipcheckVersion).null())
+                    .col(string(HipcheckRuns::HipcheckCommit).null())
+                    .col(string(HipcheckRuns::TargetKind).null())
+                    .col(text(HipcheckRuns::TargetPurl).null())
+                    .col(text(HipcheckRuns::SourceRepositoryUrl).null())
+                    .col(string(HipcheckRuns::PolicyId).null())
+                    .col(string(HipcheckRuns::PolicyVersion).null())
+                    .col(text(HipcheckRuns::PolicySource).null())
+                    .col(string(HipcheckRuns::PolicyRecommendation).null())
+                    .col(
+                        ColumnDef::new(HipcheckRuns::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(HipcheckRuns::Table, HipcheckRuns::PackageVersionId)
+                            .to(PackageVersion::Table, PackageVersion::Id),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_hipcheck_runs_package_version_created_at")
+                    .table(HipcheckRuns::Table)
+                    .col(HipcheckRuns::PackageVersionId)
+                    .col(HipcheckRuns::CreatedAt)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(HipcheckChecks::Table)
+                    .if_not_exists()
+                    .col(pk_auto(HipcheckChecks::Id))
+                    .col(integer(HipcheckChecks::RunId))
+                    .col(integer(HipcheckChecks::Ordinal))
+                    .col(string(HipcheckChecks::PluginName))
+                    .col(string(HipcheckChecks::PluginPublisher))
+                    .col(string(HipcheckChecks::PluginVersion))
+                    .col(string(HipcheckChecks::PluginQuery))
+                    .col(text(HipcheckChecks::PolicyExpression))
+                    .col(string(HipcheckChecks::State))
+                    .col(string(HipcheckChecks::Effect))
+                    .col(string(HipcheckChecks::Severity).null())
+                    .col(text(HipcheckChecks::Summary))
+                    .col(
+                        ColumnDef::new(HipcheckChecks::Value)
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(string(HipcheckChecks::StartedAt).null())
+                    .col(string(HipcheckChecks::EndedAt).null())
+                    .col(string(HipcheckChecks::ErrorKind).null())
+                    .col(text(HipcheckChecks::ErrorMessage).null())
+                    .col(
+                        ColumnDef::new(HipcheckChecks::ErrorRetryable)
+                            .boolean()
+                            .null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(HipcheckChecks::Table, HipcheckChecks::RunId)
+                            .to(HipcheckRuns::Table, HipcheckRuns::Id),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(HipcheckConcerns::Table)
+                    .if_not_exists()
+                    .col(pk_auto(HipcheckConcerns::Id))
+                    .col(integer(HipcheckConcerns::CheckId))
+                    .col(integer(HipcheckConcerns::Ordinal))
+                    .col(string(HipcheckConcerns::Kind))
+                    .col(text(HipcheckConcerns::Message))
+                    .col(
+                        ColumnDef::new(HipcheckConcerns::Details)
+                            .json_binary()
+                            .null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(HipcheckConcerns::Table, HipcheckConcerns::CheckId)
+                            .to(HipcheckChecks::Table, HipcheckChecks::Id),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(HipcheckFindings::Table)
+                    .if_not_exists()
+                    .col(pk_auto(HipcheckFindings::Id))
+                    .col(integer(HipcheckFindings::RunId))
+                    .col(integer(HipcheckFindings::CheckId).null())
+                    .col(integer(HipcheckFindings::Ordinal))
+                    .col(string(HipcheckFindings::Kind))
+                    .col(string(HipcheckFindings::Effect))
+                    .col(string(HipcheckFindings::Severity).null())
+                    .col(text(HipcheckFindings::Summary))
+                    .col(
+                        ColumnDef::new(HipcheckFindings::Evidence)
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(HipcheckFindings::Table, HipcheckFindings::RunId)
+                            .to(HipcheckRuns::Table, HipcheckRuns::Id),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(HipcheckFindings::Table, HipcheckFindings::CheckId)
+                            .to(HipcheckChecks::Table, HipcheckChecks::Id),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("idx_hipcheck_runs_package_version_created_at")
+                    .table(HipcheckRuns::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(Table::drop().table(HipcheckFindings::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(HipcheckConcerns::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(HipcheckChecks::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(HipcheckRuns::Table).to_owned())
+            .await
+    }
+}
+#[derive(DeriveIden)]
+enum HipcheckRuns {
+    Table,
+    Id,
+    PackageVersionId,
+    Status,
+    RawJson,
+    RawJsonBytes,
+    RawJsonTruncated,
+    Stdout,
+    StdoutTruncated,
+    Stderr,
+    StderrTruncated,
+    ExitStatus,
+    ErrorKind,
+    ErrorMessage,
+    Retryable,
+    SchemaVersion,
+    HipcheckVersion,
+    HipcheckCommit,
+    TargetKind,
+    TargetPurl,
+    SourceRepositoryUrl,
+    PolicyId,
+    PolicyVersion,
+    PolicySource,
+    PolicyRecommendation,
+    CreatedAt,
+}
+#[derive(DeriveIden)]
+enum HipcheckChecks {
+    Table,
+    Id,
+    RunId,
+    Ordinal,
+    PluginName,
+    PluginPublisher,
+    PluginVersion,
+    PluginQuery,
+    PolicyExpression,
+    State,
+    Effect,
+    Severity,
+    Summary,
+    Value,
+    StartedAt,
+    EndedAt,
+    ErrorKind,
+    ErrorMessage,
+    ErrorRetryable,
+}
+#[derive(DeriveIden)]
+enum HipcheckConcerns {
+    Table,
+    Id,
+    CheckId,
+    Ordinal,
+    Kind,
+    Message,
+    Details,
+}
+#[derive(DeriveIden)]
+enum HipcheckFindings {
+    Table,
+    Id,
+    RunId,
+    CheckId,
+    Ordinal,
+    Kind,
+    Effect,
+    Severity,
+    Summary,
+    Evidence,
+}

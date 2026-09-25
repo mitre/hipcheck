@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="710" viewBox="0 0 1200 710" role="img" aria-labelledby="title description">
+  <title id="title">Illustrative Night Vision assessment smart table</title>
+  <desc id="description">A wireframe of the Assessments page showing a sortable, filterable table with one upgrade assessment per row.</desc>
+  <style>
+    .ink { fill:#17212b; font-family:Inter,Arial,sans-serif; }
+    .muted { fill:#687789; font-family:Inter,Arial,sans-serif; }
+    .mono { fill:#17212b; font-family:Menlo,Consolas,monospace; font-weight:700; }
+    .small { font-family:Inter,Arial,sans-serif; font-size:14px; }
+    .tiny { font-family:Inter,Arial,sans-serif; font-size:12px; }
+    .heading { font-family:Inter,Arial,sans-serif; font-size:27px; font-weight:700; }
+  </style>
+  <rect width="1200" height="710" rx="14" fill="#f7f9fa"/>
+  <rect x="1" y="1" width="1198" height="708" rx="13" fill="none" stroke="#cbd3db"/>
+  <rect x="1" y="1" width="1198" height="61" rx="13" fill="#fff"/>
+  <path d="M1 61h1198" stroke="#dce2e7"/>
+  <rect x="28" y="18" width="25" height="25" rx="7" fill="#0f766e"/>
+  <text x="40" y="36" text-anchor="middle" fill="#fff" font-family="Arial" font-size="14">◇</text>
+  <text x="63" y="37" class="ink" font-size="17" font-weight="700">Night Vision</text>
+  <text x="1138" y="36" class="muted tiny" text-anchor="end">Data freshness: current</text>
+  <rect x="1" y="62" width="211" height="647" fill="#f4f6f8"/>
+  <path d="M211 62v647" stroke="#dce2e7"/>
+  <text x="23" y="99" class="muted tiny" font-weight="700">WORKSPACE</text>
+  <rect x="13" y="111" width="176" height="35" rx="6" fill="#dff3f0"/>
+  <text x="27" y="133" fill="#145f5a" font-family="Inter,Arial" font-size="14" font-weight="700">◫  Assessments</text>
+  <text x="27" y="171" class="muted small">◌  Package sources</text>
+  <text x="23" y="220" class="muted tiny" font-weight="700">SYSTEM</text>
+  <text x="27" y="254" class="muted small">◷  Data status</text>
+  <text x="244" y="116" class="heading ink">Assessments</text>
+  <text x="244" y="142" class="muted small">KEV-linked exposures and their upgrade decisions.</text>
+  <rect x="244" y="169" width="337" height="37" rx="7" fill="#fff" stroke="#d3dbe2"/>
+  <rect x="247" y="172" width="112" height="31" rx="5" fill="#e0f3f0"/>
+  <text x="303" y="192" text-anchor="middle" fill="#155f5a" class="tiny" font-weight="700">Needs review (2)</text>
+  <text x="421" y="192" text-anchor="middle" class="muted tiny" font-weight="700">Processing (1)</text>
+  <text x="522" y="192" text-anchor="middle" class="muted tiny" font-weight="700">Completed (3)</text>
+  <rect x="874" y="169" width="290" height="37" rx="6" fill="#fff" stroke="#cbd4dc"/>
+  <text x="890" y="192" class="muted tiny">Filter package or source</text>
+  <rect x="244" y="221" width="920" height="407" rx="9" fill="#fff" stroke="#d5dde4"/>
+  <rect x="245" y="222" width="918" height="41" rx="8" fill="#f7f9fa"/>
+  <path d="M244 263h920M244 380h920M244 497h920M244 587h920" stroke="#e2e6ea"/>
+  <text x="260" y="247" class="muted tiny" font-weight="700">EXPOSURE ↕</text>
+  <text x="445" y="247" class="muted tiny" font-weight="700">PACKAGE SOURCE ↕</text>
+  <text x="650" y="247" class="muted tiny" font-weight="700">PATCH CANDIDATE ↕</text>
+  <text x="798" y="247" class="muted tiny" font-weight="700">VERDICT ↕</text>
+  <text x="920" y="247" class="muted tiny" font-weight="700">UPDATED ↕</text>
+  <text x="1078" y="247" class="muted tiny" font-weight="700">ACTION</text>
+  <text x="260" y="294" class="mono" font-size="13">lodash@4.17.20</text>
+  <rect x="260" y="306" width="82" height="18" rx="9" fill="#fde8e8"/><text x="301" y="319" text-anchor="middle" fill="#ad2e31" class="tiny" font-weight="700">● KEV affected</text><text x="350" y="319" class="muted tiny">CVE-2021-23337</text>
+  <text x="445" y="294" class="ink small" font-weight="700">agency-web</text><text x="445" y="319" class="muted tiny">through api-client</text>
+  <text x="650" y="304" class="mono" font-size="13">4.17.21</text>
+  <rect x="798" y="291" width="91" height="21" rx="10" fill="#def4e8"/><text x="843" y="306" text-anchor="middle" fill="#147044" class="tiny" font-weight="700">Recommended</text>
+  <text x="920" y="304" class="muted tiny">Today, 9:42 AM</text><rect x="1062" y="284" width="85" height="28" rx="6" fill="#0f766e"/><text x="1104" y="302" text-anchor="middle" fill="#fff" class="tiny" font-weight="700">Open</text>
+  <text x="260" y="411" class="mono" font-size="13">minimist@1.2.5</text>
+  <rect x="260" y="423" width="82" height="18" rx="9" fill="#fde8e8"/><text x="301" y="436" text-anchor="middle" fill="#ad2e31" class="tiny" font-weight="700">● KEV affected</text><text x="350" y="436" class="muted tiny">CVE-2021-44906</text>
+  <text x="445" y="411" class="ink small" font-weight="700">partner-portal</text><text x="445" y="436" class="muted tiny">through request-utils</text>
+  <text x="650" y="421" class="mono" font-size="13">1.2.8</text>
+  <rect x="798" y="408" width="58" height="21" rx="10" fill="#fff1d7"/><text x="827" y="423" text-anchor="middle" fill="#906109" class="tiny" font-weight="700">Caution</text>
+  <text x="920" y="421" class="muted tiny">Today, 9:17 AM</text><rect x="1062" y="401" width="85" height="28" rx="6" fill="#0f766e"/><text x="1104" y="419" text-anchor="middle" fill="#fff" class="tiny" font-weight="700">Open</text>
+  <text x="260" y="528" class="mono" font-size="13">axios@0.21.1</text>
+  <rect x="260" y="540" width="82" height="18" rx="9" fill="#fde8e8"/><text x="301" y="553" text-anchor="middle" fill="#ad2e31" class="tiny" font-weight="700">● KEV affected</text><text x="350" y="553" class="muted tiny">CVE-2021-3749</text>
+  <text x="445" y="528" class="ink small" font-weight="700">claims-service</text><text x="445" y="553" class="muted tiny">direct dependency</text>
+  <text x="650" y="538" class="muted tiny">Analysis running</text>
+  <rect x="798" y="525" width="73" height="21" rx="10" fill="#edf0f2"/><text x="834" y="540" text-anchor="middle" fill="#657486" class="tiny" font-weight="700">In progress</text>
+  <text x="920" y="538" class="muted tiny">Today, 9:03 AM</text><rect x="1062" y="518" width="85" height="28" rx="6" fill="#fff" stroke="#c7d0d9"/><text x="1104" y="536" text-anchor="middle" class="ink tiny" font-weight="700">Status</text>
+  <text x="260" y="610" class="muted tiny">Showing 2 assessments</text><text x="1147" y="610" class="muted tiny" text-anchor="end">Sorted by highest concern</text>
+  <text x="244" y="673" class="muted tiny">Illustrative information hierarchy only — the live UI may use a different visual treatment.</text>
+</svg>

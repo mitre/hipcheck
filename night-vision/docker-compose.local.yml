@@ -1,0 +1,52 @@
+services:
+  nv-app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: nv-app:local
+    pull_policy: missing
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  nv-server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      secrets:
+
+    image: nv-server:local
+    pull_policy: missing
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  postgres:
+    pull_policy: missing
+    ports:
+      # Allow host-run backend tools to use the disposable local database.
+      - "127.0.0.1:5432:5432"
+    networks:
+      - database
+      # A non-internal network is required for Docker to publish a host port.
+      # No other service joins this network.
+      - postgres-host
+
+volumes:
+  nv-server-cache:
+    name: night-vision-local-nv-server-cache
+  nv-server-hipcheck-data:
+    name: night-vision-local-nv-server-hipcheck-data
+  postgres-data:
+    name: night-vision-local-postgres-data
+
+networks:
+  postgres-host:
+
+secrets:
+
+
+  nv-server-database-url:
+    file: ${NV_SERVER_DATABASE_URL_SECRET_FILE:?NV_SERVER_DATABASE_URL_SECRET_FILE is required}
+  health-diagnostics-token:
+    file: ${HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE:?HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE is required}
+  postgres-password:
+    file: ${POSTGRES_PASSWORD_SECRET_FILE:?POSTGRES_PASSWORD_SECRET_FILE is required}
