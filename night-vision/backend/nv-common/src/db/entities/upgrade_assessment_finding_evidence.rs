@@ -4,14 +4,14 @@ use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(
-    schema_name = "public",
-    table_name = "upgrade_assessment_finding_evidence"
+	schema_name = "public",
+	table_name = "upgrade_assessment_finding_evidence"
 )]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub finding_id: i32,
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub evidence_source_id: i32,
+	#[sea_orm(primary_key, auto_increment = false)]
+	pub finding_id: i32,
+	#[sea_orm(primary_key, auto_increment = false)]
+	pub evidence_source_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

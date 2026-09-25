@@ -60,7 +60,7 @@ pub use node_semver::{Range as NpmRange, SemverError, Version as NpmVersion};
 /// Anything node-semver rejects comes back as an [`NpmRangeError::InvalidRange`], so
 /// the resolver can bail before doing a registry lookup.
 pub fn parse_range(raw: &str) -> Result<NpmRange, NpmRangeError> {
-    NpmRange::parse(raw).map_err(NpmRangeError::InvalidRange)
+	NpmRange::parse(raw).map_err(NpmRangeError::InvalidRange)
 }
 
 /// Which of a package's published versions fall within `range`.
@@ -78,16 +78,16 @@ pub fn parse_range(raw: &str) -> Result<NpmRange, NpmRangeError> {
 /// sort in between releases (`1.4.0 < 1.5.0-beta.1 < 1.5.0`) while usually
 /// not matching.
 pub fn elaborate_npm_version_bounds<'a>(
-    known_pkg_versions: &'a [NpmVersion],
-    range: &NpmRange,
+	known_pkg_versions: &'a [NpmVersion],
+	range: &NpmRange,
 ) -> Result<Vec<&'a NpmVersion>, NpmRangeError> {
-    if !known_pkg_versions.is_sorted() {
-        return Err(NpmRangeError::UnsortedVersions);
-    }
-    Ok(known_pkg_versions
-        .iter()
-        .filter(|version| range.satisfies(version))
-        .collect())
+	if !known_pkg_versions.is_sorted() {
+		return Err(NpmRangeError::UnsortedVersions);
+	}
+	Ok(known_pkg_versions
+		.iter()
+		.filter(|version| range.satisfies(version))
+		.collect())
 }
 
 /// Something that keeps us from answering a bounds query.
@@ -95,182 +95,182 @@ pub fn elaborate_npm_version_bounds<'a>(
 /// Either of these means the resolver shouldn't do a registry lookup.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NpmRangeError {
-    /// node-semver rejected the raw range string.
-    InvalidRange(SemverError),
+	/// node-semver rejected the raw range string.
+	InvalidRange(SemverError),
 
-    /// The version list given to [`elaborate_npm_version_bounds`] wasn't
-    /// sorted in increasing order.
-    UnsortedVersions,
+	/// The version list given to [`elaborate_npm_version_bounds`] wasn't
+	/// sorted in increasing order.
+	UnsortedVersions,
 }
 
 impl Display for NpmRangeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            Self::InvalidRange(_) => write!(f, "invalid version range"),
-            Self::UnsortedVersions => {
-                write!(
-                    f,
-                    "known package versions must be sorted in increasing order"
-                )
-            }
-        }
-    }
+	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+		match self {
+			Self::InvalidRange(_) => write!(f, "invalid version range"),
+			Self::UnsortedVersions => {
+				write!(
+					f,
+					"known package versions must be sorted in increasing order"
+				)
+			}
+		}
+	}
 }
 
 impl std::error::Error for NpmRangeError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::InvalidRange(source) => Some(source),
-            Self::UnsortedVersions => None,
-        }
-    }
+	fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+		match self {
+			Self::InvalidRange(source) => Some(source),
+			Self::UnsortedVersions => None,
+		}
+	}
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+	use super::*;
 
-    /// Little helper: parse a list of published-version strings.
-    fn published(raw: &[&str]) -> Vec<NpmVersion> {
-        raw.iter()
-            .map(|v| NpmVersion::parse(v).unwrap_or_else(|e| panic!("bad test version `{v}`: {e}")))
-            .collect()
-    }
+	/// Little helper: parse a list of published-version strings.
+	fn published(raw: &[&str]) -> Vec<NpmVersion> {
+		raw.iter()
+			.map(|v| NpmVersion::parse(v).unwrap_or_else(|e| panic!("bad test version `{v}`: {e}")))
+			.collect()
+	}
 
-    /// Little helper: run the whole pipeline and render the matches back to
-    /// strings for easy comparison.
-    fn matching(list: &[NpmVersion], raw_range: &str) -> Vec<String> {
-        let range = parse_range(raw_range)
-            .unwrap_or_else(|e| panic!("expected `{raw_range}` to parse: {e}"));
-        let matches = elaborate_npm_version_bounds(list, &range)
-            .unwrap_or_else(|e| panic!("expected bounds query for `{raw_range}` to succeed: {e}"));
-        matches
-            .into_iter()
-            .map(std::string::ToString::to_string)
-            .collect()
-    }
+	/// Little helper: run the whole pipeline and render the matches back to
+	/// strings for easy comparison.
+	fn matching(list: &[NpmVersion], raw_range: &str) -> Vec<String> {
+		let range = parse_range(raw_range)
+			.unwrap_or_else(|e| panic!("expected `{raw_range}` to parse: {e}"));
+		let matches = elaborate_npm_version_bounds(list, &range)
+			.unwrap_or_else(|e| panic!("expected bounds query for `{raw_range}` to succeed: {e}"));
+		matches
+			.into_iter()
+			.map(std::string::ToString::to_string)
+			.collect()
+	}
 
-    #[test]
-    fn bounds_filter_published_versions() {
-        let list = published(&["1.0.0", "1.2.2", "1.2.3", "1.5.0", "2.0.0"]);
-        assert_eq!(matching(&list, "^1.2.3"), ["1.2.3", "1.5.0"]);
-    }
+	#[test]
+	fn bounds_filter_published_versions() {
+		let list = published(&["1.0.0", "1.2.2", "1.2.3", "1.5.0", "2.0.0"]);
+		assert_eq!(matching(&list, "^1.2.3"), ["1.2.3", "1.5.0"]);
+	}
 
-    #[test]
-    fn bounds_handle_tilde_and_x_ranges_too() {
-        let list = published(&["1.1.9", "1.2.0", "1.2.9", "1.3.0"]);
-        assert_eq!(matching(&list, "~1.2.3"), ["1.2.9"]);
-        assert_eq!(matching(&list, "1.2.x"), ["1.2.0", "1.2.9"]);
-    }
+	#[test]
+	fn bounds_handle_tilde_and_x_ranges_too() {
+		let list = published(&["1.1.9", "1.2.0", "1.2.9", "1.3.0"]);
+		assert_eq!(matching(&list, "~1.2.3"), ["1.2.9"]);
+		assert_eq!(matching(&list, "1.2.x"), ["1.2.0", "1.2.9"]);
+	}
 
-    #[test]
-    fn bounds_of_or_ranges_are_not_contiguous() {
-        // The union skips 2.0.0 in the middle — this is why the API returns
-        // the matching versions rather than one contiguous sub-slice.
-        let list = published(&["1.0.0", "1.5.0", "2.0.0", "3.0.0", "3.1.0"]);
-        assert_eq!(
-            matching(&list, "^1.0.0 || ^3.0.0"),
-            ["1.0.0", "1.5.0", "3.0.0", "3.1.0"]
-        );
-    }
+	#[test]
+	fn bounds_of_or_ranges_are_not_contiguous() {
+		// The union skips 2.0.0 in the middle — this is why the API returns
+		// the matching versions rather than one contiguous sub-slice.
+		let list = published(&["1.0.0", "1.5.0", "2.0.0", "3.0.0", "3.1.0"]);
+		assert_eq!(
+			matching(&list, "^1.0.0 || ^3.0.0"),
+			["1.0.0", "1.5.0", "3.0.0", "3.1.0"]
+		);
+	}
 
-    #[test]
-    fn bounds_skip_interleaved_prereleases() {
-        // Prereleases sort between releases (1.4.0 < 1.5.0-beta.1 < 1.5.0) but
-        // don't satisfy a release range — the other reason matches can't be
-        // one contiguous sub-slice.
-        let list = published(&["1.4.0", "1.5.0-beta.1", "1.5.0"]);
-        assert_eq!(matching(&list, "^1.2.3"), ["1.4.0", "1.5.0"]);
-    }
+	#[test]
+	fn bounds_skip_interleaved_prereleases() {
+		// Prereleases sort between releases (1.4.0 < 1.5.0-beta.1 < 1.5.0) but
+		// don't satisfy a release range — the other reason matches can't be
+		// one contiguous sub-slice.
+		let list = published(&["1.4.0", "1.5.0-beta.1", "1.5.0"]);
+		assert_eq!(matching(&list, "^1.2.3"), ["1.4.0", "1.5.0"]);
+	}
 
-    #[test]
-    fn bounds_include_prereleases_on_the_same_version_tuple() {
-        // npm's prerelease rule: a prerelease version can match only when some
-        // comparator carries a prerelease on the same major.minor.patch.
-        let list = published(&["1.2.3-beta.1", "1.2.3-beta.2", "1.2.3", "1.3.0"]);
-        assert_eq!(
-            matching(&list, "^1.2.3-beta.1"),
-            ["1.2.3-beta.1", "1.2.3-beta.2", "1.2.3", "1.3.0"]
-        );
-    }
+	#[test]
+	fn bounds_include_prereleases_on_the_same_version_tuple() {
+		// npm's prerelease rule: a prerelease version can match only when some
+		// comparator carries a prerelease on the same major.minor.patch.
+		let list = published(&["1.2.3-beta.1", "1.2.3-beta.2", "1.2.3", "1.3.0"]);
+		assert_eq!(
+			matching(&list, "^1.2.3-beta.1"),
+			["1.2.3-beta.1", "1.2.3-beta.2", "1.2.3", "1.3.0"]
+		);
+	}
 
-    #[test]
-    fn bounds_can_be_empty() {
-        let list = published(&["1.0.0", "1.1.0"]);
-        assert!(matching(&list, "^2.0.0").is_empty());
-    }
+	#[test]
+	fn bounds_can_be_empty() {
+		let list = published(&["1.0.0", "1.1.0"]);
+		assert!(matching(&list, "^2.0.0").is_empty());
+	}
 
-    #[test]
-    fn bounds_reject_unsorted_versions() {
-        let list = published(&["2.0.0", "1.0.0"]);
-        let range = parse_range("^1.0.0").expect("valid range");
-        assert_eq!(
-            elaborate_npm_version_bounds(&list, &range),
-            Err(NpmRangeError::UnsortedVersions)
-        );
-    }
+	#[test]
+	fn bounds_reject_unsorted_versions() {
+		let list = published(&["2.0.0", "1.0.0"]);
+		let range = parse_range("^1.0.0").expect("valid range");
+		assert_eq!(
+			elaborate_npm_version_bounds(&list, &range),
+			Err(NpmRangeError::UnsortedVersions)
+		);
+	}
 
-    #[test]
-    fn parse_range_rejects_malformed_input() {
-        parse_range("1.2.3.4").unwrap_err();
-        parse_range("not a version").unwrap_err();
-    }
+	#[test]
+	fn parse_range_rejects_malformed_input() {
+		parse_range("1.2.3.4").unwrap_err();
+		parse_range("not a version").unwrap_err();
+	}
 
-    // ========================================================================
-    // Known node-semver quirks, pinned as *accepted* behavior
-    // ------------------------------------------------------------------------
-    // `parse_range` hands raw range strings straight to node-semver with no
-    // validation or rewriting layer in front of it, so whatever node-semver
-    // does is what this module does. That's a deliberate simplification (see
-    // the module docs), but it means two of node-semver's rougher edges are
-    // now our behavior too. These tests exist so that if a future node-semver
-    // upgrade changes either one, it shows up as a failing test to
-    // investigate rather than a silent behavior change.
+	// ========================================================================
+	// Known node-semver quirks, pinned as *accepted* behavior
+	// ------------------------------------------------------------------------
+	// `parse_range` hands raw range strings straight to node-semver with no
+	// validation or rewriting layer in front of it, so whatever node-semver
+	// does is what this module does. That's a deliberate simplification (see
+	// the module docs), but it means two of node-semver's rougher edges are
+	// now our behavior too. These tests exist so that if a future node-semver
+	// upgrade changes either one, it shows up as a failing test to
+	// investigate rather than a silent behavior change.
 
-    /// node-semver drops unrecognized tokens instead of erroring on them:
-    /// parsing `"1.2.3 foo"` succeeds and quietly behaves like `"1.2.3"`. A
-    /// stricter front-end would reject this outright; we don't have one, so
-    /// we accept it.
-    #[test]
-    fn unrecognized_tokens_are_silently_dropped_not_rejected() {
-        for input in ["1.2.3 foo", "foo 1.2.3", "~1.y 1.2.3", "1.2.3 ~1.y"] {
-            parse_range(input).unwrap_or_else(|e| {
-                panic!(
-                    "expected node-semver to laxly accept `{input}` by dropping the \
+	/// node-semver drops unrecognized tokens instead of erroring on them:
+	/// parsing `"1.2.3 foo"` succeeds and quietly behaves like `"1.2.3"`. A
+	/// stricter front-end would reject this outright; we don't have one, so
+	/// we accept it.
+	#[test]
+	fn unrecognized_tokens_are_silently_dropped_not_rejected() {
+		for input in ["1.2.3 foo", "foo 1.2.3", "~1.y 1.2.3", "1.2.3 ~1.y"] {
+			parse_range(input).unwrap_or_else(|e| {
+				panic!(
+					"expected node-semver to laxly accept `{input}` by dropping the \
                      unrecognized token; it now errors ({e}) instead — if that's \
                      node-semver becoming stricter, this test can be deleted"
-                )
-            });
-        }
-    }
+				)
+			});
+		}
+	}
 
-    /// node-semver 2.2.0 parses `<=` with a partial version too strictly:
-    /// `<=1.2` becomes `<=1.2.0-0`, excluding `1.2.0` itself. Real npm treats
-    /// an inclusive bound on a partial version as covering the whole omitted
-    /// range — `<=1.2` should behave like `<1.3.0-0`, matching every `1.2.x`
-    /// patch.
-    ///
-    /// This means `1.2.0` (and any other `1.2.x`) is wrongly excluded from a
-    /// `<=1.2` or `<=1` range under our current dependency version. If this
-    /// starts failing after a `node-semver` bump, the bug may be fixed
-    /// upstream — double check against npm's own behavior before deleting
-    /// this test.
-    #[test]
-    fn engine_mishandles_lte_partial_versions() {
-        let versions = [
-            NpmVersion::parse("1.1.0").unwrap(),
-            NpmVersion::parse("1.2.0").unwrap(),
-            NpmVersion::parse("1.2.9").unwrap(),
-            NpmVersion::parse("1.3.0").unwrap(),
-        ];
+	/// node-semver 2.2.0 parses `<=` with a partial version too strictly:
+	/// `<=1.2` becomes `<=1.2.0-0`, excluding `1.2.0` itself. Real npm treats
+	/// an inclusive bound on a partial version as covering the whole omitted
+	/// range — `<=1.2` should behave like `<1.3.0-0`, matching every `1.2.x`
+	/// patch.
+	///
+	/// This means `1.2.0` (and any other `1.2.x`) is wrongly excluded from a
+	/// `<=1.2` or `<=1` range under our current dependency version. If this
+	/// starts failing after a `node-semver` bump, the bug may be fixed
+	/// upstream — double check against npm's own behavior before deleting
+	/// this test.
+	#[test]
+	fn engine_mishandles_lte_partial_versions() {
+		let versions = [
+			NpmVersion::parse("1.1.0").unwrap(),
+			NpmVersion::parse("1.2.0").unwrap(),
+			NpmVersion::parse("1.2.9").unwrap(),
+			NpmVersion::parse("1.3.0").unwrap(),
+		];
 
-        let range = parse_range("<=1.2").expect("node-semver accepts this syntax");
-        let matches = elaborate_npm_version_bounds(&versions, &range).expect("sorted input");
-        assert_eq!(
-            matches,
-            [&versions[0]],
-            "expected the known `<=1.2` bug (excluding 1.2.0 and 1.2.9) — if this \
+		let range = parse_range("<=1.2").expect("node-semver accepts this syntax");
+		let matches = elaborate_npm_version_bounds(&versions, &range).expect("sorted input");
+		assert_eq!(
+			matches,
+			[&versions[0]],
+			"expected the known `<=1.2` bug (excluding 1.2.0 and 1.2.9) — if this \
              now includes them, node-semver's `<=` handling may have been fixed"
-        );
-    }
+		);
+	}
 }

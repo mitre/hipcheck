@@ -5,14 +5,14 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(schema_name = "public", table_name = "cisa_kev_entries")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub cve_id: String,
-    #[sea_orm(column_type = "JsonBinary")]
-    pub entry: Json,
-    pub first_seen_at: DateTimeWithTimeZone,
-    pub last_seen_at: DateTimeWithTimeZone,
-    pub updated_at: DateTimeWithTimeZone,
-    pub removed_at: Option<DateTimeWithTimeZone>,
+	#[sea_orm(primary_key, auto_increment = false)]
+	pub cve_id: String,
+	#[sea_orm(column_type = "JsonBinary")]
+	pub entry: Json,
+	pub first_seen_at: DateTimeWithTimeZone,
+	pub last_seen_at: DateTimeWithTimeZone,
+	pub updated_at: DateTimeWithTimeZone,
+	pub removed_at: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

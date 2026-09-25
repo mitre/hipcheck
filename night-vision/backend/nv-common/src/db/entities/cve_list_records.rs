@@ -5,15 +5,15 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(schema_name = "public", table_name = "cve_list_records")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub cve_id: String,
-    pub record_format_version: String,
-    #[sea_orm(column_type = "JsonBinary")]
-    pub record: Json,
-    pub deleted: bool,
-    pub first_seen_at: DateTimeWithTimeZone,
-    pub last_seen_at: DateTimeWithTimeZone,
-    pub updated_at: DateTimeWithTimeZone,
+	#[sea_orm(primary_key, auto_increment = false)]
+	pub cve_id: String,
+	pub record_format_version: String,
+	#[sea_orm(column_type = "JsonBinary")]
+	pub record: Json,
+	pub deleted: bool,
+	pub first_seen_at: DateTimeWithTimeZone,
+	pub last_seen_at: DateTimeWithTimeZone,
+	pub updated_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -5,19 +5,19 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(schema_name = "public", table_name = "cve_list_sync_runs")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub generation: i64,
-    pub checked_at: DateTimeWithTimeZone,
-    pub completed_at: Option<DateTimeWithTimeZone>,
-    pub status: String,
-    pub repository_url: Option<String>,
-    pub repository_ref: Option<String>,
-    pub commit_sha: Option<String>,
-    pub records_seen: i32,
-    pub records_inserted: i32,
-    pub records_updated: i32,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub error: Option<String>,
+	#[sea_orm(primary_key)]
+	pub generation: i64,
+	pub checked_at: DateTimeWithTimeZone,
+	pub completed_at: Option<DateTimeWithTimeZone>,
+	pub status: String,
+	pub repository_url: Option<String>,
+	pub repository_ref: Option<String>,
+	pub commit_sha: Option<String>,
+	pub records_seen: i32,
+	pub records_inserted: i32,
+	pub records_updated: i32,
+	#[sea_orm(column_type = "Text", nullable)]
+	pub error: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

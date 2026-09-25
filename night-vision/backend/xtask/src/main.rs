@@ -6,16 +6,16 @@ use clap::{Arg, Command, value_parser};
 use std::{path::PathBuf, process::ExitCode};
 
 fn main() -> ExitCode {
-    if let Err(e) = run() {
-        eprintln!("{e}");
-        return ExitCode::FAILURE;
-    }
+	if let Err(e) = run() {
+		eprintln!("{e}");
+		return ExitCode::FAILURE;
+	}
 
-    ExitCode::SUCCESS
+	ExitCode::SUCCESS
 }
 
 fn run() -> Result<()> {
-    let matches = Command::new("xtask")
+	let matches = Command::new("xtask")
         .about("Task runner for the Night Vision backend")
         .arg_required_else_help(true)
         .subcommand(
@@ -58,14 +58,14 @@ $ RUSTC_BOOTSTRAP=1 cargo -Z unstable-options <BUILD_CMD> --unit-graph | cargo x
         )
         .get_matches();
 
-    match matches.subcommand() {
-        Some(("add", cmd)) => command::add(cmd)?,
-        Some(("ci", cmd)) => command::ci(cmd)?,
-        Some(("lint", cmd)) => command::lint(cmd)?,
-        Some(("unit-graph", cmd)) => command::unit_graph(cmd)?,
-        Some(_) => unimplemented!("unknown command"),
-        None => {}
-    }
+	match matches.subcommand() {
+		Some(("add", cmd)) => command::add(cmd)?,
+		Some(("ci", cmd)) => command::ci(cmd)?,
+		Some(("lint", cmd)) => command::lint(cmd)?,
+		Some(("unit-graph", cmd)) => command::unit_graph(cmd)?,
+		Some(_) => unimplemented!("unknown command"),
+		None => {}
+	}
 
-    Ok(())
+	Ok(())
 }

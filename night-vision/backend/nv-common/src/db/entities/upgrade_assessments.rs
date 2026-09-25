@@ -5,19 +5,19 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(schema_name = "public", table_name = "upgrade_assessments")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub id: String,
-    pub package_name: String,
-    pub current_version: String,
-    pub trigger_kind: String,
-    pub trigger_reference: String,
-    pub candidate_version: Option<String>,
-    pub status: String,
-    pub created_at: DateTimeWithTimeZone,
-    pub finished_at: Option<DateTimeWithTimeZone>,
-    #[sea_orm(column_type = "JsonBinary")]
-    pub report: Option<Json>,
-    pub error: Option<String>,
+	#[sea_orm(primary_key, auto_increment = false)]
+	pub id: String,
+	pub package_name: String,
+	pub current_version: String,
+	pub trigger_kind: String,
+	pub trigger_reference: String,
+	pub candidate_version: Option<String>,
+	pub status: String,
+	pub created_at: DateTimeWithTimeZone,
+	pub finished_at: Option<DateTimeWithTimeZone>,
+	#[sea_orm(column_type = "JsonBinary")]
+	pub report: Option<Json>,
+	pub error: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

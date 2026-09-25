@@ -21,11 +21,11 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
-    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .get_connection()
-            .execute_unprepared(
-                "
+	async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+		manager
+			.get_connection()
+			.execute_unprepared(
+				"
 UPDATE package_sources
 SET resolution_status = 'pending',
     next_attempt_at = clock_timestamp()
@@ -37,14 +37,14 @@ SET failure_kind = 'internal',
     retryable = FALSE
 WHERE resolution_status = 'failed' AND failure_kind IS NULL;
 ",
-            )
-            .await?;
-        Ok(())
-    }
+			)
+			.await?;
+		Ok(())
+	}
 
-    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
-        // This migration only corrects rows that were otherwise stuck or
-        // unreadable; there is no prior state worth restoring on rollback.
-        Ok(())
-    }
+	async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+		// This migration only corrects rows that were otherwise stuck or
+		// unreadable; there is no prior state worth restoring on rollback.
+		Ok(())
+	}
 }

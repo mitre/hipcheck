@@ -9,49 +9,49 @@ use std::time::Duration;
 pub struct AsyncRuntime(tokio::runtime::Runtime);
 
 impl AsyncRuntime {
-    /// Construct a new async runtime using the given configuration.
-    pub fn new(config: &Config) -> Result<Self, RuntimeBuildError> {
-        let mut builder = tokio::runtime::Builder::new_multi_thread();
+	/// Construct a new async runtime using the given configuration.
+	pub fn new(config: &Config) -> Result<Self, RuntimeBuildError> {
+		let mut builder = tokio::runtime::Builder::new_multi_thread();
 
-        // Make sure to turn on IO and timers, otherwise it won't run at all.
-        builder.enable_all();
+		// Make sure to turn on IO and timers, otherwise it won't run at all.
+		builder.enable_all();
 
-        if let Some(worker_threads) = config.async_worker_threads {
-            builder.worker_threads(worker_threads);
-        }
+		if let Some(worker_threads) = config.async_worker_threads {
+			builder.worker_threads(worker_threads);
+		}
 
-        if let Some(thread_stack_size) = config.async_worker_thread_stack_size {
-            builder.thread_stack_size(thread_stack_size);
-        }
+		if let Some(thread_stack_size) = config.async_worker_thread_stack_size {
+			builder.thread_stack_size(thread_stack_size);
+		}
 
-        if let Some(max_blocking_threads) = config.async_max_blocking_threads {
-            builder.max_blocking_threads(max_blocking_threads);
-        }
+		if let Some(max_blocking_threads) = config.async_max_blocking_threads {
+			builder.max_blocking_threads(max_blocking_threads);
+		}
 
-        if let Some(keep_alive) = config.async_blocking_thread_keep_alive {
-            builder.thread_keep_alive(Duration::from_millis(keep_alive));
-        }
+		if let Some(keep_alive) = config.async_blocking_thread_keep_alive {
+			builder.thread_keep_alive(Duration::from_millis(keep_alive));
+		}
 
-        if let Some(global_queue_interval) = config.async_global_queue_interval {
-            builder.global_queue_interval(global_queue_interval);
-        }
+		if let Some(global_queue_interval) = config.async_global_queue_interval {
+			builder.global_queue_interval(global_queue_interval);
+		}
 
-        if let Some(event_interval) = config.async_event_interval {
-            builder.event_interval(event_interval);
-        }
+		if let Some(event_interval) = config.async_event_interval {
+			builder.event_interval(event_interval);
+		}
 
-        let runtime = builder.build().map_err(RuntimeBuildError)?;
+		let runtime = builder.build().map_err(RuntimeBuildError)?;
 
-        Ok(Self(runtime))
-    }
+		Ok(Self(runtime))
+	}
 
-    /// Run a future to completion on the async runtime.
-    pub fn block_on<F>(&self, fut: F) -> F::Output
-    where
-        F: Future,
-    {
-        self.0.block_on(fut)
-    }
+	/// Run a future to completion on the async runtime.
+	pub fn block_on<F>(&self, fut: F) -> F::Output
+	where
+		F: Future,
+	{
+		self.0.block_on(fut)
+	}
 }
 
 /// Failure to build the Tokio async runtime.
@@ -59,13 +59,13 @@ impl AsyncRuntime {
 pub struct RuntimeBuildError(std::io::Error);
 
 impl std::fmt::Display for RuntimeBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "failed to build tokio runtime")
-    }
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "failed to build tokio runtime")
+	}
 }
 
 impl std::error::Error for RuntimeBuildError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.0)
-    }
+	fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+		Some(&self.0)
+	}
 }

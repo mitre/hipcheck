@@ -5,14 +5,14 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(schema_name = "public", table_name = "upgrade_assessment_verdicts")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
-    pub candidate_id: i32,
-    pub verdict: String,
-    #[sea_orm(column_type = "Text")]
-    pub rationale: String,
-    pub evidence_quality: String,
-    pub computed_at: DateTimeWithTimeZone,
+	#[sea_orm(primary_key)]
+	pub id: i32,
+	pub candidate_id: i32,
+	pub verdict: String,
+	#[sea_orm(column_type = "Text")]
+	pub rationale: String,
+	pub evidence_quality: String,
+	pub computed_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

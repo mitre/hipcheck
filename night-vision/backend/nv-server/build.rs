@@ -24,76 +24,76 @@ use std::process::Command;
 // - NV_BUILD_COMMIT_DATE: The date of the Git commit.
 
 fn main() {
-    add_commit_info_to_env();
+	add_commit_info_to_env();
 }
 
 fn add_commit_info_to_env() {
-    println!("cargo:rerun-if-env-changed=CFG_OMIT_COMMIT_HASH");
+	println!("cargo:rerun-if-env-changed=CFG_OMIT_COMMIT_HASH");
 
-    if std::env::var_os("CFG_OMIT_COMMIT_HASH").is_some() {
-        return;
-    }
+	if std::env::var_os("CFG_OMIT_COMMIT_HASH").is_some() {
+		return;
+	}
 
-    if let Some(info) = CommitInfo::get() {
-        println!("cargo:rustc-env=NV_BUILD_COMMIT_HASH={}", info.hash);
-        println!(
-            "cargo:rustc-env=NV_BUILD_COMMIT_SHORT_HASH={}",
-            info.short_hash,
-        );
-        println!("cargo:rustc-env=NV_BUILD_COMMIT_DATE={}", info.date);
-    }
+	if let Some(info) = CommitInfo::get() {
+		println!("cargo:rustc-env=NV_BUILD_COMMIT_HASH={}", info.hash);
+		println!(
+			"cargo:rustc-env=NV_BUILD_COMMIT_SHORT_HASH={}",
+			info.short_hash,
+		);
+		println!("cargo:rustc-env=NV_BUILD_COMMIT_DATE={}", info.date);
+	}
 }
 
 struct CommitInfo {
-    hash: String,
-    short_hash: String,
-    date: String,
+	hash: String,
+	short_hash: String,
+	date: String,
 }
 
 impl CommitInfo {
-    fn get() -> Option<Self> {
-        Self::from_git()
-    }
+	fn get() -> Option<Self> {
+		Self::from_git()
+	}
 
-    fn from_git() -> Option<Self> {
-        // nv-server is two levels down from the root of the repository.
-        if path_to_git().exists().not() {
-            return None;
-        }
+	fn from_git() -> Option<Self> {
+		// nv-server is two levels down from the root of the repository.
+		if path_to_git().exists().not() {
+			return None;
+		}
 
-        let output = match Command::new("git")
-            .arg("log")
-            .arg("-1")
-            .arg("--date=short")
-            .arg("--format=%H %h %cd")
-            .arg("--abbrev=9")
-            .output()
-        {
-            Ok(output) if output.status.success() => output,
-            _ => return None,
-        };
+		let output = match Command::new("git")
+			.arg("log")
+			.arg("-1")
+			.arg("--date=short")
+			.arg("--format=%H %h %cd")
+			.arg("--abbrev=9")
+			.output()
+		{
+			Ok(output) if output.status.success() => output,
+			_ => return None,
+		};
 
-        let stdout = String::from_utf8(output.stdout).expect("git output is ASCII");
-        Self::from_string(&stdout)
-    }
+		let stdout = String::from_utf8(output.stdout).expect("git output is ASCII");
+		Self::from_string(&stdout)
+	}
 
-    fn from_string(s: &str) -> Option<Self> {
-        let mut parts = s.split_whitespace().map(ToOwned::to_owned);
+	fn from_string(s: &str) -> Option<Self> {
+		let mut parts = s.split_whitespace().map(ToOwned::to_owned);
 
-        Some(Self {
-            hash: parts.next()?,
-            short_hash: parts.next()?,
-            date: parts.next()?,
-        })
-    }
+		Some(Self {
+			hash: parts.next()?,
+			short_hash: parts.next()?,
+			date: parts.next()?,
+		})
+	}
 }
 
 // Normally I'd use the `pathbuf` crate to do this, but I'm keeping this
 // build script dependency-free to minimize the impact it has on build times.
 fn path_to_git() -> PathBuf {
-    let mut p = PathBuf::new();
-    p.push("..");
-    p.push("..");
-    p.push(".git");
-    p
+	let mut p = PathBuf::new();
+	p.push("..");
+	p.push("..");
+	p.push(".git");
+	p
 }

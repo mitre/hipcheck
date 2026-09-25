@@ -5,36 +5,36 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
-    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(CveListRecords::Table)
-                    .add_column(
-                        ColumnDef::new(CveListRecords::Deleted)
-                            .boolean()
-                            .not_null()
-                            .default(false),
-                    )
-                    .to_owned(),
-            )
-            .await
-    }
+	async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+		manager
+			.alter_table(
+				Table::alter()
+					.table(CveListRecords::Table)
+					.add_column(
+						ColumnDef::new(CveListRecords::Deleted)
+							.boolean()
+							.not_null()
+							.default(false),
+					)
+					.to_owned(),
+			)
+			.await
+	}
 
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(CveListRecords::Table)
-                    .drop_column(CveListRecords::Deleted)
-                    .to_owned(),
-            )
-            .await
-    }
+	async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+		manager
+			.alter_table(
+				Table::alter()
+					.table(CveListRecords::Table)
+					.drop_column(CveListRecords::Deleted)
+					.to_owned(),
+			)
+			.await
+	}
 }
 
 #[derive(DeriveIden)]
 enum CveListRecords {
-    Table,
-    Deleted,
+	Table,
+	Deleted,
 }

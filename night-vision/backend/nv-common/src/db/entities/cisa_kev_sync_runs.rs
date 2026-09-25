@@ -5,22 +5,22 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(schema_name = "public", table_name = "cisa_kev_sync_runs")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub generation: i64,
-    pub checked_at: DateTimeWithTimeZone,
-    pub completed_at: Option<DateTimeWithTimeZone>,
-    pub status: String,
-    pub catalog_version: Option<String>,
-    pub catalog_date_released: Option<DateTimeWithTimeZone>,
-    pub catalog_count: Option<i32>,
-    pub etag: Option<String>,
-    pub last_modified: Option<String>,
-    pub content_sha256: Option<String>,
-    pub records_seen: i32,
-    pub records_inserted: i32,
-    pub records_updated: i32,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub error: Option<String>,
+	#[sea_orm(primary_key)]
+	pub generation: i64,
+	pub checked_at: DateTimeWithTimeZone,
+	pub completed_at: Option<DateTimeWithTimeZone>,
+	pub status: String,
+	pub catalog_version: Option<String>,
+	pub catalog_date_released: Option<DateTimeWithTimeZone>,
+	pub catalog_count: Option<i32>,
+	pub etag: Option<String>,
+	pub last_modified: Option<String>,
+	pub content_sha256: Option<String>,
+	pub records_seen: i32,
+	pub records_inserted: i32,
+	pub records_updated: i32,
+	#[sea_orm(column_type = "Text", nullable)]
+	pub error: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
