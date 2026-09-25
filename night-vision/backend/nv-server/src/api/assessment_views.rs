@@ -309,6 +309,31 @@ fn search_matches(item: &AssessmentQueueItem, search: &str) -> bool {
             .is_some_and(|exposure| exposure.package.name.to_lowercase().contains(&search))
 }
 
+fn accumulate_coverage(
+    item: &AssessmentQueueItem,
+    exposure_count: &mut u32,
+    unassessed_count: &mut u32,
+    processing_source_count: &mut u32,
+    unavailable_source_count: &mut u32,
+) {
+    if item.exposure.is_some() {
+        *exposure_count = exposure_count.saturating_add(1);
+        if item.state == AssessmentReadState::NotAssessed {
+            *unassessed_count = unassessed_count.saturating_add(1);
+        }
+    } else {
+        match item.state {
+            AssessmentReadState::Processing => {
+                *processing_source_count = processing_source_count.saturating_add(1);
+            }
+            AssessmentReadState::Failed | AssessmentReadState::Unavailable => {
+                *unavailable_source_count = unavailable_source_count.saturating_add(1);
+            }
+            _ => {}
+        }
+    }
+}
+
 fn parse_cursor(cursor: Option<&str>) -> Result<(i32, usize), HttpError> {
     let Some(cursor) = cursor else {
         return Ok((0, 0));
@@ -538,28 +563,19 @@ pub(super) async fn work_queue(
             0
         };
         for (index, item) in rows.into_iter().enumerate().skip(offset) {
-            if item.exposure.is_some() {
-                exposure_count = exposure_count.saturating_add(1);
-                if item.state == AssessmentReadState::NotAssessed {
-                    unassessed_count = unassessed_count.saturating_add(1);
-                }
-            } else {
-                match item.state {
-                    AssessmentReadState::Processing => {
-                        processing_source_count = processing_source_count.saturating_add(1);
-                    }
-                    AssessmentReadState::Failed | AssessmentReadState::Unavailable => {
-                        unavailable_source_count = unavailable_source_count.saturating_add(1);
-                    }
-                    _ => {}
-                }
-            }
             let visible = view_matches(&item, query.view)
                 && query
                     .search
                     .as_deref()
                     .is_none_or(|search| search_matches(&item, search));
             if visible {
+                accumulate_coverage(
+                    &item,
+                    &mut exposure_count,
+                    &mut unassessed_count,
+                    &mut processing_source_count,
+                    &mut unavailable_source_count,
+                );
                 items.push(item);
             }
             if items.len() >= limit as usize {
@@ -824,6 +840,50 @@ pub(super) async fn validate_exposure_reference(
 mod tests {
     use super::*;
 
+    fn test_queue_item(
+        state: AssessmentReadState,
+        candidate_state: AssessmentCandidateState,
+        verdict: Option<UpgradeAssessmentVerdict>,
+        source_name: Option<&str>,
+        file_name: &str,
+        package_name: Option<&str>,
+    ) -> AssessmentQueueItem {
+        AssessmentQueueItem {
+            id: "source:test".to_owned(),
+            source: AssessmentSourceIdentity {
+                id: Uuid::nil(),
+                name: source_name.map(str::to_owned),
+                file_name: file_name.to_owned(),
+                lifecycle: "completed".to_owned(),
+            },
+            exposure: package_name.map(|package_name| PackageSourceExposure {
+                package: VersionedPackage {
+                    id: Uuid::from_u64_pair(1, 2),
+                    name: package_name.to_owned(),
+                    version: "1.2.3".to_owned(),
+                    ecosystem: PackageSourceEcosystem::Npm,
+                    purl: format!("pkg:npm/{package_name}@1.2.3"),
+                    derivations: Vec::new(),
+                },
+                cve_id: "CVE-2026-1234".to_owned(),
+                kev: PackageSourceExposureKevContext {
+                    vendor_project: None,
+                    product: None,
+                    vulnerability_name: None,
+                    date_added: None,
+                },
+            }),
+            reachability_truncated: false,
+            state,
+            assessment_id: None,
+            candidate_state,
+            candidate: None,
+            verdict,
+            updated_at: Utc::now(),
+            detail_url: "/package-sources/test".to_owned(),
+        }
+    }
+
     #[test]
     fn cursor_and_exposure_identity_are_stable_and_validated() {
         assert_eq!(parse_cursor(Some("12:3")).unwrap(), (12, 3));
@@ -875,6 +935,122 @@ mod tests {
         item.state = AssessmentReadState::NotAssessed;
         item.verdict = None;
         assert!(view_matches(&item, AssessmentQueueView::NeedsReview));
+    }
+
+    #[test]
+    fn coverage_counts_only_visible_items_after_filters() {
+        let hidden_processing = test_queue_item(
+            AssessmentReadState::Processing,
+            AssessmentCandidateState::Processing,
+            None,
+            Some("hidden-source"),
+            "hidden-package.json",
+            None,
+        );
+        let hidden_exposure = test_queue_item(
+            AssessmentReadState::NotAssessed,
+            AssessmentCandidateState::Unavailable,
+            None,
+            Some("alpha-source"),
+            "alpha-package.json",
+            Some("hidden-package"),
+        );
+        let visible_exposure = test_queue_item(
+            AssessmentReadState::NotAssessed,
+            AssessmentCandidateState::Unavailable,
+            None,
+            Some("visible-source"),
+            "visible-package.json",
+            Some("visible-package"),
+        );
+
+        let mut exposure_count = 0;
+        let mut unassessed_count = 0;
+        let mut processing_source_count = 0;
+        let mut unavailable_source_count = 0;
+
+        for item in [&hidden_processing, &hidden_exposure, &visible_exposure] {
+            let visible = view_matches(item, AssessmentQueueView::NeedsReview)
+                && search_matches(item, "visible");
+            if visible {
+                accumulate_coverage(
+                    item,
+                    &mut exposure_count,
+                    &mut unassessed_count,
+                    &mut processing_source_count,
+                    &mut unavailable_source_count,
+                );
+            }
+        }
+
+        assert_eq!(exposure_count, 1);
+        assert_eq!(unassessed_count, 1);
+        assert_eq!(processing_source_count, 0);
+        assert_eq!(unavailable_source_count, 0);
+    }
+
+    #[test]
+    fn coverage_counts_visible_processing_source_rows() {
+        let visible_processing = test_queue_item(
+            AssessmentReadState::Processing,
+            AssessmentCandidateState::Processing,
+            None,
+            Some("processing-source"),
+            "processing-package.json",
+            None,
+        );
+
+        let mut exposure_count = 0;
+        let mut unassessed_count = 0;
+        let mut processing_source_count = 0;
+        let mut unavailable_source_count = 0;
+
+        if view_matches(&visible_processing, AssessmentQueueView::Processing) {
+            accumulate_coverage(
+                &visible_processing,
+                &mut exposure_count,
+                &mut unassessed_count,
+                &mut processing_source_count,
+                &mut unavailable_source_count,
+            );
+        }
+
+        assert_eq!(exposure_count, 0);
+        assert_eq!(unassessed_count, 0);
+        assert_eq!(processing_source_count, 1);
+        assert_eq!(unavailable_source_count, 0);
+    }
+
+    #[test]
+    fn coverage_counts_visible_unavailable_source_rows() {
+        let visible_unavailable = test_queue_item(
+            AssessmentReadState::Unavailable,
+            AssessmentCandidateState::Unavailable,
+            None,
+            Some("unavailable-source"),
+            "unavailable-package.json",
+            None,
+        );
+
+        let mut exposure_count = 0;
+        let mut unassessed_count = 0;
+        let mut processing_source_count = 0;
+        let mut unavailable_source_count = 0;
+
+        if view_matches(&visible_unavailable, AssessmentQueueView::NeedsReview) {
+            accumulate_coverage(
+                &visible_unavailable,
+                &mut exposure_count,
+                &mut unassessed_count,
+                &mut processing_source_count,
+                &mut unavailable_source_count,
+            );
+        }
+
+        assert_eq!(exposure_count, 0);
+        assert_eq!(unassessed_count, 0);
+        assert_eq!(processing_source_count, 0);
+        assert_eq!(unavailable_source_count, 1);
     }
 
     #[test]
