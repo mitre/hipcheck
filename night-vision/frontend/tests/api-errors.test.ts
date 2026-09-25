@@ -18,16 +18,16 @@ test('normalizes response errors without exposing arbitrary response content', (
 	});
 });
 
-test('treats malformed JSON from a successful response as a retryable server failure', () => {
+test('treats malformed JSON from a successful response as an unexpected failure', () => {
 	const error = normalizeApiError({
 		error: new SyntaxError('private parse details'),
 		response: new Response('{', { status: 200 })
 	});
 
 	assert.deepEqual(error, {
-		kind: 'server',
-		message: 'Night Vision returned an invalid response. Please try again.',
-		retryable: true,
+		kind: 'unexpected',
+		message: 'The request could not be completed.',
+		retryable: false,
 		status: 200
 	});
 });

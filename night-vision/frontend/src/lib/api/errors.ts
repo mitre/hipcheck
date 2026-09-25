@@ -45,16 +45,7 @@ export const normalizeApiError = ({ error, request, response }: ClientFailure): 
 	if (response && !response.ok) return statusError(response.status);
 
 	if (response) {
-		// A successful HTTP status can still carry malformed JSON. Other failures
-		// while handling a response may come from client-side processing.
-		return error instanceof SyntaxError
-			? {
-					kind: 'server',
-					message: 'Night Vision returned an invalid response. Please try again.',
-					retryable: true,
-					status: response.status
-				}
-			: { ...unexpectedError(), status: response.status };
+		return { ...unexpectedError(), status: response.status };
 	}
 
 	if (request && (error instanceof TypeError || (error instanceof DOMException && error.name === 'NetworkError'))) {
