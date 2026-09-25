@@ -147,6 +147,22 @@ fn candidate_rank(candidate: &AssessmentCandidate) -> (u8, u8) {
     (verdict, distance)
 }
 
+fn detail_verdict(
+    candidates: &[AssessmentCandidate],
+    report: Option<&UpgradeAssessmentResult>,
+) -> Option<UpgradeAssessmentVerdict> {
+    candidates
+        .iter()
+        .find(|candidate| {
+            matches!(
+                candidate.selection_state,
+                AssessmentSelectionState::Selected
+            )
+        })
+        .and_then(|candidate| candidate.verdict.clone())
+        .or_else(|| report.map(|report| report.verdict.clone()))
+}
+
 fn candidate_state(state: AssessmentReadState, count: usize) -> AssessmentCandidateState {
     match state {
         AssessmentReadState::Completed if count == 0 => AssessmentCandidateState::NoCandidate,
@@ -696,15 +712,7 @@ pub(super) async fn exposure_detail(
         ));
     }
     let selected_candidate_id = selected_candidate_id(&all_candidates);
-    let verdict = all_candidates
-        .iter()
-        .find(|candidate| {
-            matches!(
-                candidate.selection_state,
-                AssessmentSelectionState::Selected
-            )
-        })
-        .and_then(|candidate| candidate.verdict.clone());
+    let verdict = detail_verdict(&all_candidates, report.as_ref());
     let candidates = all_candidates
         .into_iter()
         .skip(candidate_cursor)
@@ -922,6 +930,10 @@ mod tests {
         assert!(candidates[0].major_upgrade_caution.is_some());
         assert!(selected_candidate_id(&candidates).is_none());
         assert_eq!(
+            detail_verdict(&candidates, Some(&report)),
+            Some(UpgradeAssessmentVerdict::Caution)
+        );
+        assert_eq!(
             candidate_state(AssessmentReadState::Completed, 0),
             AssessmentCandidateState::NoCandidate
         );
@@ -943,6 +955,10 @@ mod tests {
         assert_eq!(
             selected_candidate_id(&candidates).as_deref(),
             Some("pkg:npm/example-package@0.5.1")
+        );
+        assert_eq!(
+            detail_verdict(&candidates, Some(&report)),
+            candidates[0].verdict.clone()
         );
     }
 }
