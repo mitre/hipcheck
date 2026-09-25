@@ -33,7 +33,7 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiError 
 type ClientResult<T> = { data?: T; error?: unknown; response?: Response };
 
 const isApiResultTerminal = <T>(result: ApiResult<T>, isTerminalStatus: (value: T) => boolean): boolean =>
-	!result.ok || isTerminalStatus(result.data);
+	result.ok ? isTerminalStatus(result.data) : !result.error.retryable;
 
 const toApiResult = <T>({ data, error, response }: ClientResult<T>): ApiResult<T> => {
 	if (error !== undefined || data === undefined) return { ok: false, error: normalizeApiError(response) };

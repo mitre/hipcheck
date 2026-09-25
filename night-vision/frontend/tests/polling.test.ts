@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { pollUntilTerminal } from '../src/lib/api/polling.ts';
+import { isPackageSourceTerminal } from '../src/lib/server/night-vision-api.ts';
 
 type ApiResult<T> = { ok: true; data: T } | { ok: false; error: unknown };
 
@@ -92,7 +93,7 @@ test('composes with ApiResult-based package-source status polling', async () => 
 			calls += 1;
 			return status;
 		},
-		isTerminal: (status) => !status.ok || status.data.status !== 'processing',
+		isTerminal: isPackageSourceTerminal,
 		intervalMs: 0,
 		maxAttempts: 3
 	});
@@ -105,14 +106,49 @@ test('composes with ApiResult-based package-source status polling', async () => 
 	assert.equal(calls, 2);
 });
 
-test('treats ApiResult errors as terminal polling outcomes', async () => {
+
+test('continues polling after retryable ApiResult errors on package-source status checks', async () => {
+	let calls = 0;
+	const statuses: Array<ApiResult<{ status: 'processing' | 'completed'; id: string; createdAt: string }>> = [
+		{
+			ok: false,
+			error: {
+				kind: 'network',
+				message: 'Unable to reach Night Vision. Check your connection and try again.',
+				retryable: true
+			}
+		},
+		{ ok: true, data: { status: 'completed', id: 'pkg-1', createdAt: '2026-01-01T00:00:00Z' } }
+	];
+
+	const result = await pollUntilTerminal({
+		getStatus: async () => {
+			const status = statuses[calls];
+			calls += 1;
+			return status;
+		},
+		isTerminal: isPackageSourceTerminal,
+		intervalMs: 0,
+		maxAttempts: 3
+	});
+
+	assert.deepEqual(result, {
+		kind: 'completed',
+		value: { ok: true, data: { status: 'completed', id: 'pkg-1', createdAt: '2026-01-01T00:00:00Z' } },
+		attempts: 2
+	});
+	assert.equal(calls, 2);
+});
+
+test('treats non-retryable ApiResult errors as terminal polling outcomes', async () => {
 	let calls = 0;
 	const errorResult: ApiResult<{ status: 'processing'; id: string; createdAt: string }> = {
 		ok: false,
 		error: {
-			kind: 'network',
-			message: 'Unable to reach Night Vision. Check your connection and try again.',
-			retryable: true
+			kind: 'not-found',
+			message: 'The requested resource was not found.',
+			retryable: false,
+			status: 404
 		}
 	};
 
@@ -121,7 +157,7 @@ test('treats ApiResult errors as terminal polling outcomes', async () => {
 			calls += 1;
 			return errorResult;
 		},
-		isTerminal: (status) => !status.ok || status.data.status !== 'processing',
+		isTerminal: isPackageSourceTerminal,
 		intervalMs: 0,
 		maxAttempts: 3
 	});
