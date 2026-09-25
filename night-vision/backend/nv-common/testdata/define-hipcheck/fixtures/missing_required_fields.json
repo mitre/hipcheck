@@ -1,0 +1,35 @@
+{
+  "schema_version": "1",
+  "hipcheck": {
+    "version": "4.0.0-pre",
+    "commit": "abc123def456"
+  },
+  "target": {
+    "kind": "npm",
+    "purl": "pkg:npm/%40scope/name@1.2.7",
+    "source_repository_url": "https://github.com/example/name"
+  },
+  "policy": {
+    "id": "night-vision-upgrade-assessment",
+    "source": "policies/night-vision-upgrade-assessment.hcpolicy",
+    "recommendation": "PASS"
+  },
+  "checks": [
+    {
+      "plugin": {
+        "name": "npm-release-delta",
+        "publisher": "mitre",
+        "version": "0.1.0",
+        "query": "release_delta"
+      },
+      "policy": {
+        "expression": "plugin.release_delta == PASS"
+      },
+      "effect": "context",
+      "summary": "missing required fields",
+      "value": {
+        "installScriptsChanged": false
+      }
+    }
+  ]
+}

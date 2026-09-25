@@ -1,0 +1,101 @@
+schema-version = "1.12.0"
+
+[install]
+
+## Version Control Software (VCS's)
+
+# This Git is a Night Vision team development tool. Keep it recent for local
+# contribution workflows. It is intentionally separate from the Git installed
+# in the backend container, where Git is a runtime dependency of nv-server's CVE
+# List ingest path.
+git = { pkg-path = "git" }
+jujutsu = { pkg-path = "jujutsu" }
+
+## Rust Toolchain
+
+# This configuration is adapted from the example configuration in the Flox documentation.
+#
+# See: https://flox.dev/docs/languages/rust
+
+# All "rust toolchain" pieces are installed into their own pkg-group, to ensure we're always using
+# compatible versions of the tools together. These are basically the things `rustup` would normally
+# manage for us.
+#
+# Note that we set the "version" here to ensure we're being precise about the version of the Rust
+# toolchain in use. The way that package groups work in Flox, this also ensures that *everything
+# else in the same package group (the "rust-toolchain" group) will use a compatible version with
+# Rust 1.95.0.
+#
+# NOTE: Keep this Rust version in sync with the version set in `backend/Dockerfile`.
+#
+# Since we're managing toolchains with Flox, we will always have *some* delay in our ability to
+# adopt new Rust versions, since we have to wait for new releases to be packaged and published
+# to FloxHub.
+cargo = { pkg-path = "cargo", version = "1.95.0", pkg-group = "rust-toolchain" }
+# Note that we import this, even though it's technically already present as a dependency of
+# `cargo`, because in Nix packages don't inherently "export" their dependencies, so without this
+# import, `rustc` would be available to `cargo`, but not to anything else. This way, if we need to
+# interact with `rustc` directly, either during debugging or in a build script, we can. The
+# `pkg-group` declaration ensures we're using the same version of `rustc` that `cargo` itself is
+# using under the hood.
+rustc = { pkg-path = "rustc", pkg-group = "rust-toolchain" }
+clippy = { pkg-path = "clippy", pkg-group = "rust-toolchain" }
+rustfmt = { pkg-path = "rustfmt", pkg-group = "rust-toolchain" }
+# Slightly awkward name, but this is the Rust standard library source code.
+rust-lib-src = { pkg-path = "rustPlatform.rustLibSrc", pkg-group = "rust-toolchain" }
+
+# The Rust standard library expects to be able to link against this on macOS, so we provide it.
+libiconv = { pkg-path = "libiconv", systems = ["aarch64-darwin", "x86_64-darwin"] }
+
+# Rust executables on Linux expect to link to `libgcc` for stack unwinding, so we include it here.
+# Note that currently, `gcc` incorporates *all* of GCC, including the `gcc` CLI, manpages, and
+# more, when we technically only care about `libgcc`. In the future, Flox plans to split up `gcc`
+# into more granular packages, in which case we could depend on *just* `libgcc`.
+gcc = { pkg-path = "gcc", systems = ["aarch64-linux", "x86_64-linux"] }
+
+# These don't need to be the "rust-toolchain" group, since they're versioned separately.
+rust-analyzer = { pkg-path = "rust-analyzer" }
+cargo-autoinherit = { pkg-path = "cargo-autoinherit" }
+cargo-nextest = { pkg-path = "cargo-nextest" }
+cargo-hakari = { pkg-path = "cargo-hakari" }
+cargo-outdated = { pkg-path = "cargo-outdated" }
+cargo-udeps = { pkg-path = "cargo-udeps" }
+cargo-audit = { pkg-path = "cargo-audit" }
+# Used to test whether parser tests detect small behavior changes.
+cargo-mutants = { pkg-path = "cargo-mutants" }
+
+## Other Backend Tools
+
+# Used by `scripts/test.sh` to lint POSIX shell scripts.
+shellcheck = { pkg-path = "shellcheck" }
+
+# Used by shell scripts and frontend package-command wrappers.
+sed = { pkg-path = "gnused" }
+
+# Used to visualize unit-graphs by 'xtask' (provided the `dot` CLI)
+graphviz = { pkg-path = "graphviz" }
+
+## Frontend Tools
+
+nodejs_24 = { pkg-path = "nodejs_24" }
+pnpm = { pkg-path = "pnpm", version = "11.4.0" }
+
+## Database Stuff
+
+postgresql_18 = { pkg-path = "postgresql_18" }
+sea-orm-cli = { pkg-path = "sea-orm-cli" }
+pgadmin4 = { pkg-path = "pgadmin4" }
+
+# GitLab CLI
+glab = { pkg-path = "glab" }
+
+# NOTE: Keep the version of this synced with the version in `backend/Dockerfile`.
+cargo-chef = { pkg-path = "cargo-chef", version = "0.1.77" }
+
+[options]
+
+# Explicitly list the supported systems for our environment. This list was already implied, in that
+# we already knew our environment wouldn't work on Windows (since Nix doesn't), but it's good to
+# be explicit. Windows users should either use WSL (recommended) or manage their tools manually
+# (not recommended).
+systems = ["aarch64-darwin", "x86_64-darwin", "aarch64-linux", "x86_64-linux"]

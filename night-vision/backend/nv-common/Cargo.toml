@@ -1,0 +1,47 @@
+[package]
+name = "nv-common"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait.workspace = true
+async-channel.workspace = true
+camino.workspace = true
+chrono.workspace = true
+clap-verbosity-flag.workspace = true
+dropshot.workspace = true
+futures-util.workspace = true
+fastrand.workspace = true
+httpdate.workspace = true
+itertools.workspace = true
+jiff.workspace = true
+migration.workspace = true
+node-semver.workspace = true
+percent-encoding.workspace = true
+reqwest.workspace = true
+sea-orm.workspace = true
+sea-query.workspace = true
+secrecy.workspace = true
+sha2.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+slog.workspace = true
+slog-term.workspace = true
+slog-async.workspace = true
+spookey.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+url.workspace = true
+uuid.workspace = true
+windows-acls.workspace = true
+workspace-hack.workspace = true
+
+[dev-dependencies]
+httpmock = { workspace = true }
+proptest = { workspace = true }
+sea-orm = { workspace = true, features = ["mock"] }

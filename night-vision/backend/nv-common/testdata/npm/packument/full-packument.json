@@ -1,0 +1,52 @@
+{
+  "name": "example",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "example",
+      "version": "1.0.0",
+      "description": "Example package",
+      "main": "index.js",
+      "license": "MIT",
+      "dependencies": {
+        "serde": "^1.0.0"
+      },
+      "devDependencies": {
+        "serde_json": "^1.0.0"
+      },
+      "peerDependencies": {
+        "tokio": "^1.0.0"
+      },
+      "optionalDependencies": {
+        "bytes": "^1.0.0"
+      },
+      "engines": {
+        "node": ">=18"
+      },
+      "dist": {
+        "tarball": "https://registry.npmjs.org/example/-/example-1.0.0.tgz",
+        "shasum": "0123456789abcdef0123456789abcdef01234567",
+        "integrity": "sha512-example"
+      }
+    }
+  },
+  "description": "Example package",
+  "homepage": "https://example.com",
+  "keywords": [
+    "example",
+    "test"
+  ],
+  "license": "MIT",
+  "maintainers": [
+    {
+      "name": "Example Maintainer",
+      "email": "maintainer@example.com"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/example"
+  }
+}
