@@ -17,7 +17,7 @@ fn generate_schemars_for_target_types(out_dir: &Path) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-	generate_schemars_for_target_types(Path::new("../sdk/schema"))?;
+	generate_schemars_for_target_types(Path::new("sdk/schema"))?;
 
 	// Make the target available as a compile-time env var for plugin arch
 	// resolution

@@ -16,7 +16,7 @@ organizational directories.
 
 Some of these directories include:
 
-- `hipcheck/` - The main `hc` binary crate.
+- repository root - The main `hc` binary crate.
 - `sdk/` - Contains the plugin [software development kits (SDKs)][plugin_sdk] maintained by the Hipcheck team for various languages, which each language's SDK in a separate subdirectory.
 	- `rust/` - The Hipcheck [Rust SDK][rust_sdk] crate.
 - `library/` - Supporting library crates used by Hipcheck core or by plugins.
@@ -33,7 +33,9 @@ Some of these directories include:
 
 ## The Hipcheck binary crate
 
-Important modules within the `hipcheck/` binary crate include:
+The main `hc` binary crate lives at the repository root, with its source under `src/`.
+
+Important modules within the main binary crate include:
 
 - `cache/` - Implements the `hc cache` subcommand for manipulating the repository and plugin caches.
 - `cli.rs` - Defines the Hipcheck command line interface.

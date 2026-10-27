@@ -4,12 +4,12 @@ use crate::error::Result;
 use std::io::Write;
 use std::{fs::File, path::Path};
 
-static BINARY_KDL: &str = include_str!("../../config/Binary.kdl");
-static EXEC_KDL: &str = include_str!("../../config/Exec.kdl");
-static HIPCHECK_KDL: &str = include_str!("../../config/Hipcheck.kdl");
-static LANGS_KDL: &str = include_str!("../../config/Langs.kdl");
-static ORGS_KDL: &str = include_str!("../../config/Orgs.kdl");
-static TYPOS_KDL: &str = include_str!("../../config/Typos.kdl");
+static BINARY_KDL: &str = include_str!("../config/Binary.kdl");
+static EXEC_KDL: &str = include_str!("../config/Exec.kdl");
+static HIPCHECK_KDL: &str = include_str!("../config/Hipcheck.kdl");
+static LANGS_KDL: &str = include_str!("../config/Langs.kdl");
+static ORGS_KDL: &str = include_str!("../config/Orgs.kdl");
+static TYPOS_KDL: &str = include_str!("../config/Typos.kdl");
 
 pub fn write_policy_files(path: &Path) -> Result<()> {
 	std::fs::create_dir_all(path)?;
