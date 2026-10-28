@@ -690,7 +690,7 @@ mod tests {
 			"(eq 3 (count (filter (gt 8.0) (foreach (sub 1.0) [1.0 2.0 10.0 20.0 30.0]))))";
 		let context = Value::Null;
 		let expr = parse(program).unwrap();
-		println!("EXPR: {:?}", &expr);
+		println!("EXPR: {:?}", expr);
 		let expr = FunctionResolver::std().run(expr).unwrap();
 		let expr = TypeFixer::std().run(expr).unwrap();
 		println!("RESOLVER RES: {:?}", expr);

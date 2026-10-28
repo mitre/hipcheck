@@ -8,6 +8,7 @@ pub(crate) mod query_endpoint;
 pub(crate) mod query_schema;
 
 /// Defines a single query endpoint for the plugin.
+#[allow(clippy::double_must_use)]
 #[tonic::async_trait]
 pub trait Query: Send {
 	/// Get the input schema for the query as a `schemars::schema::SchemaObject`.

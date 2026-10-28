@@ -10,6 +10,7 @@ pub mod error;
 pub mod types;
 
 pub mod proto {
+	#![allow(clippy::double_must_use)]
 	include!(concat!(env!("OUT_DIR"), "/hipcheck.v1.rs"));
 }
 
