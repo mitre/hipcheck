@@ -158,7 +158,7 @@ indexmap = "2.12.0"
 indextree = "4.7.4"
 indicatif = "0.18.3"
 itertools = "0.14.0"
-jiff = { version = "0.2.16", default-features = false }
+jiff = { version = "0.2.38", default-features = false }
 kdl = "6.5.0"
 lazy_static = "1.5.0"
 log = { version = "0.4.34", default-features = false }
