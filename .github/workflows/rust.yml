@@ -107,7 +107,7 @@ jobs:
         # NOTE: MUST be synced manually with runners in 'dist-workspace.toml'
         #
         # We've purposefully chosen to use two different versions of macOS here
-        # to achieve ARM and x86 support (macos-14 is ARM, macos-15-intel is
+        # to achieve ARM and x86 support (macos-15 is ARM, macos-15-intel is
         # x86), since alternative runners with matching versions aren't all on
         # the free plan for GitHub Actions.
         #
@@ -118,7 +118,7 @@ jobs:
             ubuntu-22.04,
             ubuntu-22.04-arm,
             windows-2022,
-            macos-14,
+            macos-15,
             macos-15-intel,
           ]
     runs-on: ${{ matrix.os }}
@@ -199,7 +199,7 @@ jobs:
         # NOTE: MUST be synced manually with runners in 'dist-workspace.toml'
         #
         # We've purposefully chosen to use two different versions of macOS here
-        # to achieve ARM and x86 support (macos-14 is ARM, macos-15-intel is
+        # to achieve ARM and x86 support (macos-15 is ARM, macos-15-intel is
         # x86), since alternative runners with matching versions aren't all on
         # the free plan for GitHub Actions.
         #
@@ -210,7 +210,7 @@ jobs:
             ubuntu-22.04,
             ubuntu-22.04-arm,
             windows-2022,
-            macos-14,
+            macos-15,
             macos-15-intel,
           ]
     runs-on: ${{ matrix.os }}
