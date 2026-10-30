@@ -181,7 +181,7 @@ quote = "1.0.42"
 rand = "0.9.3"
 rayon = "1.11.0"
 regex = "1.13.1"
-rustls = { version = "0.23.35", default-features = false }
+rustls = { version = "0.23.46", default-features = false }
 rustls-platform-verifier = "0.6.2"
 salsa = "0.24.0"
 schemars = "1.2.3"
