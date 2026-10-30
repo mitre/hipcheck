@@ -1,0 +1,184 @@
+# Container configuration file for `nv-server`.
+#
+# This file is packaged into the container image as the default configuration.
+# It assumes the database is reachable on the container network as `postgres`.
+
+# Bind all container interfaces so Docker port publishing and orchestrator
+# service routing can reach the server.
+server-address = "0.0.0.0:8080"
+
+# The path to the secret file containing the database connection string.
+#
+# This file is mounted as part of starting up the container in our
+# `docker compose` configuration.
+database-connection-file = "/run/secrets/nv-server/database-url"
+
+# This token protects GET /health/diagnostics and raw Hipcheck evidence. Docker
+# Compose mounts the value as a runtime secret; do not add it to this
+# configuration file.
+health-diagnostics-token-file = "/run/secrets/nv-server/health-diagnostics-token"
+
+# Maximum size in bytes for the request body.
+#
+# Default: 1024
+http-request-body-max-bytes =
+
+# The default behavior for handling early client disconnects.
+# Can be "cancel" or "continue".
+#
+# Default: "continue"
+http-early-disconnect-behavior =
+
+# Maximum size in bytes of the package.json contents submitted to the
+# package-source endpoint. Must be greater than 0 and must not exceed 1048576.
+#
+# Default: 1048576 (1 MiB)
+package-source-contents-max-bytes =
+
+# Timeout in milliseconds for accepting one package-source submission. Must be
+# greater than 0.
+#
+# Default: 5000
+package-source-request-timeout =
+
+# Maximum number of package-source submissions accepted concurrently per
+# server process. Must be greater than 0.
+#
+# Default: 4
+package-source-max-concurrency =
+
+# The maximum number of connections to the database.
+#
+# Default: 100
+database-max-connections =
+
+# The minimum number of connections to the database.
+#
+# Default: 0
+database-min-connections =
+
+# Timeout in milliseconds for establishing a connection to the database.
+#
+# Default: (no timeout)
+database-connect-timeout =
+
+# Timeout in milliseconds for idle connections to the database.
+#
+# Default: (no timeout)
+database-idle-timeout =
+
+# Timeout in milliseconds for acquiring a connection from the database.
+#
+# Default: (no timeout)
+database-acquire-timeout =
+
+# Maximum total lifetime in milliseconds for a connection to the database.
+#
+# Default: (no timeout)
+database-max-lifetime =
+
+# The Git repository URL for CVE List data.
+#
+# Default: https://github.com/CVEProject/cvelistV5.git
+cve-list-repository-url =
+
+# The Git repository ref for CVE List data.
+#
+# Default: main
+cve-list-repository-ref =
+
+# The interval in milliseconds between CVE List sync attempts.
+#
+# Default: 420000
+cve-list-sync-interval =
+
+# The maximum age in milliseconds for a confirmed CVE List snapshot to be current.
+# Default: twice cve-list-sync-interval.
+cve-list-freshness-threshold =
+
+# The timeout in milliseconds for one CVE List sync attempt.
+#
+# Default: 3600000
+cve-list-sync-timeout =
+
+# The timeout in milliseconds for the first CVE List sync attempt.
+#
+# Default: 14400000
+cve-list-first-sync-timeout =
+
+# The local checkout path for the CVE List repository cache.
+cve-list-checkout-path = "/var/cache/night-vision/cvelistV5"
+
+# The maximum number of CVE List records to parse concurrently.
+#
+# Default: auto, based on async worker threads and async blocking threads,
+# capped at 32.
+cve-list-parse-concurrency =
+
+# The maximum number of CVE List records to write in one database batch.
+#
+# Default: 500
+cve-list-write-batch-size =
+
+# The maximum size in bytes for one CVE List record blob.
+#
+# Default: 5242880
+cve-record-max-bytes =
+
+# The number of parsed CVE List records to buffer before database writes.
+#
+# Default: auto, based on cve-list-parse-concurrency and
+# cve-list-write-batch-size, capped at 1024.
+cve-list-write-channel-size =
+
+# The maximum NPM packument response size in bytes.
+#
+# Default: 67108864
+package-elaboration-max-packument-bytes = 67108864
+
+# The bundled Hipcheck artifact and its writable Night Vision-owned runtime
+# state. Startup validates these paths before the server accepts requests.
+hipcheck-bin-path = "/usr/local/bin/hc"
+hipcheck-policy-path = "/opt/night-vision/hipcheck/config/Hipcheck.kdl"
+hipcheck-exec-config-path = "/opt/night-vision/hipcheck/config/Exec.kdl"
+hipcheck-working-dir = "/var/cache/night-vision/hipcheck"
+hipcheck-cache-dir = "/var/cache/night-vision/hipcheck"
+hipcheck-data-dir = "/var/lib/night-vision/hipcheck"
+
+# Defaults: 300000 ms, 1048576 stdout bytes, 1048576 stderr bytes, and
+# 4194304 JSON bytes.
+hipcheck-timeout =
+hipcheck-stdout-max-bytes =
+hipcheck-stderr-max-bytes =
+hipcheck-json-max-bytes =
+hipcheck-max-concurrent-runs = 1
+
+# The number of async worker threads to use for handling requests.
+#
+# Default: (the number of CPU cores available on the system)
+async-worker-threads =
+
+# The size in bytes for stacks available to worker tasks.
+#
+# Default: 2000000
+async-worker-thread-stack-size =
+
+# The maximum number of blocking threads in the async runtime.
+#
+# Default: 512
+async-max-blocking-threads =
+
+# The number of milliseconds to keep blocking threads alive after they finish.
+#
+# Default: 10000
+async-blocking-thread-keep-alive =
+
+# The number of scheduler ticks between polls to the global task queue.
+#
+# Default: 31
+async-global-queue-interval =
+
+# The number of scheduler ticks between event polling.
+#
+# Default: 61
+async-event-interval =

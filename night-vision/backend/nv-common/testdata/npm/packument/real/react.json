@@ -1,0 +1,819 @@
+{
+  "name": "react",
+  "dist-tags": {
+    "beta": "19.0.0-beta-26f2496093-20240514",
+    "rc": "19.0.0-rc.1",
+    "next": "19.3.0-canary-d5736f09-20260507",
+    "latest": "19.2.8",
+    "backport": "19.0.8",
+    "experimental": "0.0.0-experimental-1724e9ce-20260729",
+    "canary": "19.3.0-canary-1724e9ce-20260729"
+  },
+  "versions": {
+    "0.3.0": {
+      "name": "react",
+      "version": "0.3.0",
+      "author": {
+        "name": "Jeff Barczewski",
+        "email": "jeff.barczewski@gmail.com"
+      },
+      "_id": "react@0.3.0",
+      "maintainers": [
+        {
+          "name": "jeffbski",
+          "email": "jeff.barczewski@gmail.com"
+        }
+      ],
+      "bugs": {
+        "url": "http://github.com/jeffbski/react/issues"
+      },
+      "dist": {
+        "shasum": "64f73e67ad01c068ead6576cb779611b6ba40746",
+        "tarball": "https://registry.npmjs.org/react/-/react-0.3.0.tgz",
+        "integrity": "sha512-a8+1JoLx7wIXZh7uuT2b9PIHtREqSf6Gwotc8jq1WNE+zOTTwcE5QAt1kbwcImuvSg1MHwGAk66JzZw1hGUO3g==",
+        "signatures": [
+          {
+            "sig": "MEUCIQDAgRbluFKQIS1jr2ft7wHTrdAzUN12bgkNVJ+4G5mZqwIgJQpECEyK4dhm1xlA4TZ+yWbMRzYalmG9F+0ttqclTq0=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ]
+      },
+      "main": "react",
+      "engines": {
+        "node": "*"
+      },
+      "scripts": {
+        "test": "node_modules/.bin/tapr test"
+      },
+      "_npmUser": {
+        "name": "jeffbski",
+        "email": "jeff.barczewski@gmail.com"
+      },
+      "licenses": [
+        {
+          "url": "http://github.com/jeffbski/react/raw/master/LICENSE",
+          "type": "MIT"
+        }
+      ],
+      "repository": {
+        "url": "git://github.com/jeffbski/react.git",
+        "type": "git"
+      },
+      "_npmVersion": "1.1.0-beta-10",
+      "description": "React is a javascript module to make it easier to work with asynchronous code, by reducing boilerplate code and improving error and exception handling while allowing variable and task dependencies when defining flow.",
+      "directories": {},
+      "_nodeVersion": "v0.6.7",
+      "dependencies": {
+        "sprintf": "~0.1.1",
+        "ensure-array": "~0.0.2",
+        "eventemitter2": "~0.4.1"
+      },
+      "_defaultsLoaded": true,
+      "devDependencies": {
+        "tap": "~0.1.0",
+        "tapr": "~0.1.0",
+        "Deferred": "~0.1.1",
+        "promised-io": "~0.3.0"
+      },
+      "_engineSupported": true
+    },
+    "16.7.0": {
+      "name": "react",
+      "version": "16.7.0",
+      "keywords": [
+        "react"
+      ],
+      "license": "MIT",
+      "_id": "react@16.7.0",
+      "maintainers": [
+        {
+          "name": "acdlite",
+          "email": "npm@andrewclark.io"
+        },
+        {
+          "name": "brianvaughn",
+          "email": "briandavidvaughn@gmail.com"
+        },
+        {
+          "name": "fb",
+          "email": "opensource+npm@fb.com"
+        },
+        {
+          "name": "flarnie",
+          "email": "flarnie.npm@gmail.com"
+        },
+        {
+          "name": "gaearon",
+          "email": "dan.abramov@gmail.com"
+        },
+        {
+          "name": "sebmarkbage",
+          "email": "sebastian@calyptus.eu"
+        },
+        {
+          "name": "sophiebits",
+          "email": "npm@sophiebits.com"
+        },
+        {
+          "name": "threepointone",
+          "email": "threepointone@gmail.com"
+        },
+        {
+          "name": "trueadm",
+          "email": "dg@domgan.com"
+        }
+      ],
+      "homepage": "https://reactjs.org/",
+      "bugs": {
+        "url": "https://github.com/facebook/react/issues"
+      },
+      "dist": {
+        "shasum": "b674ec396b0a5715873b350446f7ea0802ab6381",
+        "tarball": "https://registry.npmjs.org/react/-/react-16.7.0.tgz",
+        "fileCount": 10,
+        "integrity": "sha512-StCz3QY8lxTb5cl2HJxjwLFOXPIFQp+p+hxQfc8WE0QiLfCtIlKj8/+5tjjKm8uSTlAW+fCPaavGFS06V9Ar3A==",
+        "signatures": [
+          {
+            "sig": "MEQCICuS/ipI5VizsbkuW1HPSwHtDGnhJB8Ezk1Kmwx70nNBAiA0PNkVkmWa+eGcRHbSrFujVJhHszWAScteEPE7wdOpzQ==",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 198986,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJcGu41CRA9TVsSAnZWagAA4+oP+wf/iSyQPwCwEzwjzS3+\nYXfjl2NoxxpPFQgjChPVzKBvNhvP2jyZCxudCcqyERPMgJ1j2V7cyuDby6CR\noqreg5iC01sGhH3ckhWIkYeoMxZvQU7V2dFf1XfLDrR6HGRfT2fH38bmw8nU\n30hDzChrrnP0SnoY6B85SLYBkF0yiI5cLjUiidklCM5/LGfCEs9pvgppWiiQ\nFB6zprF+jUEc0jFGUKMu9MAdYjactR/GcwutthKODmAixm4wv9k/RyUnGyow\nFNp6VBgPf9oIhw/QbXNOBJl0usDKIqQBqaN53loBhGBPlfTviOWt/bB8j1K4\nrkA5H9TX+rshkdK+wmbReUghpHq7Gt+vj/PyKAQ9ncvz0wUmjJ1jJBy3HucF\nO0zVHV8pUMYQgg1ZPxTixvwyu1a6hoySBAImA+s/4lzrEjiWPzp67RZQTXTv\npZkTfNVbhW9Yxgq1cL/9b8WhfKvuPQfauLRmF2omavJupb0z+jkoDSNXZqNK\nEETPerWJYodHfhjkWQgo0Nx/+hPoEAkPBK9iJfW7YUwETHHDg+N0/a2AY3YO\nBIwpIoH0HppbmVhN/HEmjOXGmUhcTl44n5yxKssSxF/4hERXtjRuyeQzf9t7\nDaPUCqJmK5TSUB0h8vnICwmRf6/8JFacUyzoD2tkrTwphiMR3OC97o/ErjI1\niTSI\r\n=31Pc\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "main": "index.js",
+      "_from": "react@0.0.0-4a1072194",
+      "_spec": "react@0.0.0-4a1072194",
+      "_where": "/Users/acdlite/Code/react/build/node_modules",
+      "_shasum": "eca0e35d0d40fd15770de2e46073aeb654723443",
+      "engines": {
+        "node": ">=0.10.0"
+      },
+      "_npmUser": {
+        "name": "acdlite",
+        "email": "npm@andrewclark.io"
+      },
+      "_inBundle": false,
+      "_location": "/react",
+      "_resolved": "https://registry.npmjs.org/react/-/react-0.0.0-4a1072194.tgz",
+      "_integrity": "sha512-ZUj2lkUDLjwJaGu4WD0dYSvsfIyhQt2l/AJDlg4ij+rCDU3fSFKgHWanNovViUoaWHAxgrpft3KGFfvWPZH5LA==",
+      "_requested": {
+        "raw": "react@0.0.0-4a1072194",
+        "name": "react",
+        "type": "version",
+        "rawSpec": "0.0.0-4a1072194",
+        "registry": true,
+        "saveSpec": null,
+        "fetchSpec": "0.0.0-4a1072194",
+        "escapedName": "react"
+      },
+      "browserify": {
+        "transform": [
+          "loose-envify"
+        ]
+      },
+      "deprecated": false,
+      "repository": {
+        "url": "git+https://github.com/facebook/react.git",
+        "type": "git"
+      },
+      "_npmVersion": "6.4.1",
+      "_requiredBy": [
+        "#USER",
+        "/"
+      ],
+      "description": "React is a JavaScript library for building user interfaces.",
+      "directories": {},
+      "_nodeVersion": "10.14.2",
+      "dependencies": {
+        "scheduler": "^0.12.0",
+        "prop-types": "^15.6.2",
+        "loose-envify": "^1.1.0",
+        "object-assign": "^4.1.1"
+      },
+      "_hasShrinkwrap": false,
+      "_phantomChildren": {},
+      "bundleDependencies": false,
+      "_npmOperationalInternal": {
+        "tmp": "tmp/react_16.7.0_1545268788828_0.7098138909397134",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "19.0.0-beta-26f2496093-20240514": {
+      "name": "react",
+      "version": "19.0.0-beta-26f2496093-20240514",
+      "keywords": [
+        "react"
+      ],
+      "license": "MIT",
+      "_id": "react@19.0.0-beta-26f2496093-20240514",
+      "maintainers": [
+        {
+          "name": "gnoff",
+          "email": "jcs.gnoff@gmail.com"
+        },
+        {
+          "name": "fb",
+          "email": "opensource+npm@fb.com"
+        },
+        {
+          "name": "sophiebits",
+          "email": "npm@sophiebits.com"
+        },
+        {
+          "name": "react-bot",
+          "email": "react-core@meta.com"
+        }
+      ],
+      "homepage": "https://react.dev/",
+      "bugs": {
+        "url": "https://github.com/facebook/react/issues"
+      },
+      "dist": {
+        "shasum": "3a0d63746b3f9ebd461a0731191bd08047fb1dbb",
+        "tarball": "https://registry.npmjs.org/react/-/react-19.0.0-beta-26f2496093-20240514.tgz",
+        "fileCount": 27,
+        "integrity": "sha512-ZsU/WjNZ6GfzMWsq2DcGjElpV9it8JmETHm9mAJuOJNhuJcWJxt8ltCJabONFRpDFq1A/DP0d0KFj9CTJVM4VA==",
+        "signatures": [
+          {
+            "sig": "MEYCIQC8ZsgtsPQmZkO5edZHGIsx7ShpLKbYEpElNgXn6iVRMgIhAJ5/a6uyZGG8A5CixrN+DqZdf8VwvpNFBKAbxScR012V",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 378704
+      },
+      "main": "index.js",
+      "engines": {
+        "node": ">=0.10.0"
+      },
+      "exports": {
+        ".": {
+          "default": "./index.js",
+          "react-server": "./react.react-server.js"
+        },
+        "./jsx-runtime": {
+          "default": "./jsx-runtime.js",
+          "react-server": "./jsx-runtime.react-server.js"
+        },
+        "./package.json": "./package.json",
+        "./jsx-dev-runtime": {
+          "default": "./jsx-dev-runtime.js",
+          "react-server": "./jsx-dev-runtime.react-server.js"
+        },
+        "./compiler-runtime": {
+          "default": "./compiler-runtime.js",
+          "react-server": "./compiler-runtime.js"
+        }
+      },
+      "gitHead": "26f24960935cc395dd9892b3ac48249c9dbcc195",
+      "_npmUser": {
+        "name": "react-bot",
+        "email": "react-core@meta.com"
+      },
+      "repository": {
+        "url": "git+https://github.com/facebook/react.git",
+        "type": "git",
+        "directory": "packages/react"
+      },
+      "_npmVersion": "10.5.0",
+      "description": "React is a JavaScript library for building user interfaces.",
+      "directories": {},
+      "_nodeVersion": "18.20.1",
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "_npmOperationalInternal": {
+        "tmp": "tmp/react_19.0.0-beta-26f2496093-20240514_1715703209516_0.3097344445009971",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "19.0.0-rc.1": {
+      "name": "react",
+      "version": "19.0.0-rc.1",
+      "keywords": [
+        "react"
+      ],
+      "license": "MIT",
+      "_id": "react@19.0.0-rc.1",
+      "maintainers": [
+        {
+          "name": "gnoff",
+          "email": "jcs.gnoff@gmail.com"
+        },
+        {
+          "name": "fb",
+          "email": "opensource+npm@fb.com"
+        },
+        {
+          "name": "sophiebits",
+          "email": "npm@sophiebits.com"
+        },
+        {
+          "name": "react-bot",
+          "email": "react-core@meta.com"
+        }
+      ],
+      "homepage": "https://react.dev/",
+      "bugs": {
+        "url": "https://github.com/facebook/react/issues"
+      },
+      "dist": {
+        "shasum": "469cc8ae6bdba224dcaab10ad6c4d90843f21352",
+        "tarball": "https://registry.npmjs.org/react/-/react-19.0.0-rc.1.tgz",
+        "fileCount": 27,
+        "integrity": "sha512-NZKln+uyPuyHchzP07I6GGYFxdAoaKhehgpCa3ltJGzwE31OYumLeshGaitA1R/fS5d9D2qpZVwTFAr6zCLM9w==",
+        "signatures": [
+          {
+            "sig": "MEUCIQCUXOUDQDwe4eJsBu+ST2IzFIFXjppvRb4Em055YwvQvQIgMHO6B65ynFgLSXhCAmQZtxDjbztGjPZIfMtLnKTdBR8=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 237482
+      },
+      "main": "index.js",
+      "engines": {
+        "node": ">=0.10.0"
+      },
+      "exports": {
+        ".": {
+          "default": "./index.js",
+          "react-server": "./react.react-server.js"
+        },
+        "./jsx-runtime": {
+          "default": "./jsx-runtime.js",
+          "react-server": "./jsx-runtime.react-server.js"
+        },
+        "./package.json": "./package.json",
+        "./jsx-dev-runtime": {
+          "default": "./jsx-dev-runtime.js",
+          "react-server": "./jsx-dev-runtime.react-server.js"
+        },
+        "./compiler-runtime": {
+          "default": "./compiler-runtime.js",
+          "react-server": "./compiler-runtime.js"
+        }
+      },
+      "gitHead": "79e36bcf39816ba4dd9c5330aa0fa5794b175e9d",
+      "_npmUser": {
+        "name": "react-bot",
+        "email": "react-core@meta.com"
+      },
+      "repository": {
+        "url": "git+https://github.com/facebook/react.git",
+        "type": "git",
+        "directory": "packages/react"
+      },
+      "_npmVersion": "10.5.0",
+      "description": "React is a JavaScript library for building user interfaces.",
+      "directories": {},
+      "_nodeVersion": "18.20.1",
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "_npmOperationalInternal": {
+        "tmp": "tmp/react_19.0.0-rc.1_1731605022722_0.8676454375242093",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "19.3.0-canary-d5736f09-20260507": {
+      "name": "react",
+      "version": "19.3.0-canary-d5736f09-20260507",
+      "keywords": [
+        "react"
+      ],
+      "license": "MIT",
+      "_id": "react@19.3.0-canary-d5736f09-20260507",
+      "maintainers": [
+        {
+          "name": "fb",
+          "email": "opensource+npm@fb.com"
+        },
+        {
+          "name": "react-bot",
+          "email": "react-core@meta.com"
+        }
+      ],
+      "homepage": "https://react.dev/",
+      "bugs": {
+        "url": "https://github.com/facebook/react/issues"
+      },
+      "dist": {
+        "shasum": "a59b8a9bb1a6bd6dd4184c5487854dcc9136b664",
+        "tarball": "https://registry.npmjs.org/react/-/react-19.3.0-canary-d5736f09-20260507.tgz",
+        "fileCount": 27,
+        "integrity": "sha512-EL3w0mHylqEtiySCjcj/nPOkK1j6KvKsaFkeavTqR6hbd6bQi7gyCcTSHXQ2XpTjv8hfKWFArSVF6he1sgQcEQ==",
+        "signatures": [
+          {
+            "sig": "MEYCIQCbozShXV6+mnmc7Q9sUZdGqpFimc0t9i9aEf08fKHQ9AIhAMwOejkAmhjTYvAUVILkmSuL9tShA1R7VVuPFjts8Veo",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          }
+        ],
+        "unpackedSize": 178794
+      },
+      "main": "index.js",
+      "engines": {
+        "node": ">=0.10.0"
+      },
+      "exports": {
+        ".": {
+          "default": "./index.js",
+          "react-server": "./react.react-server.js"
+        },
+        "./jsx-runtime": {
+          "default": "./jsx-runtime.js",
+          "react-server": "./jsx-runtime.react-server.js"
+        },
+        "./package.json": "./package.json",
+        "./jsx-dev-runtime": {
+          "default": "./jsx-dev-runtime.js",
+          "react-server": "./jsx-dev-runtime.react-server.js"
+        },
+        "./compiler-runtime": {
+          "default": "./compiler-runtime.js",
+          "react-server": "./compiler-runtime.js"
+        }
+      },
+      "gitHead": "d5736f098edee62c44f27b053e6e48f5fa443803",
+      "_npmUser": {
+        "name": "react-bot",
+        "email": "react-core@meta.com"
+      },
+      "repository": {
+        "url": "git+https://github.com/facebook/react.git",
+        "type": "git",
+        "directory": "packages/react"
+      },
+      "_npmVersion": "10.8.2",
+      "description": "React is a JavaScript library for building user interfaces.",
+      "directories": {},
+      "_nodeVersion": "20.19.0",
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "_npmOperationalInternal": {
+        "tmp": "tmp/react_19.3.0-canary-d5736f09-20260507_1778258596303_0.8757602215286209",
+        "host": "s3://npm-registry-packages-npm-production"
+      }
+    },
+    "19.2.8": {
+      "name": "react",
+      "version": "19.2.8",
+      "keywords": [
+        "react"
+      ],
+      "license": "MIT",
+      "_id": "react@19.2.8",
+      "maintainers": [
+        {
+          "name": "fb",
+          "email": "opensource+npm@fb.com"
+        },
+        {
+          "name": "react-bot",
+          "email": "react-core@meta.com"
+        }
+      ],
+      "homepage": "https://react.dev/",
+      "bugs": {
+        "url": "https://github.com/react/react/issues"
+      },
+      "dist": {
+        "shasum": "a80663dbb58d69c6fe3fd291d3cb324e8a7dff2d",
+        "tarball": "https://registry.npmjs.org/react/-/react-19.2.8.tgz",
+        "fileCount": 27,
+        "integrity": "sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==",
+        "signatures": [
+          {
+            "sig": "MEYCIQCCmnis0gzyZIp8pPdpFV387Lljmx4ah4Pjs3dgMujpiwIhAPzEs2mi+AlgkTXXTDLnSQ9wtZK8R7ywMKY/mkKjCwVi",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          }
+        ],
+        "attestations": {
+          "url": "https://registry.npmjs.org/-/npm/v1/attestations/react@19.2.8",
+          "provenance": {
+            "predicateType": "https://slsa.dev/provenance/v1"
+          }
+        },
+        "unpackedSize": 171598
+      },
+      "main": "index.js",
+      "engines": {
+        "node": ">=0.10.0"
+      },
+      "exports": {
+        ".": {
+          "default": "./index.js",
+          "react-server": "./react.react-server.js"
+        },
+        "./jsx-runtime": {
+          "default": "./jsx-runtime.js",
+          "react-server": "./jsx-runtime.react-server.js"
+        },
+        "./package.json": "./package.json",
+        "./jsx-dev-runtime": {
+          "default": "./jsx-dev-runtime.js",
+          "react-server": "./jsx-dev-runtime.react-server.js"
+        },
+        "./compiler-runtime": {
+          "default": "./compiler-runtime.js",
+          "react-server": "./compiler-runtime.js"
+        }
+      },
+      "gitHead": "1dd4ecbdabf826f527fc9a58c05ea70375b7d170",
+      "_npmUser": {
+        "name": "GitHub Actions",
+        "email": "npm-oidc-no-reply@github.com",
+        "trustedPublisher": {
+          "id": "github",
+          "oidcConfigId": "oidc:19f8086e-9f33-439e-8cce-d73997f53038"
+        }
+      },
+      "repository": {
+        "url": "git+https://github.com/react/react.git",
+        "type": "git",
+        "directory": "packages/react"
+      },
+      "_npmVersion": "11.16.0",
+      "description": "React is a JavaScript library for building user interfaces.",
+      "directories": {},
+      "_nodeVersion": "24.18.0",
+      "_hasShrinkwrap": false,
+      "_npmOperationalInternal": {
+        "tmp": "tmp/react_19.2.8_1784648488566_0.8362834279539053",
+        "host": "s3://npm-registry-packages-npm-production"
+      }
+    },
+    "19.0.8": {
+      "name": "react",
+      "version": "19.0.8",
+      "keywords": [
+        "react"
+      ],
+      "license": "MIT",
+      "_id": "react@19.0.8",
+      "maintainers": [
+        {
+          "name": "fb",
+          "email": "opensource+npm@fb.com"
+        },
+        {
+          "name": "react-bot",
+          "email": "react-core@meta.com"
+        }
+      ],
+      "homepage": "https://react.dev/",
+      "bugs": {
+        "url": "https://github.com/react/react/issues"
+      },
+      "dist": {
+        "shasum": "02fd0c18e5baf06c6c59ff663775729811255eb1",
+        "tarball": "https://registry.npmjs.org/react/-/react-19.0.8.tgz",
+        "fileCount": 27,
+        "integrity": "sha512-0AdV74MDFG2T5TolFNYvgSqhbH26yUAe2yUErKArC8ehNHb84bwXE0dS68EvEJNBt01eSVNdhL0U6N60JKrFjw==",
+        "signatures": [
+          {
+            "sig": "MEUCIQCw2lSZMCS4uidtxCdOHIXkRKsi4BXFwqt6gG9mcQPoDwIgdCa+rZxspheQ8qrgNxW38BKrBDGsxjVGZPa5o+9HY3Y=",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          }
+        ],
+        "attestations": {
+          "url": "https://registry.npmjs.org/-/npm/v1/attestations/react@19.0.8",
+          "provenance": {
+            "predicateType": "https://slsa.dev/provenance/v1"
+          }
+        },
+        "unpackedSize": 237471
+      },
+      "main": "index.js",
+      "engines": {
+        "node": ">=0.10.0"
+      },
+      "exports": {
+        ".": {
+          "default": "./index.js",
+          "react-server": "./react.react-server.js"
+        },
+        "./jsx-runtime": {
+          "default": "./jsx-runtime.js",
+          "react-server": "./jsx-runtime.react-server.js"
+        },
+        "./package.json": "./package.json",
+        "./jsx-dev-runtime": {
+          "default": "./jsx-dev-runtime.js",
+          "react-server": "./jsx-dev-runtime.react-server.js"
+        },
+        "./compiler-runtime": {
+          "default": "./compiler-runtime.js",
+          "react-server": "./compiler-runtime.js"
+        }
+      },
+      "gitHead": "dec2f1b17e5853e62c9041760158899895062ecc",
+      "_npmUser": {
+        "name": "GitHub Actions",
+        "email": "npm-oidc-no-reply@github.com",
+        "trustedPublisher": {
+          "id": "github",
+          "oidcConfigId": "oidc:19f8086e-9f33-439e-8cce-d73997f53038"
+        }
+      },
+      "repository": {
+        "url": "git+https://github.com/react/react.git",
+        "type": "git",
+        "directory": "packages/react"
+      },
+      "_npmVersion": "11.16.0",
+      "description": "React is a JavaScript library for building user interfaces.",
+      "directories": {},
+      "_nodeVersion": "24.18.0",
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "_npmOperationalInternal": {
+        "tmp": "tmp/react_19.0.8_1784648602127_0.8952724548240079",
+        "host": "s3://npm-registry-packages-npm-production"
+      }
+    },
+    "19.3.0-canary-1724e9ce-20260729": {
+      "name": "react",
+      "version": "19.3.0-canary-1724e9ce-20260729",
+      "keywords": [
+        "react"
+      ],
+      "license": "MIT",
+      "_id": "react@19.3.0-canary-1724e9ce-20260729",
+      "maintainers": [
+        {
+          "name": "fb",
+          "email": "opensource+npm@fb.com"
+        },
+        {
+          "name": "react-bot",
+          "email": "react-core@meta.com"
+        }
+      ],
+      "homepage": "https://react.dev/",
+      "bugs": {
+        "url": "https://github.com/react/react/issues"
+      },
+      "dist": {
+        "shasum": "9e47b3f9b997cf964fced8c6db4c1b76b0eb4ef5",
+        "tarball": "https://registry.npmjs.org/react/-/react-19.3.0-canary-1724e9ce-20260729.tgz",
+        "fileCount": 27,
+        "integrity": "sha512-SwJY0JEcTkqnHQfJVvZNQ4QNQ5i6t141K2EHdGm87eZt7MshmCl+EIFZokDBH/1bqPrK+5oB3gF+BtR2/rWgcQ==",
+        "signatures": [
+          {
+            "sig": "MEUCIQCHW6bznZdhFxg89vEbYNKqIO0vike5/q4dr0uct0QH8QIgDh0b8RLsL9137pplmnzuXdpIB5cygpycmH0UXdhGRGg=",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          },
+          {
+            "sig": "MEQCIBpHbASaAT/rUZF6DkMm4MGH8LVhvCSNSDVXzn3th7N6AiBZHWcr3U6I/VtNvGNAjem0KPs1WcKqd+bEKGhvjH164A==",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          }
+        ],
+        "attestations": {
+          "url": "https://registry.npmjs.org/-/npm/v1/attestations/react@19.3.0-canary-1724e9ce-20260729",
+          "provenance": {
+            "predicateType": "https://slsa.dev/provenance/v1"
+          }
+        },
+        "unpackedSize": 178788
+      },
+      "main": "index.js",
+      "engines": {
+        "node": ">=0.10.0"
+      },
+      "exports": {
+        ".": {
+          "default": "./index.js",
+          "react-server": "./react.react-server.js"
+        },
+        "./jsx-runtime": {
+          "default": "./jsx-runtime.js",
+          "react-server": "./jsx-runtime.react-server.js"
+        },
+        "./package.json": "./package.json",
+        "./jsx-dev-runtime": {
+          "default": "./jsx-dev-runtime.js",
+          "react-server": "./jsx-dev-runtime.react-server.js"
+        },
+        "./compiler-runtime": {
+          "default": "./compiler-runtime.js",
+          "react-server": "./compiler-runtime.js"
+        }
+      },
+      "gitHead": "1724e9ce0aa1db99bcbe2633304b6a0fee2e4e1e",
+      "_npmUser": {
+        "name": "GitHub Actions",
+        "email": "npm-oidc-no-reply@github.com",
+        "trustedPublisher": {
+          "id": "github",
+          "oidcConfigId": "oidc:19f8086e-9f33-439e-8cce-d73997f53038"
+        }
+      },
+      "repository": {
+        "url": "git+https://github.com/react/react.git",
+        "type": "git",
+        "directory": "packages/react"
+      },
+      "_npmVersion": "11.16.0",
+      "description": "React is a JavaScript library for building user interfaces.",
+      "directories": {},
+      "_nodeVersion": "24.18.0",
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "_npmOperationalInternal": {
+        "tmp": "tmp/react_19.3.0-canary-1724e9ce-20260729_1785350914669_0.03998326352893611",
+        "host": "s3://npm-registry-packages-npm-production"
+      }
+    },
+    "0.0.0-experimental-1724e9ce-20260729": {
+      "_id": "react@0.0.0-experimental-1724e9ce-20260729",
+      "bugs": {
+        "url": "https://github.com/react/react/issues"
+      },
+      "dist": {
+        "shasum": "7af3753e6e23a1336b2f42b0d0cc982f265ca763",
+        "tarball": "https://registry.npmjs.org/react/-/react-0.0.0-experimental-1724e9ce-20260729.tgz",
+        "fileCount": 27,
+        "integrity": "sha512-mcOvx0GuqQ2Sr8ySjKraFmLjS0tOCGcI9GAGwsgpg8hloLX9QmRTAmjRjs8SMwPfPFotcS8EBFWRRGS90maXhQ==",
+        "signatures": [
+          {
+            "sig": "MEYCIQCO6W74jKs8VOFf0aBJ/ZLQ1OA4u98LuGNwsX7rQAXDZgIhANvEfmzW2JEwW9B62tGtXFtTwVXVW0JIfcZpgWEu+UPE",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          },
+          {
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "sig": "MEUCIQClPgRC15kdZNB8GVlGye7CVHH8chD0MfC7Ui0sWcYZzAIgc+0v8dkSh4xBh9+pu8XNgf+QXvif3KjBkcV/z/Nn9C0="
+          }
+        ],
+        "attestations": {
+          "url": "https://registry.npmjs.org/-/npm/v1/attestations/react@0.0.0-experimental-1724e9ce-20260729",
+          "provenance": {
+            "predicateType": "https://slsa.dev/provenance/v1"
+          }
+        },
+        "unpackedSize": 198380
+      },
+      "main": "index.js",
+      "name": "react",
+      "engines": {
+        "node": ">=0.10.0"
+      },
+      "exports": {
+        ".": {
+          "default": "./index.js",
+          "react-server": "./react.react-server.js"
+        },
+        "./jsx-runtime": {
+          "default": "./jsx-runtime.js",
+          "react-server": "./jsx-runtime.react-server.js"
+        },
+        "./package.json": "./package.json",
+        "./jsx-dev-runtime": {
+          "default": "./jsx-dev-runtime.js",
+          "react-server": "./jsx-dev-runtime.react-server.js"
+        },
+        "./compiler-runtime": {
+          "default": "./compiler-runtime.js",
+          "react-server": "./compiler-runtime.js"
+        }
+      },
+      "gitHead": "1724e9ce0aa1db99bcbe2633304b6a0fee2e4e1e",
+      "license": "MIT",
+      "version": "0.0.0-experimental-1724e9ce-20260729",
+      "_npmUser": {
+        "name": "GitHub Actions",
+        "email": "npm-oidc-no-reply@github.com",
+        "trustedPublisher": {
+          "id": "github",
+          "oidcConfigId": "oidc:19f8086e-9f33-439e-8cce-d73997f53038"
+        }
+      },
+      "homepage": "https://react.dev/",
+      "keywords": [
+        "react"
+      ],
+      "repository": {
+        "url": "git+https://github.com/react/react.git",
+        "type": "git",
+        "directory": "packages/react"
+      },
+      "_npmVersion": "11.16.0",
+      "description": "React is a JavaScript library for building user interfaces.",
+      "directories": {},
+      "maintainers": [
+        {
+          "name": "fb",
+          "email": "opensource+npm@fb.com"
+        },
+        {
+          "name": "react-bot",
+          "email": "react-core@meta.com"
+        }
+      ],
+      "_nodeVersion": "24.18.0",
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "_npmOperationalInternal": {
+        "host": "s3://npm-registry-packages-npm-production",
+        "tmp": "tmp/react_0.0.0-experimental-1724e9ce-20260729_1785351058180_0.6756228160377713"
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@scope/package",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "@scope/package",
+      "version": "1.0.0",
+      "description": "Scoped package example",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/@scope/package/-/package-1.0.0.tgz",
+        "shasum": "0123456789abcdef0123456789abcdef01234567"
+      }
+    }
+  }
+}

@@ -1,0 +1,2247 @@
+{
+  "name": "@angular/core",
+  "dist-tags": {
+    "v4-lts": "4.4.7",
+    "v5-lts": "5.2.11",
+    "v6-lts": "6.1.10",
+    "v7-lts": "7.2.15",
+    "v8-lts": "8.2.14",
+    "v9-lts": "9.1.13",
+    "v10-lts": "10.2.5",
+    "v11-lts": "11.2.14",
+    "v12-lts": "12.2.17",
+    "v14-lts": "14.3.0",
+    "v13-lts": "13.4.0",
+    "v15-lts": "15.2.10",
+    "v16-lts": "16.2.12",
+    "v17-lts": "17.3.12",
+    "v18-lts": "18.2.14",
+    "v19-lts": "19.2.25",
+    "next": "22.2.0-next.0",
+    "v20-lts": "20.3.27",
+    "latest": "22.1.0",
+    "v21-lts": "21.2.19"
+  },
+  "versions": {
+    "4.4.7": {
+      "name": "@angular/core",
+      "version": "4.4.7",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@4.4.7",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "18bdc17bec7bdccb6424402fc90550e15a6d221b",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-4.4.7.tgz",
+        "fileCount": 135,
+        "integrity": "sha512-Jxs6gNTl5KjXflg5vi5rlnokq1johFccN94qSOgDv+Mg1iuGF2i9p7EHkw3Y8jBCVaSLw1qgHE+wMb6KTlJDLA==",
+        "signatures": [
+          {
+            "sig": "MEQCIHB7nWg88BRf/ahU6oowSRpgwPefAUhxW9UeESZ7E+noAiAPewu5w61FVROlmryBvEXvq5nqzB0gf+XP29iNVkfL8w==",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 5398397,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJa1GbaCRA9TVsSAnZWagAAVuQP/0h0RJ5MSD8TZ0k0m0ch\nAag83GNRTeodAUu/p9jpFwXca58P83k1qbJrmft78fZyXYVSvr6ecmSOQ1Ys\nQu+V86pTmhIbDQumxOBsTwxnt3CY8o07Q+8Bq9pxZ8//DmsqvUDAyAvsOTY8\nAA9yj80NsCyCx/Mh3EpQRrH1i8dqLvtttu/TAxDxvvz9hryFt370iRXJDTNd\ndEu+UIUbqKOey6+U9mI+7H/PPzA86M9kHTeTNJmtGjQOYPzzuwziD7/AZP/P\nPrMWysGtkNvPZVzpSP6SFwIGQJzmXEattzUWX6UzdiHve7aiD0ytnJI6Slk8\nzh+KmHObshuOI/hLw7+y1mfl0yOEWfHGq0qeo59O8k6FY8iaVzn2S/nbzTj9\nYXJLyqKqA3ajyNNfYnJDqg+zCOp9zGoRtJAkejRr/BuYB4pXzKkry3FLO7qf\nomkU/zl97mFXrtYVEUGcrtSoEcko8+FBwgyE1YgrSfaiY7IQAr8OB+cJEVS1\nd8q0Qo4Q2rbaPqerAMwGGSV8S3GaY9bG/4cKFSQTkJCCulxrmkLk3mE7yyhN\nKeGUCxWNlbwoRtGRWqa+nloHZAcL2q4zBIaGsB5h4X4Wm8InkQOL4dadYpBn\n58XRXSE+i4nXK+ULMZ7FTgIZb/57tyJTnJlDVeF/4AMODyxUclve+2f2V5Os\npJV4\r\n=+X6U\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "main": "./bundles/core.umd.js",
+      "es2015": "./@angular/core.js",
+      "module": "./@angular/core.es5.js",
+      "typings": "./core.d.ts",
+      "_npmUser": {
+        "name": "angular",
+        "email": "devops+npm@angular.io"
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git"
+      },
+      "_npmVersion": "5.8.0",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "_nodeVersion": "8.9.4",
+      "dependencies": {
+        "tslib": "^1.7.1"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^5.0.1",
+        "zone.js": "^0.8.4"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_4.4.7_1523869402320_0.6206814108270144",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "5.2.11": {
+      "name": "@angular/core",
+      "version": "5.2.11",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@5.2.11",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "0e38fdf4fa038a3c168c72952682f2ee3721f1a3",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-5.2.11.tgz",
+        "fileCount": 144,
+        "integrity": "sha512-h2vpvXNAdOqKzbVaZcHnHGMT5A8uDnizk6FgGq6SPyw9s3d+/VxZ9LJaPjUk3g2lICA7og1tUel+2YfF971MlQ==",
+        "signatures": [
+          {
+            "sig": "MEQCICEygkoeE7glQE5J1cNiloTVtLpIeyR5jeBzRiJ8iC1KAiB05zUnuf4D5YwuNMPJ9h2HnilMiO+oHOhoXpSVC1BsjQ==",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 7233896,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJa/Ki2CRA9TVsSAnZWagAAEZQP/09PGfmgOnOH6ByjlMLJ\n3cXoWkdTkxEdCzUD3JQZmlS2UOPBOaccVwcs9FORwnIQC3Bx9q/lbxslnCJf\nx/jBMSFzN0JMNn/hALfXb0JhztvFuhIVWnyRrg7gEitc9JLVY5VJMCnUe2rA\n+iVjCAiUjLgLqIoGY+HivCLVCARiBpNRJXxQ7eAN9ZdfXkpW5nHGzMCsGHeX\n+QBzMsFKfDDgKmYsFsaDcXtdx3Ce7aSHodYRjmdSOb+ihiGNDFi93iF6oo5D\nhpc40D6GXvOhXFVQV/rM/fqQBBuvxfCDsx09JQz9llxubcIO0dQtXhYEkNeb\n3IgmT+ZsAI17DRLwoai0hVrdM55HZ7nDel9lSMoVnpKITlYC1tz+aql0vl8F\nJQIYFWZitK8/xMKJ8VBF30LffxbSP4L3AMhAsR92LWTPoaSq98mwbNgkH31N\nfToPwj4CbEnDZcs6/nc1nLOeAwqyvcftfNgMncJJ04El6pqMmvRZMAwJNvRv\nmXF8Ak9l1EU+a00jHwY/vPItKqfUD1c+s/T5YUo0Txq77cz53XVbXZfKh40E\nkLKo1RgOImOa8C9xPtQ2gCZklnkdLpY6sRd6I+kZ/56ucF0hLmXO7+bhaMgd\n1QkTyeM0Qr7QRwAdrZpSGIEET63nsOuJE9VWgCvs5sryjQU4DOH8oDgx9Vtz\nzgRM\r\n=gync\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "main": "./bundles/core.umd.js",
+      "es2015": "./esm2015/core.js",
+      "module": "./esm5/core.js",
+      "typings": "./core.d.ts",
+      "_npmUser": {
+        "name": "angular",
+        "email": "devops+npm@angular.io"
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git"
+      },
+      "_npmVersion": "5.5.1",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "_nodeVersion": "8.9.2",
+      "dependencies": {
+        "tslib": "^1.7.1"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^5.5.0",
+        "zone.js": "^0.8.4"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_5.2.11_1526507701454_0.7729964874694726",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "6.1.10": {
+      "name": "@angular/core",
+      "version": "6.1.10",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@6.1.10",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "9f3d8b7e44ec0a68c88745d25a920f98bfb2bc43",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-6.1.10.tgz",
+        "fileCount": 527,
+        "integrity": "sha512-61l3rIQTVdT45eOf6/fBJIeVmV10mcrxqS4N/1OWkuDT29YSJTZSxGcv8QjAyyutuhcqWWpO6gVRkN07rWmkPg==",
+        "signatures": [
+          {
+            "sig": "MEUCIQDUVeK/RumcYTUFelcgNaVTmXIbuCSAQxoHIS2+n6mATQIgSkI2kZxoQ/Hw09CXZA+jUh7FoQX0tssa9ZCIuw/czQk=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 15491940,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJbvkgpCRA9TVsSAnZWagAARAwP/j4r1fOoY1T0TKNalofc\nbZcAiPYPhUZMexBfu4PhgftLTzraXuPGWbQoKc/zRe51dm7BJZQY5hp+yzwF\n0lcpSjl9VnNI0IIK0LhA13ZU2W+hxp4pxr1ND+oWYNIQxTd9OcXMVrWgbA8c\nkAZUYNFyXRmggVFIXqFe7zud2YaYibyvDZyGoriHs2BabxMgr07n4jSRg+vU\nYzVbFhef+36wA0MYFbL7w06J527jPjF39DwUuIaIJuxzhlDm+lsYcdEuOmpC\nglUjn/WtHScYDndX+jq1dPVFoFJtDfSbKg/P1GzUKLfIailwBYQcbUaev7dR\nnXgeQyQ3lCfbmFMT5dXPJNy364QyNOHDROQCPaRD3i6XSgn2qBh35iT9BU3A\n7Az4UHF62AtNExB688iTFZ1GrJxwrhxL+MiFs6jKKxyqigQjMN+Yrc/at36y\njhDspaRGNX004fd8pxW+SBkaMSS7MfiSVwYLAv/hfM+eNVJ8daL+gfel51Iq\nfsLrBox4zxoJ+VHrVr+dT8j1U03zhjhd6pADQqaMbsgDp0J3VqLphFJ3lWRF\n+Hn05R6koPqfaikwu+N6kg2N9J3yxuxYC9+Dagj+1IGk8TmQZjUVXABPbvMD\neCOd5TG67Vy3AiEFRbMcuLK9KbMeYAQrZ7KPNgjfpRl2KKAheBMaBGLt72/2\n6jCr\r\n=sjNl\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "esm5": "./esm5/core.js",
+      "main": "./bundles/core.umd.js",
+      "fesm5": "./fesm5/core.js",
+      "es2015": "./fesm2015/core.js",
+      "module": "./fesm5/core.js",
+      "esm2015": "./esm2015/core.js",
+      "typings": "./core.d.ts",
+      "_npmUser": {
+        "name": "angular",
+        "email": "devops+npm@angular.io"
+      },
+      "fesm2015": "./fesm2015/core.js",
+      "ng-update": {
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/http",
+          "@angular/platform-server",
+          "@angular/platform-webworker",
+          "@angular/platform-webworker-dynamic",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git"
+      },
+      "_npmVersion": "6.2.0",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "10.9.0",
+      "dependencies": {
+        "tslib": "^1.9.0"
+      },
+      "_hasShrinkwrap": false,
+      "peerDependencies": {
+        "rxjs": "^6.0.0",
+        "zone.js": "~0.8.26"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_6.1.10_1539196969122_0.4275534077685652",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "7.2.15": {
+      "name": "@angular/core",
+      "version": "7.2.15",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@7.2.15",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "c00d4be0ebe95b70f7631154169509cc97934e9a",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-7.2.15.tgz",
+        "fileCount": 611,
+        "integrity": "sha512-XsuYm0jEU/mOqwDOk2utThv8J9kESkAerfuCHClE9rB2TtHUOGCfekF7lJWqjjypu6/J9ygoPFo7hdAE058ZGg==",
+        "signatures": [
+          {
+            "sig": "MEYCIQCqBXXp6+QK/WGxQVNGAi38MiBR6MStFBQToK4bfHjFxgIhAND8quWmuABDEAM9lvYZKDypnhvISd/EXlBwvoADOhk1",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 20728232,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJc0fVECRA9TVsSAnZWagAAy9wQAIhC0rqE5IUcbRVVPsIJ\ncQvdRurUolS/nPou6eGyzTNGPWUt4kzJqCxSR2wwa2OZgm2u/aZ4YBJyp8/e\n4s0lXYiA+EQvaQjt0fzK0dq90xI6bhXw/8TRjIVrc7XS1EkcnZkM46UMXeal\nogc/iNoDV1QKzRRKJethumvfrRx58mvPBfT75n2b+u8v2+akx4AtqN978lqI\nKKQaVluNWqoOviYi5R4GoO80zVTdL8nOh5lgjUQblJ2hwrulZ/H5c1xfFyn1\nzGln2htMLXD82keU8YAEiK2oQJSx8uv9n9dkA5YxodYJnsivZrhCCx2jrae2\nL8Jw+Na9ffx1mhvdWrK3+pt3iA0+NUp9tPSGW8u77lymO8c9pTWreQv4Cg6b\nvvAdZDiWxy1I/rcxSyh0X9qylfgLiy+IXLV4ctfxRNizSkyFVCvEHM2Wqla6\n+NT32AF2ol2JlDUfYhlW6sZgJyaWCYUATawh1HhYMBm1ZpnzWbvccl5nnnfI\nQCeNbTV1BX7wiQ5OoF/xtjJAWIjg5XQhQardDPx+x2yn++RKk9kCwbkVYLme\n4PfSXQnoxO/X1tjonDju3x7Hti6wayBRyqfwzJC1EqEeV1FPG5i0aULZbEEx\ngP4T+1TC2rYeVRSNX+N0lvkBRfGJoOaUWwFVadsdjzc5982of4GEMZOa9qSo\n8jbs\r\n=iwkV\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "esm5": "./esm5/core.js",
+      "main": "./bundles/core.umd.js",
+      "fesm5": "./fesm5/core.js",
+      "es2015": "./fesm2015/core.js",
+      "module": "./fesm5/core.js",
+      "esm2015": "./esm2015/core.js",
+      "typings": "./core.d.ts",
+      "_npmUser": {
+        "name": "angular",
+        "email": "devops+npm@angular.io"
+      },
+      "fesm2015": "./fesm2015/core.js",
+      "ng-update": {
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/http",
+          "@angular/platform-server",
+          "@angular/platform-webworker",
+          "@angular/platform-webworker-dynamic",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git"
+      },
+      "_npmVersion": "6.2.0",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "10.9.0",
+      "dependencies": {
+        "tslib": "^1.9.0"
+      },
+      "_hasShrinkwrap": false,
+      "peerDependencies": {
+        "rxjs": "^6.0.0",
+        "zone.js": "~0.8.26"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_7.2.15_1557263683770_0.7539921855295397",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "8.2.14": {
+      "name": "@angular/core",
+      "version": "8.2.14",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@8.2.14",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "35566f5b19480369229477e7e0e0fde740bd5204",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-8.2.14.tgz",
+        "fileCount": 614,
+        "integrity": "sha512-zeePkigi+hPh3rN7yoNENG/YUBUsIvUXdxx+AZq+QPaFeKEA2FBSrKn36ojHFrdJUjKzl0lPMEiGC2b6a6bo6g==",
+        "signatures": [
+          {
+            "sig": "MEUCIE4LIN3n+Tx69Sm4xSatFjGDvh303jl6Onc+Cyey20VhAiEAzq2luVHsvChNwvwqALuBFXR1+VGifaXNwLI3dgHFYpM=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 25931453,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.4\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJdzGnOCRA9TVsSAnZWagAAlm0P/RuyAWTfIW9Bi3ZttZ00\n9qFM4iJd9MTGqbKstxkyOHwUGgkIM/5eQ9qxfjpeWx6BQzPOPkfHjczgcYUk\ntwxgG/Lgo7qr2FSmwjtAbIG09pbvkvmmwZO0MzaL7CqsWacP+MONQOIEo2DA\nLxfQ+3e+F33Oqw8fliet11YAk2gWeXf2rq0qfs9JaRGTPDwgHqN9D+KcxnAz\nsTQx7weK1qkp67QHLG8DPPWjh0bYkjpA53veMHfY6Sjlg37C7NzSxr65bgdM\nVfg+PjTXWajjxizowh992xLAfVGfi3CzFqCHLbMHhfyWm1/oUwd8EpEHznbv\nOVAwhf4G3W2KJYn2DP69Dy73iNSzxS5qL32e/x7FEmCkpXGD3DEoWq/8TtHd\nb/9kC+ukzOGZFlfoRYHYaJptQAxkZo2Lhzg6xlWKZxdgufaLMuaER7D+NFau\njH3/xWsxwyW4zo7nuwwYQCmsFZfMqLtABRL4x8lROn4wp06juzy5Ida6Lzau\n2bEFmTT5N9Ld2Hya0NpU9HFR2huLS2TM97qt/eS3AQv5eUWYQZwMeeOMnBTZ\ngQU5JjnhXcI1N2z6aphyJfkIMuPaYVF0AnFNt8+JOz3YDdDCxFae+UTPCewx\n7avJaWkp/4Jv/D23MxuD6wVOVc9c1p7nGcNeS4CsaZUi4bsaW+OgqBfqIjVw\n2MNE\r\n=LOss\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "esm5": "./esm5/core.js",
+      "main": "./bundles/core.umd.js",
+      "fesm5": "./fesm5/core.js",
+      "es2015": "./fesm2015/core.js",
+      "module": "./fesm5/core.js",
+      "esm2015": "./esm2015/core.js",
+      "typings": "./core.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "fesm2015": "./fesm2015/core.js",
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/platform-webworker",
+          "@angular/platform-webworker-dynamic",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git"
+      },
+      "_npmVersion": "6.9.0",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "10.16.0",
+      "dependencies": {
+        "tslib": "^1.9.0"
+      },
+      "publishConfig": {
+        "registry": "https://wombat-dressing-room.appspot.com"
+      },
+      "_hasShrinkwrap": false,
+      "peerDependencies": {
+        "rxjs": "^6.4.0",
+        "zone.js": "~0.9.1"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_8.2.14_1573677517257_0.9232639484278251",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "9.1.13": {
+      "name": "@angular/core",
+      "version": "9.1.13",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@9.1.13",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "a87bc5a7926a50aec0bfcead769078bc7f1b93fa",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-9.1.13.tgz",
+        "fileCount": 682,
+        "integrity": "sha512-mBm24Q9GjkAsxMAzqQ86U1078+yTEpr0+syMEruUtJ0HUH6Fzn3J+6xTLb+BVcGb9RkCkFaV9T5mcn6ZM0f++g==",
+        "signatures": [
+          {
+            "sig": "MEUCID2r9MeCqYBKk/PeIenqXT4ir9m1SExVWeaJzzrZOgQIAiEA6qYqGNsfSc3ObnT8z5XZcZZSP4X/HSw4EDvJxr/oQTA=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 28017826,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.13\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJf2qZ0CRA9TVsSAnZWagAAxycP/2LkZGJK1JxQ9F6/2f7j\nDqmnIN3/lWbgr8FqJoeIrom2lNowfGnpaoU4Rk+OQiL59c1D2O0KSBtTerGg\nRwcTLcpBluQy/vm4tJAbtdz8LC19cRF1mFqDm26C/fPj94+pus1f8ZhqeUxn\nW5tS00B33HCXaTPupG1dkuezmTcEjoDhB1gKv6p4i6FBle2XrMcEUGsHDW+a\nkZS6h4qVyHJ/NFi3nrHyUfsE2nSNZulreWDiL5qsjfaLxRXDkPZMSV/0hhqx\nmmqMOydxJ+y/kkwuqzTtItP+5j6Olz5Rw3yzSXb0k8m4RM1dD6uf/t24DtXP\nxp0Nh+TbpI1VJftoQ62H4aIIBXAkj2JUQS10OOqjwGgV3rMISukx0bnMrjAe\nrWZrMyO26sLGwDpHkt+2uDQLKcNATJGWJRCphJB/s2HJkiI66Iol9O6FICTw\n7cj8Tp8RtIRJZQRGelq6VJw12O0+zC+XA3DudFJ5BA+ElZbCQ09RbhOUvwnB\nMSHUHLkdGEYGaCQphbtukxO+5mTvemoP43o4F2q7f8oHHSdJPplWz5jhiaYa\nqxFG+Oto6nhGGFMjlAVuCvpWBOUS7ZecUOj7/8ExZ5MeI4XATzvxsYQa+Ofb\nOhreFhmMYbbJA8cG6gnN86mfa2oTmJUNf7ZfVX7XQSXRdYejCvP4MQ71Y3sC\n/qi8\r\n=VL/8\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "esm5": "./esm5/core.js",
+      "main": "./bundles/core.umd.js",
+      "fesm5": "./fesm5/core.js",
+      "es2015": "./fesm2015/core.js",
+      "module": "./fesm5/core.js",
+      "esm2015": "./esm2015/core.js",
+      "typings": "./core.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "fesm2015": "./fesm2015/core.js",
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/platform-webworker",
+          "@angular/platform-webworker-dynamic",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "_npmVersion": "6.13.4",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "12.14.1",
+      "publishConfig": {
+        "registry": "https://wombat-dressing-room.appspot.com"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3",
+        "tslib": "^1.10.0",
+        "zone.js": "~0.10.3"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_9.1.13_1608164979692_0.5412813920209223",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "10.2.5": {
+      "name": "@angular/core",
+      "version": "10.2.5",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@10.2.5",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "2050b0dbb180aa98c2ec46bba6d4827565ba2a2d",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-10.2.5.tgz",
+        "fileCount": 419,
+        "integrity": "sha512-krhOKNTj5XE92Rk9ASX5KmgTF72j7qT2PLVxrGEVjuUKjBY2XaK3TV0Kotq9zI3qa9WgeCrP/Njn6jlKQCCAEQ==",
+        "signatures": [
+          {
+            "sig": "MEUCIQC3ZwH56teFlpmdCd1t45hi130sRDvBxSzcLM3iotyQxwIgQhAwFF25lupf6UUKvYX4G6UbwSJsupxm0vtUZ9FciWA=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 17767956,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.13\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJgd2AhCRA9TVsSAnZWagAAs58P/RAHcRP/ZKxtYWec2IM4\nUJCvlV9BEm2g6nawGV+v+vIz1w2CxJ9UhemZPzh3ftW88yvI4mdNL64GnSWc\nhXar1keubKpiXgeQVxuAx+1g+Vn4NUk5TytI/h0jZnIrKFGGJVwfDhe4VEFH\nb6IkpMcQPelQDNs7OS1/4K9r9CBt06kJy2F15lSx1gEYvHqB+SteVwx1clgO\nMIzw8sdnJglEPiZZQwAyNW82uctA7nYk04ToFp3vVyYjZfqHCgb2c+ddLGWq\nI7kMlqqAoL26yBqHcfImRw5N5FusPAgIgMvel8fnu9bRHueYhHUj3HAQAX1Z\nWOksOhptxwCiFYIYLl7zFezs5vmWbjuri5f7MUghMa9KugOvHQIsUkNR0kbF\nGS4e5lFrioM/bsvi0xSBahV4EUd55jFk+ZRPawV7MCeMmN7yjdV7AVFyxeaS\nWEPkZjEma6xYKxqzByK3zWjf0O7BxG6Kq8jdAbA7iOPK34BzKg4t7o7QXmkT\nzmhWHA+V9UVFZ7NB062ZFm1NDAphX4Wmbu8uWOVmpOd7VF4smhzVWRdaaMtd\ngmFN1CEDFWzASrL10dJn5L2W+gwn0w3CP1hu6rrFq63vpjERQDU53xBkNQv1\nExhB0XHInbKmFVEraZh/T7Rc9KeWuJgm2H5+3U8DI3mo35eF6AeiM4JGPwA+\nUkSh\r\n=Pcbf\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "main": "./bundles/core.umd.js",
+      "es2015": "./fesm2015/core.js",
+      "module": "./fesm2015/core.js",
+      "esm2015": "./esm2015/core.js",
+      "typings": "./core.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "fesm2015": "./fesm2015/core.js",
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/platform-webworker",
+          "@angular/platform-webworker-dynamic",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "_npmVersion": "6.13.4",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "12.14.1",
+      "dependencies": {
+        "tslib": "^2.0.0"
+      },
+      "publishConfig": {
+        "registry": "https://wombat-dressing-room.appspot.com"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3",
+        "zone.js": "~0.10.3"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_10.2.5_1618436129075_0.8522666487505994",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "11.2.14": {
+      "name": "@angular/core",
+      "version": "11.2.14",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@11.2.14",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "3ebe298c79d5413dc670d56b7f503bd4d788d4a8",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-11.2.14.tgz",
+        "fileCount": 485,
+        "integrity": "sha512-vpR4XqBGitk1Faph37CSpemwIYTmJ3pdIVNoHKP6jLonpWu+0azkchf0f7oD8/2ivj2F81opcIw0tcsy/D/5Vg==",
+        "signatures": [
+          {
+            "sig": "MEUCIB9WTebEOX0zVmy8rk5L3rRDMyiAaA5zaVKOQ08wc+a3AiEAskpDFKlJt/ta1ZOyiI/B4WfYWYpGcFi1sRnlmQ0pW3U=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 18503875,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v3.0.13\r\nComment: https://openpgpjs.org\r\n\r\nwsFcBAEBCAAQBQJgnEXTCRA9TVsSAnZWagAArF0P/0RFph/ft5AItyLDFEAV\n15+/AqGikG6gc1O4vN9fGgkYGKarn2kv3e6KfqgVZV1VNYPETlzGQD91h8m4\nPUPECPZ/sOac7pQV7u4YC9+KJpyxDBWoSZyoV8uGxdlYJXt2cAwE7vbFgog/\nddYB4Z2nTpnHLsThj1/4k2V9MxbawHWlbXzpzjbsEs8hBstBabYycUVsq4EO\naWxmTTTczojgTZJhT4U5Bia6+39WDAxUF0lv0GmS0N5BmiI+LoNohB6Pw8uz\nYFED5QecQC3xdQZg/ldjkOuEfz6fiRP5Vc+dWFMHnPGUoGRCYjB9rF0Pzrl/\n6bgYqIvC2gOcSenOi7yRI3fp54nXreM93UwzPyGuLKnU9190uu6o66Q/7Kjw\nelnh9tHdJHTujnLoW/XPL6/s+ja13ZjigrbV8ZiHlPgSuOPFNFnxxg7Gsjq2\nVpBto8ej0AVmJFTWukl65A4vSLaFACU6KcuTVYHf9vz3tQHTbGRpojKELmYI\nnJ0bXgwucWsUnNWmz0OrYnZpcy041EFPnWGF5oFOpcb5//b8jSKUbIgC/a6e\nhfkJO+TaXV8ZsvOzd5pmd08TCj8RGM+9bRHmWpX6SViyhUFWhBZKtT/MBUdE\n+MTfqh91f61XUFjnD1Iiq1cGb+tS8NGo4wFyn1Pb9SUEcJGZF1jW4p3L3lut\n3xjX\r\n=WQ+E\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "main": "./bundles/core.umd.js",
+      "es2015": "./fesm2015/core.js",
+      "module": "./fesm2015/core.js",
+      "esm2015": "./esm2015/core.js",
+      "typings": "./core.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "fesm2015": "./fesm2015/core.js",
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "_npmVersion": "6.14.12",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "14.16.1",
+      "dependencies": {
+        "tslib": "^2.0.0"
+      },
+      "publishConfig": {
+        "registry": "https://wombat-dressing-room.appspot.com"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3",
+        "zone.js": "^0.10.2 || ^0.11.3"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_11.2.14_1620854227435_0.7292395988533276",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "12.2.17": {
+      "name": "@angular/core",
+      "version": "12.2.17",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@12.2.17",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "15c70a46de66f3d9500b2dc8e233f30328e83ad0",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-12.2.17.tgz",
+        "fileCount": 492,
+        "integrity": "sha512-XUvTgU0D8XqNH5Y7UlTMk/XjUQaEGC0kZxhw/QSSQr65WrXtXmcD4d8Cg84TJ52uGXmf7IAruKvtbvu1Mbmvug==",
+        "signatures": [
+          {
+            "sig": "MEUCIGqeFCvkA59BDMDTklGWl4qc7GdJckCefAymCBPdE0yfAiEAhEBSIdVCykKpedykFkgosWTplKzNRhttzwExogLiwCE=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 16205076,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJjfQg5ACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2Vmp3Iw/+K8lp1HFeQVvrd4hzS92x2lazBIA4EepAd45ZR6TaLpZXShcl\r\nvVl1ITBhSd8IujuprVxvp6RQjcDcrpfuYwigKae6Pk1KdulVsVvMI5rZpUqw\r\nBxcoNXFemMOYsYWbOSQYnRDpcmQ5XZG4Ohz1KWXNFFM0s4YsXqcF+3aBiym4\r\nfgabwbiPgngy9AJuUf2GF9WrjLJNyJj7nFsN4L9QNwnMGkRnZDGTxt7izKuH\r\neRyQFgeXNaMXl5CBE3y6UiGO373zspRyFSrDqT/eUaf8IVtQJp+r/pQljIwx\r\nx6TYs/YzdT2PHhZP3oo/Z6QzNWS7Vjau3JZcg9cFvQnMbSUyZxNI7u4jf10/\r\nawQMSUjo92qUAs3CelTPa1/2jBuQuksmm0IPn/rjaHlf+gx5rRw2fWM4DyJl\r\n6vX4dcl7T2r3t3hcN195J7wa+tg678n1lbe5wr0v1g8kUhsULZB4LVoSZbba\r\nrSpje242EpQhJGuryz1/dvHs98wcdh6XOJ4F/A6Y74w+yWl9lqpQ0Mjv+M6U\r\nH8OH2ubrpO3vbkKTwp8ghVtBf/oGfjAKAekKfg9c3pWHDTdjOcZC61z6f2Pl\r\nW8YoPnopc/xzsnfFZ+MdTbUzgg0V3gP//yXxu4IyPurS7NWcS/tMJVJEFRjc\r\n2mjPxSjErCIUofr0U1qj2zfIOHh5er+voog=\r\n=zdUK\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "main": "./bundles/core.umd.js",
+      "es2015": "./fesm2015/core.js",
+      "module": "./fesm2015/core.js",
+      "engines": {
+        "node": "^12.14.1 || >=14.0.0"
+      },
+      "esm2015": "./esm2015/core.js",
+      "typings": "./core.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "fesm2015": "./fesm2015/core.js",
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "_npmVersion": "6.14.12",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "14.16.1",
+      "dependencies": {
+        "tslib": "^2.2.0"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.0.0",
+        "zone.js": "~0.11.4"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_12.2.17_1669138489599_0.42718633325302346",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "14.3.0": {
+      "name": "@angular/core",
+      "version": "14.3.0",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@14.3.0",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "7f44c59b6e866fa4cee7221495040c1ead433895",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-14.3.0.tgz",
+        "fileCount": 334,
+        "integrity": "sha512-wYiwItc0Uyn4FWZ/OAx/Ubp2/WrD3EgUJ476y1XI7yATGPF8n9Ld5iCXT08HOvc4eBcYlDfh90kTXR6/MfhzdQ==",
+        "signatures": [
+          {
+            "sig": "MEUCICccw8aOHk1yv8Jxv2dnMTMhc5hQv8oaWO4onKqiBKHxAiEAn5vPIpNPy5jCwSTTnfeocp0e7wT13OzlgVyy8K1xDoc=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 19051825,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJkDvOJACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2VmrPMhAAkxur4Y07K1u2drlECXI6L/2wPbPsaUDcPPR4Oud8iVdxX4+1\r\njAb48diC5YbA/VRkB1/4xrLyVzGPl9h3lq8gIB30Jkffv3G69UwlF/1BVDca\r\n4vyH0fCjBcoeL3jOi4S/EGp6Fa21gZwPP45DX1ccY1hpJtDIy5qwtMelisPJ\r\nBoOGlLjnQ33DG3r39emy5SqzZKnSFQGMoQe2SswdqYuNixFpOjzxd/0rzEgl\r\ndjQonN0NbifCRDfutDiqjiNAK11QFAlplhy/c0pyh9hLiBjrZBm17qzkpjgI\r\nOGJZF/4OF2VkxDr5WAFMdA09DsmoYnORNastT7VUkHlXD+wkRNbZqi4JUSKk\r\nAq8nq6mDLZNf+PpzHxoPttBny7CwHm19CdpwDsjz1Z+pSIDQ6zkMOx0tiRUP\r\n8ZoiJGkRDQ8MU9F72QCg02XiMOBNcgpTza+x/P6I1Pp3B6L3waq8I+PfFFi+\r\n7bZ4stzw9MCMEiCKmbfYnmu4kGiEMmRHVwRYURyvsg7FTHnINb3TVzhkbrH7\r\noXSGaezxOOxiW4ya5O3EVYf0SYRVpZtx59FtuY3ticavOQUwGbXFOzpmM4Ld\r\nseRYx0RFOZ4HYQ4XEdME+xp/C7x8RX8u0UGOZignvWFS8ah5tIHItvfVl1RW\r\nOB07d2YoPByDO185KqZ4vopeemF4S0CDedk=\r\n=fsgP\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "type": "module",
+      "es2020": "./fesm2020/core.mjs",
+      "module": "./fesm2015/core.mjs",
+      "engines": {
+        "node": "^14.15.0 || >=16.10.0"
+      },
+      "esm2020": "./esm2020/core.mjs",
+      "exports": {
+        ".": {
+          "node": "./fesm2015/core.mjs",
+          "types": "./index.d.ts",
+          "es2015": "./fesm2015/core.mjs",
+          "es2020": "./fesm2020/core.mjs",
+          "default": "./fesm2020/core.mjs",
+          "esm2020": "./esm2020/core.mjs"
+        },
+        "./testing": {
+          "node": "./fesm2015/testing.mjs",
+          "types": "./testing/index.d.ts",
+          "es2015": "./fesm2015/testing.mjs",
+          "es2020": "./fesm2020/testing.mjs",
+          "default": "./fesm2020/testing.mjs",
+          "esm2020": "./esm2020/testing/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        }
+      },
+      "gitHead": "aad7aee49ef7a92319307a55ee070ceb12263b86",
+      "typings": "./index.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "fesm2015": "./fesm2015/core.mjs",
+      "fesm2020": "./fesm2020/core.mjs",
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "_npmVersion": "8.19.2",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "16.14.2",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.11.4 || ~0.12.0"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_14.3.0_1678701448796_0.34851013995903557",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "13.4.0": {
+      "name": "@angular/core",
+      "version": "13.4.0",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@13.4.0",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "1418e3c2be203dd7d72494dd43279483757eacff",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-13.4.0.tgz",
+        "fileCount": 337,
+        "integrity": "sha512-RE9KL7pRj+3lkJjdSR2uKmqiG0gqjnoVCMbSLG93pWrmzNIhElmlkiDaK39aMHGl836dc68Usv9CEisyVnRqHQ==",
+        "signatures": [
+          {
+            "sig": "MEUCIQCpdzOn9Zg/wf/ZebjmgiOR7T76oPPbwCqZe3IF2W96XgIgN1tCruHTAUI8j4A2BzNkqO4fALRFucMU96qbU57g6J0=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 12775873,
+        "npm-signature": "-----BEGIN PGP SIGNATURE-----\r\nVersion: OpenPGP.js v4.10.10\r\nComment: https://openpgpjs.org\r\n\r\nwsFzBAEBCAAGBQJkLwQxACEJED1NWxICdlZqFiEECWMYAoorWMhJKdjhPU1b\r\nEgJ2VmpdKRAAkmYAtVcKgbQyyZg2nmM0cywmZ3OiWX5S3U6fTMPD8j3OibMj\r\nXY/IIneW4vcpcH0krGjuSJDs6+2sgws8TZm7MXAj5rhWbrBfQca/xOvBTgHh\r\nk9K/8ih/jIvMcCjt/4Y4gSg/T0jJYGLbL6n/QmwOWQD6cG1F3KFCM4Ow1kag\r\n7iEQqHcbt0UUWBKyrKvw+/5qZa/0rMtZ6x5Iti3LUPOHnwVtkGKOUO7B6vwd\r\nt1Gvw+wbbwTekb2ANwtzQTTmBFX7K3c4m6iS92bjdKWK+WcmQuZ9jJrWcZ0J\r\nrLk4WBRtbjHpeKI4aYSoCe70sycSFKC0VMW0OKwy9WmYjyrjD78f9V5LQ10N\r\nZlEhHJ8hqUhd6c81bfuRVHGvd1VjLnF+LOc6VUE2j7T/GOJBx66adVXSt1FG\r\nML46EKCtmyopp2aYg9kUqfzo21FSqwVFHCms1FNQrFOh8Pmm8gw1wbup39R0\r\ny8nTPtV+Rpru1PszNhJllWdZGYboltHLuTJ7RPjAA3vFIvnZV2HSmqkY59u0\r\n0CDdL8MXxL7fS0AS/9bb95LmQr4n//pIsyj0AW3EjrWQKlBSmRiuYtxBriSi\r\n/5Th+xfJca26NyHBHhv6MYXLTHNSN5CAR0mxtCGfrmA+tHJy6cEPxaZ6DFri\r\n/WtTlv9kKsnOzyxa6lucPVzyZp1xIhuOak8=\r\n=h7Kn\r\n-----END PGP SIGNATURE-----\r\n"
+      },
+      "type": "module",
+      "es2020": "./fesm2020/core.mjs",
+      "module": "./fesm2015/core.mjs",
+      "engines": {
+        "node": "^12.20.0 || ^14.15.0 || >=16.10.0"
+      },
+      "esm2020": "./esm2020/core.mjs",
+      "exports": {
+        ".": {
+          "node": "./fesm2015/core.mjs",
+          "types": "./core.d.ts",
+          "es2015": "./fesm2015/core.mjs",
+          "es2020": "./fesm2020/core.mjs",
+          "default": "./fesm2020/core.mjs",
+          "esm2020": "./esm2020/core.mjs"
+        },
+        "./testing": {
+          "node": "./fesm2015/testing.mjs",
+          "types": "./testing/testing.d.ts",
+          "es2015": "./fesm2015/testing.mjs",
+          "es2020": "./fesm2020/testing.mjs",
+          "default": "./fesm2020/testing.mjs",
+          "esm2020": "./esm2020/testing/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        }
+      },
+      "gitHead": "222c939065d7b608bf8c41c72b1f4d1d1f70da32",
+      "typings": "./core.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "fesm2015": "./fesm2015/core.mjs",
+      "fesm2020": "./fesm2020/core.mjs",
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "_npmVersion": "8.19.2",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "16.18.1",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.11.4"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_13.4.0_1680802865366_0.4270381362596851",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "15.2.10": {
+      "name": "@angular/core",
+      "version": "15.2.10",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@15.2.10",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "93c1e0d460d21711654c578d2709a402e1822023",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-15.2.10.tgz",
+        "fileCount": 285,
+        "integrity": "sha512-meGGidnitQJGDxYd9/LrqYiVlId+vGaLoiLgJdKBz+o2ZO6OmXQGuNw2VBqf17/Cc0/UjzrOY7+kILNFKkk/WQ==",
+        "signatures": [
+          {
+            "sig": "MEYCIQDtGa0VIiKEoRoPXWssuLFbUnX5r54ShcPhDCrCLPXI9QIhAKwXe9Alh7zegdP58/njn2psoOXuZCueA9wkRF+GViYa",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 22968773
+      },
+      "type": "module",
+      "es2020": "./fesm2020/core.mjs",
+      "module": "./fesm2015/core.mjs",
+      "engines": {
+        "node": "^14.20.0 || ^16.13.0 || >=18.10.0"
+      },
+      "esm2020": "./esm2020/core.mjs",
+      "exports": {
+        ".": {
+          "node": "./fesm2015/core.mjs",
+          "types": "./index.d.ts",
+          "es2015": "./fesm2015/core.mjs",
+          "es2020": "./fesm2020/core.mjs",
+          "default": "./fesm2020/core.mjs",
+          "esm2020": "./esm2020/core.mjs"
+        },
+        "./testing": {
+          "node": "./fesm2015/testing.mjs",
+          "types": "./testing/index.d.ts",
+          "es2015": "./fesm2015/testing.mjs",
+          "es2020": "./fesm2020/testing.mjs",
+          "default": "./fesm2020/testing.mjs",
+          "esm2020": "./esm2020/testing/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        }
+      },
+      "gitHead": "62dbb9ace499f2962f81078717a86fcb5f33454c",
+      "typings": "./index.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "fesm2015": "./fesm2015/core.mjs",
+      "fesm2020": "./fesm2020/core.mjs",
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "schematics": "./schematics/collection.json",
+      "_npmVersion": "8.19.3",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "18.13.0",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.11.4 || ~0.12.0 || ~0.13.0"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_15.2.10_1696450780518_0.016499725052213643",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "16.2.12": {
+      "name": "@angular/core",
+      "version": "16.2.12",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@16.2.12",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "f664204275ee5f5eb46bddc0867e7a514731605f",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-16.2.12.tgz",
+        "fileCount": 326,
+        "integrity": "sha512-GLLlDeke/NjroaLYOks0uyzFVo6HyLl7VOm0K1QpLXnYvW63W9Ql/T3yguRZa7tRkOAeFZ3jw+1wnBD4O8MoUA==",
+        "signatures": [
+          {
+            "sig": "MEUCIQCMSjntRbz+bjPVO84mOX6sZjoPS6sz3iZr+MS5W0r0ZAIgGfblHiPihehMDJEfUSQUtMHxb1w8/b3SQR5LGbhw0oU=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 19117005
+      },
+      "type": "module",
+      "module": "./fesm2022/core.mjs",
+      "engines": {
+        "node": "^16.14.0 || >=18.10.0"
+      },
+      "exports": {
+        ".": {
+          "esm": "./esm2022/core.mjs",
+          "types": "./index.d.ts",
+          "default": "./fesm2022/core.mjs",
+          "esm2022": "./esm2022/core.mjs"
+        },
+        "./testing": {
+          "esm": "./esm2022/testing/testing.mjs",
+          "types": "./testing/index.d.ts",
+          "default": "./fesm2022/testing.mjs",
+          "esm2022": "./esm2022/testing/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./rxjs-interop": {
+          "esm": "./esm2022/rxjs-interop/rxjs-interop.mjs",
+          "types": "./rxjs-interop/index.d.ts",
+          "default": "./fesm2022/rxjs-interop.mjs",
+          "esm2022": "./esm2022/rxjs-interop/rxjs-interop.mjs"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        }
+      },
+      "gitHead": "9023c66034b013133bc4f98c2e2ea3f164fc61bc",
+      "typings": "./index.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "schematics": "./schematics/collection.json",
+      "_npmVersion": "8.19.3",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "18.13.0",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.13.0"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_16.2.12_1698961362042_0.5876833753248352",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "17.3.12": {
+      "name": "@angular/core",
+      "version": "17.3.12",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@17.3.12",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "d66ee14071c9f157f68907cff461f235e6eaffe1",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-17.3.12.tgz",
+        "fileCount": 389,
+        "integrity": "sha512-MuFt5yKi161JmauUta4Dh0m8ofwoq6Ino+KoOtkYMBGsSx+A7dSm+DUxxNwdj7+DNyg3LjVGCFgBFnq4g8z06A==",
+        "signatures": [
+          {
+            "sig": "MEUCIQDmeMS+Hoj4qT7T9F/RqOANKUTvPTZI7sdC5knIga048wIgPRSvhcmqvl5tSa+X87aa4itggwhm3nyr0zlTdkCdZaM=",
+            "keyid": "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA"
+          }
+        ],
+        "unpackedSize": 28829091
+      },
+      "type": "module",
+      "module": "./fesm2022/core.mjs",
+      "engines": {
+        "node": "^18.13.0 || >=20.9.0"
+      },
+      "exports": {
+        ".": {
+          "esm": "./esm2022/core.mjs",
+          "types": "./index.d.ts",
+          "default": "./fesm2022/core.mjs",
+          "esm2022": "./esm2022/core.mjs"
+        },
+        "./testing": {
+          "esm": "./esm2022/testing/testing.mjs",
+          "types": "./testing/index.d.ts",
+          "default": "./fesm2022/testing.mjs",
+          "esm2022": "./esm2022/testing/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./rxjs-interop": {
+          "esm": "./esm2022/rxjs-interop/rxjs-interop.mjs",
+          "types": "./rxjs-interop/index.d.ts",
+          "default": "./fesm2022/rxjs-interop.mjs",
+          "esm2022": "./esm2022/rxjs-interop/rxjs-interop.mjs"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        },
+        "./primitives/signals": {
+          "esm": "./esm2022/primitives/signals/index.mjs",
+          "types": "./primitives/signals/index.d.ts",
+          "default": "./fesm2022/primitives/signals.mjs",
+          "esm2022": "./esm2022/primitives/signals/index.mjs"
+        }
+      },
+      "gitHead": "188f2dba21ba88b25efc8df4a600551d7795a1e0",
+      "typings": "./index.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "schematics": "./schematics/collection.json",
+      "_npmVersion": "10.2.4",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "18.19.1",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.14.0"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_17.3.12_1721243228275_0.7503915378678101",
+        "host": "s3://npm-registry-packages"
+      }
+    },
+    "18.2.14": {
+      "name": "@angular/core",
+      "version": "18.2.14",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@18.2.14",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "510a86712a7bdf5dc02becb2ec5f94dc2024138e",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-18.2.14.tgz",
+        "fileCount": 427,
+        "integrity": "sha512-BIPrCs93ZZTY9ym7yfoTgAQ5rs706yoYeAdrgc8kh/bDbM9DawxKlgeKBx2FLt09Y0YQ1bFhKVp0cV4gDEaMxQ==",
+        "signatures": [
+          {
+            "sig": "MEQCIDVmr6kenU3cyPFd83Yz8DJVKzcpwulAr9h9v/CFiNgYAiA5repukiqj8674l/drOvcRToi550mmbxbHzE3JmsiF7A==",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          }
+        ],
+        "unpackedSize": 22096118
+      },
+      "type": "module",
+      "module": "./fesm2022/core.mjs",
+      "engines": {
+        "node": "^18.19.1 || ^20.11.1 || >=22.0.0"
+      },
+      "exports": {
+        ".": {
+          "esm": "./esm2022/core.mjs",
+          "types": "./index.d.ts",
+          "default": "./fesm2022/core.mjs",
+          "esm2022": "./esm2022/core.mjs"
+        },
+        "./testing": {
+          "esm": "./esm2022/testing/testing.mjs",
+          "types": "./testing/index.d.ts",
+          "default": "./fesm2022/testing.mjs",
+          "esm2022": "./esm2022/testing/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./rxjs-interop": {
+          "esm": "./esm2022/rxjs-interop/rxjs-interop.mjs",
+          "types": "./rxjs-interop/index.d.ts",
+          "default": "./fesm2022/rxjs-interop.mjs",
+          "esm2022": "./esm2022/rxjs-interop/rxjs-interop.mjs"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        },
+        "./primitives/signals": {
+          "esm": "./esm2022/primitives/signals/index.mjs",
+          "types": "./primitives/signals/index.d.ts",
+          "default": "./fesm2022/primitives/signals.mjs",
+          "esm2022": "./esm2022/primitives/signals/index.mjs"
+        },
+        "./primitives/event-dispatch": {
+          "esm": "./esm2022/primitives/event-dispatch/index.mjs",
+          "types": "./primitives/event-dispatch/index.d.ts",
+          "default": "./fesm2022/primitives/event-dispatch.mjs",
+          "esm2022": "./esm2022/primitives/event-dispatch/index.mjs"
+        },
+        "./event-dispatch-contract.min.js": {
+          "default": "./event-dispatch-contract.min.js"
+        }
+      },
+      "gitHead": "062b1a1f0ea8b95b58bb722c0f3cad54214291fb",
+      "typings": "./index.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "schematics": "./schematics/collection.json",
+      "_npmVersion": "10.2.4",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "20.11.1",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.14.10"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_18.2.14_1757530109098_0.7226300645796342",
+        "host": "s3://npm-registry-packages-npm-production"
+      }
+    },
+    "19.2.25": {
+      "name": "@angular/core",
+      "version": "19.2.25",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@19.2.25",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "ad68cbd85d195bbcb57dd579d930423ba70c7a1d",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-19.2.25.tgz",
+        "fileCount": 67,
+        "integrity": "sha512-j7/irbbdO4rmZfRXS+sphCerzgcRlpGFwxHc/76Ual+ckwJG0MPsNFkllz2SIEZzE1EZkmIunGrHbjeRBJjyvg==",
+        "signatures": [
+          {
+            "sig": "MEUCIDiAPNVa4xhatYj+k3V4i9CiJNsoFjd5hEoXpBQ+cnB1AiEAxXlHGnQy9zivKOqYDWw2x3osjfoyLTRVGqg+rf6W2Vk=",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          }
+        ],
+        "unpackedSize": 10029060
+      },
+      "type": "module",
+      "module": "./fesm2022/core.mjs",
+      "engines": {
+        "node": "^18.19.1 || ^20.11.1 || >=22.0.0"
+      },
+      "exports": {
+        ".": {
+          "types": "./index.d.ts",
+          "default": "./fesm2022/core.mjs"
+        },
+        "./testing": {
+          "types": "./testing/index.d.ts",
+          "default": "./fesm2022/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./rxjs-interop": {
+          "types": "./rxjs-interop/index.d.ts",
+          "default": "./fesm2022/rxjs-interop.mjs"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        },
+        "./primitives/di": {
+          "types": "./primitives/di/index.d.ts",
+          "default": "./fesm2022/primitives/di.mjs"
+        },
+        "./primitives/signals": {
+          "types": "./primitives/signals/index.d.ts",
+          "default": "./fesm2022/primitives/signals.mjs"
+        },
+        "./primitives/event-dispatch": {
+          "types": "./primitives/event-dispatch/index.d.ts",
+          "default": "./fesm2022/primitives/event-dispatch.mjs"
+        },
+        "./event-dispatch-contract.min.js": {
+          "default": "./event-dispatch-contract.min.js"
+        }
+      },
+      "gitHead": "3f4cae24868228ccf91b44106749dde63e6abe70",
+      "typings": "./index.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "schematics": "./schematics/collection.json",
+      "_npmVersion": "10.8.2",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "18.20.5",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.15.0"
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_19.2.25_1780399239309_0.7542063097292042",
+        "host": "s3://npm-registry-packages-npm-production"
+      }
+    },
+    "20.3.27": {
+      "name": "@angular/core",
+      "version": "20.3.27",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@20.3.27",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "97ce97a90c3e06564df7d7d8abbb2eeac3afdb07",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-20.3.27.tgz",
+        "fileCount": 85,
+        "integrity": "sha512-8EfYIUST5CKldOF4MAYWTFFRB7EtwqUoQBZdar6US39/EEzWm/wm/iRNkH2jmKe4YuPa2GoeHS1WQ8VRuOk7Dg==",
+        "signatures": [
+          {
+            "sig": "MEUCIQCSqeqqXlGqwFH5GbIv4bpU7ZzaTvFg2oG79ns45E+MzAIgJXHjCoAjpTMje4ljs+RUObBVuQk0UFsqeTksReRktqI=",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          },
+          {
+            "sig": "MEQCIFK8uQkIAXlE7o8hhPSL5qXQYBdw5ioqTS8ZAfKQ82N8AiBrwQIYHiDvY4Y7htyzCYmdduWd7SBURvyZZLNcyOwG4w==",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          }
+        ],
+        "unpackedSize": 10420575
+      },
+      "type": "module",
+      "module": "./fesm2022/core.mjs",
+      "engines": {
+        "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+      },
+      "exports": {
+        ".": {
+          "types": "./index.d.ts",
+          "default": "./fesm2022/core.mjs"
+        },
+        "./testing": {
+          "types": "./testing/index.d.ts",
+          "default": "./fesm2022/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./rxjs-interop": {
+          "types": "./rxjs-interop/index.d.ts",
+          "default": "./fesm2022/rxjs-interop.mjs"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        },
+        "./primitives/di": {
+          "types": "./primitives/di/index.d.ts",
+          "default": "./fesm2022/primitives/di.mjs"
+        },
+        "./primitives/signals": {
+          "types": "./primitives/signals/index.d.ts",
+          "default": "./fesm2022/primitives/signals.mjs"
+        },
+        "./primitives/event-dispatch": {
+          "types": "./primitives/event-dispatch/index.d.ts",
+          "default": "./fesm2022/primitives/event-dispatch.mjs"
+        },
+        "./event-dispatch-contract.min.js": {
+          "default": "./event-dispatch-contract.min.js"
+        }
+      },
+      "typings": "./index.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "schematics": "./schematics/collection.json",
+      "_npmVersion": "10.9.4",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "22.21.0",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.15.0",
+        "@angular/compiler": "20.3.27"
+      },
+      "peerDependenciesMeta": {
+        "zone.js": {
+          "optional": true
+        },
+        "@angular/compiler": {
+          "optional": true
+        }
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_20.3.27_1785354775939_0.1591999999662359",
+        "host": "s3://npm-registry-packages-npm-production"
+      }
+    },
+    "22.1.0": {
+      "name": "@angular/core",
+      "version": "22.1.0",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@22.1.0",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "08306582331507009dc0227cbb720a414cecda97",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-22.1.0.tgz",
+        "fileCount": 105,
+        "integrity": "sha512-X5UaMuOCI4HAvSQIs3QtM+5e0Cni16DRaHUIL3BIBd4ZQNnSH3pZ25TsKQ8Jlu/3hAQ9rzV278kNQcecooGJ7g==",
+        "signatures": [
+          {
+            "sig": "MEUCIBFnQVI4n0KjwYZJX41fghBHLLlVLGtHQQX/7GM/Gs3TAiEAtpnn+HGHdW/sFY6ZKOfRnLwtboCwrKYFAX29lX/dQwg=",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          },
+          {
+            "sig": "MEUCIQD/39KznpQ1OrjQspvkY/BgTVrQlpBEM3uoCtObUbZM8AIgVgBvZoLTnScT8r9Q8oGNFtDURBfsKm5lp+MScGOtK8Y=",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          }
+        ],
+        "unpackedSize": 6913561
+      },
+      "type": "module",
+      "module": "./fesm2022/core.mjs",
+      "angular": {
+        "bestPractices": {
+          "path": "./resources/best-practices.md",
+          "format": "markdown"
+        }
+      },
+      "engines": {
+        "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
+      },
+      "exports": {
+        ".": {
+          "types": "./types/core.d.ts",
+          "default": "./fesm2022/core.mjs"
+        },
+        "./testing": {
+          "types": "./types/testing.d.ts",
+          "default": "./fesm2022/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./rxjs-interop": {
+          "types": "./types/rxjs-interop.d.ts",
+          "default": "./fesm2022/rxjs-interop.mjs"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        },
+        "./primitives/di": {
+          "types": "./types/primitives-di.d.ts",
+          "default": "./fesm2022/primitives-di.mjs"
+        },
+        "./primitives/signals": {
+          "types": "./types/primitives-signals.d.ts",
+          "default": "./fesm2022/primitives-signals.mjs"
+        },
+        "./primitives/event-dispatch": {
+          "types": "./types/primitives-event-dispatch.d.ts",
+          "default": "./fesm2022/primitives-event-dispatch.mjs"
+        },
+        "./event-dispatch-contract.min.js": {
+          "default": "./event-dispatch-contract.min.js"
+        }
+      },
+      "gitHead": "52e48dbea4057672af268b84ec89eebc177fe50b",
+      "typings": "./types/core.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "schematics": "./schematics/collection.json",
+      "_npmVersion": "10.9.8",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "22.23.1",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "devDependencies": {
+        "@mcp-b/webmcp-types": "^4.0.0",
+        "@mcp-b/webmcp-polyfill": "^4.0.0"
+      },
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.15.0 || ~0.16.0",
+        "@angular/compiler": "22.1.0"
+      },
+      "peerDependenciesMeta": {
+        "zone.js": {
+          "optional": true
+        },
+        "@angular/compiler": {
+          "optional": true
+        }
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_22.1.0_1785357586783_0.8808472058893573",
+        "host": "s3://npm-registry-packages-npm-production"
+      }
+    },
+    "21.2.19": {
+      "name": "@angular/core",
+      "version": "21.2.19",
+      "author": {
+        "name": "angular"
+      },
+      "license": "MIT",
+      "_id": "@angular/core@21.2.19",
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "homepage": "https://github.com/angular/angular#readme",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "34273628395bd05988b71403a4c296f04fdb43a7",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-21.2.19.tgz",
+        "fileCount": 95,
+        "integrity": "sha512-PVoXD1kBexOJLkFzKx2zBY/0oZJXGru0eGn2hu0q5n3vkZlYsR1yRolfGenK1gZE48Qibiw/ttg/X/pAIPEZGg==",
+        "signatures": [
+          {
+            "sig": "MEYCIQC0u4IGBXqJgBSJJhR1VDEpZPXu8Q0FaIfarKOqf/18YQIhANk2p5rqvqD4jBy1XQltZu1RpYGYh0ovnxSm7e0O4BSV",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          },
+          {
+            "sig": "MEQCIBWWcWMn7wAQF/hqeeP0g3PXs0fWUlb5vC6wYtMht5x4AiBywq16MNmMSXNblAPJAhFXpyMhA2EKExXJniFIdDrybQ==",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          }
+        ],
+        "unpackedSize": 6809398
+      },
+      "type": "module",
+      "module": "./fesm2022/core.mjs",
+      "angular": {
+        "bestPractices": {
+          "path": "./resources/best-practices.md",
+          "format": "markdown"
+        }
+      },
+      "engines": {
+        "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+      },
+      "exports": {
+        ".": {
+          "types": "./types/core.d.ts",
+          "default": "./fesm2022/core.mjs"
+        },
+        "./testing": {
+          "types": "./types/testing.d.ts",
+          "default": "./fesm2022/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./rxjs-interop": {
+          "types": "./types/rxjs-interop.d.ts",
+          "default": "./fesm2022/rxjs-interop.mjs"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        },
+        "./primitives/di": {
+          "types": "./types/primitives-di.d.ts",
+          "default": "./fesm2022/primitives-di.mjs"
+        },
+        "./primitives/signals": {
+          "types": "./types/primitives-signals.d.ts",
+          "default": "./fesm2022/primitives-signals.mjs"
+        },
+        "./primitives/event-dispatch": {
+          "types": "./types/primitives-event-dispatch.d.ts",
+          "default": "./fesm2022/primitives-event-dispatch.mjs"
+        },
+        "./event-dispatch-contract.min.js": {
+          "default": "./event-dispatch-contract.min.js"
+        }
+      },
+      "gitHead": "a50941b580d8137110d93339cc90dc22eb99936f",
+      "typings": "./types/core.d.ts",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "schematics": "./schematics/collection.json",
+      "_npmVersion": "10.9.7",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "sideEffects": false,
+      "_nodeVersion": "22.22.2",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.15.0 || ~0.16.0",
+        "@angular/compiler": "21.2.19"
+      },
+      "peerDependenciesMeta": {
+        "zone.js": {
+          "optional": true
+        },
+        "@angular/compiler": {
+          "optional": true
+        }
+      },
+      "_npmOperationalInternal": {
+        "tmp": "tmp/core_21.2.19_1785357920337_0.33062438062643107",
+        "host": "s3://npm-registry-packages-npm-production"
+      }
+    },
+    "22.2.0-next.0": {
+      "_id": "@angular/core@22.2.0-next.0",
+      "bugs": {
+        "url": "https://github.com/angular/angular/issues"
+      },
+      "dist": {
+        "shasum": "f6a216ca06391be8de8cc7fc69da0c6b01652170",
+        "tarball": "https://registry.npmjs.org/@angular/core/-/core-22.2.0-next.0.tgz",
+        "fileCount": 105,
+        "integrity": "sha512-H0T3UlRMSiw9Nvzj6cExb/n04vcxpg/ypbSoaGhih12OQH06A+2Oz5GJTj3jfo8rha023XqKJjxYGVmKNRtbfA==",
+        "signatures": [
+          {
+            "sig": "MEUCIDxmVbdYyITeuZYhDIaJivog/x2eW4OAMBhp4WMqB4hiAiEAwDERi2U/6luSdBdXuTZO5GKmAPMd56jZu62fNjimXyk=",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+          },
+          {
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "sig": "MEUCIQCYaGdQfuRPr7jq0evczo7CyCZgsaaN6DVyhOaA3B4iwwIgf/WUi+OK/XtK7R5nAtWVqUjfGA4q1bhiCxncR1BG6kE="
+          }
+        ],
+        "unpackedSize": 6914072
+      },
+      "name": "@angular/core",
+      "type": "module",
+      "author": {
+        "name": "angular"
+      },
+      "module": "./fesm2022/core.mjs",
+      "angular": {
+        "bestPractices": {
+          "path": "./resources/best-practices.md",
+          "format": "markdown"
+        }
+      },
+      "engines": {
+        "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
+      },
+      "exports": {
+        ".": {
+          "types": "./types/core.d.ts",
+          "default": "./fesm2022/core.mjs"
+        },
+        "./testing": {
+          "types": "./types/testing.d.ts",
+          "default": "./fesm2022/testing.mjs"
+        },
+        "./package.json": {
+          "default": "./package.json"
+        },
+        "./rxjs-interop": {
+          "types": "./types/rxjs-interop.d.ts",
+          "default": "./fesm2022/rxjs-interop.mjs"
+        },
+        "./schematics/*": {
+          "default": "./schematics/*.js"
+        },
+        "./primitives/di": {
+          "types": "./types/primitives-di.d.ts",
+          "default": "./fesm2022/primitives-di.mjs"
+        },
+        "./primitives/signals": {
+          "types": "./types/primitives-signals.d.ts",
+          "default": "./fesm2022/primitives-signals.mjs"
+        },
+        "./primitives/event-dispatch": {
+          "types": "./types/primitives-event-dispatch.d.ts",
+          "default": "./fesm2022/primitives-event-dispatch.mjs"
+        },
+        "./event-dispatch-contract.min.js": {
+          "default": "./event-dispatch-contract.min.js"
+        }
+      },
+      "gitHead": "22d18dbcfbc55e243c27cc56bd808137048fbcce",
+      "license": "MIT",
+      "typings": "./types/core.d.ts",
+      "version": "22.2.0-next.0",
+      "_npmUser": {
+        "name": "google-wombot",
+        "email": "node-team-npm+wombot@google.com"
+      },
+      "homepage": "https://github.com/angular/angular#readme",
+      "ng-update": {
+        "migrations": "./schematics/migrations.json",
+        "packageGroup": [
+          "@angular/core",
+          "@angular/bazel",
+          "@angular/common",
+          "@angular/compiler",
+          "@angular/compiler-cli",
+          "@angular/animations",
+          "@angular/elements",
+          "@angular/platform-browser",
+          "@angular/platform-browser-dynamic",
+          "@angular/forms",
+          "@angular/platform-server",
+          "@angular/upgrade",
+          "@angular/router",
+          "@angular/language-service",
+          "@angular/localize",
+          "@angular/service-worker"
+        ]
+      },
+      "repository": {
+        "url": "git+https://github.com/angular/angular.git",
+        "type": "git",
+        "directory": "packages/core"
+      },
+      "schematics": "./schematics/collection.json",
+      "_npmVersion": "10.9.8",
+      "description": "Angular - the core framework",
+      "directories": {},
+      "maintainers": [
+        {
+          "name": "angular",
+          "email": "devops+npm@angular.io"
+        },
+        {
+          "name": "google-wombot",
+          "email": "node-team-npm+wombot@google.com"
+        }
+      ],
+      "sideEffects": false,
+      "_nodeVersion": "22.23.1",
+      "dependencies": {
+        "tslib": "^2.3.0"
+      },
+      "_hasShrinkwrap": false,
+      "readmeFilename": "README.md",
+      "devDependencies": {
+        "@mcp-b/webmcp-types": "^4.0.0",
+        "@mcp-b/webmcp-polyfill": "^4.0.0"
+      },
+      "peerDependencies": {
+        "rxjs": "^6.5.3 || ^7.4.0",
+        "zone.js": "~0.15.0 || ~0.16.0",
+        "@angular/compiler": "22.2.0-next.0"
+      },
+      "peerDependenciesMeta": {
+        "zone.js": {
+          "optional": true
+        },
+        "@angular/compiler": {
+          "optional": true
+        }
+      },
+      "_npmOperationalInternal": {
+        "host": "s3://npm-registry-packages-npm-production",
+        "tmp": "tmp/core_22.2.0-next.0_1785358210537_0.6963814487639655"
+      }
+    }
+  }
+}

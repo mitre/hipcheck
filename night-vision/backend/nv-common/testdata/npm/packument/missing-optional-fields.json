@@ -1,0 +1,16 @@
+{
+  "name": "no-metadata",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "no-metadata",
+      "version": "1.0.0",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/no-metadata/-/no-metadata-1.0.0.tgz",
+        "shasum": "0123456789abcdef0123456789abcdef01234567"
+      }
+    }
+  }
+}

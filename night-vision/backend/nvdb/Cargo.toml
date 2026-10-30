@@ -1,0 +1,34 @@
+[package]
+name = "nvdb"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+camino.workspace = true
+chrono.workspace = true
+clap.workspace = true
+clap-verbosity-flag.workspace = true
+indicatif.workspace = true
+migration.workspace = true
+nv-common.workspace = true
+nv-server-client = { workspace = true }
+percent-encoding.workspace = true
+sea-orm.workspace = true
+sea-orm-migration.workspace = true
+secrecy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+slog.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+url.workspace = true
+uuid.workspace = true
+workspace-hack.workspace = true
+
+[dev-dependencies]
+httpmock = { workspace = true }

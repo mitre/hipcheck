@@ -1,0 +1,4 @@
+# Disposable PostgreSQL configuration for the Hipcheck persistence CI test.
+server-address = "127.0.0.1:0"
+database-connection = "postgres://postgres@postgres:5432/nv_integration_test"
+cve-list-checkout-path = "/tmp/night-vision-cvelist"

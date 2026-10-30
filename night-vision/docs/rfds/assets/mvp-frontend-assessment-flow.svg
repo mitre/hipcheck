@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1010" viewBox="0 0 1200 1010" role="img" aria-labelledby="title description">
+  <title id="title">Illustrative Night Vision MVP frontend assessment flow</title>
+  <desc id="description">A vertical wireframe that connects a KEV-linked exposure to patch candidate selection, release checks, and a cautious upgrade verdict.</desc>
+  <style>
+    .page { fill: #f7f9fa; }
+    .surface { fill: #ffffff; stroke: #d5dde4; stroke-width: 1.5; }
+    .line { stroke: #c7d1d9; stroke-width: 1.5; stroke-dasharray: 5 5; }
+    .ink { fill: #18212b; font-family: Inter, Arial, sans-serif; }
+    .muted { fill: #647384; font-family: Inter, Arial, sans-serif; }
+    .mono { fill: #18212b; font-family: Menlo, Consolas, monospace; font-weight: 700; }
+    .stage { fill: #176c66; font-family: Inter, Arial, sans-serif; font-weight: 700; }
+    .tiny { font-family: Inter, Arial, sans-serif; font-size: 13px; }
+    .small { font-family: Inter, Arial, sans-serif; font-size: 15px; }
+    .body { font-family: Inter, Arial, sans-serif; font-size: 16px; }
+    .heading { font-family: Inter, Arial, sans-serif; font-size: 18px; font-weight: 700; }
+    .title { font-family: Inter, Arial, sans-serif; font-size: 28px; font-weight: 700; }
+  </style>
+  <rect class="page" width="1200" height="1010" rx="14"/>
+  <rect x="1" y="1" width="1198" height="1008" rx="13" fill="none" stroke="#cbd3db"/>
+  <rect x="1" y="1" width="1198" height="61" rx="13" fill="#ffffff"/>
+  <path d="M1 61h1198" stroke="#dce2e7"/>
+  <rect x="28" y="18" width="25" height="25" rx="7" fill="#0f766e"/>
+  <text x="40.5" y="36" text-anchor="middle" fill="#fff" font-family="Arial" font-size="14">◇</text>
+  <text class="ink" x="63" y="37" font-size="17" font-weight="700">Night Vision</text>
+  <text class="muted tiny" x="1139" y="36" text-anchor="end">Assessment NV-2026-0142 · Data current</text>
+
+  <text class="muted small" x="94" y="105">Assessments / NV-2026-0142</text>
+  <text class="title ink" x="94" y="145">Is this patch a reasonable upgrade?</text>
+  <text class="muted body" x="94" y="173">Follow the evidence from a KEV-linked dependency to a cautious recommendation.</text>
+
+  <g class="tiny">
+    <circle cx="105" cy="213" r="11" fill="#0f766e"/><text x="105" y="218" text-anchor="middle" fill="#fff">✓</text><text class="stage" x="123" y="218">Exposure found</text>
+    <path d="M220 213h107" stroke="#0f766e"/><circle cx="340" cy="213" r="11" fill="#0f766e"/><text x="340" y="218" text-anchor="middle" fill="#fff">✓</text><text class="stage" x="358" y="218">Candidate chosen</text>
+    <path d="M485 213h107" stroke="#0f766e"/><circle cx="605" cy="213" r="11" fill="#0f766e"/><text x="605" y="218" text-anchor="middle" fill="#fff">✓</text><text class="stage" x="623" y="218">Risk checked</text>
+    <path d="M716 213h107" stroke="#c7d1d9"/><circle cx="836" cy="213" r="11" fill="#fff" stroke="#0f766e"/><text class="stage" x="836" y="218" text-anchor="middle">4</text><text class="ink" x="854" y="218" font-weight="700">Verdict</text>
+  </g>
+
+  <rect class="surface" x="94" y="244" width="1012" height="132" rx="9"/>
+  <path d="M94 293h1012" stroke="#e0e5ea"/>
+  <circle cx="122" cy="269" r="12" fill="#e2f2f0"/><text class="stage tiny" x="122" y="274" text-anchor="middle">1</text><text class="heading ink" x="144" y="275">Start with the reachable exposure</text><text class="muted tiny" x="1082" y="274" text-anchor="end">from agency-web/package.json</text>
+  <text class="mono" x="121" y="325" font-size="17">lodash@4.17.20</text>
+  <text class="muted small" x="121" y="350">Reachable through api-client · CVE-2021-23337 is a CISA Known Exploited Vulnerability.</text>
+  <rect x="958" y="313" width="119" height="25" rx="12" fill="#fde8e8"/><text x="1017" y="330" text-anchor="middle" fill="#ad2e31" class="tiny" font-weight="700">● KEV affected</text>
+
+  <path class="line" d="M122 376v28"/><text x="122" y="414" text-anchor="middle" fill="#0f766e" font-family="Arial" font-size="20">↓</text>
+  <rect class="surface" x="94" y="425" width="1012" height="166" rx="9"/>
+  <path d="M94 474h1012M94 516h1012M94 553h1012" stroke="#e0e5ea"/>
+  <circle cx="122" cy="450" r="12" fill="#e2f2f0"/><text class="stage tiny" x="122" y="455" text-anchor="middle">2</text><text class="heading ink" x="144" y="456">Choose a newer patch candidate</text><text class="muted tiny" x="1082" y="455" text-anchor="end">Patch upgrades only</text>
+  <text class="muted tiny" x="121" y="500">Candidate</text><text class="muted tiny" x="469" y="500">Known exposure</text>
+  <rect x="95" y="517" width="1010" height="36" fill="#eff9f7"/>
+  <text class="mono tiny" x="121" y="540">4.17.21</text><rect x="469" y="526" width="126" height="19" rx="10" fill="#def4e8"/><text x="532" y="540" text-anchor="middle" fill="#147044" class="tiny" font-weight="700">✓ No longer affected</text><rect x="1005" y="524" width="72" height="23" rx="5" fill="#0f766e"/><text x="1041" y="540" text-anchor="middle" fill="#fff" class="tiny" font-weight="700">Selected</text>
+  <text class="mono tiny" x="121" y="577">4.17.22</text><rect x="469" y="563" width="139" height="19" rx="10" fill="#fff1d7"/><text x="538" y="577" text-anchor="middle" fill="#906109" class="tiny" font-weight="700">? Evidence unavailable</text><rect x="1014" y="561" width="63" height="23" rx="5" fill="#fff" stroke="#c8d1d9"/><text x="1045" y="577" text-anchor="middle" class="tiny">Choose</text>
+
+  <path class="line" d="M122 591v28"/><text x="122" y="629" text-anchor="middle" fill="#0f766e" font-family="Arial" font-size="20">↓</text>
+  <rect class="surface" x="94" y="640" width="1012" height="123" rx="9"/>
+  <path d="M94 689h1012M431 689v74M768 689v74" stroke="#e0e5ea"/>
+  <circle cx="122" cy="665" r="12" fill="#e2f2f0"/><text class="stage tiny" x="122" y="670" text-anchor="middle">3</text><text class="heading ink" x="144" y="671">Check the selected release</text><text class="muted tiny" x="1082" y="670" text-anchor="end">Candidate 4.17.21</text>
+  <text class="muted tiny" x="121" y="717">VULNERABILITY STATUS</text><text class="ink small" x="121" y="743">✓ Outside affected range</text>
+  <text class="muted tiny" x="457" y="717">SUPPLY-CHAIN SIGNALS</text><text class="ink small" x="457" y="743">✓ No blocking findings</text>
+  <text class="muted tiny" x="794" y="717">EVIDENCE QUALITY</text><text class="ink small" x="794" y="743">✓ Sources agree</text>
+
+  <path class="line" d="M122 763v28"/><text x="122" y="801" text-anchor="middle" fill="#0f766e" font-family="Arial" font-size="20">↓</text>
+  <rect class="surface" x="94" y="812" width="1012" height="151" rx="9"/>
+  <path d="M94 861h1012" stroke="#e0e5ea"/>
+  <circle cx="122" cy="837" r="12" fill="#e2f2f0"/><text class="stage tiny" x="122" y="842" text-anchor="middle">4</text><text class="heading ink" x="144" y="843">Make the recommendation</text><text class="muted tiny" x="1082" y="842" text-anchor="end">Based on the checks above</text>
+  <circle cx="130" cy="899" r="18" fill="#dbf3e7"/><text x="130" y="905" text-anchor="middle" fill="#147246" font-family="Arial" font-size="19" font-weight="700">✓</text>
+  <text class="heading ink" x="160" y="891">Recommended</text><text class="muted small" x="160" y="916">4.17.21 appears to remove the KEV-linked exposure; completed checks found no serious signal.</text>
+  <text x="160" y="944" fill="#188055" class="tiny" font-weight="700">✓ Issue appears fixed</text><text x="373" y="944" fill="#188055" class="tiny" font-weight="700">✓ No blocking signal</text><text x="603" y="944" fill="#188055" class="tiny" font-weight="700">✓ Patch-level upgrade</text>
+  <text class="muted tiny" x="94" y="992">Illustrative information flow only — the live UI may use a different visual treatment.</text>
+</svg>
