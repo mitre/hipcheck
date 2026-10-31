@@ -30,7 +30,7 @@ global = "ubuntu-22.04"
 # Ensure Apple Silicon macOS builds run natively rather than cross-compiling
 # from x86. Also makes sure our Apple Silicon macOS release builds match the
 # runner used for regular CI testing.
-aarch64-apple-darwin = "macos-14"
+aarch64-apple-darwin = "macos-15"
 # Update our Ubuntu release runs away from Ubuntu 20.04, which is now being
 # sunset by GitHub. They only track the last two LTS Ubuntu releases for free
 # runners, and with 24.04 out they're sunsetting 20.04. We're *just* moving to
