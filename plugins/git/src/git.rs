@@ -9,11 +9,8 @@ use anyhow::Result;
 use gix::ObjectId;
 use gix::Repository;
 use gix::bstr::ByteSlice;
-use gix::diff::blob::Algorithm;
-use gix::diff::blob::UnifiedDiffBuilder;
-use gix::diff::blob::intern::InternedInput;
-use gix::diff::blob::sink::Counter;
-use gix::diff::blob::sources::lines_with_terminator;
+use gix::diff::blob::unified_diff::{ConsumeBinaryHunk, ContextSize};
+use gix::diff::blob::{Algorithm, InternedInput, UnifiedDiff, diff_with_slider_heuristics};
 use gix::object;
 use gix::objs::tree::EntryKind;
 use gix::revision::Walk;
@@ -74,6 +71,19 @@ fn walk_commits<'repo, T>(
 		results.push(res);
 	}
 	Ok(results)
+}
+
+/// Compatibility wrapper for diff results produced from `gix`.
+///
+/// Older `gix` versions exposed blob diff helpers that returned a structure
+/// containing insertion/removal counts and a rendered unified diff patch.
+/// Newer `gix` versions reorganized that API, so we keep this small local
+/// struct to preserve the shape the rest of this file expects while adapting
+/// to the new API in one place.
+struct BlobDiffResult {
+	insertions: u32,
+	removals: u32,
+	wrapped: String,
 }
 
 pub fn get_latest_commit<P>(repo_path: P) -> Result<Option<RawCommit>>
@@ -162,16 +172,36 @@ where
 	Ok(raw_commits_since_cutoff)
 }
 
-fn diff_objects(old_object: Option<&str>, new_object: Option<&str>) -> Counter<String> {
-	let input = InternedInput::new(
-		lines_with_terminator(old_object.unwrap_or_default()),
-		lines_with_terminator(new_object.unwrap_or_default()),
-	);
-	gix::diff::blob::diff(
-		Algorithm::Myers,
+/// Compute line-based additions/removals and unified diff text using the
+/// newer `gix` blob diff API.
+///
+/// Older `gix` versions exposed a one-shot blob diff helper that combined
+/// counting and patch rendering. Newer versions split these responsibilities,
+/// so this function now computes a diff first and then renders unified diff
+/// output explicitly.
+fn diff_objects(old_object: Option<&str>, new_object: Option<&str>) -> BlobDiffResult {
+	let before = old_object.unwrap_or_default().as_bytes();
+	let after = new_object.unwrap_or_default().as_bytes();
+
+	let input = InternedInput::new(before, after);
+	let diff = diff_with_slider_heuristics(Algorithm::Myers, &input);
+
+	// If unified diff rendering fails, preserve count information and fall back
+	// to an empty patch rather than failing the whole query.
+	let wrapped = UnifiedDiff::new(
+		&diff,
 		&input,
-		Counter::new(UnifiedDiffBuilder::new(&input)),
+		ConsumeBinaryHunk::new(String::new(), "\n"),
+		ContextSize::default(),
 	)
+	.consume()
+	.unwrap_or_default();
+
+	BlobDiffResult {
+		insertions: diff.count_additions(),
+		removals: diff.count_removals(),
+		wrapped,
+	}
 }
 
 fn get_diff(repo: &Repository, commit: gix::Commit) -> Result<Diff> {
