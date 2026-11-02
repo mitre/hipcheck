@@ -5,9 +5,13 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel
+
+
+class LocalGitRepo(BaseModel):
+    path: str = Field(..., description='The path to the repo.')
+    git_ref: str = Field(..., description="The Git ref we're referring to.")
 
 
 class GitHub(BaseModel):
@@ -26,36 +30,31 @@ class KnownRemote(RootModel[KnownRemote1]):
     root: KnownRemote1
 
 
-class LocalGitRepo(BaseModel):
-    git_ref: str = Field(..., description="The Git ref we're referring to.")
-    path: str = Field(..., description='The path to the repo.')
-
-
 class PackageHost(Enum):
     Npm = 'Npm'
     PyPI = 'PyPI'
 
 
 class RemoteGitRepo(BaseModel):
-    known_remote: Optional[KnownRemote] = None
     url: AnyUrl
+    known_remote: KnownRemote | None = None
 
 
 class Package(BaseModel):
-    host: PackageHost = Field(..., description='What host the package is from.')
-    name: str = Field(..., description='The package name')
     purl: AnyUrl = Field(..., description='A package url for the package.')
+    name: str = Field(..., description='The package name')
     version: str = Field(..., description='The package version')
+    host: PackageHost = Field(..., description='What host the package is from.')
 
 
 class Target(BaseModel):
-    local: LocalGitRepo = Field(..., description='The path to the local repository.')
-    package: Optional[Package] = Field(
-        None, description='The package associated with the target, if any.'
-    )
-    remote: Optional[RemoteGitRepo] = Field(
-        None, description='The url of the remote repository, if any.'
-    )
     specifier: str = Field(
         ..., description='The original specifier provided by the user.'
+    )
+    local: LocalGitRepo = Field(..., description='The path to the local repository.')
+    remote: RemoteGitRepo | None = Field(
+        None, description='The url of the remote repository, if any.'
+    )
+    package: Package | None = Field(
+        None, description='The package associated with the target, if any.'
     )
