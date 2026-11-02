@@ -11,7 +11,7 @@ anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 hipcheck-sdk = { workspace = true, features = ["macros"] }
 lru = { workspace = true }
-gix = { workspace = true, features = ["basic", "max-control", "zlib-stock"] }
+gix = { workspace = true, features = ["basic", "max-control", "zlib-stock", "sha1"] }
 jiff = { workspace = true, features = ["serde"] }
 tracing = { workspace = true }
 schemars = { workspace = true, features = ["url2"] }
