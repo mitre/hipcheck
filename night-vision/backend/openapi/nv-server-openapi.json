@@ -1,0 +1,2605 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Night Vision",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/assessment-exposures/{source_id}/{package_id}/{cve_id}": {
+      "get": {
+        "operationId": "get_assessment_exposure_detail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cve_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "package_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "candidateCursor",
+            "schema": {
+              "nullable": true,
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            }
+          },
+          {
+            "in": "query",
+            "name": "candidateLimit",
+            "schema": {
+              "nullable": true,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentExposureDetail"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/assessment-work-queue": {
+      "get": {
+        "operationId": "get_assessment_work_queue",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "nullable": true,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "schema": {
+              "$ref": "#/components/schemas/AssessmentQueueView"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentWorkQueue"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/assessments": {
+      "post": {
+        "operationId": "post_assessment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostAssessmentBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "successfully enqueued operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostAssessmentResponse"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/assessments/{id}": {
+      "get": {
+        "operationId": "get_assessment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentStatus"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/assessments/{id}/evidence": {
+      "get": {
+        "operationId": "get_assessment_evidence",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeRawHipcheck",
+            "schema": {
+              "nullable": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentEvidence"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/data-status": {
+      "get": {
+        "operationId": "data_status",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataStatus"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/health/diagnostics": {
+      "get": {
+        "operationId": "health_diagnostics",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDiagnostics"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/package-sources": {
+      "get": {
+        "operationId": "list_package_sources",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "$ref": "#/components/schemas/PackageSourceListDirection"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "schema": {
+              "$ref": "#/components/schemas/PackageSourceListFilter"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "nullable": true,
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "$ref": "#/components/schemas/PackageSourceListSort"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageSourceList"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_package_source",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostPackageSourceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "successfully enqueued operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPackageSourceResponse"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/package-sources/{id}": {
+      "get": {
+        "operationId": "get_package_source",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageSourceStatus"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete_package_source",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "successfully enqueued operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageSourceOperationResponse"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/package-sources/{id}/cancel": {
+      "post": {
+        "operationId": "cancel_package_source",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "successfully enqueued operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageSourceOperationResponse"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/package-sources/{id}/exposures": {
+      "get": {
+        "operationId": "get_package_source_exposures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageSourceExposures"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/upgrade-assessments": {
+      "post": {
+        "operationId": "post_upgrade_assessment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpgradeAssessmentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "successfully enqueued operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostUpgradeAssessmentResponse"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/upgrade-assessments/{id}": {
+      "get": {
+        "operationId": "get_upgrade_assessment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpgradeAssessmentStatus"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/upgrade-assessments/{id}/result": {
+      "get": {
+        "operationId": "get_upgrade_assessment_result",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpgradeAssessmentResult"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssessmentCandidate": {
+        "type": "object",
+        "properties": {
+          "caveats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpgradeAssessmentCaveat"
+            }
+          },
+          "caveatsTruncated": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpgradeAssessmentEvidence"
+            }
+          },
+          "evidenceState": {
+            "$ref": "#/components/schemas/AssessmentEvidenceState"
+          },
+          "evidenceTruncated": {
+            "type": "boolean"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpgradeAssessmentFinding"
+            }
+          },
+          "findingsTruncated": {
+            "type": "boolean"
+          },
+          "id": {
+            "description": "Canonical NPM package URL when the package name is known; otherwise an assessment-scoped version key.",
+            "type": "string"
+          },
+          "majorUpgradeCaution": {
+            "nullable": true,
+            "type": "string"
+          },
+          "selectionState": {
+            "$ref": "#/components/schemas/AssessmentSelectionState"
+          },
+          "semverCompatibility": {
+            "description": "SemVer's API guarantee; it does not prove application compatibility.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentSemverCompatibility"
+              }
+            ]
+          },
+          "upgradeDistance": {
+            "$ref": "#/components/schemas/UpgradeAssessmentUpgradeDistance"
+          },
+          "verdict": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpgradeAssessmentVerdict"
+              }
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "caveats",
+          "caveatsTruncated",
+          "evidence",
+          "evidenceState",
+          "evidenceTruncated",
+          "findings",
+          "findingsTruncated",
+          "id",
+          "selectionState",
+          "semverCompatibility",
+          "upgradeDistance",
+          "version"
+        ]
+      },
+      "AssessmentCandidateState": {
+        "type": "string",
+        "enum": [
+          "available",
+          "no-candidate",
+          "processing",
+          "failed",
+          "unavailable"
+        ]
+      },
+      "AssessmentCheck": {
+        "type": "object",
+        "properties": {
+          "effect": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "effect",
+          "state",
+          "summary"
+        ]
+      },
+      "AssessmentCoverage": {
+        "type": "object",
+        "properties": {
+          "complete": {
+            "type": "boolean"
+          },
+          "exposureCount": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string"
+          },
+          "processingSourceCount": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "scope": {
+            "type": "string"
+          },
+          "unassessedCount": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "unavailableSourceCount": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "complete",
+          "exposureCount",
+          "message",
+          "processingSourceCount",
+          "scope",
+          "unassessedCount",
+          "unavailableSourceCount"
+        ]
+      },
+      "AssessmentDiagnostics": {
+        "type": "object",
+        "properties": {
+          "errorKind": {
+            "nullable": true,
+            "type": "string"
+          },
+          "errorMessage": {
+            "nullable": true,
+            "type": "string"
+          },
+          "exitStatus": {
+            "nullable": true,
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryable": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "sourceRepositoryUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "stderr": {
+            "nullable": true,
+            "type": "string"
+          },
+          "stderrTruncated": {
+            "type": "boolean"
+          },
+          "stdout": {
+            "nullable": true,
+            "type": "string"
+          },
+          "stdoutTruncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stderrTruncated",
+          "stdoutTruncated"
+        ]
+      },
+      "AssessmentEvidence": {
+        "type": "object",
+        "properties": {
+          "affectedPurl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentCheck"
+            }
+          },
+          "diagnostics": {
+            "$ref": "#/components/schemas/AssessmentDiagnostics"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentFinding"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rawHipcheck": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "checks",
+          "diagnostics",
+          "findings",
+          "id"
+        ]
+      },
+      "AssessmentEvidenceState": {
+        "type": "string",
+        "enum": [
+          "available",
+          "missing",
+          "processing",
+          "failed",
+          "unavailable"
+        ]
+      },
+      "AssessmentExposureDetail": {
+        "type": "object",
+        "properties": {
+          "assessmentId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid"
+          },
+          "candidateState": {
+            "$ref": "#/components/schemas/AssessmentCandidateState"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentCandidate"
+            }
+          },
+          "caveats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpgradeAssessmentCaveat"
+            }
+          },
+          "caveatsTruncated": {
+            "type": "boolean"
+          },
+          "dataStatus": {
+            "$ref": "#/components/schemas/DataStatus"
+          },
+          "exposure": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PackageSourceExposure"
+              }
+            ]
+          },
+          "failureMessage": {
+            "nullable": true,
+            "type": "string"
+          },
+          "nextCandidateCursor": {
+            "nullable": true,
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0
+          },
+          "reachabilityTruncated": {
+            "type": "boolean"
+          },
+          "selectedCandidateId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/AssessmentSourceIdentity"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AssessmentReadState"
+          },
+          "summary": {
+            "nullable": true,
+            "type": "string"
+          },
+          "verdict": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpgradeAssessmentVerdict"
+              }
+            ]
+          }
+        },
+        "required": [
+          "candidateState",
+          "candidates",
+          "caveats",
+          "caveatsTruncated",
+          "dataStatus",
+          "reachabilityTruncated",
+          "source",
+          "state"
+        ]
+      },
+      "AssessmentExposureReference": {
+        "description": "Identifies one CVE-linked reachable package version in a submitted source.",
+        "type": "object",
+        "properties": {
+          "cveId": {
+            "type": "string"
+          },
+          "packageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "cveId",
+          "packageId",
+          "sourceId"
+        ]
+      },
+      "AssessmentFinding": {
+        "type": "object",
+        "properties": {
+          "effect": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "nullable": true,
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "effect",
+          "kind",
+          "summary"
+        ]
+      },
+      "AssessmentQueueItem": {
+        "type": "object",
+        "properties": {
+          "assessmentId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid"
+          },
+          "candidate": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentCandidate"
+              }
+            ]
+          },
+          "candidateState": {
+            "$ref": "#/components/schemas/AssessmentCandidateState"
+          },
+          "detailUrl": {
+            "type": "string"
+          },
+          "exposure": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PackageSourceExposure"
+              }
+            ]
+          },
+          "id": {
+            "description": "Stable source/package/CVE key, or source key while resolution is incomplete.",
+            "type": "string"
+          },
+          "reachabilityTruncated": {
+            "type": "boolean"
+          },
+          "source": {
+            "$ref": "#/components/schemas/AssessmentSourceIdentity"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AssessmentReadState"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "verdict": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpgradeAssessmentVerdict"
+              }
+            ]
+          }
+        },
+        "required": [
+          "candidateState",
+          "detailUrl",
+          "id",
+          "reachabilityTruncated",
+          "source",
+          "state",
+          "updatedAt"
+        ]
+      },
+      "AssessmentQueueView": {
+        "type": "string",
+        "enum": [
+          "needs-review",
+          "processing",
+          "completed"
+        ]
+      },
+      "AssessmentReadState": {
+        "type": "string",
+        "enum": [
+          "not-assessed",
+          "processing",
+          "completed",
+          "failed",
+          "unavailable"
+        ]
+      },
+      "AssessmentSelectionState": {
+        "type": "string",
+        "enum": [
+          "selected",
+          "available"
+        ]
+      },
+      "AssessmentSemverCompatibility": {
+        "type": "string",
+        "enum": [
+          "compatible",
+          "incompatible",
+          "no-guarantee",
+          "unknown"
+        ]
+      },
+      "AssessmentSourceIdentity": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lifecycle": {
+            "type": "string"
+          },
+          "name": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "fileName",
+          "id",
+          "lifecycle"
+        ]
+      },
+      "AssessmentStatus": {
+        "type": "object",
+        "properties": {
+          "affectedPurl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "errorKind": {
+            "nullable": true,
+            "type": "string"
+          },
+          "errorMessage": {
+            "nullable": true,
+            "type": "string"
+          },
+          "exitStatus": {
+            "nullable": true,
+            "type": "integer",
+            "format": "int32"
+          },
+          "findingCount": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recommendation": {
+            "nullable": true,
+            "type": "string"
+          },
+          "retryable": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "sourceRepositoryUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "target": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "findingCount",
+          "id",
+          "state"
+        ]
+      },
+      "AssessmentWorkQueue": {
+        "type": "object",
+        "properties": {
+          "coverage": {
+            "description": "Counts refer only to the returned page. An unavailable dataset or an incomplete source means the full exposure count is unknown.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentCoverage"
+              }
+            ]
+          },
+          "dataStatus": {
+            "$ref": "#/components/schemas/DataStatus"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentQueueItem"
+            }
+          },
+          "nextCursor": {
+            "nullable": true,
+            "type": "string"
+          },
+          "view": {
+            "$ref": "#/components/schemas/AssessmentQueueView"
+          }
+        },
+        "required": [
+          "coverage",
+          "dataStatus",
+          "items",
+          "view"
+        ]
+      },
+      "CveIngestHealth": {
+        "type": "object",
+        "properties": {
+          "freshness": {
+            "type": "string"
+          },
+          "lastSuccessfulSyncAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "latestRun": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CveListSyncRunHealth"
+              }
+            ]
+          },
+          "latestSuccessfulCommit": {
+            "nullable": true,
+            "type": "string"
+          },
+          "recordsAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "freshness",
+          "recordsAvailable"
+        ]
+      },
+      "CveListSyncRunHealth": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "nullable": true,
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recordsInserted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recordsSeen": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recordsUpdated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkedAt",
+          "generation",
+          "recordsInserted",
+          "recordsSeen",
+          "recordsUpdated",
+          "status"
+        ]
+      },
+      "DataStatus": {
+        "description": "Bounded data-freshness information intended for browser users.",
+        "type": "object",
+        "properties": {
+          "cisaKev": {
+            "$ref": "#/components/schemas/DatasetDataStatus"
+          },
+          "cveList": {
+            "$ref": "#/components/schemas/DatasetDataStatus"
+          }
+        },
+        "required": [
+          "cisaKev",
+          "cveList"
+        ]
+      },
+      "DatasetDataStatus": {
+        "type": "object",
+        "properties": {
+          "assessmentImpact": {
+            "type": "string"
+          },
+          "availability": {
+            "type": "string"
+          },
+          "freshness": {
+            "type": "string"
+          },
+          "lastSuccessfulSyncAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "latestAttempt": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DatasetSyncAttempt"
+              }
+            ]
+          }
+        },
+        "required": [
+          "assessmentImpact",
+          "availability",
+          "freshness"
+        ]
+      },
+      "DatasetSyncAttempt": {
+        "type": "object",
+        "properties": {
+          "completedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "failureMessage": {
+            "nullable": true,
+            "description": "A stable, bounded message rather than upstream diagnostic output.",
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "startedAt",
+          "status"
+        ]
+      },
+      "Error": {
+        "description": "Error information from a response.",
+        "type": "object",
+        "properties": {
+          "error_code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "request_id"
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "HealthDiagnostics": {
+        "description": "Health information for operators, not untrusted API callers.",
+        "type": "object",
+        "properties": {
+          "cveIngest": {
+            "$ref": "#/components/schemas/CveIngestHealth"
+          },
+          "kevIngest": {
+            "$ref": "#/components/schemas/KevIngestHealth"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cveIngest",
+          "kevIngest",
+          "status"
+        ]
+      },
+      "KevIngestHealth": {
+        "type": "object",
+        "properties": {
+          "freshness": {
+            "type": "string"
+          },
+          "lastSuccessfulSyncAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "latestRun": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/KevSyncRunHealth"
+              }
+            ]
+          },
+          "recordsAvailable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "freshness",
+          "recordsAvailable"
+        ]
+      },
+      "KevSyncRunHealth": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "nullable": true,
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recordsInserted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recordsSeen": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recordsUpdated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkedAt",
+          "generation",
+          "recordsInserted",
+          "recordsSeen",
+          "recordsUpdated",
+          "status"
+        ]
+      },
+      "PackageSource": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "$ref": "#/components/schemas/PackageSourceEcosystem"
+          },
+          "fileName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "contents",
+          "displayName",
+          "ecosystem",
+          "fileName"
+        ]
+      },
+      "PackageSourceAttention": {
+        "type": "string",
+        "enum": [
+          "none",
+          "warnings",
+          "failed",
+          "exposure-data-unavailable"
+        ]
+      },
+      "PackageSourceEcosystem": {
+        "type": "string",
+        "enum": [
+          "npm"
+        ]
+      },
+      "PackageSourceExposure": {
+        "type": "object",
+        "properties": {
+          "cveId": {
+            "type": "string"
+          },
+          "kev": {
+            "$ref": "#/components/schemas/PackageSourceExposureKevContext"
+          },
+          "package": {
+            "$ref": "#/components/schemas/VersionedPackage"
+          }
+        },
+        "required": [
+          "cveId",
+          "kev",
+          "package"
+        ]
+      },
+      "PackageSourceExposureKevContext": {
+        "type": "object",
+        "properties": {
+          "dateAdded": {
+            "nullable": true,
+            "type": "string"
+          },
+          "product": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vendorProject": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vulnerabilityName": {
+            "nullable": true,
+            "type": "string"
+          }
+        }
+      },
+      "PackageSourceExposureSummaryStatus": {
+        "type": "string",
+        "enum": [
+          "available",
+          "unavailable",
+          "processing",
+          "failed",
+          "cancelled"
+        ]
+      },
+      "PackageSourceExposures": {
+        "type": "object",
+        "properties": {
+          "exposures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackageSourceExposure"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PackageSourceExposuresStatus"
+          }
+        },
+        "required": [
+          "exposures",
+          "id",
+          "status"
+        ]
+      },
+      "PackageSourceExposuresStatus": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "completed-with-warnings",
+          "failed"
+        ]
+      },
+      "PackageSourceFailureKind": {
+        "type": "string",
+        "enum": [
+          "validation",
+          "dependency-unavailable",
+          "resolution",
+          "internal"
+        ]
+      },
+      "PackageSourceLifecycle": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "processing",
+          "completed",
+          "completed-with-warnings",
+          "failed",
+          "cancelled"
+        ]
+      },
+      "PackageSourceList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackageSourceSummary"
+            }
+          },
+          "nextCursor": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PackageSourceOperationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PackageSourceOperationStatus"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
+      "PackageSourceOperationStatus": {
+        "type": "string",
+        "enum": [
+          "cancelled",
+          "deleting"
+        ]
+      },
+      "PackageSourceStatus": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending"
+                ]
+              }
+            },
+            "required": [
+              "attempt",
+              "createdAt",
+              "id",
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "processing"
+                ]
+              }
+            },
+            "required": [
+              "attempt",
+              "createdAt",
+              "id",
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "cancelledAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "cancelled"
+                ]
+              }
+            },
+            "required": [
+              "attempt",
+              "cancelledAt",
+              "createdAt",
+              "id",
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "completedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "source": {
+                "$ref": "#/components/schemas/PackageSource"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "completed"
+                ]
+              },
+              "versionedPackages": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VersionedPackage"
+                }
+              }
+            },
+            "required": [
+              "attempt",
+              "completedAt",
+              "createdAt",
+              "id",
+              "source",
+              "status",
+              "versionedPackages"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "completedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "source": {
+                "$ref": "#/components/schemas/PackageSource"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "completed-with-warnings"
+                ]
+              },
+              "versionedPackages": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VersionedPackage"
+                }
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PackageSourceWarning"
+                }
+              },
+              "warningsTruncated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "attempt",
+              "completedAt",
+              "createdAt",
+              "id",
+              "source",
+              "status",
+              "versionedPackages",
+              "warnings",
+              "warningsTruncated"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "diagnostic": {
+                "type": "string"
+              },
+              "finishedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "kind": {
+                "$ref": "#/components/schemas/PackageSourceFailureKind"
+              },
+              "previousVersionedPackages": {
+                "description": "The last successfully published reachable-version snapshot, if any.\n\nA failed re-elaboration does not replace the prior snapshot, so callers can continue to inspect it while acting on `diagnostic`.",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VersionedPackage"
+                }
+              },
+              "retryable": {
+                "description": "Whether the automatic-retry service would still retry a failure of this kind; does not by itself mean an automatic retry is scheduled, since the automatic-attempt budget may already be exhausted.",
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "failed"
+                ]
+              }
+            },
+            "required": [
+              "attempt",
+              "createdAt",
+              "diagnostic",
+              "finishedAt",
+              "id",
+              "kind",
+              "previousVersionedPackages",
+              "retryable",
+              "status"
+            ]
+          }
+        ]
+      },
+      "PackageSourceSummary": {
+        "type": "object",
+        "properties": {
+          "activityAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attention": {
+            "$ref": "#/components/schemas/PackageSourceAttention"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "$ref": "#/components/schemas/PackageSourceEcosystem"
+          },
+          "exposureCount": {
+            "nullable": true,
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "exposureStatus": {
+            "$ref": "#/components/schemas/PackageSourceExposureSummaryStatus"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/PackageSourceLifecycle"
+          },
+          "reachablePackageCount": {
+            "nullable": true,
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "resolutionAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "activityAt",
+          "attention",
+          "createdAt",
+          "displayName",
+          "ecosystem",
+          "exposureStatus",
+          "id",
+          "lifecycle"
+        ]
+      },
+      "PackageSourceWarning": {
+        "type": "object",
+        "properties": {
+          "declaredByPurl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "dependencyName": {
+            "type": "string"
+          },
+          "message": {
+            "description": "A fixed explanation that does not include untrusted registry content.",
+            "type": "string"
+          },
+          "specificationKind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dependencyName",
+          "message",
+          "specificationKind"
+        ]
+      },
+      "PostAssessmentBody": {
+        "type": "object",
+        "properties": {
+          "affectedPurl": {
+            "type": "string"
+          },
+          "targetPurl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "affectedPurl",
+          "targetPurl"
+        ],
+        "additionalProperties": false
+      },
+      "PostAssessmentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "PostPackageSourceBody": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "contents",
+          "fileName"
+        ],
+        "additionalProperties": false
+      },
+      "PostPackageSourceResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "PostUpgradeAssessmentResponse": {
+        "type": "object",
+        "properties": {
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resultUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UpgradeAssessmentWorkflowStatus"
+          },
+          "statusUrl": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "createdAt",
+          "id",
+          "status"
+        ]
+      },
+      "UpgradeAssessmentCandidateVersion": {
+        "type": "object",
+        "properties": {
+          "isRequestedCandidate": {
+            "type": "boolean"
+          },
+          "releaseTimestamp": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "upgradeDistance": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpgradeAssessmentUpgradeDistance"
+              }
+            ]
+          },
+          "verdict": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpgradeAssessmentVerdict"
+              }
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "isRequestedCandidate",
+          "version"
+        ]
+      },
+      "UpgradeAssessmentCaveat": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "summary"
+        ]
+      },
+      "UpgradeAssessmentError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "nullable": true,
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "UpgradeAssessmentEvidence": {
+        "type": "object",
+        "properties": {
+          "details": {
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "rawSourceIdentifiers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceType": {
+            "$ref": "#/components/schemas/UpgradeAssessmentEvidenceSourceType"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sourceType",
+          "summary",
+          "title"
+        ]
+      },
+      "UpgradeAssessmentEvidenceSourceType": {
+        "type": "string",
+        "enum": [
+          "vulnerabilityDatabase",
+          "kev",
+          "hipcheck",
+          "packageRegistry",
+          "internalAnalysis"
+        ]
+      },
+      "UpgradeAssessmentFinding": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/UpgradeAssessmentFindingCategory"
+          },
+          "confidence": {
+            "nullable": true,
+            "type": "string"
+          },
+          "effect": {
+            "$ref": "#/components/schemas/UpgradeAssessmentFindingEffect"
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "severity": {
+            "nullable": true,
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "effect",
+          "id",
+          "summary",
+          "title"
+        ]
+      },
+      "UpgradeAssessmentFindingCategory": {
+        "type": "string",
+        "enum": [
+          "vulnerability",
+          "supplyChain",
+          "missingEvidence",
+          "caveatTrigger"
+        ]
+      },
+      "UpgradeAssessmentFindingEffect": {
+        "type": "string",
+        "enum": [
+          "blocking",
+          "review",
+          "context",
+          "missingCheck"
+        ]
+      },
+      "UpgradeAssessmentInput": {
+        "type": "object",
+        "properties": {
+          "candidateVersion": {
+            "nullable": true,
+            "type": "string"
+          },
+          "cveLinkage": {
+            "nullable": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exposure": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentExposureReference"
+              }
+            ]
+          },
+          "kevLinkage": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpgradeAssessmentKevLinkage"
+              }
+            ]
+          },
+          "packageSource": {
+            "$ref": "#/components/schemas/UpgradeAssessmentPackageSourceInput"
+          },
+          "vulnerablePackage": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpgradeAssessmentVulnerablePackageInput"
+              }
+            ]
+          }
+        },
+        "required": [
+          "packageSource"
+        ],
+        "additionalProperties": false
+      },
+      "UpgradeAssessmentKevLinkage": {
+        "type": "object",
+        "properties": {
+          "cveIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "knownExploited": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UpgradeAssessmentPackageSourceInput": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "$ref": "#/components/schemas/PackageSourceEcosystem"
+          },
+          "fileName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "contents",
+          "ecosystem",
+          "fileName"
+        ]
+      },
+      "UpgradeAssessmentResult": {
+        "type": "object",
+        "properties": {
+          "assessedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "candidateVersions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpgradeAssessmentCandidateVersion"
+            }
+          },
+          "caveats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpgradeAssessmentCaveat"
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpgradeAssessmentEvidence"
+            }
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpgradeAssessmentFinding"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpgradeAssessmentInput"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UpgradeAssessmentWorkflowStatus"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/UpgradeAssessmentVerdict"
+          }
+        },
+        "required": [
+          "assessedAt",
+          "candidateVersions",
+          "caveats",
+          "evidence",
+          "findings",
+          "id",
+          "input",
+          "status",
+          "summary",
+          "verdict"
+        ]
+      },
+      "UpgradeAssessmentStatus": {
+        "type": "object",
+        "properties": {
+          "completedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UpgradeAssessmentError"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UpgradeAssessmentWorkflowStatus"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "createdAt",
+          "id",
+          "status",
+          "updatedAt"
+        ]
+      },
+      "UpgradeAssessmentUpgradeDistance": {
+        "type": "string",
+        "enum": [
+          "patch",
+          "minor",
+          "major",
+          "unknown"
+        ]
+      },
+      "UpgradeAssessmentVerdict": {
+        "type": "string",
+        "enum": [
+          "recommended",
+          "caution",
+          "avoid",
+          "unknown"
+        ]
+      },
+      "UpgradeAssessmentVulnerablePackageInput": {
+        "type": "object",
+        "properties": {
+          "ecosystem": {
+            "$ref": "#/components/schemas/PackageSourceEcosystem"
+          },
+          "name": {
+            "type": "string"
+          },
+          "purl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ecosystem",
+          "name",
+          "version"
+        ]
+      },
+      "UpgradeAssessmentWorkflowStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "completed",
+          "failed"
+        ]
+      },
+      "VersionedPackage": {
+        "type": "object",
+        "properties": {
+          "derivations": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "ecosystem": {
+            "$ref": "#/components/schemas/PackageSourceEcosystem"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "purl": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "derivations",
+          "ecosystem",
+          "id",
+          "name",
+          "purl",
+          "version"
+        ]
+      },
+      "PackageSourceListDirection": {
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "PackageSourceListFilter": {
+        "type": "string",
+        "enum": [
+          "all",
+          "needs-attention",
+          "processing",
+          "failed"
+        ]
+      },
+      "PackageSourceListSort": {
+        "type": "string",
+        "enum": [
+          "activity",
+          "identity",
+          "lifecycle",
+          "resolution-time",
+          "reachable-packages",
+          "exposures"
+        ]
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

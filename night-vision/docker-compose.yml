@@ -1,0 +1,133 @@
+x-common-service: &common-service
+  # Shared lifecycle, resource, and logging defaults.
+  restart: unless-stopped
+  stop_grace_period: 30s
+  cpus: 1.0
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  nv-app:
+    <<: *common-service
+    image: ${NV_APP_IMAGE:?NV_APP_IMAGE is required}
+    labels:
+      org.opencontainers.image.source: "https://github.com/mitre/hipcheck/night-vision"
+      org.opencontainers.image.title: "Night Vision App"
+      org.opencontainers.image.description: "Night Vision frontend application"
+    init: true
+    mem_limit: 256m
+    read_only: true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://nv-server:8080}
+      HOST: 0.0.0.0
+      PORT: 3000
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    networks:
+      - public
+
+  nv-server:
+    <<: *common-service
+    image: ${NV_SERVER_IMAGE:?NV_SERVER_IMAGE is required}
+    labels:
+      org.opencontainers.image.source: "https://github.com/mitre/hipcheck/night-vision"
+      org.opencontainers.image.title: "Night Vision Server"
+      org.opencontainers.image.description: "Night Vision backend server"
+    init: true
+    mem_limit: 2g
+    read_only: true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    volumes:
+      # The root filesystem stays read-only, but CVE List Git sync needs a
+      # persistent writable parent directory for its checkout path.
+      - nv-server-cache:/var/cache/night-vision
+      # Hipcheck artifacts are part of the immutable backend image. Only its
+      # bounded cache and Night Vision-managed work/data directory are writable.
+      - nv-server-hipcheck-data:/var/lib/night-vision/hipcheck
+    secrets:
+      - source: nv-server-database-url
+        target: nv-server/database-url
+      - source: health-diagnostics-token
+        target: nv-server/health-diagnostics-token
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error http://127.0.0.1:8080/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    networks:
+      - public
+      - database
+
+  postgres:
+    <<: *common-service
+    # NOTE: Keep this version synced with the PostgreSQL version set in `.flox/env/manifest.toml`.
+    image: postgres:18.4
+    # The official image defines this user and can initialize a fresh volume without root.
+    user: postgres
+    labels:
+      org.opencontainers.image.source: "https://github.com/mitre/hipcheck/night-vision"
+      org.opencontainers.image.title: "Night Vision PostgreSQL"
+      org.opencontainers.image.description: "Night Vision development database"
+    mem_limit: 2g
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres/password
+    secrets:
+      - source: postgres-password
+        target: postgres/password
+    healthcheck:
+      test:
+        ["CMD-SHELL", 'pg_isready -d "$${POSTGRES_DB}" -U "$${POSTGRES_USER}"']
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    volumes:
+      # PostgreSQL 18+ stores data in a major-versioned subdirectory under this path.
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - database
+
+volumes:
+  nv-server-cache:
+  nv-server-hipcheck-data:
+  postgres-data:
+
+networks:
+  public:
+  database:
+    # Keep PostgreSQL reachable only by services attached to this Compose network.
+    internal: true
+
+secrets:
+  nv-server-database-url:
+    file: ${NV_SERVER_DATABASE_URL_SECRET_FILE:?NV_SERVER_DATABASE_URL_SECRET_FILE is required}
+  health-diagnostics-token:
+    file: ${HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE:?HEALTH_DIAGNOSTICS_TOKEN_SECRET_FILE is required}
+  postgres-password:
+    file: ${POSTGRES_PASSWORD_SECRET_FILE:?POSTGRES_PASSWORD_SECRET_FILE is required}

@@ -1,0 +1,4 @@
+# This is an example Spookey file.
+
+some-key = some value
+another-key = "another value"

@@ -1,0 +1,37 @@
+[package]
+name = "nv-server"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+camino.workspace = true
+# We'd prefer to use `jiff` over `chrono`, but `dropshot` depends on
+# an old version of `schemars` that doesn't support `jiff`. When we
+# can use a newer version of `schemars`, we should switch to using
+# `jiff`.
+chrono.workspace = true
+clap.workspace = true
+clap-verbosity-flag.workspace = true
+dropshot.workspace = true
+http.workspace = true
+nv-common.workspace = true
+nv-server-api.workspace = true
+percent-encoding.workspace = true
+sea-orm.workspace = true
+secrecy.workspace = true
+semver.workspace = true
+serde_json.workspace = true
+slog.workspace = true
+subtle.workspace = true
+tokio.workspace = true
+url.workspace = true
+uuid.workspace = true
+workspace-hack.workspace = true
+
+[dev-dependencies]
+httpmock.workspace = true
+sea-orm = { workspace = true, features = ["mock"] }

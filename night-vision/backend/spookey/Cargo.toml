@@ -1,0 +1,14 @@
+[package]
+name = "spookey"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+
+# We purposefully do not have dependencies in `spookey`.
+# It's intended to be simple and to compile as fast as possible.
+# Please do not add dependencies.

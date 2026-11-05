@@ -1,0 +1,20 @@
+// Night Vision MVP Hipcheck policy.
+//
+// The manifest is local and the executable is built from the commit documented
+// in ../README.md. Do not replace it with an HTTPS manifest or a version range:
+// that would reintroduce floating plugin resolution.
+plugins {
+    plugin "mitre/binary" version="0.0.0" manifest="/var/cache/night-vision/hipcheck/plugins/binary/local-release-plugin.kdl"
+}
+
+analyze {
+    investigate policy="(gt 0.5 $)"
+    investigate-if-fail "mitre/binary"
+
+    category "night-vision-mvp" {
+        analysis "mitre/binary" {
+            binary-file #rel("Binary.kdl")
+            binary-file-threshold 0
+        }
+    }
+}

@@ -1,0 +1,28 @@
+
+[advisories]
+# Advisory IDs to ignore. Each should be accompanied with an explanation of *why* we're ignoring
+# the advisory, so we can re-assess the reasoning in the future.
+ignore = [
+    # This vulnerability in the `rsa` crate shows up for us as part of `sqlx`'s MySQL integration
+    # logic. We aren't using MySQL, so we don't run any of the vulnerable code in question.
+    "RUSTSEC-2023-0071",
+
+    # This is the notice for the `paste` crate being unmaintained. While `paste` *is* unmaintained,
+    # it's also effectively "done," in that it does the things it's supposed to do well enough.
+    # If something did happen to require a security response in `paste` that would be very
+    # surprising, and would also be big news within the Rust community given how widely `paste`
+    # continues to be used. As such, we're comfortable silencing this notice.
+    "RUSTSEC-2024-0436",
+
+    # This is an unmaintained notice for `proc-macro-error2`. We're not supremely concerned about
+    # unmaintained notices right now.
+    "RUSTSEC-2026-0173",
+
+    # Ditto, also an unmaintained notice. This one for `rustls-pemfile`.
+    "RUSTSEC-2025-0134",
+
+    # `rust_decimal` includes optional `rkyv` in Cargo.lock, but no backend package enables
+    # the `rust_decimal` `rkyv` feature. We do not build or use this dependency, though
+    # `cargo audit` reports it because it scans every package recorded in the lockfile.
+    "RUSTSEC-2026-0235"
+]

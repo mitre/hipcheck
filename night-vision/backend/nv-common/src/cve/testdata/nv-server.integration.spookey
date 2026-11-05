@@ -1,0 +1,10 @@
+# Configuration for ignored CVE List Postgres integration tests.
+#
+# The database name intentionally contains "integration" so the test safety
+# check accepts it as disposable. Override this file with
+# NV_POSTGRES_INTEGRATION_CONFIG_PATH when your local Postgres setup needs
+# different connection details.
+
+server-address = "127.0.0.1:0"
+database-connection = "postgres://localhost:5432/nv_integration_test"
+cve-list-checkout-path = "target/cve-list-integration/cvelistV5"

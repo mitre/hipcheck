@@ -1,0 +1,121 @@
+import type {
+	GetPackageSourceErrors,
+	GetPackageSourceResponse,
+	GetPackageSourceResponses,
+	GetPackageSourceExposuresErrors,
+	GetPackageSourceExposuresResponse,
+	GetPackageSourceExposuresResponses,
+	GetUpgradeAssessmentErrors,
+	GetUpgradeAssessmentResponse,
+	GetUpgradeAssessmentResponses,
+	GetUpgradeAssessmentResultErrors,
+	GetUpgradeAssessmentResultResponse,
+	GetUpgradeAssessmentResultResponses,
+	ListPackageSourcesData,
+	ListPackageSourcesErrors,
+	ListPackageSourcesResponse,
+	ListPackageSourcesResponses,
+	PostPackageSourceBody,
+	PostPackageSourceErrors,
+	PostPackageSourceResponse,
+	PostPackageSourceResponses,
+	PostUpgradeAssessmentData,
+	PostUpgradeAssessmentErrors,
+	PostUpgradeAssessmentResponse,
+	PostUpgradeAssessmentResponses
+} from '$lib/api/generated';
+import type { Client } from '$lib/api/generated/client/types.gen';
+import { normalizeApiError, type ApiError } from '$lib/api/errors';
+import { nightVisionClient } from './api-client';
+
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiError };
+
+type ClientResult<T> = { data?: T; error?: unknown; request?: Request; response?: Response };
+
+const isApiResultTerminal = <T>(result: ApiResult<T>, isTerminalStatus: (value: T) => boolean): boolean =>
+	result.ok ? isTerminalStatus(result.data) : !result.error.retryable;
+
+const toApiResult = <T>({ data, error, request, response }: ClientResult<T>): ApiResult<T> => {
+	if (error !== undefined || data === undefined) return { ok: false, error: normalizeApiError({ error, request, response }) };
+
+	return { ok: true, data };
+};
+
+/** Typed helpers are the only supported route-facing API boundary. */
+export const createNightVisionApi = (client: Client = nightVisionClient) => ({
+	submitPackageSource: async (body: PostPackageSourceBody): Promise<ApiResult<PostPackageSourceResponse>> =>
+		toApiResult(
+			await client.post<PostPackageSourceResponses, PostPackageSourceErrors>({
+				url: '/package-sources',
+				body
+			})
+		),
+
+	listPackageSources: async (
+		query?: ListPackageSourcesData['query']
+	): Promise<ApiResult<ListPackageSourcesResponse>> =>
+		toApiResult(
+			await client.get<ListPackageSourcesResponses, ListPackageSourcesErrors>({
+				url: '/package-sources',
+				query
+			})
+		),
+
+	getPackageSourceStatus: async (
+		id: string,
+		requestOptions?: Pick<RequestInit, 'signal'>
+	): Promise<ApiResult<GetPackageSourceResponse>> =>
+		toApiResult(
+			await client.get<GetPackageSourceResponses, GetPackageSourceErrors>({
+				url: '/package-sources/{id}',
+				path: { id },
+				...requestOptions
+			})
+		),
+
+	getPackageSourceExposures: async (id: string): Promise<ApiResult<GetPackageSourceExposuresResponse>> =>
+		toApiResult(
+			await client.get<GetPackageSourceExposuresResponses, GetPackageSourceExposuresErrors>({
+				url: '/package-sources/{id}/exposures',
+				path: { id }
+			})
+		),
+
+	submitUpgradeAssessment: async (
+		body: PostUpgradeAssessmentData['body']
+	): Promise<ApiResult<PostUpgradeAssessmentResponse>> =>
+		toApiResult(
+			await client.post<PostUpgradeAssessmentResponses, PostUpgradeAssessmentErrors>({
+				url: '/upgrade-assessments',
+				body
+			})
+		),
+
+	getUpgradeAssessmentStatus: async (
+		id: string,
+		requestOptions?: Pick<RequestInit, 'signal'>
+	): Promise<ApiResult<GetUpgradeAssessmentResponse>> =>
+		toApiResult(
+			await client.get<GetUpgradeAssessmentResponses, GetUpgradeAssessmentErrors>({
+				url: '/upgrade-assessments/{id}',
+				path: { id },
+				...requestOptions
+			})
+		),
+
+	getUpgradeAssessmentResult: async (id: string): Promise<ApiResult<GetUpgradeAssessmentResultResponse>> =>
+		toApiResult(
+			await client.get<GetUpgradeAssessmentResultResponses, GetUpgradeAssessmentResultErrors>({
+				url: '/upgrade-assessments/{id}/result',
+				path: { id }
+			})
+		)
+});
+
+export const nightVisionApi = createNightVisionApi();
+
+export const isPackageSourceTerminal = (status: ApiResult<GetPackageSourceResponse>): boolean =>
+	isApiResultTerminal(status, (value) => value.status !== 'processing');
+
+export const isUpgradeAssessmentTerminal = (status: ApiResult<GetUpgradeAssessmentResponse>): boolean =>
+	isApiResultTerminal(status, (value) => value.status !== 'pending');
