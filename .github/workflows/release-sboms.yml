@@ -1,0 +1,140 @@
+name: Release SBOMs
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to generate SBOMs for (for example: hipcheck-v3.15.0)"
+        required: true
+      publish:
+        description: "Upload generated SBOMs back to the GitHub Release"
+        required: true
+        default: "false"
+
+permissions: {}
+
+jobs:
+  generate-release-sboms:
+    name: Generate release SBOMs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+      SYFT_VERSION: v1.55.0
+      SYFT_TGZ: syft_1.55.0_linux_amd64.tar.gz
+      SYFT_SHA256: bb65249542db5fedeeb4d3f9b018b75e7264dbfbbb10486f044581a92f90490d
+    steps:
+      - name: Download release artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p artifacts
+
+          gh release download "$RELEASE_TAG" \
+            --pattern 'hipcheck-aarch64-apple-darwin.tar.xz' \
+            --pattern 'hipcheck-aarch64-unknown-linux-gnu.tar.xz' \
+            --pattern 'hipcheck-x86_64-apple-darwin.tar.xz' \
+            --pattern 'hipcheck-x86_64-unknown-linux-gnu.tar.xz' \
+            --pattern 'hipcheck-x86_64-pc-windows-msvc.zip' \
+            --dir artifacts
+
+      - name: Verify downloaded release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for artifact in \
+            hipcheck-aarch64-apple-darwin.tar.xz \
+            hipcheck-aarch64-unknown-linux-gnu.tar.xz \
+            hipcheck-x86_64-apple-darwin.tar.xz \
+            hipcheck-x86_64-unknown-linux-gnu.tar.xz \
+            hipcheck-x86_64-pc-windows-msvc.zip
+          do
+            if [[ ! -f "artifacts/$artifact" ]]; then
+              echo "Expected release artifact not found: artifacts/$artifact" >&2
+              exit 1
+            fi
+          done
+
+          ls -1 artifacts
+
+      - name: Install Syft
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl --proto '=https' --tlsv1.2 -sSfL \
+            -o "$SYFT_TGZ" \
+            "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/${SYFT_TGZ}"
+
+          echo "${SYFT_SHA256}  ${SYFT_TGZ}" | sha256sum -c -
+
+          tar -xzf "$SYFT_TGZ" syft
+          install -m 0755 syft "$HOME/.local/bin/syft"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+          "$HOME/.local/bin/syft" version
+
+      - name: Generate SPDX 2.3 and 3.0 SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for artifact in \
+            hipcheck-aarch64-apple-darwin.tar.xz \
+            hipcheck-aarch64-unknown-linux-gnu.tar.xz \
+            hipcheck-x86_64-apple-darwin.tar.xz \
+            hipcheck-x86_64-unknown-linux-gnu.tar.xz \
+            hipcheck-x86_64-pc-windows-msvc.zip
+          do
+            echo "Generating SPDX 2.3 SBOM for $artifact"
+            syft "artifacts/$artifact" -o spdx-json > "artifacts/$artifact.spdx-2.3.json"
+
+            echo "Generating SPDX 3.0 SBOM for $artifact"
+            syft "artifacts/$artifact" -o spdx-3-json > "artifacts/$artifact.spdx-3.0.json"
+          done
+
+      - name: Verify generated SBOM files
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -1 artifacts/*.spdx-2.3.json artifacts/*.spdx-3.0.json
+
+      - name: Upload SBOMs as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-sboms
+          path: |
+            artifacts/*.spdx-2.3.json
+            artifacts/*.spdx-3.0.json
+
+  upload-release-sboms:
+    name: Upload release SBOMs to GitHub Release
+    needs: generate-release-sboms
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' || github.event.inputs.publish == 'true' }}
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+    steps:
+      - name: Download generated SBOMs
+        uses: actions/download-artifact@v4
+        with:
+          name: release-sboms
+          path: artifacts
+
+      - name: Upload SBOMs to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release upload "$RELEASE_TAG" artifacts/*.spdx-2.3.json artifacts/*.spdx-3.0.json --clobber
