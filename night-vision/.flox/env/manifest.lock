@@ -1,0 +1,3378 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "schema-version": "1.12.0",
+    "install": {
+      "cargo": {
+        "pkg-path": "cargo",
+        "pkg-group": "rust-toolchain",
+        "version": "1.95.0"
+      },
+      "cargo-audit": {
+        "pkg-path": "cargo-audit"
+      },
+      "cargo-autoinherit": {
+        "pkg-path": "cargo-autoinherit"
+      },
+      "cargo-chef": {
+        "pkg-path": "cargo-chef",
+        "version": "0.1.77"
+      },
+      "cargo-hakari": {
+        "pkg-path": "cargo-hakari"
+      },
+      "cargo-mutants": {
+        "pkg-path": "cargo-mutants"
+      },
+      "cargo-nextest": {
+        "pkg-path": "cargo-nextest"
+      },
+      "cargo-outdated": {
+        "pkg-path": "cargo-outdated"
+      },
+      "cargo-udeps": {
+        "pkg-path": "cargo-udeps"
+      },
+      "clippy": {
+        "pkg-path": "clippy",
+        "pkg-group": "rust-toolchain"
+      },
+      "gcc": {
+        "pkg-path": "gcc",
+        "systems": [
+          "aarch64-linux",
+          "x86_64-linux"
+        ]
+      },
+      "git": {
+        "pkg-path": "git"
+      },
+      "glab": {
+        "pkg-path": "glab"
+      },
+      "graphviz": {
+        "pkg-path": "graphviz"
+      },
+      "jujutsu": {
+        "pkg-path": "jujutsu"
+      },
+      "libiconv": {
+        "pkg-path": "libiconv",
+        "systems": [
+          "aarch64-darwin",
+          "x86_64-darwin"
+        ]
+      },
+      "nodejs_24": {
+        "pkg-path": "nodejs_24"
+      },
+      "pgadmin4": {
+        "pkg-path": "pgadmin4"
+      },
+      "pnpm": {
+        "pkg-path": "pnpm",
+        "version": "11.4.0"
+      },
+      "postgresql_18": {
+        "pkg-path": "postgresql_18"
+      },
+      "rust-analyzer": {
+        "pkg-path": "rust-analyzer"
+      },
+      "rust-lib-src": {
+        "pkg-path": "rustPlatform.rustLibSrc",
+        "pkg-group": "rust-toolchain"
+      },
+      "rustc": {
+        "pkg-path": "rustc",
+        "pkg-group": "rust-toolchain"
+      },
+      "rustfmt": {
+        "pkg-path": "rustfmt",
+        "pkg-group": "rust-toolchain"
+      },
+      "sea-orm-cli": {
+        "pkg-path": "sea-orm-cli"
+      },
+      "sed": {
+        "pkg-path": "gnused"
+      },
+      "shellcheck": {
+        "pkg-path": "shellcheck"
+      }
+    },
+    "options": {
+      "systems": [
+        "aarch64-darwin",
+        "x86_64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ]
+    }
+  },
+  "packages": [
+    {
+      "attr_path": "cargo",
+      "broken": false,
+      "derivation": "/nix/store/b14dqy4kjc9q9jrlhky152garvv35hpz-cargo-1.95.0.drv",
+      "description": "Downloads your Rust project's dependencies and builds your project",
+      "install_id": "cargo",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "cargo-1.95.0",
+      "pname": "cargo",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:13:13.733229Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/2vdxz4xwplgb5rgfhqr0jr85fd7qqgmb-cargo-1.95.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo",
+      "broken": false,
+      "derivation": "/nix/store/x38r6h8lcv13fan2pp27kcwvb06qagrn-cargo-1.95.0.drv",
+      "description": "Downloads your Rust project's dependencies and builds your project",
+      "install_id": "cargo",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "cargo-1.95.0",
+      "pname": "cargo",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:44:08.093160Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/f8rxcxfwk1qhazprqnfji401x08xp9dr-cargo-1.95.0"
+      },
+      "system": "aarch64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo",
+      "broken": false,
+      "derivation": "/nix/store/pvwl1nixrgwmgqa82ka4f8977qyd2iky-cargo-1.95.0.drv",
+      "description": "Downloads your Rust project's dependencies and builds your project",
+      "install_id": "cargo",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "cargo-1.95.0",
+      "pname": "cargo",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:13:05.992821Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5z8rq35zk9jqnnfw4m49fwpgq7phdhai-cargo-1.95.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo",
+      "broken": false,
+      "derivation": "/nix/store/nq57nj4q6nqfbqvy36n0zsy4qzbqcy4r-cargo-1.95.0.drv",
+      "description": "Downloads your Rust project's dependencies and builds your project",
+      "install_id": "cargo",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "cargo-1.95.0",
+      "pname": "cargo",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:47:04.115485Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/z480b23kymbmrijrl49246mrzyphli15-cargo-1.95.0"
+      },
+      "system": "x86_64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "clippy",
+      "broken": false,
+      "derivation": "/nix/store/q0q9zkyyssgcaz3q8h0sygylf1wsac7a-clippy-1.95.0.drv",
+      "description": "Bunch of lints to catch common mistakes and improve your Rust code",
+      "install_id": "clippy",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "clippy-1.95.0",
+      "pname": "clippy",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:13:13.927927Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/zzzj3civ800ml2hv9czssyzsbfxl2ss7-clippy-1.95.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "clippy",
+      "broken": false,
+      "derivation": "/nix/store/kkic99bv2aw2567drfs4sqpawcz2589y-clippy-1.95.0.drv",
+      "description": "Bunch of lints to catch common mistakes and improve your Rust code",
+      "install_id": "clippy",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "clippy-1.95.0",
+      "pname": "clippy",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:44:08.340930Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/a9j78978hxxwwbr7nbbmwl110ljsv192-clippy-1.95.0-debug",
+        "out": "/nix/store/03g145gvrijz5wryc6538m3ayzgbmlq0-clippy-1.95.0"
+      },
+      "system": "aarch64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "clippy",
+      "broken": false,
+      "derivation": "/nix/store/hxq96whjslqccrq1225yn4bygvlwxg8s-clippy-1.95.0.drv",
+      "description": "Bunch of lints to catch common mistakes and improve your Rust code",
+      "install_id": "clippy",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "clippy-1.95.0",
+      "pname": "clippy",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:13:06.193420Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/ipr8v8md5glz2c6nd1zi7193s62va753-clippy-1.95.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "clippy",
+      "broken": false,
+      "derivation": "/nix/store/p4ljsv7dv7pshx5vx98556hywhzqm2ak-clippy-1.95.0.drv",
+      "description": "Bunch of lints to catch common mistakes and improve your Rust code",
+      "install_id": "clippy",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "clippy-1.95.0",
+      "pname": "clippy",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:47:04.382852Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/clml4f18gybrzp40n0mhq8kv0rw98rmq-clippy-1.95.0-debug",
+        "out": "/nix/store/42vpa7gg09gs6x9v4y7aizmxwmrc35ac-clippy-1.95.0"
+      },
+      "system": "x86_64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustPlatform.rustLibSrc",
+      "broken": false,
+      "derivation": "/nix/store/py3d3rzb3w2gbwpwf1ni3js616s1f09n-rust-lib-src.drv",
+      "install_id": "rust-lib-src",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rust-lib-src",
+      "pname": "rustLibSrc",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:16:20.414964Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "rust-lib-src",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/8ppj5bksxfg8js9g5hdh3ixp8p26ryh8-rust-lib-src"
+      },
+      "system": "aarch64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustPlatform.rustLibSrc",
+      "broken": false,
+      "derivation": "/nix/store/xqa1irwks15wlv89vw09bz5iz64gjc5s-rust-lib-src.drv",
+      "install_id": "rust-lib-src",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rust-lib-src",
+      "pname": "rustLibSrc",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:48:05.957935Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "rust-lib-src",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/kqmadl7aslp212n9dkyjmzi69v7rirnp-rust-lib-src"
+      },
+      "system": "aarch64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustPlatform.rustLibSrc",
+      "broken": false,
+      "derivation": "/nix/store/g0ak8hi052hmrq9df3iz7sdjwzkg8cly-rust-lib-src.drv",
+      "install_id": "rust-lib-src",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rust-lib-src",
+      "pname": "rustLibSrc",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:16:14.660266Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "rust-lib-src",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/17bg4qab9q04yy0r3zxwbcpwpf6dvzbz-rust-lib-src"
+      },
+      "system": "x86_64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustPlatform.rustLibSrc",
+      "broken": false,
+      "derivation": "/nix/store/pmy61a1cx8m0xi9rqdl0r7m6ffjmhbv2-rust-lib-src.drv",
+      "install_id": "rust-lib-src",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rust-lib-src",
+      "pname": "rustLibSrc",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:51:10.278867Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "rust-lib-src",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/q6kjf0h1czkacdiqmv79rc6nkj6s146m-rust-lib-src"
+      },
+      "system": "x86_64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustc",
+      "broken": false,
+      "derivation": "/nix/store/chj302xb4r0gdw2zsgzrxf84vn1bd7p7-rustc-wrapper-1.95.0.drv",
+      "description": "Safe, concurrent, practical language (wrapper script)",
+      "install_id": "rustc",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rustc-wrapper-1.95.0",
+      "pname": "rustc",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:14:54.756317Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/2wiph2c9mpr0gbgan0ixpnr51pdfhlhj-rustc-wrapper-1.95.0-doc",
+        "man": "/nix/store/zwylsaxwxgmbl38n3n38ym2yp8d4vh3l-rustc-wrapper-1.95.0-man",
+        "out": "/nix/store/z8dhxkw9d2bclp4hj4byyxmbihr8w4an-rustc-wrapper-1.95.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustc",
+      "broken": false,
+      "derivation": "/nix/store/iv46lzakjch73hmhykj7mfg597m8ww88-rustc-wrapper-1.95.0.drv",
+      "description": "Safe, concurrent, practical language (wrapper script)",
+      "install_id": "rustc",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rustc-wrapper-1.95.0",
+      "pname": "rustc",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:46:19.640328Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/wqzfi80f80r689n3knjqsn31zqz68z4q-rustc-wrapper-1.95.0-doc",
+        "man": "/nix/store/p3azdhlb0nk5kz1wqc22v7srwsb37m24-rustc-wrapper-1.95.0-man",
+        "out": "/nix/store/nh052ln9q9r24p3rb6zxiqqjy4anxa56-rustc-wrapper-1.95.0"
+      },
+      "system": "aarch64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustc",
+      "broken": false,
+      "derivation": "/nix/store/c33qqjp7kilbdll2yaq02y3rsnim7349-rustc-wrapper-1.95.0.drv",
+      "description": "Safe, concurrent, practical language (wrapper script)",
+      "install_id": "rustc",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rustc-wrapper-1.95.0",
+      "pname": "rustc",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:14:48.783178Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/z0jj0z80mr79c8z5mrw8k8rmp9jn43zh-rustc-wrapper-1.95.0-doc",
+        "man": "/nix/store/2cvnw62k02n4afiahfrip1ambv8c2489-rustc-wrapper-1.95.0-man",
+        "out": "/nix/store/6b0k5kdmlfl91qa8mk3ssfgvskqkvy4r-rustc-wrapper-1.95.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustc",
+      "broken": false,
+      "derivation": "/nix/store/fjx6b96cdywqd2c90gcysflc82aqk4pa-rustc-wrapper-1.95.0.drv",
+      "description": "Safe, concurrent, practical language (wrapper script)",
+      "install_id": "rustc",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rustc-wrapper-1.95.0",
+      "pname": "rustc",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:49:22.177030Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/m4rhqgg9qqkjy7zv9jg4z21fm92y82r2-rustc-wrapper-1.95.0-doc",
+        "man": "/nix/store/ivd567y3li0c80h3z5w77nh8m1ga340h-rustc-wrapper-1.95.0-man",
+        "out": "/nix/store/wnhmqix7bippbbzasj29qiyb422g9asg-rustc-wrapper-1.95.0"
+      },
+      "system": "x86_64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustfmt",
+      "broken": false,
+      "derivation": "/nix/store/j2j1v4b9v8ghdchz3gjzyzpzsc5bk626-rustfmt-1.95.0.drv",
+      "description": "Tool for formatting Rust code according to style guidelines",
+      "install_id": "rustfmt",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rustfmt-1.95.0",
+      "pname": "rustfmt",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:14:54.784367Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/mpb5lx4grh44xg95mim3f2sbarwl13hv-rustfmt-1.95.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustfmt",
+      "broken": false,
+      "derivation": "/nix/store/8xhn34a7297mm63rdxa503200ydv621d-rustfmt-1.95.0.drv",
+      "description": "Tool for formatting Rust code according to style guidelines",
+      "install_id": "rustfmt",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rustfmt-1.95.0",
+      "pname": "rustfmt",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T03:46:19.673234Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/lyppkpp50famfpbbmmravahq85rjbz48-rustfmt-1.95.0"
+      },
+      "system": "aarch64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustfmt",
+      "broken": false,
+      "derivation": "/nix/store/9j29rhdks393ngqkbhn18l8dhsncpv69-rustfmt-1.95.0.drv",
+      "description": "Tool for formatting Rust code according to style guidelines",
+      "install_id": "rustfmt",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rustfmt-1.95.0",
+      "pname": "rustfmt",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:14:48.812686Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/3w8bdmiz9xjr7yyggvpkf60pg8rm8km3-rustfmt-1.95.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustfmt",
+      "broken": false,
+      "derivation": "/nix/store/6j9nwg470f823hs3nrgylfciny1y8izh-rustfmt-1.95.0.drv",
+      "description": "Tool for formatting Rust code according to style guidelines",
+      "install_id": "rustfmt",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "name": "rustfmt-1.95.0",
+      "pname": "rustfmt",
+      "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+      "rev_count": 1017464,
+      "rev_date": "2026-06-16T02:33:49Z",
+      "scrape_date": "2026-06-17T04:49:22.210658Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.95.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/1x0ba5x31jqzhhk02qz4lxkznmp6q3nl-rustfmt-1.95.0"
+      },
+      "system": "x86_64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-audit",
+      "broken": false,
+      "derivation": "/nix/store/xkiqgmbp895wrxk4x10fldm3fyxy9inx-cargo-audit-0.22.1.drv",
+      "description": "Audit Cargo.lock files for crates with security vulnerabilities",
+      "install_id": "cargo-audit",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-audit-0.22.1",
+      "pname": "cargo-audit",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:40.013480Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.22.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/snwkga2f5gyf404h7mmp9wriwxb8v65f-cargo-audit-0.22.1"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-audit",
+      "broken": false,
+      "derivation": "/nix/store/f8f995fwj383gcn4l4d7c80d74hq4jgr-cargo-audit-0.22.1.drv",
+      "description": "Audit Cargo.lock files for crates with security vulnerabilities",
+      "install_id": "cargo-audit",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-audit-0.22.1",
+      "pname": "cargo-audit",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:18.727717Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.22.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/9rxbrn9aa2r1z96186s69pc7vzizyfch-cargo-audit-0.22.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-audit",
+      "broken": false,
+      "derivation": "/nix/store/52vsghqbyiyqg3ai1yk5p5c92s8qsqkf-cargo-audit-0.22.1.drv",
+      "description": "Audit Cargo.lock files for crates with security vulnerabilities",
+      "install_id": "cargo-audit",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-audit-0.22.1",
+      "pname": "cargo-audit",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:47.223065Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.22.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/3pbdnj6x364wzy0pa050d47il13fp85y-cargo-audit-0.22.1"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-audit",
+      "broken": false,
+      "derivation": "/nix/store/r3yznng13ydlc521wkrnh0lf4jqm80c8-cargo-audit-0.22.1.drv",
+      "description": "Audit Cargo.lock files for crates with security vulnerabilities",
+      "install_id": "cargo-audit",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-audit-0.22.1",
+      "pname": "cargo-audit",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:42.719248Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.22.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/2w9if868piw98xz057sz97jnjvf7hnvf-cargo-audit-0.22.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-autoinherit",
+      "broken": false,
+      "derivation": "/nix/store/8945w3p863hl1d33gk6jvhqmrf31lmz9-cargo-autoinherit-0.1.6.drv",
+      "description": "Automatically DRY up your Rust dependencies",
+      "install_id": "cargo-autoinherit",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-autoinherit-0.1.6",
+      "pname": "cargo-autoinherit",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:40.013905Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/r948j645k63n0pswfwz4bf65dagl4zpd-cargo-autoinherit-0.1.6"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-autoinherit",
+      "broken": false,
+      "derivation": "/nix/store/v1k64swrlf7wy7gl3g75ncyzip3xjd71-cargo-autoinherit-0.1.6.drv",
+      "description": "Automatically DRY up your Rust dependencies",
+      "install_id": "cargo-autoinherit",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-autoinherit-0.1.6",
+      "pname": "cargo-autoinherit",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:18.728190Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/f2kg32n40njyvajqckw3rp3y2yyp6xj4-cargo-autoinherit-0.1.6"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-autoinherit",
+      "broken": false,
+      "derivation": "/nix/store/zn28qczmnnmzra6wx3yvksajksbdkqbi-cargo-autoinherit-0.1.6.drv",
+      "description": "Automatically DRY up your Rust dependencies",
+      "install_id": "cargo-autoinherit",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-autoinherit-0.1.6",
+      "pname": "cargo-autoinherit",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:47.223477Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5vlr98ndidk4x75jkhldi41lqb6myr1x-cargo-autoinherit-0.1.6"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-autoinherit",
+      "broken": false,
+      "derivation": "/nix/store/nwn02c91ff1jq212fdng84kkdma2bwmn-cargo-autoinherit-0.1.6.drv",
+      "description": "Automatically DRY up your Rust dependencies",
+      "install_id": "cargo-autoinherit",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-autoinherit-0.1.6",
+      "pname": "cargo-autoinherit",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:42.719754Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/zw9gz7aphlylsml91pnn7673j994xh1h-cargo-autoinherit-0.1.6"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-chef",
+      "broken": false,
+      "derivation": "/nix/store/wx9g2ybnlqx9v7njh9pczh9nz1vjm7r3-cargo-chef-0.1.77.drv",
+      "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
+      "install_id": "cargo-chef",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-chef-0.1.77",
+      "pname": "cargo-chef",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:40.016009Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.77",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/wszd6x76yvlbqvprmyzhh0hzi6y6sy51-cargo-chef-0.1.77"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-chef",
+      "broken": false,
+      "derivation": "/nix/store/w491wv62ifv05ji9pfhfah6hbvfqf0js-cargo-chef-0.1.77.drv",
+      "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
+      "install_id": "cargo-chef",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-chef-0.1.77",
+      "pname": "cargo-chef",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:18.730555Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.77",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/dlczsn3vpi211kd7nx3zz44s91zv76bm-cargo-chef-0.1.77"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-chef",
+      "broken": false,
+      "derivation": "/nix/store/v7gzbwc7wlp41k7lx1zkjdh5sbszgj19-cargo-chef-0.1.77.drv",
+      "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
+      "install_id": "cargo-chef",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-chef-0.1.77",
+      "pname": "cargo-chef",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:47.225579Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.77",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/mix4pbs7dfkpjrlg2j7xjwqhq44zh763-cargo-chef-0.1.77"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-chef",
+      "broken": false,
+      "derivation": "/nix/store/icyg1y0pky53kq3m96k7y9rwhazlj010-cargo-chef-0.1.77.drv",
+      "description": "Cargo-subcommand to speed up Rust Docker builds using Docker layer caching",
+      "install_id": "cargo-chef",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-chef-0.1.77",
+      "pname": "cargo-chef",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:42.722537Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.77",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/35qds405yxhg2w6csvnkhpl5ivxz1sg3-cargo-chef-0.1.77"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-hakari",
+      "broken": false,
+      "derivation": "/nix/store/l72bds42v0x4a099abii318x5arn5ann-cargo-hakari-0.9.38.drv",
+      "description": "Manage workspace-hack packages to speed up builds in large workspaces",
+      "install_id": "cargo-hakari",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-hakari-0.9.38",
+      "pname": "cargo-hakari",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:40.020881Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.38",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/xa05iyihbky8mgrvya1q9fp2zpvw5b27-cargo-hakari-0.9.38"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-hakari",
+      "broken": false,
+      "derivation": "/nix/store/lxji70kzwr17xr2q9ihs0x2jcs0l0yka-cargo-hakari-0.9.38.drv",
+      "description": "Manage workspace-hack packages to speed up builds in large workspaces",
+      "install_id": "cargo-hakari",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-hakari-0.9.38",
+      "pname": "cargo-hakari",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:18.735943Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.38",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/17darh6mgflh4rq3pqxlybkxb6m61q9k-cargo-hakari-0.9.38"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-hakari",
+      "broken": false,
+      "derivation": "/nix/store/5kb4md8fywinacfg2n5jllzcnm0jp92z-cargo-hakari-0.9.38.drv",
+      "description": "Manage workspace-hack packages to speed up builds in large workspaces",
+      "install_id": "cargo-hakari",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-hakari-0.9.38",
+      "pname": "cargo-hakari",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:47.230434Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.38",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/6fv4y605rd5szdm5882y7l2z90h129mk-cargo-hakari-0.9.38"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-hakari",
+      "broken": false,
+      "derivation": "/nix/store/4346i2365gvh35zh2f78wvl2psv3k2nz-cargo-hakari-0.9.38.drv",
+      "description": "Manage workspace-hack packages to speed up builds in large workspaces",
+      "install_id": "cargo-hakari",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-hakari-0.9.38",
+      "pname": "cargo-hakari",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:42.728520Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.38",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/9avna51nbl5583ri4bmm51kjqcmfv6sh-cargo-hakari-0.9.38"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-mutants",
+      "broken": false,
+      "derivation": "/nix/store/dbbllsnkgpfd42sph16zm8iqc0vncm6f-cargo-mutants-27.0.0.drv",
+      "description": "Mutation testing tool for Rust",
+      "install_id": "cargo-mutants",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-mutants-27.0.0",
+      "pname": "cargo-mutants",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:40.023635Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "27.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/rz54z549wy4p5v6qj03c51308dk2c8kl-cargo-mutants-27.0.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-mutants",
+      "broken": false,
+      "derivation": "/nix/store/73hgkhx3n29f912x06w0gbi1bkmlzwkw-cargo-mutants-27.0.0.drv",
+      "description": "Mutation testing tool for Rust",
+      "install_id": "cargo-mutants",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-mutants-27.0.0",
+      "pname": "cargo-mutants",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:18.738967Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "27.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/zml4cwiz0bvwdi6w47hfjxqzzz54b59c-cargo-mutants-27.0.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-mutants",
+      "broken": false,
+      "derivation": "/nix/store/7sk3wx9lzah4iy5mdy10df9cwdpc3228-cargo-mutants-27.0.0.drv",
+      "description": "Mutation testing tool for Rust",
+      "install_id": "cargo-mutants",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-mutants-27.0.0",
+      "pname": "cargo-mutants",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:47.233117Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "27.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5vw61vj50w68csg17w7xcx6l2f8a1gld-cargo-mutants-27.0.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-mutants",
+      "broken": false,
+      "derivation": "/nix/store/886hkblln5m5d0pyp87kspcdb4n5yckm-cargo-mutants-27.0.0.drv",
+      "description": "Mutation testing tool for Rust",
+      "install_id": "cargo-mutants",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-mutants-27.0.0",
+      "pname": "cargo-mutants",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:42.731754Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "27.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/6vpplj9jwwssilrs3i83rai9zaiqkk6n-cargo-mutants-27.0.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-nextest",
+      "broken": false,
+      "derivation": "/nix/store/33bahabplchmcrwdrjmpxr7dhcavjv3v-cargo-nextest-0.9.137.drv",
+      "description": "Next-generation test runner for Rust projects",
+      "install_id": "cargo-nextest",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-nextest-0.9.137",
+      "pname": "cargo-nextest",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:40.023915Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.137",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/ylz7m947mhkgsp6i7611id3s3gcd58nq-cargo-nextest-0.9.137"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-nextest",
+      "broken": false,
+      "derivation": "/nix/store/xdbg2i71i9vaaba4jz6br16rafwrzg0w-cargo-nextest-0.9.137.drv",
+      "description": "Next-generation test runner for Rust projects",
+      "install_id": "cargo-nextest",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-nextest-0.9.137",
+      "pname": "cargo-nextest",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:18.739295Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.137",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/qb6bcg2fjvm3r9s9j98nmffmf9xwh45s-cargo-nextest-0.9.137"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-nextest",
+      "broken": false,
+      "derivation": "/nix/store/cdjh2i494dg2b4kfrcxrb3awz9gclw8s-cargo-nextest-0.9.137.drv",
+      "description": "Next-generation test runner for Rust projects",
+      "install_id": "cargo-nextest",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-nextest-0.9.137",
+      "pname": "cargo-nextest",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:47.233398Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.137",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/i6jmzv24lbwmrj42pllhq7biflgid5sr-cargo-nextest-0.9.137"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-nextest",
+      "broken": false,
+      "derivation": "/nix/store/1q4ilfbfaa8prvc31aj8l4sv74k02ipd-cargo-nextest-0.9.137.drv",
+      "description": "Next-generation test runner for Rust projects",
+      "install_id": "cargo-nextest",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-nextest-0.9.137",
+      "pname": "cargo-nextest",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:42.732103Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.137",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/jhkr7gwyrchkml33gyns9cy0yn7b57qc-cargo-nextest-0.9.137"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-outdated",
+      "broken": false,
+      "derivation": "/nix/store/0jrv66f0fqilik3i4nv2vi47jsppg05s-cargo-outdated-0.19.0.drv",
+      "description": "Cargo subcommand for displaying when Rust dependencies are out of date",
+      "install_id": "cargo-outdated",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-outdated-0.19.0",
+      "pname": "cargo-outdated",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:40.024069Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.19.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/bgmhxxvsjsrrl3jxbb4q8cx0yvw2qsn1-cargo-outdated-0.19.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-outdated",
+      "broken": false,
+      "derivation": "/nix/store/dwbac43s5ig99mashi53pmm1nrgx756f-cargo-outdated-0.19.0.drv",
+      "description": "Cargo subcommand for displaying when Rust dependencies are out of date",
+      "install_id": "cargo-outdated",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-outdated-0.19.0",
+      "pname": "cargo-outdated",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:18.739456Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.19.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/2l116xcf1m1lgrzcvfpzraqgaskw9hf2-cargo-outdated-0.19.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-outdated",
+      "broken": false,
+      "derivation": "/nix/store/byg1hnasbz83a84dsfjygnc8gzhfmn5a-cargo-outdated-0.19.0.drv",
+      "description": "Cargo subcommand for displaying when Rust dependencies are out of date",
+      "install_id": "cargo-outdated",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-outdated-0.19.0",
+      "pname": "cargo-outdated",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:47.233536Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.19.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/f37i5nqa62wyzlpjl6dsdpijkqham4gp-cargo-outdated-0.19.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-outdated",
+      "broken": false,
+      "derivation": "/nix/store/f07npsram1dfgvjw1y1gf55kzwhy6hwp-cargo-outdated-0.19.0.drv",
+      "description": "Cargo subcommand for displaying when Rust dependencies are out of date",
+      "install_id": "cargo-outdated",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-outdated-0.19.0",
+      "pname": "cargo-outdated",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:42.732271Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.19.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/hmqzdps0mqyznassyiv9y1i4ljdk5gs6-cargo-outdated-0.19.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-udeps",
+      "broken": false,
+      "derivation": "/nix/store/s3pb032ic5qvflqgxwdl8m5cclbcpya9-cargo-udeps-0.1.61.drv",
+      "description": "Find unused dependencies in Cargo.toml",
+      "install_id": "cargo-udeps",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-udeps-0.1.61",
+      "pname": "cargo-udeps",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:40.038598Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.61",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/yym2dzwfmzw8nlihwpagkb70jjcn7mz5-cargo-udeps-0.1.61"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-udeps",
+      "broken": false,
+      "derivation": "/nix/store/f9k7k34rzs9qqbd211vzl9hx3kayx5ir-cargo-udeps-0.1.61.drv",
+      "description": "Find unused dependencies in Cargo.toml",
+      "install_id": "cargo-udeps",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-udeps-0.1.61",
+      "pname": "cargo-udeps",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:18.746800Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.61",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/mz8dbg45y4q7jacm75qh65navw6dd83p-cargo-udeps-0.1.61"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-udeps",
+      "broken": false,
+      "derivation": "/nix/store/j7pphwkn7jmwprgzy2aswr48wrxig175-cargo-udeps-0.1.61.drv",
+      "description": "Find unused dependencies in Cargo.toml",
+      "install_id": "cargo-udeps",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-udeps-0.1.61",
+      "pname": "cargo-udeps",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:47.239334Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.61",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5gsnkdmwlym7wyrkbiphkkyccwx27ja1-cargo-udeps-0.1.61"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-udeps",
+      "broken": false,
+      "derivation": "/nix/store/fryn0rp9qm8daw9sxb851n448hicmzrn-cargo-udeps-0.1.61.drv",
+      "description": "Find unused dependencies in Cargo.toml",
+      "install_id": "cargo-udeps",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "cargo-udeps-0.1.61",
+      "pname": "cargo-udeps",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:42.739522Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.1.61",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/ff83058fklszc2bhrkwl3d1n09mwac54-cargo-udeps-0.1.61"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gcc",
+      "broken": false,
+      "derivation": "/nix/store/s98j0lrk70winmakb0slz06lm6g9jkpj-gcc-wrapper-15.2.0.drv",
+      "description": "GNU Compiler Collection, version 15.2.0 (wrapper script)",
+      "install_id": "gcc",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "gcc-wrapper-15.2.0",
+      "pname": "gcc",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:20.692034Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "15.2.0",
+      "outputs_to_install": [
+        "man",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/y01as0p9m8ksp0gw07fkcfyc7ys5j515-gcc-wrapper-15.2.0-info",
+        "man": "/nix/store/ix6iqra08cyg0x3lcd671cimz2kk5bdk-gcc-wrapper-15.2.0-man",
+        "out": "/nix/store/vsj0kl98ggilv1nq2gvxwrk12w2lgvjy-gcc-wrapper-15.2.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gcc",
+      "broken": false,
+      "derivation": "/nix/store/y7wnv3kycy9gpxzwmny1sppi7il9i31a-gcc-wrapper-15.2.0.drv",
+      "description": "GNU Compiler Collection, version 15.2.0 (wrapper script)",
+      "install_id": "gcc",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "gcc-wrapper-15.2.0",
+      "pname": "gcc",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:44.428049Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "15.2.0",
+      "outputs_to_install": [
+        "man",
+        "man",
+        "man",
+        "out",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/5b0hplrl0n9g159mcis4jca1fjd4822a-gcc-wrapper-15.2.0-info",
+        "man": "/nix/store/r35yg8h1w630r3lmnyglwhv5nvk284mx-gcc-wrapper-15.2.0-man",
+        "out": "/nix/store/788mx070y81zjlg5ipcl0cra3afviw9k-gcc-wrapper-15.2.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "git",
+      "broken": false,
+      "derivation": "/nix/store/cb1l04jhs3ykmidc54crdpy4x59p38c0-git-2.54.0.drv",
+      "description": "Distributed version control system",
+      "install_id": "git",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "git-2.54.0",
+      "pname": "git",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:41.164896Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.54.0",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/zn8gmbxxf5398hxg6y6nk5jimj85qj69-git-2.54.0-doc",
+        "out": "/nix/store/a14yxcqvv9x2l9mllgpirzhvz93pgprg-git-2.54.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "git",
+      "broken": false,
+      "derivation": "/nix/store/wbhnknkdqvlxbb2vqhnylydagm03da5g-git-2.54.0.drv",
+      "description": "Distributed version control system",
+      "install_id": "git",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "git-2.54.0",
+      "pname": "git",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:20.832239Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.54.0",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/c7mafmqf28l7898rpbqqkd0p3m42hc03-git-2.54.0-debug",
+        "doc": "/nix/store/klwr4n2snj7ldlpkhwarwlif80myx0vj-git-2.54.0-doc",
+        "out": "/nix/store/ixp98f9avf8ikpdrmp40cj33g0dazyp9-git-2.54.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "git",
+      "broken": false,
+      "derivation": "/nix/store/fxy7636kfcbnv94jc7a1mcambx3045h3-git-2.54.0.drv",
+      "description": "Distributed version control system",
+      "install_id": "git",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "git-2.54.0",
+      "pname": "git",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:48.307415Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.54.0",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/agyxy5ay4x06b52mj24rz44fc82328ha-git-2.54.0-doc",
+        "out": "/nix/store/s9lsrlgwr3sabw9a2dl3laykas0ijk85-git-2.54.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "git",
+      "broken": false,
+      "derivation": "/nix/store/0yd4pbrk443w8lbvsssipnckxmpaa6j3-git-2.54.0.drv",
+      "description": "Distributed version control system",
+      "install_id": "git",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "git-2.54.0",
+      "pname": "git",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:44.582080Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.54.0",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/72fyakk8w8idjbksk0h8jbkq6sgvcm85-git-2.54.0-debug",
+        "doc": "/nix/store/l444690y78nfdwyzm6mghagl7xa97myf-git-2.54.0-doc",
+        "out": "/nix/store/bcnisk3ydfgv26v2gw3zlky24g00yww2-git-2.54.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/8q2w01isaphqap5lxmfxdyiihfp5l3cb-glab-1.99.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "glab-1.99.0",
+      "pname": "glab",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:41.240227Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.99.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5qw6qx43ax9n1sh57szrigkwk2b4j4wj-glab-1.99.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/bml6bpm01z18vvjpz1r5f2k28gsc178g-glab-1.99.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "glab-1.99.0",
+      "pname": "glab",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:20.923513Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.99.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/76gj5sbvkkxrvx4nw34r1g5h5sxb8igp-glab-1.99.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/ifdgzgxh62x69spapv2mavsyva4hnz82-glab-1.99.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "glab-1.99.0",
+      "pname": "glab",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:48.378801Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.99.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/1dk55336bidacqai27z6c2bjzyw9ga4s-glab-1.99.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glab",
+      "broken": false,
+      "derivation": "/nix/store/7wlafrv5xab6v2z91rpgcs3wb9vzd5j8-glab-1.99.0.drv",
+      "description": "GitLab CLI tool bringing GitLab to your command line",
+      "install_id": "glab",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "glab-1.99.0",
+      "pname": "glab",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:44.682136Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.99.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/a146bdilqcxacscd6xfmy0vigl3bjvxq-glab-1.99.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "graphviz",
+      "broken": false,
+      "derivation": "/nix/store/qdpip5fcflnbqfglyhjhkzai5xq8i52v-graphviz-12.2.1.drv",
+      "description": "Graph visualization tools",
+      "install_id": "graphviz",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "graphviz-12.2.1",
+      "pname": "graphviz",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:41.457888Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "12.2.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/ijb4fbnqa6wzlpqnhb6q9knqpf7qqn5z-graphviz-12.2.1"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "graphviz",
+      "broken": false,
+      "derivation": "/nix/store/jc3yc1hzif0r17cinlzzhggr365jmh6r-graphviz-12.2.1.drv",
+      "description": "Graph visualization tools",
+      "install_id": "graphviz",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "graphviz-12.2.1",
+      "pname": "graphviz",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:21.796913Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "12.2.1",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/58rrk4yzwpmyxvl8cqm18h3dhv24zf00-graphviz-12.2.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "graphviz",
+      "broken": false,
+      "derivation": "/nix/store/pjjf7ppa7na78ay7hs2dsxbgw3jgw5cz-graphviz-12.2.1.drv",
+      "description": "Graph visualization tools",
+      "install_id": "graphviz",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "graphviz-12.2.1",
+      "pname": "graphviz",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:48.632521Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "12.2.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/lhxx9dzr6nbwd6ap1yc44xwhapf995rs-graphviz-12.2.1"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "graphviz",
+      "broken": false,
+      "derivation": "/nix/store/ldsrw2dz47vdnbd3gv12vmppzmdbcy78-graphviz-12.2.1.drv",
+      "description": "Graph visualization tools",
+      "install_id": "graphviz",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "graphviz-12.2.1",
+      "pname": "graphviz",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:45.672408Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "12.2.1",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/12rgns2296s4qcja778gvcbx61z77rc4-graphviz-12.2.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jujutsu",
+      "broken": false,
+      "derivation": "/nix/store/hiisxms9wca2zrxbng3m914b06xjk2xd-jujutsu-0.41.0.drv",
+      "description": "Git-compatible DVCS that is both simple and powerful",
+      "install_id": "jujutsu",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "jujutsu-0.41.0",
+      "pname": "jujutsu",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:57.334256Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.41.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/v88xyf8z9s8hb2b0hhwgjpadyvya2dzd-jujutsu-0.41.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jujutsu",
+      "broken": false,
+      "derivation": "/nix/store/dfvxchcw8mq2nrs31c3w2da4216nzsqr-jujutsu-0.41.0.drv",
+      "description": "Git-compatible DVCS that is both simple and powerful",
+      "install_id": "jujutsu",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "jujutsu-0.41.0",
+      "pname": "jujutsu",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:42.936501Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.41.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/qmmxvca0g075ndjiiip5r1bjl6mbxwgk-jujutsu-0.41.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jujutsu",
+      "broken": false,
+      "derivation": "/nix/store/i17pbii1qi19wcwgi4psccp6y6pscqmf-jujutsu-0.41.0.drv",
+      "description": "Git-compatible DVCS that is both simple and powerful",
+      "install_id": "jujutsu",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "jujutsu-0.41.0",
+      "pname": "jujutsu",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:25:04.837930Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.41.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/flf8qy3y5s8f44l3jp17nm6mx7r7f64j-jujutsu-0.41.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jujutsu",
+      "broken": false,
+      "derivation": "/nix/store/6k2d55ac6b03isz6y2pfbzy3ds9dmkjf-jujutsu-0.41.0.drv",
+      "description": "Git-compatible DVCS that is both simple and powerful",
+      "install_id": "jujutsu",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "jujutsu-0.41.0",
+      "pname": "jujutsu",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:07:06.882060Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.41.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/fxpid3izq014rl5f71qsi7w7bw470iz0-jujutsu-0.41.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "libiconv",
+      "broken": false,
+      "derivation": "/nix/store/c1kiqixgnijv81jm9bz44dkzj8ssm5mj-libiconv-113.drv",
+      "description": "Iconv(3) implementation",
+      "install_id": "libiconv",
+      "license": "[ BSD-2-Clause, BSD-3-Clause, APSL-1.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "libiconv-113",
+      "pname": "libiconv",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:58.743966Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "113",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out",
+        "out",
+        "out",
+        "out",
+        "out",
+        "out",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/zy85gk6dd29slqgs1i7xclvkgvhydgxg-libiconv-113-dev",
+        "out": "/nix/store/wjb6smwmv8cynnr776j01kjjzdks1863-libiconv-113"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "libiconv",
+      "broken": false,
+      "derivation": "/nix/store/znylhxxdmfaikhz45hh503f1xxdw5r1z-libiconv-113.drv",
+      "description": "Iconv(3) implementation",
+      "install_id": "libiconv",
+      "license": "[ BSD-2-Clause, BSD-3-Clause, APSL-1.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "libiconv-113",
+      "pname": "libiconv",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:25:06.295634Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "113",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/83s6182rp2zxm4zr673g9i6vqahcfq5d-libiconv-113-dev",
+        "out": "/nix/store/jk7dsfjs2i6d1jgchzxlv8083dhl20rh-libiconv-113"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "nodejs_24",
+      "broken": false,
+      "derivation": "/nix/store/vbx35am7lar9zvwhk4nfl3lysmbd0ils-nodejs-24.15.0.drv",
+      "description": "Event-driven I/O framework for the V8 JavaScript engine",
+      "install_id": "nodejs_24",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "nodejs-24.15.0",
+      "pname": "nodejs_24",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:56:05.116399Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "24.15.0",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/3mvbmkd7lmxi3xlka1avra24flwbgjv9-nodejs-24.15.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "nodejs_24",
+      "broken": false,
+      "derivation": "/nix/store/zc41z1042wi0d1gmyc8mlwv5av8fds2q-nodejs-24.15.0.drv",
+      "description": "Event-driven I/O framework for the V8 JavaScript engine",
+      "install_id": "nodejs_24",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "nodejs-24.15.0",
+      "pname": "nodejs_24",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:59.223548Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "24.15.0",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/rmdjmd0iy5zlyg0j2i1cd0s7ha1562fs-nodejs-24.15.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "nodejs_24",
+      "broken": false,
+      "derivation": "/nix/store/f0ay9hny5gn4c0lfrb95xrakm7yf3s2q-nodejs-24.15.0.drv",
+      "description": "Event-driven I/O framework for the V8 JavaScript engine",
+      "install_id": "nodejs_24",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "nodejs-24.15.0",
+      "pname": "nodejs_24",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:25:13.039295Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "24.15.0",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/rhv8jiklgw2bw4ljh4nm3h3r3bpnkcl3-nodejs-24.15.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "nodejs_24",
+      "broken": false,
+      "derivation": "/nix/store/f8i8jydaqs0ngxm97c091zna2mnjb43f-nodejs-24.15.0.drv",
+      "description": "Event-driven I/O framework for the V8 JavaScript engine",
+      "install_id": "nodejs_24",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "nodejs-24.15.0",
+      "pname": "nodejs_24",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:07:24.676553Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "24.15.0",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5a8ysg1jnj8jmzzyfcfw7rvpvnp5rfpa-nodejs-24.15.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pgadmin4",
+      "broken": false,
+      "derivation": "/nix/store/zfpvwh5z6f75zlz4yb71dfvfiqvr4lx3-pgadmin-9.14.drv",
+      "description": "Administration and development platform for PostgreSQL",
+      "install_id": "pgadmin4",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "pgadmin-9.14",
+      "pname": "pgadmin4",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:56:17.459275Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "9.14",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/309mzz8l8lzdn4i8sqzif03xl1ri4rxg-pgadmin-9.14-dist",
+        "out": "/nix/store/93bz12gmhs2hw9dypnywckkxiqjv3vpn-pgadmin-9.14"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pgadmin4",
+      "broken": false,
+      "derivation": "/nix/store/lq9r1l3596pisl8sapd079yljqhdhqhd-pgadmin-9.14.drv",
+      "description": "Administration and development platform for PostgreSQL",
+      "install_id": "pgadmin4",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "pgadmin-9.14",
+      "pname": "pgadmin4",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:41:16.129231Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "9.14",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/nad6sy2rcd197mhc3cxf9crbpfg2jvdn-pgadmin-9.14-dist",
+        "out": "/nix/store/wbhgykyr235j8a5zzzvfbc07y3z5khax-pgadmin-9.14"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pgadmin4",
+      "broken": false,
+      "derivation": "/nix/store/52693zjhhxpk03nxlxz520g5h6k61bv3-pgadmin-9.14.drv",
+      "description": "Administration and development platform for PostgreSQL",
+      "install_id": "pgadmin4",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "pgadmin-9.14",
+      "pname": "pgadmin4",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:25:25.565087Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "9.14",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/gd9gzk5p0s96kscjfm1yq31rsa7lcq8q-pgadmin-9.14-dist",
+        "out": "/nix/store/fwcf357mi96phb1dmqmm9kpync1zwl0h-pgadmin-9.14"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pgadmin4",
+      "broken": false,
+      "derivation": "/nix/store/j2x821wfcs8as3ahfxhd7n104d5db8kf-pgadmin-9.14.drv",
+      "description": "Administration and development platform for PostgreSQL",
+      "install_id": "pgadmin4",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "pgadmin-9.14",
+      "pname": "pgadmin4",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:07:42.168967Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "9.14",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/iaqf02wkbg7839nx1qal2i12fvf0686r-pgadmin-9.14-dist",
+        "out": "/nix/store/mbymf0qm00i7xxn0fwkzr4v2ay9xcyc3-pgadmin-9.14"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pnpm",
+      "broken": false,
+      "derivation": "/nix/store/g69l6ydp9axm5mv0z17j7i6q418pmwff-pnpm-11.4.0.drv",
+      "description": "Fast, disk space efficient package manager for JavaScript",
+      "install_id": "pnpm",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "pnpm-11.4.0",
+      "pname": "pnpm",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:56:18.989861Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "11.4.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/kfkdjppq317sm0hcqab5cqbzmqm6j67x-pnpm-11.4.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pnpm",
+      "broken": false,
+      "derivation": "/nix/store/vj1nf1pjx7bwnz00vgvnf1mxn1wgliir-pnpm-11.4.0.drv",
+      "description": "Fast, disk space efficient package manager for JavaScript",
+      "install_id": "pnpm",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "pnpm-11.4.0",
+      "pname": "pnpm",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:41:18.314750Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "11.4.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/fpjaanbd277f7sjn2xwi0p9q26p7ppdn-pnpm-11.4.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pnpm",
+      "broken": false,
+      "derivation": "/nix/store/7khb4gb7hcjk80bx8pqlsmm5mhh0m8k5-pnpm-11.4.0.drv",
+      "description": "Fast, disk space efficient package manager for JavaScript",
+      "install_id": "pnpm",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "pnpm-11.4.0",
+      "pname": "pnpm",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:25:27.082463Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "11.4.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/2lb7k2d0a9lqh8jxiggl0cpdb29bwcx2-pnpm-11.4.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pnpm",
+      "broken": false,
+      "derivation": "/nix/store/jfacl7vnwf2dlabnkjpi6qx8x65h3dmy-pnpm-11.4.0.drv",
+      "description": "Fast, disk space efficient package manager for JavaScript",
+      "install_id": "pnpm",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "pnpm-11.4.0",
+      "pname": "pnpm",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:07:44.537804Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "11.4.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/9rbr7hs1haz08fyapmcdmkvwi8ccmdim-pnpm-11.4.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_18",
+      "broken": false,
+      "derivation": "/nix/store/jq4hnq0azcry2mq0mscwz2iw9hvd4rg1-postgresql-18.4.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql_18",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "postgresql-18.4",
+      "pname": "postgresql_18",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:56:19.958096Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "18.4",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/i3slw0iw6bbrmfd6fv2awrfn8sv05ln6-postgresql-18.4-dev",
+        "doc": "/nix/store/9xjgclczbhiqszjkw2n7frbv2bxp18dh-postgresql-18.4-doc",
+        "jit": "/nix/store/9sbc77np7zp45rx1bcx9a1np4gagsyj5-postgresql-18.4-jit",
+        "lib": "/nix/store/ys292f45fyvqwrgph3gwq7n7rl1whs0p-postgresql-18.4-lib",
+        "man": "/nix/store/85vppdbg24bi3av1xmwda2yir7bn1fn7-postgresql-18.4-man",
+        "out": "/nix/store/93xplkp4ykr592v6vaslxb3k3hw0qnjb-postgresql-18.4",
+        "plperl": "/nix/store/pln6cakhhlkksmxvabs1byjf34q5zxx9-postgresql-18.4-plperl",
+        "plpython3": "/nix/store/m2rp6vi9g1j78vj3l2ny8g8b906xl813-postgresql-18.4-plpython3",
+        "pltcl": "/nix/store/4yj6vcaw07di6nsrivd4hpp9z8nlz6b5-postgresql-18.4-pltcl"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_18",
+      "broken": false,
+      "derivation": "/nix/store/wnpc7my24avwx7acby1ci2gqk338qi6a-postgresql-18.4.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql_18",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "postgresql-18.4",
+      "pname": "postgresql_18",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:41:19.609158Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "18.4",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/1p54rhym0m8j9c2zw2wvxlq8bz0d01ka-postgresql-18.4-debug",
+        "dev": "/nix/store/38ifbhk5byql1g4lfmixwyi1mwh2r5sg-postgresql-18.4-dev",
+        "doc": "/nix/store/vqyhb51l1rx5g31i16kxw580vkn92w45-postgresql-18.4-doc",
+        "jit": "/nix/store/if5awfm5ph4mbbdz26ag7a93b2sjfmki-postgresql-18.4-jit",
+        "lib": "/nix/store/f04y0i2yvf0h1f252r18a7qb4frb4iz4-postgresql-18.4-lib",
+        "man": "/nix/store/xv93dpynsyh0mlx009n6hb2yydbp3zdp-postgresql-18.4-man",
+        "out": "/nix/store/d5j24hwfvgv1cpp90qz9n4yhfhcplvzw-postgresql-18.4",
+        "plperl": "/nix/store/xwsf39yknwkd78f59mznwwacik9z15dw-postgresql-18.4-plperl",
+        "plpython3": "/nix/store/3r0ybj6kiq13qi8x73na1i446mxcqjiy-postgresql-18.4-plpython3",
+        "pltcl": "/nix/store/2aj37b27cwmynn26d2kmdr5da5xc5823-postgresql-18.4-pltcl"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_18",
+      "broken": false,
+      "derivation": "/nix/store/8j5q34w3254bpmvr85pqh4rqxxb4v8mw-postgresql-18.4.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql_18",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "postgresql-18.4",
+      "pname": "postgresql_18",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:25:28.026257Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "18.4",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/lm29nmlz173h7y7ipil6cvb92akd93wr-postgresql-18.4-dev",
+        "doc": "/nix/store/vxqnvfwc8j3d5ijhaac5py3hm27fnjzk-postgresql-18.4-doc",
+        "jit": "/nix/store/m69rafi7lri2zd3lix3rzfjcxwi1jk29-postgresql-18.4-jit",
+        "lib": "/nix/store/vznlvm0n2xr4yfm22rn26zf8q5cpw7yp-postgresql-18.4-lib",
+        "man": "/nix/store/mn0ib18w6ngr7gvqdnpwz4jy4qk7dagc-postgresql-18.4-man",
+        "out": "/nix/store/h0g5dg39cnsfdnv9w5czkr95gmv0nx4l-postgresql-18.4",
+        "plperl": "/nix/store/bndkw175svyxbf91b908caaccm1kqkyv-postgresql-18.4-plperl",
+        "plpython3": "/nix/store/7m1l6vvwlwiznanbnlxfagzqzjdxk852-postgresql-18.4-plpython3",
+        "pltcl": "/nix/store/zch6d57lfw1zmsx9n4vzsq6i29bpy2nl-postgresql-18.4-pltcl"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_18",
+      "broken": false,
+      "derivation": "/nix/store/ybz1g5ip67f8k4z763h19408953pf0h8-postgresql-18.4.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql_18",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "postgresql-18.4",
+      "pname": "postgresql_18",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:07:45.874457Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "18.4",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/jpka1ghm8z0y7h7v4816d9yhrx0rdyar-postgresql-18.4-debug",
+        "dev": "/nix/store/fidkr474nasrvs01pzzdq2pnv0lxs5df-postgresql-18.4-dev",
+        "doc": "/nix/store/7imdmv6l7ggw7vzia25mx75z4zhsz79y-postgresql-18.4-doc",
+        "jit": "/nix/store/02a9hhbjr77i2id1hxj3a596143cgjam-postgresql-18.4-jit",
+        "lib": "/nix/store/s4f8ycqsaxwbqz0ihf2ispyhnnpdim4x-postgresql-18.4-lib",
+        "man": "/nix/store/5fmidmaim5lpx1hdw2n0b1xrla0xy9pg-postgresql-18.4-man",
+        "out": "/nix/store/800vzkn0jg7hn5iq5kwlnihy3cpl6fxk-postgresql-18.4",
+        "plperl": "/nix/store/vg636xgbg7vk5rh5j3rw242bilxd873n-postgresql-18.4-plperl",
+        "plpython3": "/nix/store/dlfw54vs8cd4h4wylqvmrlrgv073vx93-postgresql-18.4-plpython3",
+        "pltcl": "/nix/store/8qfwscpkva5gz7gnhzg2a2fygkz1l38v-postgresql-18.4-pltcl"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "rust-analyzer",
+      "broken": false,
+      "derivation": "/nix/store/prf9fvkwxyk5z1gcppixz1bskx87n976-rust-analyzer-2026-04-27.drv",
+      "description": "Language server for the Rust language",
+      "install_id": "rust-analyzer",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "rust-analyzer-2026-04-27",
+      "pname": "rust-analyzer",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:57:12.935829Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2026-04-27",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5jbc9j1ilppra822phaw64bhsjy91ddx-rust-analyzer-2026-04-27"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "rust-analyzer",
+      "broken": false,
+      "derivation": "/nix/store/ab2vdy9saym0nygc37kw5pgda5s4z0bd-rust-analyzer-2026-04-27.drv",
+      "description": "Language server for the Rust language",
+      "install_id": "rust-analyzer",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "rust-analyzer-2026-04-27",
+      "pname": "rust-analyzer",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:42:26.231398Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2026-04-27",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/x9s8z0cj0yi26gip73nsjsg52ms9n7gx-rust-analyzer-2026-04-27"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "rust-analyzer",
+      "broken": false,
+      "derivation": "/nix/store/779sar42sa4knxna5cs7swflgaqn7m98-rust-analyzer-2026-04-27.drv",
+      "description": "Language server for the Rust language",
+      "install_id": "rust-analyzer",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "rust-analyzer-2026-04-27",
+      "pname": "rust-analyzer",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:26:21.495335Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2026-04-27",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/40jnzcmhddkwf4qjcv5as05cbxyslavj-rust-analyzer-2026-04-27"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "rust-analyzer",
+      "broken": false,
+      "derivation": "/nix/store/qkjz3jh9r63zwd40ls05gljyksjk6b2n-rust-analyzer-2026-04-27.drv",
+      "description": "Language server for the Rust language",
+      "install_id": "rust-analyzer",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "rust-analyzer-2026-04-27",
+      "pname": "rust-analyzer",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:08:55.959459Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2026-04-27",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/0dxi831w8wy18086f93m3mj0xj07a6lz-rust-analyzer-2026-04-27"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sea-orm-cli",
+      "broken": false,
+      "derivation": "/nix/store/v4ygsxlhg7zhc887amzzyignwjg4wx68-sea-orm-cli-1.1.19.drv",
+      "description": "Command line utility for SeaORM",
+      "install_id": "sea-orm-cli",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "sea-orm-cli-1.1.19",
+      "pname": "sea-orm-cli",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:57:27.177595Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.1.19",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/1acvyzv940rxld7jgqr9hgh2m3ds9w46-sea-orm-cli-1.1.19"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sea-orm-cli",
+      "broken": false,
+      "derivation": "/nix/store/ghvzx6pwnwmbcz6lvigzaq81s10z6wsb-sea-orm-cli-1.1.19.drv",
+      "description": "Command line utility for SeaORM",
+      "install_id": "sea-orm-cli",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "sea-orm-cli-1.1.19",
+      "pname": "sea-orm-cli",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:42:42.943700Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.1.19",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/qnxl3ziqqx3d4kw79bw0zc365bjgizv4-sea-orm-cli-1.1.19"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sea-orm-cli",
+      "broken": false,
+      "derivation": "/nix/store/n1m5qs2xxjfqv2nyqxjalb9x8frjrp06-sea-orm-cli-1.1.19.drv",
+      "description": "Command line utility for SeaORM",
+      "install_id": "sea-orm-cli",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "sea-orm-cli-1.1.19",
+      "pname": "sea-orm-cli",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:26:35.754675Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.1.19",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/fzwkwipx52inyqsqhaqd4rydnw7njkxs-sea-orm-cli-1.1.19"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sea-orm-cli",
+      "broken": false,
+      "derivation": "/nix/store/7dlkc6gnpw4cqnhysy4w2wvhbpfvg878-sea-orm-cli-1.1.19.drv",
+      "description": "Command line utility for SeaORM",
+      "install_id": "sea-orm-cli",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "sea-orm-cli-1.1.19",
+      "pname": "sea-orm-cli",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:09:13.373579Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.1.19",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/yjkixi26745lr9dibpyq8lznkm802ahr-sea-orm-cli-1.1.19"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gnused",
+      "broken": false,
+      "derivation": "/nix/store/4xsxslqxny9qlvi8hhz6qxqnsfq2bvcd-gnused-4.9.drv",
+      "description": "GNU sed, a batch stream editor",
+      "install_id": "sed",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "gnused-4.9",
+      "pname": "gnused",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:55:41.293286Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "4.9",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/xd5478k8gm67ihnsl7k314f2nb6sjsq8-gnused-4.9-info",
+        "out": "/nix/store/v1lxnb2804dgaf9sf60y6najgjs3wjsi-gnused-4.9"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gnused",
+      "broken": false,
+      "derivation": "/nix/store/d5yax94ybjybgh2k2b4k80hnxh9xygwd-gnused-4.9.drv",
+      "description": "GNU sed, a batch stream editor",
+      "install_id": "sed",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "gnused-4.9",
+      "pname": "gnused",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:40:21.542442Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "4.9",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/6y6wk75gg9xld3243a57y0wfx963s8cc-gnused-4.9-info",
+        "out": "/nix/store/likh0kijp1cg6ccfasr60xkqik8lhc9x-gnused-4.9"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gnused",
+      "broken": false,
+      "derivation": "/nix/store/nbqavip3730f2bxbv4dr8mkn5rcjdsgq-gnused-4.9.drv",
+      "description": "GNU sed, a batch stream editor",
+      "install_id": "sed",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "gnused-4.9",
+      "pname": "gnused",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:24:48.470381Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "4.9",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/kv2h7ilg3qs7q3z814vbmc6q2b43m7c9-gnused-4.9-info",
+        "out": "/nix/store/cvkh602mhz8jyq4hnajkkm22xbyc3ndg-gnused-4.9"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gnused",
+      "broken": false,
+      "derivation": "/nix/store/fax2439jq23r7zcxs44axd7aqzmwbnxf-gnused-4.9.drv",
+      "description": "GNU sed, a batch stream editor",
+      "install_id": "sed",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "gnused-4.9",
+      "pname": "gnused",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:06:45.387166Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "4.9",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out",
+        "out",
+        "out",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/whi6yac9mj29mdvmaglrnn1z6v156j1z-gnused-4.9-info",
+        "out": "/nix/store/kgxafhycw2kybbqih759ykc2043qyi5j-gnused-4.9"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "shellcheck",
+      "broken": false,
+      "derivation": "/nix/store/gm5zscq8lncrhb77yc05lina529vl1hc-shellcheck-0.11.0.drv",
+      "description": "Shell script analysis tool",
+      "install_id": "shellcheck",
+      "license": "GPL-3.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "shellcheck-0.11.0",
+      "pname": "shellcheck",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T08:57:27.630624Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.11.0",
+      "outputs_to_install": [
+        "bin",
+        "doc",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/5lr3z3mqgj186p8drycnnkxh7zs13kf0-shellcheck-0.11.0-bin",
+        "doc": "/nix/store/4wz8ih8li10v4s4q1rya1m85wc4aw4wd-shellcheck-0.11.0-doc",
+        "man": "/nix/store/5gzk96ghybkcjzhnz6gjk0k4szymwvp9-shellcheck-0.11.0-man",
+        "out": "/nix/store/ivfr09ssl368lcdw8jswrb653s43cvxb-shellcheck-0.11.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "shellcheck",
+      "broken": false,
+      "derivation": "/nix/store/k5hl3xwadsk1ny0lnw0ahcjh9cmkn2qd-shellcheck-0.11.0.drv",
+      "description": "Shell script analysis tool",
+      "install_id": "shellcheck",
+      "license": "GPL-3.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "shellcheck-0.11.0",
+      "pname": "shellcheck",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T09:42:43.692434Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.11.0",
+      "outputs_to_install": [
+        "bin",
+        "doc",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/hqajavk4av9v6l08h1xsfz19rwsir85y-shellcheck-0.11.0-bin",
+        "doc": "/nix/store/gdjj2q6jwgjj14c72hwss2zxww5hxvbm-shellcheck-0.11.0-doc",
+        "man": "/nix/store/jpdzs6ywlqmxbmzim0b8flrwc9ac94vz-shellcheck-0.11.0-man",
+        "out": "/nix/store/bg01hij699rpkg2q0fhghdyma1zf3vmc-shellcheck-0.11.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "shellcheck",
+      "broken": false,
+      "derivation": "/nix/store/fzvijm2l22p8liljhzl006hj08ys4k0l-shellcheck-0.11.0.drv",
+      "description": "Shell script analysis tool",
+      "install_id": "shellcheck",
+      "license": "GPL-3.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "shellcheck-0.11.0",
+      "pname": "shellcheck",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T10:26:36.217503Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.11.0",
+      "outputs_to_install": [
+        "bin",
+        "doc",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/g02yfjc7lgig0fnv666ii9rz1vx6mvs2-shellcheck-0.11.0-bin",
+        "doc": "/nix/store/iymch2lfdskwpzgka1igia981k76wp9w-shellcheck-0.11.0-doc",
+        "man": "/nix/store/nc5lj21np4za87piqf5nyax0ibimlzss-shellcheck-0.11.0-man",
+        "out": "/nix/store/ipidk29kr6a49xk0vl6ygz6dx2vd9ss0-shellcheck-0.11.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "shellcheck",
+      "broken": false,
+      "derivation": "/nix/store/v83rhxlawdb8ixlsydi3ynqg8kggdamp-shellcheck-0.11.0.drv",
+      "description": "Shell script analysis tool",
+      "install_id": "shellcheck",
+      "license": "GPL-3.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "name": "shellcheck-0.11.0",
+      "pname": "shellcheck",
+      "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
+      "rev_count": 1008282,
+      "rev_date": "2026-05-31T16:09:29Z",
+      "scrape_date": "2026-06-02T11:09:14.191850Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.11.0",
+      "outputs_to_install": [
+        "bin",
+        "doc",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/2lfacwyvxpllrq9jpbyz7z4v4lc3wnr9-shellcheck-0.11.0-bin",
+        "doc": "/nix/store/qbmc0kv3ddridry1w7rdc124an8fk895-shellcheck-0.11.0-doc",
+        "man": "/nix/store/0504zfbbnxm2dgnkj0pal11nv09i1g2p-shellcheck-0.11.0-man",
+        "out": "/nix/store/pmk1wsbpsxkaa33mrigc72iln3pvy9r2-shellcheck-0.11.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+onlyBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - esbuild
+engineStrict: true
+auditConfig:
+  ignoreGhsas:
+    - GHSA-pxg6-pf52-xh8x

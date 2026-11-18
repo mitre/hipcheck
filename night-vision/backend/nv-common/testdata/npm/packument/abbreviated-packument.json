@@ -1,0 +1,16 @@
+{
+  "name": "minimal-package",
+  "dist-tags": {
+    "latest": "2.0.0"
+  },
+  "versions": {
+    "2.0.0": {
+      "name": "minimal-package",
+      "version": "2.0.0",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/minimal-package/-/minimal-package-2.0.0.tgz",
+        "shasum": "0123456789abcdef0123456789abcdef01234567"
+      }
+    }
+  }
+}

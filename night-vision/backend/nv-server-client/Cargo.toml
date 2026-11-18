@@ -1,0 +1,24 @@
+[package]
+name = "nv-server-client"
+version = "0.1.0"
+edition = "2024"
+publish = false
+build = "build.rs"
+
+# Progenitor owns the generated implementation included by this crate. It is
+# intentionally not subject to the workspace's hand-written-code lint policy.
+
+[dependencies]
+chrono.workspace = true
+progenitor-client.workspace = true
+reqwest = { workspace = true, features = ["query", "stream"] }
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+workspace-hack.workspace = true
+
+[build-dependencies]
+prettyplease.workspace = true
+progenitor.workspace = true
+serde_json.workspace = true
+syn.workspace = true

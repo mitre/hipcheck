@@ -1,0 +1,98 @@
+digraph NightVisionMvp {
+    graph [
+        label="Night Vision MVP architecture",
+        labelloc=t,
+        labeljust=l,
+        fontname="Helvetica",
+        fontsize=22,
+        fontcolor="#18324A",
+        bgcolor="white",
+        pad=0.35,
+        rankdir=LR,
+        ranksep=0.8,
+        nodesep=0.4,
+        splines=polyline,
+        compound=true
+    ];
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Helvetica",
+        fontsize=13,
+        fontcolor="#18324A",
+        color="#5B87B6",
+        fillcolor="#EDF5FC",
+        penwidth=1.4,
+        margin="0.16,0.10"
+    ];
+    edge [
+        color="#557187",
+        fontname="Helvetica",
+        fontsize=10,
+        fontcolor="#334E63",
+        penwidth=1.3,
+        arrowsize=0.7
+    ];
+
+    browser [label="Browser", fillcolor="#F5F7FA", color="#94A6B7"];
+
+    subgraph cluster_frontend {
+        label="SvelteKit frontend";
+        labelloc=t;
+        fontname="Helvetica";
+        fontsize=16;
+        fontcolor="#245A89";
+        style="rounded,dashed";
+        color="#9EC1E2";
+        penwidth=1.6;
+        margin=20;
+        ui [label="Routes and\nserver actions"];
+    }
+
+    subgraph cluster_backend {
+        label="nv-server process";
+        labelloc=t;
+        fontname="Helvetica";
+        fontsize=16;
+        fontcolor="#245A89";
+        style="rounded,dashed";
+        color="#9EC1E2";
+        penwidth=1.6;
+        margin=20;
+
+        api [label="REST API", fillcolor="#DDEDFC"];
+        source_task [label="Package-source\nresolution task"];
+        sync_tasks [label="CVE and KEV\nsync tasks"];
+        assessment_task [label="Assessment task"];
+
+        { rank=same; source_task; sync_tasks; assessment_task; }
+        source_task -> sync_tasks -> assessment_task [style=invis, weight=10];
+    }
+
+    db [
+        label="PostgreSQL\nSources · resolved graph\nCVE/KEV · assessments",
+        shape=cylinder,
+        style=filled,
+        color="#428578",
+        fillcolor="#E4F4EF"
+    ];
+
+    cve [label="CVE List\nGit repository", fillcolor="#FFF5DF", color="#C49A47"];
+    kev [label="CISA KEV feed", fillcolor="#FFF5DF", color="#C49A47"];
+    npm [label="NPM registry", fillcolor="#FFF5DF", color="#C49A47"];
+    hipcheck [label="Hipcheck\nhc check subprocess", fillcolor="#F1EAFB", color="#8D70B8"];
+
+    browser -> ui [label="pages and forms", dir=both];
+    ui -> api [label="HTTP JSON", dir=both];
+    api -> db [label="source, exposure, assessment,\nand status data", dir=both];
+    api -> assessment_task [label="start accepted\nassessment"];
+    source_task -> db [label="pending source /\nresolved graph", dir=both];
+    sync_tasks -> db [label="snapshots /\nsync state", dir=both];
+    assessment_task -> db [label="verdict / evidence", dir=both];
+    cve -> sync_tasks [label="CVE records"];
+    kev -> sync_tasks [label="KEV catalog"];
+    npm -> source_task [label="package metadata"];
+    npm -> assessment_task [label="candidate metadata"];
+    assessment_task -> hipcheck [label="selected candidate"];
+    hipcheck -> assessment_task [label="analysis output"];
+}

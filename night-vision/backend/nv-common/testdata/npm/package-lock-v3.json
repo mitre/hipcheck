@@ -1,0 +1,14 @@
+{
+  "name": "example",
+  "lockfileVersion": 3,
+  "packages": {
+    "": {
+      "name": "example",
+      "version": "1.0.0"
+    },
+    "node_modules/@scope/name": {
+      "version": "2.3.4",
+      "resolved": "https://registry.npmjs.org/@scope/name/-/name-2.3.4.tgz"
+    }
+  }
+}

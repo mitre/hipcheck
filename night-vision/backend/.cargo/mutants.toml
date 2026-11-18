@@ -1,0 +1,7 @@
+# Default mutation-testing settings for backend Rust code. Individual runs
+# should narrow the source set with `cargo mutants --file ...`.
+test_package = ["nv-common"]
+test_tool = "cargo"
+minimum_test_timeout = 30
+timeout_multiplier = 3
+output = "mutants.out"
