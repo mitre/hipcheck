@@ -30,6 +30,7 @@ jobs:
       - name: Download release artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
@@ -42,7 +43,8 @@ jobs:
             --pattern 'hipcheck-x86_64-apple-darwin.tar.xz' \
             --pattern 'hipcheck-x86_64-unknown-linux-gnu.tar.xz' \
             --pattern 'hipcheck-x86_64-pc-windows-msvc.zip' \
-            --dir artifacts
+            --dir artifacts \
+            --repo "$GH_REPO"
 
       - name: Verify downloaded release artifacts
         shell: bash
@@ -102,7 +104,7 @@ jobs:
               trap 'rm -rf "$work"' EXIT
 
               case "$artifact" in
-                *.tar.xz) tar -xJF "artifacts/$artifact" -C "$work" ;;
+                *.tar.xz) tar -xJf "artifacts/$artifact" -C "$work" ;;
                 *.zip)    unzip -q "artifacts/$artifact" -d "$work" ;;
               esac
 
@@ -149,8 +151,13 @@ jobs:
       - name: Upload SBOMs to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
 
-          gh release upload "$RELEASE_TAG" artifacts/*.spdx-2.3.json artifacts/*.spdx-3.0.json --clobber
+          gh release upload "$RELEASE_TAG" \
+            artifacts/*.spdx-2.3.json \
+            artifacts/*.spdx-3.0.json \
+            --clobber \
+            --repo "$GH_REPO"
