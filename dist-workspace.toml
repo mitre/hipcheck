@@ -21,6 +21,8 @@ targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-da
 install-updater = true
 # Build only the required packages, and individually
 precise-builds = true
+# Embed dependency/audit metadata in release binaries
+cargo-auditable = true
 # The installers to generate for each app
 installers = []
 
