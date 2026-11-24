@@ -1,0 +1,47 @@
+{
+  "name": "@night-vision/example",
+  "private": true,
+  "version": "1.2.3",
+  "type": "module",
+  "engines": {
+    "node": " >=20 "
+  },
+  "scripts": {
+    "test": " cargo test "
+  },
+  "dependencies": {
+    "runtime": "^1.0.0",
+    "aliased": "npm:runtime@^1.0.0",
+    "local": "file:../local"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "peer": "^3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "peer": {
+      "optional": true
+    }
+  },
+  "optionalDependencies": {
+    "optional": "^4.0.0"
+  },
+  "bundleDependencies": [
+    "runtime"
+  ],
+  "overrides": {
+    "runtime": {
+      "nested": "^2.0.0"
+    }
+  },
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ],
+    "nohoist": [
+      "**/legacy"
+    ]
+  }
+}

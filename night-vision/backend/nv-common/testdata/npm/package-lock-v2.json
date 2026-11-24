@@ -1,0 +1,19 @@
+{
+  "name": "example",
+  "lockfileVersion": 2,
+  "packages": {
+    "": {
+      "name": "example",
+      "version": "1.0.0"
+    },
+    "node_modules/left-pad": {
+      "version": "1.1.0",
+      "resolved": "https://registry.npmjs.org/left-pad/-/left-pad-1.1.0.tgz"
+    }
+  },
+  "dependencies": {
+    "left-pad": {
+      "version": "1.1.0"
+    }
+  }
+}

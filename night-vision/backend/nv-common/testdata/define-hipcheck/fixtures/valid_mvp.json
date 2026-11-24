@@ -1,0 +1,51 @@
+{
+  "schema_version": "1",
+  "hipcheck": {
+    "version": "4.0.0-pre",
+    "commit": "abc123def456"
+  },
+  "target": {
+    "kind": "npm",
+    "purl": "pkg:npm/%40scope/name@1.2.7",
+    "source_repository_url": "https://github.com/example/name"
+  },
+  "policy": {
+    "id": "night-vision-upgrade-assessment",
+    "version": "2026-07-02",
+    "source": "policies/night-vision-upgrade-assessment.hcpolicy",
+    "recommendation": "PASS"
+  },
+  "checks": [
+    {
+      "plugin": {
+        "name": "npm-release-delta",
+        "publisher": "mitre",
+        "version": "0.1.0",
+        "query": "release_delta"
+      },
+      "policy": {
+        "expression": "plugin.release_delta == PASS"
+      },
+      "state": "passed",
+      "effect": "context",
+      "severity": "low",
+      "summary": "no suspicious release delta detected",
+      "value": {
+        "installScriptsChanged": false,
+        "packageSizeDelta": 0
+      },
+      "concerns": [
+        {
+          "kind": "policy-context",
+          "message": "No blocking release delta signals",
+          "details": {
+            "plugin": "npm-release-delta"
+          }
+        }
+      ],
+      "started_at": "2026-08-04T14:00:00Z",
+      "ended_at": "2026-08-04T14:00:03Z",
+      "error": null
+    }
+  ]
+}

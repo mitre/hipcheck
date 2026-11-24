@@ -1,0 +1,13 @@
+// Minimal binary-format list for the MVP binary-analysis policy.
+format name="Executable and Linkable Format" type="combination" {
+    extensions "elf" "axf" "bin" "o" "so"
+}
+format name="Microsoft Executable" type="executable" {
+    extensions "exe" "dll" "sys"
+}
+format name="Mach-O" type="object" {
+    extensions "dylib" "bundle"
+}
+format name="Java Archive" type="combination" {
+    extensions "jar" "ear" "war"
+}

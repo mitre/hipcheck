@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    {
+      "package": "express",
+      "fixture": "real/express.json",
+      "source": "https://registry.npmjs.org/express",
+      "capturedAt": "2026-07-29"
+    },
+    {
+      "package": "@babel/core",
+      "fixture": "real/babel-core.json",
+      "source": "https://registry.npmjs.org/%40babel%2Fcore",
+      "capturedAt": "2026-07-29"
+    },
+    {
+      "package": "node-sass",
+      "fixture": "real/node-sass.json",
+      "source": "https://registry.npmjs.org/node-sass",
+      "capturedAt": "2026-07-29"
+    },
+    {
+      "package": "request",
+      "fixture": "real/request.json",
+      "source": "https://registry.npmjs.org/request",
+      "capturedAt": "2026-07-29"
+    },
+    {
+      "package": "@types/node",
+      "fixture": "real/types--node.json",
+      "source": "https://registry.npmjs.org/%40types%2Fnode",
+      "capturedAt": "2026-07-29"
+    },
+    {
+      "package": "istanbul",
+      "fixture": "real/istanbul.json",
+      "source": "https://registry.npmjs.org/istanbul",
+      "capturedAt": "2026-07-29"
+    },
+    {
+      "package": "@angular/core",
+      "fixture": "real/angular--core.json",
+      "source": "https://registry.npmjs.org/%40angular%2Fcore",
+      "capturedAt": "2026-07-29"
+    },
+    {
+      "package": "react",
+      "fixture": "real/react.json",
+      "source": "https://registry.npmjs.org/react",
+      "capturedAt": "2026-07-29"
+    },
+    {
+      "package": "npm",
+      "fixture": "real/npm.json",
+      "source": "https://registry.npmjs.org/npm",
+      "capturedAt": "2026-07-29"
+    }
+  ]
+}

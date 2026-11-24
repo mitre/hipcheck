@@ -1,0 +1,35 @@
+services:
+  nv-app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: ${NV_APP_IMAGE:?NV_APP_IMAGE is required}
+    pull_policy: never
+
+  nv-server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        HIPCHECK_REF: ${HIPCHECK_REF:-06a3db9394742a58a7fb3412b677db25feb6f678}
+        HIPCHECK_FETCH_EPOCH: ${CI_PIPELINE_ID:-0}
+      secrets:
+        - ca_file
+
+    image: ${NV_SERVER_IMAGE:?NV_SERVER_IMAGE is required}
+    pull_policy: never
+
+  postgres:
+    pull_policy: missing
+
+volumes:
+  nv-server-cache:
+    name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required}-nv-server-cache
+  postgres-data:
+    name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required}-postgres-data
+
+secrets:
+  ca_file:
+    file: ${BUILD_CA_FILE:-/dev/null}
+
+
